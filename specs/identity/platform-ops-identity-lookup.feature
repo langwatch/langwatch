@@ -266,26 +266,26 @@ Feature: The platform operator identity lookup - the end of database surgery
 
   # ── The surfaces stay separate, structurally ───────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: The operator lookup shares no page, address or query with the organization surface
     When the operator lookup and the organization identity surface are compared
     Then they share no page and no address
     And no query serving one can be reached from the other
 
-  @unit
+  @unit @unimplemented
   Scenario: Every repair is a guarded command, and no raw edit exists on the surface
     When any repair on this surface runs
     Then it is a guarded command carrying the operator as the actor
     And no control on the surface writes a row directly
 
-  @unit
+  @unit @unimplemented
   Scenario: Every page this surface adds opens from the operator menu
     Given the operator menu offers the identity lookup
     When each menu link is resolved against the application's route table
     Then each resolves to a route registered for that exact path
     And no link falls through to the catch-all route
 
-  @unit
+  @unit @unimplemented
   Scenario: A refused repair says what to do about it, never "unknown"
     When a repair is refused for a reason we can name
     Then the answer carries a stable code and the words registered for it

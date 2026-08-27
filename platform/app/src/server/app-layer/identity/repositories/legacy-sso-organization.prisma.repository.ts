@@ -8,7 +8,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * legacy matcher needs both to route — so it is not something to grandfather.
  *
  * Read-only, deliberately. This slice stops no string write: the columns keep
- * being written and keep deciding sign-in until `SSOCONN_ROUTING` reaches
+ * being written and keep deciding sign-in until that organization reaches
  * `enforce`, which is what makes the rollback "flag off" rather than "restore
  * the data".
  */

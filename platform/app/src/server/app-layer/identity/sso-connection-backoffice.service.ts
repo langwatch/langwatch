@@ -1,14 +1,11 @@
-import {
-  type SsoConnectionLifecycleState,
-  type SsoConnectionState,
-  type SsoDomainVerification,
-  SsoSamlNotSelfServeError,
+import type {
+  SsoArrivalPolicy,
+  SsoConnectionLifecycleState,
+  SsoConnectionState,
+  SsoDomainVerification,
 } from "@langwatch/identity";
 import type { SsoConnectionService } from "@langwatch/identity-server";
-import {
-  newSsoConnectionCommandId,
-  newSsoConnectionId,
-} from "@langwatch/identity-server";
+import { newSsoConnectionCommandId } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { rowToConnection } from "./repositories/sso-connection-projection.prisma.repository";
 
@@ -45,7 +42,7 @@ export interface BackofficeSsoConnection {
   domainVerifications: SsoDomainVerification[];
   providerId: string;
   issuer: string | null;
-  allowsJit: boolean;
+  arrivalPolicy: SsoArrivalPolicy;
   source: string;
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
@@ -118,57 +115,6 @@ export class SsoConnectionBackofficeService {
     return toBackofficeConnection({
       state: rowToConnection(row),
       organizationName: names.get(row.organizationId) ?? null,
-    });
-  }
-
-  /**
-   * Register a connection for an organization.
-   *
-   * SAML is refused by name here rather than at the aggregate: the aggregate
-   * is protocol-agnostic on purpose, and D09 will terminate SAML through it.
-   * What is not available is registering one through a SELF-SERVE surface,
-   * which is a property of the surface and belongs on it.
-   */
-  async registerConnection({
-    organizationId,
-    type,
-    providerId,
-    issuer,
-    allowsJit,
-    operator,
-  }: {
-    organizationId: string;
-    type: string;
-    providerId: string;
-    issuer: string | null;
-    allowsJit: boolean;
-    operator: OperatorActor;
-  }): Promise<{ connectionId: string }> {
-    if (type !== "oidc") {
-      throw new SsoSamlNotSelfServeError(
-        `connection type ${type} is not registrable through a self-serve surface`,
-      );
-    }
-    const connectionId = newSsoConnectionId();
-    await this.deps.connections().registerConnection({
-      ...this.command({ organizationId, connectionId, operator }),
-      type: "oidc",
-      idp: {
-        issuer,
-        providerId,
-        clientIdRef: null,
-        secretRef: null,
-        certRefs: [],
-      },
-      allowsJit,
-    });
-    return { connectionId };
-  }
-
-  async claimDomain(args: DomainCommandArgs): Promise<void> {
-    await this.deps.connections().claimDomain({
-      ...this.command(args),
-      domain: args.domain,
     });
   }
 
@@ -307,7 +253,7 @@ export function toBackofficeConnection({
     domainVerifications: state.domainVerifications,
     providerId: state.idpMetadata.providerId,
     issuer: state.idpMetadata.issuer,
-    allowsJit: state.allowsJit,
+    arrivalPolicy: state.arrivalPolicy,
     source: state.source,
     testLoginAccountId: state.testLoginAccountId,
     rejection: state.rejection,

@@ -45,35 +45,35 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: the page opens with what everybody else sees
 
-    @integration
+    @integration @unimplemented
     Scenario: The first band is my photo, my name and where I stand
       When I open my profile
       Then I see my photo and my name
       And I see the address my account is reached at
       And I see whether I am an admin of my organization
 
-    @integration
+    @integration @unimplemented
     Scenario: A person with no job title is not given one
       When I open my profile
       Then nothing on it claims a job title
 
   Rule: a name is mine to change
 
-    @integration
+    @integration @unimplemented
     Scenario: Changing my name saves it
       When I set my name to "Ana Silva" and save
       Then the name is saved
       And every surface that names me says "Ana Silva" without my signing in
       again
 
-    @integration
+    @integration @unimplemented
     Scenario: Save stands down until the name has actually changed
       When I open my profile
       Then Save is not offered
       When I type a different name
       Then Save is offered
 
-    @integration
+    @integration @unimplemented
     Scenario: An empty name is refused before it is sent
       When I clear my name
       Then Save is not offered
@@ -85,7 +85,7 @@ Feature: Profile - who I am here, and where I am signed in
       Then the attempt is refused
       And my name is unchanged
 
-    @integration
+    @integration @unimplemented
     Scenario: A name that could not be saved says so
       Given saving my name fails
       When I save
@@ -94,7 +94,7 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: the photo is set where the name is
 
-    @integration
+    @integration @unimplemented
     Scenario: The photo control is on the profile page
       When I open my profile
       Then I can change my photo without leaving the page
@@ -103,26 +103,26 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: how I get in is read here and changed on Security
 
-    @integration
+    @integration @unimplemented
     Scenario: Each way in is one line
       Given I sign in with an address, a linked account and a passkey
       When I open my profile
       Then each of them is a line saying what it is
       And whether I have a password is one of those lines
 
-    @integration
+    @integration @unimplemented
     Scenario: Nothing on the summary changes anything
       When I open the sign-in methods on my profile
       Then nothing offers to add, rename or remove a way in
       And I am offered the way to Security, where they are changed
 
-    @integration
+    @integration @unimplemented
     Scenario: A deployment that does not offer a thing does not list it
       Given my deployment offers neither passkeys nor two-step verification
       When I open my profile
       Then neither is listed as something I do not have
 
-    @integration
+    @integration @unimplemented
     Scenario: A read that fails says so without taking the band down
       Given the read that says whether I have a password fails
       When I open my profile
@@ -136,27 +136,27 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: the address said here is the address I actually have
 
-    @integration
+    @integration @unimplemented
     Scenario: An account with no identifiers still states its own address
       Given my account signs in by passkey and has never added an address
       When I open the sign-in methods on my profile
       Then the address line says the address my account is reached at
       And it does not say I have none
 
-    @integration
+    @integration @unimplemented
     Scenario: An address I have not confirmed is marked in Security's words
       Given the address on my account has not been confirmed
       When I open the sign-in methods on my profile
       Then it is marked not confirmed yet
       And a confirmed address is marked nothing at all
 
-    @integration
+    @integration @unimplemented
     Scenario: Only an account with no address anywhere is told it has none
       Given my account has no address on it and no identifiers
       When I open the sign-in methods on my profile
       Then the address line says there is none yet
 
-    @integration
+    @integration @unimplemented
     Scenario: The read of my own address failing says so
       Given the read that says what address my account has fails
       When I open the sign-in methods on my profile
@@ -167,22 +167,22 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: a browser is named by what it is, not by when it signed in
 
-    @unit
+    @unit @unimplemented
     Scenario: A browser and a machine are read off what the browser sent
       When a session was signed in from a Chrome on macOS
       Then the row reads "Chrome on macOS"
 
-    @unit
+    @unit @unimplemented
     Scenario: Something we do not recognise is not guessed at
       When a session carries a user agent we cannot place
       Then the row says the browser is unknown rather than naming one
 
-    @integration
+    @integration @unimplemented
     Scenario: The browser I am reading this in says so
       When I open my profile
       Then exactly one browser is marked as this one
 
-    @integration
+    @integration @unimplemented
     Scenario: A browser nothing has happened on for a fortnight is pointed at
       Given one of my browsers has done nothing for a month
       When I open my profile
@@ -198,7 +198,7 @@ Feature: Profile - who I am here, and where I am signed in
       Then that one is gone from the list
       And the other two are still there
 
-    @integration
+    @integration @unimplemented
     Scenario: The browser I am reading this in is not offered a sign-out
       When I open my profile
       Then the row marked as this browser carries no sign-out
@@ -215,7 +215,7 @@ Feature: Profile - who I am here, and where I am signed in
       Then nothing is ended
       And their session is untouched
 
-    @integration
+    @integration @unimplemented
     Scenario: A sign-out that failed says so
       Given ending a session fails
       When I sign a browser out
@@ -226,26 +226,26 @@ Feature: Profile - who I am here, and where I am signed in
 
   Rule: the keys listed are mine
 
-    @integration
+    @integration @unimplemented
     Scenario: An administrator sees their own keys, not the organization's
       Given I am an admin and my colleague also holds a key
       When I open my profile
       Then I see my key
       And I do not see my colleague's
 
-    @integration
+    @integration @unimplemented
     Scenario: A revoked key is not listed as one I hold
       Given a key of mine was revoked
       When I open my profile
       Then it is not in the list
 
-    @integration
+    @integration @unimplemented
     Scenario: The keys are read here and managed on their own page
       When I open my profile
       Then no key can be issued or revoked from it
       And I am offered the way to the page that does both
 
-    @integration
+    @integration @unimplemented
     Scenario: A key read that fails says so
       Given the read of my keys fails
       When I open my profile

@@ -6,28 +6,45 @@
  *
  * Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
-import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { ssoConnectionsRouter } from "../ssoConnections";
 
-const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
-  mockService: {
-    list: vi.fn(),
-    getById: vi.fn(),
-    registerConnection: vi.fn(),
-    claimDomain: vi.fn(),
-    approveDomainClaim: vi.fn(),
-    rejectDomainClaim: vi.fn(),
-    attestDomain: vi.fn(),
-    activateConnection: vi.fn(),
-    suspendConnection: vi.fn(),
-    resumeConnection: vi.fn(),
-    requestTeardown: vi.fn(),
-  },
-  mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  mockSsoConnections: vi.fn(),
-}));
+const { mockService, mockAuditLog, mockSsoConnections, stubBetterAuthAdapter } =
+  vi.hoisted(() => ({
+    /** Enough of better-auth's adapter shape for `betterAuth()` to finish
+     *  constructing. Nothing in this suite reaches storage; what it needs is for
+     *  the auth module on its import graph to finish evaluating.
+     *
+     *  HOISTED, because `vi.mock` factories are: declared as a plain `const`
+     *  below the mocks that read it, the factory ran first and hit the temporal
+     *  dead zone. The rejection was unhandled, so every test still passed and
+     *  the run still exited non-zero. */
+    stubBetterAuthAdapter: {
+      id: "stub",
+      create: async () => ({}),
+      update: async () => ({}),
+      updateMany: async () => 0,
+      findOne: async () => null,
+      findMany: async () => [],
+      delete: async () => undefined,
+      deleteMany: async () => 0,
+      count: async () => 0,
+    },
+    mockService: {
+      list: vi.fn(),
+      getById: vi.fn(),
+      approveDomainClaim: vi.fn(),
+      rejectDomainClaim: vi.fn(),
+      attestDomain: vi.fn(),
+      activateConnection: vi.fn(),
+      suspendConnection: vi.fn(),
+      resumeConnection: vi.fn(),
+      requestTeardown: vi.fn(),
+    },
+    mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
+    mockSsoConnections: vi.fn(),
+  }));
 
 /**
  * The service is real code under test in its own suite; here it is a spy, so
@@ -46,8 +63,6 @@ vi.mock(
       SsoConnectionBackofficeService: class {
         list = mockService.list;
         getById = mockService.getById;
-        registerConnection = mockService.registerConnection;
-        claimDomain = mockService.claimDomain;
         approveDomainClaim = mockService.approveDomainClaim;
         rejectDomainClaim = mockService.rejectDomainClaim;
         attestDomain = mockService.attestDomain;
@@ -62,12 +77,14 @@ vi.mock(
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
-  // `betterAuth()` builds its adapter EAGERLY at module load, and this
-  // suite's import graph reaches it through the router. It has to be real
-  // enough to initialise; better-auth's own memory engine over an empty
-  // store is exactly that, and holds nothing this suite could assert
-  // against by accident.
-  identityStorageAdapter: () => memoryAdapter({}),
+  // The composition root is mocked whole, so anything else that reads it at
+  // module load has to be answered here too — `better-auth/index.ts` is on
+  // this router's import graph through `auth.ts` and evaluates both at the
+  // moment it builds its plugin list.
+  BACKUP_CODE_COUNT: 10,
+  identityBridgeCeremonies: () => ({}),
+  identityCeremonies: () => ({}),
+  identityStorageAdapter: () => () => stubBetterAuthAdapter,
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -128,16 +145,14 @@ describe("the back-office single sign-on surface", () => {
       // message that names nothing — no resource, no id, no surface. A
       // message naming the back office would tell a prober it exists and they
       // merely lack the session.
-      // `then` with both arms rather than `catch`: the success arm throws, so
-      // a call that stopped being denied fails here instead of handing the
-      // assertions below an `undefined` to read properties off.
+      // Two-handed `then` rather than `catch`: a `catch` widens the type to
+      // "the refusal or whatever the call returns", and every assertion below
+      // is about the refusal alone.
       const denial = await caller
         .attestDomain({ ...TARGET, domain: "acme.com" })
         .then(
-          () => {
-            throw new Error(
-              "attestDomain resolved: the back office gate let the call through",
-            );
+          (): never => {
+            throw new Error("the call was expected to be refused");
           },
           (error: unknown) =>
             error as {
@@ -158,7 +173,6 @@ describe("the back-office single sign-on surface", () => {
     it("refuses every mutation on the surface, not only the read", async () => {
       const caller = buildCaller("ana@acme.com");
       const attempts = [
-        () => caller.claimDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.approveDomainClaim({ ...TARGET, domain: "acme.com" }),
         () => caller.attestDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.suspend({ ...TARGET, reason: null }),
@@ -168,7 +182,6 @@ describe("the back-office single sign-on surface", () => {
       for (const attempt of attempts) {
         await expect(attempt()).rejects.toMatchObject({ code: "NOT_FOUND" });
       }
-      expect(mockService.claimDomain).not.toHaveBeenCalled();
       expect(mockService.requestTeardown).not.toHaveBeenCalled();
     });
   });
@@ -178,7 +191,6 @@ describe("the back-office single sign-on surface", () => {
     it("turns every change into a guarded command carrying the operator", async () => {
       const caller = buildCaller("olive@langwatch.ai");
 
-      await caller.claimDomain({ ...TARGET, domain: "acme.com" });
       await caller.approveDomainClaim({ ...TARGET, domain: "acme.com" });
       await caller.attestDomain({ ...TARGET, domain: "acme.com" });
       await caller.activate({ ...TARGET, testLoginAccountId: "acc_test" });
@@ -188,7 +200,6 @@ describe("the back-office single sign-on surface", () => {
       // Every one reached a lifecycle verb, and every one carried the
       // operator as the actor. The surface mints that; no input supplies it.
       const commanded = [
-        mockService.claimDomain,
         mockService.approveDomainClaim,
         mockService.attestDomain,
         mockService.activateConnection,
@@ -208,46 +219,13 @@ describe("the back-office single sign-on surface", () => {
         "activate",
         "approveDomainClaim",
         "attestDomain",
-        "claimDomain",
         "getAll",
         "getById",
-        "register",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",
         "suspend",
       ]);
-    });
-
-    /** @scenario "Setting up a SAML connection is not something anybody does themselves yet" */
-    it("refuses a SAML registration by name, saying to talk to LangWatch", async () => {
-      const caller = buildCaller("olive@langwatch.ai");
-      // The real service decides this, so the mock steps aside for one call.
-      const { SsoSamlNotSelfServeError } = await import("@langwatch/identity");
-      mockService.registerConnection.mockRejectedValueOnce(
-        new SsoSamlNotSelfServeError("connection type saml"),
-      );
-
-      const refusal = await caller
-        .register({
-          organizationId: "org_acme",
-          type: "saml",
-          providerId: "okta",
-          issuer: null,
-          allowsJit: false,
-        })
-        .then(
-          () => {
-            throw new Error(
-              "register resolved: SAML was accepted as self-serve",
-            );
-          },
-          (error: unknown) => error as { message: string },
-        );
-
-      // The wire message for a handled error IS the code; the words the
-      // reader sees come from the registry keyed by it.
-      expect(refusal.message).toBe("sso_saml_not_self_serve");
     });
 
     it("records every attempt in the audit log before the command runs", async () => {

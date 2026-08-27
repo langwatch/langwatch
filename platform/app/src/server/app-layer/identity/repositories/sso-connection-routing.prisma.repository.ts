@@ -8,7 +8,7 @@ import type { PrismaClient, SsoConnection } from "~/generated/prisma/client";
 
 /**
  * The router's domain-lookup port over the `SsoConnection` PROJECTION — what
- * `SSOCONN_ROUTING=enforce` composes, and what `shadow` compares the strings
+ * the connection-first lookup asks first, before it falls back to the strings
  * against (ADR-117 §5).
  *
  * The same port the legacy strings implement, so neither the router nor the
@@ -23,10 +23,21 @@ export class SsoConnectionDomainRoutingRepository
 {
   constructor(
     private readonly prisma: PrismaClient,
-    /** Whether this deployment actually mounted a method id. Injected rather
-     *  than read here so this class holds no policy — the same split the
-     *  legacy repository makes. */
-    private readonly isMethodConfigured: (methodId: string) => Promise<boolean>,
+    /**
+     * Whether this connection can actually be dialed. Injected rather than
+     * read here so this class holds no policy — the same split the legacy
+     * repository makes.
+     *
+     * It takes the CONNECTION as well as the method id because there are two
+     * ways to be configured since D09 and they are keyed differently: the
+     * deployment's own mounted provider is named by method id, and an
+     * organization's own registered provider is keyed by the connection.
+     */
+    private readonly isMethodConfigured: (args: {
+      methodId: string;
+      connectionId: string;
+      organizationId: string;
+    }) => Promise<boolean>,
   ) {}
 
   async findConnectionForDomain({
@@ -42,7 +53,7 @@ export class SsoConnectionDomainRoutingRepository
       where: { verifiedDomains: { has: domain } },
       orderBy: { updatedAt: "desc" },
     });
-    return row === null ? null : this.routable(row);
+    return row === null ? null : this.routable(row, domain);
   }
 
   /**
@@ -58,7 +69,25 @@ export class SsoConnectionDomainRoutingRepository
     return Promise.all(rows.map((row) => this.routable(row)));
   }
 
-  private async routable(row: SsoConnection): Promise<RoutableConnection> {
+  /**
+   * One stored row as routing sees it.
+   *
+   * `domain` is passed when the lookup HAD one, and it is the whole of how a
+   * lapse reaches sign-in (ADR-123): a domain whose published record stayed
+   * missing through its grace still routes — the door opens, the state is
+   * unchanged, every person who already works there signs in exactly as
+   * before — and it stops PROVISIONING. That is the entire behavioural
+   * difference, and it is expressed here as `allowsJit` turning false for
+   * that domain rather than as anything routing would notice.
+   *
+   * The domainless caller is the self-hosted sole-connection redirect, which
+   * runs with no address in hand and therefore never provisions anybody: it
+   * has no domain to judge and needs none.
+   */
+  private async routable(
+    row: SsoConnection,
+    domain?: string,
+  ): Promise<RoutableConnection> {
     const providerId = providerIdOf(row);
     const method: SignInMethod = {
       id: providerId,
@@ -69,8 +98,14 @@ export class SsoConnectionDomainRoutingRepository
       connectionId: row.id,
       method,
       state: routingStateOf(row.state as Parameters<typeof routingStateOf>[0]),
-      configured: await this.isMethodConfigured(providerId),
-      allowsJit: row.allowsJit,
+      configured: await this.isMethodConfigured({
+        methodId: providerId,
+        connectionId: row.id,
+        organizationId: row.organizationId,
+      }),
+      allowsJit:
+        row.arrivalPolicy !== "refuse" &&
+        (domain === undefined || !row.lapsedDomains.includes(domain)),
     };
   }
 }

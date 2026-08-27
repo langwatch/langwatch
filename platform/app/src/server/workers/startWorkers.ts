@@ -149,23 +149,6 @@ async function bootUsageStatsWorker(
   }
 }
 
-// Warns the people who can renew a way back in that one is ending, at
-// fourteen, seven and one day. It never expires anything — a binding stops
-// being a way in because two numbers are compared, not because a job ran
-// (specs/identity/sso-onboarding-tiers.feature).
-async function bootBreakGlassExpiryWorker(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startBreakGlassExpiryWorker } = await import(
-    "~/server/breakGlassExpiryWorker"
-  );
-  const worker = startBreakGlassExpiryWorker();
-  if (worker) {
-    shutdownHandles.push(() => worker.stop());
-    logger.info("break-glass expiry worker ready");
-  }
-}
-
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -536,7 +519,6 @@ export async function startWorkers(
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
     await bootRealtimeSessionPoller(shutdownHandles);
-    await bootBreakGlassExpiryWorker(shutdownHandles);
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful
