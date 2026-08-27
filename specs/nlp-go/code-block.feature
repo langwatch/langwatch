@@ -12,9 +12,18 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and
-  # code_block_realistic_test.go). The scenarios still tagged @unimplemented
-  # describe behavior not yet built (per-node stdout/stderr on the streamed
-  # execution event, and an env-driven wall-clock timeout), not a binding gap.
+  # code_block_realistic_test.go).
+  #
+  # Read the Given lines literally. A scenario that names
+  # NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is covered through the environment;
+  # one that names "the code executor's configured ceiling" is covered by
+  # handing the executor that ceiling directly, which is the same value one
+  # step later in the same wiring. The distinction matters because only the
+  # first kind proves the variable is read at all.
+  #
+  # The scenarios still tagged @unimplemented describe behavior not yet built
+  # (per-node stdout/stderr on the streamed execution event) or not yet
+  # exercised end to end over HTTP, not a binding gap.
 
   Background:
     Given nlpgo is listening on :5562
@@ -89,6 +98,10 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Wall-clock timeout terminates the subprocess
 
+    # The variable reaching the executor is covered below and by
+    # services/nlpgo/cmd (root_test.go). What is still unbuilt is this whole
+    # path over HTTP: the kill surfacing as a `/go/studio/execute_sync` error
+    # body, and the orphan-process assertion, neither of which any test makes.
     @integration @unimplemented
     Scenario: a code block exceeding NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
       Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
@@ -98,6 +111,12 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the error.message contains "timeout"
       And no orphan python3 process remains for that trace_id
 
+    @unit
+    Scenario: the operator's code-block timeout reaches the executor from the environment
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 7
+      When the service loads its config and builds the code-block executor
+      Then the executor's ceiling is 7 seconds
+
   # A per-node budget is a way to ask for LESS of the operator's ceiling,
   # never more: the ceiling bounds how long untrusted customer code may hold
   # a worker, so a workflow author cannot raise it by writing a bigger number.
@@ -105,7 +124,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     @unit
     Scenario: A code node's timeout_ms shortens its budget
-      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 30
+      Given the code executor's configured ceiling is 30 seconds
       And a code node declaring parameter "timeout_ms" = 500 whose body sleeps 10 seconds
       When the engine invokes the node
       Then the node is stopped within 3 seconds
@@ -113,7 +132,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     @unit
     Scenario: A code node cannot raise its own timeout above the operator ceiling
-      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 0.5
+      Given the code executor's configured ceiling is 500 milliseconds
       And a code node declaring parameter "timeout_ms" = 30000 whose body sleeps 10 seconds
       When the engine invokes the node
       Then the node is stopped within 3 seconds
@@ -121,7 +140,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     @unit
     Scenario: A missing or negative code timeout_ms falls back to the default
-      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 30
+      Given the code executor's configured ceiling is 30 seconds
       And a code node whose "timeout_ms" parameter is missing, 0, or negative
       When the engine invokes the node
       Then the node runs to completion under the executor default

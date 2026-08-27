@@ -31,6 +31,18 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
  */
 const NLP_FETCH_HEADROOM_MS = 30_000;
 
+/**
+ * The largest delay `setTimeout` can hold.
+ *
+ * Node stores a timer's delay in a signed 32-bit integer. A larger value is
+ * silently truncated and the timer fires after 1ms, so an agent configured
+ * with an absurd `timeoutMs` would have its request aborted almost
+ * immediately — the exact opposite of what the number asked for. Clamping
+ * here keeps the failure mode "waits ~24.9 days" rather than "aborts at
+ * once"; the engine's own operator ceiling is what actually bounds the run.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
 
@@ -291,12 +303,17 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    *
    * Always at least {@link NLP_FETCH_TIMEOUT_MS}, and above the agent's own
    * code budget when that budget is longer, so the engine gets to enforce (and
-   * report) the timeout rather than the request being aborted from here.
+   * report) the timeout rather than the request being aborted from here —
+   * capped at {@link MAX_TIMER_DELAY_MS}, which is the last value `setTimeout`
+   * still honors.
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
     if (timeoutMs === undefined) return NLP_FETCH_TIMEOUT_MS;
-    return Math.max(NLP_FETCH_TIMEOUT_MS, timeoutMs + NLP_FETCH_HEADROOM_MS);
+    return Math.min(
+      MAX_TIMER_DELAY_MS,
+      Math.max(NLP_FETCH_TIMEOUT_MS, timeoutMs + NLP_FETCH_HEADROOM_MS),
+    );
   }
 
   /** Build the end node that captures code node outputs for the response. */

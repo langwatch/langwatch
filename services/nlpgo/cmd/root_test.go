@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
 // TestResolveLangWatchBaseURL_FallsBackToLangwatchEndpoint pins the
@@ -187,8 +189,8 @@ func TestResolveCodeBlockTimeout(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := resolveCodeBlockTimeout(tc.seconds); got != tc.want {
-				t.Errorf("resolveCodeBlockTimeout(%d) = %v; want %v", tc.seconds, got, tc.want)
+			if got := resolveTimeoutSeconds(tc.seconds); got != tc.want {
+				t.Errorf("resolveTimeoutSeconds(%d) = %v; want %v", tc.seconds, got, tc.want)
 			}
 		})
 	}
@@ -212,5 +214,90 @@ func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	}
 	if got, want := exec.DefaultTimeout(), 60*time.Second; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v", got, want)
+	}
+}
+
+// TestNewHTTPExecutor_AppliesConfiguredCeiling pins the HTTP-block operator
+// knob to the executor that enforces it.
+// @scenario "The HTTP block ceiling comes from NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS"
+func TestNewHTTPExecutor_AppliesConfiguredCeiling(t *testing.T) {
+	exec := newHTTPExecutor(nlpgo.EngineConfig{HTTPBlockTimeoutSeconds: 300}, httpblock.SSRFOptions{})
+	if got, want := exec.DefaultTimeout(), 5*time.Minute; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS=300)", got, want)
+	}
+}
+
+// TestNewAgentWorkflowRunner_AppliesConfiguredCeiling pins the agent
+// sub-workflow operator knob to the runner that enforces it.
+// @scenario "The agent sub-workflow ceiling comes from NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS"
+func TestNewAgentWorkflowRunner_AppliesConfiguredCeiling(t *testing.T) {
+	runner := newAgentWorkflowRunner(nlpgo.EngineConfig{AgentWorkflowTimeoutSeconds: 300})
+	if got, want := runner.DefaultTimeout(), 5*time.Minute; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS=300)", got, want)
+	}
+}
+
+// TestNewEvaluatorExecutor_AppliesConfiguredCeiling pins the evaluator
+// operator knob to the executor that enforces it.
+// @scenario "The evaluator ceiling comes from NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS"
+func TestNewEvaluatorExecutor_AppliesConfiguredCeiling(t *testing.T) {
+	exec := newEvaluatorExecutor(nlpgo.EngineConfig{EvaluatorTimeoutSeconds: 300})
+	if got, want := exec.DefaultTimeout(), 5*time.Minute; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS=300)", got, want)
+	}
+}
+
+// TestBlockCeilings_UnsetOrNegativeKeepTheTwelveMinuteDefault guards the
+// wiring against two ways of turning an operator's mistake into an outage: an
+// unset knob must not become a zero-length (already-expired) budget, and a
+// negative one must not become a negative duration. Both defer to the
+// executor's own 12-minute default, which is what every deployment runs on
+// today.
+// @scenario "An unset or negative block-timeout knob keeps today's twelve-minute default"
+func TestBlockCeilings_UnsetOrNegativeKeepTheTwelveMinuteDefault(t *testing.T) {
+	const want = 12 * time.Minute
+
+	for _, cfg := range []nlpgo.EngineConfig{
+		{},
+		{HTTPBlockTimeoutSeconds: -30, AgentWorkflowTimeoutSeconds: -30, EvaluatorTimeoutSeconds: -30},
+	} {
+		if got := newHTTPExecutor(cfg, httpblock.SSRFOptions{}).DefaultTimeout(); got != want {
+			t.Errorf("http DefaultTimeout() = %v; want %v", got, want)
+		}
+		if got := newAgentWorkflowRunner(cfg).DefaultTimeout(); got != want {
+			t.Errorf("agent DefaultTimeout() = %v; want %v", got, want)
+		}
+		if got := newEvaluatorExecutor(cfg).DefaultTimeout(); got != want {
+			t.Errorf("evaluator DefaultTimeout() = %v; want %v", got, want)
+		}
+	}
+}
+
+// TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment closes the gap the
+// hand-built EngineConfig tests above leave open: they prove the wiring reads
+// the field, and config_test.go proves the variable fills the field, but
+// nothing joined the two. A rename on either side of that seam would leave
+// both halves green while the operator's variable selected nothing — which is
+// the exact failure this branch exists to fix.
+//
+// This is the environment-driven half of specs/nlp-go/code-block.feature's
+// wall-clock-timeout Rule. The remaining @unimplemented scenario there is the
+// end-to-end HTTP path (the kill surfacing on /go/studio/execute_sync, plus
+// orphan-process reaping), which this does not cover.
+// @scenario "the operator's code-block timeout reaches the executor from the environment"
+func TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment(t *testing.T) {
+	t.Setenv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "7")
+
+	cfg, err := nlpgo.LoadConfig(t.Context())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	exec, err := newCodeExecutor(cfg.Engine, os.Getenv)
+	if err != nil {
+		t.Fatalf("newCodeExecutor: %v", err)
+	}
+
+	if got, want := exec.DefaultTimeout(), 7*time.Second; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=7)", got, want)
 	}
 }

@@ -44,8 +44,11 @@ type Executor struct {
 
 // Options configures an Executor.
 type Options struct {
-	Client         *http.Client  // nil → http.DefaultClient
-	DefaultTimeout time.Duration // 0 → 12min (Lambda max 15min; we leave 3min margin)
+	Client *http.Client // nil → http.DefaultClient
+	// DefaultTimeout is both the budget for a request that names none and
+	// the ceiling a request's own TimeoutMS is clamped to. 0 → 12min
+	// (Lambda max 15min; we leave 3min margin).
+	DefaultTimeout time.Duration
 }
 
 // New builds an Executor with the given options.
@@ -94,8 +97,16 @@ type Request struct {
 	// ThreadID groups Studio runs into a single conversation in trace
 	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
 	ThreadID string
-	// TimeoutMS overrides the executor default timeout. 0 → default.
+	// TimeoutMS asks for LESS time than the operator allows; it can never
+	// buy more. 0 (and any negative) means the executor's own ceiling.
 	TimeoutMS int
+}
+
+// DefaultTimeout reports the wall-clock ceiling this executor applies.
+// Exported so the wiring that feeds it an operator knob is observable from a
+// test.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.defaultTime
 }
 
 // Result is the executor's parsed output. Mirrors the Python
@@ -186,9 +197,16 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("evaluatorblock: marshal body: %w", err)
 	}
 
+	// The operator's ceiling wins. A node's TimeoutMS only ever shortens the
+	// budget: a workflow author must not be able to escape
+	// NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS — the bound on how long one
+	// evaluator call may hold a worker — by writing a bigger number into
+	// their own node. A non-positive request means no request at all, which
+	// also keeps a negative duration away from context.WithTimeout, where it
+	// would abandon the call before it is sent.
 	timeout := e.defaultTime
-	if req.TimeoutMS > 0 {
-		timeout = time.Duration(req.TimeoutMS) * time.Millisecond
+	if asked := time.Duration(req.TimeoutMS) * time.Millisecond; req.TimeoutMS > 0 && asked < timeout {
+		timeout = asked
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

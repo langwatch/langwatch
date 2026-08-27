@@ -1033,6 +1033,22 @@ describe("SerializedCodeAgentAdapter", () => {
       );
     });
 
+    it("clamps its own fetch deadline to the largest delay a Node timer can hold", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      // setTimeout stores its delay in a signed 32-bit int: anything larger
+      // wraps and fires after 1ms, so an absurd budget would abort the
+      // request almost immediately instead of waiting.
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(2_147_483_647);
+    });
+
     it("omits timeout_ms when the config carries no timeout", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,

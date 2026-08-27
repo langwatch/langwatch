@@ -151,7 +151,8 @@ export const goErrorCodes = {
   guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrIdleTimeout — signals the SSE stream went silent past
-   * NLP_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the connection.
+   * NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the
+   * connection.
    *
    * @source services/nlpgo/domain/errors.go
    */

@@ -73,7 +73,7 @@ func Root(ctx context.Context, _ []string) error {
 		zap.Int("allowed_hosts", len(allowedProxyHosts)),
 	)
 
-	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
+	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
 	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
 	if err != nil {
 		return err
@@ -105,9 +105,8 @@ func Root(ctx context.Context, _ []string) error {
 
 	// Evaluator + agent-workflow blocks call the LangWatch app's own
 	// HTTP API. Both share the same LangWatchBaseURL.
-	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
-	evalExec := evaluatorblock.New(evaluatorblock.Options{})
-	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
+	evalExec := newEvaluatorExecutor(cfg.Engine)
+	agentWfRunner := newAgentWorkflowRunner(cfg.Engine)
 
 	eng := engine.New(engine.Options{
 		HTTP: httpExec,
@@ -146,19 +145,45 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (
 			engineCfg.LangWatchBaseURL,
 			getenv,
 		),
-		DefaultTimeout: resolveCodeBlockTimeout(engineCfg.CodeBlockTimeoutSeconds),
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
 	})
 }
 
-// resolveCodeBlockTimeout converts the operator's NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-// into the wall-clock timeout the code-block executor enforces.
+// newHTTPExecutor builds the HTTP-block executor from the operator-facing
+// engine config. `agent_type=http` nodes run through this same executor, so
+// NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS bounds both.
+func newHTTPExecutor(engineCfg nlpgo.EngineConfig, ssrfOpts httpblock.SSRFOptions) *httpblock.Executor {
+	return httpblock.New(httpblock.Options{
+		SSRF:           ssrfOpts,
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.HTTPBlockTimeoutSeconds),
+	})
+}
+
+// newAgentWorkflowRunner builds the `agent_type=workflow` sub-workflow runner
+// from the operator-facing engine config.
+func newAgentWorkflowRunner(engineCfg nlpgo.EngineConfig) *agentblock.WorkflowRunner {
+	return agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.AgentWorkflowTimeoutSeconds),
+	})
+}
+
+// newEvaluatorExecutor builds the evaluator-block executor from the
+// operator-facing engine config.
+func newEvaluatorExecutor(engineCfg nlpgo.EngineConfig) *evaluatorblock.Executor {
+	return evaluatorblock.New(evaluatorblock.Options{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.EvaluatorTimeoutSeconds),
+	})
+}
+
+// resolveTimeoutSeconds converts one of the operator's `_SECONDS` engine knobs
+// into the wall-clock timeout the matching executor enforces.
 //
-// A zero or negative value returns zero, which hands the decision back to
-// codeblock.New and its 60s fallback — one default, in one place. Returning a
-// negative duration instead would build an already-expired context and kill
-// every code block on its first instruction, turning a typo in a config file
-// into a total outage of the feature.
-func resolveCodeBlockTimeout(seconds int) time.Duration {
+// A zero or negative value returns zero, which hands the decision back to the
+// executor's own constructor and its documented fallback — one default, in one
+// place. Returning a negative duration instead would build an already-expired
+// context and abandon every call before it started, turning a typo in a config
+// file into a total outage of the feature.
+func resolveTimeoutSeconds(seconds int) time.Duration {
 	if seconds <= 0 {
 		return 0
 	}

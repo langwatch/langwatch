@@ -102,11 +102,24 @@ func TestExecuteStreamHandler_IdleStreamTimesOutAndCloses(t *testing.T) {
 // TestExecuteStreamHandler_EventsKeepTheStreamAlive pins the other half: the
 // idle budget is a silence budget, not a wall clock. A run that keeps
 // reporting progress must never be cut off, however long it takes.
+//
+// Three durations have to stay ordered for the assertion to mean anything,
+// and the gaps between them are the flake margin:
+//
+//	gap (250ms) < idle budget (1s) < total run (6 x 250ms = 1.5s)
+//
+// The total must exceed the budget or a timer that never resets would still
+// pass, and the gap must stay under it or a healthy run would trip. An
+// earlier version used 20ms/60ms/120ms, where a 40ms scheduling pause was
+// enough to leave the idle timer and the event channel ready at the same
+// moment — and `select` picks between ready cases at random, so the test
+// failed roughly whenever CI stalled. The margin here is 750ms of stall
+// instead of 40ms.
 func TestExecuteStreamHandler_EventsKeepTheStreamAlive(t *testing.T) {
 	rec := serveExecuteStream(t, RouterDeps{
-		App:               app.New(app.WithWorkflowExecutor(&tickingExecutor{ticks: 6, every: 20 * time.Millisecond})),
-		StreamIdleTimeout: 60 * time.Millisecond,
-	}, 5*time.Second)
+		App:               app.New(app.WithWorkflowExecutor(&tickingExecutor{ticks: 6, every: 250 * time.Millisecond})),
+		StreamIdleTimeout: time.Second,
+	}, 15*time.Second)
 
 	frames := sseFrames(t, rec.Body.String())
 	if len(frames) != 6 {
