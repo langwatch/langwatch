@@ -244,25 +244,59 @@ Scenarios are the LangWatch equivalent of end-to-end tests for agents: a user si
 ```bash
 langwatch scenario list                       # see all scenarios
 langwatch scenario create "refund flow" \
-  --description "User asks for a refund on a recent order" \
-  --criteria "Agent verifies identity" \
-  --criteria "Agent processes the refund"
-langwatch scenario run <scenario-id> --target <prompt-or-agent>
+  --situation "User asks for a refund on a recent order" \
+  --criteria "Agent verifies identity,Agent processes the refund" \
+  --folder "Checkout"                         # file it into a test suite
+langwatch scenario run <scenario-id> --target http:<agent-id>
 ```
 
-Group related scenarios into a **suite** (a run plan) for CI or scheduled runs:
+A **test suite** is a folder of scenarios: a name and the scenarios you file under it. Every project has a `Default` suite, so no scenario is loose.
 
 ```bash
 langwatch suite list
-langwatch suite run <suite-id>                # kicks off every scenario × target
+langwatch suite create "Checkout"
+langwatch suite get <id|name>
+langwatch suite rename <id|name> "Checkout regression"
+langwatch suite archive <id|name>
+langwatch suite run <id|name> --target http:<agent-id>   # every scenario × target
 ```
+
+A **run plan** is what you run, and its name is its identity. A run under the name of a plan that exists replaces that plan's configuration and joins its history; a run under a new name creates the plan. The configuration is the scope, the targets, the repeat count and the two simulation models:
+
+```bash
+langwatch run-plan run --target http:<agent-id> --suite "Checkout" \
+  --name "Checkout nightly" --repeat 3 --note "after the pricing change"
+langwatch run-plan run --target http:<agent-id> --target prompt:<prompt-id> --all
+langwatch run-plan run --target http:<agent-id> --label critical --label support
+langwatch run-plan run --target http:<agent-id> --scenario <scenario-id>
+
+langwatch run-plan list                       # the plans of the project
+langwatch run-plan get <id>                   # the configuration the next run uses
+langwatch run-plan archive <id>
+```
+
+| Flag | Effect |
+|---|---|
+| `--target <type:id>` | What to run against, repeatable. `http:`, `code:` and `workflow:` take an agent id, `prompt:` takes a prompt id. |
+| `--all`, `--suite`, `--label`, `--scenario` | The scope. Exactly one kind per run; `--suite`, `--label` and `--scenario` repeat. |
+| `--name <text>` | The plan to run under. Left out, the platform names the plan itself. |
+| `--repeat <n>` | How many times to run each scenario, 1 to 5. |
+| `--simulator-model`, `--judge-model` | The model that plays the user, and the model that judges. |
+| `--param key=value` | A value for a parameter the scenarios declare, repeatable. |
+| `--note <text>` | One line about this run, up to 200 characters. It belongs to the run, not to the plan. |
+| `--idempotency-key <key>` | Repeat it to make a retry join the first run instead of starting a second one. |
+| `--wait` | Block until the batch is complete, and exit non-zero when a run failed. |
+
+`langwatch suite run` and `langwatch scenario run` are shorter forms of the same thing: they run a plan named after the suite or the scenario and the target, and take `--name`, `--repeat`, `--param`, `--note` and `--wait` the same way.
+
+The `/api/suites` endpoints the older CLI versions called still answer and are deprecated. The commands above use `/api/v1/run-plans` and `/api/v1/test-suites`.
 
 ### Pass values into a run
 
 Every run command accepts a repeatable `--param key=value`. A parameter is a constant value that the whole run shares: a fixture id, a tenant, a plan, a region.
 
 ```bash
-langwatch suite run <suite-id> --param account_tier=platinum --param region=eu-central
+langwatch suite run <suite-id> --target http:<agent-id> --param account_tier=platinum --param region=eu-central
 langwatch scenario run <scenario-id> --target http:<agent-id> --param account_tier=platinum
 langwatch experiment run <experiment-slug> --param model=gpt-5-mini
 langwatch workflow run <workflow-id> --input '{"question":"where is my order?"}' --param region=eu-central
@@ -272,7 +306,7 @@ The value type follows the text you type. `true` and `false` are booleans. A val
 
 Each command uses the values differently:
 
-- `suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-simulations/scenario-parameters).
+- `run-plan run`, `suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-simulations/scenario-parameters).
 - `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
 - `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
 

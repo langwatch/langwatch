@@ -384,21 +384,24 @@ langwatch agent create 'My Agent' --type http --config '{
 }'
 ```
 
-Then create a scenario, pair it with the agent in a suite, and run it:
+Then create a scenario, file it into a test suite, and run the suite against the agent:
 
 ```bash
+langwatch suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --folder 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch suite run 'Smoke' --target http:<agent-id> --wait
 ```
+
+`--folder` files the scenario into a test suite that exists, by name or by id. The run goes under the run plan named after the suite and the target, so the next run of the same pair joins the same history.
 
 ## 6. Verify the run
 
-Open the run in the **Simulations** section of your project. A connected setup shows:
+Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - A trace link on each turn in the run detail, opening the agent's own spans for that turn.
