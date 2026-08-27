@@ -26,7 +26,7 @@ vi.mock("~/server/modelProviders/modelDefaults.read", () => ({
     getResolvedDefaultForFeature(...args),
 }));
 
-import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { resolveEvaluatorSettingsDefaults } from "../evaluations-legacy";
 
@@ -137,7 +137,10 @@ describe("resolveEvaluatorSettingsDefaults", () => {
       const resolved = await resolveEvaluatorSettingsDefaults("proj-1");
       expect(resolved).toEqual({ defaultModel: null, embeddingsModel: null });
 
-      const settings = getEvaluatorDefaultSettings(evaluatorWithModel, resolved);
+      const settings = getEvaluatorDefaultSettings(evaluatorWithModel, resolved, {
+        defaultModel: DEFAULT_MODEL,
+        embeddingsModel: "openai/text-embedding-3-small",
+      });
       expect((settings as any).model).toBe(DEFAULT_MODEL);
     });
   });

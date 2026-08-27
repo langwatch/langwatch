@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "~/generated/prisma/client";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { resolveEvaluatorSettingsWithSource } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { EvaluatorSettingsService } from "@langwatch/evaluation-server/internal";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const PROJECT_ID = "proj_6397_roundtrip";
@@ -68,7 +68,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
         where: { id: "eval_6397_legacy", projectId: PROJECT_ID },
       });
 
-      const { settings } = resolveEvaluatorSettingsWithSource({
+      const { settings } = EvaluatorSettingsService.create().resolve({
         config: row.config as Record<string, unknown>,
         parameters: null,
         // Read back from Postgres rather than restated: recovery is gated on

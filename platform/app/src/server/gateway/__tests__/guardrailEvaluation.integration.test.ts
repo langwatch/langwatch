@@ -22,7 +22,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { SingleEvaluationResult } from "../../evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   evaluationDataFor,
   GatewayGuardrailEvaluationService,

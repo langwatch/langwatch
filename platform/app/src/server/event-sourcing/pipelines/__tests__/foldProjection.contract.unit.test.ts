@@ -7,14 +7,17 @@ import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
-} from "../evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import { EvaluationAnalyticsStore } from "../evaluation-processing/projections/evaluationAnalytics.store";
+  EvaluationAnalyticsStore,
+} from "@langwatch/evaluation-server/internal";
+import { TraceAnalyticsAttributePolicy } from "~/runtime/app/features/evaluation-analytics-attribute-policy.adapter";
+import { type TraceAnalyticsData, TraceAnalyticsFoldProjection } from "@langwatch/trace-server";
 import {
-  type TraceAnalyticsData,
-  TraceAnalyticsFoldProjection,
-} from "../trace-processing/projections/traceAnalytics.foldProjection";
-import { TraceAnalyticsStore } from "../trace-processing/projections/traceAnalytics.store";
-import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
+  TraceAnalyticsProjectionPort,
+  type TraceAnalyticsProjectionEntry,
+  type TraceAnalyticsProjectionRead,
+  TraceAnalyticsStore,
+} from "@langwatch/trace-server";
+import { TraceSummaryFoldProjection } from "@langwatch/trace-server";
 
 /**
  * Structural contracts behind `trustAbsentMiss` (the always-write change) and the
@@ -74,9 +77,7 @@ const FOLDS: Array<{
 
 describe("fold projection contracts", () => {
   describe("given a fold declares trustAbsentMiss", () => {
-    const trusted = FOLDS.filter(
-      (fold) => fold.projection.options?.trustAbsentMiss === true,
-    );
+    const trusted = FOLDS.filter((fold) => fold.projection.options?.trustAbsentMiss === true);
 
     it("covers the folds this contract was written for", () => {
       expect(trusted.map((fold) => fold.name).sort()).toEqual([
@@ -159,10 +160,15 @@ describe("fold projection contracts", () => {
       storageAnchorMs: 1_700_000_000_000,
     });
 
-    const makeRepo = () => ({
-      upsert: vi.fn(async (..._args: unknown[]) => undefined),
-      findByTraceIdWithApplied: vi.fn(async () => null),
-    });
+    class TraceAnalyticsProjectionFake extends TraceAnalyticsProjectionPort {
+      readonly upsert = vi.fn(async (_entry: TraceAnalyticsProjectionEntry) => undefined);
+      readonly tryFindByTraceId = vi.fn(
+        async (): Promise<TraceAnalyticsProjectionRead | null> => null,
+      );
+    }
+
+    const makeStore = (storage: TraceAnalyticsProjectionFake) =>
+      TraceAnalyticsStore.create({ storage, defaultRetentionDays: 30 });
 
     /**
      * The executor dedups a redelivered batch against the ids persisted NEXT
@@ -171,25 +177,25 @@ describe("fold projection contracts", () => {
      */
     /** @scenario the redelivery watermark survives the write path */
     it("persists the applied-event-id watermark next to the row", async () => {
-      const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const storage = new TraceAnalyticsProjectionFake();
+      const store = makeStore(storage);
 
       await store.store(signalState(), context(["evt-1", "evt-2"]));
 
-      expect(repo.upsert).toHaveBeenCalledTimes(1);
-      expect(repo.upsert.mock.calls[0]![2]).toEqual(["evt-1", "evt-2"]);
+      expect(storage.upsert).toHaveBeenCalledTimes(1);
+      expect(storage.upsert.mock.calls[0]![0].appliedEventIds).toEqual(["evt-1", "evt-2"]);
     });
 
     /** @scenario the watermark round-trips through the read-back */
     it("reads the same watermark back with the state", async () => {
-      const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const storage = new TraceAnalyticsProjectionFake();
+      const store = makeStore(storage);
       await store.store(signalState(), context(["evt-1"]));
-      const writtenRow = (repo.upsert.mock.calls[0] as unknown[])[0];
-      repo.findByTraceIdWithApplied.mockResolvedValue({
+      const writtenRow = storage.upsert.mock.calls[0]![0].row;
+      storage.tryFindByTraceId.mockResolvedValue({
         row: writtenRow,
         appliedEventIds: ["evt-1"],
-      } as never);
+      });
 
       const back = await store.getWithApplied("trace-1", context());
 
@@ -205,27 +211,23 @@ describe("fold projection contracts", () => {
      */
     /** @scenario absence is authoritative because nothing is ever gated out */
     it("writes a dimension-only state too, flagged HasSignal=false", async () => {
-      const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const storage = new TraceAnalyticsProjectionFake();
+      const store = makeStore(storage);
 
       await store.store(dimensionOnlyState(), context());
 
-      expect(repo.upsert).toHaveBeenCalledTimes(1);
-      const row = (repo.upsert.mock.calls[0] as unknown[])[0] as {
-        hasSignal: boolean;
-      };
+      expect(storage.upsert).toHaveBeenCalledTimes(1);
+      const row = storage.upsert.mock.calls[0]![0].row;
       expect(row.hasSignal).toBe(false);
     });
 
     it("flags a state with real telemetry HasSignal=true", async () => {
-      const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const storage = new TraceAnalyticsProjectionFake();
+      const store = makeStore(storage);
 
       await store.store(signalState(), context());
 
-      const row = (repo.upsert.mock.calls[0] as unknown[])[0] as {
-        hasSignal: boolean;
-      };
+      const row = storage.upsert.mock.calls[0]![0].row;
       expect(row.hasSignal).toBe(true);
     });
   });
@@ -237,9 +239,9 @@ describe("fold projection contracts", () => {
       ...(appliedEventIds ? { appliedEventIds } : {}),
     });
 
-    const makeRepo = () => ({
-      upsert: vi.fn(async (..._args: unknown[]) => undefined),
-      findByEvaluationIdWithApplied: vi.fn(async () => null),
+    const makeAnalytics = () => ({
+      upsertEvaluationAnalytics: vi.fn(async (..._args: unknown[]) => undefined),
+      tryGetEvaluationAnalytics: vi.fn(async () => null),
     });
 
     const bareState = (): EvaluationAnalyticsData =>
@@ -249,13 +251,19 @@ describe("fold projection contracts", () => {
 
     /** @scenario the watermark survives the eval write path too */
     it("persists the applied-event-id watermark next to the row", async () => {
-      const repo = makeRepo();
-      const store = new EvaluationAnalyticsStore(repo as never);
+      const analytics = makeAnalytics();
+      const store = EvaluationAnalyticsStore.create({
+        analytics: analytics as never,
+        attributePolicy: new TraceAnalyticsAttributePolicy(),
+        defaultRetentionDays: 30,
+      });
 
       await store.store(bareState(), context(["evt-9"]));
 
-      expect(repo.upsert).toHaveBeenCalledTimes(1);
-      expect(repo.upsert.mock.calls[0]![2]).toEqual(["evt-9"]);
+      expect(analytics.upsertEvaluationAnalytics).toHaveBeenCalledTimes(1);
+      expect(analytics.upsertEvaluationAnalytics.mock.calls[0]![0]).toMatchObject({
+        appliedEventIds: ["evt-9"],
+      });
     });
 
     /**
@@ -264,13 +272,23 @@ describe("fold projection contracts", () => {
      */
     /** @scenario no state is unwritable, identity falls back to the aggregate id */
     it("writes a state with no identity of its own, stamped from the aggregate id", async () => {
-      const repo = makeRepo();
-      const store = new EvaluationAnalyticsStore(repo as never);
+      const analytics = makeAnalytics();
+      const store = EvaluationAnalyticsStore.create({
+        analytics: analytics as never,
+        attributePolicy: new TraceAnalyticsAttributePolicy(),
+        defaultRetentionDays: 30,
+      });
 
       await store.store(bareState(), context());
 
-      expect(repo.upsert).toHaveBeenCalledTimes(1);
-      const row = (repo.upsert.mock.calls[0] as unknown[])[0] as {
+      expect(analytics.upsertEvaluationAnalytics).toHaveBeenCalledTimes(1);
+      const input = analytics.upsertEvaluationAnalytics.mock.calls[0]![0] as {
+        row: {
+          evaluationId: string;
+          version: string;
+        };
+      };
+      const row = input.row as {
         evaluationId: string;
         version: string;
       };
