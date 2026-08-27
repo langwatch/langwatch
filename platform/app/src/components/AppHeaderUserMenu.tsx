@@ -89,9 +89,7 @@ export function AppHeaderUserMenu({
   const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   const graphicsQualityOverride = useGraphicsQualityOverrideStore((s) => s.override);
-  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
-    (s) => s.setOverride,
-  );
+  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore((s) => s.setOverride);
 
   return (
     <Menu.Root>
@@ -214,9 +212,7 @@ export function AppHeaderUserMenu({
                     <Menu.RadioItem value="auto">
                       Auto — adapts to this device on its own
                     </Menu.RadioItem>
-                    <Menu.RadioItem value="on">
-                      On — always keep things responsive
-                    </Menu.RadioItem>
+                    <Menu.RadioItem value="on">On — always keep things responsive</Menu.RadioItem>
                     <Menu.RadioItem value="off">
                       Off — always show full decorative effects
                     </Menu.RadioItem>
