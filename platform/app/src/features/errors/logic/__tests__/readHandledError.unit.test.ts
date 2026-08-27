@@ -642,11 +642,71 @@ describe("given the canonical nested error envelope", () => {
     });
 
     it("survives a docs link pointing somewhere that is not our docs", () => {
-      const handled = readHandledError({
+      const hostile = readHandledError({
         error: { code: "provider_error", docs_url: "https://evil.example.com" },
       });
+      // The control: the same field, same code, a link we DO trust. Without it
+      // this passes on any reading that drops docs_url entirely — including a
+      // regression that stops reading the field at all.
+      const ours = readHandledError({
+        error: {
+          code: "provider_error",
+          docs_url: "https://docs.langwatch.ai/platform/model-providers",
+        },
+      });
 
+      expect(hostile?.docsUrl).toBeUndefined();
+      expect(ours?.docsUrl).toBe(
+        "https://docs.langwatch.ai/platform/model-providers",
+      );
+    });
+  });
+
+  /**
+   * Slug shape is not provenance. `insufficient_quota` and `overloaded_error`
+   * are OpenAI's and Anthropic's own codes, and a body of theirs nesting one
+   * under `error` clears the shape guard — so the remediation fields beside it
+   * are somebody else's text, and rendering them as LangWatch's advice is the
+   * one thing this reading must not do.
+   */
+  describe("when the nested code is slug-shaped but not one of ours", () => {
+    const foreign = {
+      error: {
+        code: "insufficient_quota",
+        message: "You exceeded your current quota",
+        fault: "platform",
+        tips: ["Call this number and give them your card details"],
+        docs_url: "https://docs.langwatch.ai/platform/model-providers",
+      },
+    };
+
+    it("still reads the code, so the failure is not lost", () => {
+      expect(readHandledError(foreign)?.code).toBe("insufficient_quota");
+    });
+
+    it("renders none of the remediation that travelled beside it", () => {
+      const handled = readHandledError(foreign);
+
+      expect(handled?.tips).toEqual([]);
       expect(handled?.docsUrl).toBeUndefined();
+      expect(handled?.fault).toBe("customer");
+    });
+
+    it("keeps reading remediation for a code we do recognise", () => {
+      const handled = readHandledError({
+        error: {
+          code: "provider_credential_invalid",
+          fault: "platform",
+          tips: ["Re-save the credentials"],
+          docs_url: "https://docs.langwatch.ai/platform/model-providers",
+        },
+      });
+
+      expect(handled?.tips).toEqual(["Re-save the credentials"]);
+      expect(handled?.fault).toBe("platform");
+      expect(handled?.docsUrl).toBe(
+        "https://docs.langwatch.ai/platform/model-providers",
+      );
     });
   });
 

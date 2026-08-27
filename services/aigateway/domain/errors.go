@@ -92,6 +92,13 @@ const (
 	// provider_credential_invalid, which never got that far: this one proves
 	// the credential is well-formed and says the account behind it is the
 	// problem — expired, revoked, or lacking permission for the operation.
+	//
+	// Reserved: no path emits it today. A provider that refuses a credential
+	// answers with a status, and errFromBifrost forwards every answered error
+	// verbatim before classification runs, so the 401/403 arrives as itself.
+	// Registered anyway (status, fault, remediation, presentation copy) so a
+	// path that does not forward — a pre-dispatch credential refresh, a plugin
+	// rejection — has a code to use without minting a new slug.
 	ErrProviderCredentialRejected = herr.Code("provider_credential_rejected")
 	// ErrProviderConfigInvalid means the provider slot is configured in a way
 	// that cannot serve THIS request: no key declares the requested model, a

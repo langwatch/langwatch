@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/bytedance/sonic"
@@ -20,9 +19,13 @@ import (
 // means is carried in four fields (bifrost/core@v1.4.22):
 //
 //	StatusCode      the provider's HTTP status when a response was received.
-//	                Bifrost synthesizes exactly two of its own: 504 paired with
-//	                Error.Type=request_timed_out, and 499 paired with
-//	                RequestCancelled. No other status is synthesized.
+//	                Bifrost synthesizes two of its own that carry a matching
+//	                Error.Type: 504 with request_timed_out, and 499 with
+//	                RequestCancelled. It also synthesizes bare statuses with
+//	                no such type — 400 from its request validation
+//	                (bifrost.go:4292) and 400/502 from its response handling
+//	                (bifrost.go:2273, 2292, 2308) — which is why the pair, not
+//	                the status alone, is what bfIsProviderAnswer tests.
 //	Error.Type      set for those two, and for the provider taxonomy
 //	                (authentication_error, authorization_error, rate_limit_error,
 //	                invalid_request_error, api_error, network_error).
@@ -181,16 +184,17 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 		return herr.New(ctx, domain.ErrProviderError, herr.M{"message": "provider dispatch failed"})
 	}
 
+	// meta is the client contract: every key here is read by
+	// features/errors/logic/presentation.ts to build the sentence and the
+	// remediation the customer sees. The HTTP status is deliberately absent —
+	// it is on the response, and nothing renders it from here.
 	code := bfErrorCode(berr)
 	meta := herr.M{"message": bfCustomerMessage(code, berr)}
-	if status := bfStatus(berr); status > 0 {
-		meta["status"] = status
-	}
 	if provider := string(berr.ExtraFields.Provider); provider != "" {
 		meta["provider"] = provider
 	}
 	if model := berr.ExtraFields.ModelRequested; model != "" {
-		meta["model"] = model
+		meta["model"] = bfClampMetaValue(model)
 	}
 
 	// The wrapped cause travels as a herr reason, never in meta. meta is the
@@ -239,19 +243,10 @@ func bfErrorCode(berr *bfschemas.BifrostError) herr.Code {
 		return code
 	}
 
-	// 4. Status, last. A synthesized 504/499 was already caught by type; what
-	//    reaches here with a status is a provider answer whose type Bifrost
-	//    could not parse.
-	switch status := bfStatus(berr); {
-	case status == http.StatusTooManyRequests:
-		return domain.ErrRateLimited
-	case status == http.StatusGatewayTimeout || status == http.StatusRequestTimeout:
-		return domain.ErrProviderTimeout
-	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return domain.ErrProviderCredentialRejected
-	case status >= 400 && status < 500:
-		return domain.ErrBadRequest
-	}
+	// 4. Nothing identified it. Deliberately no status arm here: errFromBifrost
+	//    forwards every provider-answered error before classification, so an
+	//    error carrying a provider status never reaches this function, and a
+	//    status switch would be dead code that reads like a safety net.
 	return domain.ErrProviderError
 }
 
@@ -351,10 +346,15 @@ func bfCodeForMessage(msg string) (herr.Code, bool) {
 // bfCustomerMessage is what the customer reads. Bifrost's own message is
 // engine prose written for whoever is reading a Bifrost stack trace ("no keys
 // found that support model: x", "deployments not set"), which states a fact
-// about our internals and no action the customer can take. For the codes where
-// we know the remediation, say it; for the rest, Bifrost's sentence is still
-// the most specific thing available and is safe to relay, because these
-// failures happen before a request body is ever sent and so cannot quote it.
+// about our internals and no action the customer can take.
+//
+// Codes we recognize get copy that names the fix. The rest get fixed copy
+// rather than Bifrost's sentence: the response-side messages describe a body
+// the gateway could not read, and Bifrost's stream-read failure renders the
+// Go net error verbatim ("Error reading stream: read tcp 10.x.x.x:...->..."),
+// which puts a cluster-internal address in front of a customer. The specific
+// sentence is not lost — faults.go#handledCause puts it on the log line, off
+// the wire.
 func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 	switch code {
 	case domain.ErrProviderCredentialInvalid:
@@ -372,9 +372,6 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 		return "The gateway could not build the upstream request."
 	case domain.ErrRequestAbandoned:
 		return "The request was canceled before the provider answered."
-	}
-	if msg := bfErrorMsg(berr); msg != "" {
-		return msg
 	}
 	return "The model provider did not return a usable response."
 }
@@ -447,6 +444,19 @@ func bfDescribeUnquotableCause(category string, cause error) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// bfMaxMetaValue bounds the customer-supplied strings copied into meta.
+// ModelRequested is whatever the caller put in the request body, and meta is
+// rendered into a sentence in the browser and written to a log line; neither
+// has a length of its own to fall back on.
+const bfMaxMetaValue = 120
+
+func bfClampMetaValue(v string) string {
+	if len(v) <= bfMaxMetaValue {
+		return v
+	}
+	return v[:bfMaxMetaValue] + "..."
 }
 
 func bfStatus(e *bfschemas.BifrostError) int {

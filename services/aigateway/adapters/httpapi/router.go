@@ -1517,6 +1517,13 @@ var (
 // (specs/ai-gateway/error-transparency.feature). Everything else gets the
 // standard {"type":"error","error":{"type":"provider_error","message":...}}
 // object.
+//
+// A handled error never reaches the frame through err.Error(): herr.E renders
+// its whole Meta map and every wrapped reason into that string, so a frame
+// built from it carried the engine's internal cause — the one the JSON
+// boundary deliberately keeps to the log line — straight to the caller. The
+// customer copy the classifier wrote is used instead, so a failure reads the
+// same whether it arrives before the stream opens or during it.
 func streamErrorFrame(err error) []byte {
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) && len(ue.Body) > 0 && sonic.Valid(ue.Body) {
@@ -1524,6 +1531,17 @@ func streamErrorFrame(err error) []byte {
 	}
 	msg := err.Error()
 	errType := "provider_error"
+	var e herr.E
+	if errors.As(err, &e) {
+		// Never err.Error() for a handled error: it renders the whole Meta map
+		// and every wrapped reason. The code is the floor, the customer copy
+		// the classifier wrote is the message when there is one.
+		errType = string(e.Code)
+		msg = string(e.Code)
+		if text, ok := e.Meta["message"].(string); ok && text != "" {
+			msg = text
+		}
+	}
 	if ue != nil {
 		if ue.Message != "" {
 			msg = ue.Message

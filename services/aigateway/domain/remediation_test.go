@@ -152,6 +152,57 @@ func TestRemediate_EveryNewProviderCodeHasAdvice(t *testing.T) {
 	}
 }
 
+// The client truncates tips on arrival (MAX_TIPS in readHandledError.ts), from
+// the END, so anything past the fourth is not shown however it got there. That
+// is why the cap is applied here, where the ordering can decide what survives:
+// Vertex contributes four provider-specific tips on top of two generic ones,
+// and the provider-specific ones are the reason this registry exists.
+// @scenario "A provider-setup failure tells the customer how to fix it"
+func TestRemediate_CapsTipsSoTheProviderSpecificOnesSurvive(t *testing.T) {
+	generic := registry[ErrProviderCredentialInvalid].tips
+	require.Greater(t, len(providerCredentialTips["vertex"])+len(generic), maxTips,
+		"vertex must over-fill the cap, or this test proves nothing")
+
+	got := Remediate(herr.E{
+		Code: ErrProviderCredentialInvalid,
+		Meta: herr.M{"provider": "vertex"},
+	})
+
+	tips, ok := got.Meta["tips"].([]string)
+	require.True(t, ok)
+	assert.Len(t, tips, maxTips, "more than this and the client drops the tail unseen")
+	assert.Equal(t, providerCredentialTips["vertex"], tips,
+		"the cap keeps the provider-specific advice and drops the generic tail")
+}
+
+// The per-provider docs page is for the codes whose FIX is provider-specific.
+// A connection failure is not one of them: the host did not answer, which the
+// provider's credential page says nothing about.
+func TestRemediate_ProviderDocsOnlyForCodesWhoseFixIsProviderSpecific(t *testing.T) {
+	got := Remediate(herr.E{
+		Code: ErrProviderConnectionFailed,
+		Meta: herr.M{"provider": "vertex"},
+	})
+
+	assert.NotEqual(t, "https://docs.langwatch.ai/ai-gateway/providers/vertex", got.Meta["docs_url"],
+		"a transport failure must not be sent to the Vertex credential page")
+	assert.Equal(t, docsBase+registry[ErrProviderConnectionFailed].docsPath, got.Meta["docs_url"])
+}
+
+// The rejected code shares the credential path's provider-specific advice: the
+// artifact to go and look at is the same one, whoever refused it.
+func TestRemediate_RejectedCredentialAlsoGetsProviderSpecificAdvice(t *testing.T) {
+	got := Remediate(herr.E{
+		Code: ErrProviderCredentialRejected,
+		Meta: herr.M{"provider": "bedrock"},
+	})
+
+	tips, ok := got.Meta["tips"].([]string)
+	require.True(t, ok)
+	assert.Contains(t, strings.Join(tips, "\n"), "AWS access key")
+	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/providers/bedrock", got.Meta["docs_url"])
+}
+
 // repoRoot walks up from the package directory to the checkout root, found by
 // the docs/ directory the paths are resolved against.
 func repoRoot(t *testing.T) string {

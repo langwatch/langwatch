@@ -214,7 +214,10 @@ func TestClassifyBifrostError_CarriesTheWrappedCause(t *testing.T) {
 // PEM puts private-key bytes wherever the cause is written, and handledCause
 // writes it to a log line.
 func TestClassifyBifrostError_NeverQuotesACauseThatEmbedsItsInput(t *testing.T) {
-	privateKeyFragment := "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ"
+	// Deliberately not shaped like real key material: a high-entropy base64
+	// literal here is indistinguishable from a leak to the repo's secret
+	// scanner, and the test only needs a marker that must not survive.
+	privateKeyFragment := "private-key-bytes-that-must-not-be-relayed"
 	berr := &bfschemas.BifrostError{
 		IsBifrostError: true,
 		Error: &bfschemas.ErrorField{
@@ -312,10 +315,73 @@ func TestClassifyBifrostError_StampsProviderAndModel(t *testing.T) {
 		"the customer is told which model their provider does not serve")
 }
 
-// IsBifrostError is Bifrost's own statement of who produced the error. Only a
-// provider-produced one is an upstream response, and only an upstream response
-// may be forwarded as one — a synthesized 504 or 499 is Bifrost talking about
-// a request no provider ever answered.
+// meta is the client contract. Everything in it is rendered by
+// features/errors/logic/presentation.ts, so a key nothing reads is a field the
+// next reader has to check the browser for before they can delete it. The HTTP
+// status was such a key: it is on the response, and nothing renders it here.
+func TestClassifyBifrostError_MetaCarriesOnlyWhatTheClientRenders(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		StatusCode: bfPtr(503),
+		Error:      &bfschemas.ErrorField{Message: bfNetworkErrorMessage},
+		ExtraFields: bfschemas.BifrostErrorExtraFields{
+			Provider: bfschemas.OpenAI,
+		},
+	}
+
+	var e herr.E
+	require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+	assert.NotContains(t, e.Meta, "status", "no consumer reads it; the response carries the status")
+	for key := range e.Meta {
+		assert.Contains(t, []string{"message", "provider", "model"}, key,
+			"meta gained %q — name the consumer in presentation.ts or log it instead", key)
+	}
+}
+
+// ModelRequested is whatever the caller put in the request body, and it is
+// rendered into a sentence in the browser and written to a log line. Neither
+// has a length of its own to fall back on.
+func TestClassifyBifrostError_ClampsTheModelTheCallerSupplied(t *testing.T) {
+	long := strings.Repeat("m", 4000)
+	berr := &bfschemas.BifrostError{
+		Error:       &bfschemas.ErrorField{Message: bfNetworkErrorMessage},
+		ExtraFields: bfschemas.BifrostErrorExtraFields{ModelRequested: long},
+	}
+
+	var e herr.E
+	require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+	model, ok := e.Meta["model"].(string)
+	require.True(t, ok)
+	assert.LessOrEqual(t, len(model), bfMaxMetaValue+len("..."))
+	assert.NotEqual(t, long, model)
+}
+
+// The fallback copy must not relay Bifrost's own sentence. Its stream-read
+// failure renders the Go net error verbatim, which names a cluster-internal
+// address; the response-side messages describe a body the gateway could not
+// read. Neither is the customer's to see, and both are already on the log line
+// via faults.go#handledCause.
+func TestClassifyBifrostError_UnrecognizedFailuresDoNotRelayEngineProse(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		Error: &bfschemas.ErrorField{
+			Message: "Error reading stream: read tcp 10.42.0.7:52344->10.42.9.1:443: connection reset by peer",
+		},
+	}
+
+	var e herr.E
+	require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+	assert.Equal(t, domain.ErrProviderError, e.Code)
+	message, _ := e.Meta["message"].(string)
+	assert.NotContains(t, message, "10.42.", "an internal address must not reach the customer")
+	assert.NotContains(t, message, "read tcp")
+	assert.NotEmpty(t, message)
+}
+
+// Only a provider's own response may be forwarded as one. Bifrost states that
+// with a status paired with no synthesized type: a 504/request_timed_out or a
+// 499/RequestCancelled is Bifrost talking about a request no provider ever
+// answered, and IsBifrostError does not answer the question either —
+// bedrock.go:300 sets it on a real provider response whose body would not
+// unmarshal.
 // @scenario "An engine-produced error is never forwarded as a provider answer"
 func TestErrFromBifrost_OnlyProviderAnswersBecomeUpstreamErrors(t *testing.T) {
 	t.Run("when the provider answered", func(t *testing.T) {
@@ -418,41 +484,38 @@ func TestErrFromBifrost_HonorsBifrostFallbackRefusal(t *testing.T) {
 }
 
 // The message rules match on prose because Bifrost states these failures as
-// prose. Prose can be reworded in a dependency bump, which would silently drop
-// every match back to the generic provider_error — so pin the constants to the
-// Bifrost actually in go.mod and fail loudly if one moves.
+// prose. Two things can silently break that: a dependency bump rewording one
+// of Bifrost's constants, or a rule being dropped from bfMessageRules. Either
+// drops the match back to the generic provider_error.
+//
+// So this drives bfCodeForMessage — the function the classifier actually calls
+// — with the constant off the Bifrost in go.mod, and asserts the code it
+// produces. Matching needles against a second hand-written list instead would
+// pass happily after a rule was deleted, because the list is not the rules.
 func TestBifrostMessageConstantsStillMatchThePinnedBifrost(t *testing.T) {
-	pinned := map[string]string{
-		"network error":       bfschemas.ErrProviderNetworkError,
-		"do request":          bfschemas.ErrProviderDoRequest,
-		"request canceled":    bfschemas.ErrRequestCancelled,
-		"request marshal":     bfschemas.ErrProviderRequestMarshal,
-		"body conversion":     bfschemas.ErrRequestBodyConversion,
-		"create request":      bfschemas.ErrProviderCreateRequest,
-		"response decode":     bfschemas.ErrProviderResponseDecode,
-		"response unmarshal":  bfschemas.ErrProviderResponseUnmarshal,
-		"response empty":      bfschemas.ErrProviderResponseEmpty,
-		"response html":       bfschemas.ErrProviderResponseHTML,
-		"response decompress": bfschemas.ErrProviderResponseDecompress,
-	}
-	ours := []string{
-		bfNetworkErrorMessage, bfDoRequestMessage, bfRequestCancelledMessage,
-		bfRequestMarshalMessage, bfRequestBodyConversionMessage, bfCreateRequestMessage,
-		bfResponseDecodeMessage, bfResponseUnmarshalMessage, bfResponseEmptyMessage,
-		bfResponseHTMLMessage, bfResponseDecompressMessage,
+	pinned := map[string]struct {
+		upstream string
+		code     herr.Code
+	}{
+		"network error":       {bfschemas.ErrProviderNetworkError, domain.ErrProviderConnectionFailed},
+		"do request":          {bfschemas.ErrProviderDoRequest, domain.ErrProviderConnectionFailed},
+		"request canceled":    {bfschemas.ErrRequestCancelled, domain.ErrRequestAbandoned},
+		"request marshal":     {bfschemas.ErrProviderRequestMarshal, domain.ErrInternal},
+		"body conversion":     {bfschemas.ErrRequestBodyConversion, domain.ErrInternal},
+		"create request":      {bfschemas.ErrProviderCreateRequest, domain.ErrInternal},
+		"response decode":     {bfschemas.ErrProviderResponseDecode, domain.ErrProviderError},
+		"response unmarshal":  {bfschemas.ErrProviderResponseUnmarshal, domain.ErrProviderError},
+		"response empty":      {bfschemas.ErrProviderResponseEmpty, domain.ErrProviderError},
+		"response html":       {bfschemas.ErrProviderResponseHTML, domain.ErrProviderError},
+		"response decompress": {bfschemas.ErrProviderResponseDecompress, domain.ErrProviderError},
 	}
 
-	for name, upstream := range pinned {
+	for name, tc := range pinned {
 		t.Run("when bifrost's "+name+" message is read", func(t *testing.T) {
-			matched := false
-			for _, needle := range ours {
-				if strings.Contains(strings.ToLower(upstream), strings.ToLower(needle)) {
-					matched = true
-					break
-				}
-			}
-			assert.Truef(t, matched,
-				"bifrost reworded %q — no rule in bfMessageRules matches it any more, so it would fall through to provider_error", upstream)
+			code, ok := bfCodeForMessage(tc.upstream)
+			require.Truef(t, ok,
+				"no rule in bfMessageRules matches %q any more — bifrost reworded it, or the rule was deleted. Either way it now falls through to provider_error", tc.upstream)
+			assert.Equal(t, tc.code, code)
 		})
 	}
 }

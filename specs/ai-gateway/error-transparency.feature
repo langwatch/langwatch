@@ -234,6 +234,19 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the cause is never placed in the client-facing metadata
     And the customer reads what to change instead of what broke internally
 
+  # A failure that arrives once the stream is open reaches the caller through a
+  # different writer than the one every other failure uses, so "the customer
+  # never reads the internal cause" has to be stated for both or it holds for
+  # one. The streaming writer rendered the whole error object, metadata and
+  # wrapped cause included.
+  @bdd @error-transparency @integration
+  Scenario: A handled failure states the same thing mid-stream as it does before the stream opens
+    Given a failure the gateway can name, carrying an internal cause
+    When it happens after the response stream has already opened
+    Then the caller reads the same customer-facing sentence as on the non-streaming path
+    And the error keeps the code that names the failure
+    And neither the internal cause nor the diagnostic metadata appears in the stream
+
   @bdd @error-transparency @unit
   Scenario: A terminal setup failure does not spend the fallback chain
     Given "vk-demo" has two credentials in its fallback chain

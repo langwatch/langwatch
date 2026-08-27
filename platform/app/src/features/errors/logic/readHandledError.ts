@@ -90,13 +90,20 @@ function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
   const code = envelopeCode(envelope);
   if (code === null) return null;
 
+  // Remediation is rendered as OUR advice, so it is read only off a code we
+  // recognise. A slug-shaped code we do not know may be a provider's own
+  // (`insufficient_quota`, `overloaded_error`) nested under `error` in a body
+  // that never passed through `pkg/herr` — near enough in shape to parse, and
+  // no reason to trust whatever sits beside it in the same object.
+  const ours = KNOWN_CODES.has(code);
+
   return {
     code,
     httpStatus: stampedStatus(err),
     meta: envelopeMeta(envelope, code),
-    fault: safeFault(envelope.fault),
-    tips: safeTips(envelope.tips),
-    docsUrl: safeDocsUrl(envelope.docs_url),
+    fault: safeFault(ours ? envelope.fault : undefined),
+    tips: safeTips(ours ? envelope.tips : undefined),
+    docsUrl: ours ? safeDocsUrl(envelope.docs_url) : undefined,
     traceId: str(envelope.trace_id),
     reasons: safeReasons(envelope.reasons),
   };
@@ -108,8 +115,10 @@ function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
  * still resolves.
  *
  * Returns null unless the value is slug-shaped, the same guard the flat reading
- * applies: a provider payload that happens to nest an `error` object, or one
- * whose `code` slot holds prose, must not pass itself off as ours.
+ * applies: a payload whose `code` slot holds prose must not pass itself off as
+ * ours. Shape alone is not provenance, though — a provider's own slug clears
+ * it too, which is why `fromCanonicalEnvelope` reads the remediation fields
+ * only for codes in KNOWN_CODES.
  */
 function envelopeCode(envelope: Record<string, unknown>): string | null {
   const code = str(envelope.code) ?? str(envelope.type);

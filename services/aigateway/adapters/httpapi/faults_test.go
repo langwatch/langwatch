@@ -174,6 +174,10 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 		{domain.ErrProviderCredentialRejected, "customer", zapcore.InfoLevel},
 		// The host never answered — that one really is the provider's.
 		{domain.ErrProviderConnectionFailed, "provider", zapcore.WarnLevel},
+		// Nobody's fault. Attributed to the customer because that is where the
+		// action was (they left), and kept at info so a client on a flaky
+		// network never reaches the line operators watch.
+		{domain.ErrRequestAbandoned, "customer", zapcore.InfoLevel},
 	}
 	for _, tc := range cases {
 		logs := observedWriteError(t, context.Background(),
@@ -393,6 +397,30 @@ func TestWriteErrorDoesNotCountRateLimitedRejections(t *testing.T) {
 		herr.New(context.Background(), domain.ErrRateLimited, herr.M{"message": "rpm exceeded"}))
 	assert.Equal(t, 0, clientRejects(t, rec, "rate_limited", "vk_ceiling"))
 	assert.Equal(t, 0, clientRejectSeries(t, rec))
+}
+
+func TestWriteErrorDoesNotCountAbandonedRequests(t *testing.T) {
+	// The second exclusion inside recordClientReject, and the one the fault
+	// table cannot express: request_abandoned is a customer fault, so the
+	// faultForCode gate lets it through and only the explicit exclusion stops
+	// it. A caller disconnecting is not a rejection the gateway issued, and a
+	// client on a flaky network would otherwise read on the per-key alert as
+	// one looping on malformed bodies.
+	rec := gatewaymetrics.New()
+	observedWriteError(t, meteredContext(rec, "vk_flaky_client"),
+		herr.New(context.Background(), domain.ErrRequestAbandoned, herr.M{"message": "caller left"}))
+	assert.Equal(t, 0, clientRejects(t, rec, "request_abandoned", "vk_flaky_client"))
+	assert.Equal(t, 0, clientRejectSeries(t, rec))
+}
+
+// A control for the two exclusions above: the same call path, on a code that
+// IS a rejection the gateway issued, does count. Without it both exclusion
+// tests would keep passing if recordClientReject stopped counting anything.
+func TestWriteErrorStillCountsRejectionsTheGatewayIssued(t *testing.T) {
+	rec := gatewaymetrics.New()
+	observedWriteError(t, meteredContext(rec, "vk_bad_body"),
+		herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}))
+	assert.Equal(t, 1, clientRejects(t, rec, "bad_request", "vk_bad_body"))
 }
 
 // @scenario "A rejection on an unmetered path is still written"
