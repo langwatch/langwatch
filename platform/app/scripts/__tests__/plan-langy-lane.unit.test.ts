@@ -15,7 +15,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -32,9 +32,17 @@ const FULL_ENV = [
 
 const appDirs: string[] = [];
 
+/**
+ * The app directory sits under a `platform/app` of its own, because the planner
+ * derives the repo root from it and writes the python shim there. A flat temp
+ * directory makes the root the parent of the temp directory, which is `/` on a
+ * Linux runner and not writable.
+ */
 function appDirWith(files: Record<string, string>): string {
-  const dir = mkdtempSync(path.join(tmpdir(), "plan-langy-lane-"));
-  appDirs.push(dir);
+  const root = mkdtempSync(path.join(tmpdir(), "plan-langy-lane-"));
+  appDirs.push(root);
+  const dir = path.join(root, "platform/app");
+  mkdirSync(dir, { recursive: true });
   for (const [name, contents] of Object.entries(files)) {
     writeFileSync(path.join(dir, name), contents);
   }
@@ -400,8 +408,8 @@ describe("plan-langy-lane.sh", () => {
 
     /** @scenario "A worker binary that was never built is called out at startup" */
     it("still starts, and says which build a chat needs first", () => {
-      // The app dir is a temp dir, so the checkout's built worker is not on the
-      // path the planner derives from it, which is the un-built case.
+      // The app dir is under a temp root, so the checkout's built worker is not
+      // on the path the planner derives from it, which is the un-built case.
       const appDir = appDirWith({ ".env": FULL_ENV });
 
       const r = plan({ appDir });
