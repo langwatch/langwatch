@@ -25,6 +25,7 @@
  * resolved to names elsewhere.
  */
 
+import { DEFAULT_ACTOR_KIND } from "@langwatch/identity-links";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
@@ -486,8 +487,12 @@ function readTranscriptRow(params: {
       event_timestamp:
         row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
       // Attribution lives on the turns inside the transcript, where the
-      // account identifier actually is. A row has no single author.
+      // account identifier actually is. A row has no single author, so it
+      // carries no provider id either — and an unattributed row is a person
+      // (ADR-094 Decision 5), the mistake an admin can still fix by linking.
       actor: "",
+      actor_id: "",
+      actor_kind: DEFAULT_ACTOR_KIND,
       action: COPILOT_CONVERSATION_ACTION,
       target: facts.botName ?? "",
       cost_usd: "0",
