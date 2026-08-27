@@ -1,6 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { authClient, navigate, safeRedirectTarget } from "~/utils/auth-client";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
+
+/**
+ * A ceremony nobody completed: the sheet was dismissed, the screen went away,
+ * the request was superseded. WebAuthn reports a decline and an abort the same
+ * way it reports "no credential matched", deliberately, and none of them are
+ * events a person needs telling about.
+ */
+function wasDeclined(error: unknown): boolean {
+  if (!(error instanceof DOMException)) return false;
+  return error.name === "NotAllowedError" || error.name === "AbortError";
+}
 
 /**
  * The waiting half: ask whether the browser can do this at all, then leave a
@@ -13,9 +24,11 @@ import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 async function offerPasskeyFromAutofill({
   isLive,
   callbackUrl,
+  onError,
 }: {
   isLive: () => boolean;
   callbackUrl?: string;
+  onError: (error: unknown) => void;
 }): Promise<void> {
   try {
     const available =
@@ -23,12 +36,25 @@ async function offerPasskeyFromAutofill({
     if (!available || !isLive()) return;
 
     const result = await authClient.signIn.passkey({ autoFill: true });
-    if (!isLive() || !result || result.error) return;
+    if (!isLive() || !result) return;
+
+    // PICKING A PASSKEY IS STARTING SOMETHING. Up to here nobody had, and
+    // silence was right. Past here somebody chose a credential and is waiting
+    // for a door to open, so a refusal they never see reads as the click
+    // having done nothing at all — which is exactly how this arrived: a
+    // passkey the server no longer holds (`identity_passkey_not_recognized`)
+    // was refused correctly, and the screen said nothing.
+    if (result.error) {
+      onError(result.error);
+      return;
+    }
 
     rememberLastUsedMethod({ id: "passkey" });
     navigate(safeRedirectTarget(callbackUrl));
-  } catch {
-    // Silent by design. Nobody started this, so nobody is owed an error.
+  } catch (error) {
+    // Still silent for the ones nobody finished, and only those.
+    if (!isLive() || wasDeclined(error)) return;
+    onError(error);
   }
 }
 
@@ -52,9 +78,12 @@ async function offerPasskeyFromAutofill({
  *   - it asks first. A browser without conditional mediation is left alone
  *     rather than shown a modal prompt it did not ask for, which is what a
  *     plain `get()` would do.
- *   - it never reports failure. Nobody started this, so nobody is owed an
- *     error about it — a person typing their address must not be interrupted
- *     by something they did not do.
+ *   - it reports failure only once somebody PICKED a passkey. Until then
+ *     nobody started this and nobody is owed an error — a person typing their
+ *     address must not be interrupted by something they did not do. But
+ *     choosing a credential IS starting something, and a refusal they never
+ *     see reads as the click having done nothing at all, which is the bug
+ *     this replaces. A dismissed sheet stays silent, being a decline.
  *   - it resolves only if somebody PICKS the passkey. Until then the promise
  *     simply waits, which is why there is no loading state anywhere near it.
  *   - it waits for a gesture. The request starts when the person actually
@@ -72,11 +101,22 @@ async function offerPasskeyFromAutofill({
 export function usePasskeyAutofill({
   enabled,
   callbackUrl,
+  onError,
 }: {
   /** Only where this deployment actually offers passkeys. */
   enabled: boolean;
   callbackUrl?: string;
+  /**
+   * Told when a passkey somebody PICKED could not be used. Never told about
+   * a request nobody answered, or one they dismissed.
+   */
+  onError?: (error: unknown) => void;
 }): void {
+  // Read after the await, like `isLive`: the ceremony may resolve a minute
+  // after it started, and the caller may have handed us a new callback since.
+  const report = useRef(onError);
+  report.current = onError;
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -101,6 +141,7 @@ export function usePasskeyAutofill({
       void offerPasskeyFromAutofill({
         isLive: () => live,
         callbackUrl,
+        onError: (error) => report.current?.(error),
       });
     };
 

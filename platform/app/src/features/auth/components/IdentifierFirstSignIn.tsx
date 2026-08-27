@@ -127,6 +127,11 @@ export function IdentifierFirstSignIn() {
   usePasskeyAutofill({
     enabled: instanceMethods.some((method) => method.kind === "passkey"),
     callbackUrl,
+    // The same slot the button's refusals use. A passkey picked from the
+    // address field and refused is exactly as worth saying as one picked from
+    // the rail — and until this was wired, the autofill route said nothing at
+    // all, so a credential the server no longer holds looked like a dead click.
+    onError: setPasskeyError,
   });
 
   useEffect(() => {

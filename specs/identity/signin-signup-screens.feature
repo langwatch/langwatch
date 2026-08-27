@@ -133,6 +133,27 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     Then no waiting state is drawn for it
     And nothing about the card changes while it waits
 
+  # Where that silence ENDS. Owing nothing to an offer nobody started is right
+  # until somebody picks a credential — from that moment they have started
+  # something and are waiting for a door to open, and a refusal they never see
+  # is indistinguishable from a dead control. Reported from a live stack: a
+  # passkey the server no longer held was refused exactly as it should be, and
+  # the screen said nothing at all.
+  @integration
+  Scenario: A passkey I picked that cannot be used says so
+    Given a passkey is being offered from the address field itself
+    When I pick one and it cannot be used
+    Then the card says so in the same place its other passkey refusals appear
+    And I am not sent anywhere
+
+  # A decline is not a failure, and the browser reports it the same way it
+  # reports "nothing matched" — so neither may reach the reader.
+  @integration
+  Scenario: Dismissing the passkey sheet is not a failure
+    Given a passkey is being offered from the address field itself
+    When I dismiss the sheet instead of picking one
+    Then nothing is said about it
+
   # The opposite of the castle's rule, and worth stating so nobody reads one
   # for the other: the snake is pinned ABSENT under reduced motion, and this
   # glyph is pinned PRESENT and STILL.

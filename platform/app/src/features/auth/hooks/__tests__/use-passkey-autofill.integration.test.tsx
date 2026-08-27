@@ -26,8 +26,14 @@ vi.mock("~/utils/auth-client", () => ({
 
 import { usePasskeyAutofill } from "../usePasskeyAutofill";
 
-function Door({ enabled }: { enabled: boolean }) {
-  usePasskeyAutofill({ enabled });
+function Door({
+  enabled,
+  onError,
+}: {
+  enabled: boolean;
+  onError?: (error: unknown) => void;
+}) {
+  usePasskeyAutofill({ enabled, onError });
   return (
     <div>
       <input aria-label="Email" autoComplete="username webauthn" />
@@ -160,5 +166,62 @@ describe("given a deployment that offers passkeys", () => {
 
       expect(passkeyMock).not.toHaveBeenCalled();
     });
+  });
+
+  /**
+   * Picking a passkey is starting something, and the silence that is right
+   * for a pending offer is wrong the moment somebody chooses a credential.
+   * Reported from a live stack: a passkey the server no longer held was
+   * refused correctly (`identity_passkey_not_recognized`) and the screen said
+   * nothing at all, so the click read as broken.
+   */
+  describe("when somebody picks a passkey the server refuses", () => {
+    /** @scenario A passkey I picked that cannot be used says so */
+    it("tells the screen, so the refusal is not silent", async () => {
+      const refusal = { code: "identity_passkey_not_recognized" };
+      passkeyMock.mockImplementationOnce(
+        async () => ({ error: refusal }) as never,
+      );
+      const onError = vi.fn();
+      const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+      fireEvent.pointerDown(getByLabelText("Email"));
+
+      await waitFor(() => expect(onError).toHaveBeenCalledWith(refusal));
+      expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A passkey I picked that cannot be used says so */
+    it("reports a ceremony that threw rather than answered", async () => {
+      const thrown = new Error("the authenticator gave up");
+      passkeyMock.mockImplementationOnce(async () => {
+        throw thrown;
+      });
+      const onError = vi.fn();
+      const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+      fireEvent.pointerDown(getByLabelText("Email"));
+
+      await waitFor(() => expect(onError).toHaveBeenCalledWith(thrown));
+    });
+  });
+
+  describe("when somebody dismisses the sheet instead", () => {
+    /** @scenario Dismissing the passkey sheet is not a failure */
+    it.each([["NotAllowedError"], ["AbortError"]])(
+      "stays silent for %s, because nobody finished anything",
+      async (name) => {
+        passkeyMock.mockImplementationOnce(async () => {
+          throw new DOMException("declined", name);
+        });
+        const onError = vi.fn();
+        const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+        fireEvent.pointerDown(getByLabelText("Email"));
+        await flush();
+
+        expect(onError).not.toHaveBeenCalled();
+      },
+    );
   });
 });
