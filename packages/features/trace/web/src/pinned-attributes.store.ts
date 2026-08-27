@@ -69,11 +69,7 @@ function writeToStorage(projectId: string, pins: PinnedAttribute[]): void {
   }
 }
 
-function samePin(
-  a: PinnedAttribute,
-  source: PinnedAttributeSource,
-  key: string,
-): boolean {
+function samePin(a: PinnedAttribute, source: PinnedAttributeSource, key: string): boolean {
   return a.source === source && a.key === key;
 }
 

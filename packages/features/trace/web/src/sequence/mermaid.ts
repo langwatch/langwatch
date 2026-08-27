@@ -1,10 +1,6 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { formatDuration } from "../display-formatters";
-import {
-  buildSpanTree,
-  type SpanWithChildren,
-  sanitiseMermaidId,
-} from "./mermaid-shared";
+import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared";
 import type { SequenceSpanType } from "./types";
 
 export const INVISIBLE_RETURN = "\u200B";
@@ -42,10 +38,7 @@ function getParticipantId(span: SpanTreeNode): string | null {
 
 function getParticipantDisplay(span: SpanTreeNode): string | null {
   if (span.type === "agent" && span.name) {
-    return span.name
-      .replace(".call", "")
-      .replace(".run", "")
-      .replace("invoke_agent ", "");
+    return span.name.replace(".call", "").replace(".run", "").replace("invoke_agent ", "");
   }
   if (span.type === "llm" && span.model) {
     return span.model;
@@ -58,11 +51,7 @@ function escapeLabel(text: string): string {
   // Mermaid sequence labels treat `:` as the label separator and `;` as a
   // statement terminator; `<`/`>` would be interpreted as HTML and `#` starts a
   // comment. Strip anything Mermaid might choke on, and cap length.
-  const sanitised = text
-    .replace(/[#;]/g, " ")
-    .replace(/[<>]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const sanitised = text.replace(/[#;]/g, " ").replace(/[<>]/g, " ").replace(/\s+/g, " ").trim();
   if (sanitised.length <= 60) return sanitised;
   return `${sanitised.slice(0, 57)}…`;
 }
@@ -77,12 +66,7 @@ interface BuildContext {
   processed: Set<string>;
 }
 
-function registerParticipant(
-  ctx: BuildContext,
-  span: SpanTreeNode,
-  id: string,
-  display: string,
-) {
+function registerParticipant(ctx: BuildContext, span: SpanTreeNode, id: string, display: string) {
   if (!ctx.participants.has(id)) {
     ctx.participants.add(id);
     ctx.participantDisplay.set(id, display);
@@ -107,11 +91,7 @@ function findIncludedDescendants(
   return out;
 }
 
-function processSpan(
-  span: SpanWithChildren,
-  ctx: BuildContext,
-  parentParticipant: string | null,
-) {
+function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipant: string | null) {
   if (ctx.processed.has(span.spanId)) return;
   ctx.processed.add(span.spanId);
   if (ctx.messages.length >= MAX_MESSAGES) return;
@@ -153,9 +133,7 @@ function processSpan(
   }
 
   const isInteraction =
-    !!currentParticipant &&
-    !!parentParticipant &&
-    currentParticipant !== parentParticipant;
+    !!currentParticipant && !!parentParticipant && currentParticipant !== parentParticipant;
 
   if (isInteraction) {
     let label: string;
@@ -184,9 +162,7 @@ function processSpan(
     .forEach((child) => processSpan(child, ctx, nextParent));
 
   if (isInteraction) {
-    ctx.messages.push(
-      `    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`,
-    );
+    ctx.messages.push(`    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`);
     ctx.messages.push(`    deactivate ${currentParticipant}`);
     if (isError) ctx.messages.push("    end");
   }

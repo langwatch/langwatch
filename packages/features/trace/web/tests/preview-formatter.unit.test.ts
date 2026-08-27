@@ -144,15 +144,7 @@ describe("formatPreview", () => {
 
   describe("given a single-key JSON envelope", () => {
     it("unwraps allowlisted keys (question, input, prompt, query, text, content, message)", () => {
-      for (const key of [
-        "question",
-        "input",
-        "prompt",
-        "query",
-        "text",
-        "content",
-        "message",
-      ]) {
+      for (const key of ["question", "input", "prompt", "query", "text", "content", "message"]) {
         const result = formatPreview(`{"${key}": "hello"}`, { maxChars: 80 });
         expect(result.text).toBe("hello");
       }
@@ -359,8 +351,7 @@ describe("formatPreview", () => {
     });
 
     it("unwraps a repr chat array with None/True literals", () => {
-      const input =
-        "[{'role': 'user', 'content': 'hello there', 'name': None, 'cached': True}]";
+      const input = "[{'role': 'user', 'content': 'hello there', 'name': None, 'cached': True}]";
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.text).toBe("hello there");
       expect(result.role).toBe("user");

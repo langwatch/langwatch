@@ -136,9 +136,7 @@ export function FlameCanvas({
             (() => {
               const p = relatedSpanIds.parent.span;
               const left =
-                durationMs > 0
-                  ? ((p.startTimeMs - viewport.startMs) / durationMs) * 100
-                  : 0;
+                durationMs > 0 ? ((p.startTimeMs - viewport.startMs) / durationMs) * 100 : 0;
               const width =
                 durationMs > 0 ? ((p.endTimeMs - p.startTimeMs) / durationMs) * 100 : 100;
               if (left + width < 0 || left > 100) return null;
@@ -207,9 +205,7 @@ export function FlameCanvas({
           (() => {
             const selDur = dragSelection.endMs - dragSelection.startMs;
             const left =
-              durationMs > 0
-                ? ((dragSelection.startMs - viewport.startMs) / durationMs) * 100
-                : 0;
+              durationMs > 0 ? ((dragSelection.startMs - viewport.startMs) / durationMs) * 100 : 0;
             const width = durationMs > 0 ? (selDur / durationMs) * 100 : 0;
             return (
               <Box
@@ -254,8 +250,8 @@ export function FlameCanvas({
         {hiddenSpanCount > 0 && (
           <Flex justify="center" paddingY={1}>
             <Text textStyle="xs" color="fg.subtle">
-              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to
-              display — zoom in to see
+              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to display — zoom
+              in to see
             </Text>
           </Flex>
         )}

@@ -15,13 +15,7 @@ interface FlameAxisProps {
  * The box is the drag target for useFlameAxisZoom; ticks are rendered
  * absolutely within it so they line up with the flame rows below.
  */
-export function FlameAxis({
-  timeAxisRef,
-  ticks,
-  viewport,
-  dur,
-  onPointerDown,
-}: FlameAxisProps) {
+export function FlameAxis({ timeAxisRef, ticks, viewport, dur, onPointerDown }: FlameAxisProps) {
   return (
     <Tooltip
       content="Drag horizontally to zoom into a range · scroll to zoom · drag flame to pan"

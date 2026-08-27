@@ -36,11 +36,7 @@ export function ContextDisclosure({ context }: { context: string }) {
       )}
       {open && (
         <Box textStyle="xs" color="fg.muted" lineHeight="1.6" paddingTop={1}>
-          <RenderedMarkdown
-            markdown={asMarkdownBody(context)}
-            paddingX={0}
-            paddingY={0}
-          />
+          <RenderedMarkdown markdown={asMarkdownBody(context)} paddingX={0} paddingY={0} />
         </Box>
       )}
     </Box>

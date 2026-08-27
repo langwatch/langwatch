@@ -157,11 +157,7 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
         ) {
           try {
             const inner: unknown = JSON.parse(trimmed);
-            if (
-              isRecord(inner) &&
-              typeof inner.type === "string" &&
-              inner.type !== "text"
-            ) {
+            if (isRecord(inner) && typeof inner.type === "string" && inner.type !== "text") {
               const innerBlocks = parseContentBlocks([inner]);
               const first = innerBlocks[0];
               if (first && first.kind !== "raw") {

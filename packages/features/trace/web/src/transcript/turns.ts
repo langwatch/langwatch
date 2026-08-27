@@ -31,9 +31,7 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): ConversationTur
   // user speaking, and folding it relabelled them as the assistant.
   const isAssistantOperationEcho = (blocks: ContentBlock[]) =>
     blocks.length > 0 &&
-    blocks.every(
-      (b) => b.kind === "tool_result" || b.kind === "tool_use" || b.kind === "thinking",
-    );
+    blocks.every((b) => b.kind === "tool_result" || b.kind === "tool_use" || b.kind === "thinking");
 
   const appendToAssistant = (msg: ChatMessage, blocks: ContentBlock[]) => {
     // If the message has reasoning_content (OpenAI) or thinking (top-level)

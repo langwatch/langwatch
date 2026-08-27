@@ -26,15 +26,11 @@ export interface InlineDescriptor {
   hint?: string;
 }
 
-const chatEntrySchema = z
-  .object({ role: z.string(), content: z.unknown() })
-  .passthrough();
+const chatEntrySchema = z.object({ role: z.string(), content: z.unknown() }).passthrough();
 const chatMessageSchema = z
   .object({ role: z.string().optional(), content: z.unknown().optional() })
   .passthrough();
-const textPartSchema = z
-  .object({ type: z.literal("text"), text: z.string() })
-  .passthrough();
+const textPartSchema = z.object({ type: z.literal("text"), text: z.string() }).passthrough();
 const contentPartSchema = z
   .object({
     type: z.string().optional(),
@@ -74,11 +70,7 @@ export function detectFormat(value: unknown): AttributeFormat {
     return "leaf";
   }
 
-  if (
-    trimmed.length <= LEAF_LENGTH &&
-    !trimmed.includes("\n") &&
-    !looksJsonShaped(trimmed)
-  ) {
+  if (trimmed.length <= LEAF_LENGTH && !trimmed.includes("\n") && !looksJsonShaped(trimmed)) {
     return "leaf";
   }
 

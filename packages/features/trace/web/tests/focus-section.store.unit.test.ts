@@ -14,9 +14,7 @@ describe("useFocusSectionStore", () => {
         // accordion observer reads `pending`, expands the section,
         // scrolls + triggers the glow. Testing the store directly keeps
         // the chip's click handler decoupled from the accordion's DOM.
-        useFocusSectionStore
-          .getState()
-          .request({ traceId: "trace-abc", section: "exceptions" });
+        useFocusSectionStore.getState().request({ traceId: "trace-abc", section: "exceptions" });
         const pending = useFocusSectionStore.getState().pending;
         expect(pending?.traceId).toBe("trace-abc");
         expect(pending?.section).toBe("exceptions");
@@ -28,9 +26,7 @@ describe("useFocusSectionStore", () => {
     describe("when an evaluation chip is clicked", () => {
       /** @scenario Clicking an evaluation chip focuses the Evals section */
       it("publishes a pending focus payload for the evals section", () => {
-        useFocusSectionStore
-          .getState()
-          .request({ traceId: "trace-xyz", section: "evals" });
+        useFocusSectionStore.getState().request({ traceId: "trace-xyz", section: "evals" });
         const pending = useFocusSectionStore.getState().pending;
         expect(pending?.traceId).toBe("trace-xyz");
         expect(pending?.section).toBe("evals");
@@ -48,13 +44,9 @@ describe("useFocusSectionStore", () => {
         // operator would feel like the chip stopped responding. Nonce
         // is the cheap way to make every click distinct in observer
         // identity terms.
-        useFocusSectionStore
-          .getState()
-          .request({ traceId: "trace-abc", section: "exceptions" });
+        useFocusSectionStore.getState().request({ traceId: "trace-abc", section: "exceptions" });
         const first = useFocusSectionStore.getState().pending!.nonce;
-        useFocusSectionStore
-          .getState()
-          .request({ traceId: "trace-abc", section: "exceptions" });
+        useFocusSectionStore.getState().request({ traceId: "trace-abc", section: "exceptions" });
         const second = useFocusSectionStore.getState().pending!.nonce;
         expect(second).toBeGreaterThan(first);
       });

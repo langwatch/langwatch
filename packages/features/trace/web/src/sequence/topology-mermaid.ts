@@ -1,10 +1,6 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { formatDuration } from "../display-formatters";
-import {
-  buildSpanTree,
-  type SpanWithChildren,
-  sanitiseMermaidId,
-} from "./mermaid-shared";
+import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared";
 import type { SequenceSpanType } from "./types";
 
 interface NodeInfo {
@@ -43,10 +39,7 @@ function escapeNodeLabel(text: string): string {
 function getNode(span: SpanTreeNode): NodeInfo | null {
   const type = span.type ?? "span";
   if (type === "agent" && span.name) {
-    const display = span.name
-      .replace(".call", "")
-      .replace(".run", "")
-      .replace("invoke_agent ", "");
+    const display = span.name.replace(".call", "").replace(".run", "").replace("invoke_agent ", "");
     return {
       id: sanitiseMermaidId(`agent_${display}`),
       display,

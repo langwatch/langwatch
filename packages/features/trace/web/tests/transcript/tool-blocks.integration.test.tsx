@@ -20,11 +20,7 @@ describe("<ToolPairCard />", () => {
     /** @scenario "A skill run shows the invoked skill name" */
     it("renders the invoked skill name in the header", () => {
       renderWithProviders(
-        <ToolPairCard
-          name="Skill"
-          input={{ skill: "surf-pr", args: "" }}
-          result={null}
-        />,
+        <ToolPairCard name="Skill" input={{ skill: "surf-pr", args: "" }} result={null} />,
       );
 
       expect(screen.getByText("Skill · surf-pr")).toBeInTheDocument();
@@ -41,9 +37,7 @@ describe("<ToolPairCard />", () => {
   describe("when the tool_use is an ordinary tool", () => {
     /** @scenario "An ordinary tool call is not treated as a skill" */
     it("renders the tool name plainly, not as a skill", () => {
-      renderWithProviders(
-        <ToolPairCard name="Bash" input={{ command: "ls -la" }} result={null} />,
-      );
+      renderWithProviders(<ToolPairCard name="Bash" input={{ command: "ls -la" }} result={null} />);
 
       expect(screen.getByText("Bash")).toBeInTheDocument();
       expect(screen.queryByText(/Skill ·/)).toBeNull();

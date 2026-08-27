@@ -22,10 +22,7 @@
  */
 
 import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
-import {
-  applyPreviewNewlineTreatment,
-  stripPreviewMarkdownNoise,
-} from "./preview-markdown";
+import { applyPreviewNewlineTreatment, stripPreviewMarkdownNoise } from "./preview-markdown";
 import { pythonReprToJson } from "./python-repr";
 import type { PreviewOptions, PreviewResult } from "./preview-types";
 

@@ -34,9 +34,7 @@ describe("skillInvocation", () => {
       });
 
       it("trims surrounding whitespace", () => {
-        expect(skillSlugFromInput({ skill: "  ruthless-review  " })).toBe(
-          "ruthless-review",
-        );
+        expect(skillSlugFromInput({ skill: "  ruthless-review  " })).toBe("ruthless-review");
       });
 
       it("honors the skill_name alias", () => {

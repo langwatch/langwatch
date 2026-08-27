@@ -8,9 +8,7 @@ export function FindMatchHighlight({ traceId }: FindMatchHighlightProps) {
   useEffect(() => {
     if (!traceId) return;
 
-    const rowGroup = document.querySelector(
-      `tbody[data-trace-id="${CSS.escape(traceId)}"]`,
-    );
+    const rowGroup = document.querySelector(`tbody[data-trace-id="${CSS.escape(traceId)}"]`);
     rowGroup?.setAttribute("data-current-find-match", "");
 
     return () => rowGroup?.removeAttribute("data-current-find-match");

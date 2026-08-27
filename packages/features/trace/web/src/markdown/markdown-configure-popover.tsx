@@ -23,14 +23,7 @@ export function MarkdownConfigurePopover({
   return (
     <PopoverRoot positioning={{ placement }}>
       <PopoverTrigger asChild>
-        <Button
-          size="xs"
-          variant="outline"
-          colorPalette="blue"
-          paddingX={2}
-          height="24px"
-          gap={1}
-        >
+        <Button size="xs" variant="outline" colorPalette="blue" paddingX={2} height="24px" gap={1}>
           <Icon as={LuSettings2} boxSize={3} />
           <Text textStyle="2xs" fontWeight="semibold">
             Configure
@@ -59,17 +52,13 @@ export function MarkdownConfigurePopover({
               </ConfigCheckbox>
               <ConfigCheckbox
                 checked={config.includeMetadata}
-                onCheckedChange={(checked) =>
-                  onChange({ ...config, includeMetadata: checked })
-                }
+                onCheckedChange={(checked) => onChange({ ...config, includeMetadata: checked })}
               >
                 Metadata
               </ConfigCheckbox>
               <ConfigCheckbox
                 checked={config.includeSpanIO}
-                onCheckedChange={(checked) =>
-                  onChange({ ...config, includeSpanIO: checked })
-                }
+                onCheckedChange={(checked) => onChange({ ...config, includeSpanIO: checked })}
               >
                 Per-span input / output
               </ConfigCheckbox>
@@ -83,17 +72,13 @@ export function MarkdownConfigurePopover({
               </ConfigCheckbox>
               <ConfigCheckbox
                 checked={config.includeWaterfall}
-                onCheckedChange={(checked) =>
-                  onChange({ ...config, includeWaterfall: checked })
-                }
+                onCheckedChange={(checked) => onChange({ ...config, includeWaterfall: checked })}
               >
                 Unicode waterfall
               </ConfigCheckbox>
               <ConfigCheckbox
                 checked={config.includeFlame}
-                onCheckedChange={(checked) =>
-                  onChange({ ...config, includeFlame: checked })
-                }
+                onCheckedChange={(checked) => onChange({ ...config, includeFlame: checked })}
               >
                 Unicode flame graph
               </ConfigCheckbox>
@@ -215,9 +200,7 @@ function ConfigCheckbox({
     <Checkbox.Root
       size="xs"
       checked={checked}
-      onCheckedChange={({ checked: nextChecked }) =>
-        onCheckedChange(nextChecked === true)
-      }
+      onCheckedChange={({ checked: nextChecked }) => onCheckedChange(nextChecked === true)}
     >
       <Checkbox.HiddenInput />
       <Checkbox.Control />

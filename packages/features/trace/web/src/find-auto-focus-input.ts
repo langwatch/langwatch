@@ -1,8 +1,6 @@
 import { type RefObject, useEffect, useRef } from "react";
 
-export function useFindAutoFocusInput(
-  active: boolean,
-): RefObject<HTMLInputElement | null> {
+export function useFindAutoFocusInput(active: boolean): RefObject<HTMLInputElement | null> {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

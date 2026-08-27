@@ -69,7 +69,5 @@ export function EarlierTurnsExpander({
 }
 
 export function CollapseEarlierToggle({ onClick }: { onClick: () => void }) {
-  return (
-    <EarlierTurnsHeader icon={LuChevronUp} label="Hide earlier turns" onClick={onClick} />
-  );
+  return <EarlierTurnsHeader icon={LuChevronUp} label="Hide earlier turns" onClick={onClick} />;
 }

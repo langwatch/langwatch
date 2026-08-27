@@ -26,14 +26,7 @@ export function FlameBreadcrumbs({
   renderShortcutKey,
 }: FlameBreadcrumbsProps) {
   return (
-    <Flex
-      align="center"
-      justify="space-between"
-      gap={2}
-      paddingX={3}
-      paddingY={1.5}
-      flexShrink={0}
-    >
+    <Flex align="center" justify="space-between" gap={2} paddingX={3} paddingY={1.5} flexShrink={0}>
       <HStack gap={0.5} flexWrap="nowrap" overflow="hidden" minWidth={0}>
         <Text
           as="button"

@@ -2,12 +2,7 @@ import { Box, Flex, Text } from "@chakra-ui/react";
 import { useCallback, useRef } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatDuration } from "../display-formatters";
-import {
-  MIN_VIEWPORT_MS,
-  MINIMAP_HANDLE_PX,
-  MINIMAP_HEIGHT,
-  MINIMAP_WIDTH,
-} from "./constants";
+import { MIN_VIEWPORT_MS, MINIMAP_HANDLE_PX, MINIMAP_HEIGHT, MINIMAP_WIDTH } from "./constants";
 import { getSpanColor } from "./colors";
 import type { FlameNode, Viewport } from "./types";
 
@@ -328,14 +323,7 @@ function HandleGrip() {
   return (
     <Flex direction="column" gap="2px" pointerEvents="none">
       {[0, 1, 2].map((i) => (
-        <Box
-          key={i}
-          width="2px"
-          height="2px"
-          borderRadius="full"
-          bg="white"
-          opacity={0.85}
-        />
+        <Box key={i} width="2px" height="2px" borderRadius="full" bg="white" opacity={0.85} />
       ))}
     </Flex>
   );

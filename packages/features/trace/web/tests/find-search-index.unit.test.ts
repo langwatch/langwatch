@@ -31,10 +31,9 @@ const traces: TraceSearchItem[] = [
 
 describe("trace find search index", () => {
   it("requires the existing minimum query length and searches visible trace fields", () => {
-    const { result, rerender } = renderHook(
-      ({ query }) => useTraceSearchIndex({ traces, query }),
-      { initialProps: { query: "p" } },
-    );
+    const { result, rerender } = renderHook(({ query }) => useTraceSearchIndex({ traces, query }), {
+      initialProps: { query: "p" },
+    });
 
     expect(MIN_QUERY_LENGTH).toBe(2);
     expect(result.current).toEqual([]);

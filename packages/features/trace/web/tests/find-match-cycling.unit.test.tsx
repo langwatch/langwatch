@@ -7,10 +7,9 @@ import { useFindMatchCycling } from "../src";
 
 describe("trace find match cycling", () => {
   it("wraps next and previous navigation and resets when matches change", () => {
-    const { result, rerender } = renderHook(
-      ({ matches }) => useFindMatchCycling(matches),
-      { initialProps: { matches: ["trace-1", "trace-2"] } },
-    );
+    const { result, rerender } = renderHook(({ matches }) => useFindMatchCycling(matches), {
+      initialProps: { matches: ["trace-1", "trace-2"] },
+    });
 
     expect(result.current.currentId).toBe("trace-1");
     act(() => result.current.next());

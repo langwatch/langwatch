@@ -259,10 +259,7 @@ describe("handleKey", () => {
 
     describe("when the dropdown is closed", () => {
       it("returns noop for arrow keys (cursor movement is the editor's default)", () => {
-        const action = handleKey(
-          ctx({ text: "@status:error", cursorPos: 13 }),
-          "ArrowDown",
-        );
+        const action = handleKey(ctx({ text: "@status:error", cursorPos: 13 }), "ArrowDown");
         expect(action).toEqual<KeyAction>({ kind: "noop" });
       });
     });

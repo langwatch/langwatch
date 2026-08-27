@@ -69,9 +69,7 @@ describe("TraceFindBar", () => {
       key: "Escape",
     });
 
-    expect(
-      screen.queryByRole("search", { name: "Find on page" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("search", { name: "Find on page" })).not.toBeInTheDocument();
     expect(useFindStore.getState().isOpen).toBe(false);
   });
 });

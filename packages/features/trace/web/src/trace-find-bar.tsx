@@ -8,19 +8,14 @@ import { useFindMatchCycling } from "./find-match-cycling";
 import { FindMatchCounter } from "./find-match-counter";
 import { FindMatchHighlight } from "./find-match-highlight";
 import { useFindScrollTraceIntoView } from "./find-scroll-trace-into-view";
-import {
-  MIN_QUERY_LENGTH,
-  useTraceSearchIndex,
-  type TraceSearchItem,
-} from "./find-search-index";
+import { MIN_QUERY_LENGTH, useTraceSearchIndex, type TraceSearchItem } from "./find-search-index";
 
 type TraceFindBarProps = {
   traces: TraceSearchItem[];
   renderShortcutKey: (label: string) => ReactNode;
 };
 
-const IS_MAC =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 const ICON_SIZE = 14;
 
@@ -159,8 +154,8 @@ export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
           alignItems="center"
           gap={1}
         >
-          Press {renderShortcutKey(MOD_KEY_SYMBOL)} {renderShortcutKey("F")} again to
-          switch to your browser's find.
+          Press {renderShortcutKey(MOD_KEY_SYMBOL)} {renderShortcutKey("F")} again to switch to your
+          browser's find.
         </Text>
       </Box>
     </>

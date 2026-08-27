@@ -22,9 +22,7 @@ export function TurnView({
 }) {
   const isScenario = useIsScenarioRole();
   if (turn.kind === "system") {
-    return (
-      <SystemTurnView role={turn.role} blocks={turn.blocks} onCollapse={onCollapse} />
-    );
+    return <SystemTurnView role={turn.role} blocks={turn.blocks} onCollapse={onCollapse} />;
   }
   // In scenario mode the source role's `displayRole` is flipped, so a
   // `user` turn renders with the assistant card and an `assistant` turn

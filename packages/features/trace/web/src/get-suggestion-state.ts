@@ -32,8 +32,7 @@ export function getSuggestionState(text: string, cursorPos: number): SuggestionS
 
   // Only consume chars that are actually behind the cursor. When cursor sits
   // before any input (cursorPos === wordStart), there are no token chars yet.
-  const tokenStart =
-    wordStart < cursorPos && text[wordStart] === "-" ? wordStart + 1 : wordStart;
+  const tokenStart = wordStart < cursorPos && text[wordStart] === "-" ? wordStart + 1 : wordStart;
 
   let inner = tokenStart;
   let hadSigil = false;

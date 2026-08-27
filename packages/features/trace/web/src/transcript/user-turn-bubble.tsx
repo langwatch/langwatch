@@ -88,11 +88,7 @@ export function UserTurnBubble({
           </HStack>
           <Box color="fg" textStyle="xs" lineHeight="1.6">
             {text ? (
-              <RenderedMarkdown
-                markdown={asMarkdownBody(text)}
-                paddingX={0}
-                paddingY={0}
-              />
+              <RenderedMarkdown markdown={asMarkdownBody(text)} paddingX={0} paddingY={0} />
             ) : (
               <Text>—</Text>
             )}
@@ -105,12 +101,7 @@ export function UserTurnBubble({
   // Mixed-content user message (or empty). Render full-width with the
   // same block stack as an assistant turn but blue-accented.
   return (
-    <Box
-      marginBottom={4}
-      paddingLeft={4}
-      borderLeftWidth="2px"
-      borderLeftColor={palette.muted}
-    >
+    <Box marginBottom={4} paddingLeft={4} borderLeftWidth="2px" borderLeftColor={palette.muted}>
       <HStack gap={1.5} marginBottom={1.5}>
         <Flex
           width="16px"

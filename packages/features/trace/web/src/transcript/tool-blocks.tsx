@@ -30,14 +30,7 @@ export function OpenAIToolCallCard({
       return call.function.arguments;
     }
   }, [call.function.arguments]);
-  return (
-    <ToolPairCard
-      name={call.function.name}
-      input={parsedInput}
-      id={call.id}
-      result={null}
-    />
-  );
+  return <ToolPairCard name={call.function.name} input={parsedInput} id={call.id} result={null} />;
 }
 
 /**
@@ -165,14 +158,7 @@ export function ToolPairCard({
         {isSkill ? (
           <Box flex={1} />
         ) : argSummary ? (
-          <Text
-            textStyle="2xs"
-            fontFamily="mono"
-            color="fg.subtle"
-            truncate
-            flex={1}
-            minWidth={0}
-          >
+          <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate flex={1} minWidth={0}>
             {argSummary}
           </Text>
         ) : (
@@ -203,12 +189,7 @@ export function ToolPairCard({
         />
       </chakra.button>
       {open && (
-        <VStack
-          align="stretch"
-          gap={0}
-          borderTopWidth="1px"
-          borderTopColor="border.muted"
-        >
+        <VStack align="stretch" gap={0} borderTopWidth="1px" borderTopColor="border.muted">
           <ToolPairSection label={id ? `Args · ${id}` : "Args"}>
             {argEntries && argEntries.length > 0 ? (
               <VStack align="stretch" gap={1}>

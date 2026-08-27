@@ -28,9 +28,7 @@ const MESSAGES = [
   { role: "system", content: "You are Langy, the LangWatch assistant." },
   {
     role: "user",
-    content: [
-      { text: "I want to see all of the off topic evaluator traces", type: "text" },
-    ],
+    content: [{ text: "I want to see all of the off topic evaluator traces", type: "text" }],
   },
 ];
 
@@ -50,9 +48,7 @@ function withReversedKeys(value: unknown): unknown {
 
 describe("sameAttributeValue", () => {
   it("ignores JSON formatting and key order", () => {
-    expect(
-      sameAttributeValue(JSON.stringify(TOOL_CALLS), prettyPrinted(TOOL_CALLS)),
-    ).toBe(true);
+    expect(sameAttributeValue(JSON.stringify(TOOL_CALLS), prettyPrinted(TOOL_CALLS))).toBe(true);
     expect(sameAttributeValue(TOOL_CALLS, withReversedKeys(TOOL_CALLS))).toBe(true);
     expect(sameAttributeValue(JSON.stringify(TOOL_CALLS), TOOL_CALLS)).toBe(true);
   });

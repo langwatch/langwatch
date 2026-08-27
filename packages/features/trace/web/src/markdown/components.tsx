@@ -94,9 +94,7 @@ export function buildMarkdownComponents(colorMode: string) {
         {children}
       </Text>
     ),
-    hr: () => (
-      <Box as="hr" borderTopWidth="1px" borderTopColor="border.muted" marginY={3} />
-    ),
+    hr: () => <Box as="hr" borderTopWidth="1px" borderTopColor="border.muted" marginY={3} />,
     table: ({ children }: { children?: React.ReactNode }) => (
       <Box overflowX="auto" marginY={2}>
         <Table.Root size="sm" variant="line">
@@ -107,18 +105,12 @@ export function buildMarkdownComponents(colorMode: string) {
     thead: ({ children }: { children?: React.ReactNode }) => (
       <Table.Header>{children}</Table.Header>
     ),
-    tbody: ({ children }: { children?: React.ReactNode }) => (
-      <Table.Body>{children}</Table.Body>
-    ),
-    tr: ({ children }: { children?: React.ReactNode }) => (
-      <Table.Row>{children}</Table.Row>
-    ),
+    tbody: ({ children }: { children?: React.ReactNode }) => <Table.Body>{children}</Table.Body>,
+    tr: ({ children }: { children?: React.ReactNode }) => <Table.Row>{children}</Table.Row>,
     th: ({ children }: { children?: React.ReactNode }) => (
       <Table.ColumnHeader>{children}</Table.ColumnHeader>
     ),
-    td: ({ children }: { children?: React.ReactNode }) => (
-      <Table.Cell>{children}</Table.Cell>
-    ),
+    td: ({ children }: { children?: React.ReactNode }) => <Table.Cell>{children}</Table.Cell>,
     code(props: { className?: string; children?: React.ReactNode; inline?: boolean }) {
       const { className, children } = props;
       const match = /language-(\w+)/.exec(className ?? "");

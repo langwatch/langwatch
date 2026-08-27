@@ -1,11 +1,5 @@
 import { formatDuration } from "../display-formatters";
-import type {
-  BuiltTree,
-  FlameNode,
-  SpanContext,
-  TraceFlameSpan,
-  Viewport,
-} from "./types";
+import type { BuiltTree, FlameNode, SpanContext, TraceFlameSpan, Viewport } from "./types";
 
 export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
   const spanById = new Map<string, TraceFlameSpan>();
@@ -54,9 +48,7 @@ export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
 
 export function computeSpanContext(node: FlameNode, fullRange: Viewport): SpanContext {
   const dur = node.span.endTimeMs - node.span.startTimeMs;
-  const parentDur = node.parent
-    ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
-    : null;
+  const parentDur = node.parent ? node.parent.span.endTimeMs - node.parent.span.startTimeMs : null;
   const traceDur = fullRange.endMs - fullRange.startMs;
   return {
     duration: dur,

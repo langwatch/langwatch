@@ -138,9 +138,7 @@ describe("TraceMediaStrip", () => {
       <ChakraProvider value={defaultSystem}>
         <TraceMediaStrip
           parts={parts}
-          renderPart={(part) => (
-            <span>{part.type === "binary" ? part.filename : part.type}</span>
-          )}
+          renderPart={(part) => <span>{part.type === "binary" ? part.filename : part.type}</span>}
         />
       </ChakraProvider>,
     );

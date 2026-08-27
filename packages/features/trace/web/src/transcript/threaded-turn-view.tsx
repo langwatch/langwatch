@@ -63,8 +63,7 @@ export function ThreadedTurnView({
   const colorKey = scenarioVisuals?.displayRole ?? sourceRole;
   const palette = getRolePalette(colorKey);
   const RoleIcon = scenarioVisuals?.Icon ?? ROLE_ICONS[sourceRole] ?? LuUser;
-  const label =
-    scenarioVisuals?.label ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
+  const label = scenarioVisuals?.label ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
 
   if (expanded) {
     // Expanded body — FlatTurnView (or TurnView for bubble layout)
@@ -134,14 +133,7 @@ export function ThreadedTurnView({
           >
             {label}
           </Text>
-          <Text
-            textStyle="xs"
-            color="fg.default"
-            truncate
-            flex={1}
-            minWidth={0}
-            lineHeight={1.4}
-          >
+          <Text textStyle="xs" color="fg.default" truncate flex={1} minWidth={0} lineHeight={1.4}>
             {summary}
           </Text>
         </HStack>

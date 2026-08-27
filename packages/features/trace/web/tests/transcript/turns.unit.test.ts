@@ -84,10 +84,7 @@ describe("groupMessagesIntoTurns", () => {
       ]);
 
       expect(turns.map((turn) => turn.kind)).toEqual(["user", "assistant"]);
-      expect(turns[1]?.blocks.map((block) => block.kind)).toEqual([
-        "tool_use",
-        "tool_result",
-      ]);
+      expect(turns[1]?.blocks.map((block) => block.kind)).toEqual(["tool_use", "tool_result"]);
     });
   });
 

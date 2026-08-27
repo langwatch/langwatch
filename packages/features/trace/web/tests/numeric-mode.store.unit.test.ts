@@ -36,9 +36,7 @@ describe("numericModeStore", () => {
 
   describe("when a mode is set", () => {
     it("stores the override under the project", () => {
-      useNumericModeStore
-        .getState()
-        .setMode({ projectId: PROJECT, field: "spans", mode: "range" });
+      useNumericModeStore.getState().setMode({ projectId: PROJECT, field: "spans", mode: "range" });
       expect(
         selectNumericModesFor({
           state: useNumericModeStore.getState(),
@@ -63,9 +61,7 @@ describe("numericModeStore", () => {
     });
 
     it("keeps projects isolated", () => {
-      useNumericModeStore
-        .getState()
-        .setMode({ projectId: PROJECT, field: "spans", mode: "range" });
+      useNumericModeStore.getState().setMode({ projectId: PROJECT, field: "spans", mode: "range" });
       useNumericModeStore
         .getState()
         .setMode({ projectId: "proj-2", field: "spans", mode: "discrete" });
@@ -103,10 +99,7 @@ describe("numericModeStore", () => {
     });
 
     it("ignores a wrong storage version", () => {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ version: 2, modes: { spans: "range" } }),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, modes: { spans: "range" } }));
       useNumericModeStore.getState().hydrateFromStorage(PROJECT);
       expect(
         selectNumericModesFor({

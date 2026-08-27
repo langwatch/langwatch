@@ -38,39 +38,32 @@ interface AnnotationQueueSessionState {
  * is walked and is dropped the moment the queue is left. A set carried over
  * from last week silently feeding a dataset would be worse than re-ticking.
  */
-export const useAnnotationQueueSessionStore = create<AnnotationQueueSessionState>(
-  (set) => ({
-    active: false,
-    marks: {},
-    handoff: "idle",
-    setActive: (active) =>
-      set(active ? { active } : { active, marks: {}, handoff: "idle" }),
-    noteWalked: (traceId) =>
-      set((state) =>
-        // Only a trace the sitting has never heard of: walking back to a turn
-        // the reviewer unticked, or ticked by hand, says nothing new about it.
-        state.marks[traceId] === void 0
-          ? { marks: { ...state.marks, [traceId]: "auto" } }
-          : state,
-      ),
-    noteAnnotationSaved: (traceId) =>
-      set((state) =>
-        state.marks[traceId] === "off"
-          ? state
-          : { marks: { ...state.marks, [traceId]: "auto" } },
-      ),
-    toggle: (traceId) =>
-      set((state) => ({
-        marks: {
-          ...state.marks,
-          [traceId]: isSessionMarked(state.marks, traceId) ? "off" : "on",
-        },
-      })),
-    noteHandoffOpened: () => set({ handoff: "open" }),
-    noteHandoffAdded: () => set({ handoff: "added" }),
-    resetHandoff: () => set({ handoff: "idle" }),
-  }),
-);
+export const useAnnotationQueueSessionStore = create<AnnotationQueueSessionState>((set) => ({
+  active: false,
+  marks: {},
+  handoff: "idle",
+  setActive: (active) => set(active ? { active } : { active, marks: {}, handoff: "idle" }),
+  noteWalked: (traceId) =>
+    set((state) =>
+      // Only a trace the sitting has never heard of: walking back to a turn
+      // the reviewer unticked, or ticked by hand, says nothing new about it.
+      state.marks[traceId] === void 0 ? { marks: { ...state.marks, [traceId]: "auto" } } : state,
+    ),
+  noteAnnotationSaved: (traceId) =>
+    set((state) =>
+      state.marks[traceId] === "off" ? state : { marks: { ...state.marks, [traceId]: "auto" } },
+    ),
+  toggle: (traceId) =>
+    set((state) => ({
+      marks: {
+        ...state.marks,
+        [traceId]: isSessionMarked(state.marks, traceId) ? "off" : "on",
+      },
+    })),
+  noteHandoffOpened: () => set({ handoff: "open" }),
+  noteHandoffAdded: () => set({ handoff: "added" }),
+  resetHandoff: () => set({ handoff: "idle" }),
+}));
 
 /** The traces the sitting counts, in the order they were counted. */
 export function sessionTraceIds(marks: Record<string, SessionMark>): string[] {
@@ -80,10 +73,7 @@ export function sessionTraceIds(marks: Record<string, SessionMark>): string[] {
 }
 
 /** Whether this trace is one the sitting counts. */
-export function isSessionMarked(
-  marks: Record<string, SessionMark>,
-  traceId: string,
-): boolean {
+export function isSessionMarked(marks: Record<string, SessionMark>, traceId: string): boolean {
   const mark = marks[traceId];
   return mark === "auto" || mark === "on";
 }

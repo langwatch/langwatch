@@ -22,10 +22,7 @@ export function stripPreviewMarkdownNoise(text: string): MarkdownNoiseResult {
   return { text, hadCode, hadImage };
 }
 
-export function applyPreviewNewlineTreatment(
-  text: string,
-  mode: NewlineTreatment,
-): string {
+export function applyPreviewNewlineTreatment(text: string, mode: NewlineTreatment): string {
   if (mode === "preserve") return text;
   if (mode === "space") return text.replace(/\s+/g, " ");
   return text

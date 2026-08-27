@@ -57,10 +57,7 @@ function readFromStorage(projectId: string): Record<string, NumericMode> {
   }
 }
 
-function writeToStorage(params: {
-  projectId: string;
-  modes: Record<string, NumericMode>;
-}): void {
+function writeToStorage(params: { projectId: string; modes: Record<string, NumericMode> }): void {
   const { projectId, modes } = params;
   if (typeof window === "undefined") {
     return;

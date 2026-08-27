@@ -69,11 +69,7 @@ export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
     compute: () => {
       const now = new Date();
       const daysSinceMonday = (now.getDay() + 6) % 7;
-      const start = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() - daysSinceMonday,
-      );
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday);
       return { from: start.getTime(), to: now.getTime() };
     },
   },

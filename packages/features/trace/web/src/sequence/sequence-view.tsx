@@ -43,10 +43,7 @@ const TYPE_LABELS: Record<SequenceSpanType, string> = {
 // it render natively. The Chakra-themed chrome around the diagram (toolbar,
 // minimap, canvas bg) provides the LangWatch context.
 
-function countParticipants(
-  spans: SequenceViewProps["spans"],
-  types: ReadonlySet<string>,
-): number {
+function countParticipants(spans: SequenceViewProps["spans"], types: ReadonlySet<string>): number {
   const set = new Set<string>();
   for (const span of spans) {
     if (!types.has(span.type ?? "span")) continue;
@@ -62,16 +59,10 @@ function countParticipants(
   return set.size;
 }
 
-export function SequenceView({
-  spans,
-  selectedSpanId,
-  onSelectSpan,
-  subMode,
-}: SequenceViewProps) {
+export function SequenceView({ spans, selectedSpanId, onSelectSpan, subMode }: SequenceViewProps) {
   const { colorMode } = useColorMode();
 
-  const [selectedTypes, setSelectedTypes] =
-    useState<SequenceSpanType[]>(DEFAULT_SEQUENCE_TYPES);
+  const [selectedTypes, setSelectedTypes] = useState<SequenceSpanType[]>(DEFAULT_SEQUENCE_TYPES);
 
   const easterEgg = useKonamiEasterEgg();
 
@@ -145,9 +136,7 @@ export function SequenceView({
     return set;
   }, [spans]);
 
-  const availableSelectedCount = selectedTypes.filter((t) =>
-    presentTypeSet.has(t),
-  ).length;
+  const availableSelectedCount = selectedTypes.filter((t) => presentTypeSet.has(t)).length;
 
   const { error } = useMermaidRenderer({
     result,
@@ -267,22 +256,12 @@ export function SequenceView({
               </Text>
             </Box>
           </Tooltip>
-          <ZoomButton
-            label="Zoom in"
-            icon={LuPlus}
-            onClick={() => handleZoomBtn(ZOOM_STEP)}
-          />
+          <ZoomButton label="Zoom in" icon={LuPlus} onClick={() => handleZoomBtn(ZOOM_STEP)} />
           <ZoomButton label="Fit to screen" icon={LuMaximize} onClick={handleResetFit} />
           <CopySourceButton syntax={result.syntax} />
         </HStack>
 
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          flexShrink={0}
-          marginLeft={1.5}
-          fontWeight={500}
-        >
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} marginLeft={1.5} fontWeight={500}>
           {result.countLabel}
         </Text>
       </Flex>

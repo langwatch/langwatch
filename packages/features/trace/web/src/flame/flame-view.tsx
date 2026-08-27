@@ -45,14 +45,8 @@ export const FlameView = memo(function FlameView({
   const flameAreaRef = useRef<HTMLDivElement>(null);
   const timeAxisRef = useRef<HTMLDivElement>(null);
 
-  const {
-    viewport,
-    setViewport,
-    viewportRef,
-    clampViewport,
-    animateTo,
-    cancelAnimation,
-  } = useFlameViewport({ fullRange, flameAreaRef });
+  const { viewport, setViewport, viewportRef, clampViewport, animateTo, cancelAnimation } =
+    useFlameViewport({ fullRange, flameAreaRef });
 
   const { isPanningRef, handlePointerDown } = useFlamePanDrag({
     flameAreaRef,
@@ -140,8 +134,7 @@ export const FlameView = memo(function FlameView({
     const node = tree.byId.get(selectedSpanId);
     if (!node) return;
     const v = viewportRef.current;
-    const isCompletelyOutside =
-      node.span.endTimeMs < v.startMs || node.span.startTimeMs > v.endMs;
+    const isCompletelyOutside = node.span.endTimeMs < v.startMs || node.span.startTimeMs > v.endMs;
     if (!isCompletelyOutside) return;
     const nodeDur = node.span.endTimeMs - node.span.startTimeMs;
     const vpDur = v.endMs - v.startMs;

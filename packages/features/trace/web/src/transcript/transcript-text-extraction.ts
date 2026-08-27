@@ -73,9 +73,7 @@ export function getReasoning(message: ChatMessage, blocks: ContentBlock[]): stri
     return message.thinking;
   }
   return blocks
-    .filter(
-      (b): b is Extract<ContentBlock, { kind: "thinking" }> => b.kind === "thinking",
-    )
+    .filter((b): b is Extract<ContentBlock, { kind: "thinking" }> => b.kind === "thinking")
     .map((b) => b.text)
     .join("\n\n");
 }

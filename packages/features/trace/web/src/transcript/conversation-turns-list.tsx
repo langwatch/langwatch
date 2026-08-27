@@ -1,12 +1,6 @@
 import { useState } from "react";
-import {
-  EarlierTurnsExpander,
-  CollapseEarlierToggle,
-} from "./conversation-turn-list-controls";
-import {
-  InlineTurnList,
-  VirtualizedTurnList,
-} from "./conversation-turn-list-virtualized";
+import { EarlierTurnsExpander, CollapseEarlierToggle } from "./conversation-turn-list-controls";
+import { InlineTurnList, VirtualizedTurnList } from "./conversation-turn-list-virtualized";
 import {
   type ChatLayout,
   type ConversationTurn,
@@ -33,17 +27,12 @@ export function ConversationTurnsList({
   const canCollapseEarlier = layout === "thread" && turns.length > COLLAPSE_EARLIER_AT;
   const [showEarlier, setShowEarlier] = useState(false);
   const hiddenCount =
-    canCollapseEarlier && !showEarlier
-      ? Math.max(0, turns.length - TAIL_VISIBLE_TURNS)
-      : 0;
+    canCollapseEarlier && !showEarlier ? Math.max(0, turns.length - TAIL_VISIBLE_TURNS) : 0;
   const visibleTurns = hiddenCount > 0 ? turns.slice(hiddenCount) : turns;
 
   const header = canCollapseEarlier ? (
     hiddenCount > 0 ? (
-      <EarlierTurnsExpander
-        hiddenCount={hiddenCount}
-        onClick={() => setShowEarlier(true)}
-      />
+      <EarlierTurnsExpander hiddenCount={hiddenCount} onClick={() => setShowEarlier(true)} />
     ) : (
       <CollapseEarlierToggle onClick={() => setShowEarlier(false)} />
     )

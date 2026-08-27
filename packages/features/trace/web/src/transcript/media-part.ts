@@ -24,9 +24,7 @@ function mediaWithSource(
   type: "image" | "audio" | "video",
   mediaSource: NonNullable<ReturnType<typeof source>>,
 ): MediaPartData {
-  return mediaSource.type === "url"
-    ? { type, source: mediaSource }
-    : { type, source: mediaSource };
+  return mediaSource.type === "url" ? { type, source: mediaSource } : { type, source: mediaSource };
 }
 
 /** Maps the trace wire's common media parts to the renderer-neutral shape. */
@@ -93,9 +91,7 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
       return {
         type: "binary",
         mimeType: mediaSource.mimeType ?? "application/octet-stream",
-        ...(mediaSource.type === "url"
-          ? { url: mediaSource.value }
-          : { data: mediaSource.value }),
+        ...(mediaSource.type === "url" ? { url: mediaSource.value } : { data: mediaSource.value }),
       };
     }
     return mediaWithSource(type, mediaSource);

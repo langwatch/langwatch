@@ -3,14 +3,7 @@ import { parseContentBlocks } from "./content-parser";
 import { tryParseJSON } from "./content-format";
 import { isRecord } from "./record";
 
-const VALID_CHAT_ROLES = new Set([
-  "system",
-  "user",
-  "assistant",
-  "tool",
-  "developer",
-  "function",
-]);
+const VALID_CHAT_ROLES = new Set(["system", "user", "assistant", "tool", "developer", "function"]);
 
 function isOneChatMessage(item: unknown): item is ChatMessage {
   if (!isRecord(item)) return false;
@@ -54,15 +47,7 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
       const declared = coerceDeclaredChatMessages(obj.value);
       if (declared) return declared;
     }
-    for (const key of [
-      "messages",
-      "input",
-      "history",
-      "output",
-      "data",
-      "value",
-      "events",
-    ]) {
+    for (const key of ["messages", "input", "history", "output", "data", "value", "events"]) {
       const candidate = obj[key];
       if (candidate === undefined) continue;
       const result = coerceToChatMessages(candidate);

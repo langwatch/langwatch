@@ -35,8 +35,8 @@ export function BlockStack({
 
   const toolItemCount = useMemo(
     () =>
-      items.filter((it) => it.kind === "tool_pair" || it.kind === "orphan_result")
-        .length + toolCalls.length,
+      items.filter((it) => it.kind === "tool_pair" || it.kind === "orphan_result").length +
+      toolCalls.length,
     [items, toolCalls],
   );
   const firstToolIdx = useMemo(
@@ -49,13 +49,7 @@ export function BlockStack({
   const renderItem = (item: StackItem) => {
     const blockKey = itemBlockKey(item);
     return renderCommentAction ? (
-      <HStack
-        key={blockKey}
-        align="flex-start"
-        gap={1}
-        width="full"
-        className="msg-block"
-      >
+      <HStack key={blockKey} align="flex-start" gap={1} width="full" className="msg-block">
         <Box flex={1} minWidth={0}>
           {renderBlockContent(item)}
         </Box>
@@ -75,9 +69,7 @@ export function BlockStack({
           input={item.use.input}
           id={item.use.id}
           result={
-            item.result
-              ? { content: item.result.content, isError: item.result.isError }
-              : null
+            item.result ? { content: item.result.content, isError: item.result.isError } : null
           }
         />
       );
@@ -122,22 +114,14 @@ export function BlockStack({
             <VStack key={b.blockKey} align="stretch" gap={1.5}>
               <ContextDisclosure context={context} />
               <Box textStyle="xs" color="fg" lineHeight="1.6">
-                <RenderedMarkdown
-                  markdown={asMarkdownBody(body)}
-                  paddingX={0}
-                  paddingY={0}
-                />
+                <RenderedMarkdown markdown={asMarkdownBody(body)} paddingX={0} paddingY={0} />
               </Box>
             </VStack>
           );
         }
         return (
           <Box key={b.blockKey} textStyle="xs" color="fg" lineHeight="1.6">
-            <RenderedMarkdown
-              markdown={asMarkdownBody(b.text)}
-              paddingX={0}
-              paddingY={0}
-            />
+            <RenderedMarkdown markdown={asMarkdownBody(b.text)} paddingX={0} paddingY={0} />
           </Box>
         );
       }
@@ -223,14 +207,10 @@ export function BlockStack({
         <>
           {firstToolIdx === -1 && expander}
           {toolsOpen &&
-            toolCalls.map((tc, i) => (
-              <OpenAIToolCallCard key={tc.id ?? `oai-${i}`} call={tc} />
-            ))}
+            toolCalls.map((tc, i) => <OpenAIToolCallCard key={tc.id ?? `oai-${i}`} call={tc} />)}
         </>
       ) : (
-        toolCalls.map((tc, i) => (
-          <OpenAIToolCallCard key={tc.id ?? `oai-${i}`} call={tc} />
-        ))
+        toolCalls.map((tc, i) => <OpenAIToolCallCard key={tc.id ?? `oai-${i}`} call={tc} />)
       )}
       {isEmpty && (
         <Text textStyle="xs" color="fg.subtle" fontStyle="italic">

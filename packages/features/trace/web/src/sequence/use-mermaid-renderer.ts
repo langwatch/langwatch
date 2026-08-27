@@ -1,10 +1,4 @@
-import {
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-  useEffect,
-  useState,
-} from "react";
+import { type Dispatch, type RefObject, type SetStateAction, useEffect, useState } from "react";
 import { EASTER_EGG_IMAGE_URL } from "../use-konami-easter-egg";
 
 // Mermaid is loaded via a true `await import()` inside the effect so it
@@ -194,11 +188,7 @@ export function useMermaidRenderer({
             const cy = Number(head.getAttribute("cy") ?? "0");
             const r = Number(head.getAttribute("r") ?? "8");
             const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
-            img.setAttributeNS(
-              "http://www.w3.org/1999/xlink",
-              "href",
-              EASTER_EGG_IMAGE_URL,
-            );
+            img.setAttributeNS("http://www.w3.org/1999/xlink", "href", EASTER_EGG_IMAGE_URL);
             img.setAttribute("href", EASTER_EGG_IMAGE_URL);
             img.setAttribute("x", `${cx - r * 1.4}`);
             img.setAttribute("y", `${cy - r * 1.4}`);

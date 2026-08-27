@@ -48,11 +48,7 @@ export function useFlameKeyboard({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!(e.target instanceof HTMLElement)) return;
       const target = e.target;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      )
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
         return;
       if (!el.contains(target) && target !== el) return;
 

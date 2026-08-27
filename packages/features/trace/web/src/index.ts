@@ -54,12 +54,7 @@ export { MarkdownConfigurePopover } from "./markdown/markdown-configure-popover"
 export { RenderedMarkdown } from "./markdown/rendered-markdown";
 export { ShikiCodeBlock } from "./markdown/shiki-highlight";
 export { DEFAULT_MARKDOWN_CONFIG } from "./markdown/types";
-export type {
-  MarkdownConfig,
-  SpanDetailLevel,
-  SpanLayout,
-  SpanScope,
-} from "./markdown/types";
+export type { MarkdownConfig, SpanDetailLevel, SpanLayout, SpanScope } from "./markdown/types";
 export { FlameView } from "./flame/flame-view";
 export type { FlameViewProps, TraceFlameSpan } from "./flame/types";
 export * from "./scenario-role";

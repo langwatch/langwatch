@@ -6,11 +6,7 @@ type FindMatchCounterProps = {
   currentIndex: number;
 };
 
-export function FindMatchCounter({
-  isSearching,
-  matchCount,
-  currentIndex,
-}: FindMatchCounterProps) {
+export function FindMatchCounter({ isSearching, matchCount, currentIndex }: FindMatchCounterProps) {
   const label = isSearching
     ? "…"
     : matchCount === 0

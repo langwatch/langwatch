@@ -35,10 +35,7 @@ export interface PromptReference {
  * attribute keys into nested objects before storing, so a naïve
  * `params["langwatch.prompt.id"]` lookup misses real data.
  */
-function readAttribute(
-  params: Record<string, unknown> | null | undefined,
-  path: string,
-): unknown {
+function readAttribute(params: Record<string, unknown> | null | undefined, path: string): unknown {
   if (!params) return void 0;
   if (params[path] !== void 0) return params[path];
   const parts = path.split(".");
@@ -66,9 +63,7 @@ function* iterateLeafPaths(obj: Record<string, unknown>, prefix = ""): Generator
   }
 }
 
-export function hasPromptMetadata(
-  params: Record<string, unknown> | null | undefined,
-): boolean {
+export function hasPromptMetadata(params: Record<string, unknown> | null | undefined): boolean {
   if (!params) return false;
   for (const path of iterateLeafPaths(params)) {
     if (path.startsWith(PROMPT_PREFIX)) return true;
@@ -249,9 +244,7 @@ export function extractPromptReference(
   return null;
 }
 
-function parsePromptVariables(
-  params: Record<string, unknown>,
-): Record<string, string> | null {
+function parsePromptVariables(params: Record<string, unknown>): Record<string, string> | null {
   // Two emit shapes seen in the wild:
   //   1. Wrapped JSON string: `langwatch.prompt.variables = '{"type":"json","value":{...}}'`
   //   2. Per-key flat attributes: `langwatch.prompt.variables.input = "..."`

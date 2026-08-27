@@ -27,8 +27,7 @@ export function formatVerboseRelative(timestamp: number): string {
   // that are really just landing live.
   const diffMs = Math.max(0, Date.now() - timestamp);
   if (diffMs < MS_PER_MINUTE) return "just now";
-  const pick = (n: number, singular: string): string =>
-    `${n} ${singular}${n === 1 ? "" : "s"} ago`;
+  const pick = (n: number, singular: string): string => `${n} ${singular}${n === 1 ? "" : "s"} ago`;
   if (diffMs < MS_PER_HOUR) {
     return pick(Math.floor(diffMs / MS_PER_MINUTE), "minute");
   }
@@ -107,9 +106,7 @@ export function resolveViewerTimeZone(): string {
  */
 export function formatDayOfWeek(timestamp: number): string {
   try {
-    return new Intl.DateTimeFormat(void 0, { weekday: "long" }).format(
-      new Date(timestamp),
-    );
+    return new Intl.DateTimeFormat(void 0, { weekday: "long" }).format(new Date(timestamp));
   } catch {
     return "";
   }

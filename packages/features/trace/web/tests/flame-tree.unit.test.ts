@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildTree,
-  computeSpanContext,
-  formatPercent,
-  generateTicks,
-} from "../src/flame/tree";
+import { buildTree, computeSpanContext, formatPercent, generateTicks } from "../src/flame/tree";
 import type { TraceFlameSpan, Viewport } from "../src/flame/types";
 
 const span = (
@@ -34,10 +29,7 @@ describe("trace flame tree", () => {
     ]);
 
     expect(tree.roots.map((node) => node.span.spanId)).toEqual(["root", "orphan"]);
-    expect(tree.roots[0]?.children.map((node) => node.span.spanId)).toEqual([
-      "early",
-      "late",
-    ]);
+    expect(tree.roots[0]?.children.map((node) => node.span.spanId)).toEqual(["early", "late"]);
     expect(tree.byId.get("orphan")?.isOrphaned).toBe(true);
     expect(tree.maxDepth).toBe(1);
   });

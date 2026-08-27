@@ -205,9 +205,7 @@ describe("parseContentBlocks", () => {
 
   describe("given an AI-SDK file audio content part", () => {
     it("returns a media block so traces-v2 matches the legacy player path", () => {
-      const blocks = parseContentBlocks([
-        { type: "file", mediaType: "audio/wav", data: "QUJD" },
-      ]);
+      const blocks = parseContentBlocks([{ type: "file", mediaType: "audio/wav", data: "QUJD" }]);
 
       expect(blocks).toHaveLength(1);
       expect(blocks[0]).toMatchObject({

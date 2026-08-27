@@ -53,16 +53,11 @@ export function FlatTurnView({
   const palette = getRolePalette(colorKey);
   const RoleIcon =
     visuals.Icon ?? ROLE_ICONS[sourceRole] ?? (turn.kind === "user" ? LuUser : LuBot);
-  const label =
-    visuals.bubbleLabel ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
+  const label = visuals.bubbleLabel ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
 
   return (
     <FlatBody Icon={RoleIcon} palette={palette} label={label} onCollapse={onCollapse}>
-      <BlockStack
-        blocks={turn.blocks}
-        toolCalls={turn.toolCalls}
-        collapseTools={collapseTools}
-      />
+      <BlockStack blocks={turn.blocks} toolCalls={turn.toolCalls} collapseTools={collapseTools} />
     </FlatBody>
   );
 }
