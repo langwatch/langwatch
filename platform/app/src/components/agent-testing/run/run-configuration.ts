@@ -145,6 +145,16 @@ export function deriveRunName({
   return `${scopeLabel} ${targets.join(" vs ")}`;
 }
 
+/**
+ * What a target that the project no longer offers reads as.
+ *
+ * A configuration outlives the agent it ran against, and the id of a removed
+ * agent means nothing to the person reading the row.
+ */
+function removedLabel(target: SuiteTarget): string {
+  return target.type === "prompt" ? "a removed prompt" : "a removed agent";
+}
+
 /** One fact about a configuration, as the dropdown row reads it. */
 type ConfigurationFacts = {
   targets: string;
@@ -170,7 +180,8 @@ function factsOf({
   return {
     targets: sortTargets(configuration.targets)
       .map(
-        (target) => targetLabels.get(target.referenceId) ?? target.referenceId,
+        (target) =>
+          targetLabels.get(target.referenceId) ?? removedLabel(target),
       )
       .join(" vs "),
     parameters: parameterNames

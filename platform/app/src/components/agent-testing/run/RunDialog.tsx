@@ -15,6 +15,7 @@
  * @see specs/suites/folder-run-plan-reuse.feature
  */
 
+import { useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { RunDialogFields } from "./RunDialogFields";
 import { RunDialogFooter } from "./RunDialogFooter";
@@ -96,6 +97,10 @@ export function RunDialog({
   onRunStarted,
   onCaseRunSettled,
 }: RunDialogProps) {
+  // Escape belongs to the run name list while that list is open. The dialog's
+  // own Escape handling listens on the document in the capture phase, so it
+  // runs before the field can stop the key and has to be turned off instead.
+  const [isNameListOpen, setIsNameListOpen] = useState(false);
   const form = useRunDialogForm(subject);
   const controller = useRunDialogSubmit({
     subject,
@@ -127,6 +132,7 @@ export function RunDialog({
         if (!open && !controller.isBusy) onClose();
       }}
       placement="center"
+      closeOnEscape={!isNameListOpen}
     >
       <Dialog.Content
         bg="bg.panel"
@@ -152,7 +158,11 @@ export function RunDialog({
           maxHeight="58vh"
           overflowY="auto"
         >
-          <RunDialogFields form={form} isBusy={controller.isBusy} />
+          <RunDialogFields
+            form={form}
+            isBusy={controller.isBusy}
+            onNameListOpenChange={setIsNameListOpen}
+          />
         </Dialog.Body>
         <RunDialogFooter
           controller={controller}

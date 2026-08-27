@@ -1485,13 +1485,13 @@ describe("the run name", () => {
   });
 
   /** @scenario "Escape closes the list and leaves the dialog open" */
-  it("closes the list on Escape and leaves the dialog standing", async () => {
+  it("closes the list on Escape and asks for no dialog close", async () => {
     const user = userEvent.setup();
     mockSuitesGetAll.mockReturnValue({
       data: [planRow()],
       isLoading: false,
     });
-    renderDialog(suiteSubject());
+    const { onClose } = renderDialog(suiteSubject());
 
     // Opened from the caret, which is where the key lands: the caret took the
     // focus off the field.
@@ -1503,7 +1503,13 @@ describe("the run name", () => {
     expect(
       screen.queryByTestId("run-dialog-name-options"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
+    // The subject is what mounts the dialog, so its presence proves nothing:
+    // the close the dialog would ask its caller for is what must not happen.
+    expect(onClose).not.toHaveBeenCalled();
+
+    // A second Escape, with the list closed, does close the dialog.
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   /** @scenario "A run with no name cannot start" */

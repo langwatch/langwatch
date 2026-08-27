@@ -97,9 +97,12 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
 export function RunDialogFields({
   form,
   isBusy,
+  onNameListOpenChange,
 }: {
   form: RunDialogForm;
   isBusy: boolean;
+  /** The dialog holds its own Escape handling off while the list is open. */
+  onNameListOpenChange: (isOpen: boolean) => void;
 }) {
   return (
     <VStack align="stretch" gap={4}>
@@ -108,6 +111,7 @@ export function RunDialogFields({
         options={form.options}
         onChange={form.setRunName}
         onPick={form.applyConfiguration}
+        onListOpenChange={onNameListOpenChange}
         isBusy={isBusy}
       />
 

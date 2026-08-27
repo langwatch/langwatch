@@ -7,15 +7,19 @@
  *
  * The keys are handled on the wrapping element rather than on the input,
  * because the caret takes focus when it opens the list and Escape has to close
- * the list from either. Escape also stops there: without that it reaches the
- * dialog's own listener and takes the whole dialog away.
+ * the list from either.
+ *
+ * Escape needs both halves. Stopping the event keeps it off the dialog's own
+ * React tree, and the dialog turns its own Escape handling off while the list
+ * is open, because that one listens on the document in the capture phase and
+ * therefore runs before anything inside the dialog can stop it.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
 import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
@@ -217,6 +221,7 @@ export function RunNameField({
   options,
   onChange,
   onPick,
+  onListOpenChange,
   isBusy,
 }: {
   value: string;
@@ -225,10 +230,19 @@ export function RunNameField({
   /** Typing a name of one's own, which stops the name following the run. */
   onChange: (value: string) => void;
   onPick: (key: string) => void;
+  /**
+   * Whether the list is open, which the dialog needs: Escape must close the
+   * list alone, and the dialog's own Escape handling runs first.
+   */
+  onListOpenChange: (isOpen: boolean) => void;
   isBusy: boolean;
 }) {
   const list = useRunNameList({ value, options, onPick });
   const hasHistory = options.length > 0;
+
+  useEffect(() => {
+    onListOpenChange(list.isListOpen);
+  }, [list.isListOpen, onListOpenChange]);
 
   return (
     <Box data-testid="run-dialog-name-block">
