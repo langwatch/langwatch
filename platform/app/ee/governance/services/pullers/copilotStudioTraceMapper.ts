@@ -802,9 +802,8 @@ function turnSpan(params: {
   group: ConversationGroup;
   turn: Turn;
   traceId: string;
-  parentSpanId: string;
+  spanId: string;
   threadId: string;
-  spanSeed: string;
   skipped: number;
   conversationEndMs: number;
 }): OtlpJsonSpan {
@@ -813,9 +812,8 @@ function turnSpan(params: {
     group,
     turn,
     traceId,
-    parentSpanId,
+    spanId,
     threadId,
-    spanSeed,
     skipped,
     conversationEndMs,
   } = params;
@@ -859,8 +857,7 @@ function turnSpan(params: {
   }
   return {
     traceId,
-    spanId: hashId(`${spanSeed}:${turn.seedActivityId}`, 16),
-    parentSpanId,
+    spanId,
     name: COPILOT_TURN_SPAN_NAME,
     kind: 1,
     startTimeUnixNano: msToNano(turn.startMs),
@@ -908,106 +905,9 @@ function toolSpan(params: {
 }
 
 /**
- * The single span every turn in one conversation hangs under.
- *
- * A trace's headline is folded across its root spans, so a conversation whose
- * turns were each a root showed only whichever turn the fold read last. One
- * chain span per conversation gives the fold one place to read, and it carries
- * the arc: the first thing asked and the last thing answered.
- */
-function conversationSpan(params: {
-  origin: RoutingOrigin;
-  group: ConversationGroup;
-  turns: Turn[];
-  traceId: string;
-  spanId: string;
-  threadId: string;
-  skipped: number;
-  conversationEndMs: number;
-  /**
-   * The span's own bounds, which are NOT the conversation's.
-   *
-   * `conversationEndMs` answers "when did this conversation happen", and is
-   * what decides whether the agent was edited afterwards — a question about
-   * turns. These two answer "what time range does this span have to cover",
-   * and a tool call hanging under a turn can start before the first turn or
-   * end after the last, so they take the extremes across every span emitted
-   * under this one. A parent that does not contain its children is a trace
-   * the explorer renders wrong.
-   */
-  spanStartMs: number;
-  spanEndMs: number;
-}): OtlpJsonSpan {
-  const {
-    origin,
-    group,
-    turns,
-    traceId,
-    spanId,
-    threadId,
-    skipped,
-    conversationEndMs,
-    spanStartMs,
-    spanEndMs,
-  } = params;
-
-  const firstQuestion = turns.find((turn) => turn.question !== null)?.question;
-  const lastAnswer = [...turns]
-    .reverse()
-    .find((turn) => turn.answer !== null)?.answer;
-
-  const attributes: OtlpJsonAttr[] = [
-    stringAttr({ key: "langwatch.span.type", value: "chain" }),
-    ...conversationAttrs({
-      origin,
-      group,
-      endMs: conversationEndMs,
-      skipped,
-      threadId,
-    }),
-  ];
-  if (firstQuestion) {
-    attributes.push(
-      stringAttr({
-        key: "langwatch.input",
-        value: chatValue("user", firstQuestion),
-      }),
-    );
-  }
-  if (lastAnswer) {
-    attributes.push(
-      stringAttr({
-        key: "langwatch.output",
-        value: chatValue("assistant", lastAnswer),
-      }),
-    );
-  }
-
-  return {
-    traceId,
-    spanId,
-    name: COPILOT_CONVERSATION_SPAN_NAME,
-    kind: 1,
-    startTimeUnixNano: msToNano(spanStartMs),
-    endTimeUnixNano: msToNano(spanEndMs),
-    attributes,
-    status: { code: 1 },
-  };
-}
-
-/**
- * Map one run's pulled transcript rows to a single OTLP trace request.
- * Returns null when nothing routes.
- *
- * The action filter is the last guard between a source's events and a
- * customer's trace project: the routing step runs for every source and this
- * mapper will build a span for whatever it is handed. Without the filter, a
- * source of some other kind that acquired a destination would have its rows
- * rendered as things people said.
- */
-/**
- * Every span one conversation contributes: the chain span its turns hang
- * under, one span per turn, and one per tool call.
+ * Every span one conversation contributes: one root span per turn, and one
+ * per tool call. Each turn is its own trace; all turns in one conversation
+ * share a threadId so the Conversation view groups them.
  *
  * Empty when the group produced no turns — a row of pure bookkeeping routes
  * nothing rather than routing an empty conversation.
@@ -1020,92 +920,56 @@ function conversationSpans(params: {
   const { turns, skipped } = turnsOf(group.activities);
   if (turns.length === 0) return [];
 
-  const seeds: ConversationSeeds = {
-    // A Copilot trace is the whole conversation, so the conversation key
-    // alone names it — unlike Genie, where a trace is one question.
-    trace: [group.key],
-    thread: [group.key],
-    span: [group.key],
-  };
-  const identity = deriveConversationIdentity(origin, seeds);
+  const calls = toolCallsOf(group.activities);
   const conversationEndMs = turns.reduce(
     (latest, turn) => Math.max(latest, turn.endMs),
     turns[0]!.startMs,
   );
 
-  // Read before the root span is built, because the root has to cover them: a
-  // call hanging under a turn can start before the first turn began or run
-  // past the last one's end.
-  const calls = toolCallsOf(group.activities);
-  const spanStartMs = calls.reduce(
-    (earliest, call) => Math.min(earliest, call.startMs),
-    turns[0]!.startMs,
-  );
-  const spanEndMs = calls.reduce(
-    (latest, call) => Math.max(latest, call.endMs),
-    conversationEndMs,
-  );
+  const turnIdentities = turns.map((turn) => {
+    const seeds: ConversationSeeds = {
+      trace: [group.key, turn.seedActivityId],
+      thread: [group.key],
+      span: [group.key, turn.seedActivityId],
+    };
+    return { turn, identity: deriveConversationIdentity(origin, seeds) };
+  });
 
-  const spans: OtlpJsonSpan[] = [
-    conversationSpan({
-      origin,
-      group,
-      turns,
-      traceId: identity.traceId,
-      spanId: identity.rootSpanId,
-      threadId: identity.threadId,
-      skipped,
-      conversationEndMs,
-      spanStartMs,
-      spanEndMs,
-    }),
-  ];
+  const spans: OtlpJsonSpan[] = [];
 
-  for (const turn of turns) {
+  for (const { turn, identity } of turnIdentities) {
     spans.push(
       turnSpan({
         origin,
         group,
         turn,
         traceId: identity.traceId,
-        parentSpanId: identity.rootSpanId,
+        spanId: identity.rootSpanId,
         threadId: identity.threadId,
-        spanSeed: identity.spanSeed,
         skipped,
         conversationEndMs,
       }),
     );
   }
 
-  spans.push(...toolSpansOf({ origin, calls, turns, identity }));
+  for (const call of calls) {
+    const parentEntry =
+      [...turnIdentities]
+        .reverse()
+        .find(({ turn }) => turn.startMs <= call.startMs) ??
+      turnIdentities[0]!;
+    spans.push(
+      toolSpan({
+        origin,
+        call,
+        traceId: parentEntry.identity.traceId,
+        parentSpanId: parentEntry.identity.rootSpanId,
+        spanSeed: parentEntry.identity.spanSeed,
+      }),
+    );
+  }
 
   return spans;
-}
-
-/**
- * One span per tool call, each hanging off the turn it falls inside by time.
- * A call that predates every turn hangs off the first one rather than being
- * dropped.
- */
-function toolSpansOf(params: {
-  origin: RoutingOrigin;
-  calls: ToolCall[];
-  turns: Turn[];
-  identity: ReturnType<typeof deriveConversationIdentity>;
-}): OtlpJsonSpan[] {
-  const { origin, calls, turns, identity } = params;
-  return calls.map((call) => {
-    const parent =
-      [...turns].reverse().find((turn) => turn.startMs <= call.startMs) ??
-      turns[0]!;
-    return toolSpan({
-      origin,
-      call,
-      traceId: identity.traceId,
-      parentSpanId: hashId(`${identity.spanSeed}:${parent.seedActivityId}`, 16),
-      spanSeed: identity.spanSeed,
-    });
-  });
 }
 
 export function mapCopilotEventsToTraceRequest({
