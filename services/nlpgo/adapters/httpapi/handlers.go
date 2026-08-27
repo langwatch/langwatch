@@ -374,9 +374,9 @@ func normalizeInputs(v any) map[string]any {
 // executeStreamHandler is the entry point for /go/studio/execute.
 // Returns Server-Sent Events: one `execution_state_change` per node
 // transition (running → success/error), `is_alive_response` heartbeats every
-// NLP_STREAM_HEARTBEAT_SECONDS, and a final `done` (or `error`) frame
-// when the run completes. Closes when the client disconnects.
-func executeStreamHandler(application *app.App) http.HandlerFunc {
+// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS, and a final `done` (or `error`)
+// frame when the run completes. Closes when the client disconnects.
+func executeStreamHandler(application *app.App, configuredHeartbeat time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		executor := application.Executor()
 		if executor == nil {
@@ -453,7 +453,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		}()
 
 		events, err := executor.ExecuteStream(streamCtx, *req, app.WorkflowStreamOptions{
-			Heartbeat: streamHeartbeat(r),
+			Heartbeat: streamHeartbeat(r, configuredHeartbeat),
 		})
 		if err != nil {
 			// The SSE error frame reaches the client; this line is the
@@ -496,17 +496,32 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, eventType string, pay
 	flusher.Flush()
 }
 
-// streamHeartbeat returns the heartbeat interval, defaulting to 15s
-// when the request didn't override it via header. Tests use a tiny
-// interval to verify ticking.
-func streamHeartbeat(r *http.Request) time.Duration {
+// DefaultStreamHeartbeat is the is_alive_response cadence applied when
+// neither the request header nor the operator config names one. Matches
+// specs/nlp-go/_shared/contract.md §6; clients detect a dead stream by
+// missed heartbeats, so changing it is a contract change.
+const DefaultStreamHeartbeat = 15 * time.Second
+
+// streamHeartbeat returns the heartbeat interval for one stream. The
+// per-request header wins (tests use a tiny interval to verify
+// ticking), then the operator's configured cadence, then the default.
+//
+// A non-positive `configured` falls through to DefaultStreamHeartbeat
+// rather than reaching the engine: engine.ExecuteStream only starts the
+// heartbeat goroutine when the interval is positive, so passing zero
+// through would silently disable heartbeats entirely and let idle
+// proxies tear healthy streams down.
+func streamHeartbeat(r *http.Request, configured time.Duration) time.Duration {
 	if v := r.Header.Get("X-LangWatch-NLPGO-Heartbeat-MS"); v != "" {
 		var ms int
 		if _, err := fmt.Sscanf(v, "%d", &ms); err == nil && ms > 0 {
 			return time.Duration(ms) * time.Millisecond
 		}
 	}
-	return 15 * time.Second
+	if configured > 0 {
+		return configured
+	}
+	return DefaultStreamHeartbeat
 }
 
 // PlaygroundProxy is the dispatcher surface the playground-proxy
