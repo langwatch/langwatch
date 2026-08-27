@@ -48,6 +48,9 @@ import type {
   PulledEventChRow,
   PushedEventChRow,
   SortDir,
+  SpendByDepartmentChRow,
+  SpendByTeamSourceChRow,
+  SpendOverTimeChRow,
   SpendOverTimeGroupBy,
   SpendSortField,
   WindowCountChRow,
@@ -595,59 +598,13 @@ export class ActivityMonitorService {
       windowStart,
     });
 
-    const acc = new Map<
-      string,
-      { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
-    >();
-    for (const r of rows) {
-      const hasPrincipalUser = r.actor !== "";
-      const departmentId = resolveTraceDepartmentId({
-        hasPrincipalUser,
-        userDepartmentId: userDepartmentByEmail.get(r.actor),
-        userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
-        projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
-      });
-      // An archived or otherwise-unknown department rolls up as Unassigned
-      // without a backfill: it is simply absent from the active name map.
-      const key =
-        departmentId !== UNASSIGNED_DEPARTMENT &&
-        activeDepartmentNames.has(departmentId)
-          ? departmentId
-          : UNASSIGNED_DEPARTMENT;
-      const prior = acc.get(key) ?? {
-        spendNanoUsd: 0n,
-        requestCount: 0,
-        lastActivityMs: 0,
-      };
-      acc.set(key, {
-        spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
-        requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(
-          prior.lastActivityMs,
-          Number(r.lastActivityMs),
-        ),
-      });
-    }
-
-    return [...acc.entries()]
-      .map(([key, v]) => ({
-        departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
-        departmentName:
-          key === UNASSIGNED_DEPARTMENT
-            ? "Unassigned"
-            : activeDepartmentNames.get(key)!,
-        spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
-        requestCount: v.requestCount,
-        lastActivityIso:
-          v.lastActivityMs > 0
-            ? new Date(v.lastActivityMs).toISOString()
-            : null,
-      }))
-      .sort((a, b) => {
-        const aNano = usdToNanoUsd(a.spendUsd);
-        const bNano = usdToNanoUsd(b.spendUsd);
-        return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
-      });
+    return assembleDepartmentRows({
+      rows,
+      projectDepartmentById,
+      userDepartmentByEmail,
+      userTeamDepartmentByEmail,
+      activeDepartmentNames,
+    });
   }
 
   private async activeDepartmentNames(
@@ -772,73 +729,8 @@ export class ActivityMonitorService {
     });
     const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
 
-    const ORG_WIDE_KEY = "__org_wide__";
-    const byTeam = new Map<
-      string,
-      {
-        teamId: string | null;
-        teamName: string;
-        thisSpendNano: bigint;
-        prevSpendNano: bigint;
-        requestCount: number;
-        lastActivityMs: number;
-        sourceCount: number;
-      }
-    >();
-    for (const row of sourceRows) {
-      const team = teamBySource.get(row.sourceId) ?? null;
-      const key = team ? team.id : ORG_WIDE_KEY;
-      const teamId = team?.id ?? null;
-      const teamName = team?.name ?? "Org-wide";
-      const thisSpendNano = usdToNanoUsd(row.thisSpendStr);
-      const prevSpendNano = usdToNanoUsd(row.prevSpendStr);
-      const requestCount = Number(row.thisRequests);
-      const lastActivityMs = Number(row.lastActivityMs);
-      const existing = byTeam.get(key);
-      if (existing) {
-        existing.thisSpendNano += thisSpendNano;
-        existing.prevSpendNano += prevSpendNano;
-        existing.requestCount += requestCount;
-        existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(
-          existing.lastActivityMs,
-          lastActivityMs,
-        );
-      } else {
-        byTeam.set(key, {
-          teamId,
-          teamName,
-          thisSpendNano,
-          prevSpendNano,
-          requestCount,
-          lastActivityMs,
-          sourceCount: 1,
-        });
-      }
-    }
-
-    const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
-    const sign = sortDir === "asc" ? 1 : -1;
-    return [...byTeam.values()]
-      .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
-      .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
-      .slice(offset, offset + limit)
-      .map((t) => ({
-        teamId: t.teamId,
-        teamName: t.teamName,
-        spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
-        requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(
-          Number(t.thisSpendNano),
-          Number(t.prevSpendNano),
-        ),
-        hasPriorBaseline: t.prevSpendNano > 0n,
-        lastActivityIso:
-          t.lastActivityMs > 0
-            ? new Date(t.lastActivityMs).toISOString()
-            : null,
-        sourceCount: t.sourceCount,
-      }));
+    const byTeam = rollUpSourcesByTeam({ sourceRows, teamBySource });
+    return formatTeamRows({ byTeam, sortBy, sortDir, offset, limit });
   }
 
   // -----------------------------------------------------------------------
@@ -894,105 +786,20 @@ export class ActivityMonitorService {
       groupBy: input.groupBy,
     });
 
-    let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: Array<{
-      bucketMs: number;
-      key: string;
-      spendNanoUsd: bigint;
-    }>;
-
-    if (input.groupBy === "team") {
-      const sourceIds = Array.from(
-        new Set(
-          rows
-            .map((r) => r.groupKey)
-            .filter((s): s is string => typeof s === "string" && s !== ""),
-        ),
-      );
-      const sources = sourceIds.length
-        ? await this.prisma.ingestionSource.findMany({
-            where: {
-              id: { in: sourceIds },
-              organizationId: input.organizationId,
-            },
-            select: {
-              id: true,
-              team: { select: { id: true, name: true } },
-            },
+    const { labelByKey, rolledRows } =
+      input.groupBy === "team"
+        ? await this.resolveTeamSpendOverTimeRows({
+            rows,
+            organizationId: input.organizationId,
           })
-        : [];
-      const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
-      const ORG_WIDE_KEY = "__org_wide__";
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const sourceId = row.groupKey ?? "";
-        if (!sourceId) continue;
-        const team = teamBySource.get(sourceId) ?? null;
-        const key = team?.id ?? ORG_WIDE_KEY;
-        const label = team?.name ?? "Org-wide";
-        labelByKey.set(key, { key, label });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
-        });
-      }
-    } else {
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const key = row.groupKey ?? "";
-        if (!key) continue;
-        labelByKey.set(key, { key, label: key });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
-        });
-      }
-    }
+        : resolveDirectSpendOverTimeRows({ rows });
 
-    // Roll up (bucket, key) duplicates that come out of the team-side
-    // sourceId → teamId remapping (multiple sources can share one team).
-    const aggregated = new Map<string, bigint>();
-    for (const r of rolledRows) {
-      const k = `${r.bucketMs}::${r.key}`;
-      aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
-    }
-
-    const buckets = emptyDenseBuckets(windowStart, windowDays);
-    const bucketIndexByMs = new Map(
-      buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
-    );
-    for (const [composite, spendNanoUsd] of aggregated.entries()) {
-      const sep = composite.indexOf("::");
-      const bucketMs = Number(composite.slice(0, sep));
-      const key = composite.slice(sep + 2);
-      const idx = bucketIndexByMs.get(bucketMs);
-      if (idx === undefined) continue;
-      const meta = labelByKey.get(key);
-      if (!meta) continue;
-      if (spendNanoUsd <= 0n) continue;
-      buckets[idx]!.points.push({
-        key: meta.key,
-        label: meta.label,
-        spendUsd: nanoUsdToDecimalString(spendNanoUsd),
-      });
-    }
-
-    // Stable per-bucket ordering - descending spend so the largest
-    // contributor renders at the bottom of the stacked area (Recharts
-    // stacks in array order; bottom-up = largest-first).
-    for (const bucket of buckets) {
-      bucket.points.sort((a, b) => {
-        const aN = usdToNanoUsd(a.spendUsd);
-        const bN = usdToNanoUsd(b.spendUsd);
-        return bN > aN ? 1 : bN < aN ? -1 : 0;
-      });
-    }
-
-    return { buckets };
+    return fillSpendOverTimeBuckets({
+      rolledRows,
+      labelByKey,
+      windowStart,
+      windowDays,
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -1192,4 +999,270 @@ export class ActivityMonitorService {
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
     };
   }
+
+  private async resolveTeamSpendOverTimeRows({
+    rows,
+    organizationId,
+  }: {
+    rows: SpendOverTimeChRow[];
+    organizationId: string;
+  }): Promise<SpendOverTimeRolled> {
+    const sourceIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.groupKey)
+          .filter((s): s is string => typeof s === "string" && s !== ""),
+      ),
+    );
+    const sources = sourceIds.length
+      ? await this.prisma.ingestionSource.findMany({
+          where: { id: { in: sourceIds }, organizationId },
+          select: { id: true, team: { select: { id: true, name: true } } },
+        })
+      : [];
+    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
+    const ORG_WIDE_KEY = "__org_wide__";
+    const labelByKey = new Map<string, { key: string; label: string }>();
+    const rolledRows: RolledSpendRow[] = [];
+    for (const row of rows) {
+      const sourceId = row.groupKey ?? "";
+      if (!sourceId) continue;
+      const team = teamBySource.get(sourceId) ?? null;
+      const key = team?.id ?? ORG_WIDE_KEY;
+      const label = team?.name ?? "Org-wide";
+      labelByKey.set(key, { key, label });
+      rolledRows.push({
+        bucketMs: Number(row.bucketMs),
+        key,
+        spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+      });
+    }
+    return { labelByKey, rolledRows };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Extracted helpers — pure functions, no this, no side effects
+// ---------------------------------------------------------------------------
+
+interface RolledSpendRow {
+  bucketMs: number;
+  key: string;
+  spendNanoUsd: bigint;
+}
+
+interface SpendOverTimeRolled {
+  labelByKey: Map<string, { key: string; label: string }>;
+  rolledRows: RolledSpendRow[];
+}
+
+function assembleDepartmentRows({
+  rows,
+  projectDepartmentById,
+  userDepartmentByEmail,
+  userTeamDepartmentByEmail,
+  activeDepartmentNames,
+}: {
+  rows: SpendByDepartmentChRow[];
+  projectDepartmentById: ReadonlyMap<string, string | null>;
+  userDepartmentByEmail: ReadonlyMap<string, string | null>;
+  userTeamDepartmentByEmail: ReadonlyMap<string, string | null>;
+  activeDepartmentNames: ReadonlyMap<string, string>;
+}): SpendByDepartmentRow[] {
+  const acc = new Map<
+    string,
+    { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+  >();
+  for (const r of rows) {
+    const hasPrincipalUser = r.actor !== "";
+    const departmentId = resolveTraceDepartmentId({
+      hasPrincipalUser,
+      userDepartmentId: userDepartmentByEmail.get(r.actor),
+      userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
+      projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
+    });
+    const key =
+      departmentId !== UNASSIGNED_DEPARTMENT &&
+      activeDepartmentNames.has(departmentId)
+        ? departmentId
+        : UNASSIGNED_DEPARTMENT;
+    const prior = acc.get(key) ?? {
+      spendNanoUsd: 0n,
+      requestCount: 0,
+      lastActivityMs: 0,
+    };
+    acc.set(key, {
+      spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
+      requestCount: prior.requestCount + Number(r.requests),
+      lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+    });
+  }
+
+  return [...acc.entries()]
+    .map(([key, v]) => ({
+      departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
+      departmentName:
+        key === UNASSIGNED_DEPARTMENT
+          ? "Unassigned"
+          : activeDepartmentNames.get(key)!,
+      spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
+      requestCount: v.requestCount,
+      lastActivityIso:
+        v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+    }))
+    .sort((a, b) => {
+      const aNano = usdToNanoUsd(a.spendUsd);
+      const bNano = usdToNanoUsd(b.spendUsd);
+      return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
+    });
+}
+
+function rollUpSourcesByTeam({
+  sourceRows,
+  teamBySource,
+}: {
+  sourceRows: SpendByTeamSourceChRow[];
+  teamBySource: Map<string, { id: string; name: string } | null>;
+}): Map<string, TeamAccumulator> {
+  const ORG_WIDE_KEY = "__org_wide__";
+  const byTeam = new Map<string, TeamAccumulator>();
+  for (const row of sourceRows) {
+    const team = teamBySource.get(row.sourceId) ?? null;
+    const key = team ? team.id : ORG_WIDE_KEY;
+    const existing = byTeam.get(key);
+    if (existing) {
+      existing.thisSpendNano += usdToNanoUsd(row.thisSpendStr);
+      existing.prevSpendNano += usdToNanoUsd(row.prevSpendStr);
+      existing.requestCount += Number(row.thisRequests);
+      existing.sourceCount += 1;
+      existing.lastActivityMs = Math.max(
+        existing.lastActivityMs,
+        Number(row.lastActivityMs),
+      );
+    } else {
+      byTeam.set(key, {
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? "Org-wide",
+        thisSpendNano: usdToNanoUsd(row.thisSpendStr),
+        prevSpendNano: usdToNanoUsd(row.prevSpendStr),
+        requestCount: Number(row.thisRequests),
+        lastActivityMs: Number(row.lastActivityMs),
+        sourceCount: 1,
+      });
+    }
+  }
+  return byTeam;
+}
+
+interface TeamAccumulator {
+  teamId: string | null;
+  teamName: string;
+  thisSpendNano: bigint;
+  prevSpendNano: bigint;
+  requestCount: number;
+  lastActivityMs: number;
+  sourceCount: number;
+}
+
+function formatTeamRows({
+  byTeam,
+  sortBy,
+  sortDir,
+  offset,
+  limit,
+}: {
+  byTeam: Map<string, TeamAccumulator>;
+  sortBy: SpendSortField;
+  sortDir: SortDir;
+  offset: number;
+  limit: number;
+}): SpendByTeamRow[] {
+  const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
+  const sign = sortDir === "asc" ? 1 : -1;
+  return [...byTeam.values()]
+    .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
+    .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
+    .slice(offset, offset + limit)
+    .map((t) => ({
+      teamId: t.teamId,
+      teamName: t.teamName,
+      spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
+      requestCount: t.requestCount,
+      deltaPctVsPriorWindow: pctChange(
+        Number(t.thisSpendNano),
+        Number(t.prevSpendNano),
+      ),
+      hasPriorBaseline: t.prevSpendNano > 0n,
+      lastActivityIso:
+        t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
+      sourceCount: t.sourceCount,
+    }));
+}
+
+function resolveDirectSpendOverTimeRows({
+  rows,
+}: {
+  rows: SpendOverTimeChRow[];
+}): SpendOverTimeRolled {
+  const labelByKey = new Map<string, { key: string; label: string }>();
+  const rolledRows: RolledSpendRow[] = [];
+  for (const row of rows) {
+    const key = row.groupKey ?? "";
+    if (!key) continue;
+    labelByKey.set(key, { key, label: key });
+    rolledRows.push({
+      bucketMs: Number(row.bucketMs),
+      key,
+      spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+    });
+  }
+  return { labelByKey, rolledRows };
+}
+
+function fillSpendOverTimeBuckets({
+  rolledRows,
+  labelByKey,
+  windowStart,
+  windowDays,
+}: {
+  rolledRows: RolledSpendRow[];
+  labelByKey: Map<string, { key: string; label: string }>;
+  windowStart: number;
+  windowDays: number;
+}): SpendOverTimeResult {
+  const aggregated = new Map<string, bigint>();
+  for (const r of rolledRows) {
+    const k = `${r.bucketMs}::${r.key}`;
+    aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
+  }
+
+  const buckets = emptyDenseBuckets(windowStart, windowDays);
+  const bucketIndexByMs = new Map(
+    buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
+  );
+  for (const [composite, spendNanoUsd] of aggregated.entries()) {
+    const sep = composite.indexOf("::");
+    const bucketMs = Number(composite.slice(0, sep));
+    const key = composite.slice(sep + 2);
+    const idx = bucketIndexByMs.get(bucketMs);
+    if (idx === undefined) continue;
+    const meta = labelByKey.get(key);
+    if (!meta) continue;
+    if (spendNanoUsd <= 0n) continue;
+    buckets[idx]!.points.push({
+      key: meta.key,
+      label: meta.label,
+      spendUsd: nanoUsdToDecimalString(spendNanoUsd),
+    });
+  }
+
+  for (const bucket of buckets) {
+    bucket.points.sort((a, b) => {
+      const aN = usdToNanoUsd(a.spendUsd);
+      const bN = usdToNanoUsd(b.spendUsd);
+      return bN > aN ? 1 : bN < aN ? -1 : 0;
+    });
+  }
+
+  return { buckets };
 }
