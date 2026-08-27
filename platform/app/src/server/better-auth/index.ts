@@ -31,6 +31,7 @@ import {
   identityStorageAdapter,
   resolveSignInMethodPolicy,
 } from "~/server/app-layer/identity/runtime";
+import { PrismaTwoStepAccount } from "~/server/app-layer/identity/two-step-verification-adapters";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -45,13 +46,21 @@ import {
   beforeUserCreate,
   ssoAssertionDecision,
 } from "./hooks";
+import {
+  isLastWayInPath,
+  refuseIfItClosesTheLastDoor,
+} from "./last-way-in";
 import { passkeySignUpRegistration } from "./passkey-signup";
 import { issuersForRequest } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
 import { runSignInRouterShadow } from "./signInRouterShadow";
 import { resolveTrustedOrigins } from "./trustedOrigins";
-import { runTwoStepCeremony } from "./two-step-ceremonies";
+import {
+  runTwoStepCeremony,
+  type TwoStepEndpointContext,
+  userIdIn,
+} from "./two-step-ceremonies";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -854,6 +863,24 @@ export const auth = betterAuth({
       // commonest one in the fleet. With the flag off it returns having read
       // nothing, computed nothing and logged nothing.
       await runSignInRouterShadow({ pathname, url, body: ctx.body });
+
+      // ADR-119, on the two removals that reach no ceremony: the passkey
+      // plugin owns its own table so `account.delete.before` never sees a
+      // passkey going, and the plugin's `/two-factor/disable` is mounted
+      // beside the tRPC procedure that actually refuses. Both are answered
+      // BEFORE the endpoint runs, which is the only place a refusal counts —
+      // the ledger's own guard fires in the after hook, where the ceremony
+      // catches it and the endpoint has already succeeded.
+      if (isLastWayInPath(pathname)) {
+        await refuseIfItClosesTheLastDoor({
+          pathname,
+          userId: userIdIn(ctx as TwoStepEndpointContext),
+          body: ctx.body,
+          prisma,
+          requiringOrganizations: ({ userId }) =>
+            new PrismaTwoStepAccount(prisma).requiringOrganizations({ userId }),
+        });
+      }
 
       // Deployments that name no federated method never register an IdP, so
       // there is no policy to enforce — leave every route untouched (zero

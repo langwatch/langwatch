@@ -36,6 +36,7 @@ import {
   declareAuthzMiddleware,
   PermissionDeniedError,
   resolveDeclaredScope,
+  SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
 } from "@langwatch/authz";
@@ -228,14 +229,46 @@ export const checkDeclaredPermissionAny = (
         projectId,
         permissions,
       });
+
+      const scope = { tier: "project", id: projectId } as const;
+
+      // The same two things the single-permission seam does, and for the same
+      // reasons — "any one of these" is a different question about the same
+      // access, not a lighter one.
+      //
+      // D06 says both people on EVERY decision. A decision made under an
+      // impersonation through this branch named nobody, which is the one
+      // place the trail is supposed to answer who really did it.
+      recordPermissionDecision(
+        permissionDecisionRecord({
+          principal: principalOfSession({ session: ctx.session }),
+          permission: permissions[0],
+          scope,
+          permitted,
+          denialReason,
+        }),
+      );
+
       if (!permitted) {
         throw deniedError({
           permission: permissions[0],
-          scope: { tier: "project", id: projectId },
+          scope,
           organizationRole,
           denialReason,
         });
       }
+
+      // And the organization's membership condition. Without it a member who
+      // could not prove a second factor was refused by every `.permission()`
+      // procedure and then reached the same organization's data through a
+      // `.permissionAny()` one.
+      await assertSecondFactorSatisfied({
+        deps: mfaGateDepsFor(ctx),
+        userId: ctx.session.user.id,
+        sessionId: ctx.session.sessionId,
+        scope,
+      });
+
       ctx.organizationRole = organizationRole;
       ctx.permissionChecked = true;
       return next();
@@ -278,6 +311,30 @@ export const declaredNoPermission = ({
           );
         }
       }
+
+      // NO PERMISSION IS NOT NO CONDITION. These procedures are deliberately
+      // unchecked for permission — the reason is declared and reviewed — but
+      // an organization that requires a second factor requires it of anybody
+      // reaching its data, and this branch reaches it by an ALLOWED scope
+      // field. Without this, a member who could not prove one was refused by
+      // every `.permission()` procedure and then minted a durable API key for
+      // the same organization through `apiKey.create`.
+      if (ctx.session?.user) {
+        for (const key of allowedKeys) {
+          const named = (declaredInput as Record<string, unknown>)[key];
+          const tier = SCOPE_TIER_BY_FIELD[key as ScopeTierField];
+          if (tier === undefined || typeof named !== "string" || !named) {
+            continue;
+          }
+          await assertSecondFactorSatisfied({
+            deps: mfaGateDepsFor(ctx),
+            userId: ctx.session.user.id,
+            sessionId: ctx.session.sessionId,
+            scope: { tier, id: named },
+          });
+        }
+      }
+
       ctx.permissionChecked = true;
       return next();
     },

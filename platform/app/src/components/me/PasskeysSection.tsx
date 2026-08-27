@@ -432,10 +432,14 @@ export function PasskeysSection() {
     try {
       const result = await authClient.passkey.deletePasskey({ id });
       if (result?.error) {
-        // The detach guards decide this, and their refusal is a registered
-        // code — "you'd have no way back into your account", with the remedy.
-        // A flat "try again in a moment" about a refusal that will never
-        // change on a retry is the worst of both.
+        // Refused BEFORE the plugin deletes anything, by the last-way-in
+        // guard in `server/better-auth/last-way-in.ts`. It is not the detach
+        // guard: a passkey lives in the plugin's own table, so
+        // `account.delete.before` never sees one going — which is how
+        // removing the only passkey on an account used to succeed and lock
+        // the person out. The refusal carries its own sentence and the
+        // remedy, because a flat "try again in a moment" about something that
+        // will never change on a retry is the worst of both.
         showErrorToast({
           error: result.error,
           fallbackTitle: "That passkey wasn't removed",
