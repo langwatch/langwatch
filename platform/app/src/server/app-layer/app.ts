@@ -3,7 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
-import type { AppDependencies, DataRetentionDependencies, OpsDependencies } from "./dependencies";
+import type {
+  AppDependencies,
+  DataRetentionDependencies,
+  OpsDependencies,
+} from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -12,7 +16,12 @@ type SettleOutcome =
   | { status: "failed"; error: unknown }
   | { status: "timeout" };
 
-export const APP_SHUTDOWN_PHASES = ["subscriber", "redis", "clickhouse", "database"] as const;
+export const APP_SHUTDOWN_PHASES = [
+  "subscriber",
+  "redis",
+  "clickhouse",
+  "database",
+] as const;
 
 export type AppShutdownPhase = (typeof APP_SHUTDOWN_PHASES)[number];
 
@@ -46,7 +55,10 @@ export class AppShutdownResources {
       try {
         await resource.close();
       } catch (error) {
-        logger.error({ phase, name: resource.name, error }, "Failed to close application resource");
+        logger.error(
+          { phase, name: resource.name, error },
+          "Failed to close application resource",
+        );
       }
     }
   }
@@ -91,6 +103,7 @@ export class App {
   readonly annotations: AppDependencies["annotations"];
   readonly apiKeys: AppDependencies["apiKeys"];
   readonly managedProviders: AppDependencies["managedProviders"];
+  readonly scim: AppDependencies["scim"];
   readonly modelProviders: AppDependencies["modelProviders"];
   readonly prompts: AppDependencies["prompts"];
   readonly evaluators: AppDependencies["evaluators"];
@@ -128,12 +141,16 @@ export class App {
   readonly billingQueries: AppDependencies["billingQueries"];
   readonly commands: AppCommands;
   readonly storedObjects: AppDependencies["storedObjects"];
+  readonly storedObjectOwners: AppDependencies["storedObjectOwners"];
   readonly opsExplain: AppDependencies["opsExplain"];
   readonly github: AppDependencies["github"];
   readonly langy: AppDependencies["langy"];
   readonly featureFlags: AppDependencies["featureFlags"];
   readonly experiments: AppDependencies["experiments"];
   readonly scenarios: AppDependencies["scenarios"];
+  readonly scenarioTabs: AppDependencies["scenarioTabs"];
+  readonly scenarioExecution: AppDependencies["scenarioExecution"];
+  readonly scenarioExecutionPool: AppDependencies["scenarioExecutionPool"];
   readonly suites: AppDependencies["suites"];
   readonly automation: AppDependencies["automation"];
   readonly organizations: AppDependencies["organizations"];
@@ -152,7 +169,7 @@ export class App {
   readonly notifications: AppDependencies["notifications"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
-  readonly ops?: OpsDependencies;
+  readonly ops: OpsDependencies;
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
 
@@ -179,13 +196,18 @@ export class App {
     this.annotations = deps.annotations;
     this.apiKeys = deps.apiKeys;
     this.managedProviders = deps.managedProviders;
+    this.scim = deps.scim;
     this.modelProviders = deps.modelProviders;
     this.prompts = deps.prompts;
     this.evaluators = deps.evaluators;
     this.workflows = deps.workflows;
     this.monitors = deps.monitors;
+    this.featureFlags = deps.featureFlags;
     this.experiments = deps.experiments;
     this.scenarios = deps.scenarios;
+    this.scenarioTabs = deps.scenarioTabs;
+    this.scenarioExecution = deps.scenarioExecution;
+    this.scenarioExecutionPool = deps.scenarioExecutionPool;
     this.suites = deps.suites;
     this.automation = deps.automation;
     this.organizations = deps.organizations;
@@ -216,7 +238,10 @@ export class App {
     this.simulationExports = deps.simulationExports;
     this.topics = deps.topics;
     this.topicClustering = deps.commands.topicClustering;
-    this.codingAgents = Object.assign(deps.codingAgents, deps.commands.codingAgents);
+    this.codingAgents = {
+      ...deps.codingAgents,
+      ...deps.commands.codingAgents,
+    };
     this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
@@ -227,10 +252,10 @@ export class App {
     this.billingQueries = deps.billingQueries;
     this.commands = deps.commands;
     this.storedObjects = deps.storedObjects;
+    this.storedObjectOwners = deps.storedObjectOwners;
     this.opsExplain = deps.opsExplain;
     this.github = deps.github;
     this.langy = deps.langy;
-    this.featureFlags = deps.featureFlags;
     this.ops = deps.ops;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;

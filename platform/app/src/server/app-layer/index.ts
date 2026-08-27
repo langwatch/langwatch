@@ -17,7 +17,6 @@ export {
   initializeWorkerApp,
 } from "./presets";
 // Projects
-export { type ProjectFeatureFlag } from "@langwatch/project-contract";
 export type { ProjectService } from "@langwatch/project-contract";
 // Tracing
 export { traced } from "./tracing";

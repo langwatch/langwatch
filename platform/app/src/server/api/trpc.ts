@@ -106,6 +106,19 @@ interface CreateContextOptions {
   signal?: AbortSignal;
 }
 
+export interface TRPCContext {
+  session: Session | null;
+  req: NextApiRequest | undefined;
+  res: NextApiResponse | undefined;
+  prisma: typeof prisma;
+  app: RequestAppServices;
+  permissionChecked: boolean;
+  publiclyShared: boolean;
+  organizationRole: OrganizationUserRole | undefined;
+  opsScope: OpsScope | undefined;
+  signal: AbortSignal | undefined;
+}
+
 /**
  * This helper generates the "internals" for a tRPC context. If you need to use it, you can export
  * it from here.
@@ -116,7 +129,7 @@ interface CreateContextOptions {
  *
  * @see https://create.t3.gg/en/usage/trpc#-serverapitrpcts
  */
-export const createInnerTRPCContext = (opts: CreateContextOptions) => {
+export const createInnerTRPCContext = (opts: CreateContextOptions): TRPCContext => {
   const requestApp = opts.app ?? createLegacyRequestApp();
 
   return {
@@ -257,9 +270,7 @@ export function errorFormatter({
   shape: any;
   error: { cause?: unknown; message?: string; code?: string };
 }) {
-  const cause = error.cause as
-    | { limitType?: string; current?: number; max?: number }
-    | undefined;
+  const cause = error.cause as { limitType?: string; current?: number; max?: number } | undefined;
   const limitInfo = cause?.limitType
     ? {
         limitType: cause.limitType,
@@ -324,9 +335,7 @@ export function errorFormatter({
   // alternate so the toast's primary CTA can be a one-click swap
   // rather than a generic "open settings" deep link.
   const providerDisabledCause =
-    error.cause instanceof ModelProviderDisabledError
-      ? error.cause.toResponseBody()
-      : null;
+    error.cause instanceof ModelProviderDisabledError ? error.cause.toResponseBody() : null;
 
   // Free-text error messages never cross the tRPC boundary. `data.error` (code,
   // meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
@@ -343,8 +352,7 @@ export function errorFormatter({
   // requires a string message and a numeric code, and discards `data` entirely
   // when either is missing) — not fields we chose.
   const isInternalServerError =
-    error.code === "INTERNAL_SERVER_ERROR" ||
-    shape?.data?.code === "INTERNAL_SERVER_ERROR";
+    error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
   const message = handled
     ? handled.code
     : isInternalServerError
@@ -639,10 +647,7 @@ function redactValues(source: Record<string, unknown>): Record<string, string> {
 /** The object fields whose values this action must not store. */
 function redactedObjectFieldsFor(action?: string): readonly string[] {
   if (!action) return CREDENTIAL_OBJECT_FIELDS;
-  return [
-    ...CREDENTIAL_OBJECT_FIELDS,
-    ...(REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? []),
-  ];
+  return [...CREDENTIAL_OBJECT_FIELDS, ...(REDACTED_VALUE_FIELDS_BY_ACTION[action] ?? [])];
 }
 
 /**
@@ -688,13 +693,7 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
  * `action` is the tRPC path. It selects the rules that only apply to one
  * mutation, such as a run's parameter values.
  */
-export function redactAuditArgs({
-  input,
-  action,
-}: {
-  input: unknown;
-  action?: string;
-}): unknown {
+export function redactAuditArgs({ input, action }: { input: unknown; action?: string }): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
@@ -811,8 +810,7 @@ function rememberTraceId(error: unknown, span: Span): void {
 
 /** The trace id for a failed call, or the ambient one if we never saw it. */
 function traceIdForError(error: unknown): string | undefined {
-  const remembered =
-    error && typeof error === "object" ? errorTraceIds.get(error) : undefined;
+  const remembered = error && typeof error === "object" ? errorTraceIds.get(error) : undefined;
   return remembered ?? otelTrace.getActiveSpan()?.spanContext().traceId;
 }
 
@@ -1180,8 +1178,7 @@ export function recordTrpcCall(args: Parameters<typeof handleTrpcCallLogging>[0]
 
 export const loggerMiddleware = t.middleware(async ({ path, type, input, ctx, next }) => {
   // Import context utilities dynamically to avoid circular deps
-  const { createContextFromTRPC, runWithContext } =
-    await import("../context/asyncContext");
+  const { createContextFromTRPC, runWithContext } = await import("../context/asyncContext");
 
   // Create context from tRPC context and input
   const requestContext = createContextFromTRPC(ctx, input as any);
@@ -1217,13 +1214,9 @@ export const loggerMiddleware = t.middleware(async ({ path, type, input, ctx, ne
  *
  * @see https://trpc.io/docs/procedures
  */
-const authProtectedProcedure = t.procedure
-  .use(enforceUserIsAuthed)
-  .use(auditLogTRPCErrors);
+const authProtectedProcedure = t.procedure.use(enforceUserIsAuthed).use(auditLogTRPCErrors);
 
-type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
-  ? TWith
-  : Simplify<TType & TWith>;
+type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType ? TWith : Simplify<TType & TWith>;
 
 /**
  * Typescript hackery to make sure all endpoints are forced to set the input, then to explicitly tell
@@ -1474,13 +1467,10 @@ const permissionProcedureBuilder = <
         checkDeclaredPermission({ permission, via: options?.via }),
       )) as Pending["permission"],
     permissionAny: ((...permissions: [AuthzPermission, ...AuthzPermission[]]) =>
-      withPermissionCheck(
-        checkDeclaredPermissionAny(permissions),
-      )) as Pending["permissionAny"],
+      withPermissionCheck(checkDeclaredPermissionAny(permissions))) as Pending["permissionAny"],
     noPermission: ((options: { reason: string; allow?: Record<string, string> }) =>
       withPermissionCheck(declaredNoPermission(options))) as Pending["noPermission"],
-    authorizeInService: (options) =>
-      withPermissionCheck(declaredServiceAuthorization(options)),
+    authorizeInService: (options) => withPermissionCheck(declaredServiceAuthorization(options)),
   };
 };
 
@@ -1506,7 +1496,6 @@ const authMiddlewares = (enforceUserIsAuthed as unknown as { _middlewares: unkno
  * unauthenticated endpoint a deliberate, reviewed act.
  */
 export function isPublicProcedure(procedure: unknown): boolean {
-  const middlewares =
-    (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ?? [];
+  const middlewares = (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ?? [];
   return !middlewares.some((middleware) => authMiddlewares.includes(middleware));
 }

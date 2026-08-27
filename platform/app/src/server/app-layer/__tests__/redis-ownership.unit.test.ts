@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { App, getApp, globalForApp, resetApp } from "../app";
+import { App, AppShutdownResources, getApp, globalForApp, resetApp } from "../app";
 import { createTestApp } from "../presets";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -168,19 +168,16 @@ describe("Redis ownership", () => {
       // The composition root registers the connection as a graceful closeable;
       // this asserts the App honours that registration, which is what stops a
       // process from leaking a socket per boot.
+      const shutdownResources = new AppShutdownResources();
+      shutdownResources.register("redis", "redis", async () => {
+        connection.disconnect();
+      });
       const app = new App({
         ...(createTestApp({
           redis: connection,
         }) as unknown as ConstructorParameters<typeof App>[0]),
         redis: connection,
-        _gracefulCloseables: [
-          {
-            name: "redis",
-            close: async () => {
-              connection.disconnect();
-            },
-          },
-        ],
+        _shutdownResources: shutdownResources,
       });
 
       await app.close();
@@ -197,8 +194,7 @@ describe("Redis ownership", () => {
 
     /** @scenario A consumer degrades when the application has no Redis */
     it("lets a consumer take its documented fallback rather than throwing", async () => {
-      const { AutomationEmailCapService } =
-        await import("@langwatch/automation-server");
+      const { AutomationEmailCapService } = await import("@langwatch/automation-server");
       const emailCaps = AutomationEmailCapService.create({ store: null });
 
       const decision = await emailCaps.consumeHourly({
@@ -218,16 +214,15 @@ describe("Redis ownership", () => {
     it("uses the connection its caller supplied, with no App in play", async () => {
       await resetApp();
       const smembers = vi.fn().mockResolvedValue([]);
-      const { CliTokenRevocationService } =
-        await import("@ee/governance/services/cliTokenRevocation.service");
-
-      const service = CliTokenRevocationService.create({
+      const { AppCliTokenRevocationAdapter } =
+        await import("@langwatch/enterprise-api/governance/cli-token-revocation.adapter");
+      const tokenStore = AppCliTokenRevocationAdapter.create({
         smembers,
-      } as never);
-      const result = await service.revokeForUser({ userId: "user-1" });
+      } as never).tokenStore();
+      const members = await tokenStore?.members("cli:user:user-1");
 
       expect(smembers).toHaveBeenCalledOnce();
-      expect(result).toEqual({ revokedCount: 0 });
+      expect(members).toEqual([]);
       // Proves the connection came from the caller: `getApp()` would have
       // thrown, because nothing initialized an App.
       expect(() => getApp()).toThrow(/App not initialized/);

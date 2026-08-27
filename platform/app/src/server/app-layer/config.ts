@@ -5,6 +5,13 @@ import {
 } from "~/runtime/api/nlp-lambda.config";
 import type { LangyWorkerHttpConfig } from "@langwatch/langy-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import {
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+  EVAL_INPUTS_PREVIEW_BYTES,
+  type EvaluationInputOffloadConfig,
+} from "@langwatch/evaluation-server";
+import { DEFAULT_MODEL } from "~/utils/constants";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -62,13 +69,33 @@ export interface AppConfig {
   // Services
   langevalsEndpoint?: string;
   langyWorker?: LangyWorkerHttpConfig;
-  baseHost?: string;
+  scenarioExecution: {
+    langwatchEndpoint: string;
+    nlpServiceUrl: string;
+    legacyDefaultModel: string;
+    childEnvironment: {
+      path?: string;
+      home?: string;
+      user?: string;
+      shell?: string;
+      lang?: string;
+      lcAll?: string;
+      term?: string;
+      nodeCompileCache?: string;
+      corepackEnableDownloadPrompt?: string;
+      nodeExtraCaCerts?: string;
+    };
+  };
+  /** Public application origin used when rendering links in durable work. */
+  baseHost: string;
   slackPlanLimitChannel?: string;
   slackSignupsChannel?: string;
   slackSubscriptionsChannel?: string;
   hubspotPortalId?: string;
   hubspotReachedLimitFormId?: string;
   hubspotFormId?: string;
+  /** Shared secret accepted by the Auth0 SCIM webhook transport. */
+  auth0ScimWebhookSecret?: string;
 
   // Process role — controls which event-sourcing consumers run.
   // "web": dispatch commands only (no queue consumers)
@@ -94,13 +121,34 @@ export interface AppConfig {
 
   // Viewer presentation policy resolved once at process composition.
   opsSidebarEmails?: readonly string[];
+
+  /** Whether coding-agent infrastructure spans are retained at ingestion. */
+  codingAgentSpanFilterEnabled: boolean;
+
+  /** Typed limits for durable Evaluation input offload. */
+  evaluationInputsOffload: EvaluationInputOffloadConfig;
 }
 
 /** Maps the environment explicitly validated by executable boot. */
-export function createAppConfigFromEnv(overrides?: {
-  processRole?: ProcessRole;
-}): AppConfig {
+export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }): AppConfig {
   const env = getEnvironmentConfig();
+
+  const baseHost = env.BASE_HOST;
+  if (!baseHost) {
+    throw new Error("BASE_HOST is required to boot the application");
+  }
+
+  const evaluationInputsOffload: EvaluationInputOffloadConfig = {
+    inlineMaxBytes: readEvaluationByteEnv(
+      env.LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES,
+      EVAL_INPUTS_INLINE_MAX_BYTES,
+    ),
+    hardCeilingBytes: readEvaluationByteEnv(
+      env.LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES,
+      EVAL_INPUTS_HARD_CEILING_BYTES,
+    ),
+    previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
+  };
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -112,17 +160,35 @@ export function createAppConfigFromEnv(overrides?: {
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     redisDbIndex: env.REDIS_DB_INDEX,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
+    scenarioExecution: {
+      langwatchEndpoint: env.LANGWATCH_ENDPOINT,
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
+      legacyDefaultModel: DEFAULT_MODEL,
+      childEnvironment: {
+        path: process.env.PATH,
+        home: process.env.HOME,
+        user: process.env.USER,
+        shell: process.env.SHELL,
+        lang: process.env.LANG,
+        lcAll: process.env.LC_ALL,
+        term: process.env.TERM,
+        nodeCompileCache: process.env.NODE_COMPILE_CACHE,
+        corepackEnableDownloadPrompt: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
+        nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
+      },
+    },
     langyWorker: resolveLangyWorkerConfig({
       agentUrl: env.OPENCODE_AGENT_URL,
       internalSecret: env.LANGY_INTERNAL_SECRET,
     }),
-    baseHost: env.BASE_HOST,
+    baseHost,
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,
     slackSignupsChannel: env.SLACK_CHANNEL_SIGNUPS,
     slackSubscriptionsChannel: env.SLACK_CHANNEL_SUBSCRIPTIONS,
     hubspotPortalId: env.HUBSPOT_PORTAL_ID,
     hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
     hubspotFormId: env.HUBSPOT_FORM_ID,
+    auth0ScimWebhookSecret: env.AUTH0_SCIM_WEBHOOK_SECRET,
     customerIoApiKey: env.CUSTOMER_IO_API_KEY,
     customerIoRegion: env.CUSTOMER_IO_REGION,
     processRole: overrides?.processRole,
@@ -132,7 +198,15 @@ export function createAppConfigFromEnv(overrides?: {
     opsSidebarEmails: env.SHOW_OPS_IN_MAIN_SIDEBAR?.split(",")
       .map((email: string) => email.trim().toLowerCase())
       .filter(Boolean),
+    codingAgentSpanFilterEnabled: env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== true,
+    evaluationInputsOffload,
   };
+}
+
+function readEvaluationByteEnv(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
 export function resolveLangyWorkerConfig(input: {
@@ -147,9 +221,7 @@ export function resolveLangyWorkerConfig(input: {
   }
 
   if (!input.agentUrl || !input.internalSecret) {
-    throw new Error(
-      "OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together",
-    );
+    throw new Error("OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together");
   }
 
   return {

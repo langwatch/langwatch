@@ -12,26 +12,8 @@ import type { RoleService } from "@langwatch/role-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import type {
-  GovernanceAiToolCatalogService,
-  GovernanceAdminWorkspaceViewAuditService,
-  GovernanceCliBootstrapService,
-  GovernanceCliSessionInventoryService,
-  GovernanceCliTokenRevocationService,
-  GovernanceIngestionKeyService,
-  GovernanceOttlGateway,
-  GovernancePolicyService,
-  GovernanceIngestionSourceService,
-  GovernanceActivityMonitorService,
-  GovernanceOcsfExportService,
-  GovernancePersonalVirtualKeyService,
-  GovernancePersonalUsageService,
-  GovernanceQuarantineFillService,
-  GovernanceRoutingPolicyService,
-  GovernanceSetupStateService,
-  IngestionTemplatesService,
-} from "@langwatch/enterprise-governance-contract";
-import type { CanonicalCostExtractorService } from "@langwatch/enterprise-governance-server";
+import type { ScimService } from "@langwatch/enterprise-scim-contract";
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type {
   BillableEventsRepository as BillingEventsReadRepository,
   BillableEventsQueryService,
@@ -45,23 +27,30 @@ import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { BillableEventsRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
-import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import type { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
-import type { GatewayBudgetService } from "~/server/gateway/budget.service";
-import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
-import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
-import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
+import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
+import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
+import type { GatewayService } from "@langwatch/gateway-server";
+import type { GatewayVirtualKeySpendPort } from "@langwatch/gateway-server";
+import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
+import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import type { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
+import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
+import type {
+  NotificationService,
+  NurturingService,
+} from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
-import type { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
-import type { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
-import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import type {
+  ScenarioExecutionService,
+  ScenarioService,
+  ScenarioTabRegistry,
+} from "@langwatch/scenario-contract";
+import type { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import type { SuiteService } from "@langwatch/suite-contract";
 import type { SimulationService } from "@langwatch/simulation-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
@@ -93,7 +82,7 @@ import type { SessionGroupsService } from "./traces/session-groups.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
-import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import type { TraceIngestionService } from "@langwatch/trace-server";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { UsageService } from "./usage/usage.service";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -138,6 +127,7 @@ export interface AppDependencies {
   apiKeys: ApiKeyService;
 
   managedProviders: ManagedProviderService;
+  scim: ScimService;
   /** One process-owned Model Provider capability shared by all transports. */
   modelProviders: ModelProviderService;
   /** One process-owned Prompt capability shared by REST, tRPC and workers. */
@@ -167,7 +157,7 @@ export interface AppDependencies {
     sessionGroups: SessionGroupsService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
-    collection: TraceRequestCollectionService;
+    collection: TraceIngestionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
     /** Reviewer corrections applied over a captured trace at read time. */
@@ -197,20 +187,21 @@ export interface AppDependencies {
    * without ClickHouse, where the budget service falls back to Postgres.
    *
    * Repositories rather than a service because the surfaces above them
-   * genuinely differ - some build a `GatewayBudgetService` around the budget
+   * genuinely differ - some build a `GatewayService` around the budget
    * ledger, others read virtual-key spend directly. What they must not do is
    * each construct their own, which is the duplication this replaces.
    */
   gateway: {
-    /** The one process-owned member budget read service. */
-    budgetOverview: BudgetOverviewService;
+    /** The one process-owned virtual-key read/write capability. */
+    virtualKeys: VirtualKeyService;
     /** The one process-owned gateway budget decision service. */
-    budgetDecisions: GatewayBudgetService;
-    budgets: GatewayBudgetClickHouseRepository | undefined;
-    virtualKeySpend: GatewayVirtualKeySpendRepository | undefined;
+    budgetDecisions: GatewayService;
+    budgets: GatewayBudgetSpendPort | undefined;
+    changes: GatewayChangeEventsPort;
+    virtualKeySpend: GatewayVirtualKeySpendPort | undefined;
     /** Reconciliation reads for the spend-events pull API and its tRPC
      *  ledger-screen counterpart (ADR-072). */
-    spendEvents: GatewaySpendEventsRepository | undefined;
+    spendEvents: GatewaySpendEventsService | undefined;
     /** The webhook platform's emitted-events log (`gateway_spend` read
      *  through the webhook envelope shape), shared by the REST events
      *  list/get endpoints and spend-events replay. */
@@ -265,43 +256,8 @@ export interface AppDependencies {
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */
-  governance: {
-    /** The process-owned Governance activity read service. */
-    activity: GovernanceActivityMonitorService;
-    /** The process-owned template catalogue and authoring service. */
-    ingestionTemplates: IngestionTemplatesService;
-    /** The process-owned ingestion-source lifecycle and secret service. */
-    ingestionSources: GovernanceIngestionSourceService;
-    /** Process-owned Governance persona/setup detection. */
-    setupState: GovernanceSetupStateService;
-    /** Process-owned, cursor-paginated OCSF export. */
-    ocsfExport: GovernanceOcsfExportService;
-    /** Process-owned OTTL validation and transformation gateway. */
-    ottlGateway: GovernanceOttlGateway;
-    /** Process-owned bundled-versus-billable source policy. */
-    policy: GovernancePolicyService;
-    /** Canonical usage extraction shared by every Governance receiver. */
-    canonicalCostExtractor: CanonicalCostExtractorService;
-    ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
-    /** Governance-domain reads over the shared `trace_summaries` table —
-     *  the persona-detection activity probe and the quarantine-fill
-     *  per-source breakdown. */
-    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
-    /** The `governance_kpis` rollup — the spend-spike anomaly evaluator's
-     *  current/baseline window comparison. */
-    kpis: GovernanceKpisClickHouseRepository | undefined;
-    /** The /me dashboard's spend/token/model rollups. */
-    personalUsage: GovernancePersonalUsageService;
-    routingPolicies: GovernanceRoutingPolicyService;
-    personalVirtualKeys: GovernancePersonalVirtualKeyService;
-    aiTools: GovernanceAiToolCatalogService;
-    cliBootstrap: GovernanceCliBootstrapService;
-    cliSessions: GovernanceCliSessionInventoryService;
-    cliTokenRevocation: GovernanceCliTokenRevocationService;
-    adminWorkspaceViewAudit: GovernanceAdminWorkspaceViewAuditService;
-    quarantineFill: GovernanceQuarantineFillService;
-    ingestionKeys: GovernanceIngestionKeyService;
-  };
+  /** The one process-owned Enterprise Governance capability. */
+  governance: GovernanceService;
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
   billableEvents: BillingEventsReadRepository | undefined;
@@ -313,12 +269,9 @@ export interface AppDependencies {
    * pull-request linkage for reads.
    */
   github: GithubService;
-  /** Cross-tenant stored-object lookups — the documented, project-filter-free
-   *  exception `/api/files/:id` uses to resolve an id's owning project before
-   *  every subsequent read switches back to a project-scoped client. */
-  storedObjects: {
-    crossTenantOwnerLookup: StoredObjectOwnerClickHouseRepository;
-  };
+  storedObjects: StoredObjectsService;
+  /** The cross-tenant first step for historical file URLs without a project id. */
+  storedObjectOwners: StoredObjectOwnerLookupService;
   /** The operator-only `/api/ops/clickhouse/explain` endpoint's service —
    *  no tenant scoping, by design (see the repository's own doc comment).
    *  A service rather than the repository it reads, so the route calls a
@@ -328,10 +281,14 @@ export interface AppDependencies {
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: LangyService;
-  /** The process-owned feature flag capability. */
+  /** The process's one feature flag service (ADR-001, feature-flag). */
   featureFlags: FeatureFlagService;
   experiments: ExperimentService;
   scenarios: ScenarioService;
+  scenarioTabs: ScenarioTabRegistry;
+  scenarioExecution: ScenarioExecutionService;
+  /** Worker-owned pool, composed once before the Simulation pipeline mounts. */
+  scenarioExecutionPool: ScenarioExecutionPoolService | null;
   suites: SuiteService;
   automation: AutomationService;
   organizations: OrganizationService;

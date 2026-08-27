@@ -4,10 +4,38 @@ import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
 import type { App } from "~/server/app-layer/app";
+import {
+  AnomalyAlertHttpPort,
+  type AnomalyAlertHttpResponse,
+} from "@langwatch/enterprise-governance-server";
+import { AppGovernanceKpisAdapter } from "@langwatch/enterprise-api/governance/governance-kpis.adapter";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
+import { prisma } from "~/server/db";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const logger = createLogger("langwatch:workers");
+
+class AppAnomalyAlertHttpPort extends AnomalyAlertHttpPort {
+  async post(input: {
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+    signal: AbortSignal;
+  }): Promise<AnomalyAlertHttpResponse> {
+    const response = await ssrfSafeFetch(input.url, {
+      method: "POST",
+      headers: input.headers,
+      body: input.body,
+      signal: input.signal,
+    });
+    return {
+      status: response.status,
+      ok: response.ok,
+      statusText: response.statusText,
+    };
+  }
+}
 
 export interface WorkerHandle {
   /**
@@ -37,7 +65,6 @@ type ShutdownHandles = Array<() => Promise<void> | void>;
 // Fail fast if the database is unreachable — better to fail the boot loudly
 // than to come up green and have every job fail individually.
 async function verifyDatabaseReady(): Promise<void> {
-  const { prisma } = await import("~/server/db");
   try {
     await prisma.$queryRaw`-- @tenancy: connectivity probe, touches no rows
 SELECT 1`;
@@ -65,28 +92,17 @@ async function bootStorageStatsCollection(
 // pool holder the simulationRunExecution process manager's execute intent
 // reads. Without this the intent throws (outbox retries) and simulations
 // never execute on this pod.
-async function bootScenarioProcessor(
+async function bootScenarioProcessorService(
   shutdownHandles: ShutdownHandles,
   app: App,
 ): Promise<void> {
-  const { ScenarioExecutionPool } =
-    await import("~/server/scenarios/execution/execution-pool");
-  const { startScenarioProcessor } =
-    await import("~/server/scenarios/scenario.processor");
-  const { SCENARIO_WORKER } = await import("~/server/scenarios/scenario.constants");
-  const { prisma } = await import("~/server/db");
-  const scenarioPool = new ScenarioExecutionPool({
-    concurrency: SCENARIO_WORKER.CONCURRENCY,
-  });
-  const scenarioExecutionPool = app.commands.scenarioExecutionPool;
-  scenarioExecutionPool?.set(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor({
-    pool: scenarioPool,
-    app,
-    prisma,
-  });
-  if (scenarioProcessor) {
-    shutdownHandles.push(() => scenarioProcessor.close());
+  const { createAppScenarioProcessorService } = await import(
+    "~/runtime/worker/app-scenario-processor.adapter"
+  );
+  const processor = createAppScenarioProcessorService(app);
+  if (processor) {
+    const handle = await processor.start();
+    shutdownHandles.push(() => handle.close());
   }
   logger.info("scenario processor ready");
 }
@@ -97,19 +113,14 @@ async function bootOpsWorkers(
   shutdownHandles: ShutdownHandles,
   app: App,
 ): Promise<void> {
-  const [opsWorker, { prisma }, flags, flagConfig] = await Promise.all([
+  const [opsWorker, { prisma }] = await Promise.all([
     import("~/runtime/worker/ops-workers.adapter"),
     import("~/server/db"),
-    import("~/server/featureFlag"),
-    import("~/server/featureFlag/constants"),
   ]);
   const adapter = opsWorker.AppOpsWorkerAdapter.create({
     anomaly: {
       redis: app.redis ?? void 0,
-      featureFlags: flags.featureFlagService,
-      featureFlagConfig: {
-        killSwitchCacheTtlMs: flagConfig.KILL_SWITCH_CACHE_TTL_MS,
-      },
+      featureFlags: app.featureFlags,
     },
     usageStats: {
       database: prisma,
@@ -137,10 +148,18 @@ async function bootOpsWorkers(
 // rows (specs/ai-gateway/governance/anomaly-detection.feature).
 async function bootSpendSpikeAnomalyWorker(
   shutdownHandles: ShutdownHandles,
+  app: App,
 ): Promise<void> {
   const { startSpendSpikeAnomalyWorker } =
-    await import("@ee/governance/services/spendSpikeAnomalyWorker");
-  const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
+    await import("@langwatch/enterprise-worker/governance/spend-spike-anomaly.worker");
+  const { prisma } = await import("~/server/db");
+  const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker({
+    database: prisma,
+    spend: app.clickhouse.enabled
+      ? new AppGovernanceKpisAdapter(app.clickhouse.resolveClient)
+      : undefined,
+    http: new AppAnomalyAlertHttpPort(),
+  });
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
 }
@@ -533,12 +552,12 @@ export async function startWorkers(options: StartWorkersOptions): Promise<Worker
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no separate queue worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
-    await bootScenarioProcessor(shutdownHandles, options.app);
+    await bootScenarioProcessorService(shutdownHandles, options.app);
     // Langy turns self-drive: the process outbox dispatches to the Go manager,
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
     await bootOpsWorkers(shutdownHandles, options.app);
-    await bootSpendSpikeAnomalyWorker(shutdownHandles);
+    await bootSpendSpikeAnomalyWorker(shutdownHandles, options.app);
     await bootRealtimeSessionPoller(shutdownHandles);
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
