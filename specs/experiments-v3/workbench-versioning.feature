@@ -461,3 +461,47 @@ Feature: Versioned workbench saves
       Given an open workbench whose save failed for any other reason
       When the reader looks at the save status
       Then it reads that the save failed
+
+  Rule: A page adopts a version its own run wrote
+
+    A run writes its cells into the workbench state, which advances the counter.
+    The page that started that run holds every cell the run produced already,
+    because it streamed them. Reading its own run's bump as somebody else's
+    write stands autosave down and asks the reader to reload over edits the run
+    had nothing to do with.
+
+    Taking the version is the part that matters. A page that only skipped the
+    warning would keep sending the version it had, and the next save would be
+    refused for the same reason one save later.
+
+    @regression @integration
+    Scenario: A version a run wrote names that run
+      Given a run that writes its cells into the workbench state
+      When the version rows are listed
+      Then the version the run wrote names the run
+
+    @regression @integration
+    Scenario: A refusal names the run that wrote the newer version
+      Given a run wrote its cells after a client read the workbench
+      When that client saves naming the version it read
+      Then the refusal names the run that wrote the newer version
+
+    @integration
+    Scenario: A page takes a version its own run wrote
+      Given a page that started a run and has unsaved edits
+      When a version that run wrote arrives
+      Then the page takes that version
+      And it does not ask the reader to reload
+
+    @integration
+    Scenario: A page still stands down for a version somebody else wrote
+      Given a page that started a run and has unsaved edits
+      When a version somebody else wrote arrives
+      Then the page asks the reader to reload
+
+    @integration
+    Scenario: A refused save whose newer version came from this page's own run is sent again
+      Given a page that started a run and has unsaved edits
+      When its save is refused for the version that run wrote
+      Then the page takes that version and sends its edits again
+      And it does not stand autosave down
