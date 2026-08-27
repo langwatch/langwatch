@@ -50,6 +50,10 @@ import { newSsoConnectionCommandId, newSsoConnectionId } from "./sso-connection-
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 import type { SsoConnectionService } from "./sso-connection.service";
 
+/** The states `activate_connection` accepts. Stated here so the checklist and
+ *  the guard cannot drift into disagreeing about whether the button works. */
+const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
+
 /**
  * Self-serve single sign-on setup, tiers 2 and 3 (D05).
  *
@@ -558,11 +562,18 @@ export class SsoSelfServeService {
         liveCount: liveBindings.length,
       },
       arrivalsDecided,
+      // AND IN A STATE ACTIVATION ACCEPTS. Every tick above is about a
+      // precondition the customer can act on; the lifecycle is the one thing
+      // the checklist cannot make true by listing it. Leaving it out let the
+      // screen say ready while `activate_connection` — which accepts VERIFIED
+      // and nothing else — answered a raw transition code naming no step, so
+      // the button failed with nothing on screen to do about it.
       ready:
         domainProved &&
         testSignIn !== null &&
         liveBindings.length > 0 &&
-        arrivalsDecided,
+        arrivalsDecided &&
+        ACTIVATABLE_STATES.includes(connection.state),
       activated: connection.state === "ACTIVE",
     };
   }

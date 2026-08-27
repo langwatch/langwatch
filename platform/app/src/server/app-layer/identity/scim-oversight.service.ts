@@ -197,17 +197,28 @@ export class ScimOversightService {
       throw new ScimApplyNotRedrivableError({ op: letter.op });
     }
 
-    await this.deps.lifecycle().applyRedriven({
-      organizationId: sync.organizationId,
-      connectionId: sync.connectionId,
-      retiredAtMs,
-      operator,
-    });
+    // THE EFFECT FIRST, THE MARK SECOND. Stamping the letter as re-driven
+    // before doing the work meant a removal that threw — the grants service
+    // down, the person's grant moved — left a letter that reads as done. The
+    // operator pressing the control again then matched `alreadyDriven` and
+    // was told "already done", so somebody the directory asked to deactivate
+    // kept their access permanently while the log said otherwise.
+    //
+    // This order can repeat the removal instead, which is the safe half of
+    // the trade: `removeAccess` is idempotent over the same user and
+    // connection, and a second removal of access somebody no longer has is a
+    // no-op. Doing the reverse loses the deprovision entirely.
     await this.deps.deprovision().removeAccess({
       userId: letter.userId,
       organizationId: sync.organizationId,
       connectionId: sync.connectionId,
       op: letter.op as Extract<ScimApplyOp, "delete_user" | "deactivate_user">,
+    });
+    await this.deps.lifecycle().applyRedriven({
+      organizationId: sync.organizationId,
+      connectionId: sync.connectionId,
+      retiredAtMs,
+      operator,
     });
     return { applied: true };
   }

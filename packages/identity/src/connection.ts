@@ -831,12 +831,22 @@ export function emptySsoConnection({
  * other domain fact needed to know it too.
  */
 function lifecycleAfterDomainFact(
-  state: { state: SsoConnectionLifecycleState },
+  state: {
+    state: SsoConnectionLifecycleState;
+    verifiedDomains: string[];
+  },
   proposed: SsoConnectionLifecycleState,
 ): SsoConnectionLifecycleState {
-  return LIFECYCLE_BEYOND_VERIFIED.includes(state.state)
-    ? state.state
-    : proposed;
+  if (LIFECYCLE_BEYOND_VERIFIED.includes(state.state)) return state.state;
+  // AND NOT BELOW WHAT THE REMAINING DOMAINS HAVE ALREADY EARNED, which is
+  // the same rule `stateAfterWithdrawal` applies for the same reason: a fact
+  // about ONE domain says nothing about another domain's proof. Stopping at
+  // "beyond VERIFIED" left VERIFIED itself unprotected, so a connection that
+  // had proved a domain and claimed a second one dropped to CLAIMED — and
+  // `activate_connection` accepts VERIFIED and nothing else, so the customer
+  // could no longer go live with the domain they had already proved.
+  if (state.verifiedDomains.length > 0) return "VERIFIED";
+  return proposed;
 }
 
 /** Past these, a domain fact never moves the lifecycle. */

@@ -39,10 +39,15 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Click the "Add members" button and wait for the dialog to appear.
+ * Open the invite drawer from the Directory's People tab.
+ *
+ * THE BUTTON AND THE DRAWER SAY DIFFERENT THINGS, on purpose: the control is
+ * "Invite people", because that is the act, and the drawer it opens is headed
+ * "Add members", because that is what you end up with. So the step names both
+ * rather than assuming one word covers the journey.
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()

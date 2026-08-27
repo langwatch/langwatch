@@ -132,11 +132,96 @@ describe("given a connection that is already carrying sign-ins", () => {
   });
 });
 
+describe("given a connection that has already proved a domain", () => {
+  describe("when a second domain is claimed against it", () => {
+    it("stays VERIFIED, so the connection can still be activated", () => {
+      // `activate_connection` accepts VERIFIED and nothing else. Letting a
+      // claim on a SECOND domain drag the lifecycle back to CLAIMED meant a
+      // customer who had proved one domain and then added another could no
+      // longer go live with the domain they had already proved — and no
+      // screen said why, because the go-live checklist still read ready.
+      const verified = fold(
+        fold(
+          fold(
+            emptySsoConnection({ connectionId: CONNECTION }),
+            fact(CONNECTION_REGISTERED_EVENT_TYPE, {
+              organizationId: "org_acme",
+              type: "oidc",
+              idp: {
+                issuer: "https://acme.okta.com",
+                clientIdRef: null,
+                secretRef: null,
+                certRefs: [],
+              },
+              arrivalPolicy: "admit",
+              source: "self-serve",
+            }),
+          ),
+          fact(DOMAIN_CLAIMED_EVENT_TYPE, { domain: "acme.com" }),
+        ),
+        fact(DOMAIN_VERIFIED_EVENT_TYPE, {
+          domain: "acme.com",
+          method: "dns-txt",
+        }),
+      );
+      expect(verified.state).toBe("VERIFIED");
+
+      const withSecondClaim = fold(
+        verified,
+        fact(DOMAIN_CLAIMED_EVENT_TYPE, { domain: "acme.co.uk" }),
+      );
+
+      expect(withSecondClaim.state).toBe("VERIFIED");
+      expect(withSecondClaim.verifiedDomains).toEqual(["acme.com"]);
+      expect(withSecondClaim.claimedDomains).toContain("acme.co.uk");
+    });
+
+    it("stays VERIFIED even when the second claim is turned down", () => {
+      // Rejecting a claim on a domain the connection never proved says
+      // nothing about the domain it did.
+      const verified = fold(
+        fold(
+          fold(
+            emptySsoConnection({ connectionId: CONNECTION }),
+            fact(CONNECTION_REGISTERED_EVENT_TYPE, {
+              organizationId: "org_acme",
+              type: "oidc",
+              idp: {
+                issuer: "https://acme.okta.com",
+                clientIdRef: null,
+                secretRef: null,
+                certRefs: [],
+              },
+              arrivalPolicy: "admit",
+              source: "self-serve",
+            }),
+          ),
+          fact(DOMAIN_CLAIMED_EVENT_TYPE, { domain: "acme.com" }),
+        ),
+        fact(DOMAIN_VERIFIED_EVENT_TYPE, {
+          domain: "acme.com",
+          method: "dns-txt",
+        }),
+      );
+
+      const rejected = fold(
+        fold(verified, fact(DOMAIN_CLAIMED_EVENT_TYPE, { domain: "evil.test" })),
+        fact(DOMAIN_CLAIM_REJECTED_EVENT_TYPE, {
+          domain: "evil.test",
+          note: "not yours",
+        }),
+      );
+
+      expect(rejected.state).toBe("VERIFIED");
+    });
+  });
+});
+
 describe("given a connection that has not gone live yet", () => {
   describe("when a domain moves through its steps", () => {
     it("still lets each step name the lifecycle", () => {
-      // The pin is only past VERIFIED. Before that the domain journey IS the
-      // connection's journey, and a setup screen reads its progress from here.
+      // Before any domain is proved the domain journey IS the connection's
+      // journey, and a setup screen reads its progress from here.
       const draft = fold(
         emptySsoConnection({ connectionId: CONNECTION }),
         fact(CONNECTION_REGISTERED_EVENT_TYPE, {

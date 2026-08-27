@@ -156,9 +156,37 @@ describe("the operator's directory sync oversight", () => {
         operator: { userId: "user_ops" },
       });
 
-      // Recorded BEFORE it ran: an act that then failed is exactly what the
-      // history exists to hold, and recording afterwards would lose it.
-      expect(order).toEqual(["recorded", "applied"]);
+      // Recorded AFTER it ran, and the two records are different records.
+      //
+      // The OPERATOR'S ACT is held by `audited()`, which the router writes
+      // before the service is called at all — so an attempt that then failed
+      // is in history either way, which is what that history is for.
+      //
+      // This fact is about the LETTER, and it is what `alreadyDriven` reads.
+      // Stamping it first meant a removal that threw left a letter reading as
+      // driven: the operator pressed again, matched the stamp, and was told
+      // "already done" about a deprovision that never happened. Somebody the
+      // directory asked to deactivate kept their access, permanently, while
+      // the log agreed they had not.
+      expect(order).toEqual(["applied", "recorded"]);
+    });
+
+    it("leaves the letter re-drivable when the removal fails", async () => {
+      deprovision.removeAccess.mockRejectedValueOnce(
+        new Error("grants service is down"),
+      );
+
+      await expect(
+        service.redriveRetiredApply({
+          connectionId: CONNECTION,
+          retiredAtMs: RETIRED_AT,
+          operator: { userId: "user_ops" },
+        }),
+      ).rejects.toThrow(/grants service is down/);
+
+      // Nothing was stamped, so the next press is a real retry rather than a
+      // refusal that reads as success.
+      expect(lifecycle.applyRedriven).not.toHaveBeenCalled();
     });
 
     /** @scenario "Re-driving twice applies once" */

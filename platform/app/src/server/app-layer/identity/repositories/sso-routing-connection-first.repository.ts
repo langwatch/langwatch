@@ -14,13 +14,31 @@ import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
  * not a rollout state, it is a screen disagreeing with itself.
  *
  * TURNING THE CONNECTION ON IS THE DECISION, so there is no second switch to
- * consult. The projection only ever answers for a connection that is live on
- * a domain it proved, and that answer is now taken at its word.
+ * consult. A connection that has been turned on answers for its domains, and
+ * that answer is taken at its word.
  *
- * The legacy columns keep every domain the projection does not answer for,
- * which is every organization that never registered a connection — their
- * sign-in is untouched, exactly as it was.
+ * A CONNECTION THAT DECIDES NOTHING MUST NOT PRE-EMPT THE COLUMNS THAT DO.
+ * The projection deliberately answers for EVERY lifecycle state, because a
+ * SUSPENDED connection still owns its domain and the engine has a branch to
+ * say so. Routing needs a narrower question than ownership: which states
+ * actually reach a branch in `routeSignIn`. Only ACTIVE and SUSPENDED do —
+ * every other state falls through it. So taking a non-null answer as the end
+ * of the lookup meant an organization with working legacy single sign-on
+ * that merely STARTED registering a connection, and proved its domain, got a
+ * VERIFIED row that suppressed the legacy answer and matched no branch:
+ * everybody there quietly stopped being sent to their identity provider,
+ * mid-setup, before anything had been activated. The rollout switch that
+ * used to hide this is gone, so it would have been every such customer.
+ *
+ * The legacy columns keep every domain the projection does not DECIDE for —
+ * every organization that never registered a connection, and every one whose
+ * connection is not yet carrying sign-ins.
  */
+
+/** The lifecycle states `routeSignIn` has a branch for. A connection in any
+ *  other state has no answer to give, and must let the legacy lookup speak
+ *  rather than silencing it. */
+const ROUTING_STATES: readonly string[] = ["ACTIVE", "SUSPENDED"];
 export class ConnectionFirstDomainRoutingRepository
   implements SignInDomainRoutingPort
 {
@@ -39,7 +57,9 @@ export class ConnectionFirstDomainRoutingRepository
     const projected = await this.deps.connections.findConnectionForDomain({
       domain,
     });
-    if (projected !== null) return projected;
+    if (projected !== null && ROUTING_STATES.includes(projected.state)) {
+      return projected;
+    }
     return this.deps.legacy.findConnectionForDomain({ domain });
   }
 

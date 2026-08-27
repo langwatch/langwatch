@@ -141,9 +141,17 @@ export class PrismaSsoDomainClaimQueueRepository
       ),
     ];
     if (waitingDomains.length === 0) return [];
+    // THE SAME STATES `findDomainOwner` COUNTS, and it has to be the same
+    // set. That read is what decides a claim is disputed — it refuses the
+    // customer with "we are reviewing this" for a holder in any non-terminal
+    // state — while this one builds the queue an operator reviews it FROM.
+    // Filtering to ACTIVE here meant a claim held up by a VERIFIED or
+    // SUSPENDED holder was refused and then never listed: the customer could
+    // neither prove the domain nor get the claim decided, and no operator
+    // ever saw it. One question, one answer.
     const holders = await this.prisma.ssoConnection.findMany({
       where: {
-        state: "ACTIVE",
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
         verifiedDomains: { hasSome: waitingDomains },
       },
       select: { organizationId: true, verifiedDomains: true },

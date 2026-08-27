@@ -110,8 +110,23 @@ const ALLOWED_FROM: Record<
   [REGISTER_CONNECTION_COMMAND_TYPE]: [],
   [GRANDFATHER_CONNECTION_COMMAND_TYPE]: [],
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
-  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
-  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
+  // A SECOND DOMAIN'S PROGRESS IS THE DOMAIN'S, NOT THE CONNECTION'S.
+  //
+  // Claiming is allowed from VERIFIED and ACTIVE, and a domain fact no
+  // longer drags the lifecycle backwards from those states — which is what
+  // stopped a new claim knocking a live connection off the air. The two
+  // together had a cost nobody stated: the connection stayed ACTIVE, so it
+  // never became CLAIMED, so every verb below refused and the domain could
+  // never be proved at all. Adding a domain to a working connection was a
+  // dead end whose only exit was withdrawing it.
+  //
+  // So these verbs are commandable from the states a second domain can be
+  // claimed in. What decides them is the DOMAIN's own progress, which each
+  // verb already reads and refuses on: `requireClaimed`, the approved list,
+  // and `pendingVerification` naming this domain. This table only says the
+  // connection is in a state where a domain question can be asked.
+  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED", "VERIFIED", "ACTIVE"],
+  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED", "VERIFIED", "ACTIVE"],
   // Every pre-live state, because "start over" is a self-serve act: nothing
   // routes before ACTIVE, so a discard strands nobody however far the
   // journey got. A LIVE connection leaves through teardown, which is graced
@@ -145,12 +160,20 @@ const ALLOWED_FROM: Record<
     "CLAIMED",
     "APPROVED",
     "VERIFICATION_PENDING",
+    // And from the states a connection rests in with one domain already
+    // proved, so a second domain can be taken through the same ceremony.
+    "VERIFIED",
+    "ACTIVE",
   ],
   // Attestation replaces the PROOF, never the approval: it is commandable
   // from APPROVED and from nowhere else, which is what makes an attestation
   // against an unapproved claim a refusal rather than a shortcut.
-  [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED"],
-  [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING"],
+  [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED", "VERIFIED", "ACTIVE"],
+  [VERIFY_DOMAIN_COMMAND_TYPE]: [
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+    "ACTIVE",
+  ],
   // Re-checking is for a connection whose domains are actually doing
   // something: one that reached VERIFIED and one serving traffic. A
   // SUSPENDED connection routes nothing, so doubting its evidence would

@@ -68,6 +68,61 @@ describe("given an organization whose connection is live", () => {
   });
 });
 
+describe("given an organization part-way through registering a connection", () => {
+  /**
+   * The projection answers for EVERY lifecycle state, because a suspended
+   * connection still owns its domain. Routing needs the narrower question —
+   * which states reach a branch in `routeSignIn` — and only ACTIVE and
+   * SUSPENDED do. Without that narrowing, a customer with working legacy
+   * single sign-on who merely started setting up a connection and proved
+   * their domain had every sign-in stop being redirected, mid-setup, before
+   * anything was activated.
+   */
+  it.each([
+    ["DRAFT"],
+    ["CLAIMED"],
+    ["APPROVED"],
+    ["VERIFICATION_PENDING"],
+    ["VERIFIED"],
+  ] as const)(
+    "keeps the legacy answer while the connection is %s",
+    async (state) => {
+      const repository = new ConnectionFirstDomainRoutingRepository({
+        legacy: port(legacyConnection, [legacyConnection]),
+        connections: port({ ...projectedConnection, state }),
+      });
+
+      expect(
+        await repository.findConnectionForDomain({ domain: "acme.com" }),
+      ).toBe(legacyConnection);
+    },
+  );
+
+  it("hands over the moment the connection is carrying sign-ins", async () => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(legacyConnection, [legacyConnection]),
+      connections: port({ ...projectedConnection, state: "SUSPENDED" }),
+    });
+
+    // SUSPENDED still decides: the engine has a branch that says so, and a
+    // paused connection must not read as a domain nobody configured.
+    expect(
+      (await repository.findConnectionForDomain({ domain: "acme.com" }))?.state,
+    ).toBe("SUSPENDED");
+  });
+
+  it("still answers nothing when neither side has one", async () => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(null),
+      connections: port({ ...projectedConnection, state: "VERIFIED" }),
+    });
+
+    expect(
+      await repository.findConnectionForDomain({ domain: "acme.com" }),
+    ).toBeNull();
+  });
+});
+
 describe("given a domain no connection was ever projected for", () => {
   /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
   it("answers exactly what the legacy columns answered", async () => {
