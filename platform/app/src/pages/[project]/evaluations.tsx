@@ -41,7 +41,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { TASK_TYPES } from "../../server/experiments/workbenchState";
+import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
@@ -100,7 +100,10 @@ export function ExperimentsPage() {
 
   if (!project) return null;
 
-  const taskTypeToLabel: Record<keyof typeof TASK_TYPES, string> = {
+  const taskTypeToLabel: Record<
+    keyof typeof LEGACY_EXPERIMENT_TASK_TYPES,
+    string
+  > = {
     real_time: "Legacy live workflow",
     llm_app: "LLM App Experiment",
     prompt_creation: "Prompt Experiment",

@@ -174,16 +174,6 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
-vi.mock("~/server/experiments/workbenchState", () => ({
-  TASK_TYPES: {
-    real_time: "real_time",
-    llm_app: "llm_app",
-    prompt_creation: "prompt_creation",
-    custom_evaluator: "custom_evaluator",
-    scan: "scan",
-  },
-}));
-
 vi.mock("~/components/experiments/BatchEvaluationV2/BatchEvaluationSummary", () => ({
   formatEvaluationSummary: vi.fn(() => ""),
 }));

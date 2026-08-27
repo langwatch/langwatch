@@ -19,7 +19,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isLegacyOnlineEvaluationWorkbenchState } from "~/server/experiments/workbenchState";
+import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
