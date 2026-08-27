@@ -21,8 +21,14 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
+    "ioredis": "5.10.1",
+    "nanoid": "^6.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -30,9 +30,7 @@ function makeDatabase(
   const statusFindUnique = vi.fn().mockResolvedValue(overrides.projection ?? null);
   const historyFindUnique = vi
     .fn()
-    .mockResolvedValue(
-      overrides.history === undefined ? null : { Runs: overrides.history },
-    );
+    .mockResolvedValue(overrides.history === undefined ? null : { Runs: overrides.history });
 
   const database = {
     topic: { findMany: topicFindMany },
@@ -48,9 +46,7 @@ describe("PrismaTopicRepository", () => {
     const { database, topicFindMany } = makeDatabase();
     const repository = PrismaTopicRepository.create(database);
 
-    await expect(repository.findAll({ projectId: "project-1" })).resolves.toEqual(
-      topicRows,
-    );
+    await expect(repository.findAll({ projectId: "project-1" })).resolves.toEqual(topicRows);
     expect(topicFindMany).toHaveBeenCalledWith({
       where: { projectId: "project-1" },
       select: {
@@ -66,9 +62,9 @@ describe("PrismaTopicRepository", () => {
     const { database, topicFindMany } = makeDatabase();
     const repository = PrismaTopicRepository.create(database);
 
-    await expect(
-      repository.findNamesByIds({ projectId: "project-1", ids: [] }),
-    ).resolves.toEqual(new Map());
+    await expect(repository.findNamesByIds({ projectId: "project-1", ids: [] })).resolves.toEqual(
+      new Map(),
+    );
     expect(topicFindMany).not.toHaveBeenCalled();
   });
 
@@ -94,9 +90,7 @@ describe("PrismaTopicRepository", () => {
     });
     const repository = PrismaTopicRepository.create(database);
 
-    await expect(
-      repository.findClusteringStatus({ projectId: "project-1" }),
-    ).resolves.toEqual({
+    await expect(repository.findClusteringStatus({ projectId: "project-1" })).resolves.toEqual({
       projection: {
         lastRequestedAt: 100,
         lastRequestTrigger: "manual",
@@ -123,9 +117,9 @@ describe("PrismaTopicRepository", () => {
     const { database, historyFindUnique } = makeDatabase();
     const repository = PrismaTopicRepository.create(database);
 
-    await expect(
-      repository.findClusteringRunHistory({ projectId: "project-1" }),
-    ).resolves.toEqual([]);
+    await expect(repository.findClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual(
+      [],
+    );
     expect(historyFindUnique).toHaveBeenCalledWith({
       where: { projectId: "project-1" },
       select: { Runs: true },
@@ -136,8 +130,8 @@ describe("PrismaTopicRepository", () => {
     const { database } = makeDatabase({ history: "not an array" });
     const repository = PrismaTopicRepository.create(database);
 
-    await expect(
-      repository.findClusteringRunHistory({ projectId: "project-1" }),
-    ).resolves.toEqual([]);
+    await expect(repository.findClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual(
+      [],
+    );
   });
 });

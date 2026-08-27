@@ -9,7 +9,7 @@ import {
   type TopicClusteringStatusRecord,
 } from "../src/repositories/topic.repository";
 import { TopicService } from "../src/services/topic.service";
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "../src/topic-clustering.constants";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 
 const NOW = 1_800_000_000_000;
 const PROJECT_ID = "project-1";
@@ -157,20 +157,17 @@ describe("TopicService clustering status parity", () => {
   it.each([
     ["manual", true],
     ["bootstrap", false],
-  ] as const)(
-    "only treats an unanswered %s request as in flight",
-    async (trigger, expected) => {
-      const status = await service({
-        status: projection({
-          lastRequestedAt: NOW - 5_000,
-          lastRequestTrigger: trigger,
-        }),
-      }).getClusteringStatus({ projectId: PROJECT_ID });
+  ] as const)("only treats an unanswered %s request as in flight", async (trigger, expected) => {
+    const status = await service({
+      status: projection({
+        lastRequestedAt: NOW - 5_000,
+        lastRequestTrigger: trigger,
+      }),
+    }).getClusteringStatus({ projectId: PROJECT_ID });
 
-      expect(status.isRunInFlight).toBe(expected);
-      expect(status.isInProgress).toBe(false);
-    },
-  );
+    expect(status.isRunInFlight).toBe(expected);
+    expect(status.isInProgress).toBe(false);
+  });
 
   it("stops treating an unanswered request as in flight at the stale boundary", async () => {
     const status = await service({

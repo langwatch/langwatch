@@ -10,7 +10,7 @@ import {
   type TopicNamesInput,
   type TopicProjectInput,
 } from "@langwatch/topic-contract";
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "../topic-clustering.constants";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import type { TopicRepository } from "../repositories/topic.repository";
 import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port";
 
@@ -20,11 +20,7 @@ export class TopicService extends TopicServiceContract {
     schedule: TopicClusteringSchedulePort;
     now?: () => number;
   }): TopicService {
-    return new TopicService(
-      options.repository,
-      options.schedule,
-      options.now ?? Date.now,
-    );
+    return new TopicService(options.repository, options.schedule, options.now ?? Date.now);
   }
 
   private constructor(

@@ -70,9 +70,7 @@ export class PrismaTopicRepository extends TopicRepository {
     );
   }
 
-  async findClusteringStatus(
-    input: TopicProjectInput,
-  ): Promise<TopicClusteringStatusRecord> {
+  async findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord> {
     const projection = await this.database.topicClusteringRunProjection.findUnique({
       where: { projectId: input.projectId },
     });

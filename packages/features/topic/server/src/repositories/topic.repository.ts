@@ -28,9 +28,7 @@ export interface TopicClusteringStatusRecord {
 export abstract class TopicRepository {
   abstract findAll(input: TopicProjectInput): Promise<Topic[]>;
   abstract findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
-  abstract findClusteringStatus(
-    input: TopicProjectInput,
-  ): Promise<TopicClusteringStatusRecord>;
+  abstract findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord>;
   abstract findClusteringRunHistory(
     input: TopicProjectInput,
   ): Promise<TopicClusteringRunHistoryEntry[]>;

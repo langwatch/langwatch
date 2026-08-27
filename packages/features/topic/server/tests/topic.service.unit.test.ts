@@ -90,9 +90,7 @@ describe("TopicService", () => {
     const status = await service.getClusteringStatus({ projectId: "project-1" });
     expect(status.isRunInFlight).toBe(true);
     expect(status.nextRunAt).toBe(200);
-    await expect(
-      service.getClusteringRunHistory({ projectId: "project-1" }),
-    ).resolves.toEqual([
+    await expect(service.getClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual([
       expect.objectContaining({ runId: "run-1", outcome: "completed" }),
     ]);
   });

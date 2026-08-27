@@ -65,6 +65,4 @@ export const topicClusteringRunHistoryEntrySchema = z
   })
   .strict();
 
-export type TopicClusteringRunHistoryEntry = z.infer<
-  typeof topicClusteringRunHistoryEntrySchema
->;
+export type TopicClusteringRunHistoryEntry = z.infer<typeof topicClusteringRunHistoryEntrySchema>;

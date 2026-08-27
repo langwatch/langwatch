@@ -1,1 +1,0 @@
-export const TOPIC_CLUSTERING_STALE_RUN_MS = 20 * 60 * 60 * 1000;
