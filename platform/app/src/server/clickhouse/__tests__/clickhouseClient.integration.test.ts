@@ -375,48 +375,49 @@ describe("ClickHouse routing via env vars", () => {
     });
 
     /**
-     * The case that decides whether membership enters into it at all: this
-     * person belongs to an organization with its own ClickHouse. They still
-     * route to the shared instance, because what is being written is how they
-     * sign in rather than any organization's data — true of them before,
-     * across and after every organization they belong to.
+     * The case that decides whether membership enters into it at all. They
+     * still route to the shared instance, because what is being written is
+     * how they sign in rather than any organization's data — true of them
+     * before, across and after every organization they belong to.
      *
      * Pinned because the cheap reading is that a private-dataplane member
      * must follow their organization, and a membership lookup here would be
      * both a query per resolution and an answer that changes under a join.
      */
-    /** @scenario A user in a private-dataplane organization still routes to shared */
-    it("routes a user who belongs to a private-dataplane organization to the shared instance", async () => {
-      const { getClickHouseClientForTenant } = await import(
-        "../clickhouseClient"
-      );
+    describe("given the user belongs to a private-dataplane organization", () => {
+      /** @scenario A user in a private-dataplane organization still routes to shared */
+      it("routes that user to the shared instance", async () => {
+        const { getClickHouseClientForTenant } = await import(
+          "../clickhouseClient"
+        );
 
-      const { organizationId, teamId, projectId } =
-        await createTestOrgWithProject({
-          namespace: "private-member",
-          organizationId: PRIVATE_ORG_ID,
+        const { organizationId, teamId, projectId } =
+          await createTestOrgWithProject({
+            namespace: "private-member",
+            organizationId: PRIVATE_ORG_ID,
+          });
+        createdProjectIds.push(projectId);
+        createdTeamIds.push(teamId);
+        createdOrgIds.push(organizationId);
+
+        const user = await prisma.user.create({
+          data: {
+            email: `ch-private-${nanoid(8)}@example.com`,
+            name: "CH Private User",
+          },
         });
-      createdProjectIds.push(projectId);
-      createdTeamIds.push(teamId);
-      createdOrgIds.push(organizationId);
+        createdUserIds.push(user.id);
+        await prisma.organizationUser.create({
+          data: { userId: user.id, organizationId, role: "MEMBER" },
+        });
 
-      const user = await prisma.user.create({
-        data: {
-          email: `ch-private-${nanoid(8)}@example.com`,
-          name: "CH Private User",
-        },
+        expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
       });
-      createdUserIds.push(user.id);
-      await prisma.organizationUser.create({
-        data: { userId: user.id, organizationId, role: "MEMBER" },
-      });
-
-      expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
     });
   });
 
   describe("when the tenant names no project, organization or user", () => {
-    /** @scenario A tenant that names neither a project nor an organization is refused */
+    /** @scenario A tenant that names no project, organization or user is refused */
     it("refuses rather than falling back to the shared client", async () => {
       const { getClickHouseClientForTenant } = await import(
         "../clickhouseClient"

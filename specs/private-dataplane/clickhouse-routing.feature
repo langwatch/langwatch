@@ -97,8 +97,8 @@ Feature: Private ClickHouse Routing
     And no project needs to exist for that id
 
   @integration
-  Scenario: A tenant that names neither a project nor an organization is refused
-    Given an id that matches no project and no organization
+  Scenario: A tenant that names no project, organization or user is refused
+    Given an id that matches no project, no organization and no user
     When a client is resolved for that tenant
     Then resolution fails with an error naming the tenant
     And the shared client is not returned
