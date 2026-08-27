@@ -57,10 +57,8 @@
     "packages/insanity-check/**/*",
     // 7.7 MB of generated Ajv output on 19 lines, swept in as a root file by
     // `allowJs` + `./src/**/*` — a seventh of everything the compiler parses,
-    // for nothing. It carries `@ts-nocheck`, so none of it was ever checked,
-    // and `vegaLiteSchemaValidator.generated.d.ts` beside it is what the
-    // import in vegaLiteSchema.ts resolves to either way.
-    "src/features/analytics-query/visualization/vegaLiteSchemaValidator.generated.js",
+    // for nothing. The generated file is owned by the analytics web package,
+    // whose own source build keeps it out of the application type graph.
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",

@@ -86,7 +86,7 @@ export function FieldsFilters({
   actionButton,
   negated = false,
 }: {
-  filters: Record<FilterField, FilterParam>;
+  filters: Partial<Record<FilterField, FilterParam>>;
   setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
   actionButton?: React.ReactNode;
   negated?: boolean;
@@ -160,7 +160,7 @@ function FieldsFilter({
 }: {
   filterId: FilterField;
   filter: FilterDefinition;
-  filters: Record<FilterField, FilterParam>;
+  filters: Partial<Record<FilterField, FilterParam>>;
   setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
   negated?: boolean;
 }) {
@@ -212,8 +212,7 @@ function FieldsFilter({
 
   const currentStringList = Array.isArray(current) ? current : Object.keys(current);
 
-  const allowCustomValue =
-    filter.type !== "numeric" && !BOOLEAN_FILTER_IDS.includes(filterId);
+  const allowCustomValue = filter.type !== "numeric" && !BOOLEAN_FILTER_IDS.includes(filterId);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -313,13 +312,7 @@ function FieldsFilter({
           </Button>
         </Popover.Trigger>
         <Popover.Content padding={0}>
-          <Box
-            position="sticky"
-            top={0}
-            zIndex="1"
-            borderBottom="1px solid"
-            borderColor="border"
-          >
+          <Box position="sticky" top={0} zIndex="1" borderBottom="1px solid" borderColor="border">
             <InputGroup
               width="full"
               startElement={<Search size={14} color={gray400} />}
@@ -546,8 +539,7 @@ function ListSelection({
   );
 
   const options = useMemo(() => {
-    const sortingFn = (a: { count: number }, b: { count: number }) =>
-      a.count > b.count ? -1 : 1;
+    const sortingFn = (a: { count: number }, b: { count: number }) => (a.count > b.count ? -1 : 1);
 
     if (query) {
       return filterData.data?.options
@@ -566,9 +558,7 @@ function ListSelection({
   // Check if we should show custom value option
   const hasExactMatch = useMemo(() => {
     if (!customValueQuery || !options) return true;
-    return options.some(
-      (opt) => opt.label.toLowerCase() === customValueQuery.toLowerCase(),
-    );
+    return options.some((opt) => opt.label.toLowerCase() === customValueQuery.toLowerCase());
   }, [options, customValueQuery]);
 
   const showCustomValue = allowCustomValue && customValueQuery && !hasExactMatch;
@@ -656,25 +646,14 @@ function ListSelection({
 
   if (filter.type === "numeric") {
     return (
-      <RangeFilter
-        filterData={filterData}
-        currentValues={currentValues}
-        onChange={onChange}
-      />
+      <RangeFilter filterData={filterData} currentValues={currentValues} onChange={onChange} />
     );
   }
 
   const customValueIndex = options?.length ?? 0;
 
   return (
-    <Box
-      width="full"
-      paddingY={1}
-      maxHeight="280px"
-      overflowY="auto"
-      paddingX={2}
-      ref={parentRef}
-    >
+    <Box width="full" paddingY={1} maxHeight="280px" overflowY="auto" paddingX={2} ref={parentRef}>
       <VStack
         width="full"
         align="start"
@@ -749,11 +728,7 @@ function ListSelection({
                         {details}
                       </OverflownTextWithTooltip>
                     )}
-                    <OverflownTextWithTooltip
-                      fontSize="sm"
-                      lineClamp={1}
-                      wordBreak="break-all"
-                    >
+                    <OverflownTextWithTooltip fontSize="sm" lineClamp={1} wordBreak="break-all">
                       {label === "" ? "<empty>" : label}
                     </OverflownTextWithTooltip>
                   </VStack>
@@ -838,12 +813,12 @@ function RangeFilter({
   currentValues: string[];
   onChange: (value: string[]) => void;
 }) {
-  let min = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0),
-  ).format("0.[0]");
-  let max = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0),
-  ).format("0.[0]");
+  let min = +numeral(+(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0)).format(
+    "0.[0]",
+  );
+  let max = +numeral(+(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)).format(
+    "0.[0]",
+  );
   if (isNaN(min)) {
     min = 0;
   }

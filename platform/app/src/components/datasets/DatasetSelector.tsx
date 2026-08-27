@@ -8,9 +8,10 @@ import {
 } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useState } from "react";
 import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";
-import type { Dataset } from "~/generated/prisma/client";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "@langwatch/design-system/select";
+
+type DatasetOption = { id: string; name: string };
 
 /**
  * What the picker has to show. An empty dropdown renders identically whether
@@ -26,7 +27,7 @@ const pickerStateOf = ({
   isLoading,
   isError,
 }: {
-  datasets: Dataset[] | undefined;
+  datasets: DatasetOption[] | undefined;
   isLoading: boolean;
   isError: boolean;
 }): PickerState => {
@@ -60,8 +61,11 @@ function LoadingDatasets() {
   );
 }
 
-interface DatasetSelectorProps<T extends { datasetId: string }> {
-  datasets: Dataset[] | undefined;
+interface DatasetSelectorProps<
+  T extends { datasetId: string },
+  D extends DatasetOption = DatasetOption,
+> {
+  datasets: D[] | undefined;
   localStorageDatasetId: string;
   errors: FieldErrors<T>;
   setValue: UseFormSetValue<T>;
@@ -71,7 +75,10 @@ interface DatasetSelectorProps<T extends { datasetId: string }> {
   register?: never;
 }
 
-export function DatasetSelector<T extends { datasetId: string }>({
+export function DatasetSelector<
+  T extends { datasetId: string },
+  D extends DatasetOption = DatasetOption,
+>({
   datasets,
   localStorageDatasetId,
   errors,
@@ -79,7 +86,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
   onCreateNew,
   isLoading = false,
   isError = false,
-}: DatasetSelectorProps<T>) {
+}: DatasetSelectorProps<T, D>) {
   const state = pickerStateOf({ datasets, isLoading, isError });
 
   const datasetCollection = createListCollection({

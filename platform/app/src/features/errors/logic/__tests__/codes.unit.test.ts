@@ -31,7 +31,7 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  * covers `src` and `ee` only, because it is looking for *renders* and the
  * workspace packages have no UI. Codes are declared in all three.
  *
- * `src` alone was a hole with no symptom: `ee/admin/impersonation.service.ts`
+ * `src` alone was a hole with no symptom: the Ops admin implementation
  * declares three codes and `packages/api` another, so none of the four entered
  * `APP_ERROR_CODES`, none was required to have copy, and the exhaustive
  * `satisfies` in `presentation.ts` had nothing to complain about. A guard that

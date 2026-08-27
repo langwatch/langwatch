@@ -231,7 +231,7 @@ vi.mock("~/components/WorkspaceSwitcher", () => ({
 vi.mock("@langwatch/ops-web", () => ({
   ImpersonationBanner: () => null,
 }));
-vi.mock("~/features/enterprise/admin/ImpersonationSwitchBackMenuItem", () => ({
+vi.mock("~/components/ops/ImpersonationSwitchBackMenuItem", () => ({
   ImpersonationSwitchBackMenuItem: () => null,
 }));
 vi.mock("~/components/sidebar/PresenceMenuItem", () => ({

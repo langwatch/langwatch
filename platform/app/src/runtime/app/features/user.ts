@@ -1,4 +1,4 @@
-import type { GovernanceCliTokenRevocationService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@langwatch/user-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { revokeAllSessionsForUser } from "~/server/better-auth/revokeSessions";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 
 class AppUserSessionRevocationPort extends UserSessionRevocationPort {
   private constructor(
@@ -42,31 +42,31 @@ class AppUserSessionRevocationPort extends UserSessionRevocationPort {
 }
 
 class AppUserCliTokenRevocationPort extends UserCliTokenRevocationPort {
-  private constructor(private readonly service: GovernanceCliTokenRevocationService) {
+  private constructor(private readonly governance: GovernanceService) {
     super();
   }
 
-  static create(
-    service: GovernanceCliTokenRevocationService,
-  ): AppUserCliTokenRevocationPort {
-    return new AppUserCliTokenRevocationPort(service);
+  static create(governance: GovernanceService): AppUserCliTokenRevocationPort {
+    return new AppUserCliTokenRevocationPort(governance);
   }
 
   async revokeForUser(input: { userId: string }): Promise<void> {
-    await this.service.revokeForUser(input);
+    await this.governance.cliTokenRevokeForUser(input);
   }
 }
 
 class AppUserAvatarStoragePort extends UserAvatarStoragePort {
+  constructor(private readonly storedObjects: StoredObjectsService) {
+    super();
+  }
+
   async store(input: {
     projectId: string;
     userId: string;
     mediaType: UserAvatarMediaType;
     bytes: Uint8Array;
   }): Promise<{ id: string }> {
-    const stored = await createStoredObjectsService({
-      projectId: input.projectId,
-    }).storeFromBytes({
+    const stored = await this.storedObjects.storeFromBytes({
       projectId: input.projectId,
       purpose: USER_AVATAR_PURPOSE,
       ownerKind: USER_AVATAR_OWNER_KIND,
@@ -85,14 +85,15 @@ export class AppUserRuntime {
     database: PrismaClient;
     redis: RedisConnection | null;
     organizations: OrganizationService;
-    cliTokenRevocation: GovernanceCliTokenRevocationService;
+    governance: GovernanceService;
+    storedObjects: StoredObjectsService;
   }): UserService {
     return PostgresUserAdapter.create({
       database: options.database,
       sessions: AppUserSessionRevocationPort.create(options.database, options.redis),
-      cliTokens: AppUserCliTokenRevocationPort.create(options.cliTokenRevocation),
+      cliTokens: AppUserCliTokenRevocationPort.create(options.governance),
       organizations: options.organizations,
-      avatarStorage: new AppUserAvatarStoragePort(),
+      avatarStorage: new AppUserAvatarStoragePort(options.storedObjects),
     }).build();
   }
 }

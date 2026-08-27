@@ -96,10 +96,6 @@ vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", 
   CodeEditor: () => null,
 }));
 
-vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
-  TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
-}));
-
 // Track initialConfigValues passed to usePromptConfigForm
 const capturedInitialConfigValues: unknown[] = [];
 // Track the latest form methods returned by the mock so tests can drive edits

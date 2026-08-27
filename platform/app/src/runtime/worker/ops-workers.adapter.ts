@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Anomaly } from "@langwatch/ops-contract";
 import {
@@ -8,8 +9,6 @@ import {
   UsageStatsClickHouseClientResolver,
   UsageStatsErrorReporter,
   UsageStatsTelemetryClient,
-  type AnomalyFeatureFlagConfig,
-  type AnomalyFeatureFlagsPort,
   type OpsWorkerHandle,
   type UsageStatsClickHouseQuery,
   type UsageStatsClickHouseQueryResult,
@@ -160,8 +159,7 @@ class LoggedHardTierAnomalyAlertAdapter extends AnomalyHardTierAlertPort {
 export interface AppOpsWorkerAdapterOptions {
   anomaly: {
     redis: Redis | Cluster | undefined;
-    featureFlags: AnomalyFeatureFlagsPort;
-    featureFlagConfig: AnomalyFeatureFlagConfig;
+    featureFlags: FeatureFlagService;
   };
   usageStats: {
     database: PrismaClient;

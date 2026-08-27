@@ -102,7 +102,7 @@ class AppLicenseUsage extends LicenseUsagePort {
 
 class AppLicenseRetention extends LicenseRetentionPort {
   listOrganizationRules(organizationId: string) {
-    return getApp().dataRetention.policy.listOrganizationRules(organizationId);
+    return getApp().dataRetention.listOrganizationRules({ organizationId });
   }
 
   async setForOrganization(input: {
@@ -110,7 +110,7 @@ class AppLicenseRetention extends LicenseRetentionPort {
     category: string;
     retentionDays: number;
   }): Promise<void> {
-    await getApp().dataRetention.policy.setForScope({
+    await getApp().dataRetention.setForScope({
       scope: {
         scopeType: "ORGANIZATION",
         scopeId: input.organizationId,

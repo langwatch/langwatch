@@ -209,7 +209,7 @@ export const APP_ERROR_CODES = [
   "monitor_evaluator_required",
   "no_admin_configured",
   // Also a Go code, with copy already written under the shared/transport
-  // heading — `ee/admin/routes/admin.ts` raises it to hide the admin surface
+  // heading — the Ops admin transport raises it to hide the admin surface
   // from a session that is no longer an admin.
   "not_found",
   "notification_delivery_error",
@@ -305,7 +305,7 @@ export const APP_ERROR_CODES = [
   "trace_sharing_disabled",
   "trigger_filters_required",
   // Also a Go code, with copy already written under the shared/transport
-  // heading — an app-level subclass raises it too (`ee/admin/routes/admin.ts`),
+  // heading — an app-level subclass raises it too (the Ops admin transport),
   // and the scan is right to insist it be listed here as well.
   "unauthorized",
   "usage_report_failed",

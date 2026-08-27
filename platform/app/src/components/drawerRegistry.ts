@@ -352,9 +352,7 @@ export function preloadDrawer(type: DrawerType): Promise<void> {
   const factory = chunkFactories.get(component);
   if (!factory) return Promise.resolve();
 
-  return warmChunk(factory).then((loaded) =>
-    loaded ? primeLazyComponent(component) : undefined,
-  );
+  return warmChunk(factory).then((loaded) => (loaded ? primeLazyComponent(component) : undefined));
 }
 
 /**
@@ -428,9 +426,7 @@ export type DrawerProps<T extends DrawerType> = ComponentProps<(typeof drawers)[
  */
 export type DrawerCallbacks<T extends DrawerType> = {
   [
-    K in keyof DrawerProps<T> as DrawerProps<T>[K] extends
-      | ((...args: any[]) => any)
-      | undefined
+    K in keyof DrawerProps<T> as DrawerProps<T>[K] extends ((...args: any[]) => any) | undefined
       ? K
       : never
   ]?: DrawerProps<T>[K];

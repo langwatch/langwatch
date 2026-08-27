@@ -502,33 +502,7 @@ export const actionCommands: Command[] = [
     description: "Invite someone to your organization",
     icon: UserPlus,
     category: "actions",
-    keywords: [
-      "invite",
-      "member",
-      "teammate",
-      "add",
-      "user",
-      "people",
-      "organization",
-      "team",
-    ],
-  },
-  {
-    id: "action-feature-flags",
-    label: "Feature Flags (Dev)",
-    description: "Toggle feature flag overrides for this browser",
-    icon: ToggleLeft,
-    category: "actions",
-    keywords: [
-      "feature",
-      "flag",
-      "flags",
-      "toggle",
-      "dev",
-      "override",
-      "experiment",
-      "release",
-    ],
+    keywords: ["invite", "member", "teammate", "add", "user", "people", "organization", "team"],
   },
 ];
 
@@ -687,9 +661,7 @@ export function filterCommands(commands: Command[], query: string): Command[] {
   return commands.filter((cmd) => {
     const labelMatch = cmd.label.toLowerCase().includes(lowerQuery);
     const descriptionMatch = cmd.description?.toLowerCase().includes(lowerQuery);
-    const keywordMatch = cmd.keywords?.some((kw) =>
-      kw.toLowerCase().includes(lowerQuery),
-    );
+    const keywordMatch = cmd.keywords?.some((kw) => kw.toLowerCase().includes(lowerQuery));
     return labelMatch || descriptionMatch || keywordMatch;
   });
 }

@@ -82,13 +82,18 @@ export const MainMenuSections = function MainMenuSections({
         icon={featureIcons.home.icon}
         label={projectRoutes.home.title}
         project={project}
-        isActive={router.pathname === "/[project]" && !router.pathname.includes("/analytics")}
+        isActive={
+          router.pathname === "/[project]" && !router.pathname.includes("/analytics")
+        }
         showLabel={showExpanded}
       />
 
       <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
       <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data} />
-      <BuildSection {...sectionProps} canSeeAutomations={hasPermission("triggers:view")} />
+      <BuildSection
+        {...sectionProps}
+        canSeeAutomations={hasPermission("triggers:view")}
+      />
 
       {shouldIncludeGovernSection && <GovernSection showExpanded={showExpanded} />}
 
@@ -117,11 +122,15 @@ interface CodingAgentLinks {
  */
 function useCodingAgentLinks(): CodingAgentLinks {
   const { project, organization, hasPermission } = useOrganizationTeamProject();
-  const { enabled: codingAgentPagesEnabled } = useFeatureFlag("release_ui_ai_governance_enabled", {
-    organizationId: organization?.id,
-    enabled: !!organization?.id,
-  });
-  const canSeeCodingAgentActivity = codingAgentPagesEnabled && hasPermission("traces:view");
+  const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const canSeeCodingAgentActivity =
+    codingAgentPagesEnabled && hasPermission("traces:view");
   const now = new Date();
 
   return {
@@ -210,7 +219,12 @@ function TestSection({
   pendingAnnotationCount,
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
   return (
-    <SidebarSection id="test" label="Test" showExpanded={showExpanded} projectId={project?.id}>
+    <SidebarSection
+      id="test"
+      label="Test"
+      showExpanded={showExpanded}
+      projectId={project?.id}
+    >
       <CollapsibleMenuGroup
         icon={featureIcons.simulations.icon}
         label={projectRoutes.simulations.title}
@@ -236,7 +250,8 @@ function TestSection({
               project,
             }),
             isActive:
-              pathname.includes("/simulations") && !pathname.includes("/simulations/scenarios"),
+              pathname.includes("/simulations") &&
+              !pathname.includes("/simulations/scenarios"),
           },
         ]}
       />
@@ -336,7 +351,9 @@ function BuildSection({
   );
 }
 
-export const MainMenu = React.memo(function MainMenu({ isCompact = false }: MainMenuProps) {
+export const MainMenu = React.memo(function MainMenu({
+  isCompact = false,
+}: MainMenuProps) {
   const router = useRouter();
   const { project, hasPermission, isPublicRoute } = useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
