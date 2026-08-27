@@ -16,6 +16,10 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+
+/** HandledError is abstract; the tests need one concrete refusal to throw. */
+class TestHandledError extends HandledError {}
+
 import { type Context, Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -24,15 +28,15 @@ import {
   RequestValidationError,
   validator as zValidator,
 } from "~/server/api/validation";
+import { app as queryApp } from "../[[...route]]/app";
 import {
   methodNotFound,
-  recordRpcId,
   RPC_CODES,
+  recordRpcId,
   rpcErrorBody,
   rpcIdOf,
   rpcResultBody,
 } from "../[[...route]]/rpc";
-import { app as queryApp } from "../[[...route]]/app";
 import { queryRpcRequestSchema } from "../[[...route]]/schemas";
 
 /** A context stub carrying only what the envelope builders read off it. */
@@ -50,7 +54,11 @@ function errorBodyFor(error: unknown, id?: unknown) {
     error,
     canonical: canonicalBody("some_code", "Some message."),
     c: contextWith(id === undefined ? {} : { rpcId: id }),
-  }) as { jsonrpc: string; id?: unknown; error: { code: number; data: unknown } };
+  }) as {
+    jsonrpc: string;
+    id?: unknown;
+    error: { code: number; data: unknown };
+  };
 }
 
 describe("given a JSON-RPC reply is being built", () => {
@@ -75,13 +83,18 @@ describe("given a JSON-RPC reply is being built", () => {
     });
 
     it("preserves a string id as a string, not coerced to a number", () => {
-      expect(rpcResultBody({ id: "7", result: null })).toMatchObject({ id: "7" });
+      expect(rpcResultBody({ id: "7", result: null })).toMatchObject({
+        id: "7",
+      });
       expect(errorBodyFor(new Error("boom"), "7").id).toBe("7");
     });
 
     /** `null` is a legal id and distinct from "no id was sent". */
     it("distinguishes an explicit null id from an absent one", () => {
-      expect(rpcResultBody({ id: null, result: null })).toHaveProperty("id", null);
+      expect(rpcResultBody({ id: null, result: null })).toHaveProperty(
+        "id",
+        null,
+      );
       expect(rpcResultBody({ id: undefined, result: null })).not.toHaveProperty(
         "id",
       );
@@ -110,7 +123,9 @@ describe("given an error is being classified for the wire", () => {
     const body = errorBodyFor(
       new RequestValidationError({
         target: "json",
-        violations: [{ field: "method", type: "invalid_enum_value", message: "no" }],
+        violations: [
+          { field: "method", type: "invalid_enum_value", message: "no" },
+        ],
       }),
     );
     expect(body.error.code).toBe(RPC_CODES.INVALID_REQUEST);
@@ -129,7 +144,7 @@ describe("given an error is being classified for the wire", () => {
    */
   it("carries the canonical envelope through as error.data", () => {
     const body = rpcErrorBody({
-      error: new HandledError("scan_limit_exceeded", "Too much.", {
+      error: new TestHandledError("scan_limit_exceeded", "Too much.", {
         httpStatus: 422,
       }),
       canonical: canonicalBody("scan_limit_exceeded", "Too much."),
@@ -167,7 +182,9 @@ describe("given an error is being given an HTTP status", () => {
    */
   it("keeps an application refusal's own status", () => {
     const { status } = canonicalErrorFor(
-      new HandledError("scan_limit_exceeded", "Too much.", { httpStatus: 422 }),
+      new TestHandledError("scan_limit_exceeded", "Too much.", {
+        httpStatus: 422,
+      }),
       {},
     );
     expect(status).toBe(422);
@@ -184,7 +201,9 @@ describe("given an error is being given an HTTP status", () => {
     const { status } = canonicalErrorFor(
       new RequestValidationError({
         target: "json",
-        violations: [{ field: "method", type: "invalid_enum_value", message: "no" }],
+        violations: [
+          { field: "method", type: "invalid_enum_value", message: "no" },
+        ],
       }),
       {},
     );
@@ -247,18 +266,18 @@ describe("given a caller presents no credential", () => {
     };
   };
 
-  it.each(["query.run", "query.schema"])(
-    "refuses %s with 401 rather than reaching the handler",
-    async (method) => {
-      const { status, body } = await call(method);
+  it.each([
+    "query.run",
+    "query.schema",
+  ])("refuses %s with 401 rather than reaching the handler", async (method) => {
+    const { status, body } = await call(method);
 
-      expect(
-        status,
-        "a 500 here means the door opened and the handler crashed on an absent project",
-      ).toBe(401);
-      expect(body.error?.code).toBe("missing_credentials");
-    },
-  );
+    expect(
+      status,
+      "a 500 here means the door opened and the handler crashed on an absent project",
+    ).toBe(401);
+    expect(body.error?.code).toBe("missing_credentials");
+  });
 
   /**
    * The refusal must not double as a directory. If a known method and a
@@ -312,11 +331,8 @@ describe("given a request is refused before the handler runs", () => {
         status as never,
       );
     });
-    app.post(
-      "/",
-      recordRpcId,
-      zValidator("json", queryRpcRequestSchema),
-      (c) => c.json(rpcResultBody({ id: c.req.valid("json").id, result: null })),
+    app.post("/", recordRpcId, zValidator("json", queryRpcRequestSchema), (c) =>
+      c.json(rpcResultBody({ id: c.req.valid("json").id, result: null })),
     );
     return app;
   }
@@ -357,7 +373,11 @@ describe("given a request is refused before the handler runs", () => {
   });
 
   it("echoes a numeric id too, without coercing it to a string", async () => {
-    const { body } = await send({ jsonrpc: "2.0", id: 7, method: "query.nope" });
+    const { body } = await send({
+      jsonrpc: "2.0",
+      id: 7,
+      method: "query.nope",
+    });
     expect(body.id).toBe(7);
   });
 

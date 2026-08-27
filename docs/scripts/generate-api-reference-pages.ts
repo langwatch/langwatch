@@ -29,7 +29,7 @@ interface EndpointGroup {
   /**
    * `METHOD /path` keys, in the order a reader should meet them.
    *
-   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * The default sort is CRUD-shaped (list, create, get, update, delete), which
    * is right for a resource but wrong for a family that is a sequence of steps.
    * A group whose overview describes a lifecycle sets this so the sidebar and
    * the prose agree; anything the list omits falls in behind, still sorted the
@@ -86,7 +86,7 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
  * entry, and the generator fails when one is owned by neither.
  */
 const SKIP_PATHS: Record<string, string> = {
-  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
+  "/": "Not an API route: the prompts app serves the spec's root path, which has no content to document.",
   "/api/trace/search":
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
@@ -286,7 +286,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "query",
     pathPrefixes: ["/api/v1/query"],
     overviewDescription:
-      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods — read the envelope guide before you call it, especially for how auth failures answer differently from a refused query.",
+      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods: read the envelope guide before you call it, especially for how auth failures answer differently from a refused query.",
     // One path, two JSON-RPC methods: the generator makes one endpoint page for
     // it, and the envelope page carries the real explanatory weight the
     // generated page cannot (the two methods, the two error shapes).
@@ -636,7 +636,7 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently — the same failure this generator exists to
+  // it out of the sidebar silently: the same failure this generator exists to
   // prevent. Check every one of them against the filesystem up front.
   const declaredExtras = [
     ...INTRO_GROUP.pages,
@@ -737,7 +737,7 @@ function main() {
         ? "key names an operation"
         : "keys name operations";
     console.error(
-      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
     for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
     console.error(

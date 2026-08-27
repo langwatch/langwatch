@@ -162,10 +162,7 @@ describe("given the /api/v1/query JSON-RPC family", () => {
   const rpcPath = "/api/v1/query";
 
   /** POSTs a raw body, so a malformed-envelope case can send whatever it likes. */
-  const post = (
-    body: unknown,
-    options: { token?: string | null } = {},
-  ) =>
+  const post = (body: unknown, options: { token?: string | null } = {}) =>
     app.request(rpcPath, {
       method: "POST",
       headers: {
@@ -206,7 +203,10 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     method: string,
     params?: unknown,
   ) => {
-    const response = await call(method, params, { token: project.apiKey, id: 42 });
+    const response = await call(method, params, {
+      token: project.apiKey,
+      id: 42,
+    });
     const body = (await response.json()) as Record<string, any>;
     expect(response.status, `${method} failed: ${JSON.stringify(body)}`).toBe(
       200,
@@ -366,10 +366,7 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     });
 
     it("resolves an unqualified dataset name, the same as the credential-scoped door", async () => {
-      const body = await run(
-        projectA,
-        "SELECT count() AS value FROM traces",
-      );
+      const body = await run(projectA, "SELECT count() AS value FROM traces");
       expect(Number(body.rows[0].value)).toBe(SEEDED_TRACES);
     });
   });
@@ -426,9 +423,7 @@ describe("given the /api/v1/query JSON-RPC family", () => {
           caller,
           `SELECT DISTINCT TenantId FROM ${database}.traces`,
         );
-        expect(body.rows.map((row: any) => row.TenantId)).toEqual([
-          caller.id,
-        ]);
+        expect(body.rows.map((row: any) => row.TenantId)).toEqual([caller.id]);
       }
     });
 
@@ -488,7 +483,11 @@ describe("given the /api/v1/query JSON-RPC family", () => {
      * with it.
      */
     it("answers a credential refusal in the canonical envelope, unwrapped", async () => {
-      const response = await call("query.run", { sql: "SELECT 1" }, { token: null });
+      const response = await call(
+        "query.run",
+        { sql: "SELECT 1" },
+        { token: null },
+      );
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(401);
@@ -505,7 +504,11 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     });
 
     it("does not let an unauthenticated caller probe which methods exist", async () => {
-      const real = await call("query.run", { sql: "SELECT 1" }, { token: null });
+      const real = await call(
+        "query.run",
+        { sql: "SELECT 1" },
+        { token: null },
+      );
       const fake = await call("query.nope", {}, { token: null });
 
       expect(real.status).toBe(401);
@@ -542,7 +545,10 @@ describe("given the /api/v1/query JSON-RPC family", () => {
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(ENVELOPE_REFUSAL_STATUS);
-      expect(body.error, "a refusal arrived with no error member").toBeDefined();
+      expect(
+        body.error,
+        "a refusal arrived with no error member",
+      ).toBeDefined();
       // -32600: the envelope enumerates the methods, so an unknown one is
       // refused as an invalid request before dispatch is ever reached.
       expect(body.error.code).toBe(-32600);

@@ -6,8 +6,8 @@ description: 'How POST /api/v1/query dispatches query.run and query.schema over 
 ## Why one endpoint, two methods
 
 `POST /api/v1/query` is the LangWatchQL door: one path, dispatching on a JSON-RPC
-2.0 `method` field rather than the URL. That is unusual for this API — every
-other family is one path per operation — so this page exists to carry the
+2.0 `method` field rather than the URL. That is unusual for this API: every
+other family is one path per operation. So this page exists to carry the
 explanation the generated endpoint page cannot: the envelope shape, the two
 methods it dispatches to, and the one error-shape gotcha a client must code for
 before it can trust a failure response.
@@ -19,7 +19,7 @@ Every request body is a JSON-RPC 2.0 envelope:
 ```jsonc
 {
   "jsonrpc": "2.0",
-  "id": 1,                  // string | number | null — echoed back on the response
+  "id": 1,                  // string, number, or null: echoed back on the response
   "method": "query.run",    // or "query.schema"
   "params": { /* method-specific, see below */ }
 }
@@ -29,8 +29,8 @@ This door is **pragmatic JSON-RPC, not strict**. Two departures from the spec,
 both deliberate:
 
 - **Real HTTP status per outcome.** A refused query answers `422`, not `200`
-  with an `error` field — the transport status always tells you whether the
-  call was refused, so nothing here depends on parsing the body first.
+  with an `error` field: the transport status always tells you whether the
+  call was refused, so you never have to parse the body first to find out.
 - **No batch support.** Send one envelope per request. An array body is not a
   batch call.
 
@@ -61,7 +61,7 @@ project can see.
 | `followsTimeWindow` | `boolean` | Whether the statement declared the reserved time-window parameters. |
 | `followsGranularity` | `boolean` | Whether the statement declared the reserved granularity parameter. |
 | `granularitySeconds` | `number` | Optional. The step this run was bucketed at, when one applied. |
-| `diagnostics` | `Diagnostic[]` | Advisory notes about the result — see below. |
+| `diagnostics` | `Diagnostic[]` | Advisory notes about the result. See below. |
 
 ```bash
 curl -X POST https://app.langwatch.ai/api/v1/query \
@@ -101,7 +101,7 @@ curl -X POST https://app.langwatch.ai/api/v1/query \
 
 <Info>
 **Diagnostics are advisory and never reject a query.** An empty `diagnostics`
-list means no known issue was detected — it is **not** proof that the answer is
+list means no known issue was detected. It is **not** proof that the answer is
 the one you meant. A statement can declare the reserved time-window parameters
 and never actually compare against them; `followsTimeWindow: true` only tells
 you the parameters were declared and filled, not that they bounded the rows
@@ -112,7 +112,7 @@ returned. Read the statement, don't just read the flag.
 
 Lists the datasets your key can query: names, descriptions, grain, join keys,
 the time column each one prunes on, freshness, and every column's type,
-description, unit, and the permission gates that unlock it — plus a runnable
+description, unit, and the permission gates it requires, plus a runnable
 example statement per dataset.
 
 **`params`:** none. Sending `params` is not an error; it is ignored.
@@ -178,17 +178,17 @@ curl -X POST https://app.langwatch.ai/api/v1/query \
 ## The critical gotcha: not every failure carries the JSON-RPC wrapper
 
 **Only authentication and authorization failures (401, 403) answer with the
-canonical error envelope alone — never wrapped in a JSON-RPC `error`.**
-Everything else this endpoint answers with — a refused query (400, 422), or
-even an unexpected server failure (500) — is wrapped, because those are all
-raised from inside the endpoint's own handler, which installs a JSON-RPC error
-handler around itself. 401/403 are the one exception: they are raised by auth
-middleware *before* the request reaches that handler, so there is no JSON-RPC
-layer around them yet.
+canonical error envelope alone, never wrapped in a JSON-RPC `error`.**
+Everything else this endpoint answers with, including a refused query (400,
+422) or even an unexpected server failure (500), is wrapped, because those are
+all raised from inside the endpoint's own handler, which installs a JSON-RPC
+error handler around itself. 401/403 are the one exception: they are raised by
+auth middleware *before* the request reaches that handler, so there is no
+JSON-RPC layer around them yet.
 
 **Branch on the HTTP status first, then read `error.code`.** A client that
 assumes every failure carries a JSON-RPC envelope will misread a refused
-credential — it will look for `error.data.code` and find nothing, because on a
+credential: it will look for `error.data.code`, which is absent, because on a
 401/403 the code is at `error.code` directly.
 
 <Warning>
@@ -197,7 +197,7 @@ this endpoint. Get the branch order backwards and a refused API key silently
 falls through to a generic error path instead of surfacing `invalid_api_key`.
 </Warning>
 
-Compare the two shapes side by side. A **refused query** (400/422) — the
+Compare the two shapes side by side. A **refused query** (400/422): the
 request reached this endpoint's handler, which wraps its refusal in JSON-RPC:
 
 ```jsonc
@@ -217,12 +217,12 @@ request reached this endpoint's handler, which wraps its refusal in JSON-RPC:
 }
 ```
 
-The canonical envelope — `type`, `code`, `message`, `trace_id` — rides as
+The canonical envelope (`type`, `code`, `message`, `trace_id`) rides as
 `error.data`. `error.code` at the outer level (`-32000`) is the JSON-RPC
 protocol code, not the application code; the code your logic should branch on
 is one level deeper, at `error.data.code`.
 
-A **refused credential** (401/403) — raised before this endpoint's handler,
+A **refused credential** (401/403), raised before this endpoint's handler and
 never wrapped:
 
 ```jsonc
@@ -237,18 +237,18 @@ never wrapped:
 ```
 
 No `jsonrpc` key at all. The canonical envelope is the whole body, at the top
-level — the same shape every other LangWatch API family answers with.
+level: the same shape every other LangWatch API family answers with.
 
 | HTTP status | Body shape | Where the canonical `code` lives |
 |-------------|------------|-----------------------------------|
-| 200 | JSON-RPC success | — (no error) |
+| 200 | JSON-RPC success | (no error) |
 | 400, 422, 500 | JSON-RPC error | `error.data.code` |
 | 401, 403 | Canonical envelope, unwrapped | `error.code` |
 
 ## Using the SDK instead
 
 The `langwatch` TypeScript SDK handles the envelope and this exact branching
-for you — call it and read a result or a typed error, never a raw JSON-RPC
+for you: call it and read a result or a typed error, never a raw JSON-RPC
 body:
 
 ```typescript
@@ -269,7 +269,7 @@ console.log(schema.datasets.map((d) => d.name));
 ```
 
 On failure the SDK throws `LangWatchHandledError` (or `QueryApiError` when the
-platform did not name the cause) — unwrapping applies whether the failure was
+platform did not name the cause). Unwrapping applies whether the failure was
 JSON-RPC-wrapped (400/422) or bare (401/403), so `error.code` reads the same
 canonical code either way and you never branch on transport shape yourself:
 
@@ -288,8 +288,8 @@ try {
 
 ## See also
 
-- [Query overview](/api-reference/query/overview) — the generated endpoint
+- [Query overview](/api-reference/query/overview): the generated endpoint
   reference for `POST /api/v1/query`.
-- [Projection DSL & field catalog](/api-reference/traces/projection-dsl) — the
+- [Projection DSL & field catalog](/api-reference/traces/projection-dsl): the
   other place LangWatch lets you shape a response server-side, for
   `POST /api/traces/search`.

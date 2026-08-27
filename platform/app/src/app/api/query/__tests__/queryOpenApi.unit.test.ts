@@ -99,10 +99,7 @@ describe("given the generated OpenAPI document", () => {
       ["200", "result"],
       ["400", "error"],
       ["422", "error"],
-    ])("publishes the JSON-RPC envelope, not the bare payload, on %s", (
-      status,
-      member,
-    ) => {
+    ])("publishes the JSON-RPC envelope, not the bare payload, on %s", (status, member) => {
       const schema =
         paths[QUERY]?.post?.responses?.[status]?.content?.["application/json"]
           ?.schema;
