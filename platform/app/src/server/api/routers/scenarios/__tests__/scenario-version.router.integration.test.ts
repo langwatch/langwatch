@@ -108,10 +108,14 @@ describe("scenarios version procedures", () => {
     );
   });
 
+  // A case created with no suite named is filed into the project's Default
+  // suite, which is created on that first write. The suite rows go with the
+  // cases, or the project delete below is refused by the relation to them.
   beforeEach(() =>
     cleanupTestRows(prisma, [
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
     ]),
   );
 
@@ -119,6 +123,7 @@ describe("scenarios version procedures", () => {
     cleanupTestRows(prisma, [
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],

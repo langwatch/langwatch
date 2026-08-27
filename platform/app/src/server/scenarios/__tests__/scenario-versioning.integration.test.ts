@@ -12,6 +12,7 @@ import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
+import { DEFAULT_SUITE_NAME } from "../../suites/default-suite";
 import { ScenarioStaleVersionError } from "../errors";
 import { ScenarioService } from "../scenario.service";
 
@@ -171,7 +172,9 @@ describe("scenario versioning", () => {
 
       // Filing, refiling and unfiling: every one of them moves the case
       // between real folders, so an implementation that only skips the
-      // version when nothing changed cannot pass by accident.
+      // version when nothing changed cannot pass by accident. Taking the
+      // case out of its folder files it into Default, which is a move
+      // between two real folders as well.
       for (const folderId of [refunds.id, checkout.id, null]) {
         await service.moveToFolder({
           scenarioId: scenario.id,
@@ -180,9 +183,12 @@ describe("scenario versioning", () => {
         });
       }
 
+      const defaultSuite = await prisma.simulationSuite.findFirst({
+        where: { projectId, kind: "folder", name: DEFAULT_SUITE_NAME },
+      });
       const stored = await service.getById({ id: scenario.id, projectId });
       expect(stored?.version).toBe(1);
-      expect(stored?.folderId).toBeNull();
+      expect(stored?.folderId).toBe(defaultSuite?.id);
       const rows = await prisma.scenarioVersion.findMany({
         where: { projectId, scenarioId: scenario.id },
       });
