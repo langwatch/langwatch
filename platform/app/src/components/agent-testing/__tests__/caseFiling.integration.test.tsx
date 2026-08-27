@@ -85,6 +85,7 @@ vi.mock("~/utils/api", () => ({
       },
       getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
+      create: { useMutation: mutation(vi.fn()) },
       update: { useMutation: mutation(vi.fn()) },
       run: { useMutation: mutation(vi.fn()) },
       runAll: { useMutation: mutation(mockRunAll) },
@@ -196,7 +197,6 @@ describe("the Scenarios tab", () => {
   /** @scenario "A project with no scenarios shows what to do first" */
   it("says what a scenario is and offers the first one", () => {
     mockScenariosGetAll.mockReturnValue({ data: [], isLoading: false });
-    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
     renderTab();
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
@@ -217,7 +217,7 @@ describe("the Scenarios tab", () => {
     const user = userEvent.setup();
     // Loose so the row reads at the root of the All scenarios surface.
     mockScenariosGetAll.mockReturnValue({
-      data: [scenarioRow({ folderId: null })],
+      data: [scenarioRow()],
       isLoading: false,
     });
     renderTab();
@@ -282,7 +282,7 @@ describe("the Scenarios tab", () => {
   it("names the case in the archive dialog and archives it on confirm", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
-      data: [scenarioRow({ folderId: null })],
+      data: [scenarioRow()],
       isLoading: false,
     });
     renderTab();
@@ -307,7 +307,7 @@ describe("the Scenarios tab", () => {
   it("runs an unfiled case on its own without leaving the page", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
-      data: [scenarioRow({ folderId: null })],
+      data: [scenarioRow()],
       isLoading: false,
     });
     renderTab();

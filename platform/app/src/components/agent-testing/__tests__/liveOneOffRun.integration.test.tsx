@@ -97,6 +97,9 @@ vi.mock("~/utils/api", () => ({
       },
       getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
+      create: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       update: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
@@ -235,8 +238,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     id: "case_1",
     name: "Angry refund request",
     labels: [],
-    // Loose so the row reads at the root of the All scenarios surface.
-    folderId: null,
+    folderId: REFUNDS.id,
     parameters: null,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
