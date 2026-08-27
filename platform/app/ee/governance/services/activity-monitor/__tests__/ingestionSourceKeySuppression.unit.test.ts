@@ -5,14 +5,6 @@
  * `lw_is_*` ingest secret is dead weight. s3_custom is the exception:
  * it uses the webhook callback path authenticated by ingest secret.
  *
- * This file asserts:
- * 1. createSource for a pull type stores empty sentinel, returns null.
- * 2. createSource for a pure-S3 type (openai_compliance) does the same.
- * 3. createSource for s3_custom (webhook callback) generates a real secret.
- * 4. createSource for a push type generates a real secret.
- * 5. rotateSecret on a non-push source is refused.
- * 6. rotateSecret on a push source still works.
- *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  *       "Pull-source key suppression — #7616"
  */

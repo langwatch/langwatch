@@ -3518,7 +3518,9 @@ function secretModalTargets(details: SecretDetails | null) {
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
-    usesWebhookUrl: details?.sourceType === "workato",
+    usesWebhookUrl:
+      details?.sourceType === "workato" ||
+      details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }

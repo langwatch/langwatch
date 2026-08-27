@@ -855,7 +855,7 @@ function SecretRevealModal({
     sourceType === "otel_generic" ||
     sourceType === "claude_cowork" ||
     sourceType === "claude_code";
-  const usesWebhookUrl = sourceType === "workato";
+  const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
   // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1
