@@ -12,7 +12,7 @@ import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";

@@ -3,7 +3,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "@langwatch/trace-contract";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { formatCost, formatDuration } from "@langwatch/trace-web";
 import type { MarkdownConfig } from "./types";
 

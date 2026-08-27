@@ -89,7 +89,7 @@ vi.mock("~/features/traces-v2/components/TraceDrawer/conversationView", () => ({
 
 // The real adapter loads Shiki's grammars and themes; the bar cares about
 // none of it, and the conversation it highlights is mocked away above.
-vi.mock("~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter", () => ({
+vi.mock("@langwatch/trace-web", () => ({
   useShikiAdapter: () => ({ getHighlighter: () => () => null }),
 }));
 
@@ -133,8 +133,7 @@ vi.mock("~/utils/api", () => ({
 // the shared helper, and what that helper does to the reader's remembered tab
 // is the point of the fallback.
 const { useDrawerStore } = await import("~/features/traces-v2/stores/drawerStore");
-const { useAnnotationQueueSessionStore } =
-  await import("~/features/traces-v2/stores/annotationQueueSessionStore");
+const { useAnnotationQueueSessionStore } = await import("@langwatch/trace-web");
 const {
   default: MyQueuePage,
   END_SESSION_QUESTION,

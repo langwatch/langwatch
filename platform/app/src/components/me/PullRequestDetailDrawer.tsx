@@ -13,7 +13,7 @@ import { GitHub } from "~/components/icons/GitHub";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
-import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";

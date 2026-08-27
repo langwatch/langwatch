@@ -4,7 +4,7 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
-import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
+import { shikiManualChunk } from "@langwatch/trace-web";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
 import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";

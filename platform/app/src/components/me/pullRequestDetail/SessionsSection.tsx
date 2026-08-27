@@ -7,7 +7,7 @@ import {
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
-import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "@langwatch/trace-web";
 
 import { AgentLabel } from "../AgentLabel";
 import { useTerminalReplay } from "../sessions/useTerminalReplay";

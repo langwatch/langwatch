@@ -4,7 +4,7 @@ import { LuCheck, LuX } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { TRACE_NAME_MAX_LENGTH } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { TRACE_NAME_MAX_LENGTH } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 
 interface EditableTraceNameProps {

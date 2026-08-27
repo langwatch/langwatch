@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useFacetLensStore } from "../../stores/facetLensStore";

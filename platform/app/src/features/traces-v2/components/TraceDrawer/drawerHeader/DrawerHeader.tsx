@@ -21,7 +21,7 @@ import {
 } from "react-icons/lu";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import {
   MenuContent,
   MenuContextTrigger,

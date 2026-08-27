@@ -1,8 +1,7 @@
 import { usePublicEnv } from "~/hooks/usePublicEnv.ts";
-import { useActiveProject } from "../../../contexts/ActiveProjectContext.tsx";
-import type { FrameworkKey, PlatformKey } from "../types.ts";
-import { getRegistryEntry } from "./registry.tsx";
 import { parseSnippet } from "./snippets.ts";
+import type { FrameworkKey, PlatformKey } from "@langwatch/trace-server";
+import { getRegistryEntry } from "@langwatch/trace-server";
 
 interface CodegenResult {
   code: string;

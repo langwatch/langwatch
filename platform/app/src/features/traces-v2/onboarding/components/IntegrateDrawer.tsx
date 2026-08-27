@@ -2,7 +2,7 @@ import { Box, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Drawer } from "~/components/ui/drawer";
 import {
   PromptList,

@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { type DetailPayload, MISSING_VALUE } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "@langwatch/trace-web";
 
 import { EmptySection, Section } from "@langwatch/coding-agent-web";
 

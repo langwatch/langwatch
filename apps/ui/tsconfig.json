@@ -3,6 +3,7 @@
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
     "types": [],
     "strict": true,
@@ -15,6 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["tests/**/*.ts"]
 }

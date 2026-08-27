@@ -1,4 +1,4 @@
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { useTraceList } from "../../hooks/useTraceList";
 import { TraceFindBar } from "@langwatch/trace-web";
 

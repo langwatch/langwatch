@@ -95,7 +95,7 @@ vi.mock("~/features/traces-v2/components/TraceDrawer/conversationView", () => ({
 
 // The real adapter loads Shiki's grammars and themes, which the mocked
 // conversation above never highlights with.
-vi.mock("~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter", () => ({
+vi.mock("@langwatch/trace-web", () => ({
   useShikiAdapter: () => ({ getHighlighter: () => () => null }),
 }));
 

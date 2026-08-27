@@ -1,7 +1,7 @@
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   PresenceMarker,

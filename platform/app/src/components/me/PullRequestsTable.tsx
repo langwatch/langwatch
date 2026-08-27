@@ -29,7 +29,7 @@ import { Pagination } from "~/components/ui/Pagination";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
-import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
+import { formatCost, formatTokens } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";

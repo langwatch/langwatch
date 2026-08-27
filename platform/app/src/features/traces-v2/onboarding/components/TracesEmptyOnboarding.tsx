@@ -3,7 +3,7 @@ import { ArrowLeft, BookOpen, RotateCcw, Wrench } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

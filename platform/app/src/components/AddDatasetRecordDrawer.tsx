@@ -7,7 +7,7 @@ import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { useAnnotationQueueSessionStore } from "~/features/traces-v2/stores/annotationQueueSessionStore";
+import { useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

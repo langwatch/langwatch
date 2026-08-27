@@ -10,7 +10,7 @@ import {
   LuLayers,
   LuNavigation,
 } from "react-icons/lu";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Dialog } from "~/components/ui/dialog";
 import { TRACE_DRAWER_HELP_GROUPS } from "~/features/traces-v2/hooks/traceDrawerShortcutTable";
 

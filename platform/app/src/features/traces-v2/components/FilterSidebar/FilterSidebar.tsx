@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";

@@ -119,7 +119,7 @@ vi.mock("~/components/ui/toaster", () => ({
 const { AddDatasetRecordDrawerV2 } = await import("~/components/AddDatasetRecordDrawer");
 const { clearDrawerStack, useDrawer } = await import("~/hooks/useDrawer");
 const { useAnnotationQueueSessionStore } =
-  await import("~/features/traces-v2/stores/annotationQueueSessionStore");
+  await import("@langwatch/trace-web");
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
 function OpenFromTrace() {

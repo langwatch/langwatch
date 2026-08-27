@@ -1,10 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { SpanTreeCursor, TraceService } from "@langwatch/trace-contract";
-import { TraceQueryFieldValuesPort } from "@langwatch/trace-server";
+import { ClickHouseTraceAdapter, TraceQueryFieldValuesPort } from "@langwatch/trace-server";
+import {
+  EmptyTraceEventDerivationPort,
+  EmptyTraceQueryClassificationPort,
+  EmptyTraceSummaryReaderPort,
+  MissingTraceRecordPort,
+} from "@langwatch/trace-server/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import {
   startTestContainers,
   stopTestContainers,
@@ -108,10 +113,14 @@ async function walkTrace(traceId: string, limit: number) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   clickHouse = containers.clickHouseClient;
-  traces = AppTraceRuntime.create({
+  traces = ClickHouseTraceAdapter.create({
     resolveClient: async () => clickHouse,
     modelProviders: new TestModelProviderService(),
     queryFieldValues: new EmptyQueryFieldValues(),
+    queryClassification: new EmptyTraceQueryClassificationPort(),
+    summaryReader: new EmptyTraceSummaryReaderPort(),
+    records: new MissingTraceRecordPort(),
+    eventDerivation: new EmptyTraceEventDerivationPort(),
   }).build();
 
   await insertRows(
@@ -165,12 +174,7 @@ describe("Trace tree ClickHouse composition", () => {
     expect(nodes.filter((node) => node.spanId === spanIdFor(25))).toHaveLength(1);
     expect(pages).toHaveLength(4);
     expect(pages.every((page) => page.nodes.length === 10)).toBe(true);
-    expect(pages.map((page) => page.nextCursor === null)).toEqual([
-      false,
-      false,
-      false,
-      true,
-    ]);
+    expect(pages.map((page) => page.nextCursor === null)).toEqual([false, false, false, true]);
   });
 
   it("uses the span id to cross a same-millisecond page boundary", async () => {

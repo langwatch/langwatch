@@ -3,7 +3,7 @@ import { keyframes } from "@emotion/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import React, { useCallback, useState } from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import {
   PopoverArrow,

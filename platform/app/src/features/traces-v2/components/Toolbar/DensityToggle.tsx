@@ -1,7 +1,7 @@
 import { Group, HStack, IconButton, Text } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Density, useDensityStore } from "@langwatch/trace-web";
 
