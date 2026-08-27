@@ -222,6 +222,33 @@ describe("the scenarios table", () => {
       expect(result.current.selectedSuite).toEqual(DEFAULT_SUITE);
     });
 
+    /** @scenario "Archiving the open suite opens the first suite that is left" */
+    it("opens the first suite that is left when the open one is archived", () => {
+      const { result, rerender } = renderHook(
+        (props: { suites: TestSuiteEntry[] }) =>
+          useTestCasesView({
+            selection: { kind: "suite", slug: "refunds" },
+            period: {
+              startDate: new Date("2026-07-01T00:00:00.000Z"),
+              endDate: new Date("2026-07-31T00:00:00.000Z"),
+            },
+            suites: props.suites,
+            cases,
+          }),
+        { initialProps: { suites } },
+      );
+
+      expect(result.current.selectedSuite).toEqual(REFUNDS);
+
+      // The rail drops the archived suite while the address still names it.
+      rerender({ suites: [DEFAULT_SUITE] });
+
+      expect(result.current.selectedSuite).toEqual(DEFAULT_SUITE);
+      expect(result.current.cases.map((entry) => entry.id)).toEqual([
+        "case_default",
+      ]);
+    });
+
     it("holds no suite at all while the project has none", () => {
       const { result } = renderView({
         selection: { kind: "suite", slug: null },
