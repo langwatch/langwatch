@@ -226,10 +226,9 @@ describe("PromptPlaygroundChat ref methods", () => {
       // Re-widen: the `= null` above narrows the property to `null`, and the
       // render that repopulates it is opaque to control-flow analysis.
       const chatProps = captured.chatProps as Record<string, any> | null;
-      const AssistantMessageProp =
-        chatProps?.AssistantMessage as unknown as React.ComponentType<
-          Record<string, unknown>
-        >;
+      const AssistantMessageProp = chatProps?.AssistantMessage as unknown as React.ComponentType<
+        Record<string, unknown>
+      >;
       expect(AssistantMessageProp).toBeDefined();
 
       render(
@@ -275,10 +274,7 @@ describe("PromptPlaygroundChat ref methods", () => {
       it("renders the trace link for the message", () => {
         renderAssistantMessage({ content: "The answer is 42." });
 
-        expect(screen.getByTestId("trace-message")).toHaveAttribute(
-          "data-trace-id",
-          "msg-1",
-        );
+        expect(screen.getByTestId("trace-message")).toHaveAttribute("data-trace-id", "msg-1");
       });
     });
 
@@ -312,9 +308,7 @@ describe("PromptPlaygroundChat ref methods", () => {
         </ChakraProvider>,
       );
 
-      const textarea = screen.getByPlaceholderText(
-        /type your message/i,
-      ) as HTMLTextAreaElement;
+      const textarea = screen.getByPlaceholderText(/type your message/i) as HTMLTextAreaElement;
       expect(textarea).toHaveAttribute("data-tab-id", tabId);
     });
   });

@@ -22,8 +22,7 @@ export function PromptTabSwitcher(props: PromptTabSwitcherProps) {
 }
 
 function PromptTabSwitcherRow({ tabId, isActive }: { tabId: string; isActive: boolean }) {
-  const { title, hasUnsavedChanges, versionNumber, showVersionBadge } =
-    usePromptTabSummary(tabId);
+  const { title, hasUnsavedChanges, versionNumber, showVersionBadge } = usePromptTabSummary(tabId);
   const folder = getPromptFolder(title);
   const name = getDisplayHandle(title);
 
@@ -43,12 +42,7 @@ function PromptTabSwitcherRow({ tabId, isActive }: { tabId: string; isActive: bo
         {name}
       </Text>
       {hasUnsavedChanges && (
-        <Circle
-          data-testid="unsaved-indicator"
-          size="8px"
-          bg="orange.solid"
-          flexShrink={0}
-        />
+        <Circle data-testid="unsaved-indicator" size="8px" bg="orange.solid" flexShrink={0} />
       )}
       {showVersionBadge && versionNumber != null && (
         <Text fontSize="xs" color="fg.muted" flexShrink={0}>

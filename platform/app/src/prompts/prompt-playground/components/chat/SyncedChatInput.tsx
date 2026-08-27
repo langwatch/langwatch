@@ -25,14 +25,8 @@ export function SyncedChatInput({
   isVisible = true,
   onStop: _onStop,
 }: InputProps) {
-  const {
-    syncedInput,
-    setSyncedInput,
-    isSynced,
-    setIsSynced,
-    submitTrigger,
-    triggerSubmit,
-  } = usePromptPlaygroundChatSync();
+  const { syncedInput, setSyncedInput, isSynced, setIsSynced, submitTrigger, triggerSubmit } =
+    usePromptPlaygroundChatSync();
   const tabId = useTabId();
   const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
   const [localInput, setLocalInput] = useState("");

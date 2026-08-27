@@ -16,14 +16,8 @@ export function usePromptBrowserTabController() {
 
   // What the tab displays is derived once, in the hook the tab switcher's rows
   // also read, so the two renderings of a tab cannot disagree.
-  const {
-    title,
-    hasUnsavedChanges,
-    versionNumber,
-    latestVersion,
-    isOutdated,
-    showVersionBadge,
-  } = usePromptTabSummary(tabId);
+  const { title, hasUnsavedChanges, versionNumber, latestVersion, isOutdated, showVersionBadge } =
+    usePromptTabSummary(tabId);
 
   const tab = useTabById(tabId);
   const removeTab = useDraggableTabsBrowserStore((state) => state.removeTab);
@@ -45,8 +39,7 @@ export function usePromptBrowserTabController() {
       const latestPrompt = await getPromptById({ id: configId });
       if (!latestPrompt) throw new Error("Prompt not found");
 
-      const newFormValues =
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt);
+      const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt);
 
       updateTabData({
         tabId,

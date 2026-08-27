@@ -31,8 +31,7 @@ export function PromptBrowserHeader() {
    * @param params - The versioned prompt data to restore
    */
   const handleOnRestore = async (params: VersionedPrompt) => {
-    const newFormValues =
-      versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
+    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
     formMethods.reset(newFormValues);
   };
 

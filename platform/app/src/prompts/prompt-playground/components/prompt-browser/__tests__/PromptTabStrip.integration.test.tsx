@@ -69,8 +69,7 @@ function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   );
 }
 
-const closeActionFor = (name: string) =>
-  screen.queryByRole("button", { name: `Close ${name}` });
+const closeActionFor = (name: string) => screen.queryByRole("button", { name: `Close ${name}` });
 
 beforeEach(() => {
   // Each tab names itself after its own id, so the close labels tell them apart.

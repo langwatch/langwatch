@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import Ajv from "ajv";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -73,14 +64,7 @@ const ALL_OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
 export const LLM_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "json_schema"];
 
 /** Types for code block outputs */
-export const CODE_OUTPUT_TYPES: OutputType[] = [
-  "str",
-  "float",
-  "bool",
-  "dict",
-  "list",
-  "image",
-];
+export const CODE_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "dict", "list", "image"];
 
 const DEFAULT_JSON_SCHEMA = {
   type: "object",
@@ -106,14 +90,10 @@ export const OutputsSection = ({
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const jsonSchemaDialog = useDisclosure();
-  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(
-    null,
-  );
+  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(null);
 
   // Filter type options based on availableTypes prop
-  const typeOptions = ALL_OUTPUT_TYPE_OPTIONS.filter((opt) =>
-    availableTypes.includes(opt.value),
-  );
+  const typeOptions = ALL_OUTPUT_TYPE_OPTIONS.filter((opt) => availableTypes.includes(opt.value));
 
   const handleAddOutput = useCallback(
     (type: OutputType) => {
@@ -162,9 +142,7 @@ export const OutputsSection = ({
 
       onChange(
         outputs.map((o) =>
-          o.identifier === oldIdentifier
-            ? { ...o, ...updates, identifier: newIdentifier }
-            : o,
+          o.identifier === oldIdentifier ? { ...o, ...updates, identifier: newIdentifier } : o,
         ),
       );
 

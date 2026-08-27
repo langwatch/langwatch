@@ -218,12 +218,7 @@ function FieldRow({
               padding="6px 0px 6px 12px"
             />
           ) : (
-            <Text
-              fontFamily="monospace"
-              fontSize="13px"
-              width="full"
-              padding="8px 0px 8px 12px"
-            >
+            <Text fontFamily="monospace" fontSize="13px" width="full" padding="8px 0px 8px 12px">
               {currentIdentifier}
             </Text>
           )}

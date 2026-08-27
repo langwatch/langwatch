@@ -108,9 +108,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   if (rawLlmValue && typeof rawLlmValue === "string") {
     // Migrate legacy format: string model name → object with model field
     console.warn(
-      `Migrating legacy LLM format: string "${String(
-        rawLlmValue,
-      )}" → object with model field`,
+      `Migrating legacy LLM format: string "${String(rawLlmValue)}" → object with model field`,
     );
     llmValue = { model: rawLlmValue };
   } else if (rawLlmValue && typeof rawLlmValue === "object") {
@@ -138,15 +136,12 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
         llm: llmValue,
         messages: [
           { role: "system", content: parametersMap.instructions?.value ?? "" },
-          ...(Array.isArray(parametersMap.messages?.value)
-            ? parametersMap.messages.value
-            : []),
+          ...(Array.isArray(parametersMap.messages?.value) ? parametersMap.messages.value : []),
         ],
         demonstrations: {
           inline: {
             columnTypes: inputsAndOutputsToDemostrationColumns(inputs, outputs),
-            records:
-              (parametersMap.demonstrations?.value as NodeDataset)?.inline?.records ?? {},
+            records: (parametersMap.demonstrations?.value as NodeDataset)?.inline?.records ?? {},
           },
         },
         promptingTechnique: parametersMap.prompting_technique
@@ -268,9 +263,7 @@ export function nodeDataToLocalPromptConfig(
     return undefined;
   }
 
-  const parametersMap = Object.fromEntries(
-    nodeData.parameters.map((p) => [p.identifier, p]),
-  );
+  const parametersMap = Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]));
 
   const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
   if (!llmParameter) {
@@ -532,11 +525,8 @@ export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues,
 ): Omit<Omit<SaveVersionParams, "projectId">["data"], "commitMessage"> {
   const systemPrompt =
-    formValues.version.configData.messages?.find((msg) => msg.role === "system")
-      ?.content ?? "";
-  const messages = formValues.version.configData.messages?.filter(
-    (msg) => msg.role !== "system",
-  );
+    formValues.version.configData.messages?.find((msg) => msg.role === "system")?.content ?? "";
+  const messages = formValues.version.configData.messages?.filter((msg) => msg.role !== "system");
 
   const llm = formValues.version.configData.llm;
 

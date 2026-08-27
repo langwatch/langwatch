@@ -141,9 +141,7 @@ export const VariablesSection = ({
 
       onChange(
         variables.map((v) =>
-          v.identifier === oldIdentifier
-            ? { ...v, ...updates, identifier: newIdentifier }
-            : v,
+          v.identifier === oldIdentifier ? { ...v, ...updates, identifier: newIdentifier } : v,
         ),
       );
 
@@ -231,9 +229,7 @@ export const VariablesSection = ({
                 }
                 defaultValue={values[variable.identifier]}
                 onDefaultValueChange={
-                  onValueChange
-                    ? (value) => onValueChange(variable.identifier, value)
-                    : undefined
+                  onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
                 }
                 infoTooltip={infoTooltip}
                 isMappingDisabled={isMappingDisabled_internal}

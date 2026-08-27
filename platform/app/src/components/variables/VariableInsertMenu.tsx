@@ -57,9 +57,7 @@ type VariableInsertMenuProps = {
 
 const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
   if (type === "dataset") {
-    return (
-      <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />
-    );
+    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
   }
   return <ComponentIcon type={type as ComponentType} size="xs" />;
 };
@@ -273,9 +271,7 @@ export const VariableInsertMenu = ({
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setIsKeyboardNav(true);
-                  onHighlightChange(
-                    Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
-                  );
+                  onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
                   setIsKeyboardNav(true);
@@ -382,9 +378,7 @@ export const VariableInsertMenu = ({
                   gap={2}
                   cursor="pointer"
                   borderRadius="4px"
-                  background={
-                    highlightedIndex === createOptionIndex ? "blue.50" : undefined
-                  }
+                  background={highlightedIndex === createOptionIndex ? "blue.50" : undefined}
                   onMouseMove={() => {
                     if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
                       setIsKeyboardNav(false);

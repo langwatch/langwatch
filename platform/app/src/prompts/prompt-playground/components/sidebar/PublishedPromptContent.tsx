@@ -38,11 +38,7 @@ export function PublishedPromptContent({
       >
         {getDisplayHandle(promptHandle)}
       </Text>
-      <PublishedPromptActions
-        promptId={promptId}
-        promptHandle={promptHandle}
-        prompt={prompt}
-      />
+      <PublishedPromptActions promptId={promptId} promptHandle={promptHandle} prompt={prompt} />
     </HStack>
   );
 }
