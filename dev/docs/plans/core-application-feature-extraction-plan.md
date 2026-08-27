@@ -15,6 +15,8 @@ dependency-closed deletion batches. Feature ownership remains defined by
 [ADR-112](../adr/112-singular-feature-ownership.md).
 Non-blocking structural improvements discovered during extraction are recorded
 in [the follow-up ledger](core-application-feature-extraction-future-work.md).
+The current branch state and next-agent instructions are recorded in the
+[extraction hand-off](core-application-feature-extraction-handoff.md).
 
 ## Active UI/web lane hand-off
 
