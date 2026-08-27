@@ -215,3 +215,9 @@ Feature: Python SDK run plans and test suites
     Given the langwatch package
     When the names run_plans and test_suites are read
     Then each resolves to its facade and is listed in __all__
+
+  @unit
+  Scenario: The run_plans facade stays reachable after test_suites is used
+    Given the langwatch package
+    When test_suites is read before run_plans
+    Then run_plans still resolves to its facade and not to its module

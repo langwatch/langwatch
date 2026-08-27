@@ -187,3 +187,22 @@ def test_the_suites_facade_warns_that_it_is_deprecated():
 
     with pytest.warns(DeprecationWarning, match="run_plans and langwatch.test_suites"):
         SuitesFacade(client)
+
+
+# @scenario "The run_plans facade stays reachable after test_suites is used"
+def test_run_plans_stays_a_facade_after_test_suites_is_read():
+    # A fresh interpreter: this test module already imported langwatch.run_plans
+    # by name, which binds the module on the package before any facade is read.
+    import subprocess
+    import sys
+
+    script = (
+        "import langwatch\n"
+        "langwatch.setup(api_key='sk-lw-test', endpoint_url='http://localhost:9')\n"
+        "langwatch.test_suites\n"
+        "kind = type(langwatch.run_plans).__name__\n"
+        "assert kind == 'RunPlansFacade', kind\n"
+    )
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr

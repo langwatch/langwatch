@@ -17,10 +17,10 @@ import httpx
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
-from langwatch.run_plans import build_run_inputs
 from langwatch.state import get_instance
 from langwatch.utils.gateway_http import quote_path_segment, raise_for_status
 from langwatch.utils.initialization import ensure_setup
+from langwatch.utils.run_inputs import build_run_inputs
 
 TEST_SUITES_PATH = "/api/v1/test-suites"
 
