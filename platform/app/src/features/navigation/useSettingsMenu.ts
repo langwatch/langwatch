@@ -161,23 +161,20 @@ function organizationGroup({
       // How the ORGANIZATION signs in — a control of the organization itself,
       // beside its keys and its audit trail, not a fact about any one person,
       // which is why it does not sit among the people. The reader's own
-      // sign-in is Security, under You.
-      //
-      // OFFERED TO EVERYONE THIS RELEASE, which is not where it ends up. The
-      // entry belongs behind `sso:view` on an enterprise plan, and it goes
-      // there in the release that replaces this page — because that page
-      // refuses the address as well, and the menu is a courtesy, never the
-      // gate. The page here is still the old one, which guards nothing. Gate
-      // the menu before the page and the courtesy becomes the gate: an
-      // organization signing in through a provider today, on a plan that
-      // predates the enterprise flag or administered by somebody holding
-      // `admin` rather than `org-admin`, would simply stop being shown where
-      // its own sign-in is configured.
-      {
-        label: "Authentication",
-        href: "/settings/authentication",
-        icon: Lock,
-      },
+      // sign-in is Security, under You. Offered only to somebody who may at
+      // least SEE single sign-on (D05) — an administrator without the
+      // permission is not shown the entry, and the page refuses the address
+      // as well, because the menu is a courtesy, never the gate.
+      ...(showEnterpriseNav && !isLiteMember && hasPermission("sso:view")
+        ? [
+            {
+              label: "Authentication",
+              href: "/settings/authentication",
+              icon: Lock,
+              isEnterprise: true,
+            },
+          ]
+        : []),
       ...(!isLiteMember
         ? [{ label: "Usage & Billing", href: "/settings/usage", icon: Gauge }]
         : []),
