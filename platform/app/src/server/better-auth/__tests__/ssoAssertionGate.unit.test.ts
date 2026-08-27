@@ -287,11 +287,10 @@ describe("given several different reasons to refuse", () => {
       const causes = await Promise.all([
         decide(prismaWith({ connection: null }).prisma, "ana@acme.com"),
         decide(prismaWith({ connection: connectionRow() }).prisma, "x@no.test"),
+        // No `members`, which is the default: this case is refused for the
+        // connection's state, and a member list would not change the answer.
         decide(
-          prismaWith({
-            connection: connectionRow({ state: "DRAFT" }),
-            member: null,
-          }).prisma,
+          prismaWith({ connection: connectionRow({ state: "DRAFT" }) }).prisma,
           "x@acme.com",
         ),
       ]);
