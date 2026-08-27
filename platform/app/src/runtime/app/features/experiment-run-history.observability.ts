@@ -20,10 +20,10 @@ type RunHistoryError = {
   error: unknown;
 };
 
-/** App-owned telemetry for the canonical Experiment run-history repository. */
-export class AppExperimentRunHistoryTelemetry {
-  static create(): AppExperimentRunHistoryTelemetry {
-    return new AppExperimentRunHistoryTelemetry();
+/** App-owned logs and spans for the canonical Experiment run-history repository. */
+export class AppExperimentRunHistoryObservability {
+  static create(): AppExperimentRunHistoryObservability {
+    return new AppExperimentRunHistoryObservability();
   }
 
   private readonly logger = createLogger("langwatch:experiment-runs:service");
