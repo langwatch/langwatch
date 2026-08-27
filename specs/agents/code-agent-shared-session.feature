@@ -74,8 +74,8 @@ Feature: A code agent logs in once for a whole run
       Then exactly one row logs in
       And the claim is taken exactly once
       And every row answers with the session that row stored
-      # The rows of the first wave all read the empty cache, so before the
-      # claim they all logged in. The claim is what makes this a number: it
+      # The rows of the first wave all read the empty cache, so without the
+      # claim they would all log in. The claim is what makes this a number: it
       # writes only when the name is free, so one row does the work and the
       # rows beside it read what it stored.
 
