@@ -127,3 +127,19 @@ describe("applyJq", () => {
     });
   });
 });
+
+describe("given an expression outside the supported subset", () => {
+  // The refusal is where the caller decides what to try next. Naming only what
+  // this subset supports sent one agent through `jq` and `python`, both of
+  // which it then also lost.
+  /** @scenario "The built-in filter names the shell tools when it is asked for more" */
+  it.each([
+    ["[.results[] | {index, expected: .entry.l3}]"],
+    [".results[] | map(.id)"],
+    ['.["traces"]'],
+  ])("names jq and python in the shell for %s", (expression) => {
+    expect(() => applyJq(expression, { results: [] })).toThrow(
+      /`jq` and `python` are both in your shell/,
+    );
+  });
+});
