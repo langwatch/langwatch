@@ -98,6 +98,51 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the error.message contains "timeout"
       And no orphan python3 process remains for that trace_id
 
+  # A per-node budget is a way to ask for LESS of the operator's ceiling,
+  # never more: the ceiling bounds how long untrusted customer code may hold
+  # a worker, so a workflow author cannot raise it by writing a bigger number.
+  Rule: A node may ask for less time than the operator's ceiling, never more
+
+    @unit
+    Scenario: A code node's timeout_ms shortens its budget
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 30
+      And a code node declaring parameter "timeout_ms" = 500 whose body sleeps 10 seconds
+      When the engine invokes the node
+      Then the node is stopped within 3 seconds
+      And the node's error type is "code_block_timeout"
+
+    @unit
+    Scenario: A code node cannot raise its own timeout above the operator ceiling
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 0.5
+      And a code node declaring parameter "timeout_ms" = 30000 whose body sleeps 10 seconds
+      When the engine invokes the node
+      Then the node is stopped within 3 seconds
+      And the node's error type is "code_block_timeout"
+
+    @unit
+    Scenario: A missing or negative code timeout_ms falls back to the default
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is 30
+      And a code node whose "timeout_ms" parameter is missing, 0, or negative
+      When the engine invokes the node
+      Then the node runs to completion under the executor default
+      And no timeout is reported
+
+    @unit
+    Scenario: A per-node code timeout cannot exceed the operator's ceiling
+      Given the code executor's default timeout is 0.5 seconds
+      And a request asking for 30 seconds whose code sleeps 10 seconds
+      When the executor runs the request
+      Then the run is stopped within 3 seconds
+      And the result is marked timed out with error type "code_block_timeout"
+
+    @unit
+    Scenario: A negative per-node code timeout falls back to the default
+      Given the code executor's default timeout is 30 seconds
+      And a request asking for -1 seconds whose code returns immediately
+      When the executor runs the request
+      Then the result is not marked timed out
+      And the declared output is returned
+
   Rule: Process isolation prevents cross-invocation leaks
 
     @integration

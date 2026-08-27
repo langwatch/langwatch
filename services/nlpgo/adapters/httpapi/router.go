@@ -37,6 +37,11 @@ type RouterDeps struct {
 	// /go/studio/execute, from the operator's
 	// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS. Zero → DefaultStreamHeartbeat.
 	StreamHeartbeat time.Duration
+	// StreamIdleTimeout closes /go/studio/execute when the engine
+	// stream emits nothing for this long, from the operator's
+	// NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS. Zero →
+	// DefaultStreamIdleTimeout.
+	StreamIdleTimeout time.Duration
 	// OTel is the OpenTelemetry provider whose `ForceFlush` is called
 	// after each /go/studio/* request, so spans for the just-finished
 	// workflow ship to the collector before the Lambda runtime freezes
@@ -74,7 +79,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 				s.Use(forceFlushMiddleware(deps.OTel))
 			}
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
-			s.Post("/execute", executeStreamHandler(deps.App, deps.StreamHeartbeat))
+			s.Post("/execute", executeStreamHandler(deps.App, deps.StreamHeartbeat, deps.StreamIdleTimeout))
 		})
 		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
