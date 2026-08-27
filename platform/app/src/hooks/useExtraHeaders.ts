@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 

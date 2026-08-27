@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   modelProviders,
   providerDeprecation,
-} from "../../../../server/modelProviders/registry";
+} from "@langwatch/model-provider-contract";
 import { explainHandledError } from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
 

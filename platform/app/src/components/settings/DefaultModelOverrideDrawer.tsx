@@ -38,9 +38,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
-} from "~/server/modelProviders/codexRestrictions";
-import { buildCustomModelDisplayNames } from "~/server/modelProviders/customModelDisplayNames";
-import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
+} from "@langwatch/model-provider-contract";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
+import { LATEST_ALIAS_PROVIDERS } from "@langwatch/model-provider-contract";
 import { api, type RouterOutputs } from "~/utils/api";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";

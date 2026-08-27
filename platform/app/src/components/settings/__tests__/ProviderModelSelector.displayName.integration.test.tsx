@@ -33,7 +33,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
+import { resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { ProviderModelSelector } from "../ProviderModelSelector";
 
 afterEach(() => cleanup());

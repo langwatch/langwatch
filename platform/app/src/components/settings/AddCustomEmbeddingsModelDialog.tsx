@@ -1,7 +1,7 @@
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
-import { customModelEntrySchema } from "../../server/modelProviders/customModel.schema";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import { customModelEntrySchema } from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../SmallLabel";
 import {
   DialogBody,

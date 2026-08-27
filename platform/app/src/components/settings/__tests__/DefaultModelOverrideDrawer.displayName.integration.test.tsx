@@ -29,7 +29,7 @@
  *    available here, because this drawer renders THREE role rows
  *    (Default/Fast/Embeddings), each with its OWN <ProviderModelSelector>.
  *
- * 2. `@langwatch/design-system/select.tsx`'s SelectContent portals by default
+ * 2. `@langwatch/design-system/select`'s SelectContent portals by default
  *    (`portalled = true`, and ProviderModelSelector never overrides it),
  *    so a role's listbox is NOT a DOM descendant of its own
  *    `role-row-<role>` container - plain DOM-containment scoping can't

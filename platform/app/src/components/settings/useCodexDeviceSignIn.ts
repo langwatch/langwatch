@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
 import { CODEX_SIGN_IN_TTL_MS } from "@langwatch/model-provider-contract";
-import { CODEX_DEFAULT_MODEL } from "~/server/modelProviders/codexRestrictions";
+import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
 

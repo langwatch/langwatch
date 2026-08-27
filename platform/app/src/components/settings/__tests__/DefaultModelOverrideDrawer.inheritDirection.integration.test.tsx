@@ -14,7 +14,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { featuresByRole } from "~/server/modelProviders/featureRegistry";
+import { featuresByRole } from "@langwatch/model-provider-contract";
 import { DefaultModelOverrideDrawer } from "../DefaultModelOverrideDrawer";
 
 const mockCloseDrawer = vi.fn();

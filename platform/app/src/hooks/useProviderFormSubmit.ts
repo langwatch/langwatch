@@ -1,13 +1,13 @@
 import { useCallback, useState } from "react";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import {
+  modelProviders,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import { describeError, showErrorToast } from "~/features/errors";
 import { toaster } from "../components/ui/toaster";
-import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
-import {
-  type MaybeStoredModelProvider,
-  modelProviders,
-} from "../server/modelProviders/registry";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { api } from "../utils/api";
 import {
   filterMaskedApiKeys,

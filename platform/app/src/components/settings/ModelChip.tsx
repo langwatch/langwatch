@@ -7,8 +7,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
-import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
-import { isLatestAlias, resolveLatestAlias } from "~/server/modelProviders/latestAliases";
+import { modelDisplayLabel } from "@langwatch/model-provider-contract";
+import { isLatestAlias, resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

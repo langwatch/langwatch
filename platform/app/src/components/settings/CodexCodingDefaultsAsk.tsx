@@ -8,7 +8,7 @@ import {
   CODEX_DEFAULT_MODEL,
   isCodexModel,
   LANGY_CHAT_FEATURE_KEY,
-} from "~/server/modelProviders/codexRestrictions";
+} from "@langwatch/model-provider-contract";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
 import {

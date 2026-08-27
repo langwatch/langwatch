@@ -19,13 +19,15 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import {
   isCodexModel,
   isModelAllowedForFeature,
-} from "../server/modelProviders/codexRestrictions";
+} from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
-} from "../server/modelProviders/customModelDisplayNames";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { allLitellmModels } from "../server/modelProviders/registry";
+} from "@langwatch/model-provider-contract";
+import {
+  allLitellmModels,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "./llmPromptConfigs/constants";

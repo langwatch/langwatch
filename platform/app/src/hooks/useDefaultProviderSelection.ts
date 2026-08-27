@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { shouldAutoEnableAsDefault } from "../utils/modelProviderHelpers";
 
 export type UseDefaultProviderSelectionState = {
@@ -27,7 +27,7 @@ export type UseDefaultProviderSelectionReturn = UseDefaultProviderSelectionState
  * default. Initial selector values are empty; the drawer's
  * `ModelProviderDefaultSection` reads `modelSelectorOptions` and picks
  * a flagship per provider when the toggle flips on. Writes route
- * through `setRoleAtScope` against the new ModelDefaultConfig table.
+ * through the canonical default-assignment service against ModelDefaultConfig.
  */
 export function useDefaultProviderSelection({
   enabledProvidersCount,

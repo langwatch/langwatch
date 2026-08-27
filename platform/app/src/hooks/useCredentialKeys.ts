@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
-} from "../server/modelProviders/registry";
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import {
   buildCustomKeyState,
   getDisplayKeysForProvider,

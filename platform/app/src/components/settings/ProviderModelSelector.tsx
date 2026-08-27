@@ -2,11 +2,8 @@ import { Box, createListCollection, Field, HStack, Input, Text } from "@chakra-u
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
-import { modelDisplayLabel } from "../../server/modelProviders/customModelDisplayNames";
-import {
-  isLatestAlias,
-  resolveLatestAlias,
-} from "../../server/modelProviders/latestAliases";
+import { modelDisplayLabel } from "@langwatch/model-provider-contract";
+import { isLatestAlias, resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { titleCase } from "../../utils/stringCasing";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
 import { InputGroup } from "@langwatch/design-system/input-group";
