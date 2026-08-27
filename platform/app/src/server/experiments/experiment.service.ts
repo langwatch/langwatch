@@ -28,6 +28,7 @@ import { WorkbenchReferenceRepository } from "./workbenchReference.repository";
 import {
   collectWorkbenchReferences,
   parseWorkbenchState,
+  repairWorkbenchState,
   stripResults,
   toJsonValue,
 } from "./workbenchValidation";
@@ -65,12 +66,32 @@ export interface WorkbenchSaveResult {
 }
 
 export interface WorkbenchVersionSummary {
+  /**
+   * The number this version is restored and displayed by. Numbered versions
+   * run 1, 2, 3 with no gaps; the rolling autosave row rides on the counter
+   * and is shown as "Autosave" instead of a number.
+   */
   version: number;
+  /**
+   * The workbench counter this row was last written at. It says how recent
+   * the row's content is, which the rolling row's own number cannot: the list
+   * is ordered by it, and the row that matches the experiment's counter is the
+   * one holding the live state.
+   */
+  counterVersion: number;
   autoSaved: boolean;
   commitMessage: string | null;
   authorId: string | null;
   authorLabel: string;
+  /** When the row was first written. */
   createdAt: Date;
+  /**
+   * When the row was last written. The rolling autosave row is rewritten in
+   * place, so this is what says how old its content is; `createdAt` on that
+   * row is the start of the session. Numbered rows are never rewritten, so
+   * the two are the same on them.
+   */
+  updatedAt: Date;
 }
 
 /**
@@ -490,6 +511,11 @@ export class ExperimentService {
    * Reads an evaluations workbench, with the version a writer must send back.
    * Archived rows read as missing and a row of another experiment type is
    * refused, the same two answers the workbench route has always given.
+   *
+   * The stored blob is repaired on the way out, the same way the browser store
+   * repairs it at its own load boundary. A row an earlier write left in a shape
+   * the save seam now refuses would otherwise be readable and unwritable: every
+   * backend edit of it would fail on a field nobody typed.
    */
   async getWorkbenchState({
     projectId,
@@ -511,14 +537,14 @@ export class ExperimentService {
     const actorLabel = await this.authorOfVersion({
       projectId,
       experimentId: row.id,
-      version: row.workbenchVersion,
+      counterVersion: row.workbenchVersion,
     });
 
     return {
       experimentId: row.id,
       slug: row.slug,
       name: row.name,
-      state: (row.workbenchState as PersistedEvaluationsV3State | null) ?? null,
+      state: repairWorkbenchState(row.workbenchState),
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
       ...(actorLabel ? { actorLabel } : {}),
@@ -532,21 +558,22 @@ export class ExperimentService {
    * page had no one to name. A change Langy made in the reader's own tab must
    * read as Langy's, so both the version probe and a refused save carry this.
    *
-   * The newest version row names the version asked about only when the two
-   * numbers agree. A workflow evaluation moves the counter without writing a
-   * row, so the newest row can describe an older version, and naming its
-   * author would credit a person for a write the platform made. No match means
-   * no name, which reads as "somewhere else" and is the honest answer.
+   * The join is on `counterVersion`, the counter each row was written at, and
+   * the newest row names the counter asked about only when the two agree. A
+   * workflow evaluation moves the counter without writing a row, so the newest
+   * row can describe an older state, and naming its author would credit a
+   * person for a write the platform made. No match means no name, which reads
+   * as "somewhere else" and is the honest answer.
    */
   private async authorOfVersion(
     {
       projectId,
       experimentId,
-      version,
+      counterVersion,
     }: {
       projectId: string;
       experimentId: string;
-      version: number;
+      counterVersion: number;
     },
     // On the refusal path this runs inside the save's own transaction, so it
     // reads on that connection rather than borrowing a second one from the pool
@@ -557,7 +584,7 @@ export class ExperimentService {
       { projectId, experimentId, take: 1 },
       options,
     );
-    if (!latest || latest.version !== version) return undefined;
+    if (!latest || latest.counterVersion !== counterVersion) return undefined;
     return latest.authorLabel as WorkbenchActorLabel;
   }
 
@@ -685,7 +712,7 @@ export class ExperimentService {
         {
           projectId,
           experimentId: current.id,
-          version: current.workbenchVersion,
+          counterVersion: current.workbenchVersion,
         },
         { tx },
       );
@@ -726,7 +753,7 @@ export class ExperimentService {
       tx,
       projectId,
       experimentId: row.id,
-      version: nextVersion,
+      counterVersion: nextVersion,
       state,
       actor,
       commitMessage,
@@ -805,6 +832,7 @@ export class ExperimentService {
                 experimentId,
                 projectId,
                 version: 1,
+                counterVersion: 1,
                 autoSaved: false,
                 commitMessage: commitMessage ?? null,
                 authorId: actor.userId ?? null,
@@ -900,7 +928,10 @@ export class ExperimentService {
     });
   }
 
-  /** The version list, newest first. `cursor` is the version to page below. */
+  /**
+   * The version list, newest content first. `cursor` is the `counterVersion`
+   * to page below, which is what `nextCursor` hands back.
+   */
   async listWorkbenchVersions({
     projectId,
     id,
@@ -926,13 +957,13 @@ export class ExperimentService {
       projectId,
       experimentId: row.id,
       take,
-      beforeVersion: cursor,
+      ...(cursor === undefined ? {} : { beforeCounterVersion: cursor }),
     });
 
     const last = versions[versions.length - 1];
     return {
       versions,
-      nextCursor: versions.length === take && last ? last.version : null,
+      nextCursor: versions.length === take && last ? last.counterVersion : null,
     };
   }
 
@@ -979,7 +1010,12 @@ export class ExperimentService {
       state: liveResults ? { ...restored, results: liveResults } : restored,
       expectedVersion: current.version,
       actor,
-      commitMessage: `Restored from v${version}`,
+      // The rolling autosave row is addressed by a number but shown as
+      // "Autosave", so naming its number here would send a reader looking for
+      // a version the list does not have.
+      commitMessage: found.autoSaved
+        ? "Restored from the autosave"
+        : `Restored from v${version}`,
     });
   }
 
@@ -1085,15 +1121,27 @@ export class ExperimentService {
    *
    * A person typing gets ONE rolling row, updated in place: the workbench
    * autosaves constantly and a row per keystroke would bury the versions that
-   * mean something. Everything else (a named commit, an agent write, a
+   * mean something. That row is shown as "Autosave" and carries no number a
+   * reader follows. Everything else (a named commit, an agent write, a
    * restore) inserts a numbered row, because each of those is an event
    * somebody will want to find again.
+   *
+   * The numbers a reader follows are the numbered rows' own sequence: one
+   * higher than the highest number this experiment holds. Taking the counter
+   * instead is what put a hole between "v20" and "v1" after twenty minutes of
+   * typing, because every autosave moved the counter and left no row behind.
+   *
+   * The rolling row rides on the counter, and every write pushes it there.
+   * That is what keeps the two number lines apart: the counter counts writes,
+   * so it is always higher than the numbered sequence of an experiment that
+   * has autosaved at least once, and the numbered insert below can never land
+   * on the number the rolling row holds.
    */
   private async writeVersionRow({
     tx,
     projectId,
     experimentId,
-    version,
+    counterVersion,
     state,
     actor,
     commitMessage,
@@ -1101,38 +1149,54 @@ export class ExperimentService {
     tx: Prisma.TransactionClient;
     projectId: string;
     experimentId: string;
-    version: number;
+    counterVersion: number;
     state: PersistedEvaluationsV3State;
     actor: WorkbenchActor;
     commitMessage?: string;
   }): Promise<void> {
     const snapshot = toJsonValue(stripResults(state));
     const isRollingAutosave = actor.label === "user" && !commitMessage;
+    const rolling = await this.repository.findRollingAutosaveVersion(
+      { projectId, experimentId },
+      { tx },
+    );
 
-    if (isRollingAutosave) {
-      const rolling = await this.repository.findRollingAutosaveVersion(
-        { projectId, experimentId },
+    if (isRollingAutosave && rolling) {
+      await this.repository.updateVersionById(
+        {
+          id: rolling.id,
+          projectId,
+          data: {
+            version: counterVersion,
+            counterVersion,
+            state: snapshot,
+            authorId: actor.userId ?? null,
+            authorLabel: actor.label,
+            commitMessage: null,
+            schemaVersion: WORKBENCH_SCHEMA_VERSION,
+          },
+        },
         { tx },
       );
-      if (rolling) {
-        await this.repository.updateVersionById(
-          {
-            id: rolling.id,
-            projectId,
-            data: {
-              version,
-              state: snapshot,
-              authorId: actor.userId ?? null,
-              authorLabel: actor.label,
-              commitMessage: null,
-              schemaVersion: WORKBENCH_SCHEMA_VERSION,
-            },
-          },
-          { tx },
-        );
-        return;
-      }
+      return;
     }
+
+    if (rolling) {
+      // Moved before the insert, in the same transaction, so the number this
+      // row leaves behind is free for the numbered sequence to take. Its
+      // content did not change, so its counterVersion does not move.
+      await this.repository.updateVersionById(
+        { id: rolling.id, projectId, data: { version: counterVersion } },
+        { tx },
+      );
+    }
+
+    const version = isRollingAutosave
+      ? counterVersion
+      : (await this.repository.findMaxNumberedVersion(
+          { projectId, experimentId },
+          { tx },
+        )) + 1;
 
     await this.repository.createVersion(
       {
@@ -1140,6 +1204,7 @@ export class ExperimentService {
           experimentId,
           projectId,
           version,
+          counterVersion,
           autoSaved: isRollingAutosave,
           commitMessage: commitMessage ?? null,
           authorId: actor.userId ?? null,

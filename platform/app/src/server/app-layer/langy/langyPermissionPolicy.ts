@@ -125,6 +125,13 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
  * compromise, so the read/manage split the rest of this file turns on has
  * nothing to bite on.
  *
+ * `agentCache` is the same carve-out one step removed. An agent under test
+ * writes what it produced during a run there, and what it produces is normally
+ * the session it logged in with. The entry is encrypted at rest and a read
+ * hands back the plaintext, so a read of the cache is a read of whatever
+ * credential the agent put in it. Every route in the family asks for
+ * `agentCache:manage`, so there is no weaker grain to hold either.
+ *
  * `langy` and `ops` are not part of the "everything" the owner widened,
  * because neither is tenant data:
  *
@@ -144,6 +151,9 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
  */
 const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   secrets: "reading a stored credential is obtaining it; there is no safe read",
+  agentCache:
+    "an agent stores the session it logged in with here, so a read returns a " +
+    "credential; and every route in the family asks for `agentCache:manage`",
   langy:
     "`langy:create` starts Langy turns, so holding it lets Langy invoke " +
     "itself recursively; and its conversations are Langy's own record",

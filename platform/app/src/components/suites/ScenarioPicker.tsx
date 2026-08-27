@@ -24,7 +24,18 @@ interface Scenario {
   id: string;
   name: string;
   labels: string[];
+  /** The test suite the case is filed in, when the project uses them. */
+  folderId?: string | null;
 }
+
+/** One test suite, so the list can be read under the suite names. */
+export interface ScenarioPickerFolder {
+  id: string;
+  name: string;
+}
+
+/** What the group of cases filed in no test suite reads as. */
+export const PICKER_UNFILED_GROUP_NAME = "Unfiled test cases";
 
 export interface ScenarioPickerProps {
   /** Filtered list of scenarios to display. */
@@ -57,6 +68,42 @@ export interface ScenarioPickerProps {
   archivedIds?: { id: string; name: string }[];
   /** Handler to remove an archived scenario. */
   onRemoveArchived?: (id: string) => void;
+  /**
+   * The test suites the cases are filed in. When any is given the list reads
+   * under the suite names; an empty list keeps the flat list.
+   */
+  folders?: ScenarioPickerFolder[];
+}
+
+/** The cases under their suite name, unfiled last. Empty groups are left out. */
+function groupScenariosByFolder(
+  scenarios: Scenario[],
+  folders: ScenarioPickerFolder[],
+): { id: string; name: string; scenarios: Scenario[] }[] {
+  const groups: { id: string; name: string; scenarios: Scenario[] }[] = [];
+
+  for (const folder of folders) {
+    const held = scenarios.filter(
+      (scenario) => scenario.folderId === folder.id,
+    );
+    if (held.length > 0) {
+      groups.push({ id: folder.id, name: folder.name, scenarios: held });
+    }
+  }
+
+  const folderIds = new Set(folders.map((folder) => folder.id));
+  const unfiled = scenarios.filter(
+    (scenario) => !scenario.folderId || !folderIds.has(scenario.folderId),
+  );
+  if (unfiled.length > 0) {
+    groups.push({
+      id: "__unfiled__",
+      name: PICKER_UNFILED_GROUP_NAME,
+      scenarios: unfiled,
+    });
+  }
+
+  return groups;
 }
 
 export function ScenarioPicker({
@@ -75,7 +122,13 @@ export function ScenarioPicker({
   hasError,
   archivedIds = [],
   onRemoveArchived,
+  folders,
 }: ScenarioPickerProps) {
+  const groups =
+    folders && folders.length > 0
+      ? groupScenariosByFolder(scenarios, folders)
+      : null;
+
   return (
     <Box
       border="1px solid"
@@ -140,22 +193,36 @@ export function ScenarioPicker({
         gap={1}
         align="stretch"
       >
-        {scenarios.map((scenario) => (
-          <HStack key={scenario.id} gap={2} paddingY={1} cursor="pointer">
-            <Checkbox
-              checked={selectedIds.includes(scenario.id)}
-              onCheckedChange={() => onToggle(scenario.id)}
-              flex={1}
-            >
-              <HStack gap={2} flex={1}>
-                <Text fontSize="sm" flex={1}>
-                  {scenario.name}
+        {groups
+          ? groups.map((group) => (
+              <VStack key={group.id} gap={1} align="stretch">
+                <Text
+                  fontSize="xs"
+                  fontWeight="bold"
+                  textTransform="uppercase"
+                  color="fg.muted"
+                  paddingTop={1}
+                >
+                  {group.name}
                 </Text>
-                <TagList labels={scenario.labels} />
-              </HStack>
-            </Checkbox>
-          </HStack>
-        ))}
+                {group.scenarios.map((scenario) => (
+                  <ScenarioPickerRow
+                    key={scenario.id}
+                    scenario={scenario}
+                    checked={selectedIds.includes(scenario.id)}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </VStack>
+            ))
+          : scenarios.map((scenario) => (
+              <ScenarioPickerRow
+                key={scenario.id}
+                scenario={scenario}
+                checked={selectedIds.includes(scenario.id)}
+                onToggle={onToggle}
+              />
+            ))}
       </VStack>
 
       {/* Archived scenarios warning */}
@@ -218,5 +285,32 @@ export function ScenarioPicker({
         </HStack>
       </HStack>
     </Box>
+  );
+}
+
+function ScenarioPickerRow({
+  scenario,
+  checked,
+  onToggle,
+}: {
+  scenario: Scenario;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <HStack gap={2} paddingY={1} cursor="pointer">
+      <Checkbox
+        checked={checked}
+        onCheckedChange={() => onToggle(scenario.id)}
+        flex={1}
+      >
+        <HStack gap={2} flex={1}>
+          <Text fontSize="sm" flex={1}>
+            {scenario.name}
+          </Text>
+          <TagList labels={scenario.labels} />
+        </HStack>
+      </Checkbox>
+    </HStack>
   );
 }

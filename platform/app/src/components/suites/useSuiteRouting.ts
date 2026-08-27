@@ -107,7 +107,7 @@ const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
  * reach. An open drawer is the exception: it holds a run from the set being
  * navigated away from.
  */
-const survivesSelectionChange = (key: string): boolean =>
+export const survivesSelectionChange = (key: string): boolean =>
   !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");
 
 export function useSuiteRouting(): SuiteRouting {

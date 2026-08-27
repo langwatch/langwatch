@@ -170,6 +170,30 @@ function fmtRelative(date: Date | string | null): string {
  * config for this source type" (a valid `{ pullConfig: null }`) distinct from
  * "the form is wrong" (`null`), which a bare return would collapse.
  */
+/**
+ * The source types that reassemble their own pull config.
+ *
+ * Exported so a test can hold it against the fields the form collects. A
+ * source type with a `secret: true` field and no builder here does not fail
+ * loudly: the form drops secret keys deliberately, expecting a builder to put
+ * them back under `credentials`, so without one the secret is collected from
+ * the admin, dropped on the way through, and the source saves looking
+ * complete. Every run then fails for want of a credential the form asked for.
+ *
+ * The list is not `Partial`, so it and the map below cannot drift apart —
+ * adding a builder without naming it here, or naming one that does not exist,
+ * is a type error.
+ */
+export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
+  "http_custom",
+  "databricks_genie",
+  "copilot_studio_dataverse",
+  "anthropic_admin",
+] as const;
+
+type PullConfigBuilderSourceType =
+  (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
+
 function resolvePullConfig(
   composer: ComposerState,
   {
@@ -181,8 +205,9 @@ function resolvePullConfig(
   // generic adapter can run unmodified. The locked-shape reference pullers
   // (copilot_studio / openai_compliance / claude_compliance) only need the
   // adapter id - their validateConfig override returns the frozen config.
-  const builders: Partial<
-    Record<SourceType, [() => unknown | null, string, string]>
+  const builders: Record<
+    PullConfigBuilderSourceType,
+    [() => unknown | null, string, string]
   > = {
     http_custom: [
       () => buildHttpCustomPullConfig(composer),
@@ -194,6 +219,11 @@ function resolvePullConfig(
       "Missing required Databricks fields",
       "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
+    copilot_studio_dataverse: [
+      () => buildCopilotStudioDataversePullConfig(composer),
+      "Missing required Copilot Studio fields",
+      "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.",
+    ],
     anthropic_admin: [
       () =>
         buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
@@ -204,7 +234,11 @@ function resolvePullConfig(
     ],
   };
 
-  const builder = builders[composer.sourceType];
+  const builder = (
+    builders as Partial<
+      Record<SourceType, (typeof builders)[keyof typeof builders]>
+    >
+  )[composer.sourceType];
   if (builder) {
     const [build, title, description] = builder;
     const pullConfig = build();
@@ -1805,6 +1839,41 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "How often to call Purview Audit. Default 300s.",
     },
   ],
+  copilot_studio_dataverse: [
+    {
+      key: "environmentUrl",
+      label: "Power Platform environment URL",
+      placeholder: "https://org12345.crm.dynamics.com",
+      hint: "From Power Platform admin centre → your environment → Environment URL. Environments served from a custom domain are not supported yet.",
+      required: true,
+    },
+    {
+      // Named `credentials*` on purpose, like the Databricks fields: the
+      // adapter reads all three from `pullConfig.credentials`, which is the
+      // only subtree the server encrypts. A field named `tenantId` would be
+      // dropped by `parserFieldValue` and never reach the adapter at all.
+      key: "credentialsTenantId",
+      label: "Microsoft Entra tenant ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "credentialsClientId",
+      label: "App registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "credentialsClientSecret",
+      label: "App registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
+      required: true,
+      secret: true,
+    },
+  ],
   openai_compliance: [
     {
       key: "bucket",
@@ -2262,6 +2331,47 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  * `spaceIds` is a comma-separated string in the form but an array in the
  * adapter's schema.
  */
+/**
+ * The pullConfig for a Copilot Studio source reading Dataverse.
+ *
+ * All three credential fields travel in the `credentials` subtree — the only
+ * part of parserConfig the server encrypts — which is why they are named
+ * `credentials*`. Without this builder the composer would fall through to the
+ * bare `{ adapter }` default: the form would collect a client secret,
+ * `parserFieldValue` would drop it as a secret, nothing would put it back, and
+ * the source would save looking complete and fail every run for want of a
+ * credential it did ask for.
+ */
+function buildCopilotStudioDataversePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const environmentUrl = (p.environmentUrl ?? "").trim().replace(/\/+$/, "");
+  const tenantId = (p.credentialsTenantId ?? "").trim();
+  const clientId = (p.credentialsClientId ?? "").trim();
+  const clientSecret = (p.credentialsClientSecret ?? "").trim();
+
+  // All three or none: two thirds of an app registration is not a sign-in,
+  // and accepting it would save a source that cannot run.
+  if (!environmentUrl || !tenantId || !clientId || !clientSecret) return null;
+
+  return {
+    adapter: "copilot_studio_dataverse",
+    environmentUrl,
+    // Empty means every agent the credential can see, which is what most
+    // customers want and what covers a new agent the day someone makes one.
+    botIds: (p.botIds ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
+      "*/15 * * * *",
+    credentials: { tenantId, clientId, clientSecret },
+  };
+}
+
 function buildDatabricksGeniePullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
@@ -2605,6 +2715,12 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // the merge, the raw form value would persist `warehouseId: ""`, which the
     // adapter reads as a warehouse to go ask the workspace about.
     databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
+    // The builder normalises `environmentUrl` (trailing slashes stripped) and
+    // turns `botIds` from a comma-separated string into an array. The raw form
+    // values winning the merge would leave a string where the adapter's schema
+    // expects a list, and an address the destination check reads differently
+    // from the one the adapter calls.
+    copilot_studio_dataverse: ["environmentUrl", "botIds"],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

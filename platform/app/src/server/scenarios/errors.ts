@@ -6,6 +6,7 @@
 import {
   HandledError,
   type HandledErrorOptions,
+  NotFoundError,
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
@@ -16,6 +17,75 @@ export class ScenarioNotFoundError extends Error {
   constructor(message = "Scenario not found") {
     super(message);
     this.name = "ScenarioNotFoundError";
+  }
+}
+
+/**
+ * Thrown when a scenario is filed into something that is not an active folder
+ * of the same project: a custom run plan, an archived folder, another
+ * project's folder, or an id that names nothing.
+ */
+export class ScenarioFolderNotFoundError extends HandledError {
+  declare readonly code: "scenario_folder_not_found";
+
+  constructor() {
+    super("scenario_folder_not_found", "Test suite folder not found", {
+      httpStatus: 404,
+    });
+    this.name = "ScenarioFolderNotFoundError";
+  }
+}
+
+/**
+ * Refuses a save made against a version somebody else already replaced.
+ *
+ * Raised only when the caller sent an expected version: a caller that sends
+ * none asked for "save over whatever is there", and gets the next number. The
+ * refusal happens before the write, so the stored case is exactly as the other
+ * save left it. `currentVersion` rides on `meta` so the editor can offer the
+ * reload it needs.
+ *
+ * @see specs/scenarios/scenario-versioning.feature
+ */
+export class ScenarioStaleVersionError extends HandledError {
+  declare readonly code: "scenario_stale_version";
+
+  constructor({ currentVersion }: { currentVersion: number }) {
+    super(
+      "scenario_stale_version",
+      "This test case changed since it was loaded",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: { currentVersion },
+      },
+    );
+    this.name = "ScenarioStaleVersionError";
+  }
+}
+
+/**
+ * Raised when a version number names no stored version of the scenario.
+ *
+ * The synthesized "Created" entry a pre-versioning scenario shows also lands
+ * here on read or restore: it has no stored snapshot to serve.
+ *
+ * @see specs/scenarios/scenario-version-restore.feature
+ */
+export class ScenarioVersionNotFoundError extends NotFoundError {
+  declare readonly code: "scenario_version_not_found";
+
+  constructor({
+    scenarioId,
+    version,
+  }: {
+    scenarioId: string;
+    version: number;
+  }) {
+    super("scenario_version_not_found", "Scenario version", String(version), {
+      meta: { scenarioId, version },
+    });
+    this.name = "ScenarioVersionNotFoundError";
   }
 }
 

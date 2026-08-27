@@ -44,6 +44,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -116,6 +117,7 @@ import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAgentSandboxMaintenancePipeline } from "./pipelines/agent-sandbox-maintenance/pipeline";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
@@ -604,6 +606,20 @@ export class PipelineRegistry {
         sessionKeyReap: {
           reap: () =>
             reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Code agent credential maintenance, on the same footing. A sandbox key is
+    // minted per run and nothing revokes it at the end of one, so this sweep
+    // is what retires it.
+    this.deps.eventSourcing.register(
+      createAgentSandboxMaintenancePipeline({
+        sandboxKeyReap: {
+          reap: () =>
+            reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
@@ -1207,6 +1223,9 @@ export class PipelineRegistry {
           {
             distinctId: "evaluator-settings-recovery",
             defaultValue: false,
+            // A pipeline-wide switch, flipped for the fleet and not per tenant.
+            projectId: NOT_TARGETED,
+            organizationId: NOT_TARGETED,
           },
         ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
@@ -1227,7 +1246,13 @@ export class PipelineRegistry {
           try {
             disabled = await featureFlagService.isEnabled(
               "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+              {
+                distinctId: "evaluation-inputs-offload",
+                defaultValue: false,
+                // A pipeline-wide switch, flipped for the fleet.
+                projectId: NOT_TARGETED,
+                organizationId: NOT_TARGETED,
+              },
             );
           } catch {
             // Unreadable kill switch: stay on the default (offload enabled).
@@ -1791,6 +1816,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // Introspection — derived from the live EventSourcing runtime
 // ============================================================================
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { getApp } from "../app-layer/app";
 // StaticPipelineDefinition is already imported at the top of the file.
 

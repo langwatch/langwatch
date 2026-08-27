@@ -5,24 +5,35 @@
  * Handles CRUD, duplication, and run scheduling.
  */
 
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
+import { nanoid } from "nanoid";
+import type {
+  Prisma,
+  PrismaClient,
+  SimulationSuite,
+} from "~/generated/prisma/client";
 import type {
   SuiteRunResult,
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
+import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
-import { encryptRunSecretValues } from "../scenarios/run-secret-values";
+import {
+  encryptRunSecretValues,
+  type RunSecretCiphertext,
+} from "../scenarios/run-secret-values";
 import {
   ScenarioRepository,
   type ScenarioRunConfig,
 } from "../scenarios/scenario.repository";
+import { RUN_ALL_SUITE_LABEL, RUN_ALL_SUITE_NAME } from "./constants";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -30,7 +41,12 @@ import {
   InvalidTargetReferencesError,
   SuiteNameTakenError,
   SuiteNotFoundError,
+  SuiteScopeEmptyError,
+  SuiteScopeNotAllowedError,
+  SuiteTargetsRequiredError,
 } from "./errors";
+import { isDynamicScope, parseSuiteScope } from "./scope";
+import { readScopeMembership } from "./scope-membership";
 import {
   type CreateSuiteInput,
   SuiteRepository,
@@ -39,6 +55,7 @@ import {
 import {
   isSuiteAgentTargetType,
   parseSuiteTargets,
+  type SuiteKind,
   type SuiteTarget,
 } from "./types";
 
@@ -63,6 +80,74 @@ type ResolvedTargetReferences = {
   missing: SuiteTarget[];
 };
 
+/**
+ * Resolves the values each scenario of a run reads, split into the plain ones
+ * the child reads as `params` and the secret ones it reads as `secrets`.
+ *
+ * The secrets are encrypted here, at the last point that holds them in clear,
+ * so the queued event and everything folded from it carry ciphertext. Only
+ * scenarios that resolved at least one secret get an entry.
+ */
+async function resolveParameterMaps(params: {
+  scenarios: readonly ScenarioRunConfig[];
+  values?: RunParameterValues;
+}): Promise<{
+  parametersByScenarioId: Map<string, RunParameterValues>;
+  secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
+}> {
+  const resolved = await resolveRunParameters({
+    scenarios: params.scenarios,
+    values: params.values,
+  });
+  return {
+    parametersByScenarioId: new Map(
+      [...resolved].map(([scenarioId, scenarioParameters]) => [
+        scenarioId,
+        scenarioParameters.parameters,
+      ]),
+    ),
+    secretParametersByScenarioId: new Map(
+      [...resolved]
+        .filter(
+          ([, scenarioParameters]) =>
+            Object.keys(scenarioParameters.secretParameters).length > 0,
+        )
+        .map(([scenarioId, scenarioParameters]) => [
+          scenarioId,
+          encryptRunSecretValues(scenarioParameters.secretParameters),
+        ]),
+    ),
+  };
+}
+
+/**
+ * The two things a test suite refuses in an update.
+ *
+ * Both are a second answer to what the suite runs, which its own filing
+ * already decides: a scope is a rule over the whole project, and a member list
+ * is derived from `Scenario.folderId` by reconcileFolderMembership and nothing
+ * else, so a direct write here would fork the two sides of that invariant.
+ */
+function assertFolderUpdate(data: UpdateSuiteInput): void {
+  if (data.scope !== undefined && data.scope !== null) {
+    throw new SuiteScopeNotAllowedError();
+  }
+  if (data.scenarioIds !== undefined) {
+    throw new ValidationError(
+      "A folder's scenarios are managed by filing scenarios into it",
+      {
+        meta: {
+          fieldErrors: {
+            scenarioIds: [
+              "A folder's scenarios are managed by filing scenarios into it",
+            ],
+          },
+        },
+      },
+    );
+  }
+}
+
 export class SuiteService {
   constructor(
     private readonly repository: SuiteRepository,
@@ -70,6 +155,7 @@ export class SuiteService {
     private readonly agentRepository: AgentRepository,
     private readonly llmConfigRepository: LlmConfigRepository,
     private readonly suiteRunService: SuiteRunService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   /**
@@ -85,6 +171,7 @@ export class SuiteService {
       new AgentRepository(params.prisma),
       new LlmConfigRepository(params.prisma),
       params.suiteRunService,
+      params.prisma,
     );
   }
 
@@ -113,7 +200,18 @@ export class SuiteService {
     );
   }
 
-  async getAll(params: { projectId: string }): Promise<SimulationSuite[]> {
+  /**
+   * Lists the project's suites of the given kinds.
+   *
+   * The default is deliberately "custom" only: every caller that predates
+   * folders, the v1 run plan list and the public suites endpoint, names no
+   * kind, and must never see a folder row (an empty folder would render 0/0
+   * there and refuse to run). A caller that wants folders says so.
+   */
+  async getAll(params: {
+    projectId: string;
+    kinds?: SuiteKind[];
+  }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteService.getAll",
       {
@@ -124,9 +222,174 @@ export class SuiteService {
       },
       async (span) => {
         logger.debug({ projectId: params.projectId }, "Fetching all suites");
-        const result = await this.repository.findAll(params);
+        const result = await this.repository.findAll({
+          projectId: params.projectId,
+          kinds: params.kinds ?? ["custom"],
+        });
         span.setAttribute("result.count", result.length);
         return result;
+      },
+    );
+  }
+
+  /**
+   * Creates an empty folder. Unlike a custom run plan, a folder starts with
+   * no scenarios and no targets: scenarios arrive through filing, targets
+   * through the run dialog.
+   *
+   * Folder and plan slugs share one per-project namespace, so a name another
+   * suite already uses gets a numeric suffix instead of a refusal: a person
+   * naming a folder must not be blocked by a run plan they may not even see.
+   */
+  async createFolder(params: {
+    projectId: string;
+    name: string;
+  }): Promise<SimulationSuite> {
+    return tracer.withActiveSpan(
+      "SuiteService.createFolder",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        const name = params.name.trim();
+        const baseSlug = slugify(name);
+        if (!name || !baseSlug) {
+          throw new ValidationError("A folder needs a name", {
+            meta: { fieldErrors: { name: ["A folder needs a name"] } },
+          });
+        }
+        const initialSlug = await this.generateUniqueSlug({
+          baseSlug,
+          projectId: params.projectId,
+        });
+        const result = await this.saveWithSlugRetry({
+          initialSlug,
+          execute: (slug) =>
+            this.repository.create({
+              projectId: params.projectId,
+              name,
+              slug,
+              kind: "folder",
+              scenarioIds: [],
+              targets: [],
+              repeatCount: 1,
+              labels: [],
+            }),
+          regenerateSlug: () =>
+            this.generateUniqueSlug({
+              baseSlug,
+              projectId: params.projectId,
+            }),
+        });
+        span.setAttribute("suite.id", result.id);
+        return result;
+      },
+    );
+  }
+
+  async getAllFolders(params: {
+    projectId: string;
+  }): Promise<SimulationSuite[]> {
+    return this.getAll({ projectId: params.projectId, kinds: ["folder"] });
+  }
+
+  /**
+   * Renames a folder. The slug stays as it was: run history routes and the
+   * folder's internal run set are addressed through it, so a rename must not
+   * break either.
+   */
+  async renameFolder(params: {
+    projectId: string;
+    folderId: string;
+    name: string;
+  }): Promise<SimulationSuite> {
+    return tracer.withActiveSpan(
+      "SuiteService.renameFolder",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.folderId,
+        },
+      },
+      async () => {
+        const name = params.name.trim();
+        if (!name) {
+          throw new ValidationError("A folder needs a name", {
+            meta: { fieldErrors: { name: ["A folder needs a name"] } },
+          });
+        }
+        const folder = await this.repository.findById({
+          id: params.folderId,
+          projectId: params.projectId,
+        });
+        if (folder?.kind !== "folder") {
+          throw new SuiteNotFoundError();
+        }
+        return await this.repository.update({
+          id: params.folderId,
+          projectId: params.projectId,
+          data: { name },
+        });
+      },
+    );
+  }
+
+  /**
+   * Archives a folder and every scenario filed in it, in one transaction.
+   *
+   * Constraint: the folder's scenarioIds is NOT recomputed here. The archived
+   * folder keeps the membership it had as a readable snapshot, which is what
+   * a future restore needs. This is the one place the membership invariant is
+   * deliberately suspended (see server/suites/folder-membership.ts).
+   *
+   * Idempotent: archiving an archived folder keeps its original archive time
+   * and touches no scenario.
+   */
+  async archiveFolder(params: {
+    projectId: string;
+    folderId: string;
+  }): Promise<SimulationSuite> {
+    return tracer.withActiveSpan(
+      "SuiteService.archiveFolder",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.folderId,
+        },
+      },
+      async () => {
+        return await this.prisma.$transaction(async (tx) => {
+          const folder = await tx.simulationSuite.findFirst({
+            where: {
+              id: params.folderId,
+              projectId: params.projectId,
+              kind: "folder",
+            },
+            select: { id: true },
+          });
+          if (!folder) {
+            throw new SuiteNotFoundError();
+          }
+          await this.scenarioRepository.archiveManyByFolder({
+            projectId: params.projectId,
+            folderId: params.folderId,
+            tx,
+          });
+          const archived = await this.repository.archive({
+            id: params.folderId,
+            projectId: params.projectId,
+            tx,
+          });
+          if (!archived) {
+            throw new SuiteNotFoundError();
+          }
+          return archived;
+        });
       },
     );
   }
@@ -175,8 +438,18 @@ export class SuiteService {
           { projectId: params.projectId, suiteId: params.id },
           "Updating suite",
         );
+        const existing = await this.repository.findById({
+          id: params.id,
+          projectId: params.projectId,
+        });
+        if (!existing) {
+          throw new SuiteNotFoundError();
+        }
         const data: UpdateSuiteInput = { ...params.data };
-        if (params.data.name) {
+        if (existing.kind === "folder") {
+          assertFolderUpdate(data);
+          // A folder rename keeps its slug (see renameFolder), so no re-slug.
+        } else if (params.data.name) {
           const slug = slugify(params.data.name);
           await this.ensureSlugAvailable({
             slug,
@@ -228,6 +501,10 @@ export class SuiteService {
           slug,
           description: original.description,
           scenarioIds: original.scenarioIds,
+          // A copy covers what the original covers, rule included.
+          ...(original.scope !== null && {
+            scope: original.scope as Prisma.InputJsonValue,
+          }),
           targets: parseSuiteTargets(original.targets),
           repeatCount: original.repeatCount,
           labels: original.labels,
@@ -291,6 +568,8 @@ export class SuiteService {
     batchRunId?: string;
     /** Values supplied for the run, overriding each scenario's own defaults. */
     parameters?: RunParameterValues;
+    /** One short line describing why this batch was run. */
+    note?: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -308,44 +587,31 @@ export class SuiteService {
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
+        // A suite with no target at all, a folder before its first run,
+        // is refused before anything is resolved or scheduled.
+        if (targets.length === 0) {
+          throw new SuiteTargetsRequiredError();
+        }
+
         const resolved = await this.resolveReferences({
-          suite,
+          scenarioIds: await this.readRunMembership({ suite, projectId }),
           projectId,
           organizationId,
           targets,
         });
 
-        // Every parameter check runs before the first job is scheduled, so a
-        // rejected run leaves nothing half-started behind it.
-        const resolvedParameters = await resolveRunParameters({
-          scenarios: resolved.scenarioConfigs,
-          values: params.parameters,
-        });
-        const parametersByScenarioId = new Map(
-          [...resolvedParameters].map(([scenarioId, scenarioParameters]) => [
-            scenarioId,
-            scenarioParameters.parameters,
-          ]),
-        );
-        // Encrypted here, at the last point that holds the values in clear, so
-        // the queued event and everything folded from it carry ciphertext.
-        const secretParametersByScenarioId = new Map(
-          [...resolvedParameters]
-            .filter(
-              ([, scenarioParameters]) =>
-                Object.keys(scenarioParameters.secretParameters).length > 0,
-            )
-            .map(([scenarioId, scenarioParameters]) => [
-              scenarioId,
-              encryptRunSecretValues(scenarioParameters.secretParameters),
-            ]),
-        );
+        const { parametersByScenarioId, secretParametersByScenarioId } =
+          await resolveParameterMaps({
+            scenarios: resolved.scenarioConfigs,
+            values: params.parameters,
+          });
 
         const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
           projectId,
           activeScenarioIds: resolved.activeScenarioIds,
           scenarioNameMap: resolved.scenarioNameMap,
+          scenarioVersionMap: resolved.scenarioVersionMap,
           activeTargets: resolved.activeTargets,
           repeatCount: suite.repeatCount,
           skippedArchived: resolved.skippedArchived,
@@ -353,12 +619,149 @@ export class SuiteService {
           batchRunId: params.batchRunId,
           parametersByScenarioId,
           secretParametersByScenarioId,
+          note: params.note,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);
         span.setAttribute("suite.job_count", result.jobCount);
 
         return result;
+      },
+    );
+  }
+
+  /**
+   * The scenarios a run covers.
+   *
+   * A folder's membership is read from the scenarios that name it, archived
+   * ones included: the folder's scenarioIds cache holds only active members,
+   * and the run reports the archived ones as skipped.
+   *
+   * Any other suite covers what its scope says. A dynamic scope is resolved
+   * against the project as it is right now and written back onto the plan, so
+   * a case written after the plan runs without the plan being edited. A plan
+   * with no scope, or one of mode "cases", runs the scenarioIds it stores.
+   *
+   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no case.
+   */
+  private async readRunMembership(params: {
+    suite: SimulationSuite;
+    projectId: string;
+  }): Promise<string[]> {
+    if (params.suite.kind === "folder") {
+      const members = await this.scenarioRepository.findManyByFolder({
+        projectId: params.projectId,
+        folderId: params.suite.id,
+      });
+      return members.map((member) => member.id);
+    }
+
+    const scope = parseSuiteScope(params.suite.scope);
+    if (!isDynamicScope(scope)) {
+      return params.suite.scenarioIds;
+    }
+
+    const resolved = await readScopeMembership({
+      projectId: params.projectId,
+      suiteId: params.suite.id,
+      scope,
+      storedScenarioIds: params.suite.scenarioIds,
+      prisma: this.prisma,
+    });
+    if (resolved.length === 0) {
+      throw new SuiteScopeEmptyError();
+    }
+    return resolved;
+  }
+
+  /**
+   * Runs every non-archived scenario of the project through the managed
+   * "All test cases" suite.
+   *
+   * The suite is a per-project singleton found by {@link RUN_ALL_SUITE_LABEL}
+   * (never by name, since a person may name their own plan "All test cases"). Its
+   * scenarioIds are refreshed to all active scenarios at each run, and the
+   * targets chosen in the run dialog are persisted onto it so the next run
+   * preselects them. It is a kind "custom" suite, so v1 lists it as an
+   * ordinary run plan and its history lands in its own internal run set.
+   */
+  async runAll(params: {
+    projectId: string;
+    organizationId: string;
+    idempotencyKey: string;
+    batchRunId?: string;
+    targets?: SuiteTarget[];
+    parameters?: RunParameterValues;
+    note?: string;
+  }): Promise<SuiteRunResult & { suiteId: string }> {
+    return tracer.withActiveSpan(
+      "SuiteService.runAll",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        const activeScenarioIds = (
+          await this.scenarioRepository.findAll({
+            projectId: params.projectId,
+          })
+        ).map((scenario) => scenario.id);
+
+        const existing = await this.repository.findFirstByLabel({
+          projectId: params.projectId,
+          label: RUN_ALL_SUITE_LABEL,
+        });
+
+        let suite: SimulationSuite;
+        if (existing) {
+          suite = await this.repository.update({
+            id: existing.id,
+            projectId: params.projectId,
+            data: {
+              scenarioIds: activeScenarioIds,
+              ...(params.targets !== undefined && { targets: params.targets }),
+            },
+          });
+        } else {
+          const baseSlug = slugify(RUN_ALL_SUITE_NAME);
+          const initialSlug = await this.generateUniqueSlug({
+            baseSlug,
+            projectId: params.projectId,
+          });
+          suite = await this.saveWithSlugRetry({
+            initialSlug,
+            execute: (slug) =>
+              this.repository.create({
+                projectId: params.projectId,
+                name: RUN_ALL_SUITE_NAME,
+                slug,
+                kind: "custom",
+                scenarioIds: activeScenarioIds,
+                targets: params.targets ?? [],
+                repeatCount: 1,
+                labels: [RUN_ALL_SUITE_LABEL],
+              }),
+            regenerateSlug: () =>
+              this.generateUniqueSlug({
+                baseSlug,
+                projectId: params.projectId,
+              }),
+          });
+        }
+        span.setAttribute("suite.id", suite.id);
+
+        const result = await this.run({
+          suite,
+          projectId: params.projectId,
+          organizationId: params.organizationId,
+          idempotencyKey: params.idempotencyKey,
+          batchRunId: params.batchRunId,
+          parameters: params.parameters,
+          note: params.note,
+        });
+        return { ...result, suiteId: suite.id };
       },
     );
   }
@@ -450,22 +853,77 @@ export class SuiteService {
     }
   }
 
+  /**
+   * Picks a slug not taken by any suite in the project, appending an
+   * incrementing numeric suffix (-2, -3, ...) on collision and falling back
+   * to a random suffix after 100 candidates. Mirrors the experiment service's
+   * generateUniqueSlug. A TOCTOU race between this check and the insert is
+   * closed by {@link SuiteService.saveWithSlugRetry}.
+   */
+  private async generateUniqueSlug(params: {
+    baseSlug: string;
+    projectId: string;
+  }): Promise<string> {
+    const escaped = params.baseSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const suffixPattern = new RegExp(`^${escaped}(-\\d+)?$`);
+    const existingSlugs = new Set(
+      (
+        await this.repository.findSlugsByPrefix({
+          projectId: params.projectId,
+          slugPrefix: params.baseSlug,
+        })
+      ).filter((slug) => suffixPattern.test(slug)),
+    );
+
+    if (!existingSlugs.has(params.baseSlug)) {
+      return params.baseSlug;
+    }
+    for (let index = 2; index <= 102; index++) {
+      const candidate = `${params.baseSlug}-${index}`;
+      if (!existingSlugs.has(candidate)) {
+        return candidate;
+      }
+    }
+    return `${params.baseSlug}-${nanoid(8)}`;
+  }
+
+  /**
+   * Runs a suite insert with one slug-conflict retry: a P2002 on the unique
+   * (projectId, slug) regenerates the slug and tries once more.
+   */
+  private async saveWithSlugRetry(params: {
+    initialSlug: string;
+    execute: (slug: string) => Promise<SimulationSuite>;
+    regenerateSlug: () => Promise<string>;
+  }): Promise<SimulationSuite> {
+    try {
+      return await params.execute(params.initialSlug);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const newSlug = await params.regenerateSlug();
+        return await params.execute(newSlug);
+      }
+      throw error;
+    }
+  }
+
   private async resolveReferences(params: {
-    suite: SimulationSuite;
+    scenarioIds: string[];
     projectId: string;
     organizationId: string;
     targets: SuiteTarget[];
   }): Promise<{
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    scenarioVersionMap: Map<string, number>;
     scenarioConfigs: ScenarioRunConfig[];
     activeTargets: SuiteTarget[];
     skippedArchived: SuiteRunResult["skippedArchived"];
   }> {
-    const { suite, projectId, organizationId, targets } = params;
+    const { scenarioIds, projectId, organizationId, targets } = params;
 
     const scenarioResolution = await this.resolveScenarioReferences({
-      ids: suite.scenarioIds,
+      ids: scenarioIds,
       projectId,
     });
 
@@ -505,10 +963,16 @@ export class SuiteService {
     const scenarioNameMap = new Map(
       scenarioConfigs.map((scenario) => [scenario.id, scenario.name]),
     );
+    // The version each queued run is stamped with, from the same read as the
+    // names, so the stamp is the state the run was scheduled from.
+    const scenarioVersionMap = new Map(
+      scenarioConfigs.map((scenario) => [scenario.id, scenario.version]),
+    );
 
     return {
       activeScenarioIds: scenarioResolution.active,
       scenarioNameMap,
+      scenarioVersionMap,
       scenarioConfigs,
       activeTargets: targetResolution.active,
       skippedArchived: {

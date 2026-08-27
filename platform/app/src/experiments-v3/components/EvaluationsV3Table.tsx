@@ -39,6 +39,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
+import { newTargetId } from "../actions/transforms/addTarget";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
 import { useDatasetSync } from "../hooks/useDatasetSync";
@@ -479,7 +480,7 @@ export function EvaluationsV3Table({
         savedAgent.type === "workflow" && fieldsResolved;
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`, // Generate unique ID for the workbench
+        id: newTargetId(),
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent
           ? "http"
@@ -557,7 +558,7 @@ export function EvaluationsV3Table({
       };
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`,
+        id: newTargetId(),
         type: "evaluator",
         targetEvaluatorId: evaluator.id,
         inputs,
@@ -598,7 +599,7 @@ export function EvaluationsV3Table({
     }) => {
       // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const targetId = `target_${Date.now()}`;
+      const targetId = newTargetId();
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
@@ -932,7 +933,7 @@ export function EvaluationsV3Table({
           useEvaluationsV3Store.getState().activeDatasetId;
 
         // Create target with pending mappings
-        const targetId = `target_${Date.now()}`;
+        const targetId = newTargetId();
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",

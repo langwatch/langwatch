@@ -4,6 +4,11 @@
 
 **Status:** Proposed
 
+**Amended by:** [ADR-127](127-an-identifier-is-an-aggregate.md) — §1's tenancy
+(`tenantId = userId`) stands; its aggregate choice (`aggregateId = userId`) and
+§2's per-user queue lane, projection cursor and read-your-writes wait are
+replaced by one aggregate per identifier.
+
 **Program:** Identity platform redesign — epic `../identity-platform-redesign.md`, plan `../identity-platform/delivery-plan.md`, deliverable `../identity-platform/D01-identity-pipeline-and-identifiers.md`. This is the "ADR-1" those documents refer to.
 
 **Relates to:** [`007-event-sourcing-architecture.md`](./007-event-sourcing-architecture.md) (pipeline doctrine), [`022-event-log-source-of-truth.md`](./022-event-log-source-of-truth.md) and [`015-projection-replay-coordination.md`](./015-projection-replay-coordination.md) (both left **unamended** — see §Revision), ADR-052 (process-manager substrate and the content boundary identity deliberately deviates from), ADR-066 (fold contract), ADR-029 §4 (purge tractability), ADR-092 §13 and [`110-grant-aggregates-are-grants.md`](./110-grant-aggregates-are-grants.md) (the grants rollout as it finally shipped — the shape this ADR mirrors, and the one rule it deliberately departs from; see §Revision 2026-08-23).

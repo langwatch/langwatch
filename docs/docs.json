@@ -843,6 +843,7 @@
             "group": "Using Langy",
             "pages": [
               "langy/chat",
+              "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
               "langy/insights"
@@ -1093,6 +1094,7 @@
               "api-reference/experiments/read-run-results",
               "api-reference/experiments/report-dspy-optimizer-steps",
               "api-reference/experiments/post-create-an-experiment",
+              "api-reference/experiments/read-one-experiment",
               "api-reference/experiments/list-an-experiment-s-versions",
               "api-reference/experiments/read-an-experiment-s-setup",
               "api-reference/experiments/save-an-experiment-s-setup",
@@ -1149,6 +1151,8 @@
               "api-reference/scenarios/list-scenarios",
               "api-reference/scenarios/create-scenarios",
               "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/list-a-scenario-s-versions",
+              "api-reference/scenarios/read-one-scenario-version",
               "api-reference/scenarios/update-scenarios",
               "api-reference/scenarios/delete-scenarios"
             ]
@@ -1278,6 +1282,15 @@
               "api-reference/secrets/get-secrets",
               "api-reference/secrets/update-secrets",
               "api-reference/secrets/delete-secrets"
+            ]
+          },
+          {
+            "group": "Agent Cache",
+            "pages": [
+              "api-reference/agent-cache/overview",
+              "api-reference/agent-cache/get-entry",
+              "api-reference/agent-cache/put-entry",
+              "api-reference/agent-cache/delete-entry"
             ]
           },
           {
@@ -1565,7 +1578,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1787635540",
+      "source": "/ci/cache/busted/1787752783",
       "destination": "/introduction"
     },
     {

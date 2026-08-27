@@ -1627,10 +1627,11 @@ model Experiment {
 //
 // Ordinary typing in the workbench writes a single rolling row with
 // `autoSaved = true`, updated in place so a long editing session does not
-// leave one row per keystroke behind. A commit, an agent write and a restore
-// each write a new `autoSaved = false` row, which is what a person sees in
-// the version list. `version` matches the `Experiment.workbenchVersion` the
-// write produced, so history and the live row share one number line.
+// leave one row per keystroke behind. That row is shown as "Autosave" and
+// carries no number a person reads. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, and those rows are numbered
+// 1, 2, 3 with no gaps: the number is one higher than the highest numbered
+// row of the experiment, not the counter.
 //
 // `state` never carries run results: those live only on the live experiment
 // row, because a snapshot exists to restore a setup, not to replay an old run.
@@ -1638,10 +1639,19 @@ model Experiment {
 // current results across, so bringing an old setup back never clears the
 // output cells and evaluator scores of the run the experiment holds now.
 model ExperimentVersion {
-  id           String @id @default(nanoid())
-  experimentId String
-  projectId    String
-  version      Int
+  id             String @id @default(nanoid())
+  experimentId   String
+  projectId      String
+  /// The number the version is addressed and displayed by. Numbered rows hold
+  /// a gap-free sequence. The rolling autosave row rides on the counter
+  /// instead, which is what keeps it clear of that sequence.
+  version        Int
+  /// `Experiment.workbenchVersion` at the moment this row was last written.
+  /// The rolling row is rewritten in place, so this is the only column that
+  /// says how recent its content is, and the version list sorts and pages by
+  /// it. It also joins a row to the live state: the row whose `counterVersion`
+  /// equals the experiment's counter holds what the workbench shows now.
+  counterVersion Int
 
   autoSaved     Boolean @default(false)
   commitMessage String?
@@ -1659,10 +1669,13 @@ model ExperimentVersion {
 
   @@unique([experimentId, version])
   @@index([projectId, experimentId, autoSaved])
-  // The version list pages by version inside one experiment, and a restore
-  // reads one version number. Both name all three columns, so the sort key
-  // belongs in the index rather than being applied to fetched rows.
+  // A restore reads one version number of one experiment, and a numbered write
+  // reads the highest number that experiment holds. Both name all three
+  // columns, so the sort key belongs in the index rather than being applied to
+  // fetched rows.
   @@index([projectId, experimentId, version])
+  // The version list pages by counterVersion inside one experiment.
+  @@index([projectId, experimentId, counterVersion])
   @@index([createdAt])
 }
 
@@ -2836,6 +2849,19 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
+  // The folder (a SimulationSuite with kind "folder") this scenario is filed
+  // in, or null for an unfiled scenario. This column is the source of truth
+  // for folder membership; the folder's scenarioIds is a denormalized copy
+  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
+  // See specs/suites/folder-membership-invariant.feature.
+  folderId        String?
+  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // Counts one up on every save of the editable fields. Each number has a
+  // ScenarioVersion row holding the state as saved; the unique constraint
+  // there is what keeps two concurrent saves from sharing a number. See
+  // specs/scenarios/scenario-versioning.feature.
+  version         Int       @default(1)
+  versions        ScenarioVersion[]
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2843,6 +2869,46 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
+  @@index([projectId, folderId])
+}
+
+// One saved state of a scenario's editable fields. Append-only: a restore
+// writes a new row rather than rewriting an old one. See
+// specs/scenarios/scenario-versioning.feature and
+// specs/scenarios/scenario-version-restore.feature.
+model ScenarioVersion {
+  id         String @id @default(nanoid())
+  scenarioId String
+  /// Deleting the case takes its history with it. Under relationMode="prisma"
+  /// the cascade is the client's, so a raw SQL delete still has to clear these
+  /// rows itself.
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// The project of the parent case, carried here so every read filters by
+  /// tenant without a join. The service is what keeps the pair honest: no
+  /// composite foreign key can, under relationMode="prisma".
+  projectId  String
+  version    Int
+
+  authorId String?
+  /// Who wrote this version: "user", "api", "cli" or "langy".
+  authorLabel String
+
+  changeDescription String?
+
+  /// Envelope { schemaVersion, fields, changedFields } holding the editable
+  /// field set as saved and the names of the fields this save changed.
+  snapshot Json
+  /// Schema version of `snapshot`, so a later shape change can be read forward.
+  schemaVersion Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scenarioId, version])
+  // The history pages by version inside one scenario, and a restore reads one
+  // version number. Both name all three columns, so the sort key belongs in
+  // the index rather than being applied to fetched rows.
+  @@index([projectId, scenarioId, version])
+  @@index([createdAt])
 }
 
 model SimulationSuite {
@@ -2862,12 +2928,26 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
+  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
+  // is a suite that groups scenarios through Scenario.folderId; a custom suite
+  // is a hand-assembled run plan. String rather than a Prisma enum so a new
+  // kind needs no database migration.
+  kind            String     @default("custom")
+  // What the plan covers, as { mode } plus the mode's own field: "all",
+  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
+  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
+  // keeps the list it already held. A folder carries none: its members come
+  // from Scenario.folderId. See server/suites/scope.ts and
+  // specs/suites/run-plan-dynamic-scopes.feature.
+  scope           Json?
+  folderScenarios Scenario[] @relation("FolderScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
+  @@index([projectId, kind])
 }
 
 model Subscription {

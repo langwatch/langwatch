@@ -193,6 +193,102 @@ browser-live half is covered by the channel's integration tests and by
 browser QA. Run one file per vitest invocation, same as every other suite
 here.
 
+## The fake workbench tab
+
+`fake-workbench-tab.ts` is a workbench page without a browser. It exists because
+the scenario adapter attaches no page, so every `langwatch ui call workbench.*`
+the agent runs falls back to the backend after the claim window, and the browser
+half of the UI-action channel was never covered end to end.
+
+A tab hears the `ui` entry on the turn stream the adapter is already reading,
+claims the action, applies the same shared transform to the same store, saves the
+document with `expectedVersion`, and completes the action. For `workbench.run` it
+posts the same `POST /api/experiments/execute` request the page posts and drains
+the same stream. Nothing the page shares is reimplemented: the action manifest,
+the store, `executeUiAction`, `buildExecutionRequest`, `resultsFold`,
+`readLiveWorkbench` and `scopeFromRunPayload` are the app's own modules, imported
+through the `~/` alias `vitest.config.ts` declares for this suite.
+
+```ts
+const langy = makeLangyAdapter({
+  pageContext: [{ kind: "experiment", ref: slug, label: "my experiment" }],
+});
+const tab = await openFakeWorkbenchTab({ adapter: langy, experimentSlug: slug });
+// ... run the scenario ...
+await tab.close();
+```
+
+Omit `adapter` for a tab that only drives the workbench directly
+(`tab.runToCompletion(scope)`), which is how `workbench-fake-tab.harness.test.ts`
+exercises the run path without spending a Langy turn.
+
+**One tab per process.** The workbench store is a module singleton, so a second
+concurrent tab would drive the same board. `openFakeWorkbenchTab` refuses one.
+`fileParallelism: false` plus one file per vitest run already serialize the
+suites.
+
+**The three second claim window is a hard constant.**
+`UI_ACTION_CLAIM_WINDOW_MS` has no env override. A tab's cost inside it is one
+SSE frame plus one claim mutation, which is milliseconds locally. Assert "at
+least one action was claimed", never "every action was": a lost claim degrades to
+a backend execution that still writes the right document. Every drop is logged
+with how long it waited (`tab.droppedActions`), so a flake reads as a timing
+report rather than a mystery.
+
+**A server-side edit needs the API bundle rebuilt, or the suite measures the
+old code.** haven's `api` lane runs `node dist/server/server.cjs` and only ever
+builds that bundle when the file is missing, so anything you change under
+`src/server/` is invisible to a suite until you run
+`pnpm --filter @langwatch/web build:server` and then `make haven restart api`.
+`make haven restart app` bounces vite alone and does nothing for the API.
+
+### Proving which leg carried an action
+
+Three handles, in increasing order of what they prove:
+
+1. `tab.claimedActions`: the harness's own record, with the outcome
+   `executeUiAction` returned. Cheapest, always available.
+2. `langy.state.toolOutputs`: the CLI prints the platform's own bytes back, and
+   the tool card carries them to the test process, so
+   `"executedVia":"browser"` and `"executedVia":"backend"` are readable there.
+   This is the only agent-visible carrier of `executedVia`.
+3. `getWorkbenchState(slug)`: proves the change landed, and says nothing about
+   which leg carried it. Use it for the outcome, never for the leg.
+
+### Three credentials, and mixing them is the easy mistake
+
+| Surface | Credential |
+|---|---|
+| `langy.*`, `experiments.saveEvaluationsV3`, `experiments.getEvaluationsV3BySlug`, `langy.messages`, `POST /api/experiments/execute` | the session cookie (`trpc.ts`) |
+| `GET/PUT /api/experiments/:slug/workbench-state`, `GET /api/experiments/runs*`, `POST /api/experiments` | `X-Auth-Token: LANGWATCH_API_KEY` (`workbench-rest.ts`) |
+| `POST /api/langy/ui/actions` | the agent worker's own session key, never the suite's |
+
+`LANGY_PROJECT_ID` is the project's real id, not its slug: the tRPC procedures
+resolve permissions on the id, and a slug there is refused as `no-binding` on
+every project-scoped call.
+
+### How it differs from the real page
+
+| Divergence | Which test owns the gap |
+|---|---|
+| No React render, so the handler table is built once instead of in a `useMemo` | `StalePageRefusesAgentActions.integration.test.tsx` |
+| No autosave debounce: every claimed action saves before it answers | `RunFlushesPendingSave.integration.test.tsx` |
+| No `experiment_updated` broadcast, so a tab learns it is behind only from a refused save. It then reloads before the next action, which is the clean-page half of what `useWorkbenchUpdateListener` does; `tab.reload()` asks for it explicitly | the `@integration` scenarios in `specs/langy/langy-ui-actions-fallback.feature` |
+| `workbench.getState` answers without `targetNames`: resolving a prompt handle is a React hook and this tab calls none. The projection falls back to what state alone can answer | the projection's own unit tests |
+| No `revealTargetColumn`, no status line, no toasts | both DOM helpers already no-op without a document |
+| One store singleton, so one tab per process and no two-tab claim race | the `@unit` scenarios on `executeUiAction` |
+| Its own SSE reader, because `fetchSSE` needs a browser origin | the run pipeline's own integration tests |
+
+### The suites that use it
+
+| File | What it covers | Model turns |
+|---|---|---|
+| `workbench-fake-tab.harness.test.ts` | the tab's run path: a comparison column run alone, and one variant of a comparison chip re-run alone, both of which have to seed the columns they compare | none (judge calls only) |
+| `langy-workbench-live.scenario.test.ts` | one judged conversation with the page open, the tab closed mid-script, and the zero-model refusal pin | three agent turns |
+
+Run the harness file first: it validates the shared request builder and the
+results fold without spending a Langy turn.
+
 ### Rule-adherence evaluator (over Langy's own traces)
 
 The scenario judge is the primary eval. To ALSO grade Langy on live traffic,

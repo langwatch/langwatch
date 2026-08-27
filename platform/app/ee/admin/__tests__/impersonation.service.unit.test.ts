@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
 import {
   type AuditLogFn,
   CannotImpersonateAdminError,
@@ -46,9 +47,26 @@ function makePrisma(): StubPrisma {
       findUnique: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
     },
-    // No organization of the target's requires a second factor by default,
-    // so the operator's own enrollment is not consulted (D06).
-    organizationUser: { findMany: vi.fn().mockResolvedValue([]) },
+    /**
+     * Not a stub that answers — the REAL organization-tenancy guard.
+     *
+     * This delegate used to resolve `[]` unconditionally, and that is exactly
+     * how a top-level `organizationUser.findMany({ where: { userId, ... } })`
+     * reached production: the guard refuses a query with no
+     * single-organization predicate (ADR-021), so every impersonation answered
+     * 500 while this suite stayed green. Running the guard here means a query
+     * the database would refuse is a query these tests refuse too — the
+     * service is expected to read memberships nested off the target row, which
+     * never lands on this delegate at all.
+     */
+    organizationUser: {
+      findMany: vi.fn(async (args: unknown) =>
+        guardOrganizationId(
+          { model: "OrganizationUser", action: "findMany", args },
+          async () => [],
+        ),
+      ),
+    },
   };
 }
 
@@ -75,25 +93,30 @@ describe("ImpersonationService", () => {
 
   describe("start", () => {
     describe("given the target belongs to an organization requiring a second factor", () => {
-      const healthyTarget = {
+      /**
+       * The target row as the service now reads it: the memberships that
+       * require a second factor ride along as a nested select, so the slugs
+       * are part of the target rather than a second query.
+       */
+      const healthyTarget = (requiringOrganizationSlugs: string[] = []) => ({
         id: "user_target",
         name: "Target",
         email: "target@example.com",
         image: null,
         deactivatedAt: null,
-      };
+        orgMemberships: requiringOrganizationSlugs.map((slug) => ({
+          organization: { slug },
+        })),
+      });
 
       /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
       it("refuses when the operator has not set one up, and stamps nothing", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique
-          .mockResolvedValueOnce(healthyTarget)
+          .mockResolvedValueOnce(healthyTarget(["acme"]))
           // The operator's own account, read only because the target's
           // organization requires one.
           .mockResolvedValueOnce({ twoFactorEnabled: false });
-        prisma.organizationUser.findMany.mockResolvedValue([
-          { organization: { slug: "acme" } },
-        ]);
         const auditLog = makeAuditLog();
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
@@ -118,11 +141,8 @@ describe("ImpersonationService", () => {
       it("allows it when the operator has one of their own", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique
-          .mockResolvedValueOnce(healthyTarget)
+          .mockResolvedValueOnce(healthyTarget(["acme"]))
           .mockResolvedValueOnce({ twoFactorEnabled: true });
-        prisma.organizationUser.findMany.mockResolvedValue([
-          { organization: { slug: "acme" } },
-        ]);
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
@@ -141,8 +161,7 @@ describe("ImpersonationService", () => {
 
       it("does not consult the operator when no organization requires one", async () => {
         const prisma = makePrisma();
-        prisma.user.findUnique.mockResolvedValue(healthyTarget);
-        prisma.organizationUser.findMany.mockResolvedValue([]);
+        prisma.user.findUnique.mockResolvedValue(healthyTarget());
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
@@ -161,6 +180,52 @@ describe("ImpersonationService", () => {
         expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
         expect(prisma.session.update).toHaveBeenCalled();
       });
+
+      /**
+       * The regression that took production down, executed rather than
+       * asserted about.
+       *
+       * "Which of this person's organizations require a factor" spans every
+       * organization they belong to, so asking it as a top-level
+       * `organizationUser.findMany` presents `guardOrganizationId` a query with
+       * no single-organization predicate and the guard refuses it — a refusal
+       * the customer met as "Couldn't impersonate the user", not as a skipped
+       * check. The stub delegate above runs the real guard, so restoring that
+       * query fails this test with the production error instead of shipping.
+       *
+       * The delegate going untouched is the invariant, not a detail: the
+       * memberships have to arrive nested off the target row, where the guard
+       * is right not to look. The clause itself is deliberately NOT compared
+       * against a re-typed copy of itself — a hand-copied literal matches its
+       * own copy no matter how far the real query drifts, which is the failure
+       * mode this whole file exists to stop.
+       */
+      /** @scenario "Looking up the requirement decides the request rather than failing it" */
+      it("asks for the memberships without a top-level OrganizationUser query", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique
+          // "acme" requires a factor, so the check runs in full rather than
+          // short-circuiting on an empty membership list.
+          .mockResolvedValueOnce(healthyTarget(["acme"]))
+          .mockResolvedValueOnce({ twoFactorEnabled: true });
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          makeAuditLog(),
+        );
+
+        await service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "Debugging trace #42",
+          req: {},
+        });
+
+        expect(prisma.organizationUser.findMany).not.toHaveBeenCalled();
+        const [targetRead] = prisma.user.findUnique.mock.calls[0]!;
+        expect(targetRead.select).toHaveProperty("orgMemberships");
+        expect(prisma.session.update).toHaveBeenCalled();
+      });
     });
 
     describe("given a healthy, non-admin, non-deactivated target", () => {
@@ -172,6 +237,8 @@ describe("ImpersonationService", () => {
           email: "target@example.com",
           image: null,
           deactivatedAt: null,
+          // Belongs to nothing that requires a second factor.
+          orgMemberships: [],
         });
         const auditLog = makeAuditLog();
         const service = ImpersonationService.create(

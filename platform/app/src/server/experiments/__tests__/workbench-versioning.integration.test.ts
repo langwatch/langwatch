@@ -278,6 +278,180 @@ describe("workbench versioning", () => {
           where: { id: experimentId, projectId: project.id },
         });
         expect(autoSaved[0]?.version).toBe(experiment.workbenchVersion);
+        // The row was rewritten by the last of those saves, so it is the state
+        // the experiment holds now and the list has to sort it first.
+        expect(autoSaved[0]?.counterVersion).toBe(experiment.workbenchVersion);
+      });
+    });
+  });
+
+  describe("given an evaluation committed, typed on and committed again", () => {
+    const typeThenCommitTwice = async () => {
+      const { experimentId } = await createEvaluation();
+      const first = await service.commitWorkbenchVersion({
+        projectId: project.id,
+        id: experimentId,
+        commitMessage: "First",
+        actor: { label: "user" },
+      });
+
+      for (const label of ["one", "two", "three", "four", "five"]) {
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed(label),
+          actor: { label: "user" },
+        });
+      }
+
+      const second = await service.commitWorkbenchVersion({
+        projectId: project.id,
+        id: experimentId,
+        commitMessage: "Second",
+        actor: { label: "user" },
+      });
+
+      return { experimentId, first, second };
+    };
+
+    describe("when the numbered versions are read", () => {
+      /** @scenario "Typing between two commits leaves no gap in the numbers" */
+      it("numbers them 1, 2, 3 however many autosaves land between", async () => {
+        const { experimentId } = await typeThenCommitTwice();
+
+        const rows = await versionRows(experimentId);
+        expect(
+          rows.filter((row) => !row.autoSaved).map((row) => row.version),
+        ).toEqual([1, 2, 3]);
+      });
+    });
+
+    describe("when the versions are listed", () => {
+      /** @scenario "The newest version is the one written last" */
+      it("puts the second commit first and the autosave under it", async () => {
+        const { experimentId } = await typeThenCommitTwice();
+
+        const { versions } = await service.listWorkbenchVersions({
+          projectId: project.id,
+          id: experimentId,
+        });
+
+        // The history as a reader sees it: the autosave carries no number of
+        // its own, and the numbered versions run down without a gap.
+        expect(
+          versions.map((entry) =>
+            entry.autoSaved ? "autosave" : `v${entry.version}`,
+          ),
+        ).toEqual(["v3", "autosave", "v2", "v1"]);
+        expect(versions[0]?.commitMessage).toBe("Second");
+        expect(versions[2]?.commitMessage).toBe("First");
+      });
+
+      it("pages through the whole history without repeating a row", async () => {
+        const { experimentId } = await typeThenCommitTwice();
+
+        const firstPage = await service.listWorkbenchVersions({
+          projectId: project.id,
+          id: experimentId,
+          limit: 2,
+        });
+        expect(firstPage.nextCursor).not.toBeNull();
+
+        const secondPage = await service.listWorkbenchVersions({
+          projectId: project.id,
+          id: experimentId,
+          limit: 2,
+          cursor: firstPage.nextCursor ?? undefined,
+        });
+
+        const walked = [...firstPage.versions, ...secondPage.versions].map(
+          (entry) => entry.counterVersion,
+        );
+        expect(walked).toHaveLength(4);
+        expect(new Set(walked).size).toBe(4);
+        expect([...walked].sort((a, b) => b - a)).toEqual(walked);
+      });
+
+      it("puts the version the experiment holds first", async () => {
+        const { experimentId } = await typeThenCommitTwice();
+
+        const experiment = await prisma.experiment.findFirstOrThrow({
+          where: { id: experimentId, projectId: project.id },
+        });
+        const { versions } = await service.listWorkbenchVersions({
+          projectId: project.id,
+          id: experimentId,
+        });
+
+        expect(versions[0]?.counterVersion).toBe(experiment.workbenchVersion);
+      });
+    });
+  });
+
+  describe("given a version history holding an autosave", () => {
+    describe("when the autosave row is restored", () => {
+      /** @scenario "A restore of the autosave says so instead of naming a number" */
+      it("names the autosave rather than a number no reader can see", async () => {
+        const { experimentId } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Typed, never committed"),
+          actor: { label: "user" },
+        });
+        const rows = await versionRows(experimentId);
+        const autoSaved = rows.find((row) => row.autoSaved);
+
+        const restored = await service.restoreWorkbenchVersion({
+          projectId: project.id,
+          id: experimentId,
+          version: autoSaved?.version ?? 0,
+          actor: { label: "user" },
+        });
+
+        const written = await prisma.experimentVersion.findFirstOrThrow({
+          where: {
+            experimentId,
+            projectId: project.id,
+            counterVersion: restored.version,
+          },
+        });
+        expect(written.commitMessage).toBe("Restored from the autosave");
+      });
+    });
+  });
+
+  describe("given a commit landing straight after one autosave", () => {
+    describe("when the version rows are read", () => {
+      /** @scenario "The autosave row and the numbered versions never take the same number" */
+      it("keeps the autosave row on a number of its own", async () => {
+        const { experimentId } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Typed once"),
+          actor: { label: "user" },
+        });
+        await service.commitWorkbenchVersion({
+          projectId: project.id,
+          id: experimentId,
+          commitMessage: "Straight after",
+          actor: { label: "user" },
+        });
+
+        const rows = await versionRows(experimentId);
+        expect(rows).toHaveLength(3);
+        expect(new Set(rows.map((row) => row.version)).size).toBe(3);
+        expect(
+          rows.filter((row) => !row.autoSaved).map((row) => row.version),
+        ).toEqual([1, 2]);
+
+        const experiment = await prisma.experiment.findFirstOrThrow({
+          where: { id: experimentId, projectId: project.id },
+        });
+        expect(rows.find((row) => row.autoSaved)?.version).toBe(
+          experiment.workbenchVersion,
+        );
       });
     });
   });
@@ -301,8 +475,14 @@ describe("workbench versioning", () => {
           actor: { label: "user" },
         });
 
+        // A save reports the counter it produced, and the row it wrote is the
+        // one holding that counter. The row's own number belongs to the
+        // numbered sequence, which counts deliberate versions rather than
+        // saves, so the two are not the same number.
         const rows = await versionRows(experimentId);
-        const commit = rows.find((row) => row.version === committed.version);
+        const commit = rows.find(
+          (row) => row.counterVersion === committed.version,
+        );
         expect(commit?.autoSaved).toBe(false);
         expect(commit?.commitMessage).toBe("Ready for review");
       });
@@ -323,7 +503,9 @@ describe("workbench versioning", () => {
         });
 
         const rows = await versionRows(experimentId);
-        const written = rows.find((row) => row.version === saved.version);
+        const written = rows.find(
+          (row) => row.counterVersion === saved.version,
+        );
         expect(written?.autoSaved).toBe(false);
         expect(written?.authorLabel).toBe("langy");
       });
@@ -375,7 +557,8 @@ describe("workbench versioning", () => {
         const rows = await versionRows(experimentId);
         expect(rows.map((row) => row.version)).toContain(first.version);
         expect(
-          rows.find((row) => row.version === restored.version)?.commitMessage,
+          rows.find((row) => row.counterVersion === restored.version)
+            ?.commitMessage,
         ).toBe(`Restored from v${first.version}`);
       });
     });

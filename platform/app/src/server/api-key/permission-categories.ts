@@ -171,6 +171,13 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("secrets"),
   },
   {
+    key: "agentCache",
+    label: "Agent Cache",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf("agentCache"),
+    writePermissions: allActionsOf("agentCache"),
+  },
+  {
     key: "auditLog",
     label: "Audit Log",
     accessLevels: ["read"],

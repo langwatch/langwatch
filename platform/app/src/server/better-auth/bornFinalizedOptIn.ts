@@ -3,6 +3,7 @@ import { normalizedRequestPathname } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in");
 
@@ -82,7 +83,10 @@ export async function isBornFinalizedSignUp({
     return await featureFlagService.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, {
       distinctId: email,
       defaultValue: false,
-      ...(organizationId === null ? {} : { organizationId }),
+      // Sign-up time: the person has no project yet, and an organization
+      // only when their email domain matches one.
+      projectId: NOT_TARGETED,
+      organizationId: organizationId ?? NOT_TARGETED,
     });
   } catch (error) {
     // Never fail the sign-up over the flag itself: an unreadable flag means

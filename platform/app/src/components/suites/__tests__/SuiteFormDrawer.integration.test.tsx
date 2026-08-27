@@ -106,6 +106,11 @@ vi.mock("~/utils/api", () => ({
       resolveArchivedNames: {
         useQuery: vi.fn(() => ({ data: undefined })),
       },
+      folders: {
+        getAll: {
+          useQuery: vi.fn(() => ({ data: [] })),
+        },
+      },
     },
     licenseEnforcement: {
       checkLimit: {
@@ -233,6 +238,8 @@ function makeSuiteConfig(
     projectId: "proj_1",
     name: "My Suite",
     slug: "my-suite",
+    kind: "custom",
+    scope: null,
     description: "A test suite",
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],

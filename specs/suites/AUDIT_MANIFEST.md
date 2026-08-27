@@ -10,6 +10,22 @@ Classes:
 - **DELETE** — aspirational/stale; remove from the spec.
 - **DUPLICATE** — already covered by another scenario or test; remove + cross-link.
 
+## Agent Testing v2 additions
+
+Six spec files were added for Agent Testing v2. They are outside the #3458
+audit: every scenario in them carries a binding tag (`@unit` or
+`@integration`) and none is `@unimplemented`, so nothing in them is audit debt.
+They bind as the implementation phases land.
+
+| File | Phase that binds it |
+|------|---------------------|
+| suite-folders.feature | WS1 phase 2 (folders) |
+| folder-run-plan-reuse.feature | WS1 phase 2 (folders), plus WS3 for the v2 Test Runs list |
+| folder-membership-invariant.feature | WS1 phase 2 (folders) |
+| run-notes.feature | WS1 phase 1 (notes), plus WS3/WS4 for the surfaces |
+| run-note-metadata-convention.feature | WS1 phase 1 (notes) |
+| one-off-runs-surface.feature | Existing behavior; the v2 rows bind in WS3 |
+
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
 | specs/suites/archived-scenario-exclusion.feature | "Run a suite that contains archived scenarios and targets" | KEEP | E2E flow for #1828 (`feat(suites): exclude archived scenarios and targets from suite runs`). Behavior is implemented in `platform/app/src/server/suites/suite.service.ts`; no e2e test bound. Phase 3 should add a Playwright run or convert to integration. |

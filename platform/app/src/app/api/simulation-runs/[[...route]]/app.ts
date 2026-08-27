@@ -5,7 +5,10 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
+import type {
+  BatchSummary,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -40,6 +43,19 @@ const scenarioRunResponseSchema = z.object({
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+  note: z
+    .string()
+    .nullable()
+    .describe(
+      "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
+    ),
+  scenarioVersion: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
+    ),
 });
 
 const scenarioRunResponseWithPlatformUrlSchema =
@@ -70,6 +86,12 @@ const batchSummarySchema = z.object({
   isComplete: z
     .boolean()
     .describe("True when every run of the batch reached a terminal status."),
+  note: z
+    .string()
+    .nullable()
+    .describe(
+      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
+    ),
 });
 
 /**
@@ -90,6 +112,21 @@ function toBatchSummaryResponse(batch: BatchSummary) {
     firstCompletedAt: batch.firstCompletedAt,
     allCompletedAt: batch.allCompletedAt,
     isComplete: batch.settledCount === batch.totalCount && batch.totalCount > 0,
+    note: batch.note,
+  };
+}
+
+/**
+ * The API's view of one run. The published fields are mapped one by one off
+ * the run's metadata, and the metadata itself stays out of the response: its
+ * layout is internal, the fields are the contract.
+ */
+function toRunResponse(run: ScenarioRunData) {
+  const { metadata, ...rest } = run;
+  return {
+    ...rest,
+    note: metadata?.note ?? null,
+    scenarioVersion: metadata?.langwatch?.scenarioVersion ?? null,
   };
 }
 
@@ -160,7 +197,7 @@ secured.access(requires("scenarios:view")).get(
       const runs = "runs" in result ? result.runs : [];
       return c.json({
         runs: runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
@@ -181,7 +218,7 @@ secured.access(requires("scenarios:view")).get(
 
       return c.json({
         runs: result.runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
@@ -205,7 +242,7 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       runs: result.runs.map((r) => ({
-        ...r,
+        ...toRunResponse(r),
         platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
           scenarioRunId: r.scenarioRunId,
@@ -259,7 +296,7 @@ secured.access(requires("scenarios:view")).get(
     }
 
     return c.json({
-      ...run,
+      ...toRunResponse(run),
       platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
         scenarioRunId: run.scenarioRunId,
