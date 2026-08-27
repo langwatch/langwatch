@@ -166,11 +166,19 @@ export class PrismaOrganizationConnectionFactors
   }: {
     organizationId: string;
   }): Promise<readonly string[] | null> {
-    const connection = await this.prisma.ssoConnection.findFirst({
-      where: { organizationId },
+    // A DISCARDED or TORN_DOWN connection is not a connection this
+    // organization has. Counting one meant an abandoned setup left the
+    // members page warning forever that "your identity provider is not
+    // telling us a second factor was used" about a provider that does not
+    // exist.
+    const connections = await this.prisma.ssoConnection.findMany({
+      where: {
+        organizationId,
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
       select: { id: true },
     });
-    if (!connection) return null;
+    if (connections.length === 0) return null;
 
     const memberships = await this.prisma.organizationUser.findMany({
       where: { organizationId, disabledAt: null },
@@ -178,10 +186,36 @@ export class PrismaOrganizationConnectionFactors
     });
     if (memberships.length === 0) return [];
 
+    // ONLY THE SESSIONS THE CONNECTION MINTED. The question this answers is
+    // what the IDENTITY PROVIDER asserts, and reading it off every member
+    // session answered a different one: one member signing in locally with a
+    // password and an authenticator code put `otp` in the set, so the screen
+    // told an administrator their provider covers the second factor and
+    // suppressed the warning — while every federated member kept being held
+    // at the enrollment gate for the reason it had just hidden.
+    //
+    // `Identifier.providerId` is the connection the session was minted
+    // through (ADR-116), which is what ties a session to the provider rather
+    // than to the person. Read in two steps because `Session.identifierId`
+    // carries no relation field — it is a plain column, on purpose, so that
+    // adding it ended nobody's session.
+    const memberIds = memberships.map((membership) => membership.userId);
+    const federatedIdentifiers = await this.prisma.identifier.findMany({
+      where: {
+        userId: { in: memberIds },
+        providerId: { in: connections.map((connection) => connection.id) },
+      },
+      select: { id: true },
+    });
+    if (federatedIdentifiers.length === 0) return [];
+
     const sessions = await this.prisma.session.findMany({
       where: {
-        userId: { in: memberships.map((membership) => membership.userId) },
+        userId: { in: memberIds },
         expires: { gt: new Date() },
+        identifierId: {
+          in: federatedIdentifiers.map((identifier) => identifier.id),
+        },
       },
       select: { amr: true },
     });
@@ -240,7 +274,11 @@ export class LoggingOrganizationMfaNotifier implements OrganizationMfaNotifier {
   }): Promise<void> {
     logger.info(
       { organizationId, actorUserId, memberCount: memberUserIds.length },
-      "organization now requires a second factor; its members were told",
+      // Says what happened. Claiming the members were told, when this class
+      // is a logger, made the one record of the event a false one — and the
+      // administrator asking why nobody was notified would have been reading
+      // the line that said they were.
+      "organization now requires a second factor; no notification is sent yet",
     );
   }
 }

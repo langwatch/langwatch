@@ -87,8 +87,26 @@ const tenantOrgCache = new Map<string, string>();
  * Users whose identity events route to the shared instance. Cached apart from
  * `tenantOrgCache` because a user resolves to no organization at all — that
  * is the whole point of them — so there is nothing to key there.
+ *
+ * WITH A TTL, because unlike `tenantOrgCache` this caches something that
+ * CHANGES. A project's owning organization is immutable; "this user belongs
+ * to no private-dataplane organization" stops being true the moment they join
+ * one. The cache was write-only, so a user resolved once before joining kept
+ * having their identity events written to the shared platform log for the
+ * rest of the process's life — the exact case the guard below exists for,
+ * defeated by remembering the answer from before it mattered.
  */
-const sharedUserTenantCache = new Set<string>();
+const SHARED_USER_TENANT_TTL_MS = 60_000;
+const sharedUserTenantCache = new Map<string, number>();
+
+/** Whether this user is still known to be on the shared instance. */
+function sharedUserTenantIsFresh(tenantId: string, nowMs: number): boolean {
+  const at = sharedUserTenantCache.get(tenantId);
+  if (at === undefined) return false;
+  if (nowMs - at < SHARED_USER_TENANT_TTL_MS) return true;
+  sharedUserTenantCache.delete(tenantId);
+  return false;
+}
 
 /**
  * Returns the appropriate ClickHouse client for a given tenant.
@@ -149,7 +167,7 @@ const sharedUserTenantCache = new Set<string>();
 export async function getClickHouseClientForTenant(
   tenantId: string,
 ): Promise<ClickHouseClient | null> {
-  if (sharedUserTenantCache.has(tenantId)) {
+  if (sharedUserTenantIsFresh(tenantId, Date.now())) {
     return sharedClickHouseClientOrThrow();
   }
 
@@ -158,7 +176,7 @@ export async function getClickHouseClientForTenant(
 
   const orgId = await organizationIdForTenant(tenantId);
   if (orgId === null) {
-    sharedUserTenantCache.add(tenantId);
+    sharedUserTenantCache.set(tenantId, Date.now());
     return sharedClickHouseClientOrThrow();
   }
 

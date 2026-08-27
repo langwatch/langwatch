@@ -47,6 +47,18 @@ const TRANSPORT_FAILURES = [
  */
 export function isServerUnreachable(error: unknown): boolean {
   if (!error) return false;
+
+  // A SERVER THAT ANSWERED IS REACHABLE, whatever the browser thinks of the
+  // network. This check used to sit BELOW the `onLine` shortcut, so in any
+  // context where `onLine` reads false while HTTP still works — headless and
+  // containerised browsers, some Linux setups — every named refusal on the
+  // sign-in card was repainted as "we can't reach the server", which
+  // discards the registry copy and starts an unbounded retry. On that card
+  // the retried call is `auth.route`, whose budget is 60 an hour, so the
+  // loop spent it in three minutes and then hammered a 429 for the rest of
+  // the hour.
+  if (carriesAResponse(error)) return false;
+
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return true;
   }
@@ -57,10 +69,7 @@ export function isServerUnreachable(error: unknown): boolean {
     return false;
   }
 
-  // A server that ANSWERED — even to refuse — is reachable, whatever the
-  // message happens to say. This is the half that keeps a named refusal from
-  // being mistaken for a network blip.
-  return !carriesAResponse(error);
+  return true;
 }
 
 function messageOf(error: unknown): string | null {

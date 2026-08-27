@@ -1,11 +1,17 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   accountIdentifiers,
   verificationCeremony,
 } from "~/server/app-layer/identity/runtime";
+import { AuthRateLimitedError } from "~/server/auth/errors";
 import { rateLimit } from "~/server/rateLimit";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+/** How long "not now" lasts, in whole seconds, so a countdown can say a
+ *  number rather than "later". */
+function secondsUntil(resetAt: number): number {
+  return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+}
 
 /**
  * RFC 7636 §4.2: the S256 challenge, base64url of a SHA-256 digest — 43
@@ -172,9 +178,13 @@ export const identityRouter = createTRPCRouter({
         max: 10,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many attempts. Please try again later.",
+        // The registry has words for this code and a countdown to render
+        // from `retryAfterSeconds`. A bare TRPCError carries no handled
+        // payload, so the account-settings toast fell back to its generic
+        // title and the person was told nothing about how long to wait —
+        // while the identical limit on `user.register` says both.
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
@@ -208,9 +218,13 @@ export const identityRouter = createTRPCRouter({
         max: 10,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many attempts. Please try again later.",
+        // The registry has words for this code and a countdown to render
+        // from `retryAfterSeconds`. A bare TRPCError carries no handled
+        // payload, so the account-settings toast fell back to its generic
+        // title and the person was told nothing about how long to wait —
+        // while the identical limit on `user.register` says both.
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 

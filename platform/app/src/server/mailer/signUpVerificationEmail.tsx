@@ -22,9 +22,15 @@ export const sendSignUpVerificationEmail = async ({
         <b>{email}</b>). Click the button below to confirm it and carry on:
       </EmailParagraph>
       <EmailAction href={verificationUrl} label="Confirm my email address" />
+      {/* "Nothing has been created" stopped being true when `user.register`
+          started making the account before sending this. Telling a stranger
+          nothing exists, while an unconfirmed account holds their address and
+          their own later sign-up is refused, is the untrue opening
+          `addressConfirmationEmail` was split out to avoid. */}
       <EmailParagraph tone="muted" style={{ margin: 0 }}>
         This link expires in 1 hour and can be used once. If this was not you,
-        you can ignore this email: nothing has been created.
+        you can ignore this email — the account cannot sign anybody in until
+        this address is confirmed, and it will not be used for anything else.
       </EmailParagraph>
     </EmailShell>,
   );

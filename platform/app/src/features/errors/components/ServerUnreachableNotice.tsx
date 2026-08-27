@@ -1,8 +1,14 @@
 import { Box, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 
-/** How often to try again while nobody can reach us. */
+/** How soon to try again the first time, doubling from there. */
 const RETRY_EVERY_MS = 3_000;
+/** The longest gap between tries, so a long outage still recovers promptly. */
+const RETRY_CEILING_MS = 30_000;
+/** How many times to try before leaving it to the person. Bounded because the
+ *  call being retried is often rate limited, and a loop that outlives the
+ *  budget spends the rest of the window earning 429s. */
+const MAX_RETRIES = 8;
 
 /**
  * We cannot reach the server — said as a WAIT, not as a failure.
@@ -41,8 +47,27 @@ export function ServerUnreachableNotice({
 
   useEffect(() => {
     if (!retry.current) return;
-    const timer = setInterval(() => retry.current?.(), RETRY_EVERY_MS);
-    return () => clearInterval(timer);
+    // BOUNDED, AND BACKING OFF. An uncapped three-second retry spends a
+    // rate-limited endpoint's whole budget in minutes and then hammers the
+    // 429 it earned — on the sign-in card the retried call is `auth.route`,
+    // which allows sixty an hour. Doubling to a ceiling keeps a genuine blip
+    // recovering quickly while a real outage costs a handful of requests.
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      if (attempt >= MAX_RETRIES) return;
+      const wait = Math.min(
+        RETRY_EVERY_MS * 2 ** attempt,
+        RETRY_CEILING_MS,
+      );
+      timer = setTimeout(() => {
+        attempt += 1;
+        retry.current?.();
+        schedule();
+      }, wait);
+    };
+    schedule();
+    return () => clearTimeout(timer);
   }, []);
 
   return (
