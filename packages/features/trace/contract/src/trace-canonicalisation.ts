@@ -92,20 +92,14 @@ export const classifyClaudeCallResultSchema = z.object({
 export type CanonicalAttributes = z.infer<typeof canonicalAttributesSchema>;
 export type CanonicalEvent = z.infer<typeof canonicalEventSchema>;
 export type CanonicalSpanContext = z.infer<typeof canonicalSpanContextSchema>;
-export type CanonicalizeSpanAttributesInput = z.infer<
-  typeof canonicalizeSpanAttributesInputSchema
->;
+export type CanonicalizeSpanAttributesInput = z.infer<typeof canonicalizeSpanAttributesInputSchema>;
 export type CanonicalizeSpanAttributesResult = z.infer<
   typeof canonicalizeSpanAttributesResultSchema
 >;
 export type CanonicalizeLogRecordInput = z.infer<typeof canonicalizeLogRecordInputSchema>;
-export type CanonicalizeLogRecordResult = z.infer<
-  typeof canonicalizeLogRecordResultSchema
->;
+export type CanonicalizeLogRecordResult = z.infer<typeof canonicalizeLogRecordResultSchema>;
 export type ExtractMessageTextInput = z.infer<typeof extractMessageTextInputSchema>;
-export type DeriveClaudeRequestContentInput = z.infer<
-  typeof deriveClaudeRequestContentInputSchema
->;
+export type DeriveClaudeRequestContentInput = z.infer<typeof deriveClaudeRequestContentInputSchema>;
 export type DeriveClaudeRequestContentResult = z.infer<
   typeof deriveClaudeRequestContentResultSchema
 >;
@@ -118,15 +112,19 @@ export type DeriveClaudeResponseContentResult = z.infer<
 export type ClassifyClaudeCallInput = z.infer<typeof classifyClaudeCallInputSchema>;
 export type ClassifyClaudeCallResult = z.infer<typeof classifyClaudeCallResultSchema>;
 
-/** Deterministic canonicalisation of a received trace span. */
+/**
+ * Trace's portable deterministic canonicalisation boundary.
+ *
+ * Log and metric preparation have separate ownership. Trace projections only
+ * receive the stable operations needed to interpret a trace span and its
+ * correlated records.
+ */
 export abstract class TraceCanonicalisationService {
   abstract canonicalizeSpanAttributes(
     input: CanonicalizeSpanAttributesInput,
   ): CanonicalizeSpanAttributesResult;
 
-  abstract canonicalizeLogRecord(
-    input: CanonicalizeLogRecordInput,
-  ): CanonicalizeLogRecordResult;
+  abstract canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
 
   abstract tryExtractMessageText(input: ExtractMessageTextInput): string | null;
 

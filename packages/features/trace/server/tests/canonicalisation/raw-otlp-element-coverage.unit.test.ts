@@ -58,8 +58,7 @@ const ELEMENTS: {
     key: "cost",
     get: (a) =>
       a["langwatch.span.cost"] ??
-      (a["gen_ai.request.model"] !== undefined &&
-      a["gen_ai.usage.input_tokens"] !== undefined
+      (a["gen_ai.request.model"] !== undefined && a["gen_ai.usage.input_tokens"] !== undefined
         ? "costable"
         : undefined),
   },
@@ -81,8 +80,7 @@ const ELEMENTS: {
   },
   {
     key: "output content",
-    get: (a) =>
-      a["gen_ai.output.messages"] ?? a["gen_ai.completion"] ?? a["langwatch.output"],
+    get: (a) => a["gen_ai.output.messages"] ?? a["gen_ai.completion"] ?? a["langwatch.output"],
   },
 ];
 

@@ -5,6 +5,8 @@ export * from "./derive-trace-timestamp";
 export * from "./trace";
 export * from "./trace-view.contract";
 export * from "./trace-canonicalisation";
+export * from "./trace-ingress.commands";
+export * from "./trace-ingress.events";
 export * from "./trace-content-part";
 export * from "./trace-content-part.visitor";
 export * from "./trace-attributes";
@@ -18,6 +20,16 @@ export * from "./trace-query-parser";
 export * from "./trace-query.contract";
 export * from "./trace.queries";
 export * from "./trace.service";
+export * from "./trace-record";
+export * from "./trace.errors";
+export * from "./trace-projection";
+export * from "./trace-processing.commands";
+export * from "./trace-processing.events";
+export * from "./trace-log-contribution";
+export * from "./trace-metric-correlation";
+export * from "./trace-message.schemas";
+export * from "./trace-evaluation.contract";
+export * from "./trace-derived-event";
 export * from "./trace-list.repository";
 export {
   normalizedSpanSchema,
@@ -58,16 +70,21 @@ export {
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   RECORD_SPAN_COMMAND_TYPE,
+  RECORD_TRACE_SPAN_COMMAND_TYPE,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   REMOVE_ANNOTATION_COMMAND_TYPE,
   RESOLVE_ORIGIN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_VERSIONS,
+  SPAN_RECORDED_EVENT_TYPE,
+  SPAN_RECORDED_EVENT_VERSION_LATEST,
+  SPAN_RECORDED_EVENT_VERSIONS,
   SPAN_REFERENCED_PAYLOAD_TYPE,
   SPAN_REFERENCED_PAYLOAD_VERSION_LATEST,
   SPAN_REFERENCED_PAYLOAD_VERSIONS,
   STALE_TRACE_THRESHOLD_MS,
+  SYNTHETIC_TRACE_SPAN_NAMES,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_VERSIONS,

@@ -8,9 +8,7 @@ export interface CostSplit {
   nonBilledCost: number;
 }
 
-export function isNonBillableTrace(
-  attributes: Record<string, string> | null | undefined,
-): boolean {
+export function isNonBillableTrace(attributes: Record<string, string> | null | undefined): boolean {
   return attributes?.[NON_BILLABLE_ATTR] === "true";
 }
 

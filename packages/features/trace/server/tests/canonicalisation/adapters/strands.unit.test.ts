@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { SpanDataBag } from "../../../src/stores/canonical-span.store";
-import { toAttrValue } from "../../../src/services/canonical-value.service";
+import { SpanDataBag } from "../../../src/stores/canonical-span.bag";
+import { toAttrValue } from "../../../src/services/canonical-value.rules";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../../../src/ports/canonical-attributes.port";
-import { StrandsCanonicalisationAdapter } from "../../../src/adapters/strands-canonicalisation.adapter";
+import { StrandsCanonicaliser } from "../../../src/services/canonicalisation/strands.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
 /**
@@ -54,8 +54,8 @@ function createStrandsContext(
   return { bag, out, span, recordRule, setAttr, setAttrIfAbsent };
 }
 
-describe("StrandsCanonicalisationAdapter", () => {
-  const extractor = new StrandsCanonicalisationAdapter();
+describe("StrandsCanonicaliser", () => {
+  const extractor = new StrandsCanonicaliser();
 
   describe("when Strands detection matches", () => {
     it("detects via instrumentationScope.name = strands.telemetry.tracer", () => {
@@ -92,10 +92,7 @@ describe("StrandsCanonicalisationAdapter", () => {
     });
 
     it("maps execute_tool to tool", () => {
-      const ctx = createStrandsContext(
-        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "execute_tool" },
-        [],
-      );
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "execute_tool" }, []);
 
       extractor.apply(ctx);
 
@@ -103,10 +100,7 @@ describe("StrandsCanonicalisationAdapter", () => {
     });
 
     it("maps invoke_agent to agent", () => {
-      const ctx = createStrandsContext(
-        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "invoke_agent" },
-        [],
-      );
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "invoke_agent" }, []);
 
       extractor.apply(ctx);
 
@@ -171,9 +165,10 @@ describe("StrandsCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      const messages = JSON.parse(
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
-      ) as Array<{ role: string; content: string }>;
+      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as Array<{
+        role: string;
+        content: string;
+      }>;
       expect(messages).toEqual([
         { role: "user", content: "First question" },
         { role: "assistant", content: "First answer" },
@@ -203,9 +198,9 @@ describe("StrandsCanonicalisationAdapter", () => {
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
 
-      const messages = JSON.parse(
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
-      ) as Array<{ role: string }>;
+      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as Array<{
+        role: string;
+      }>;
       expect(messages).toEqual([
         { role: "user", content: "Hi" },
         { role: "assistant", content: "Hello!" },
@@ -230,9 +225,7 @@ describe("StrandsCanonicalisationAdapter", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
 
       // Only user messages remain in input
-      const messages = JSON.parse(
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
-      ) as unknown[];
+      const messages = JSON.parse(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string) as unknown[];
       expect(messages).toHaveLength(1);
       expect(messages[0]).toEqual({ role: "user", content: "Hi" });
     });

@@ -17,12 +17,7 @@ export enum NormalizedStatusCode {
   ERROR = 2,
 }
 
-const normalizedAttributeScalarSchema = z.union([
-  z.string(),
-  z.boolean(),
-  z.number(),
-  z.bigint(),
-]);
+const normalizedAttributeScalarSchema = z.union([z.string(), z.boolean(), z.number(), z.bigint()]);
 
 const normalizedAttributesValueSchema = z.union([
   normalizedAttributeScalarSchema,

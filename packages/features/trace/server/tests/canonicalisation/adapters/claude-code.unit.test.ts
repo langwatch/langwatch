@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { ClaudeCodeCanonicalisationAdapter } from "../../../src/adapters/claude-code-canonicalisation.adapter";
-import { isConversationalQuerySource } from "../../../src/services/claude-code-call-policy.service";
-import { buildInputMessagesFromRequestBody } from "../../../src/services/claude-code-request.service";
+import { ClaudeCodeCanonicaliser } from "../../../src/services/canonicalisation/claude-code.canonicaliser";
+import { isConversationalQuerySource } from "../../../src/services/claude-code-call-policy.rules";
+import { buildInputMessagesFromRequestBody } from "../../../src/services/claude-code-request.rules";
 import {
   extractAssistantOutputFromResponseBody,
   extractAssistantTextFromResponseBody,
   extractSessionTitleFromResponseBody,
-} from "../../../src/services/claude-code-response.service";
+} from "../../../src/services/claude-code-response.rules";
 import { createExtractorContext, createLogExtractorContext } from "./test-helpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 
-describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
+describe("ClaudeCodeCanonicaliser.applyLog", () => {
   // The model-call events (api_request / api_request_body / api_response_body)
   // are folded downstream from the log path itself, not lifted onto canonical
   // attributes here. The only claude_code event this extractor lifts is
@@ -28,7 +28,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
       "session.id": "sess_user_prompt",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "langwatch.input": "Reply EXACTLY this token and nothing else: PONG-X",
@@ -45,7 +45,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
     });
     ctx.out["langwatch.thread.id"] = "sess_earlier";
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out["langwatch.thread.id"]).toBe("sess_earlier");
     expect(ctx.out["langwatch.input"]).toBe("hi");
@@ -57,7 +57,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
       prompt: "ignored",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
       input_tokens: "120",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -85,14 +85,14 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog", () => {
       tool_name: "Bash",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 });
 
-describe("ClaudeCodeCanonicalisationAdapter.apply (span side)", () => {
+describe("ClaudeCodeCanonicaliser.apply (span side)", () => {
   it("lifts the CLI's bare-named token + model attrs onto canonical gen_ai.usage.* on the native llm_request span", () => {
     const ctx = createExtractorContext(
       {
@@ -105,7 +105,7 @@ describe("ClaudeCodeCanonicalisationAdapter.apply (span side)", () => {
       { name: "claude_code.llm_request" },
     );
 
-    new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+    new ClaudeCodeCanonicaliser().apply(ctx);
 
     expect(ctx.out).toEqual({
       "gen_ai.request.model": "claude-opus-4-7",
@@ -126,22 +126,19 @@ describe("ClaudeCodeCanonicalisationAdapter.apply (span side)", () => {
       { name: "claude_code.tool" },
     );
 
-    new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+    new ClaudeCodeCanonicaliser().apply(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
   it("never overwrites a canonical attribute a gateway-proxied gen_ai.* span already set", () => {
-    // setAttrIfAbsent semantics: if GenAICanonicalisationAdapter (or an earlier rule) already
+    // setAttrIfAbsent semantics: if GenAICanonicaliser (or an earlier rule) already
     // claimed the canonical key, this extractor must not clobber it.
-    const ctx = createExtractorContext(
-      { input_tokens: 999 },
-      { name: "claude_code.llm_request" },
-    );
+    const ctx = createExtractorContext({ input_tokens: 999 }, { name: "claude_code.llm_request" });
     ctx.out["gen_ai.usage.input_tokens"] = 10;
 
-    new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+    new ClaudeCodeCanonicaliser().apply(ctx);
 
     expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(10);
   });
@@ -152,7 +149,7 @@ describe("ClaudeCodeCanonicalisationAdapter.apply (span side)", () => {
       { name: "claude_code.llm_request" },
     );
 
-    new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+    new ClaudeCodeCanonicaliser().apply(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -223,9 +220,7 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
     expect(extractAssistantTextFromResponseBody("{not valid json")).toBeNull();
     expect(extractAssistantTextFromResponseBody(JSON.stringify({}))).toBeNull();
     expect(
-      extractAssistantTextFromResponseBody(
-        JSON.stringify({ content: "string-not-array" }),
-      ),
+      extractAssistantTextFromResponseBody(JSON.stringify({ content: "string-not-array" })),
     ).toBeNull();
     expect(
       extractAssistantTextFromResponseBody(
@@ -295,9 +290,7 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
     expect(buildInputMessagesFromRequestBody(void 0)).toBeNull();
     expect(buildInputMessagesFromRequestBody("")).toBeNull();
     // claude truncates large request bodies inline -> invalid JSON tail.
-    expect(
-      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
-    ).toBeNull();
+    expect(buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u')).toBeNull();
     expect(buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
     // messages present but every turn flattens to empty -> null.
     expect(
@@ -343,8 +336,7 @@ describe("extractAssistantOutputFromResponseBody", () => {
 });
 
 describe("extractSessionTitleFromResponseBody", () => {
-  const titleBody = (text: string): string =>
-    JSON.stringify({ content: [{ type: "text", text }] });
+  const titleBody = (text: string): string => JSON.stringify({ content: [{ type: "text", text }] });
 
   describe("given the title generator's own reply", () => {
     /** @scenario The title lifts from a generate_session_title response body, capped */
@@ -379,9 +371,7 @@ describe("extractSessionTitleFromResponseBody", () => {
       expect(extractSessionTitleFromResponseBody(titleBody("Done, pushed."))).toBeNull();
       // Right shape, wrong type or empty.
       expect(extractSessionTitleFromResponseBody(titleBody('{"title": 7}'))).toBeNull();
-      expect(
-        extractSessionTitleFromResponseBody(titleBody('{"title": "   "}')),
-      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody(titleBody('{"title": "   "}'))).toBeNull();
       expect(extractSessionTitleFromResponseBody(titleBody('["a title"]'))).toBeNull();
       // No text block at all.
       expect(
@@ -394,7 +384,7 @@ describe("extractSessionTitleFromResponseBody", () => {
   });
 });
 
-describe("ClaudeCodeCanonicalisationAdapter.applyLog api_request reasoning effort", () => {
+describe("ClaudeCodeCanonicaliser.applyLog api_request reasoning effort", () => {
   /** @scenario "Claude Code reasoning effort is lifted from the model call log event" */
   it("lifts the effort setting onto the canonical reasoning-effort key for a conversational turn", () => {
     const ctx = createLogExtractorContext(SCOPE, {
@@ -405,7 +395,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_request reasoning effor
       cost_usd: "0.02",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({ "gen_ai.request.reasoning_effort": "high" });
     expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/api_request");
@@ -418,7 +408,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_request reasoning effor
       effort: "low",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("low");
   });
@@ -430,7 +420,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_request reasoning effor
       effort: "low",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -443,13 +433,13 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_request reasoning effor
       cost_usd: "0.01",
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
   });
 });
 
-describe("ClaudeCodeCanonicalisationAdapter.applyLog api_response_body cache TTL split", () => {
+describe("ClaudeCodeCanonicaliser.applyLog api_response_body cache TTL split", () => {
   /** @scenario "Claude Code cache TTL split is lifted from the response body log event" */
   it("lifts the per-TTL cache creation counts from the response body usage", () => {
     const body = JSON.stringify({
@@ -468,7 +458,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_response_body cache TTL
       body,
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "gen_ai.usage.cache_creation_5m.input_tokens": 1200,
@@ -490,7 +480,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_response_body cache TTL
       body,
     });
 
-    new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+    new ClaudeCodeCanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "gen_ai.usage.cache_creation_1h.input_tokens": 36610,
@@ -507,7 +497,7 @@ describe("ClaudeCodeCanonicalisationAdapter.applyLog api_response_body cache TTL
         "event.name": "api_response_body",
         body,
       });
-      new ClaudeCodeCanonicalisationAdapter().applyLog(ctx);
+      new ClaudeCodeCanonicaliser().applyLog(ctx);
       expect(ctx.out).toEqual({});
     }
   });
@@ -586,8 +576,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
   });
 
   it("recovers a partial STRING system value cut mid-escape", () => {
-    const raw =
-      '{"messages":[{"role":"user","content":"q"}],"system":"Line one\\nLine two\\';
+    const raw = '{"messages":[{"role":"user","content":"q"}],"system":"Line one\\nLine two\\';
     const out = buildInputMessagesFromRequestBody(raw)!;
     const system = out.find((m) => m.role === "system")!;
     expect(system.content).toContain("Line one\nLine two");
@@ -605,9 +594,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
   });
 
   it("still returns null when nothing complete precedes the cut", () => {
-    expect(
-      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
-    ).toBeNull();
+    expect(buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u')).toBeNull();
   });
 });
 
@@ -618,7 +605,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
  * the span side records how much was written and leaves the lifetime to the
  * log side rather than asserting one it cannot see.
  */
-describe("ClaudeCodeCanonicalisationAdapter.apply cache lifetime", () => {
+describe("ClaudeCodeCanonicaliser.apply cache lifetime", () => {
   describe("given a claude code model call that wrote to its cache", () => {
     /** @scenario "A call that does not say how long its cache lives is priced as before" */
     it("records what was written without qualifying how long it lives", () => {
@@ -627,7 +614,7 @@ describe("ClaudeCodeCanonicalisationAdapter.apply cache lifetime", () => {
         { name: "claude_code.llm_request" },
       );
 
-      new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+      new ClaudeCodeCanonicaliser().apply(ctx);
 
       expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(17854);
       expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
@@ -644,7 +631,7 @@ describe("ClaudeCodeCanonicalisationAdapter.apply cache lifetime", () => {
         { name: "claude_code.llm_request" },
       );
 
-      new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+      new ClaudeCodeCanonicaliser().apply(ctx);
 
       // Gateway-emitted spans carry the split already. Canonical output merges
       // over the span rather than replacing it, so writing nothing here is
@@ -662,7 +649,7 @@ describe("ClaudeCodeCanonicalisationAdapter.apply cache lifetime", () => {
         { name: "claude_code.llm_request" },
       );
 
-      new ClaudeCodeCanonicalisationAdapter().apply(ctx);
+      new ClaudeCodeCanonicaliser().apply(ctx);
 
       expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
     });

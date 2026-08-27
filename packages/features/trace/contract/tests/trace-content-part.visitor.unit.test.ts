@@ -102,9 +102,7 @@ describe("visitContentPart", () => {
 
     /** @scenario A Gemini inline-data part carries its bytes with no part type at all */
     it("reads the JavaScript SDK spelling identically", () => {
-      expect(
-        decode({ inlineData: { mimeType: "application/pdf", data: PNG_B64 } }),
-      ).toEqual(
+      expect(decode({ inlineData: { mimeType: "application/pdf", data: PNG_B64 } })).toEqual(
         decode({
           inline_data: { mime_type: "application/pdf", data: PNG_B64 },
         }),
@@ -118,9 +116,9 @@ describe("visitContentPart", () => {
       { mimeType: "video/mp4", expected: "video" },
       { mimeType: "text/plain", expected: "document" },
     ])("resolves $mimeType to a $expected part", ({ mimeType, expected }) => {
-      expect(
-        decode({ inline_data: { mime_type: mimeType, data: PNG_B64 } }),
-      ).toMatchObject({ type: expected });
+      expect(decode({ inline_data: { mime_type: mimeType, data: PNG_B64 } })).toMatchObject({
+        type: expected,
+      });
     });
 
     it("leaves a provider-hosted file_data part alone, since it carries no bytes", () => {
@@ -137,9 +135,9 @@ describe("visitContentPart", () => {
 
   describe("given a media part whose source shape is not one we speak", () => {
     it("passes it through rather than inventing an empty payload", () => {
-      expect(decode({ type: "image", source: { type: "container", id: "abc" } })).toEqual(
-        { branch: "unknown" },
-      );
+      expect(decode({ type: "image", source: { type: "container", id: "abc" } })).toEqual({
+        branch: "unknown",
+      });
     });
   });
 });

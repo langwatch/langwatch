@@ -294,9 +294,7 @@ export function setFacetValueAtLocation({
     const leadingWs = currentQuery.length - trimmed.length;
     const replacement = `${fieldName}:${escapeValue(newValue)}`;
     return (
-      currentQuery.slice(0, leadingWs + start) +
-      replacement +
-      currentQuery.slice(leadingWs + end)
+      currentQuery.slice(0, leadingWs + start) + replacement + currentQuery.slice(leadingWs + end)
     );
   } catch {
     return currentQuery;
@@ -502,11 +500,7 @@ export function removeNodeAtLocation({
   }
 }
 
-function appendClause(
-  query: string,
-  clause: string,
-  combinator: "AND" | "OR" = "AND",
-): string {
+function appendClause(query: string, clause: string, combinator: "AND" | "OR" = "AND"): string {
   const trimmed = query.trim();
   if (!trimmed) {
     return clause;

@@ -10,6 +10,18 @@ export const traceQueryFieldCatalogueInputSchema = z.object({
 
 export const traceQueryFieldCatalogueOutputSchema = z.string();
 
-export type TraceQueryFieldCatalogueInput = z.infer<
-  typeof traceQueryFieldCatalogueInputSchema
->;
+export const traceQueryClassificationInputSchema = z.object({
+  query: z.string(),
+});
+
+export const traceQueryClassificationSchema = z.object({
+  evaluations: z.boolean(),
+  events: z.boolean(),
+  spans: z.boolean(),
+});
+
+export type TraceQueryFieldCatalogueInput = z.infer<typeof traceQueryFieldCatalogueInputSchema>;
+
+export type TraceQueryClassificationInput = z.infer<typeof traceQueryClassificationInputSchema>;
+
+export type TraceQueryClassification = z.infer<typeof traceQueryClassificationSchema>;

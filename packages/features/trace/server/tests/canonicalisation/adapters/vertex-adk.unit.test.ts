@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { VertexAdkCanonicalisationAdapter } from "../../../src/adapters/vertex-adk-canonicalisation.adapter";
+import { VertexAdkCanonicaliser } from "../../../src/services/canonicalisation/vertex-adk.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
 /**
@@ -124,8 +124,8 @@ const toolSpanAttrs = (): Record<string, unknown> => ({
   }),
 });
 
-describe("VertexAdkCanonicalisationAdapter", () => {
-  const extractor = new VertexAdkCanonicalisationAdapter();
+describe("VertexAdkCanonicaliser", () => {
+  const extractor = new VertexAdkCanonicaliser();
 
   describe("given a generate_content span", () => {
     describe("when the span is canonicalised", () => {
@@ -215,9 +215,7 @@ describe("VertexAdkCanonicalisationAdapter", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS]).toEqual(
-          llmRequestPayload.config.tools,
-        );
+        expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS]).toEqual(llmRequestPayload.config.tools);
       });
 
       it("types the span as llm", () => {
@@ -350,9 +348,7 @@ describe("VertexAdkCanonicalisationAdapter", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-          "Be concise.\nBe kind.",
-        );
+        expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be concise.\nBe kind.");
       });
     });
 
@@ -447,12 +443,8 @@ describe("VertexAdkCanonicalisationAdapter", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.recordRule).not.toHaveBeenCalledWith(
-          "vertex-adk:tool_call_args->input",
-        );
-        expect(ctx.recordRule).not.toHaveBeenCalledWith(
-          "vertex-adk:tool_response->output",
-        );
+        expect(ctx.recordRule).not.toHaveBeenCalledWith("vertex-adk:tool_call_args->input");
+        expect(ctx.recordRule).not.toHaveBeenCalledWith("vertex-adk:tool_response->output");
         expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBeUndefined();
       });
     });

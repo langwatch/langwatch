@@ -269,9 +269,7 @@ describe("TraceCanonicalisationService: structured IO", () => {
       // Value is unwrapped
       expect(result.attributes["langwatch.input"]).toBe("Hello world");
       // Type is recorded in reserved types
-      expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
-        "langwatch.input=text",
-      ]);
+      expect(result.attributes["langwatch.reserved.value_types"]).toEqual(["langwatch.input=text"]);
       // Should NOT produce gen_ai.input.messages for text types
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
     });
@@ -293,9 +291,7 @@ describe("TraceCanonicalisationService: structured IO", () => {
 
       // Value is unwrapped (object stored directly)
       expect(result.attributes["langwatch.input"]).toEqual(rawData);
-      expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
-        "langwatch.input=raw",
-      ]);
+      expect(result.attributes["langwatch.reserved.value_types"]).toEqual(["langwatch.input=raw"]);
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
     });
   });
@@ -315,9 +311,7 @@ describe("TraceCanonicalisationService: structured IO", () => {
 
       // Value is unwrapped — string array passes through toAttrValue
       expect(result.attributes["langwatch.input"]).toEqual(["a", "b", "c"]);
-      expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
-        "langwatch.input=list",
-      ]);
+      expect(result.attributes["langwatch.reserved.value_types"]).toEqual(["langwatch.input=list"]);
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
     });
   });

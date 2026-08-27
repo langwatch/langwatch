@@ -1,9 +1,15 @@
-import type { SpanTreeCursor } from "@langwatch/trace-contract";
+import type {
+  EvaluationTraceEvent,
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  SpanTreeCursor,
+} from "@langwatch/trace-contract";
 import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHousePort } from "../../ports/clickhouse.port";
 import {
   TraceRepository,
+  type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../../ports/trace.port";
@@ -91,8 +97,7 @@ const mapSummary = (row: SpanSummaryRow) => {
         "gen_ai.request.model": row.Model || void 0,
         "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || void 0,
         "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || void 0,
-        "gen_ai.usage.cache_creation_1h.input_tokens":
-          row.CacheCreation1hTokens || void 0,
+        "gen_ai.usage.cache_creation_1h.input_tokens": row.CacheCreation1hTokens || void 0,
         "gen_ai.usage.input_chars": row.InputChars || void 0,
         "gen_ai.usage.audio_seconds": row.AudioSeconds || void 0,
         "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || void 0,
@@ -100,10 +105,8 @@ const mapSummary = (row: SpanSummaryRow) => {
         "langwatch.model.inputCostPerToken": row.CustomInputRate || void 0,
         "langwatch.model.outputCostPerToken": row.CustomOutputRate || void 0,
         "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || void 0,
-        "langwatch.model.cacheCreationCostPerToken":
-          row.CustomCacheCreationRate || void 0,
-        "langwatch.model.cacheCreation1hCostPerToken":
-          row.CustomCacheCreation1hRate || void 0,
+        "langwatch.model.cacheCreationCostPerToken": row.CustomCacheCreationRate || void 0,
+        "langwatch.model.cacheCreation1hCostPerToken": row.CustomCacheCreation1hRate || void 0,
         "langwatch.span.cost": row.LwSpanCost || void 0,
       },
       model: row.ResponseModel || row.Model || void 0,
@@ -154,6 +157,86 @@ const dedupInTuple = (extraInnerWhere: string): string => `
   )
 `;
 
+type EvaluationSpanRow = {
+  SpanType: string;
+  Model: string;
+  Contexts: string;
+};
+
+type EvaluationEventRow = {
+  EventType: string;
+  Attributes: Record<string, string>;
+};
+
+function textualContext(value: unknown): string {
+  if (typeof value === "string") {
+    try {
+      return textualContext(JSON.parse(value));
+    } catch {
+      return value.trim();
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(textualContext).filter(Boolean).join("\n").trim();
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+
+  return "";
+}
+
+function mapEvaluationSpan(row: EvaluationSpanRow): EvaluationTraceSpan {
+  let rawContexts: unknown;
+
+  try {
+    rawContexts = JSON.parse(row.Contexts);
+  } catch {
+    rawContexts = [];
+  }
+
+  const ragContextTexts = Array.isArray(rawContexts)
+    ? rawContexts
+        .map((context) => {
+          if (typeof context === "object" && context !== null) {
+            const content = Object.entries(context).find(([key]) => key === "content")?.[1];
+            return textualContext(content ?? context);
+          }
+          return textualContext(context);
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    type: row.SpanType || "span",
+    model: row.Model || null,
+    ragContextTexts,
+  };
+}
+
+function mapEvaluationEvent(row: EvaluationEventRow): EvaluationTraceEvent {
+  const metrics: EvaluationTraceEvent["metrics"] = [];
+  const details: EvaluationTraceEvent["details"] = [];
+
+  for (const [key, value] of Object.entries(row.Attributes)) {
+    if (
+      key === "vote" ||
+      key === "score" ||
+      key.startsWith("metrics.") ||
+      key.startsWith("event.metrics.")
+    ) {
+      const metricKey = key.replace(/^(event\.)?metrics\./, "");
+      metrics.push({ key: metricKey, value: Number(value) || 0 });
+    } else {
+      details.push({ key, value });
+    }
+  }
+
+  return { eventType: row.EventType, metrics, details };
+}
+
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceRepository {
   private constructor(private readonly clickhouse: TraceClickHousePort) {
@@ -162,6 +245,145 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
 
   static create(clickhouse: TraceClickHousePort): ClickHouseTraceSpanRepository {
     return new ClickHouseTraceSpanRepository(clickhouse);
+  }
+
+  async findEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]> {
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceSpanRepository.findEvaluationSpans",
+    );
+    const client = await this.clickhouse.resolve(input.tenantId);
+    const window =
+      input.occurredAtMs === void 0
+        ? ""
+        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+    const result = await client.query<EvaluationSpanRow>({
+      query: `
+        SELECT
+          SpanAttributes['langwatch.span.type'] AS SpanType,
+          coalesce(nullIf(SpanAttributes['gen_ai.response.model'], ''), SpanAttributes['gen_ai.request.model']) AS Model,
+          SpanAttributes['langwatch.rag.contexts'] AS Contexts
+        FROM ${STORED_SPANS_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${window}
+          AND ${dedupInTuple(window)}
+        ORDER BY StartTime ASC
+        LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+        ...(input.occurredAtMs === void 0
+          ? {}
+          : {
+              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+            }),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<EvaluationSpanRow>();
+    if (rows.length === 0 && input.occurredAtMs !== void 0) {
+      return this.findEvaluationSpans({
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+      });
+    }
+    return rows.map(mapEvaluationSpan);
+  }
+
+  async findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceSpanRepository.findEvaluationEvents",
+    );
+    const client = await this.clickhouse.resolve(input.tenantId);
+    const window =
+      input.occurredAtMs === void 0
+        ? ""
+        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+    const result = await client.query<EvaluationEventRow>({
+      query: `
+        SELECT event_name AS EventType, event_attrs AS Attributes
+        FROM (
+          SELECT TenantId, TraceId, SpanId,
+            \`Events.Timestamp\` AS Events_Timestamp,
+            \`Events.Name\` AS Events_Name,
+            \`Events.Attributes\` AS Events_Attributes
+          FROM ${STORED_SPANS_TABLE}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            ${window}
+            AND ${dedupInTuple(window)}
+        )
+        ARRAY JOIN
+          Events_Timestamp AS event_timestamp,
+          Events_Name AS event_name,
+          Events_Attributes AS event_attrs
+        WHERE event_name != 'exception'
+        ORDER BY event_timestamp DESC
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+        ...(input.occurredAtMs === void 0
+          ? {}
+          : {
+              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+            }),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<EvaluationEventRow>();
+    if (rows.length === 0 && input.occurredAtMs !== void 0) {
+      return this.findEvaluationEvents({
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+      });
+    }
+    return rows.map(mapEvaluationEvent);
+  }
+
+  async tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceSpanRepository.tryFindIngestLag",
+    );
+
+    const client = await this.clickhouse.resolve(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          quantile(0.95)(SpanLagMs) AS P95LagMs,
+          count() AS SampleCount
+        FROM (
+          SELECT
+            TraceId,
+            dateDiff('millisecond', max(EndTime), max(CreatedAt)) AS SpanLagMs
+          FROM stored_spans
+          WHERE TenantId = {tenantId:String}
+            AND StartTime >= now() - INTERVAL 7 DAY
+          GROUP BY TraceId
+        )
+        WHERE SpanLagMs >= 0
+      `,
+      query_params: { tenantId: input.tenantId },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{
+      P95LagMs: number | null;
+      SampleCount: number | string;
+    }>();
+    const row = rows[0];
+    const p95LagMs = Number(row?.P95LagMs ?? Number.NaN);
+    if (!Number.isFinite(p95LagMs)) return null;
+
+    return {
+      p95LagMs,
+      sampleCount: Number(row?.SampleCount ?? 0),
+    };
   }
 
   async findSummaryPage(input: {
@@ -181,16 +403,12 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     }
 
     const occurredAtMs =
-      input.occurredAtMs ??
-      (await this.resolveTraceOccurredAtMs(input.tenantId, input.traceId));
+      input.occurredAtMs ?? (await this.resolveTraceOccurredAtMs(input.tenantId, input.traceId));
     if (occurredAtMs === void 0) {
       return this.queryPage(input, void 0);
     }
 
-    const bounded = await this.queryPage(
-      input,
-      occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-    );
+    const bounded = await this.queryPage(input, occurredAtMs - DEFAULT_PARTITION_WINDOW_MS);
     return bounded.rows.length > 0 ? bounded : this.queryPage(input, void 0);
   }
 
@@ -209,8 +427,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     // past any fixed window. `UpdatedAt` is not the partition key, but the
     // tenant/trace prefix remains selective and preserves the old route's
     // behaviour for in-place span updates.
-    const sinceFilter =
-      "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
+    const sinceFilter = "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const result = await client.query({
       query: `
         SELECT ${summarySelect}
@@ -246,9 +463,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
       ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
       : "";
     const timeFilter =
-      lowerBoundMs !== void 0
-        ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})"
-        : "";
+      lowerBoundMs !== void 0 ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})" : "";
     const result = await client.query({
       query: `
         SELECT ${summarySelect}
@@ -305,9 +520,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
   }): Promise<number | undefined> {
     const client = await this.clickhouse.resolve(input.tenantId);
     const windowPredicate =
-      input.sinceMs === void 0
-        ? ""
-        : "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
+      input.sinceMs === void 0 ? "" : "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
     const result = await client.query({
       query: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs

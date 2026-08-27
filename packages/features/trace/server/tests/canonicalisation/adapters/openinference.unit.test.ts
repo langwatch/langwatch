@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { OpenInferenceCanonicalisationAdapter } from "../../../src/adapters/openinference-canonicalisation.adapter";
+import { OpenInferenceCanonicaliser } from "../../../src/services/canonicalisation/openinference.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("OpenInferenceCanonicalisationAdapter", () => {
-  const extractor = new OpenInferenceCanonicalisationAdapter();
+describe("OpenInferenceCanonicaliser", () => {
+  const extractor = new OpenInferenceCanonicaliser();
 
   describe("when openinference.span.kind is present", () => {
     it("maps lowercase kind to langwatch.span.type", () => {
@@ -97,10 +97,7 @@ describe("OpenInferenceCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.LANGWATCH_USER_ID,
-        "user-abc",
-      );
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(ATTR_KEYS.LANGWATCH_USER_ID, "user-abc");
       expect(ctx.out[ATTR_KEYS.LANGWATCH_USER_ID]).toBe("user-abc");
     });
 
@@ -190,9 +187,7 @@ describe("OpenInferenceCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_LABELS]).toBe(
-        JSON.stringify(["tag-a", "tag-b"]),
-      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_LABELS]).toBe(JSON.stringify(["tag-a", "tag-b"]));
     });
   });
 

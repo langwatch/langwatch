@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { MastraCanonicalisationAdapter } from "../../../src/adapters/mastra-canonicalisation.adapter";
+import { MastraCanonicaliser } from "../../../src/services/canonicalisation/mastra.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("MastraCanonicalisationAdapter", () => {
-  const extractor = new MastraCanonicalisationAdapter();
+describe("MastraCanonicaliser", () => {
+  const extractor = new MastraCanonicaliser();
 
   describe("when instrumentationScope.name is @mastra/otel", () => {
     const mastraScope = {
@@ -68,10 +68,7 @@ describe("MastraCanonicalisationAdapter", () => {
     });
 
     it("maps generic to span", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "generic" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({ [ATTR_KEYS.MASTRA_SPAN_TYPE]: "generic" }, mastraScope);
 
       extractor.apply(ctx);
 
@@ -302,9 +299,7 @@ describe("MastraCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe(
-        "The weather in London is sunny, 15°C.",
-      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe("The weather in London is sunny, 15°C.");
     });
 
     it("does not set langwatch.output for empty text", () => {
@@ -465,9 +460,7 @@ describe("MastraCanonicalisationAdapter", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(720);
-      expect(typeof ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        "number",
-      );
+      expect(typeof ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe("number");
     });
   });
 
@@ -873,9 +866,7 @@ describe("MastraCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe(
-        "Score the translation quality from 0-10",
-      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe("Score the translation quality from 0-10");
     });
 
     it("extracts structured object output as langwatch.output", () => {

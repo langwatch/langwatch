@@ -38,10 +38,7 @@ export const EVALUATOR_SCORE_FIELD = "evaluatorScore";
 export const EVALUATOR_LABEL_FIELD = "evaluatorLabel";
 
 /** The categorical sub-condition fields a single evaluator group can carry. */
-const CATEGORICAL_SUB_FIELDS = new Set<string>([
-  EVALUATOR_VERDICT_FIELD,
-  EVALUATOR_LABEL_FIELD,
-]);
+const CATEGORICAL_SUB_FIELDS = new Set<string>([EVALUATOR_VERDICT_FIELD, EVALUATOR_LABEL_FIELD]);
 
 export interface CategoricalSub {
   field: string;
@@ -181,10 +178,7 @@ function readSubConditions(node: LiqeQuery, group: EvaluatorGroup): void {
  * (`getFacetValueState`, `getRangeValue`) would alias two active evaluators
  * that share a verdict value.
  */
-export function readEvaluatorGroupFromAst(
-  ast: LiqeQuery,
-  evaluatorId: string,
-): EvaluatorGroup {
+export function readEvaluatorGroupFromAst(ast: LiqeQuery, evaluatorId: string): EvaluatorGroup {
   const group: EvaluatorGroup = {
     present: false,
     categorical: [],
@@ -213,10 +207,7 @@ export function readEvaluatorGroupFromAst(
 }
 
 /** Convenience wrapper that parses a query string then reads its group state. */
-export function readEvaluatorGroup(
-  currentQuery: string,
-  evaluatorId: string,
-): EvaluatorGroup {
+export function readEvaluatorGroup(currentQuery: string, evaluatorId: string): EvaluatorGroup {
   if (!currentQuery.trim()) {
     return { present: false, categorical: [], score: null };
   }
@@ -340,9 +331,7 @@ export function toggleEvaluatorSubFilterInQuery({
   value: string;
 }): string {
   return mutateEvaluatorGroup(currentQuery, evaluatorId, (group) => {
-    const idx = group.categorical.findIndex(
-      (s) => s.field === field && s.value === value,
-    );
+    const idx = group.categorical.findIndex((s) => s.field === field && s.value === value);
     if (idx < 0) {
       group.categorical.push({ field, value, negated: false });
     } else {
@@ -375,9 +364,7 @@ export function setEvaluatorScoreRangeInQuery({
     // `evaluatorScore:[NaN TO NaN]` is a liqe SyntaxError. Mirror the read
     // side, which only treats finite bounds as a real range.
     group.score =
-      Number.isFinite(fromNum) && Number.isFinite(toNum)
-        ? { from: fromNum, to: toNum }
-        : null;
+      Number.isFinite(fromNum) && Number.isFinite(toNum) ? { from: fromNum, to: toNum } : null;
   });
 }
 

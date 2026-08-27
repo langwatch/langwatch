@@ -4,10 +4,7 @@ import {
 } from "./trace-content-part.file-decoder";
 import { toMediaPart } from "./trace-content-part.provider-source";
 import { tryParseRecord } from "./trace-content-part.record-schema";
-import type {
-  AsyncContentPartVisitor,
-  ContentPartVisitor,
-} from "./trace-content-part.types";
+import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types";
 
 export function dispatchContentPart<R>(
   part: unknown,
@@ -32,11 +29,7 @@ export function dispatchContentPart<R>(
 
   if (o.type === "text" || (!o.type && o.text)) {
     const text =
-      typeof o.text === "string"
-        ? o.text
-        : typeof o.content === "string"
-          ? o.content
-          : "";
+      typeof o.text === "string" ? o.text : typeof o.content === "string" ? o.content : "";
     return visitor.text(text);
   }
 
@@ -123,11 +116,7 @@ export function dispatchContentPart<R>(
   if (o.type === "tool_use" || o.type === "tool_call") {
     return visitor.toolCall({
       name:
-        typeof o.name === "string"
-          ? o.name
-          : typeof o.toolName === "string"
-            ? o.toolName
-            : "tool",
+        typeof o.name === "string" ? o.name : typeof o.toolName === "string" ? o.toolName : "tool",
       arguments: o.arguments ?? o.input ?? o.args,
     });
   }
@@ -151,10 +140,7 @@ export function dispatchContentPart<R>(
   return visitor.unknown?.(part);
 }
 
-export function visitContentPart<R>(
-  part: unknown,
-  visitor: ContentPartVisitor<R>,
-): R | undefined {
+export function visitContentPart<R>(part: unknown, visitor: ContentPartVisitor<R>): R | undefined {
   return dispatchContentPart(part, visitor);
 }
 

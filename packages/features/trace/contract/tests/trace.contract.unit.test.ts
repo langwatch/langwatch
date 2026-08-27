@@ -75,9 +75,7 @@ describe("Trace span-tree contract", () => {
   });
 
   it("rejects an invalid cursor and returns the exact page shape", () => {
-    expect(() =>
-      spanTreeCursorSchema.parse({ startTimeMs: -1, spanId: "span_1" }),
-    ).toThrow();
+    expect(() => spanTreeCursorSchema.parse({ startTimeMs: -1, spanId: "span_1" })).toThrow();
     expect(
       spanTreePageSchema.parse({
         nodes: [],

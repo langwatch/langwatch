@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { LegacyOtelCanonicalisationAdapter } from "../../../src/adapters/legacy-otel-canonicalisation.adapter";
+import { LegacyOtelCanonicaliser } from "../../../src/services/canonicalisation/legacy-otel.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("LegacyOtelCanonicalisationAdapter", () => {
-  const extractor = new LegacyOtelCanonicalisationAdapter();
+describe("LegacyOtelCanonicaliser", () => {
+  const extractor = new LegacyOtelCanonicaliser();
 
   describe("when type attribute is present", () => {
     it("maps to langwatch.span.type", () => {
@@ -136,14 +136,8 @@ describe("LegacyOtelCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.ERROR_TYPE,
-        "ValueError",
-      );
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.ERROR_MESSAGE,
-        "Invalid input",
-      );
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(ATTR_KEYS.ERROR_TYPE, "ValueError");
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(ATTR_KEYS.ERROR_MESSAGE, "Invalid input");
     });
 
     it("extracts error.message from status.message as fallback", () => {
@@ -153,10 +147,7 @@ describe("LegacyOtelCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.ERROR_MESSAGE,
-        "Request failed",
-      );
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(ATTR_KEYS.ERROR_MESSAGE, "Request failed");
     });
   });
 });

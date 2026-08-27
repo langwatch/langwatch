@@ -1,16 +1,25 @@
 import {
   TraceQueryFieldValuesPort,
+  TraceSummaryReaderPort,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
 } from "../src";
-import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ClickHouseTraceAdapter } from "../src";
 import { ClickHouseTraceSpanRepository } from "../src/repositories/clickhouse/trace-span.repository";
 import { describe, expect, it } from "vitest";
+import { TestModelProviderService } from "./support/model-provider.service.fake";
+import { TestTraceQueryClassification } from "./support/query-classification.fake";
+import { traceReadPorts } from "./support/trace-read-ports.fake";
 
 class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
   async list() {
     return { values: [] };
+  }
+}
+
+class NullSummaryReader extends TraceSummaryReaderPort {
+  async tryGetSummary(): Promise<null> {
+    return null;
   }
 }
 
@@ -45,94 +54,16 @@ const resolver =
     },
   });
 
-class StaticModelProviders extends ModelProviderService {
-  readonly inputs: unknown[] = [];
-
-  estimateCost(input: unknown): number {
-    this.inputs.push(input);
-    return 0.47;
-  }
-  listForProject(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  listForOrganization(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  getForProject(): Promise<Record<string, never>> {
-    return Promise.resolve({});
-  }
-  tryGetProviderForProject(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryFindRowServingModel(): Promise<never> {
-    throw new Error("not used");
-  }
-  getExecutionProviders(): Promise<never> {
-    throw new Error("not used");
-  }
-  upsert(): Promise<never> {
-    throw new Error("not used");
-  }
-  delete(): Promise<void> {
-    return Promise.resolve();
-  }
-  validateApiKey(): Promise<never> {
-    throw new Error("not used");
-  }
-  testConnection(): Promise<{ connected: boolean }> {
-    return Promise.resolve({ connected: false });
-  }
-  getCodexStatus(): Promise<never> {
-    throw new Error("not used");
-  }
-  refreshCodexForGateway(): Promise<never> {
-    throw new Error("not used");
-  }
-  isManagedProvider(): boolean {
-    return false;
-  }
-  getDefaultSnapshot(): Promise<never> {
-    throw new Error("not used");
-  }
-  getInheritedValues(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryGetResolvedDefault(): Promise<null> {
-    return Promise.resolve(null);
-  }
-  setDefault(): Promise<void> {
-    return Promise.resolve();
-  }
-  saveDefaultConfig(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryGetDefaultConfig(): Promise<null> {
-    return Promise.resolve(null);
-  }
-  deleteDefaultConfig(): Promise<void> {
-    return Promise.resolve();
-  }
-  listCosts(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  upsertCost(): Promise<never> {
-    throw new Error("not used");
-  }
-  deleteCost(): Promise<void> {
-    return Promise.resolve();
-  }
-  translate(): Promise<never> {
-    throw new Error("not used");
-  }
-}
-
 describe("ClickHouseTraceAdapter", () => {
   it("constructs concrete repositories behind the public adapter", async () => {
     const calls: Array<{ tenantId: string; sql: string }> = [];
     const service = ClickHouseTraceAdapter.create({
       resolveClient: resolver(calls),
-      modelProviders: new StaticModelProviders(),
+      modelProviders: new TestModelProviderService(),
       queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      summaryReader: new NullSummaryReader(),
+      ...traceReadPorts(),
     }).build();
 
     const page = await service.getSpanTreePage({
@@ -155,11 +86,14 @@ describe("ClickHouseTraceAdapter", () => {
 
   it("preserves the full node wire shape while pricing a missing stored cost", async () => {
     const calls: Array<{ tenantId: string; sql: string }> = [];
-    const modelProviders = new StaticModelProviders();
+    const modelProviders = new TestModelProviderService(0.47);
     const service = ClickHouseTraceAdapter.create({
       resolveClient: resolver(calls, ""),
       modelProviders,
       queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      summaryReader: new NullSummaryReader(),
+      ...traceReadPorts(),
     }).build();
 
     const page = await service.getSpanTreePage({
@@ -190,7 +124,7 @@ describe("ClickHouseTraceAdapter", () => {
         updatedAtMs: 30,
       },
     ]);
-    expect(modelProviders.inputs).toEqual([
+    expect(modelProviders.costInputs).toEqual([
       expect.objectContaining({
         model: "model",
         promptTokens: 2,
@@ -200,6 +134,88 @@ describe("ClickHouseTraceAdapter", () => {
         }),
       }),
     ]);
+  });
+});
+
+describe("ClickHouseTraceSpanRepository evaluation reads", () => {
+  it("preserves the fields Evaluation consumes from canonical stored spans", async () => {
+    const calls: string[] = [];
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
+        query: async <_Row>({ query }: { query: string }) => {
+          calls.push(query);
+          const rows: unknown[] = [
+            {
+              SpanType: "rag",
+              Model: "",
+              Contexts: JSON.stringify([
+                { content: "plain context" },
+                { content: { title: "structured context" } },
+              ]),
+            },
+            { SpanType: "", Model: "model-1", Contexts: "" },
+          ];
+
+          return { json: async <T>() => rows as T[] };
+        },
+      }),
+    });
+
+    await expect(
+      repository.findEvaluationSpans({
+        tenantId: "project_1",
+        traceId: "trace_1",
+      }),
+    ).resolves.toEqual([
+      {
+        type: "rag",
+        model: null,
+        ragContextTexts: ["plain context", JSON.stringify({ title: "structured context" })],
+      },
+      { type: "span", model: "model-1", ragContextTexts: [] },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("FROM stored_spans");
+    expect(calls[0]).not.toContain("trace_analytics");
+  });
+
+  it("keeps legacy event metric mapping and newest-event ordering", async () => {
+    const calls: string[] = [];
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
+        query: async <_Row>({ query }: { query: string }) => {
+          calls.push(query);
+          const rows: unknown[] = [
+            {
+              EventType: "thumbs_up_down",
+              Attributes: {
+                "event.metrics.vote": "1",
+                note: "useful",
+              },
+            },
+          ];
+
+          return { json: async <T>() => rows as T[] };
+        },
+      }),
+    });
+
+    await expect(
+      repository.findEvaluationEvents({
+        tenantId: "project_1",
+        traceId: "trace_1",
+      }),
+    ).resolves.toEqual([
+      {
+        eventType: "thumbs_up_down",
+        metrics: [{ key: "vote", value: 1 }],
+        details: [{ key: "note", value: "useful" }],
+      },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("Events.Timestamp");
+    expect(calls[0]).toContain("ORDER BY event_timestamp DESC");
+    expect(calls[0]).not.toContain("elasticsearch");
   });
 });
 
@@ -271,9 +287,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     expect(call.sql).toContain(
       "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})",
     );
-    expect(call.sql).toContain(
-      "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})",
-    );
+    expect(call.sql).toContain("AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})");
     expect(call.sql).not.toContain("StartTime <=");
     const innerElection = call.sql.slice(
       call.sql.indexOf("SELECT TenantId, TraceId, SpanId, max(UpdatedAt)"),

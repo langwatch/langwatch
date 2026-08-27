@@ -92,9 +92,7 @@ describe("TraceCanonicalisationService — chat message coercion", () => {
       ]);
 
       // System instruction extracted from content blocks using 'content' field
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "You are a helpful assistant.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("You are a helpful assistant.");
     });
   });
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { canonicalisation } from "../test-helpers";
-import { CopilotCanonicalisationAdapter } from "../../../src/adapters/copilot-canonicalisation.adapter";
+import { CopilotCanonicaliser } from "../../../src/services/canonicalisation/copilot.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("CopilotCanonicalisationAdapter", () => {
+describe("CopilotCanonicaliser", () => {
   describe("when the span carries copilot-specific attributes", () => {
     /** @scenario Repository and organization context are lifted onto the canonical span */
     it("lifts repository and organization onto metadata", () => {
@@ -13,7 +13,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.github.org": "acme",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["metadata.copilot_repository"]).toBe("acme/api");
       expect(ctx.out["metadata.copilot_organization"]).toBe("acme");
@@ -25,7 +25,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.total_premium_requests": 3,
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["metadata.copilot_premium_requests"]).toBe("3");
     });
@@ -35,7 +35,7 @@ describe("CopilotCanonicalisationAdapter", () => {
       // dollars — dollar cost stays with the pricing-lookup pipeline.
       const ctx = createExtractorContext({ "github.copilot.cost": 1.5 });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["metadata.copilot_cost"]).toBe("1.5");
       expect(ctx.out["langwatch.cost.usd"]).toBeUndefined();
@@ -50,7 +50,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.nano_aiu": 4459750000,
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["metadata.copilot_nano_aiu"]).toBe("4459750000");
       expect(ctx.out["langwatch.cost.usd"]).toBeUndefined();
@@ -62,7 +62,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.user.id"]).toBe("a1b2c3hash");
     });
@@ -74,7 +74,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         { instrumentationScope: { name: "github.copilot", version: null } },
       );
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.user.id"]).toBe("hash");
     });
@@ -85,7 +85,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         { instrumentationScope: { name: "@github/copilot", version: null } },
       );
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.user.id"]).toBe("hash");
     });
@@ -98,7 +98,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
     });
@@ -111,7 +111,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
     });
@@ -123,7 +123,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(128);
     });
@@ -137,7 +137,7 @@ describe("CopilotCanonicalisationAdapter", () => {
       });
       ctx.out["langwatch.user.id"] = "already-set";
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.user.id"]).toBe("already-set");
       expect(ctx.bag.attrs.has("enduser.pseudo.id")).toBe(true);
@@ -150,7 +150,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.tool.call.count": 1,
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("tool");
     });
@@ -167,7 +167,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         },
       );
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("tool");
     });
@@ -178,7 +178,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "github.copilot.turn_id": "t1",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("agent");
     });
@@ -192,7 +192,7 @@ describe("CopilotCanonicalisationAdapter", () => {
       });
       ctx.out["langwatch.span.type"] = "llm";
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
     });
@@ -206,7 +206,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "some.other.attr": "x",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out).toEqual({});
     });
@@ -217,7 +217,7 @@ describe("CopilotCanonicalisationAdapter", () => {
         "gen_ai.operation.name": "chat",
       });
 
-      new CopilotCanonicalisationAdapter().apply(ctx);
+      new CopilotCanonicaliser().apply(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.bag.attrs.has("enduser.pseudo.id")).toBe(true);
@@ -255,7 +255,7 @@ describe("CopilotCanonicalisationAdapter", () => {
       });
 
       // Standard core — GenAI's work, zero copilot-specific code.
-      // appliedRules pins the delegation: without GenAICanonicalisationAdapter in the
+      // appliedRules pins the delegation: without GenAICanonicaliser in the
       // chain these attrs would still merge via remaining(), so the
       // value assertions alone would be unfalsifiable.
       expect(result.appliedRules.some((r) => r.startsWith("genai:"))).toBe(true);
@@ -279,12 +279,8 @@ describe("CopilotCanonicalisationAdapter", () => {
       // or a parse regression, fails this test.
       const result = canonicalize({
         "gen_ai.operation.name": "chat",
-        "gen_ai.input.messages": JSON.stringify([
-          { role: "user", content: "fix the bug" },
-        ]),
-        "gen_ai.output.messages": JSON.stringify([
-          { role: "assistant", content: "done" },
-        ]),
+        "gen_ai.input.messages": JSON.stringify([{ role: "user", content: "fix the bug" }]),
+        "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: "done" }]),
         "github.copilot.turn_id": "t1",
       });
 

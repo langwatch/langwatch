@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { GenAICanonicalisationAdapter } from "../../../src/adapters/gen-ai-canonicalisation.adapter";
+import { GenAICanonicaliser } from "../../../src/services/canonicalisation/gen-ai.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("GenAICanonicalisationAdapter", () => {
-  const extractor = new GenAICanonicalisationAdapter();
+describe("GenAICanonicaliser", () => {
+  const extractor = new GenAICanonicaliser();
 
   describe("when gen_ai.system is present", () => {
     it("maps to gen_ai.provider.name and consumes original", () => {
@@ -110,9 +110,7 @@ describe("GenAICanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
-        "You are a helpful assistant.",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("You are a helpful assistant.");
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi there" },

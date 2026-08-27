@@ -1,5 +1,4 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,7 +11,11 @@ import {
   type TraceSpanSummaryRecord,
   type TraceSpanPage,
 } from "../src/ports/trace.port";
+import { TraceSummaryReaderPort } from "../src/ports/trace-summary-reader.port";
 import { TraceService } from "../src/services/trace.service";
+import { TestModelProviderService } from "./support/model-provider.service.fake";
+import { TestTraceQueryClassification } from "./support/query-classification.fake";
+import { traceReadPorts } from "./support/trace-read-ports.fake";
 
 const node: SpanTreeNode = {
   spanId: "span_1",
@@ -44,6 +47,18 @@ const record = (value: SpanTreeNode): TraceSpanSummaryRecord => ({
 });
 
 class FakeTraceRepository extends TraceRepository {
+  findEvaluationSpans(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  findEvaluationEvents(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
+  async tryFindIngestLag(): Promise<null> {
+    return null;
+  }
+
   constructor(private readonly rows: TraceSpanSummaryRecord[] = [record(node)]) {
     super();
   }
@@ -63,91 +78,18 @@ class FakeTraceRepository extends TraceRepository {
   }
 }
 
-class FakeModelProviderService extends ModelProviderService {
-  constructor(private readonly cost = 0) {
-    super();
-  }
-
-  estimateCost(): number {
-    return this.cost;
-  }
-  listForProject(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  listForOrganization(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  getForProject(): Promise<Record<string, never>> {
-    return Promise.resolve({});
-  }
-  tryGetProviderForProject(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryFindRowServingModel(): Promise<never> {
-    throw new Error("not used");
-  }
-  getExecutionProviders(): Promise<never> {
-    throw new Error("not used");
-  }
-  upsert(): Promise<never> {
-    throw new Error("not used");
-  }
-  delete(): Promise<void> {
-    return Promise.resolve();
-  }
-  validateApiKey(): Promise<never> {
-    throw new Error("not used");
-  }
-  testConnection(): Promise<{ connected: boolean }> {
-    return Promise.resolve({ connected: false });
-  }
-  getCodexStatus(): Promise<never> {
-    throw new Error("not used");
-  }
-  refreshCodexForGateway(): Promise<never> {
-    throw new Error("not used");
-  }
-  isManagedProvider(): boolean {
-    return false;
-  }
-  getDefaultSnapshot(): Promise<never> {
-    throw new Error("not used");
-  }
-  getInheritedValues(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryGetResolvedDefault(): Promise<null> {
-    return Promise.resolve(null);
-  }
-  setDefault(): Promise<void> {
-    return Promise.resolve();
-  }
-  saveDefaultConfig(): Promise<never> {
-    throw new Error("not used");
-  }
-  tryGetDefaultConfig(): Promise<null> {
-    return Promise.resolve(null);
-  }
-  deleteDefaultConfig(): Promise<void> {
-    return Promise.resolve();
-  }
-  listCosts(): Promise<[]> {
-    return Promise.resolve([]);
-  }
-  upsertCost(): Promise<never> {
-    throw new Error("not used");
-  }
-  deleteCost(): Promise<void> {
-    return Promise.resolve();
-  }
-  translate(): Promise<never> {
-    throw new Error("not used");
-  }
-}
-
 class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
   async list(): Promise<TraceQueryFieldValuesResult> {
     return { values: [] };
+  }
+}
+
+class CapturingSummaryReader extends TraceSummaryReaderPort {
+  readonly calls: Array<{ tenantId: string; traceId: string }> = [];
+
+  async tryGetSummary(input: { tenantId: string; traceId: string }): Promise<null> {
+    this.calls.push(input);
+    return null;
   }
 }
 
@@ -157,8 +99,11 @@ const service = (
 ) =>
   TraceService.create({
     repository: new FakeTraceRepository(rows.map(record)),
-    modelProviders: new FakeModelProviderService(),
+    modelProviders: new TestModelProviderService(),
     queryFieldValues,
+    queryClassification: new TestTraceQueryClassification(),
+    summaryReader: new CapturingSummaryReader(),
+    ...traceReadPorts(),
   });
 
 class CharacterizedQueryFieldValues extends TraceQueryFieldValuesPort {
@@ -182,6 +127,23 @@ class CharacterizedQueryFieldValues extends TraceQueryFieldValuesPort {
 }
 
 describe("TraceService span-tree read", () => {
+  it("looks up a summary through the Trace-owned projection reader", async () => {
+    const summaryReader = new CapturingSummaryReader();
+    const traceService = TraceService.create({
+      repository: new FakeTraceRepository(),
+      modelProviders: new TestModelProviderService(),
+      queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      summaryReader,
+      ...traceReadPorts(),
+    });
+
+    await expect(
+      traceService.tryGetSummary({ projectId: "project_1", traceId: "trace_1" }),
+    ).resolves.toBeNull();
+    expect(summaryReader.calls).toEqual([{ tenantId: "project_1", traceId: "trace_1" }]);
+  });
+
   it("returns the complete characterized page and cursor", async () => {
     await expect(
       service().getSpanTreePage({
@@ -219,6 +181,18 @@ describe("TraceService span-tree read", () => {
 
   it("fails loudly if a repository claims another page without a cursor row", async () => {
     class InvalidTraceRepository extends TraceRepository {
+      findEvaluationSpans(): Promise<[]> {
+        return Promise.resolve([]);
+      }
+
+      findEvaluationEvents(): Promise<[]> {
+        return Promise.resolve([]);
+      }
+
+      async tryFindIngestLag(): Promise<null> {
+        return null;
+      }
+
       async findSummaryPage(): Promise<TraceSpanPage> {
         return { rows: [], hasMore: true };
       }
@@ -231,24 +205,28 @@ describe("TraceService span-tree read", () => {
     await expect(
       TraceService.create({
         repository: new InvalidTraceRepository(),
-        modelProviders: new FakeModelProviderService(),
+        modelProviders: new TestModelProviderService(),
         queryFieldValues: new EmptyQueryFieldValues(),
+        queryClassification: new TestTraceQueryClassification(),
+        summaryReader: new CapturingSummaryReader(),
+        ...traceReadPorts(),
       }).getSpanTreePage({
         projectId: "project_1",
         traceId: "trace_1",
         limit: 1,
         canSeeCosts: true,
       }),
-    ).rejects.toThrow(
-      "span-summary page reported hasMore without any rows to key the cursor from",
-    );
+    ).rejects.toThrow("span-summary page reported hasMore without any rows to key the cursor from");
   });
 
   it("computes a missing cost through the full Model Provider service", async () => {
     const result = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
-      modelProviders: new FakeModelProviderService(0.12),
+      modelProviders: new TestModelProviderService(0.12),
       queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      summaryReader: new CapturingSummaryReader(),
+      ...traceReadPorts(),
     }).getSpanTreePage({
       projectId: "project_1",
       traceId: "trace_1",
@@ -262,8 +240,11 @@ describe("TraceService span-tree read", () => {
   it("preserves every live delta node field while pricing and gating costs", async () => {
     const priced = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
-      modelProviders: new FakeModelProviderService(0.12),
+      modelProviders: new TestModelProviderService(0.12),
       queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      summaryReader: new CapturingSummaryReader(),
+      ...traceReadPorts(),
     }).getSpanTreeDelta({
       projectId: "project_1",
       traceId: "trace_1",
@@ -291,9 +272,7 @@ describe("TraceService query field catalogue", () => {
       timeRange: { from: 100, to: 200 },
     });
 
-    expect(catalogue).toContain(
-      "- status (categorical): Status — e.g. warning, custom, error, ok",
-    );
+    expect(catalogue).toContain("- status (categorical): Status — e.g. warning, custom, error, ok");
     expect(catalogue).toContain("- model (categorical): Model");
     expect(catalogue).not.toContain("- model (categorical): Model — e.g.");
     expect(fieldValues.calls.length).toBeGreaterThan(1);

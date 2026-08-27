@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { FallbackCanonicalisationAdapter } from "../../../src/adapters/fallback-canonicalisation.adapter";
+import { FallbackCanonicaliser } from "../../../src/services/canonicalisation/fallback.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("FallbackCanonicalisationAdapter", () => {
-  const extractor = new FallbackCanonicalisationAdapter();
+describe("FallbackCanonicaliser", () => {
+  const extractor = new FallbackCanonicaliser();
 
   describe("when no span type set and tool indicators present", () => {
     it("infers tool from operation.name = ai.toolCall", () => {

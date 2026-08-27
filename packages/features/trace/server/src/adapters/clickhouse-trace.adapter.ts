@@ -1,12 +1,18 @@
-import type { TraceService as TraceServiceContract } from "@langwatch/trace-contract";
+import {
+  TraceNotFoundError,
+  type TraceByIdInput,
+  type TraceDerivedEventsInput,
+  type TraceService as TraceServiceContract,
+} from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
-import {
-  TraceClickHousePort,
-  type TraceClickHouseResolver,
-} from "../ports/clickhouse.port";
+import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository";
 import { TraceQueryFieldValuesPort } from "../ports/query-field-values.port";
+import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port";
+import { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port";
+import { TraceRecordPort } from "../ports/trace-record.port";
+import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port";
 import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter";
 import {
   TraceRepository,
@@ -19,6 +25,10 @@ export type ClickHouseTraceAdapterOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderService;
   queryFieldValues: TraceQueryFieldValuesPort;
+  queryClassification?: TraceQueryClassificationPort;
+  summaryReader?: TraceSummaryReaderPort;
+  records?: TraceRecordPort;
+  eventDerivation?: TraceEventDerivationPort;
 };
 
 /** Composes the Trace service from its ClickHouse and query-value boundaries. */
@@ -35,6 +45,10 @@ export class ClickHouseTraceAdapter {
       repository: new NullTraceRepository(),
       modelProviders,
       queryFieldValues: NullQueryFieldValuesAdapter.create(),
+      queryClassification: NullTraceQueryClassificationAdapter.create(),
+      summaryReader: new NullTraceSummaryReader(),
+      records: new NullTraceRecordPort(),
+      eventDerivation: new NullTraceEventDerivationPort(),
     });
   }
 
@@ -45,6 +59,11 @@ export class ClickHouseTraceAdapter {
       ),
       modelProviders: this.options.modelProviders,
       queryFieldValues: this.options.queryFieldValues,
+      queryClassification:
+        this.options.queryClassification ?? NullTraceQueryClassificationAdapter.create(),
+      summaryReader: this.options.summaryReader ?? new NullTraceSummaryReader(),
+      records: this.options.records ?? new NullTraceRecordPort(),
+      eventDerivation: this.options.eventDerivation ?? new NullTraceEventDerivationPort(),
     });
   }
 }
@@ -64,11 +83,55 @@ class ResolverTraceClickHousePort extends TraceClickHousePort {
 }
 
 class NullTraceRepository extends TraceRepository {
+  async findEvaluationSpans(): Promise<[]> {
+    return [];
+  }
+
+  async findEvaluationEvents(): Promise<[]> {
+    return [];
+  }
+
+  async tryFindIngestLag(): Promise<null> {
+    return null;
+  }
+
   async findSummaryPage(): Promise<TraceSpanPage> {
     return { rows: [], hasMore: false };
   }
 
   async findSummarySince(): Promise<TraceSpanSummaryRecord[]> {
     return [];
+  }
+}
+
+class NullTraceSummaryReader extends TraceSummaryReaderPort {
+  async tryGetSummary(): Promise<null> {
+    return null;
+  }
+}
+
+class NullTraceRecordPort extends TraceRecordPort {
+  async getById(input: TraceByIdInput): Promise<never> {
+    throw new TraceNotFoundError(input.traceId);
+  }
+}
+
+class NullTraceEventDerivationPort extends TraceEventDerivationPort {
+  async derive(_input: TraceDerivedEventsInput): Promise<[]> {
+    return [];
+  }
+}
+
+class NullTraceQueryClassificationAdapter extends TraceQueryClassificationPort {
+  private constructor() {
+    super();
+  }
+
+  static create(): NullTraceQueryClassificationAdapter {
+    return new NullTraceQueryClassificationAdapter();
+  }
+
+  classify() {
+    return { evaluations: false, events: false, spans: false };
   }
 }

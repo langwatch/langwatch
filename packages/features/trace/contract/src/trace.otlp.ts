@@ -129,14 +129,7 @@ const STATUS_CODE_SET = {
 
 /** OTLP uses numeric span kinds in binary and symbolic names in JSON. */
 export const eSpanKindSchema = z.union([
-  z.union([
-    z.literal(0),
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-  ]),
+  z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   z.enum([
     "SPAN_KIND_UNSPECIFIED",
     "SPAN_KIND_INTERNAL",

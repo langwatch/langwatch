@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { GenAICanonicalisationAdapter } from "../../../src/adapters/gen-ai-canonicalisation.adapter";
+import { GenAICanonicaliser } from "../../../src/services/canonicalisation/gen-ai.canonicaliser";
 import { createLogExtractorContext } from "./test-helpers";
 
 const SCOPE = "gen_ai";
 
-describe("GenAICanonicalisationAdapter.applyLog", () => {
+describe("GenAICanonicaliser.applyLog", () => {
   it("lifts every gen_ai.* canonical field a gemini log carries", () => {
     const ctx = createLogExtractorContext(SCOPE, {
       "gen_ai.request.model": "gemini-2.0-flash",
@@ -17,7 +17,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       cached_content_token_count: "7",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "langwatch.model": "gemini-2.0-flash",
@@ -37,7 +37,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       unrelated: "value",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       "gen_ai.request.model": "gemini-2.0-pro",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "langwatch.model": "gemini-2.0-pro",
@@ -62,7 +62,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       cached_content_token_count: "999",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out["langwatch.cache_read_tokens"]).toBe("100");
   });
@@ -73,7 +73,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       cached_content_token_count: "42",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out["langwatch.cache_read_tokens"]).toBe("42");
   });
@@ -83,7 +83,7 @@ describe("GenAICanonicalisationAdapter.applyLog", () => {
       "gen_ai.request.model": "custom-model",
     });
 
-    new GenAICanonicalisationAdapter().applyLog(ctx);
+    new GenAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out["langwatch.model"]).toBe("custom-model");
   });

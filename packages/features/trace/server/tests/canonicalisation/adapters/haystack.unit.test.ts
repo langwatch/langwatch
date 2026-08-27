@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { HaystackCanonicalisationAdapter } from "../../../src/adapters/haystack-canonicalisation.adapter";
+import { HaystackCanonicaliser } from "../../../src/services/canonicalisation/haystack.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("HaystackCanonicalisationAdapter", () => {
-  const extractor = new HaystackCanonicalisationAdapter();
+describe("HaystackCanonicaliser", () => {
+  const extractor = new HaystackCanonicaliser();
 
   const haystackScope = {
     instrumentationScope: {

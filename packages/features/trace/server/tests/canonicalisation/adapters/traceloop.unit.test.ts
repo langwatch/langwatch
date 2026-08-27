@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { TraceloopCanonicalisationAdapter } from "../../../src/adapters/traceloop-canonicalisation.adapter";
+import { TraceloopCanonicaliser } from "../../../src/services/canonicalisation/traceloop.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("TraceloopCanonicalisationAdapter", () => {
-  const extractor = new TraceloopCanonicalisationAdapter();
+describe("TraceloopCanonicaliser", () => {
+  const extractor = new TraceloopCanonicaliser();
 
   describe("when traceloop.span.kind is present", () => {
     it("maps llm to langwatch.span.type llm", () => {
@@ -57,9 +57,7 @@ describe("TraceloopCanonicalisationAdapter", () => {
 
     it("does not overwrite existing gen_ai.input.messages", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([
-          { role: "user", content: "existing" },
-        ]),
+        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([{ role: "user", content: "existing" }]),
         [ATTR_KEYS.TRACELOOP_ENTITY_INPUT]: JSON.stringify([
           { role: "user", content: "traceloop" },
         ]),

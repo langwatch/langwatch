@@ -1,9 +1,6 @@
-import type {
-  CanonicalAttributes,
-  CanonicalSpanContext,
-} from "@langwatch/trace-contract";
-import type { LogRecordDataBag } from "../stores/canonical-log-record.store";
-import type { SpanDataBag } from "../stores/canonical-span.store";
+import type { CanonicalAttributes, CanonicalSpanContext } from "@langwatch/trace-contract";
+import type { LogRecordDataBag } from "../stores/canonical-log-record.bag";
+import type { SpanDataBag } from "../stores/canonical-span.bag";
 
 /** Span input and output shared by canonicalisation extractors. */
 export type ExtractorContext = {
@@ -34,14 +31,3 @@ export abstract class CanonicalAttributesPort {
   /** Optional log canonicalisation; span and log passes remain independent. */
   abstract applyLog?(ctx: LogExtractorContext): void;
 }
-
-export const setIfDefined = (
-  out: CanonicalAttributes,
-  key: string,
-  value: unknown,
-): void => {
-  if (value === null || value === void 0) {
-    return;
-  }
-  out[key] = value;
-};

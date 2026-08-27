@@ -1,9 +1,4 @@
-import type {
-  LiqeQuery,
-  LiteralExpressionToken,
-  RangeExpressionToken,
-  TagToken,
-} from "liqe";
+import type { LiqeQuery, LiteralExpressionToken, RangeExpressionToken, TagToken } from "liqe";
 import { describe, expect, it } from "vitest";
 import {
   addSameFieldOrValue,
@@ -16,12 +11,7 @@ import {
   swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "../../src/trace-query-mutations";
-import {
-  ParseError,
-  parse,
-  serialize,
-  stripAtSigils,
-} from "../../src/trace-query-parser";
+import { ParseError, parse, serialize, stripAtSigils } from "../../src/trace-query-parser";
 import {
   analyzeOrGroups,
   buildFacetStateLookup,
@@ -52,9 +42,7 @@ function parseTag(query: string): TagToken {
   return ast;
 }
 
-function parseLiteralTag(
-  query: string,
-): TagToken & { expression: LiteralExpressionToken } {
+function parseLiteralTag(query: string): TagToken & { expression: LiteralExpressionToken } {
   const tag = parseTag(query);
   expect(tag.expression.type).toBe("LiteralExpression");
 
@@ -139,9 +127,7 @@ describe("removeNodeAtLocation", () => {
       it("drops the targeted tag and the now-orphaned AND keyword", () => {
         const query = "status:error AND model:gpt-5-mini";
         const { start, end } = locationOf(query, "status:error");
-        expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe(
-          "model:gpt-5-mini",
-        );
+        expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe("model:gpt-5-mini");
       });
     });
   });
@@ -160,9 +146,7 @@ describe("removeNodeAtLocation", () => {
   describe("given a tag whose location does not match", () => {
     it("leaves the query unchanged", () => {
       const query = "status:error AND model:gpt-5-mini";
-      expect(removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 })).toBe(
-        query,
-      );
+      expect(removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 })).toBe(query);
     });
   });
 });
@@ -491,9 +475,7 @@ describe("validateAst", () => {
     });
 
     it("recurses into both arms of a LogicalExpression", () => {
-      expect(validateAst(parse("status:error AND model:"))).toBe(
-        "Missing value after `model:`",
-      );
+      expect(validateAst(parse("status:error AND model:"))).toBe("Missing value after `model:`");
     });
 
     it("recurses into parenthesised groups", () => {
@@ -895,8 +877,7 @@ describe("buildFacetStateLookup", () => {
   describe("when used as a lookup-table for sidebar rows", () => {
     it("returns `neutral` (via fallback) for unseen field/value pairs", () => {
       const map = buildFacetStateLookup(parse("status:error"));
-      const get = (field: string, value: string) =>
-        map.get(`${field}|${value}`) ?? "neutral";
+      const get = (field: string, value: string) => map.get(`${field}|${value}`) ?? "neutral";
       expect(get("status", "error")).toBe("include");
       expect(get("status", "warning")).toBe("neutral");
       expect(get("model", "gpt-5-mini")).toBe("neutral");
@@ -967,9 +948,7 @@ describe("analyzeOrGroups", () => {
 
   describe("given a multi-arm OR", () => {
     it("flattens nested ORs into a single group", () => {
-      const result = analyzeOrGroups(
-        parse("status:error OR status:warning OR model:gpt-5-mini"),
-      );
+      const result = analyzeOrGroups(parse("status:error OR status:warning OR model:gpt-5-mini"));
       expect(result.groups).toHaveLength(1);
       const g = firstGroup(result);
       expect(g.members).toHaveLength(3);
@@ -1002,9 +981,7 @@ describe("analyzeOrGroups", () => {
   describe("given multiple disjoint OR groups", () => {
     it("emits one group per OR scope, each with its own id", () => {
       const result = analyzeOrGroups(
-        parse(
-          "(status:error OR model:gpt-5-mini) AND (origin:application OR origin:simulation)",
-        ),
+        parse("(status:error OR model:gpt-5-mini) AND (origin:application OR origin:simulation)"),
       );
       expect(result.groups).toHaveLength(2);
       const ids = new Set(result.groups.map((g) => g.id));
@@ -1016,9 +993,7 @@ describe("analyzeOrGroups", () => {
       // both ids so a row in either group lights up correctly. (This
       // is the regression Copilot caught on the singular `fieldToGroupId`.)
       const result = analyzeOrGroups(
-        parse(
-          "(status:error OR model:gpt-5-mini) AND (status:warning OR origin:application)",
-        ),
+        parse("(status:error OR model:gpt-5-mini) AND (status:warning OR origin:application)"),
       );
       const statusGroups = result.fieldToGroupIds.get("status");
       expect(statusGroups).toBeDefined();
@@ -1159,9 +1134,7 @@ describe("addToOrGroupAtLocation", () => {
         fieldName: "origin",
         value: "app",
       });
-      expect(result).toBe(
-        "(status:error OR model:gpt-5-mini OR origin:app) AND name:bar",
-      );
+      expect(result).toBe("(status:error OR model:gpt-5-mini OR origin:app) AND name:bar");
     });
   });
 
@@ -1366,8 +1339,7 @@ describe("addSameFieldOrValue removal round-trips (collapse via removeFacetValue
     describe("when one value is removed (3 → 2)", () => {
       it("keeps the parenthesised OR group", () => {
         const out = removeFacetValueFromQuery({
-          currentQuery:
-            "(origin:sample OR origin:application OR origin:api) AND model:gpt-5-mini",
+          currentQuery: "(origin:sample OR origin:application OR origin:api) AND model:gpt-5-mini",
           fieldName: "origin",
           value: "api",
         });
@@ -1569,9 +1541,7 @@ describe("swapOperatorAtLocation", () => {
     });
 
     it("returns whitespace-only input unchanged", () => {
-      expect(swapOperatorAtLocation({ currentQuery: "   ", start: 0, end: 0 })).toBe(
-        "   ",
-      );
+      expect(swapOperatorAtLocation({ currentQuery: "   ", start: 0, end: 0 })).toBe("   ");
     });
   });
 

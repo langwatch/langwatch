@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { SpanDataBag } from "../../../src/stores/canonical-span.store";
+import { SpanDataBag } from "../../../src/stores/canonical-span.bag";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../../../src/ports/canonical-attributes.port";
-import { LogfireCanonicalisationAdapter } from "../../../src/adapters/logfire-canonicalisation.adapter";
+import { LogfireCanonicaliser } from "../../../src/services/canonicalisation/logfire.canonicaliser";
 import { createExtractorContext, parseJsonStringAttrs } from "./test-helpers";
 
 function createLogfireContext(
@@ -47,8 +47,8 @@ function createLogfireContext(
   return { bag, out, span, recordRule, setAttr, setAttrIfAbsent };
 }
 
-describe("LogfireCanonicalisationAdapter", () => {
-  const extractor = new LogfireCanonicalisationAdapter();
+describe("LogfireCanonicaliser", () => {
+  const extractor = new LogfireCanonicaliser();
 
   describe("when raw_input is present", () => {
     it("maps to gen_ai.input.messages", () => {
@@ -68,9 +68,7 @@ describe("LogfireCanonicalisationAdapter", () => {
       // allowing span type inference.
       const ctx = createLogfireContext({
         [ATTR_KEYS.RAW_INPUT]: JSON.stringify([{ role: "user", content: "Hello" }]),
-        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([
-          { role: "user", content: "existing" },
-        ]),
+        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([{ role: "user", content: "existing" }]),
       });
 
       extractor.apply(ctx);

@@ -19,9 +19,7 @@ export function validateAst(ast: LiqeQuery): string | null {
   if (ast.type === "Tag") {
     if (ast.expression.type === "EmptyExpression") {
       const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
-      return fieldName
-        ? `Missing value after \`${fieldName}:\``
-        : "Missing value after `:`";
+      return fieldName ? `Missing value after \`${fieldName}:\`` : "Missing value after `:`";
     }
     return null;
   }
@@ -72,11 +70,7 @@ export function getFacetValues(
   return { include, exclude };
 }
 
-export function getFacetValueState(
-  ast: LiqeQuery,
-  fieldName: string,
-  value: string,
-): FacetState {
+export function getFacetValueState(ast: LiqeQuery, fieldName: string, value: string): FacetState {
   const { include, exclude } = getFacetValues(ast, fieldName);
   if (include.includes(value)) {
     return "include";
@@ -297,10 +291,7 @@ function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {
   // surfaces if the user expects the sidebar to be authoritative.
   if (node.type === "LogicalExpression") {
     if (node.operator.operator === "OR") {
-      return [
-        ...collectOrMembers(node.left, negated),
-        ...collectOrMembers(node.right, negated),
-      ];
+      return [...collectOrMembers(node.left, negated), ...collectOrMembers(node.right, negated)];
     }
     return [];
   }

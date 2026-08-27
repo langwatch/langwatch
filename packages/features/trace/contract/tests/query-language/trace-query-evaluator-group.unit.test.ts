@@ -59,9 +59,7 @@ describe("toggleEvaluatorSubFilterInQuery", () => {
 
     describe("when the same verdict is toggled again (include -> exclude)", () => {
       it("negates that sub-condition, keeping it in the group", () => {
-        expect(toggleVerdict(base, "pass")).toBe(
-          "(evaluator:X AND NOT evaluatorVerdict:pass)",
-        );
+        expect(toggleVerdict(base, "pass")).toBe("(evaluator:X AND NOT evaluatorVerdict:pass)");
       });
     });
 
@@ -144,9 +142,7 @@ describe("setEvaluatorScoreRangeInQuery", () => {
         from: "0.2",
         to: "0.8",
       });
-      expect(out).toBe(
-        "(evaluator:X AND evaluatorVerdict:pass AND evaluatorScore:[0.2 TO 0.8])",
-      );
+      expect(out).toBe("(evaluator:X AND evaluatorVerdict:pass AND evaluatorScore:[0.2 TO 0.8])");
     });
   });
 
@@ -167,8 +163,7 @@ describe("removeEvaluatorScoreRangeInQuery", () => {
   describe("given a group with a verdict and a score range", () => {
     it("clears just the score, keeping the verdict in the group", () => {
       const out = removeEvaluatorScoreRangeInQuery({
-        currentQuery:
-          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorScore:[0 TO 0.5])",
+        currentQuery: "(evaluator:X AND evaluatorVerdict:pass AND evaluatorScore:[0 TO 0.5])",
         evaluatorId: "X",
       });
       expect(out).toBe("(evaluator:X AND evaluatorVerdict:pass)");

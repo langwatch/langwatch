@@ -36,10 +36,7 @@ export function walkAST(
  * Filter AST nodes, removing those for which predicate returns false.
  * Reconstructs the tree, collapsing logical expressions as needed.
  */
-export function filterAST(
-  ast: LiqeQuery,
-  predicate: (node: LiqeQuery) => boolean,
-): LiqeQuery {
+export function filterAST(ast: LiqeQuery, predicate: (node: LiqeQuery) => boolean): LiqeQuery {
   if (ast.type === "Tag") {
     return predicate(ast) ? ast : EMPTY_AST;
   }

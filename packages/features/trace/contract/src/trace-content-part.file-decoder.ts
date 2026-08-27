@@ -1,8 +1,6 @@
 import type { BinaryPart } from "./trace-content-part.types";
 
-export function parseBase64DataUri(
-  uri: string,
-): { mimeType: string; base64: string } | null {
+export function parseBase64DataUri(uri: string): { mimeType: string; base64: string } | null {
   if (!uri.startsWith("data:")) return null;
   const commaIdx = uri.indexOf(",");
   if (commaIdx === -1) return null;
@@ -14,9 +12,7 @@ export function parseBase64DataUri(
   return { mimeType, base64: uri.slice(commaIdx + 1) };
 }
 
-export function openAiFilePayloadToBinaryPart(
-  file: Record<string, unknown>,
-): BinaryPart | null {
+export function openAiFilePayloadToBinaryPart(file: Record<string, unknown>): BinaryPart | null {
   const fileData = typeof file.file_data === "string" ? file.file_data : undefined;
   if (!fileData) return null;
   const filename = typeof file.filename === "string" ? file.filename : undefined;

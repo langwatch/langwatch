@@ -519,10 +519,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // OccurredAt > since has its matching span StartTime >= OccurredAt > since,
     // so the count is unchanged; the buffer covers any OccurredAt-vs-StartTime
     // skew and matches the +/- 2 day margin used elsewhere for span pruning.
-    const effectiveFrom = Math.max(
-      params.timeRange.from,
-      params.since - SINCE_WINDOW_BUFFER_MS,
-    );
+    const effectiveFrom = Math.max(params.timeRange.from, params.since - SINCE_WINDOW_BUFFER_MS);
     const {
       sql: whereClause,
       baseSql: baseWhereClause,
@@ -951,10 +948,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             return out;
           })();
 
-    const [categoricals, ranges] = await Promise.all([
-      categoricalsPromise,
-      rangesPromise,
-    ]);
+    const [categoricals, ranges] = await Promise.all([categoricalsPromise, rangesPromise]);
 
     return { categoricals, ranges };
   }

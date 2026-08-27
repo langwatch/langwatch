@@ -38,18 +38,14 @@ function firstString(o: Record<string, unknown>, ...keys: string[]): string | un
   return undefined;
 }
 
-function mediaKindForMimeType(
-  mimeType: string,
-): "image" | "audio" | "video" | "document" {
+function mediaKindForMimeType(mimeType: string): "image" | "audio" | "video" | "document" {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType.startsWith("video/")) return "video";
   return "document";
 }
 
-export function inlineDataToMediaPart(
-  o: Record<string, unknown>,
-): NormalizedMediaPart | null {
+export function inlineDataToMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
   const carrier = o.inline_data ?? o.inlineData;
   const c = tryParseRecord(carrier);
   if (!c) return null;
@@ -71,10 +67,7 @@ export function inlineDataToMediaPart(
 
 function toMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
   if (
-    (o.type === "image" ||
-      o.type === "audio" ||
-      o.type === "video" ||
-      o.type === "document") &&
+    (o.type === "image" || o.type === "audio" || o.type === "video" || o.type === "document") &&
     o.source
   ) {
     const source = normalizeContentSource(o.source);

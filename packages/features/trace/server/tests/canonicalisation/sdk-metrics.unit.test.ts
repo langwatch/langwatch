@@ -233,12 +233,8 @@ describe("TraceCanonicalisationService — cache-read token canonicalisation", (
         span: stubSpan,
       });
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        37127,
-      );
-      expect(
-        result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS],
-      ).toBeUndefined();
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(37127);
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]).toBeUndefined();
     });
 
     it("preserves the canonicalised cache count alongside the model", () => {
@@ -252,9 +248,7 @@ describe("TraceCanonicalisationService — cache-read token canonicalisation", (
       });
 
       expect(result.attributes[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("claude-opus-4-7");
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        37127,
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(37127);
     });
   });
 
@@ -269,9 +263,7 @@ describe("TraceCanonicalisationService — cache-read token canonicalisation", (
         span: stubSpan,
       });
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-        5000,
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(5000);
     });
   });
 });
@@ -293,9 +285,7 @@ describe("TraceCanonicalisationService — cache-creation across providers", () 
         span: stubSpan,
       });
 
-      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
-        1000,
-      );
+      expect(result.attributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(1000);
     });
   });
 });

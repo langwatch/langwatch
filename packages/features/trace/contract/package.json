@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "liqe": "^3.8.7",
+    "ts-pattern": "^5.7.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

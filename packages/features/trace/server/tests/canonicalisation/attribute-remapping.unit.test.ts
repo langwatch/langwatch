@@ -12,7 +12,7 @@ describe("TraceCanonicalisationService — take vs preserve semantics", () => {
         span: stubSpan,
       });
 
-      // gen_ai.prompt is taken by GenAICanonicalisationAdapter → should not appear in output
+      // gen_ai.prompt is taken by GenAICanonicaliser → should not appear in output
       expect(result.attributes["gen_ai.prompt"]).toBeUndefined();
       // It should have been mapped to gen_ai.input.messages
       expect(result.attributes["gen_ai.input.messages"]).toBeDefined();
@@ -30,9 +30,7 @@ describe("TraceCanonicalisationService — take vs preserve semantics", () => {
     });
 
     it("removes llm.input_messages from output after mapping", () => {
-      const messages = JSON.stringify([
-        { role: "user", content: "Hello from OpenLLMetry" },
-      ]);
+      const messages = JSON.stringify([{ role: "user", content: "Hello from OpenLLMetry" }]);
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: { "llm.input_messages": messages },
         events: [],

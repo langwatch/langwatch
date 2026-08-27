@@ -175,10 +175,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           span: clientSpan,
         });
 
-        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(
-          650,
-          5,
-        );
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBeCloseTo(650, 5);
       });
     });
 
@@ -581,9 +578,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       });
 
       // genAi extractor consumes the attribute and extracts text content
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "You are a helpful assistant.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("You are a helpful assistant.");
     });
 
     it("passes through string system_instructions", () => {
@@ -597,9 +592,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         span: clientSpan,
       });
 
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "Be concise and accurate.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("Be concise and accurate.");
     });
   });
 
@@ -657,9 +650,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.operation.name"]).toBe("execute_tool");
       expect(result.attributes["gen_ai.tool.name"]).toBe("search_flights");
       expect(result.attributes["gen_ai.tool.call.id"]).toBe("call_abc123");
-      expect(result.attributes["gen_ai.tool.description"]).toBe(
-        "Search available flights",
-      );
+      expect(result.attributes["gen_ai.tool.description"]).toBe("Search available flights");
       expect(result.attributes["gen_ai.tool.type"]).toBe("function");
     });
   });
@@ -795,9 +786,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from parts-based message
-      expect(result.attributes["gen_ai.system_instructions"]).toBe(
-        "You are a helpful assistant.",
-      );
+      expect(result.attributes["gen_ai.system_instructions"]).toBe("You are a helpful assistant.");
 
       // Conversation ID
       expect(result.attributes["gen_ai.conversation.id"]).toBe("conv_session_1");
@@ -834,9 +823,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     it("handles output messages with direct string content", () => {
-      const outputMessages = [
-        { role: "assistant", content: "The capital of France is Paris." },
-      ];
+      const outputMessages = [{ role: "assistant", content: "The capital of France is Paris." }];
 
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -871,9 +858,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.operation.name"]).toBe("invoke_agent");
       expect(result.attributes["gen_ai.agent.name"]).toBe("travel-planner");
       expect(result.attributes["gen_ai.agent.id"]).toBe("agent_123");
-      expect(result.attributes["gen_ai.agent.description"]).toBe(
-        "Plans travel itineraries",
-      );
+      expect(result.attributes["gen_ai.agent.description"]).toBe("Plans travel itineraries");
     });
   });
 

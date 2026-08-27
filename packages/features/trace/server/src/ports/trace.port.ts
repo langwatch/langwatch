@@ -1,4 +1,10 @@
-import type { SpanTreeCursor, SpanTreeNode } from "@langwatch/trace-contract";
+import type {
+  EvaluationTraceEvent,
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  SpanTreeCursor,
+  SpanTreeNode,
+} from "@langwatch/trace-contract";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 
 /** A private read record; cost inputs never leave the Trace service. */
@@ -12,8 +18,19 @@ export type TraceSpanPage = {
   hasMore: boolean;
 };
 
+export type TraceIngestLagSample = {
+  p95LagMs: number;
+  sampleCount: number;
+};
+
 /** The single projected Trace persistence boundary. */
 export abstract class TraceRepository {
+  abstract findEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
+
+  abstract findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
+
+  abstract tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
+
   abstract findSummaryPage(input: {
     tenantId: string;
     traceId: string;

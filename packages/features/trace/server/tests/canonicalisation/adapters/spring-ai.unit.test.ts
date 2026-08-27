@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SpringAICanonicalisationAdapter } from "../../../src/adapters/spring-ai-canonicalisation.adapter";
+import { SpringAICanonicaliser } from "../../../src/services/canonicalisation/spring-ai.canonicaliser";
 import { createLogExtractorContext } from "./test-helpers";
 
 const PROMPT_SCOPE =
@@ -8,7 +8,7 @@ const PROMPT_SCOPE =
 const COMPLETION_SCOPE =
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler";
 
-describe("SpringAICanonicalisationAdapter.applyLog", () => {
+describe("SpringAICanonicaliser.applyLog", () => {
   it("lifts prompt body onto langwatch.input", () => {
     const ctx = createLogExtractorContext(
       PROMPT_SCOPE,
@@ -16,7 +16,7 @@ describe("SpringAICanonicalisationAdapter.applyLog", () => {
       "Chat Model Prompt Content:\nWhat is the capital of France?",
     );
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "langwatch.input": "What is the capital of France?",
@@ -25,13 +25,9 @@ describe("SpringAICanonicalisationAdapter.applyLog", () => {
   });
 
   it("lifts completion body onto langwatch.output", () => {
-    const ctx = createLogExtractorContext(
-      COMPLETION_SCOPE,
-      {},
-      "Chat Model Completion:\nParis.",
-    );
+    const ctx = createLogExtractorContext(COMPLETION_SCOPE, {}, "Chat Model Completion:\nParis.");
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({ "langwatch.output": "Paris." });
     expect(ctx.recordRule).toHaveBeenCalledWith("spring-ai/completion");
@@ -44,20 +40,16 @@ describe("SpringAICanonicalisationAdapter.applyLog", () => {
       "Chat Model Prompt Content:\nignored",
     );
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
   it("returns no-op when body identifier is unrecognised", () => {
-    const ctx = createLogExtractorContext(
-      PROMPT_SCOPE,
-      {},
-      "Unknown Identifier:\nsome content",
-    );
+    const ctx = createLogExtractorContext(PROMPT_SCOPE, {}, "Unknown Identifier:\nsome content");
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
   });
@@ -69,19 +61,15 @@ describe("SpringAICanonicalisationAdapter.applyLog", () => {
       "Chat Model Prompt Content: missing newline",
     );
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
   });
 
   it("returns no-op when content after identifier is empty", () => {
-    const ctx = createLogExtractorContext(
-      PROMPT_SCOPE,
-      {},
-      "Chat Model Prompt Content:\n",
-    );
+    const ctx = createLogExtractorContext(PROMPT_SCOPE, {}, "Chat Model Prompt Content:\n");
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({});
   });
@@ -93,7 +81,7 @@ describe("SpringAICanonicalisationAdapter.applyLog", () => {
       "Chat Model Completion:\nLine 1\nLine 2\nLine 3",
     );
 
-    new SpringAICanonicalisationAdapter().applyLog(ctx);
+    new SpringAICanonicaliser().applyLog(ctx);
 
     expect(ctx.out).toEqual({
       "langwatch.output": "Line 1\nLine 2\nLine 3",

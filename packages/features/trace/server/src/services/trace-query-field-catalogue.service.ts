@@ -15,9 +15,7 @@ type CategoricalSearchField = SearchFieldMeta & {
   valueType: "categorical";
 };
 
-function isCategoricalSearchField(
-  field: SearchFieldMeta,
-): field is CategoricalSearchField {
+function isCategoricalSearchField(field: SearchFieldMeta): field is CategoricalSearchField {
   return field.valueType === "categorical" && field.facetField !== void 0;
 }
 
@@ -48,10 +46,8 @@ export class TraceQueryFieldCatalogueService {
   ): string[] {
     const dynamicValues = facetField ? (dynamic.get(facetField) ?? []) : [];
     const staticValues = FIELD_VALUES[fieldName] ?? [];
-    return Array.from(new Set([...dynamicValues, ...staticValues])).slice(
-      0,
-      SAMPLES_SHOWN,
-    );
+
+    return Array.from(new Set([...dynamicValues, ...staticValues])).slice(0, SAMPLES_SHOWN);
   }
 
   private async fetchDynamicValues(

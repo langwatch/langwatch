@@ -216,9 +216,7 @@ export function parse(query: string): LiqeQuery {
     const error =
       e instanceof LiqeSyntaxError
         ? new ParseError(e.message, e.offset)
-        : new ParseError(
-            "Invalid query syntax — check for unmatched quotes or parentheses.",
-          );
+        : new ParseError("Invalid query syntax — check for unmatched quotes or parentheses.");
     cacheSet(trimmed, { ok: false, error });
     throw error;
   }

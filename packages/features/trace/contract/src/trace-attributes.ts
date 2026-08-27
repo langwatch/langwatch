@@ -144,12 +144,10 @@ export const ATTR_KEYS = {
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
   LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN: "langwatch.model.cacheReadCostPerToken",
-  LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN:
-    "langwatch.model.cacheCreationCostPerToken",
+  LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN: "langwatch.model.cacheCreationCostPerToken",
   // The customer's own rate for an hour-long cache entry, which bills above a
   // short-lived one. Absent, hour-long writes price at the rate above.
-  LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN:
-    "langwatch.model.cacheCreation1hCostPerToken",
+  LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN: "langwatch.model.cacheCreation1hCostPerToken",
 
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
@@ -245,10 +243,8 @@ export const ATTR_KEYS = {
   // body). The TTL is what decides the write's price, 5m bills at 1.25x base
   // input, 1h at 2x, so the split, not just the total, is what tells a
   // reader which cache a session is paying for.
-  GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS:
-    "gen_ai.usage.cache_creation_5m.input_tokens",
-  GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS:
-    "gen_ai.usage.cache_creation_1h.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS: "gen_ai.usage.cache_creation_5m.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS: "gen_ai.usage.cache_creation_1h.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
 
   // Audio usage measures the gateway emits: characters synthesized by a
@@ -268,8 +264,7 @@ export const ATTR_KEYS = {
   // response span carrying the SAME usage). The fold skips token/cost/cache
   // accumulation for marked spans so the trace total counts the usage once,
   // while the per-span detail still shows it on each span.
-  LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION:
-    "langwatch.reserved.skip_token_accumulation",
+  LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION: "langwatch.reserved.skip_token_accumulation",
 
   // Mastra attributes
   MASTRA_INPUT: "input",

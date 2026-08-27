@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { VercelCanonicalisationAdapter } from "../../../src/adapters/vercel-canonicalisation.adapter";
+import { VercelCanonicaliser } from "../../../src/services/canonicalisation/vercel.canonicaliser";
 import { createExtractorContext } from "./test-helpers";
 
-describe("VercelCanonicalisationAdapter", () => {
-  const extractor = new VercelCanonicalisationAdapter();
+describe("VercelCanonicaliser", () => {
+  const extractor = new VercelCanonicaliser();
 
   describe("when instrumentationScope.name is 'ai'", () => {
     it("processes the span and sets span type from span name", () => {
@@ -34,9 +34,7 @@ describe("VercelCanonicalisationAdapter", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.recordRule).toHaveBeenCalledWith(
-        "vercel:span.name->langwatch.span.type",
-      );
+      expect(ctx.recordRule).toHaveBeenCalledWith("vercel:span.name->langwatch.span.type");
     });
 
     it("sets model attributes when ai.model is provided", () => {

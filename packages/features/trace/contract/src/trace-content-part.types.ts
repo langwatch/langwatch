@@ -13,21 +13,13 @@ export interface BinaryPart {
 
 export type ContentPartVisitor<R> = {
   text(text: string): R;
-  media(part: {
-    type: "image" | "audio" | "video" | "document";
-    source: ContentSource;
-  }): R;
+  media(part: { type: "image" | "audio" | "video" | "document"; source: ContentSource }): R;
   binary(part: BinaryPart): R;
   toolCall(part: { name: string; arguments: unknown }): R;
   toolResult(part: { result: unknown }): R;
   imageUrl?(url: string): R;
   bareImage?(src: string): R;
-  inputAudio?(part: {
-    data?: string;
-    url?: string;
-    format?: string;
-    mimeType?: string;
-  }): R;
+  inputAudio?(part: { data?: string; url?: string; format?: string; mimeType?: string }): R;
   unknown?(value: unknown): R;
 };
 
