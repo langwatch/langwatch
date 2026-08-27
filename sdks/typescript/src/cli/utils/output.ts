@@ -327,7 +327,8 @@ const parsePathSteps = (expression: string): PathStep[] => {
       // the FIRST segment may be empty, and only to carry a root accessor
       // (`.[]`, `.[0]`), which the accessor branch below handles.
       throw new Error(
-        `Invalid --jq expression "${expression}": empty segment at position ${position + 1}`,
+        `Invalid --jq expression "${expression}": empty segment at position ${position + 1}.` +
+          USE_THE_SHELL,
       );
     }
     if (key !== undefined) steps.push({ kind: "key", key });

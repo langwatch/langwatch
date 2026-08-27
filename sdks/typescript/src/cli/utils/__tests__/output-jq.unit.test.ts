@@ -126,20 +126,19 @@ describe("applyJq", () => {
       expect(applyJq(".nope", DATA)).toBeNull();
     });
   });
-});
-
-describe("given an expression outside the supported subset", () => {
-  // The refusal is where the caller decides what to try next. Naming only what
-  // this subset supports sent one agent through `jq` and `python`, both of
-  // which it then also lost.
-  /** @scenario "The built-in filter names the shell tools when it is asked for more" */
-  it.each([
-    ["[.results[] | {index, expected: .entry.l3}]"],
-    [".results[] | map(.id)"],
-    ['.["traces"]'],
-  ])("names jq and python in the shell for %s", (expression) => {
-    expect(() => applyJq(expression, { results: [] })).toThrow(
-      /`jq` and `python` are both in your shell/,
-    );
+  describe("when the expression asks for more than the subset does", () => {
+    /** @scenario "The built-in filter names the shell tools when it is asked for more" */
+    it.each([
+      ["[.results[] | {index, expected: .entry.l3}]"],
+      [".results[] | map(.id)"],
+      ['.["traces"]'],
+      // A typo rather than a reach for more power, but the caller still needs
+      // to be told where the rest of the work can be done.
+      [".traces..traceId"],
+    ])("names jq and python in the shell for %s", (expression) => {
+      expect(() => applyJq(expression, { results: [] })).toThrow(
+        /`jq` and `python` are both in your shell/,
+      );
+    });
   });
 });
