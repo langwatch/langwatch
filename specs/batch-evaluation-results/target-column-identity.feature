@@ -34,6 +34,24 @@ Feature: Target column identity on the results page
     Then the target column headers read "classifier" and "summarizer"
 
   # ============================================================================
+  # Chart axis labels
+  # ============================================================================
+
+  @integration
+  Scenario: Two bars with the same target name keep their own axis labels
+    Given a run with two targets both stored under the name "classifier"
+    When the cost chart renders one bar per target
+    Then the first bar is labelled "classifier (1)"
+    And the second bar is labelled "classifier (2)"
+
+  @integration
+  Scenario: Two bars grouped under one prompt name keep their own axis labels
+    Given a run with two targets that use different prompts named "classifier"
+    When the cost chart groups its bars by prompt
+    Then the first bar is labelled "classifier (1)"
+    And the second bar is labelled "classifier (2)"
+
+  # ============================================================================
   # Targets the run does not hold
   # ============================================================================
 
