@@ -76,6 +76,17 @@ function report(outcome: SsoDomainReproofOutcome): void {
       "a domain's verification record could not be re-read (will retry on the next interval)",
     );
   }
+  // A FULL BATCH IS NOT A FINISHED SWEEP. The sweep is round-robin by
+  // `lastReproofAt`, so nothing is skipped forever — but an installation
+  // whose connection count has outgrown the batch takes several cycles to
+  // come round, and that is worth knowing before somebody wonders why a
+  // lapse took a day. Silent truncation reads exactly like full coverage.
+  if (outcome.truncated) {
+    logger.warn(
+      { checked: outcome.checked },
+      "the re-proof batch filled; the remaining connections are swept on the following intervals",
+    );
+  }
 }
 
 export function startSsoDomainReproofWorker():

@@ -72,8 +72,20 @@ class StubTargets implements SsoDomainReproofTargetRepository {
     },
   ];
 
+  /** Which connections the sweep said it had looked at, in order. */
+  swept: string[][] = [];
+
   async findDomainsProvedByRecord(): Promise<SsoDomainReproofTarget[]> {
     return this.targets;
+  }
+
+  async markSwept({
+    connectionIds,
+  }: {
+    connectionIds: readonly string[];
+    atMs: number;
+  }): Promise<void> {
+    this.swept.push([...connectionIds]);
   }
 }
 
@@ -390,6 +402,20 @@ describe("re-reading the record that proves a domain", () => {
       expect(recorded()).toEqual([]);
       expect(committed).toEqual([]);
       expect(notifier.waverings).toEqual([]);
+    });
+
+    it("still records that it looked, so the next sweep moves on", async () => {
+      // THIS IS WHY THE LOOK IS ITS OWN FACT. A healthy re-read writes no
+      // history — the assertion above — so a sweep ordered by anything the
+      // re-read writes re-reads the same connections forever. Worse, a
+      // domain that STARTS wavering does write, which sorted the one domain
+      // in its grace window to the back and out of the batch: the domain
+      // that most needed re-checking was the one that stopped being
+      // re-checked, so it never lapsed and kept vouching for new people.
+      await reproof.sweep();
+
+      expect(recorded()).toEqual([]);
+      expect(targets.swept).toEqual([[CONNECTION]]);
     });
 
     it("is not fooled by somebody else's record at the same name", async () => {

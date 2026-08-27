@@ -316,6 +316,22 @@ export class PrismaSsoDomainReproofTargets
 {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /** The look is its own fact — see the port's note on why the sweep cannot
+   *  order by anything the re-read writes. */
+  async markSwept({
+    connectionIds,
+    atMs,
+  }: {
+    connectionIds: readonly string[];
+    atMs: number;
+  }): Promise<void> {
+    if (connectionIds.length === 0) return;
+    await this.prisma.ssoConnection.updateMany({
+      where: { id: { in: [...connectionIds] } },
+      data: { lastReproofAt: new Date(atMs) },
+    });
+  }
+
   async findDomainsProvedByRecord({
     limit,
   }: {
@@ -332,7 +348,15 @@ export class PrismaSsoDomainReproofTargets
         verifiedDomains: true,
         domainVerifications: true,
       },
-      orderBy: { updatedAt: "asc" },
+      // THE LOOK, NOT THE WRITE. `updatedAt` does not move on a healthy
+      // re-read (no facts are emitted), so ordering by it re-read the same
+      // prefix every cycle — and a domain that started wavering DID bump it,
+      // sorting the one domain in its grace window out of the batch and
+      // leaving it never to lapse. `lastReproofAt` is stamped on every
+      // target the sweep takes, whatever it finds, so coverage is genuinely
+      // round-robin. Null sorts first, so a connection never looked at is
+      // looked at soonest.
+      orderBy: [{ lastReproofAt: { sort: "asc", nulls: "first" } }],
       take: limit,
     });
     return rows.flatMap((row) => {

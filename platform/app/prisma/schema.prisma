@@ -559,6 +559,15 @@ model SsoConnection {
   testLoginAccountId  String?
   /// { domain, note } - the last ops rejection, read back on a re-claim.
   rejection           Json?
+  /// When the re-proof sweep last LOOKED at this connection, whatever it
+  /// found (ADR-123). A column of its own because the sweep cannot order by
+  /// `updatedAt`: a healthy re-read writes no facts, so `updatedAt` never
+  /// moves — while a domain that starts WAVERING does bump it, which sorted
+  /// the one domain mid-grace to the back of the queue and out of the batch.
+  /// The domain that most needed re-checking was the one that stopped being
+  /// re-checked, so it never lapsed. Null until first swept, which sorts
+  /// first, so a new connection is looked at soonest.
+  lastReproofAt       DateTime?
   createdBy           String?
   /// While TEARDOWN_PENDING: when the process manager's wake completes it.
   tearDownAfter       DateTime?

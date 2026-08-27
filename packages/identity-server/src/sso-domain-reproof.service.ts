@@ -74,6 +74,19 @@ export interface SsoDomainReproofTargetRepository {
   findDomainsProvedByRecord(args: {
     limit: number;
   }): Promise<SsoDomainReproofTarget[]>;
+  /**
+   * Record that the sweep has LOOKED at these connections, whatever it found.
+   *
+   * Ordering the sweep by anything the re-read writes cannot work: a healthy
+   * re-read writes nothing, so the same prefix is read forever — and a domain
+   * that starts wavering DOES write, which sorted the one domain in its grace
+   * window out of the batch and left it never to lapse. The look is its own
+   * fact, and this is what makes the sweep round-robin.
+   */
+  markSwept(args: {
+    connectionIds: readonly string[];
+    atMs: number;
+  }): Promise<void>;
 }
 
 /** Who is told the evidence behind their domain is going, and then gone. */
@@ -97,6 +110,10 @@ export interface SsoDomainReproofNotifier {
 /** What one sweep did, for the worker's log line and for a test to assert on
  *  without reading a ledger. */
 export interface SsoDomainReproofOutcome {
+  /** Whether the batch filled, so more domains are waiting for the next
+   *  cycle. Reported rather than inferred, because a sweep that silently
+   *  covers half the fleet reads exactly like one that covered all of it. */
+  truncated?: boolean;
   checked: number;
   wavered: number;
   lapsed: number;
@@ -163,6 +180,21 @@ export class SsoDomainReproofService {
         outcome.failed.push({ domain: target.domain, error });
       }
     }
+
+    // Stamped for every target taken, including the ones that failed: the
+    // question this answers is "has the sweep looked at you", and a
+    // connection whose look threw must still go to the back of the queue or
+    // it blocks every connection behind it forever.
+    if (targets.length > 0) {
+      await this.deps.targets.markSwept({
+        connectionIds: [
+          ...new Set(targets.map((target) => target.connectionId)),
+        ],
+        atMs: this.now(),
+      });
+    }
+
+    outcome.truncated = targets.length >= SSO_DOMAIN_REPROOF_BATCH;
     return outcome;
   }
 

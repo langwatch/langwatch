@@ -17,6 +17,7 @@ import {
   IdentityRowList,
 } from "~/components/access/IdentityRow";
 import { ProvenanceChip } from "~/components/access/ProvenanceChip";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { CopyInput } from "~/components/CopyInput";
 import { AutomaticJoinsNotice } from "~/components/members/AutomaticJoinsNotice";
 import { InviteRow } from "~/components/members/InvitesTable";
@@ -200,6 +201,16 @@ function PeopleList({
   });
 
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
+
+  // WHO IS ABOUT TO BE REMOVED, and null while nobody is. The row menu called
+  // the mutation straight from its click handler, so a stray press on "Remove
+  // from organization" ended somebody's membership with nothing in between —
+  // while the identical action in `PersonDrawer` has always been behind a
+  // confirmation, as group and role deletion are.
+  const [confirmingRemoval, setConfirmingRemoval] = useState<{
+    userId: string;
+    label: string;
+  } | null>(null);
 
   const deleteMember = (userId: string) => {
     deleteMemberMutation.mutate(
@@ -391,7 +402,13 @@ function PeopleList({
                   canDelete={canDeleteMember(member.userId)}
                   onOpen={() => openDrawer("person", { userId: member.userId })}
                   onSetDisabled={setMemberDisabled}
-                  onDelete={deleteMember}
+                  onDelete={() =>
+                    setConfirmingRemoval({
+                      userId: member.userId,
+                      label:
+                        member.user.name ?? member.user.email ?? "this member",
+                    })
+                  }
                 />
               </HStack>
             }
@@ -564,6 +581,25 @@ function PeopleList({
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
+
+      <ConfirmDialog
+        open={confirmingRemoval !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfirmingRemoval(null);
+        }}
+        title="Remove from organization"
+        message={`Remove ${
+          confirmingRemoval?.label ?? "this member"
+        } from this organization? They lose access to everything in it.`}
+        confirmLabel="Remove"
+        tone="danger"
+        loading={deleteMemberMutation.isPending}
+        onConfirm={() => {
+          if (!confirmingRemoval) return;
+          deleteMember(confirmingRemoval.userId);
+          setConfirmingRemoval(null);
+        }}
+      />
     </>
   );
 }
