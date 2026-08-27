@@ -41,6 +41,12 @@ export interface ClickHouseExperimentRunResultRecord {
   EvaluationCost: number | null;
   EvaluationInputs: string | null;
   EvaluationDurationMs: number | null;
+  /**
+   * 1 when the cell was copied into the run from the board, 0 when the run
+   * produced it. The run's cost and duration read only the rows it produced;
+   * its verdicts and scores read every row.
+   */
+  CarriedOver: number;
   OccurredAt: Date;
 }
 
@@ -120,6 +126,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationCost: null,
       EvaluationInputs: null,
       EvaluationDurationMs: null,
+      CarriedOver: event.data.carriedOver ? 1 : 0,
       OccurredAt: new Date(event.occurredAt),
     };
   }
@@ -168,6 +175,7 @@ export class ExperimentRunResultStorageMapProjection
         ? JSON.stringify(event.data.inputs)
         : null,
       EvaluationDurationMs: normalizeDurationMs(event.data.duration),
+      CarriedOver: event.data.carriedOver ? 1 : 0,
       OccurredAt: new Date(event.occurredAt),
     };
   }

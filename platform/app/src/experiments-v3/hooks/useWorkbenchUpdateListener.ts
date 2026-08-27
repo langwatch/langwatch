@@ -13,7 +13,12 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;
 
 /** Applies a server version to the open workbench, and reloads it on demand. */
-type ApplyServerVersion = (serverVersion: number, actorLabel?: string) => void;
+type ApplyServerVersion = (update: {
+  serverVersion: number;
+  actorLabel?: string;
+  /** The run that wrote it, when a run did. */
+  runId?: string;
+}) => void;
 
 /**
  * True when this tab's own save is going to settle the version it just heard
@@ -41,21 +46,55 @@ function thisTabWillAnswerFirst(isDirty: boolean): boolean {
 }
 
 /** A version that landed while a reload was already running. */
-type MissedVersion = { serverVersion: number; actorLabel?: string };
+type MissedVersion = {
+  serverVersion: number;
+  actorLabel?: string;
+  runId?: string;
+};
 
 /** Keeps the newest missed version, since an older one is already covered. */
 const rememberMissedVersion = ({
   ref,
   serverVersion,
   actorLabel,
+  runId,
 }: {
   ref: MutableRefObject<MissedVersion | undefined>;
   serverVersion: number;
   actorLabel?: string;
+  runId?: string;
 }): void => {
   const missed = ref.current;
   if (missed && serverVersion <= missed.serverVersion) return;
-  ref.current = { serverVersion, ...(actorLabel && { actorLabel }) };
+  ref.current = {
+    serverVersion,
+    ...(actorLabel && { actorLabel }),
+    ...(runId && { runId }),
+  };
+};
+
+/**
+ * Takes a version this page's own run wrote, and carries on saving.
+ *
+ * A run writes its cells into the saved state, which advances the counter. The
+ * page already holds every cell that run produced, because it streamed them, so
+ * there is nothing to reload and nothing to warn about. What there IS is the
+ * reader's other edits, still inside the autosave debounce: treating this bump
+ * as somebody else's write stands autosave down and loses them.
+ *
+ * Taking the version is the part that matters. A page that only skipped the
+ * warning would keep sending the version it had, and the next save would be
+ * refused for exactly the same reason one save later.
+ */
+const adoptOwnRunVersion = (serverVersion: number): void => {
+  const store = useEvaluationsV3Store.getState();
+  store.setWorkbenchVersion(serverVersion);
+  // Staleness this write already answers. A refusal raised by a DIFFERENT
+  // writer at a newer version still stands.
+  const stale = store.staleWorkbench;
+  if (stale && stale.serverVersion <= serverVersion) {
+    store.setStaleWorkbench(undefined);
+  }
 };
 
 /**
@@ -119,16 +158,30 @@ const useApplyServerVersion = ({
   const missedRef = useRef<MissedVersion | undefined>(undefined);
 
   const applyServerVersion = useCallback<ApplyServerVersion>(
-    (serverVersion, actorLabel) => {
+    ({ serverVersion, actorLabel, runId }) => {
       const known = versionRef.current;
       if (known === undefined || serverVersion <= known) return;
+      // This page's own run, before every other rule. It is the one writer
+      // whose bump carries nothing the page does not already have.
+      if (
+        runId &&
+        useEvaluationsV3Store.getState().runsStartedHere?.includes(runId)
+      ) {
+        adoptOwnRunVersion(serverVersion);
+        return;
+      }
       if (thisTabWillAnswerFirst(isDirtyRef.current)) return;
       if (isDirtyRef.current) {
         setStaleWorkbench({ serverVersion, actorLabel });
         return;
       }
       if (reloadingRef.current) {
-        rememberMissedVersion({ ref: missedRef, serverVersion, actorLabel });
+        rememberMissedVersion({
+          ref: missedRef,
+          serverVersion,
+          actorLabel,
+          runId,
+        });
         return;
       }
       reloadingRef.current = true;
@@ -140,7 +193,7 @@ const useApplyServerVersion = ({
         // Re-run the same rule rather than reloading outright: the reload that
         // just finished may already have carried this version, and the
         // workbench may have gone dirty while it ran.
-        if (missed) applyServerVersion(missed.serverVersion, missed.actorLabel);
+        if (missed) applyServerVersion(missed);
       })();
     },
     [setStaleWorkbench],
@@ -189,7 +242,11 @@ const useExperimentUpdateSignal = ({
           return;
         }
         if (parsed.slug !== experimentSlug) return;
-        applyServerVersion(parsed.version, parsed.actorLabel);
+        applyServerVersion({
+          serverVersion: parsed.version,
+          actorLabel: parsed.actorLabel,
+          ...(parsed.runId ? { runId: parsed.runId } : {}),
+        });
       },
     },
   );
@@ -221,8 +278,12 @@ const useVisibilityVersionProbe = ({
       lastProbeAtRef.current = now;
       void trpcUtils.experiments.getWorkbenchVersion
         .fetch({ projectId, experimentSlug })
-        .then(({ version, actorLabel }) =>
-          applyServerVersion(version, actorLabel),
+        .then(({ version, actorLabel, runId }) =>
+          applyServerVersion({
+            serverVersion: version,
+            ...(actorLabel ? { actorLabel } : {}),
+            ...(runId ? { runId } : {}),
+          }),
         )
         .catch(() => undefined);
     };
