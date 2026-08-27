@@ -3,6 +3,7 @@ package agentblock_test
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,6 +57,45 @@ func TestWorkflowRunner_RequestTimeoutCannotExceedTheOperatorCeiling(t *testing.
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("want a deadline-exceeded error, got %v", err)
+	}
+	if elapsed < 150*time.Millisecond {
+		t.Errorf("elapsed = %v; the 200ms ceiling must be what fired, not an immediate cancellation", elapsed)
+	}
+	if elapsed >= 3*time.Second {
+		t.Errorf("elapsed = %v; the ceiling, not the request, must decide", elapsed)
+	}
+}
+
+// TestWorkflowRunner_OverflowingRequestTimeoutClampsToTheCeiling pins the edge
+// that turns "can only shorten" into "fails instantly": a TimeoutMS large
+// enough that milliseconds-to-nanoseconds overflows int64 lands on a NEGATIVE
+// duration, which reads as smaller than the ceiling and expires the context
+// before the call is sent. Such a value must fall back to the ceiling.
+// @scenario "An agent sub-workflow's overflowing timeout_ms falls back to the operator's ceiling"
+func TestWorkflowRunner_OverflowingRequestTimeoutClampsToTheCeiling(t *testing.T) {
+	base := silentServer(t)
+	runner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{
+		DefaultTimeout: 200 * time.Millisecond,
+	})
+
+	start := time.Now()
+	_, err := runner.Execute(context.Background(), agentblock.WorkflowRunRequest{
+		BaseURL:    base,
+		APIKey:     "test-key",
+		WorkflowID: "wf_1",
+		Inputs:     map[string]any{"q": "hi"},
+		TimeoutMS:  math.MaxInt64,
+	})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("want an error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("want a deadline-exceeded error, got %v", err)
+	}
+	if elapsed < 150*time.Millisecond {
+		t.Errorf("elapsed = %v; an overflowed budget must not expire the call immediately", elapsed)
 	}
 	if elapsed >= 3*time.Second {
 		t.Errorf("elapsed = %v; the ceiling, not the request, must decide", elapsed)

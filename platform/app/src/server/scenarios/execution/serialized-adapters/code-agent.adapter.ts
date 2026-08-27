@@ -32,16 +32,21 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
 const NLP_FETCH_HEADROOM_MS = 30_000;
 
 /**
- * The largest delay `setTimeout` can hold.
+ * The platform's own maximum for one scenario turn (15 minutes).
  *
- * Node stores a timer's delay in a signed 32-bit integer. A larger value is
- * silently truncated and the timer fires after 1ms, so an agent configured
- * with an absurd `timeoutMs` would have its request aborted almost
- * immediately — the exact opposite of what the number asked for. Clamping
- * here keeps the failure mode "waits ~24.9 days" rather than "aborts at
- * once"; the engine's own operator ceiling is what actually bounds the run.
+ * The engine ceiling (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`) bounds how
+ * long the agent's *Python* may run; it does not bound how long this process
+ * is willing to hold an HTTP request open. Without a maximum here, an agent
+ * config carrying an absurd `timeoutMs` parks a worker on a socket for as long
+ * as the number says — up to ~24.9 days, where `setTimeout` stops honoring the
+ * delay at all.
+ *
+ * 15 minutes sits just above the engine's own 12-minute ceiling family
+ * (`resolveTimeoutSeconds` in services/nlpgo/cmd/root.go), so the engine still
+ * gets to enforce and REPORT its timeout before this deadline fires; anything
+ * past that is a config error, not a budget.
  */
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const NLP_FETCH_MAX_TIMEOUT_MS = 900_000;
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
@@ -304,14 +309,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * Always at least {@link NLP_FETCH_TIMEOUT_MS}, and above the agent's own
    * code budget when that budget is longer, so the engine gets to enforce (and
    * report) the timeout rather than the request being aborted from here —
-   * capped at {@link MAX_TIMER_DELAY_MS}, which is the last value `setTimeout`
-   * still honors.
+   * bounded by {@link NLP_FETCH_MAX_TIMEOUT_MS}, this platform's maximum for
+   * one turn.
+   *
+   * An over-large `timeoutMs` is clamped rather than rejected. The schemas
+   * that carry it (`CodeAgentDataSchema`, `RawCodeAgentConfigSchema`) stay
+   * `.positive()` with no `.max()` on purpose: they mirror what is already
+   * stored on the agent, and the engine's contract for the same number is
+   * "clamp to the operator's ceiling", not "fail the call". Adding a `.max()`
+   * would make a stored value that the engine handles fine fail the whole
+   * scenario run at prefetch time instead.
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
     if (timeoutMs === undefined) return NLP_FETCH_TIMEOUT_MS;
     return Math.min(
-      MAX_TIMER_DELAY_MS,
+      NLP_FETCH_MAX_TIMEOUT_MS,
       Math.max(NLP_FETCH_TIMEOUT_MS, timeoutMs + NLP_FETCH_HEADROOM_MS),
     );
   }

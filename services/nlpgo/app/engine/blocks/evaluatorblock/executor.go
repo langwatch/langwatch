@@ -34,6 +34,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // Executor runs a single evaluator block invocation.
@@ -201,13 +202,8 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS — the bound on how long one
 	// evaluator call may hold a worker — by writing a bigger number into
-	// their own node. A non-positive request means no request at all, which
-	// also keeps a negative duration away from context.WithTimeout, where it
-	// would abandon the call before it is sent.
-	timeout := e.defaultTime
-	if asked := time.Duration(req.TimeoutMS) * time.Millisecond; req.TimeoutMS > 0 && asked < timeout {
-		timeout = asked
-	}
+	// their own node.
+	timeout := blocktimeout.Clamp(e.defaultTime, req.TimeoutMS)
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 

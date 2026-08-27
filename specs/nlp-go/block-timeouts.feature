@@ -4,7 +4,7 @@
 # can never buy more than the deployment allows. The code block already works
 # this way (specs/nlp-go/code-block.feature); this file pins the same rule for
 # the three sibling blocks, so no caller can reach a `context.WithTimeout` that
-# the operator has not bounded.
+# the operator has not bounded — plus the overflow edge, which all four share.
 Feature: Block timeouts — a node may ask for less than the operator's ceiling, never more
 
   Rule: The HTTP block clamps a node's timeout_ms to the operator's ceiling
@@ -72,8 +72,51 @@ Feature: Block timeouts — a node may ask for less than the operator's ceiling,
       Then the executor's ceiling is 5 minutes
 
     @unit
-    Scenario: An unset or negative block-timeout knob keeps today's twelve-minute default
+    Scenario: An unset block-timeout knob keeps today's twelve-minute default
       Given none of the block timeout knobs are set
       When the service wires the HTTP, agent workflow and evaluator executors
       Then every ceiling is 12 minutes
-      And a negative value defers to the same default rather than expiring
+
+    @unit
+    Scenario: A negative block-timeout knob keeps today's twelve-minute default rather than expiring
+      Given every block timeout knob is set to -30 seconds
+      When the service wires the HTTP, agent workflow and evaluator executors
+      Then every ceiling is 12 minutes
+
+  Rule: A timeout_ms too large to convert falls back to the ceiling, never to an instant failure
+
+    A millisecond count above roughly 9.2e12 overflows int64 when converted to
+    a nanosecond duration and wraps NEGATIVE. A negative budget reads as
+    "shorter than the ceiling" and expires the call before it is sent, which
+    would invert the rule above: the largest numbers a node can write would be
+    the ones that fail fastest.
+
+    @unit
+    Scenario: An HTTP node's overflowing timeout_ms falls back to the operator's ceiling
+      Given the HTTP block's configured timeout is 200 milliseconds
+      And an HTTP node asking for more milliseconds than a duration can hold, against an endpoint that never answers
+      When the executor runs the request
+      Then the call is abandoned no sooner than the configured 200 milliseconds
+      And the error reports a deadline exceeded
+
+    @unit
+    Scenario: An agent sub-workflow's overflowing timeout_ms falls back to the operator's ceiling
+      Given the agent workflow runner's configured timeout is 200 milliseconds
+      And a sub-workflow call asking for more milliseconds than a duration can hold, against an endpoint that never answers
+      When the runner executes the call
+      Then the call is abandoned no sooner than the configured 200 milliseconds
+      And the error reports a deadline exceeded
+
+    @unit
+    Scenario: An evaluator's overflowing timeout_ms falls back to the operator's ceiling
+      Given the evaluator block's configured timeout is 200 milliseconds
+      And an evaluator call asking for more milliseconds than a duration can hold, against an endpoint that never answers
+      When the executor runs the request
+      Then the call is abandoned no sooner than the configured 200 milliseconds
+      And the error reports a deadline exceeded
+
+    @unit
+    Scenario: A code node's overflowing timeout_ms falls back to the operator's ceiling
+      Given a code node asking for more milliseconds than a duration can hold
+      When the engine reads the node's timeout_ms
+      Then it reads as no request at all, leaving the operator's ceiling in charge

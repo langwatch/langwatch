@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
@@ -609,16 +610,12 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 }
 
 // nodeTimeout reads the node's `timeout_ms` parameter — the same identifier
-// and units the HTTP block uses — as a duration. Missing, zero and negative
-// all yield 0, which the executors read as "use the configured default". The
-// value is a request for a SHORTER budget only; the code executor clamps it to
-// the operator's ceiling.
+// and units the HTTP block uses — as a duration. Missing, zero, negative and
+// values too large to convert all yield 0, which the executors read as "use
+// the configured default". The value is a request for a SHORTER budget only;
+// the code executor clamps it to the operator's ceiling.
 func nodeTimeout(params []dsl.Field) time.Duration {
-	ms := paramInt(params, "timeout_ms")
-	if ms <= 0 {
-		return 0
-	}
-	return time.Duration(ms) * time.Millisecond
+	return blocktimeout.FromMillis(paramInt(params, "timeout_ms"))
 }
 
 func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {

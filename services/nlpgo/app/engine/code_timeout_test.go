@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -89,4 +90,18 @@ func TestRunCode_NonPositiveNodeTimeoutFallsBackToTheDefault(t *testing.T) {
 			assert.Equal(t, "done", outputs["ok"])
 		})
 	}
+}
+
+// TestNodeTimeout_OverflowingMillisecondsFallsBackToTheDefault pins the edge
+// that turns "can only shorten" into "fails instantly": a `timeout_ms` large
+// enough that milliseconds-to-nanoseconds overflows int64 wraps to a NEGATIVE
+// duration. The code executor reads only positive durations as a request, so
+// the overflowed value must arrive as 0 — "no request, use the operator's
+// ceiling" — rather than as a negative budget.
+// @scenario "A code node's overflowing timeout_ms falls back to the operator's ceiling"
+func TestNodeTimeout_OverflowingMillisecondsFallsBackToTheDefault(t *testing.T) {
+	node := withTimeoutMS(codeNode("code-1", "", "ok"), math.MaxInt64)
+
+	assert.Equal(t, time.Duration(0), nodeTimeout(node.Data.Parameters),
+		"an overflowed budget must read as no request at all")
 }

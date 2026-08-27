@@ -34,6 +34,8 @@ func TestCodeBlock_RequestTimeoutCannotExceedTheOperatorCeiling(t *testing.T) {
 	assert.True(t, res.TimedOut, "the ceiling, not the request, must decide")
 	require.NotNil(t, res.Error)
 	assert.Equal(t, codeblock.TimeoutType, res.Error.Type)
+	assert.GreaterOrEqual(t, elapsed, 400*time.Millisecond,
+		"the 500ms ceiling must be what fired, not an immediate cancellation")
 	assert.Less(t, elapsed, 3*time.Second, "the run must be stopped at the ceiling")
 }
 
@@ -53,6 +55,8 @@ func TestCodeBlock_RequestTimeoutBelowTheCeilingIsHonored(t *testing.T) {
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 	assert.True(t, res.TimedOut)
+	assert.GreaterOrEqual(t, elapsed, 400*time.Millisecond,
+		"the 500ms request must be what fired, not an immediate cancellation")
 	assert.Less(t, elapsed, 3*time.Second)
 }
 

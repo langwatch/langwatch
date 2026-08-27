@@ -1033,7 +1033,7 @@ describe("SerializedCodeAgentAdapter", () => {
       );
     });
 
-    it("clamps its own fetch deadline to the largest delay a Node timer can hold", async () => {
+    it("clamps its own fetch deadline to the platform's maximum for one turn", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER },
         nlpServiceUrl: nlpServiceUrl,
@@ -1042,11 +1042,25 @@ describe("SerializedCodeAgentAdapter", () => {
 
       await adapter.call(defaultInput);
 
-      // setTimeout stores its delay in a signed 32-bit int: anything larger
-      // wraps and fires after 1ms, so an absurd budget would abort the
-      // request almost immediately instead of waiting.
+      // The engine ceiling bounds the agent's Python, not this HTTP request.
+      // Without a maximum here an absurd config parks a worker on a socket
+      // for as long as the number says — up to ~24.9 days.
       const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
-      expect(spanAttributes["nlp.timeout_ms"]).toBe(2_147_483_647);
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
+    });
+
+    it("clamps a budget only just past the platform's maximum", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        // 890s + the 30s headroom lands at 920s, above the 900s maximum.
+        config: { ...defaultConfig, timeoutMs: 890_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
     });
 
     it("omits timeout_ms when the config carries no timeout", async () => {

@@ -247,30 +247,41 @@ func TestNewEvaluatorExecutor_AppliesConfiguredCeiling(t *testing.T) {
 	}
 }
 
-// TestBlockCeilings_UnsetOrNegativeKeepTheTwelveMinuteDefault guards the
-// wiring against two ways of turning an operator's mistake into an outage: an
-// unset knob must not become a zero-length (already-expired) budget, and a
-// negative one must not become a negative duration. Both defer to the
-// executor's own 12-minute default, which is what every deployment runs on
-// today.
-// @scenario "An unset or negative block-timeout knob keeps today's twelve-minute default"
-func TestBlockCeilings_UnsetOrNegativeKeepTheTwelveMinuteDefault(t *testing.T) {
+// assertTwelveMinuteCeilings pins every block ceiling one config resolves to.
+func assertTwelveMinuteCeilings(t *testing.T, cfg nlpgo.EngineConfig) {
+	t.Helper()
 	const want = 12 * time.Minute
 
-	for _, cfg := range []nlpgo.EngineConfig{
-		{},
-		{HTTPBlockTimeoutSeconds: -30, AgentWorkflowTimeoutSeconds: -30, EvaluatorTimeoutSeconds: -30},
-	} {
-		if got := newHTTPExecutor(cfg, httpblock.SSRFOptions{}).DefaultTimeout(); got != want {
-			t.Errorf("http DefaultTimeout() = %v; want %v", got, want)
-		}
-		if got := newAgentWorkflowRunner(cfg).DefaultTimeout(); got != want {
-			t.Errorf("agent DefaultTimeout() = %v; want %v", got, want)
-		}
-		if got := newEvaluatorExecutor(cfg).DefaultTimeout(); got != want {
-			t.Errorf("evaluator DefaultTimeout() = %v; want %v", got, want)
-		}
+	if got := newHTTPExecutor(cfg, httpblock.SSRFOptions{}).DefaultTimeout(); got != want {
+		t.Errorf("http DefaultTimeout() = %v; want %v", got, want)
 	}
+	if got := newAgentWorkflowRunner(cfg).DefaultTimeout(); got != want {
+		t.Errorf("agent DefaultTimeout() = %v; want %v", got, want)
+	}
+	if got := newEvaluatorExecutor(cfg).DefaultTimeout(); got != want {
+		t.Errorf("evaluator DefaultTimeout() = %v; want %v", got, want)
+	}
+}
+
+// TestBlockCeilings_UnsetKeepTheTwelveMinuteDefault guards the wiring against
+// an unset knob becoming a zero-length — that is, already-expired — budget.
+// 12 minutes is what every deployment runs on today.
+// @scenario "An unset block-timeout knob keeps today's twelve-minute default"
+func TestBlockCeilings_UnsetKeepTheTwelveMinuteDefault(t *testing.T) {
+	assertTwelveMinuteCeilings(t, nlpgo.EngineConfig{})
+}
+
+// TestBlockCeilings_NegativeKeepTheTwelveMinuteDefault guards the other half:
+// a negative knob must not become a negative duration, which context.WithTimeout
+// reads as an already-blown deadline and would turn one operator typo into an
+// outage across every block.
+// @scenario "A negative block-timeout knob keeps today's twelve-minute default rather than expiring"
+func TestBlockCeilings_NegativeKeepTheTwelveMinuteDefault(t *testing.T) {
+	assertTwelveMinuteCeilings(t, nlpgo.EngineConfig{
+		HTTPBlockTimeoutSeconds:     -30,
+		AgentWorkflowTimeoutSeconds: -30,
+		EvaluatorTimeoutSeconds:     -30,
+	})
 }
 
 // TestCodeBlockTimeout_ReachesTheExecutorFromTheEnvironment closes the gap the

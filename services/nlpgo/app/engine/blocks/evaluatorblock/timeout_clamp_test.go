@@ -3,6 +3,7 @@ package evaluatorblock_test
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,6 +57,45 @@ func TestEvaluator_RequestTimeoutCannotExceedTheOperatorCeiling(t *testing.T) {
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("want a deadline-exceeded error, got %v", err)
+	}
+	if elapsed < 150*time.Millisecond {
+		t.Errorf("elapsed = %v; the 200ms ceiling must be what fired, not an immediate cancellation", elapsed)
+	}
+	if elapsed >= 3*time.Second {
+		t.Errorf("elapsed = %v; the ceiling, not the request, must decide", elapsed)
+	}
+}
+
+// TestEvaluator_OverflowingRequestTimeoutClampsToTheCeiling pins the edge that
+// turns "can only shorten" into "fails instantly": a TimeoutMS large enough
+// that milliseconds-to-nanoseconds overflows int64 lands on a NEGATIVE
+// duration, which reads as smaller than the ceiling and expires the context
+// before the call is sent. Such a value must fall back to the ceiling.
+// @scenario "An evaluator's overflowing timeout_ms falls back to the operator's ceiling"
+func TestEvaluator_OverflowingRequestTimeoutClampsToTheCeiling(t *testing.T) {
+	base := silentServer(t)
+	exec := evaluatorblock.New(evaluatorblock.Options{
+		DefaultTimeout: 200 * time.Millisecond,
+	})
+
+	start := time.Now()
+	_, err := exec.Execute(context.Background(), evaluatorblock.Request{
+		BaseURL:       base,
+		APIKey:        "test-key",
+		EvaluatorSlug: "langevals/exact_match",
+		Data:          map[string]any{"input": "hi"},
+		TimeoutMS:     math.MaxInt64,
+	})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("want an error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("want a deadline-exceeded error, got %v", err)
+	}
+	if elapsed < 150*time.Millisecond {
+		t.Errorf("elapsed = %v; an overflowed budget must not expire the call immediately", elapsed)
 	}
 	if elapsed >= 3*time.Second {
 		t.Errorf("elapsed = %v; the ceiling, not the request, must decide", elapsed)

@@ -2,6 +2,7 @@ package httpblock_test
 
 import (
 	"context"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -62,6 +63,8 @@ func TestHTTPBlock_RequestTimeoutCannotExceedTheOperatorCeiling(t *testing.T) {
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond,
+		"the 200ms ceiling must be what fired, not an immediate cancellation")
 	assert.Less(t, elapsed, 3*time.Second, "the ceiling, not the request, must decide")
 }
 
@@ -81,6 +84,9 @@ func TestHTTPBlock_RequestTimeoutBelowTheCeilingIsHonored(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond,
+		"the 200ms request must be what fired, not an immediate cancellation")
 	assert.Less(t, elapsed, 3*time.Second)
 }
 
@@ -99,5 +105,33 @@ func TestHTTPBlock_MissingRequestTimeoutUsesTheCeiling(t *testing.T) {
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond,
+		"the 200ms ceiling must be what fired, not an immediate cancellation")
+	assert.Less(t, elapsed, 3*time.Second)
+}
+
+// TestHTTPBlock_OverflowingRequestTimeoutClampsToTheCeiling pins the edge that
+// turns "can only shorten" into "fails instantly": a `timeout_ms` large enough
+// that milliseconds-to-nanoseconds overflows int64 lands on a NEGATIVE
+// duration, which reads as smaller than the ceiling and expires the context
+// before the request is sent. Such a value must fall back to the ceiling.
+// @scenario "An HTTP node's overflowing timeout_ms falls back to the operator's ceiling"
+func TestHTTPBlock_OverflowingRequestTimeoutClampsToTheCeiling(t *testing.T) {
+	url, host := silentServer(t)
+	exec := silentExecutor(t, host, 200*time.Millisecond)
+
+	start := time.Now()
+	_, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:       url,
+		Method:    http.MethodGet,
+		TimeoutMS: math.MaxInt64,
+	})
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond,
+		"an overflowed budget must not expire the call immediately")
 	assert.Less(t, elapsed, 3*time.Second)
 }

@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // WorkflowRunner runs an agent node configured with `agent_type=workflow`
@@ -172,13 +174,8 @@ func (r *WorkflowRunner) Execute(ctx context.Context, req WorkflowRunRequest) (*
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS — the bound on how long one
 	// sub-workflow call may hold a worker — by writing a bigger number into
-	// their own node. A non-positive request means no request at all, which
-	// also keeps a negative duration away from context.WithTimeout, where it
-	// would abandon the call before it is sent.
-	timeout := r.defaultTime
-	if asked := time.Duration(req.TimeoutMS) * time.Millisecond; req.TimeoutMS > 0 && asked < timeout {
-		timeout = asked
-	}
+	// their own node.
+	timeout := blocktimeout.Clamp(r.defaultTime, req.TimeoutMS)
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
