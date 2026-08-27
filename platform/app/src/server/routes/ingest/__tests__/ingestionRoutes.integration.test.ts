@@ -109,7 +109,7 @@ async function seedOrgWithIngestionSource({
     teamId: team.id,
     userId: user.id,
     ingestionSourceId: source.id,
-    ingestSecret,
+    ingestSecret: ingestSecret!,
     sourceType,
   };
 }
