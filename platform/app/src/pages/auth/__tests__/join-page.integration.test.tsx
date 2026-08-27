@@ -66,7 +66,15 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: { IS_SAAS: false } }),
 }));
 
-vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
+vi.mock("~/features/errors", () => ({
+  showErrorToast: vi.fn(),
+  // Stood in rather than rendered for real: what matters here is that the
+  // page reaches the refusal branch at all, not which words the code-keyed
+  // registry puts in it.
+  HandledErrorAlert: ({ fallbackTitle }: { fallbackTitle: string }) => (
+    <div data-testid="lookup-refusal">{fallbackTitle}</div>
+  ),
+}));
 
 import Join from "../join";
 
@@ -181,6 +189,30 @@ describe("given a verified address nothing is open to", () => {
         expect(hardRedirectMock).toHaveBeenCalledWith("/"),
       );
       expect(requestMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a lookup that could not be made", () => {
+  describe("when sign-up reaches the join step", () => {
+    /** @scenario A lookup that failed is not read as having found nothing */
+    it("says the check could not be made, and creating stays an explicit choice", () => {
+      lookupRef.current = {
+        isError: true,
+        error: new Error("lookup unavailable"),
+        refetch: vi.fn(),
+      } as unknown as { data: unknown };
+
+      renderPage();
+
+      // A lookup we could not make is not a lookup that found nothing. The
+      // difference matters: carrying on would put somebody in an organization
+      // of their own while their colleagues were already here.
+      expect(screen.getByTestId("lookup-refusal")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Create a new organization instead/ }),
+      ).toBeInTheDocument();
+      expect(hardRedirectMock).not.toHaveBeenCalled();
     });
   });
 });

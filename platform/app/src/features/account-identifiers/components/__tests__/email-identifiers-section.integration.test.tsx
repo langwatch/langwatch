@@ -165,6 +165,7 @@ describe("the account's email addresses", () => {
     });
 
     /** @scenario Each email address says whether it has been confirmed */
+    /** @scenario A second address is nudged, never gated */
     it("says which one has been confirmed and which has not", () => {
       renderSection();
 
@@ -176,6 +177,7 @@ describe("the account's email addresses", () => {
     });
 
     /** @scenario An unconfirmed address offers to send its link again */
+    /** @scenario A second address is nudged, never gated */
     it("offers to send the link again, and does not look the same afterwards", async () => {
       renderSection();
 

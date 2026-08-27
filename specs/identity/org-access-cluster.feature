@@ -406,9 +406,10 @@ Feature: The people and access settings, as one cluster
 
     @integration
     Scenario: The protocol keeps its name in the body copy
-      When "ana" opens the directory page
-      Then the navigation entry says "Directory"
-      And the page still says SCIM, for the administrator who searched for it
+      When "ana" reads where her identity provider sends people
+      Then the copy names SCIM, for the administrator who searched for it
+      And no page in the cluster is titled after the protocol, because the
+      navigation is named for what a page holds
 
   # FOUR TABS, EACH A DIFFERENT SUBJECT. People, the containers people sit
   # in, the groups a provider sends, and the departments they are spent

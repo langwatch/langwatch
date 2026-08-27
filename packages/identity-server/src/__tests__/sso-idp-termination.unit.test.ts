@@ -193,6 +193,32 @@ describe("registering an identity provider", () => {
       });
     });
 
+    /** @scenario "SAML is no longer refused for being SAML" */
+    it("registers a SAML provider without refusing it for its protocol", () => {
+      // The refusal this replaces was `sso_saml_not_self_serve`: SAML was
+      // turned away for being SAML, whatever it carried. Both shapes are
+      // accepted now, and what is left refuses only what it cannot read.
+      expect(() =>
+        validateSamlRegistration({
+          protocol: "saml",
+          entryPoint: "https://login.acme.example/sso",
+          entityId: null,
+          metadataXml: IDP_METADATA,
+          certificate: null,
+        }),
+      ).not.toThrow();
+
+      expect(() =>
+        validateSamlRegistration({
+          protocol: "saml",
+          entryPoint: "https://login.acme.example/sso",
+          entityId: "https://login.acme.example",
+          metadataXml: null,
+          certificate: CERTIFICATE,
+        }),
+      ).not.toThrow();
+    });
+
     /** @scenario "Metadata that is not a SAML descriptor is refused by name" */
     it("refuses a document that describes no identity provider", () => {
       const refusal = catchCode(() =>

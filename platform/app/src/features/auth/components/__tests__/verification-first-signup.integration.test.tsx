@@ -382,6 +382,38 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a field the server rejects comes back", () => {
+    /** @scenario Sign-up hands a single-sign-on domain to its provider */
+    it("hands a routed domain to its provider instead of asking for a credential", async () => {
+      routeMock.mockResolvedValue({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [
+          { id: "okta", kind: "oidc", connectionId: "conn_acme" },
+        ],
+        reasonCode: "domain_routed",
+      } as RoutingDecision);
+
+      const { container } = renderScreen();
+
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      // Handed on: the screen names the provider rather than the address it
+      // would have collected a credential for.
+      await screen.findByTestId("routed-to-connection");
+
+      // The account is made at the provider. A password box here would be a
+      // way to create the exact thing the connection exists to prevent, so
+      // the credential step is never reached for this address.
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario A rejected field says what to fix, next to the field */
     it("puts the complaint on the field that caused it", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");

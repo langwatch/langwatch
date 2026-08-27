@@ -297,6 +297,7 @@ describe("given the directory page", () => {
 
   describe("when the reader may see the sync but not manage the organization", () => {
     /** @scenario A reader who may not read groups is told nothing they cannot have */
+    /** @scenario A reader who may not read membership is not shown a roster */
     it("refuses the page rather than offering tabs that would all be empty", () => {
       state.permissions = new Set(["sso:view"]);
       renderPage();

@@ -417,6 +417,7 @@ describe("the directory provisioning page", () => {
   describe("given somebody who may see single sign-on but not manage it", () => {
     /** @scenario "Seeing sync status and managing tokens are two different permissions" */
     /** @scenario "Reading the requests takes seeing single sign-on, and writes nothing" */
+    /** @scenario "Seeing the sequence takes the same permission as seeing the state" */
     it("reads the panel normally and is offered no minting or revoking control", async () => {
       readerHolding(["sso:view"]);
       mockTokenList.mockReturnValue({
@@ -538,6 +539,33 @@ describe("given a connection the directory has been pushing to", () => {
       ).toBeTruthy();
       // The slug is what a reader BRANCHES on, never what they read.
       expect(within(requests).queryByText("invalid_resource")).toBeNull();
+    });
+  });
+
+  describe("when nothing has come through the connection yet", () => {
+    /** @scenario "A connection nothing has happened on says so rather than drawing an empty list" */
+    it("says what it holds, rather than drawing a list with nothing in it", async () => {
+      mockRequests.mockReturnValue({ data: [], isLoading: false });
+
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      const [requests] = screen.getAllByTestId("directory-requests");
+      if (!requests) throw new Error("no requests list rendered");
+      // Requests age out of a retention window, so the words are about what
+      // this holds rather than about what the provider has ever sent. Only
+      // one of those two is ours to assert.
+      expect(
+        within(requests).getByText(/No requests recorded/i),
+      ).toBeTruthy();
+      expect(within(requests).getByText(/thirty days/i)).toBeTruthy();
     });
   });
 

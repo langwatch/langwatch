@@ -44,7 +44,7 @@ const { mockTokens, mockReconciliation, apiDouble } = vi.hoisted(() => {
 
 vi.mock("~/utils/api", () => apiDouble);
 
-import { TokensSection } from "../ConnectorsSection";
+import { ConnectorsOverview, TokensSection } from "../ConnectorsSection";
 
 const connection = ({
   connectionId,
@@ -77,6 +77,33 @@ const renderTokens = () =>
 const openTheDialog = async () => {
   await userEvent.click(screen.getByRole("button", { name: "Issue token" }));
 };
+
+describe("given the connectors overview", () => {
+  beforeEach(() => {
+    mockTokens.mockReturnValue({ data: [], isLoading: false });
+    mockReconciliation.mockReturnValue({ data: [], isLoading: false });
+  });
+
+  describe("when an administrator reads where their provider sends people", () => {
+    /** @scenario The protocol keeps its name in the body copy */
+    it("names the protocol here, where the address it applies to is", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <ConnectorsOverview
+            organizationId="org_acme"
+            mayReadMembership={false}
+            maySetUpSingleSignOn
+          />
+        </ChakraProvider>,
+      );
+
+      // The navigation entry says Directory because that is what the page
+      // holds. An IT administrator arrives having searched for SCIM, and this
+      // address is the SCIM endpoint, so this is the honest place for the word.
+      expect(screen.getByText(/talks to us over SCIM/i)).toBeInTheDocument();
+    });
+  });
+});
 
 describe("given the provisioning tokens section", () => {
   beforeEach(() => {

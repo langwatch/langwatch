@@ -227,6 +227,34 @@ describe("given an administrator whose identity provider is registered", () => {
     );
   });
 
+  /** @scenario "The journey asks who the connection lets in" */
+  it("offers the three answers at the step after the way back in", () => {
+    setupRef.current = setupWith({ goLive: { ...NOTHING_DONE, domainProved: true } });
+
+    draw();
+
+    // The step exists as its own question rather than as a default nobody
+    // was asked: turning a connection on without saying what it does with
+    // somebody it has never seen is choosing by not choosing.
+    expect(screen.getByText("Say who it lets in")).toBeInTheDocument();
+    expect(screen.getByText("Only people already here")).toBeInTheDocument();
+    expect(screen.getByText("They ask, you approve")).toBeInTheDocument();
+    expect(
+      screen.getByText("They join, on a domain you verified"),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "The journey asks who the connection lets in" */
+  it("says the widest answer rests on the domain proof rather than on a count of who receives mail", () => {
+    setupRef.current = setupWith({ goLive: { ...NOTHING_DONE, domainProved: true } });
+
+    draw();
+
+    expect(
+      screen.getByText(/Only addresses on a domain you verified ever reach it/),
+    ).toBeInTheDocument();
+  });
+
   /** @scenario "The go-live step shows all three preconditions rather than the first missing one" */
   it("shows all three preconditions outstanding, each with the step that meets it", () => {
     const { container } = draw();
