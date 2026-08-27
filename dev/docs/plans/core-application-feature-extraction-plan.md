@@ -12,6 +12,8 @@ dependency-closed deletion batches. Feature ownership remains defined by
 [ADR-101](../adr/101-feature-package-surfaces.md),
 [ADR-111](../adr/111-physical-application-workspaces.md), and
 [ADR-112](../adr/112-singular-feature-ownership.md).
+Non-blocking structural improvements discovered during extraction are recorded
+in [the follow-up ledger](core-application-feature-extraction-future-work.md).
 
 ## Progress
 
@@ -111,14 +113,20 @@ The next committed batches after the `origin/main` merge are:
 5. **Evaluation-wave completion:** drain the remaining execution adapters,
    transports, workers and reusable UI while keeping Evaluation, Evaluator,
    Monitor, Experiment, Scenario, Simulation and Suite as separate services.
-6. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
+6. **Prompt web cut:** use the redesign in
+   [PR 7371](https://github.com/langwatch/langwatch/pull/7371) as the starting
+   implementation for the Prompt web package and `apps/ui` composition. Do not
+   migrate the displaced Prompt UI first and rewrite it again. Review the PR
+   against the current Prompt contract and preserve every live transport and
+   browser behaviour it does not replace.
+7. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
    one dependency-closed read-side collaborator.
-7. **Trace edit overlay and protection:** move the 18-file edit/protection core
+8. **Trace edit overlay and protection:** move the 18-file edit/protection core
    and its behavioural coverage.
-8. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
+9. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
    not into the Trace service merely because they currently live under Trace.
-9. **API composition:** adopt the parked REST surface when `apps/api` is
-   created; do not churn current routes before that physical cut.
+10. **API composition:** adopt the parked REST surface when `apps/api` is
+    created; do not churn current routes before that physical cut.
 
 The remainder of Evaluation and the other feature slices remain open. They are
 not completion fallout from the batches above:
