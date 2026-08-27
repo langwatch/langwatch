@@ -14,10 +14,15 @@ Feature: A run plan is identified by its name
       - nothing matches: a plan is created with that name and that config.
 
     Two kinds of row are skipped when the name is matched. An archived plan,
-    because a person archived it. And the throwaway suite `langwatch scenario
-    run` creates, which carries the label `cli-ephemeral` and is archived as
-    soon as the run is queued: joining one attaches a person's run to a plan
-    that is about to disappear from every list.
+    because a person archived it. And the throwaway rows written by older
+    CLIs, which carry the label `cli-ephemeral` and are archived as soon as
+    the run is queued: joining one attaches a person's run to a plan that is
+    about to disappear from every list.
+
+    A name is optional. A caller that sends none gets one derived from what
+    the run covers and what it runs against, which is the same name the run
+    dialog suggests, so a run started from the command line and one started
+    from the dialog land on one plan.
 
     Two rules follow, and both were bugs in the prototype:
 
@@ -77,6 +82,16 @@ Feature: A run plan is identified by its name
     When a run is started under the plan name "Refunds"
     Then a run plan of kind custom named "Refunds" is created
     And the folder is unchanged
+
+  # --- A run that names no plan ---
+
+  @integration
+  Scenario: A run started with no name is named after its scope and targets
+    Given a project holding the test suites "Refunds" and "Checkout"
+    When a run of "Refunds" against two agents is started with no name
+    Then a run plan named "Refunds <agent> vs <agent>" is created
+    And the agents are named in the order the plan stores them
+    And a second run with no name joins that same plan
 
   # --- A run of one scenario is an ordinary plan ---
 

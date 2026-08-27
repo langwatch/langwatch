@@ -18,6 +18,7 @@ import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
 import { CLI_EPHEMERAL_LABEL } from "../constants";
+import { sortSuiteTargets } from "../plan-config";
 import type { SuiteScope } from "../scope";
 import { SuiteService } from "../suite.service";
 import type { SuiteTarget } from "../types";
@@ -395,6 +396,60 @@ describe("resolving a run plan by name", () => {
         where: { id: first.suiteId, projectId },
       });
       expect(archived?.archivedAt).not.toBeNull();
+    });
+
+    /** @scenario "A run started with no name is named after its scope and targets" */
+    it("names a run that sends no name after its scope and its targets", async () => {
+      const refunds = await suiteService.createFolder({
+        projectId,
+        name: "Refunds",
+      });
+      // A second suite keeps the scope a folders scope: naming every suite of
+      // the project is the same thing as "all scenarios".
+      await suiteService.createFolder({ projectId, name: "Checkout" });
+      await createCase("One", refunds.id);
+      const first = await createHttpAgent();
+      const second = await createHttpAgent();
+      const targets: SuiteTarget[] = [
+        { type: "http", referenceId: first.id },
+        { type: "http", referenceId: second.id },
+      ];
+
+      const result = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config: {
+          scope: { mode: "folders", folderIds: [refunds.id] },
+          targets,
+        },
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      const nameOf = new Map([
+        [first.id, first.name],
+        [second.id, second.name],
+      ]);
+      const expected = `Refunds ${sortSuiteTargets(targets)
+        .map((target) => nameOf.get(target.referenceId))
+        .join(" vs ")}`;
+      expect(result.created).toBe(true);
+      expect(result.planName).toBe(expected);
+
+      // The same run started again resolves the same name, so it joins the
+      // plan the first one created.
+      const again = await suiteService.runPlan({
+        projectId,
+        organizationId,
+        config: {
+          scope: { mode: "folders", folderIds: [refunds.id] },
+          targets,
+        },
+        idempotencyKey: `run-${nanoid(6)}`,
+      });
+
+      expect(again.created).toBe(false);
+      expect(again.suiteId).toBe(result.suiteId);
+      expect(await plansNamed(expected)).toHaveLength(1);
     });
 
     /** @scenario "A folder-kind suite does not answer to a run plan name" */

@@ -146,9 +146,17 @@ export class SuiteRepository {
     );
   }
 
+  /**
+   * The project's suites of the given kinds, newest first.
+   *
+   * Archived rows are left out unless the caller asks for them: a list that
+   * shows what is running now must not offer a plan somebody archived, while
+   * a history view has to resolve the plan a finished run belongs to.
+   */
   async findAll(params: {
     projectId: string;
     kinds: SuiteKind[];
+    includeArchived?: boolean;
   }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteRepository.findAll",
@@ -170,7 +178,7 @@ export class SuiteRepository {
           where: {
             projectId: params.projectId,
             kind: { in: params.kinds },
-            archivedAt: null,
+            ...(params.includeArchived !== true && { archivedAt: null }),
           },
           orderBy: { updatedAt: "desc" },
         });
@@ -228,6 +236,22 @@ export class SuiteRepository {
         NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
       },
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    });
+  }
+
+  /**
+   * The names of the given suites, archived ones included.
+   *
+   * Feeds the name a run plan is derived under, which reads the folders its
+   * scope covers. Only the id and the name, because that is all a name needs.
+   */
+  async findNamesByIds(params: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.simulationSuite.findMany({
+      where: { id: { in: params.ids }, projectId: params.projectId },
+      select: { id: true, name: true },
     });
   }
 

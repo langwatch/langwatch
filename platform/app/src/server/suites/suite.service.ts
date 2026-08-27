@@ -22,6 +22,7 @@ import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
+import { ScenarioNotFoundError } from "../scenarios/errors";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
 import type { RunActor } from "../scenarios/run-actor";
@@ -46,6 +47,7 @@ import {
   SuiteTargetsRequiredError,
 } from "./errors";
 import { normalizePlanScope, sortSuiteTargets } from "./plan-config";
+import { derivePlanName } from "./plan-name";
 import { isDynamicScope, parseSuiteScope, type SuiteScope } from "./scope";
 import { readScopeMembership, readScopeScenarioIds } from "./scope-membership";
 import { pickFreeSlug } from "./slug";
@@ -146,13 +148,56 @@ async function resolveParameterMaps(params: {
   };
 }
 
+/** The execution settings a run carries and a test suite never holds. */
+const EXECUTION_FIELDS = [
+  "targets",
+  "repeatCount",
+  "simulatorModel",
+  "judgeModel",
+] as const;
+
+type ExecutionField = (typeof EXECUTION_FIELDS)[number];
+
+/** The execution fields a request carries, in the order they are refused. */
+function executionFieldsIn(
+  source: Partial<Record<ExecutionField, unknown>>,
+): ExecutionField[] {
+  return EXECUTION_FIELDS.filter((field) => source[field] !== undefined);
+}
+
+/** One refusal naming every execution field the request carried. */
+function refuseExecutionFields(params: {
+  fields: ExecutionField[];
+  message: string;
+}): never {
+  throw new ValidationError(params.message, {
+    meta: {
+      fieldErrors: Object.fromEntries(
+        params.fields.map((field) => [field, [params.message]]),
+      ),
+    },
+  });
+}
+
+const PLAN_EXECUTION_REFUSAL =
+  "A run plan runs its stored configuration. Send a new configuration to run-plans/run.";
+
+const FOLDER_EXECUTION_REFUSAL =
+  "A test suite holds what it collects, not how a run of it is executed. Send the targets, the repeat count and the models with the run.";
+
 /**
- * The two things a test suite refuses in an update.
+ * What a test suite refuses in an update.
  *
- * Both are a second answer to what the suite runs, which its own filing
- * already decides: a scope is a rule over the whole project, and a member list
- * is derived from `Scenario.folderId` by reconcileFolderMembership and nothing
- * else, so a direct write here would fork the two sides of that invariant.
+ * A scope and a member list are both a second answer to what the suite
+ * collects, which its own filing already decides: a scope is a rule over the
+ * whole project, and a member list is derived from `Scenario.folderId` by
+ * reconcileFolderMembership and nothing else, so a direct write here would
+ * fork the two sides of that invariant.
+ *
+ * The execution settings are refused for the same reason one step along: they
+ * say how a run is executed, the run plan a run resolves already holds them,
+ * and a copy on the folder row is a second answer with nothing saying which
+ * one the next run reads.
  */
 function assertFolderUpdate(data: UpdateSuiteInput): void {
   if (data.scope !== undefined && data.scope !== null) {
@@ -171,6 +216,13 @@ function assertFolderUpdate(data: UpdateSuiteInput): void {
         },
       },
     );
+  }
+  const execution = executionFieldsIn(data);
+  if (execution.length > 0) {
+    refuseExecutionFields({
+      fields: execution,
+      message: FOLDER_EXECUTION_REFUSAL,
+    });
   }
 }
 
@@ -256,6 +308,8 @@ export class SuiteService {
   async getAll(params: {
     projectId: string;
     kinds?: SuiteKind[];
+    /** Archived rows too, for a view that resolves the plan of an old run. */
+    includeArchived?: boolean;
   }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteService.getAll",
@@ -270,6 +324,9 @@ export class SuiteService {
         const result = await this.repository.findAll({
           projectId: params.projectId,
           kinds: params.kinds ?? ["custom"],
+          ...(params.includeArchived !== undefined && {
+            includeArchived: params.includeArchived,
+          }),
         });
         span.setAttribute("result.count", result.length);
         return result;
@@ -339,6 +396,54 @@ export class SuiteService {
     projectId: string;
   }): Promise<SimulationSuite[]> {
     return this.getAll({ projectId: params.projectId, kinds: ["folder"] });
+  }
+
+  /**
+   * One folder with the cases filed in it, named.
+   *
+   * The names come from the folder's `scenarioIds`, which
+   * reconcileFolderMembership keeps as the folder's active members, and the
+   * order of that list is the order the detail view reads. Archived cases are
+   * left out: an archived folder keeps a snapshot for a later restore, and it
+   * may name cases archived since.
+   */
+  async getFolderDetail(params: {
+    projectId: string;
+    folderId: string;
+  }): Promise<SimulationSuite & { scenarios: { id: string; name: string }[] }> {
+    return tracer.withActiveSpan(
+      "SuiteService.getFolderDetail",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.folderId,
+        },
+      },
+      async (span) => {
+        const folder = await this.repository.findById({
+          id: params.folderId,
+          projectId: params.projectId,
+        });
+        if (folder?.kind !== "folder") {
+          throw new SuiteNotFoundError();
+        }
+        const rows =
+          folder.scenarioIds.length > 0
+            ? await this.scenarioRepository.findActiveNamesByIds({
+                ids: folder.scenarioIds,
+                projectId: params.projectId,
+              })
+            : [];
+        const nameById = new Map(rows.map((row) => [row.id, row.name]));
+        const scenarios = folder.scenarioIds.flatMap((id) => {
+          const name = nameById.get(id);
+          return name === undefined ? [] : [{ id, name }];
+        });
+        span.setAttribute("result.count", scenarios.length);
+        return { ...folder, scenarios };
+      },
+    );
   }
 
   /**
@@ -588,12 +693,24 @@ export class SuiteService {
   }
 
   /**
-   * Schedule a suite run.
+   * Schedule a run of a suite addressed by its stored row.
+   *
+   * What the row means depends on its kind, and the two are opposites:
+   *
+   * - a FOLDER holds no execution settings at all, so the request carries
+   *   them and the run goes through {@link runTestSuite}, which resolves the
+   *   run plan the settings are written onto;
+   * - a CUSTOM row IS a run plan, so it runs the configuration it stores and
+   *   a request that carries execution settings is refused. Replacing a
+   *   plan's configuration is a run started under a name, through
+   *   {@link runPlan}, never a side effect of running the plan.
    *
    * Resolves all scenario and target references, filtering out archived ones.
    * Schedules N active-scenarios x M active-targets x repeatCount jobs.
    *
    * @returns The batch run ID, job count, and any skipped archived references
+   * @throws {ValidationError} if a custom row is run with execution settings
+   * @throws {SuiteTargetsRequiredError} if a folder is run with no target
    * @throws {InvalidScenarioReferencesError} if any scenario references are missing (deleted)
    * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
    * @throws {AllScenariosArchivedError} if all scenarios are archived
@@ -611,6 +728,18 @@ export class SuiteService {
     organizationId: string;
     idempotencyKey: string;
     batchRunId?: string;
+    /**
+     * The name of the run plan a folder run resolves. Derived from the scope
+     * and the targets when the caller sends none. Read by folder runs only.
+     */
+    name?: string;
+    /** The targets a folder run goes against. */
+    targets?: SuiteTarget[];
+    /** How many times a folder run repeats each pairing. */
+    repeatCount?: number;
+    /** Model overrides for a folder run. */
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
     /** Values supplied for the run, overriding each scenario's own defaults. */
     parameters?: RunParameterValues;
     /** One short line describing why this batch was run. */
@@ -623,6 +752,23 @@ export class SuiteService {
      */
     actor?: RunActor;
   }): Promise<SuiteRunResult> {
+    if (params.suite.kind === "folder") {
+      const { suite, ...rest } = params;
+      return this.runTestSuite({
+        ...rest,
+        folderId: suite.id,
+        targets: params.targets ?? [],
+      });
+    }
+
+    const overrides = executionFieldsIn(params);
+    if (overrides.length > 0) {
+      refuseExecutionFields({
+        fields: overrides,
+        message: PLAN_EXECUTION_REFUSAL,
+      });
+    }
+
     return tracer.withActiveSpan(
       "SuiteService.run",
       {
@@ -762,16 +908,12 @@ export class SuiteService {
   }
 
   /**
-   * The scenarios a run covers.
+   * The scenarios a run of a stored plan covers.
    *
-   * A folder's membership is read from the scenarios that name it, archived
-   * ones included: the folder's scenarioIds cache holds only active members,
-   * and the run reports the archived ones as skipped.
-   *
-   * Any other suite covers what its scope says. A dynamic scope is resolved
-   * against the project as it is right now and written back onto the plan, so
-   * a case written after the plan runs without the plan being edited. A plan
-   * with no scope, or one of mode "cases", runs the scenarioIds it stores.
+   * A plan covers what its scope says. A dynamic scope is resolved against
+   * the project as it is right now and written back onto the plan, so a case
+   * written after the plan runs without the plan being edited. A plan with no
+   * scope, or one of mode "cases", runs the scenarioIds it stores.
    *
    * @throws {SuiteScopeEmptyError} when a dynamic scope covers no case.
    */
@@ -779,14 +921,6 @@ export class SuiteService {
     suite: SimulationSuite;
     projectId: string;
   }): Promise<string[]> {
-    if (params.suite.kind === "folder") {
-      const members = await this.scenarioRepository.findManyByFolder({
-        projectId: params.projectId,
-        folderId: params.suite.id,
-      });
-      return members.map((member) => member.id);
-    }
-
     const scope = parseSuiteScope(params.suite.scope);
     if (!isDynamicScope(scope)) {
       return params.suite.scenarioIds;
@@ -931,7 +1065,12 @@ export class SuiteService {
   async runPlan(params: {
     projectId: string;
     organizationId: string;
-    name: string;
+    /**
+     * The plan this run joins or creates. Derived from what the run covers
+     * and what it runs against when the caller sends none, by the same rule
+     * the run dialog suggests a name with.
+     */
+    name?: string;
     config: RunPlanConfigInput;
     idempotencyKey: string;
     batchRunId?: string;
@@ -950,8 +1089,8 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const name = params.name.trim();
-        if (!name) {
+        const requestedName = params.name?.trim();
+        if (params.name !== undefined && !requestedName) {
           throw new ValidationError("A run needs a name", {
             meta: { fieldErrors: { name: ["A run needs a name"] } },
           });
@@ -981,6 +1120,18 @@ export class SuiteService {
           parameters: params.parameters,
         });
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
+
+        // Derived only once the run holds up, so a refused run reads no names
+        // it will not use.
+        const name =
+          requestedName ??
+          (await this.defaultPlanName({
+            projectId: params.projectId,
+            organizationId: params.organizationId,
+            scope,
+            scenarioIds: params.config.scenarioIds ?? [],
+            targets,
+          }));
 
         const { suite, created } = await this.resolvePlanByName({
           projectId: params.projectId,
@@ -1013,6 +1164,247 @@ export class SuiteService {
         };
       },
     );
+  }
+
+  /**
+   * Starts a run of one test suite, addressed by its id.
+   *
+   * A test suite holds what it collects and nothing about how a run of it is
+   * executed, so the targets, the repeat count and the models arrive with the
+   * request and are written onto the run plan this run resolves. A request
+   * that names no target is refused before anything is read: there is no
+   * stored row to fall back to, by design.
+   *
+   * @see specs/suites/folder-run-plan-reuse.feature
+   */
+  async runTestSuite(params: {
+    projectId: string;
+    organizationId: string;
+    folderId: string;
+    targets: SuiteTarget[];
+    /** Derived from the suite's name and the targets when absent. */
+    name?: string;
+    repeatCount?: number;
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+    idempotencyKey: string;
+    batchRunId?: string;
+    parameters?: RunParameterValues;
+    note?: string;
+    actor?: RunActor;
+  }): Promise<
+    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+  > {
+    if (params.targets.length === 0) {
+      throw new SuiteTargetsRequiredError();
+    }
+    const folder = await this.repository.findById({
+      id: params.folderId,
+      projectId: params.projectId,
+    });
+    if (folder?.kind !== "folder") {
+      throw new SuiteNotFoundError();
+    }
+    return this.runPlan({
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+      ...(params.name !== undefined && { name: params.name }),
+      config: {
+        scope: { mode: "folders", folderIds: [params.folderId] },
+        targets: params.targets,
+        ...(params.repeatCount !== undefined && {
+          repeatCount: params.repeatCount,
+        }),
+        ...(params.simulatorModel !== undefined && {
+          simulatorModel: params.simulatorModel,
+        }),
+        ...(params.judgeModel !== undefined && {
+          judgeModel: params.judgeModel,
+        }),
+      },
+      idempotencyKey: params.idempotencyKey,
+      ...(params.batchRunId !== undefined && { batchRunId: params.batchRunId }),
+      ...(params.parameters !== undefined && {
+        parameters: params.parameters,
+      }),
+      ...(params.note !== undefined && { note: params.note }),
+      ...(params.actor !== undefined && { actor: params.actor }),
+    });
+  }
+
+  /**
+   * Starts a run of one test case, addressed by its id.
+   *
+   * The same path as a suite run, over a hand-picked scope of one case. The
+   * case is checked first so an id that names nothing is refused as a missing
+   * case rather than as a plan whose scope covers nothing.
+   */
+  async runScenario(params: {
+    projectId: string;
+    organizationId: string;
+    scenarioId: string;
+    targets: SuiteTarget[];
+    /** Derived from the case's name and the targets when absent. */
+    name?: string;
+    repeatCount?: number;
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+    idempotencyKey: string;
+    batchRunId?: string;
+    parameters?: RunParameterValues;
+    note?: string;
+    actor?: RunActor;
+  }): Promise<
+    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+  > {
+    const found = await this.scenarioRepository.findNamesByIds({
+      ids: [params.scenarioId],
+      projectId: params.projectId,
+    });
+    if (found.length === 0) {
+      throw new ScenarioNotFoundError();
+    }
+    return this.runPlan({
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+      ...(params.name !== undefined && { name: params.name }),
+      config: {
+        scope: { mode: "cases" },
+        scenarioIds: [params.scenarioId],
+        targets: params.targets,
+        ...(params.repeatCount !== undefined && {
+          repeatCount: params.repeatCount,
+        }),
+        ...(params.simulatorModel !== undefined && {
+          simulatorModel: params.simulatorModel,
+        }),
+        ...(params.judgeModel !== undefined && {
+          judgeModel: params.judgeModel,
+        }),
+      },
+      idempotencyKey: params.idempotencyKey,
+      ...(params.batchRunId !== undefined && { batchRunId: params.batchRunId }),
+      ...(params.parameters !== undefined && {
+        parameters: params.parameters,
+      }),
+      ...(params.note !== undefined && { note: params.note }),
+      ...(params.actor !== undefined && { actor: params.actor }),
+    });
+  }
+
+  /**
+   * The name a run takes when the caller sends none: what it covers, then
+   * what it runs against.
+   *
+   * The words are the run dialog's, so a run started from the command line
+   * and one started from the dialog over the same scope and targets resolve
+   * to one plan.
+   */
+  private async defaultPlanName(params: {
+    projectId: string;
+    organizationId: string;
+    scope: SuiteScope;
+    /** The cases a hand-picked scope covers; read by that scope alone. */
+    scenarioIds: string[];
+    targets: SuiteTarget[];
+  }): Promise<string> {
+    const [scopeLabel, targetNames] = await Promise.all([
+      this.scopeLabel({
+        projectId: params.projectId,
+        scope: params.scope,
+        scenarioIds: params.scenarioIds,
+      }),
+      this.resolveTargetNames({
+        targets: params.targets,
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+      }),
+    ]);
+    return derivePlanName({
+      scopeLabel,
+      // Stored order, so the name reads the columns in the order the results
+      // show them. A target the project no longer names reads as its id.
+      targetLabels: sortSuiteTargets(params.targets).map(
+        (target) => targetNames[target.referenceId] ?? target.referenceId,
+      ),
+    });
+  }
+
+  /**
+   * What a scope is called in a run name.
+   *
+   * Every empty rule reads as "All scenarios": a rule that names nothing
+   * covers everything the moment it is resolved, so the name says so.
+   */
+  private async scopeLabel(params: {
+    projectId: string;
+    scope: SuiteScope;
+    scenarioIds: string[];
+  }): Promise<string> {
+    const { scope } = params;
+    switch (scope.mode) {
+      case "all":
+        return RUN_ALL_SUITE_NAME;
+      case "labels":
+        return scope.labels.length === 0
+          ? RUN_ALL_SUITE_NAME
+          : scope.labels.join(", ");
+      case "folders":
+        return this.folderScopeLabel({
+          projectId: params.projectId,
+          folderIds: scope.folderIds,
+        });
+      case "cases":
+        return this.caseScopeLabel({
+          projectId: params.projectId,
+          scenarioIds: params.scenarioIds,
+        });
+    }
+  }
+
+  /**
+   * One or two test suites read by name, more read as a count: a name listing
+   * five suites is no longer a name.
+   */
+  private async folderScopeLabel(params: {
+    projectId: string;
+    folderIds: string[];
+  }): Promise<string> {
+    if (params.folderIds.length === 0) return RUN_ALL_SUITE_NAME;
+    if (params.folderIds.length > 2) {
+      return `${params.folderIds.length} test suites`;
+    }
+    const rows = await this.repository.findNamesByIds({
+      ids: params.folderIds,
+      projectId: params.projectId,
+    });
+    const nameById = new Map(rows.map((row) => [row.id, row.name]));
+    const names = params.folderIds.flatMap((id) => {
+      const name = nameById.get(id);
+      return name === undefined ? [] : [name];
+    });
+    return names.length === 0 ? RUN_ALL_SUITE_NAME : names.join(", ");
+  }
+
+  /**
+   * One hand-picked case reads by its own name, several as a count.
+   *
+   * A count in place of the one name would name every single-case run of one
+   * agent the same thing, and they would all stack onto one run plan.
+   */
+  private async caseScopeLabel(params: {
+    projectId: string;
+    scenarioIds: string[];
+  }): Promise<string> {
+    if (params.scenarioIds.length === 0) return RUN_ALL_SUITE_NAME;
+    if (params.scenarioIds.length > 1) {
+      return `${params.scenarioIds.length} scenarios`;
+    }
+    const rows = await this.scenarioRepository.findNamesByIds({
+      ids: params.scenarioIds,
+      projectId: params.projectId,
+    });
+    return rows[0]?.name ?? "Selected scenario";
   }
 
   /**
@@ -1148,6 +1540,29 @@ export class SuiteService {
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
+    const targetNames = await this.resolveTargetNames({
+      targets,
+      projectId,
+      organizationId,
+    });
+
+    return { scenarios, targets: targetNames };
+  }
+
+  /**
+   * What each target is called, by reference id.
+   *
+   * Agents and prompts live in different tables and are read in one batch
+   * each. A reference the project no longer holds is simply absent, so the
+   * caller decides what a removed target reads as.
+   */
+  private async resolveTargetNames(params: {
+    targets: SuiteTarget[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Record<string, string>> {
+    const { targets, projectId, organizationId } = params;
+
     const agentIds = targets
       .filter((t) => isSuiteAgentTargetType(t.type))
       .map((t) => t.referenceId);
@@ -1155,28 +1570,23 @@ export class SuiteService {
       .filter((t) => t.type === "prompt")
       .map((t) => t.referenceId);
 
-    const agentRows =
+    const [agentRows, promptRows] = await Promise.all([
       agentIds.length > 0
-        ? await this.agentRepository.findNamesByIds({
-            ids: agentIds,
-            projectId,
-          })
-        : [];
-
-    const promptRows =
+        ? this.agentRepository.findNamesByIds({ ids: agentIds, projectId })
+        : Promise.resolve([]),
       promptIds.length > 0
-        ? await this.llmConfigRepository.findNamesByIds({
+        ? this.llmConfigRepository.findNamesByIds({
             ids: promptIds,
             projectId,
             organizationId,
           })
-        : [];
+        : Promise.resolve([]),
+    ]);
 
-    const targetNames: Record<string, string> = {};
-    for (const r of agentRows) targetNames[r.id] = r.name;
-    for (const r of promptRows) targetNames[r.id] = r.name;
-
-    return { scenarios, targets: targetNames };
+    const names: Record<string, string> = {};
+    for (const row of agentRows) names[row.id] = row.name;
+    for (const row of promptRows) names[row.id] = row.name;
+    return names;
   }
 
   /**

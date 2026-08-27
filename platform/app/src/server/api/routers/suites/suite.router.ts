@@ -14,6 +14,7 @@ import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
 import { suiteScopeSchema } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
@@ -25,12 +26,6 @@ import {
   suiteTargetSchema,
   updateSuiteSchema,
 } from "./schemas";
-
-/**
- * How long a run plan name may be. Long enough for a derived
- * `<scope> <target> vs <target>` name, short enough to stay a name.
- */
-const MAX_PLAN_NAME_LENGTH = 200;
 
 function createSuiteService(prisma: PrismaClient) {
   return SuiteService.create({

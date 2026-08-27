@@ -317,9 +317,35 @@ describe("suites.folders integration", () => {
     });
   });
 
-  describe("folder targets", () => {
-    /** @scenario "The target chosen for a folder run is offered again next time" */
-    it("persists targets set on a folder through suites.update", async () => {
+  describe("folder execution settings", () => {
+    /** @scenario "Updating a folder with execution settings is refused with validation_error" */
+    it("refuses targets, a repeat count and models on a folder", async () => {
+      const folder = await caller.suites.folders.create({
+        projectId,
+        name: "Refunds",
+      });
+
+      await expect(
+        caller.suites.update({
+          projectId,
+          id: folder.id,
+          targets: [{ type: "http", referenceId: "agent_prod" }],
+          repeatCount: 3,
+          simulatorModel: "openai/gpt-5-mini",
+        }),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: "validation_error" }),
+      });
+
+      const kept = await prisma.simulationSuite.findFirst({
+        where: { id: folder.id, projectId },
+      });
+      expect(kept?.targets).toEqual([]);
+      expect(kept?.repeatCount).toBe(1);
+      expect(kept?.simulatorModel).toBeNull();
+    });
+
+    it("still saves a name and labels on a folder", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
         name: "Refunds",
@@ -328,13 +354,13 @@ describe("suites.folders integration", () => {
       await caller.suites.update({
         projectId,
         id: folder.id,
-        targets: [{ type: "http", referenceId: "agent_prod" }],
+        labels: ["priority"],
       });
 
-      const folders = await caller.suites.folders.getAll({ projectId });
-      expect(folders.find((f) => f.id === folder.id)?.targets).toEqual([
-        { type: "http", referenceId: "agent_prod" },
-      ]);
+      const kept = await prisma.simulationSuite.findFirst({
+        where: { id: folder.id, projectId },
+      });
+      expect(kept?.labels).toEqual(["priority"]);
     });
 
     it("refuses a direct scenarioIds write on a folder", async () => {
@@ -372,8 +398,8 @@ describe("suites.folders integration", () => {
       expect(listed.map((suite) => suite.id)).toEqual([plan.id]);
     });
 
-    /** @scenario "The v2 Test Runs list holds both folders and custom run plans" */
-    it("returns folders and custom plans when both kinds are named", async () => {
+    /** @scenario "The v2 Test Runs list holds custom run plans only" */
+    it("lists custom plans for Test Runs and folders for the suites rail", async () => {
       const refunds = await caller.suites.folders.create({
         projectId,
         name: "Refunds",
@@ -384,13 +410,15 @@ describe("suites.folders integration", () => {
       });
       const plan = await createCustomPlan("Nightly");
 
-      const listed = await caller.suites.getAll({
+      const testRuns = await caller.suites.getAll({
         projectId,
-        kinds: ["folder", "custom"],
+        kinds: ["custom"],
       });
+      expect(testRuns.map((suite) => suite.id)).toEqual([plan.id]);
 
-      expect(listed.map((suite) => suite.id).sort()).toEqual(
-        [refunds.id, checkout.id, plan.id].sort(),
+      const suites = await caller.suites.folders.getAll({ projectId });
+      expect(suites.map((suite) => suite.id).sort()).toEqual(
+        [refunds.id, checkout.id].sort(),
       );
     });
   });
