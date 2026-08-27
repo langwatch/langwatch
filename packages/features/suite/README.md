@@ -27,9 +27,10 @@ durable read model exists.
   execution port: it resolves run-only parameters and dispatches the existing
   simulation and Suite-run commands. The Suite service and its run repository
   remain package-owned.
-- `platform/app/src/components/suites/`, pages and hooks remain application
-  composition because they depend on tRPC stores, routing and page layout.
-  Simulation cards, their status treatment, and message previews import the
-  canonical `suite/web` primitives directly.
+- `platform/app/src/components/suites/` retains only page and transport
+  composition: form orchestration, routing, tRPC queries, and drawers. The
+  controlled scenario/target pickers, run dialogs, and run-history
+  presentation, transforms, polling, expansion, and store state live in
+  `suite/web` and are driven by explicit callbacks from the app.
 - The REST `/api/suites` and tRPC suite router consume the process-owned
   `app.suites`; neither transport constructs a service per request.
