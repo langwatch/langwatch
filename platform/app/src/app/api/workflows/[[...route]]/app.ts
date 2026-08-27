@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError, type Workflow } from "@langwatch/workflow-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import type { Workflow } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";

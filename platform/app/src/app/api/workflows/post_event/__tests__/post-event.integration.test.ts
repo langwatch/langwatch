@@ -32,13 +32,6 @@ import {
   resolveNlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda";
 
-// FF-on regardless of PostHog state.
-vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
-  featureFlagService: {
-    isEnabled: vi.fn().mockResolvedValue(true),
-  },
-}));
-
 // Per-owner port scheme (rchaves's call): use the 5561X / 5562X range.
 // Each port corresponds to a "real" production port + an extra trailing
 // digit, so the connection between dev port and test port is obvious

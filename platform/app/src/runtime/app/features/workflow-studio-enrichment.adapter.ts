@@ -1,14 +1,10 @@
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,
   type WorkflowLlmParameterResolution,
 } from "@langwatch/workflow-server";
-import {
-  getProjectModelProviders,
-  prepareLitellmParams,
-} from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
 import { decrypt } from "~/utils/encryption";
 
 type ProjectEnvironmentDatabase = {
@@ -90,15 +86,11 @@ export class AppWorkflowProjectEnvironmentPort extends WorkflowProjectEnvironmen
 export class AppWorkflowLlmParametersPort extends WorkflowLlmParametersPort {
   static create(input: {
     modelProviders: ModelProviderService;
-    managedProviders: ManagedProviderService;
   }): AppWorkflowLlmParametersPort {
-    return new AppWorkflowLlmParametersPort(input.modelProviders, input.managedProviders);
+    return new AppWorkflowLlmParametersPort(input.modelProviders);
   }
 
-  private constructor(
-    private readonly modelProviders: ModelProviderService,
-    private readonly managedProviders: ManagedProviderService,
-  ) {
+  private constructor(private readonly modelProviders: ModelProviderService) {
     super();
   }
 
@@ -127,11 +119,10 @@ export class AppWorkflowLlmParametersPort extends WorkflowLlmParametersPort {
           provider,
           configured: true,
           enabled: true,
-          litellmParams: await prepareLitellmParams(
-            this.modelProviders,
-            this.managedProviders,
-            { model, modelProvider, projectId: input.projectId },
-          ),
+          litellmParams: await this.modelProviders.prepareExecution({
+            model,
+            projectId: input.projectId,
+          }),
         };
       }),
     );

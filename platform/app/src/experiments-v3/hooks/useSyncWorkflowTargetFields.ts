@@ -14,9 +14,7 @@ type DerivedTargetFields = {
 };
 
 const isWorkflowAgentTarget = (target: TargetConfig): boolean =>
-  target.type === "agent" &&
-  target.agentType === "workflow" &&
-  !!target.dbAgentId;
+  target.type === "agent" && target.agentType === "workflow" && !!target.dbAgentId;
 
 const sameFields = ({
   recorded,
@@ -94,10 +92,7 @@ export const useSyncWorkflowTargetFields = () => {
     })),
   );
 
-  const workflowTargets = useMemo(
-    () => targets.filter(isWorkflowAgentTarget),
-    [targets],
-  );
+  const workflowTargets = useMemo(() => targets.filter(isWorkflowAgentTarget), [targets]);
 
   // The project's agents, the same query the agent picker uses, so this
   // usually costs nothing beyond a cache read.
@@ -124,15 +119,11 @@ export const useSyncWorkflowTargetFields = () => {
 
   useEffect(() => {
     const targets = useEvaluationsV3Store.getState().targets;
-    const pending = (JSON.parse(derived) as DerivedTargetFields[]).flatMap(
-      (fields) => {
-        const target = targets.find((t) => t.id === fields.targetId);
-        const updates = target
-          ? staleFields({ target, derived: fields })
-          : undefined;
-        return updates ? [{ targetId: fields.targetId, updates }] : [];
-      },
-    );
+    const pending = (JSON.parse(derived) as DerivedTargetFields[]).flatMap((fields) => {
+      const target = targets.find((t) => t.id === fields.targetId);
+      const updates = target ? staleFields({ target, derived: fields }) : undefined;
+      return updates ? [{ targetId: fields.targetId, updates }] : [];
+    });
 
     if (pending.length === 0) return;
 

@@ -14,13 +14,16 @@ import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
-import type { PrismaClient, WorkflowVersion } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import {
   WorkflowNotFoundError,
   WorkflowVersionNotFoundError,
+  type WorkflowVersionHistoryEntry,
   type WorkflowService,
+  type WorkflowVersion,
+  type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
@@ -35,7 +38,10 @@ import {
   recursiveAlphabeticallySortedKeys,
 } from "@langwatch/workflow-contract";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
-import { featureByKey } from "../../modelProviders/featureRegistry";
+import {
+  featureByKey,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
@@ -56,7 +62,7 @@ export const workflowRouter = createTRPCRouter({
     .query(() => {
       return {
         engineMode: "go" as const,
-        optimizeEnabled: false,
+        optimizeEnabled: false as const,
       };
     }),
 
@@ -75,6 +81,7 @@ export const workflowRouter = createTRPCRouter({
       const dsl = await prepareWorkflowDsl({
         prisma: ctx.prisma,
         projectId: input.projectId,
+        modelProviders: ctx.app.modelProviders,
         dsl: { ...input.dsl, workflow_id: workflowId },
       });
       const { workflow, version } = await ctx.app.workflows.create({
@@ -353,7 +360,7 @@ export const workflowRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(workflowApiGetByIdInputSchema)
     .permission("workflows:view")
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<WorkflowWithVersion> => {
       let workflow;
       try {
         workflow = await ctx.app.workflows.getById({
@@ -385,7 +392,7 @@ export const workflowRouter = createTRPCRouter({
   getVersions: protectedProcedure
     .input(workflowApiGetVersionsInputSchema)
     .permission("workflows:view")
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }): Promise<WorkflowVersionHistoryEntry[]> => {
       try {
         return await ctx.app.workflows.getVersionHistory({
           workflowId: input.workflowId,
@@ -1120,7 +1127,7 @@ export const saveOrCommitWorkflowVersion = async ({
   ctx: {
     prisma: PrismaClient;
     session: Session;
-    app: { workflows: WorkflowService };
+    app: { workflows: WorkflowService; modelProviders: ModelProviderService };
   };
   input: {
     projectId: string;
@@ -1134,6 +1141,7 @@ export const saveOrCommitWorkflowVersion = async ({
   const dslWithMergedConfigs = await prepareWorkflowDsl({
     prisma: ctx.prisma,
     projectId: input.projectId,
+    modelProviders: ctx.app.modelProviders,
     dsl: input.dsl,
   });
   const updatedVersion = await ctx.app.workflows.saveVersion({
@@ -1169,10 +1177,12 @@ async function prepareWorkflowDsl({
   prisma,
   projectId,
   dsl,
+  modelProviders,
 }: {
   prisma: PrismaClient;
   projectId: string;
   dsl: z.infer<typeof studioWorkflowSchema>;
+  modelProviders?: ModelProviderService;
 }): Promise<z.infer<typeof studioWorkflowSchema>> {
   // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
   // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
@@ -1187,6 +1197,7 @@ async function prepareWorkflowDsl({
     prisma,
     projectId,
     dsl: dslWithMergedConfigs,
+    modelProviders,
   });
   return dslWithMergedConfigs;
 }

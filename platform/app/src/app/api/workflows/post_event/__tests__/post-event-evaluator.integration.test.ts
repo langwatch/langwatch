@@ -36,12 +36,6 @@ import {
   resolveNlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda";
 
-vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
-  featureFlagService: {
-    isEnabled: vi.fn().mockResolvedValue(true),
-  },
-}));
-
 // Per-owner port scheme: 5561X / 5562X range (production port + extra
 // trailing digit, makes the dev↔test connection obvious to readers).
 // Each live integration test that spawns its own nlpgo subprocess

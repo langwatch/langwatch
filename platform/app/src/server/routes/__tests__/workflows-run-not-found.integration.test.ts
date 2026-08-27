@@ -15,6 +15,7 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
+import { globalForApp } from "~/server/app-layer/app";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
@@ -128,20 +129,18 @@ describe("POST /api/workflows/:workflowId/run", () => {
     expect(body.message).toBe("Workflow not published");
   });
 
-  describe("when runWorkflow throws an untyped error", () => {
+  describe("when WorkflowService.run throws an untyped error", () => {
     afterEach(() => {
-      vi.doUnmock("~/server/workflows/runWorkflow");
-      vi.resetModules();
+      vi.restoreAllMocks();
     });
 
-    /** @scenario An untyped runWorkflow error still returns a safe 500, not a leaked message */
+    /** @scenario An untyped workflow error still returns a safe 500. */
     it("returns a generic 500 without leaking the internal error message", async () => {
-      vi.resetModules();
-      vi.doMock("~/server/workflows/runWorkflow", () => ({
-        runWorkflow: vi
-          .fn()
-          .mockRejectedValue(new Error("db connection refused at 10.0.0.5")),
-      }));
+      const application = globalForApp.__langwatch_app;
+      if (!application) throw new Error("test App was not initialized");
+      vi.spyOn(application.workflows, "run").mockRejectedValue(
+        new Error("db connection refused at 10.0.0.5"),
+      );
       const { app } = await import("../misc");
 
       const res = await app.request(`/api/workflows/${unpublishedWorkflowId}/run`, {

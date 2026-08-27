@@ -16,7 +16,8 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { useWorkflowTargetAgentData } from "./useWorkflowTargetAgentData";
 
 export type AgentWorkflowTargetEditorDrawerProps = {
@@ -130,7 +131,7 @@ export function AgentWorkflowTargetEditorDrawer(
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}
                         icon={workflowQuery.data.icon}
-                        updatedAt={workflowQuery.data.updatedAt}
+                        updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
                         action={
                           <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
                         }
@@ -141,7 +142,7 @@ export function AgentWorkflowTargetEditorDrawer(
                     <WorkflowCardDisplay
                       name={workflowQuery.data.name}
                       icon={workflowQuery.data.icon}
-                      updatedAt={workflowQuery.data.updatedAt}
+                      updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
                       width="300px"
                     />
                   )}

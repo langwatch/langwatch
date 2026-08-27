@@ -7,8 +7,8 @@ import { NoDataInfoBlock } from "../../components/NoDataInfoBlock";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { WorkflowCreateDialog } from "../../components/workflows/CreateWorkflowButton";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
 
@@ -51,15 +51,9 @@ function Workflows() {
         </PageLayout.Container>
       ) : (
         <VStack gap={6} width="full" align="start" padding={6}>
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
-            gap={6}
-            width="full"
-          >
+          <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
             {workflows.isLoading &&
-              Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} height="200px" />
-              ))}
+              Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} height="200px" />)}
             {workflows.data?.map((workflow) => (
               // Armed, the card can be handed to Langy; the link still opens the
               // studio exactly as before. The chip id matches the one
@@ -72,11 +66,7 @@ function Workflows() {
                   name: workflow.name,
                 })}
               >
-                <Link
-                  href={`/${project?.slug}/studio/${workflow.id}`}
-                  display="block"
-                  asChild
-                >
+                <Link href={`/${project?.slug}/studio/${workflow.id}`} display="block" asChild>
                   <WorkflowCard
                     workflowId={workflow.id}
                     query={workflows}
@@ -101,7 +91,7 @@ function Workflows() {
         </VStack>
       )}
 
-      <NewWorkflowModal open={open} onClose={onClose} />
+      <WorkflowCreateDialog open={open} onClose={onClose} />
     </DashboardLayout>
   );
 }

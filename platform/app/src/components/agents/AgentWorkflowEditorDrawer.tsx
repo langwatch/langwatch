@@ -22,7 +22,8 @@ import type { FieldMapping, Variable } from "~/components/variables";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type {
   CustomComponentConfig,
   Field as DSLField,
@@ -344,7 +345,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}
                         icon={workflowQuery.data.icon}
-                        updatedAt={workflowQuery.data.updatedAt}
+                        updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
                         action={
                           <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
                         }
@@ -355,7 +356,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                     <WorkflowCardDisplay
                       name={workflowQuery.data.name}
                       icon={workflowQuery.data.icon}
-                      updatedAt={workflowQuery.data.updatedAt}
+                      updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
                       width="300px"
                     />
                   )}

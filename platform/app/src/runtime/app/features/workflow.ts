@@ -1,57 +1,58 @@
 import type { DatasetService } from "@langwatch/dataset-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PostgresWorkflowAdapter,
   WorkflowDslMigrationPort,
-  WorkflowExecutionPort,
-  type WorkflowExecutionInput,
+  WorkflowNlpRuntimePort,
   type WorkflowLlmParametersPort,
   type WorkflowProjectEnvironmentPort,
 } from "@langwatch/workflow-server";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowDsl } from "@langwatch/workflow-contract";
 import {
-  migrateWorkflowDslForExecution,
-  WorkflowNlpExecutor,
-} from "~/server/workflows/runWorkflow";
+  migrateDSLVersion,
+  type StudioClientEvent,
+  type WorkflowDsl,
+  type WorkflowRunOrigin,
+  type WorkflowService,
+} from "@langwatch/workflow-contract";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
+import { nlpgoFetch } from "~/server/nlpgo/nlpgoFetch";
 
 /** App composition supplies one WorkflowService through request context. */
 export type AppWorkflowRuntimeOptions = {
   database: PrismaClient;
   datasets: DatasetService;
-  execution?: WorkflowExecutionPort;
   dslMigration?: WorkflowDslMigrationPort;
-  generateId?: () => string;
   projectEnvironment: WorkflowProjectEnvironmentPort;
   llmParameters: WorkflowLlmParametersPort;
+  modelProviders: ModelProviderService;
+  nlpRuntime: WorkflowNlpRuntimePort;
 };
 
-/** Binds the process-owned Workflow NLP executor to the canonical port. */
-export class AppWorkflowExecutionPort extends WorkflowExecutionPort {
-  static create(): AppWorkflowExecutionPort {
-    return new AppWorkflowExecutionPort();
+export class AppWorkflowNlpRuntimePort extends WorkflowNlpRuntimePort {
+  static create(nlpLambda: NlpLambdaRuntime): AppWorkflowNlpRuntimePort {
+    return new AppWorkflowNlpRuntimePort(nlpLambda);
   }
 
-  private constructor() {
+  private constructor(private readonly nlpLambda: NlpLambdaRuntime) {
     super();
   }
 
-  private executor: WorkflowNlpExecutor | undefined;
-
-  connect(executor: WorkflowNlpExecutor): void {
-    if (this.executor) {
-      throw new Error("Workflow execution port is already connected.");
-    }
-
-    this.executor = executor;
-  }
-
-  execute(input: WorkflowExecutionInput): Promise<unknown> {
-    if (!this.executor) {
-      throw new Error("Workflow execution port is not connected.");
-    }
-
-    return this.executor.execute(input);
+  dispatch(input: {
+    projectId: string;
+    body: StudioClientEvent;
+    origin: WorkflowRunOrigin;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }) {
+    return nlpgoFetch(this.nlpLambda, {
+      projectId: input.projectId,
+      path: "/studio/execute_sync",
+      body: input.body,
+      origin: input.origin,
+      causalityDepth: input.causalityDepth,
+      parentTrace: input.parentTrace,
+    });
   }
 }
 
@@ -65,7 +66,7 @@ export class AppWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
   }
 
   migrate(dsl: WorkflowDsl): WorkflowDsl {
-    return migrateWorkflowDslForExecution(dsl);
+    return migrateDSLVersion(dsl);
   }
 }
 
