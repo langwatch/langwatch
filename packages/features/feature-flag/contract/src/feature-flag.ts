@@ -139,7 +139,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Per-project (distinctId = project id) disable for OTLP span token estimation. Operators can opt a single tenant out before reaching for the global switch.",
+      "Per-project disable for OTLP span token estimation. Operators can opt a single tenant out before reaching for the global switch.",
     family: "Collector",
   },
 

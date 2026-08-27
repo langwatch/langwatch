@@ -204,6 +204,13 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
   Rule: Authenticated targets are authorised exactly
 
     @unit
+    Scenario: Target rule context is derived from one canonical target
+      Given a signed-in caller resolving a project target
+      When the service evaluates a tenant and percentage rule
+      Then project, organization, and user bucket context come from that target
+      And the caller supplies no separate identity or bucketing arguments
+
+    @unit
     Scenario: A project cannot be paired with another organization
       Given a caller may view a project
       When they resolve it with an organization that does not own it
@@ -329,6 +336,12 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       Then it is refused
 
   Rule: Tenant policy is authorised against the exact scope it names
+
+    @unit
+    Scenario: A viewer cannot read tenant experiment policy
+      Given a member who may view a project but cannot manage its experiments
+      When they read the experiment catalogue
+      Then project and organization policy fields are absent
 
     @unit
     Scenario: Setting a project policy requires the manage permission on that project

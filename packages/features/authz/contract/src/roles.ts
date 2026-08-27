@@ -92,6 +92,7 @@ const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
   "gatewayCacheRules:delete",
   "gatewayCacheRules:manage",
   "langy:manage",
+  "featureFlags:manageExperiments",
 ];
 
 /**
@@ -161,6 +162,7 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "webhookEndpoints:manage",
   "gatewaySpend:view",
   "gatewaySpend:manage",
+  "featureFlags:manageExperiments",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];

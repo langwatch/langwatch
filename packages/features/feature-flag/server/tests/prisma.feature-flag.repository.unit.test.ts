@@ -5,12 +5,9 @@
  * repository, the row store and the service rather than through an
  * assertion on call arguments.
  *
- * `tryGetStoredValue` keeps "no row" as a distinct `null` so the caller can
- * decide whether to fall through to the registry default. Per-span
- * ingestion cannot afford full resolution, so it calls `isEnabledFromStore`
- * instead. That makes the registry default the thing an unconfigured
- * deployment actually gets, which is what these tests pin: reading the
- * registry object alone would prove nothing about the path the edge takes.
+ * The public service resolves through that repository path. An absent row
+ * falls through to the registry default; callers do not reproduce that
+ * nullable decision outside the service.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PostgresFeatureFlagAdapter } from "../src/adapters/postgres.feature-flag.adapter";
@@ -99,16 +96,8 @@ describe("given no operator row exists for the trace blob offload flag", () => {
       const service = buildService();
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(true);
-    });
-
-    it("still reports the raw absence as null, which full resolution needs", async () => {
-      const service = buildService();
-
-      await expect(
-        service.tryGetStoredValue(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
-      ).resolves.toBeNull();
     });
   });
 });
@@ -124,7 +113,7 @@ describe("given an operator switched the trace blob offload flag off fleet-wide"
       });
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(false);
     });
   });
@@ -137,7 +126,10 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
       await writeOptOutRule(service);
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: OPTED_OUT_PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, {
+          kind: "project",
+          projectId: OPTED_OUT_PROJECT_ID,
+        }),
       ).resolves.toBe(false);
     });
   });
@@ -148,7 +140,7 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
       await writeOptOutRule(service);
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(true);
     });
 
@@ -172,7 +164,7 @@ describe("given a rule-only write for a flag whose registry default is off", () 
       });
 
       await expect(
-        service.isEnabledFromStore(MEDIA_EXTRACTION, { projectId: PROJECT_ID }),
+        service.isEnabled(MEDIA_EXTRACTION, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(false);
     });
   });
@@ -185,7 +177,7 @@ describe("given the database read fails", () => {
       const service = buildService();
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(true);
     });
   });
@@ -203,7 +195,7 @@ describe("given an operator clears a flag", () => {
       await service.clearStoredFlag({ key: BLOB_OFFLOAD, lastEditedBy: "operator-1" });
 
       await expect(
-        service.isEnabledFromStore(BLOB_OFFLOAD, { projectId: PROJECT_ID }),
+        service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
       ).resolves.toBe(true);
     });
   });

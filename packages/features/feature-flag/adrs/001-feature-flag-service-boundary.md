@@ -72,6 +72,10 @@ requested scope, and a project is checked against its owning organisation.
 Legacy per-organisation procedures silently omit non-members to avoid becoming
 a membership oracle.
 
+The service accepts that canonical target directly. It derives tenant rule
+context and percentage bucketing centrally; callers do not pass separate
+identity, bucketing, project and organisation argument bags.
+
 The authenticated map contains only registered browser flags. The anonymous
 map has a separate, smaller allowlist. Its random v4 browser identifier is
 stored alone; it is not a device fingerprint and rotates when site data is
@@ -96,6 +100,10 @@ reverse the decision.
 Personal enrolment is stored only for authenticated users. Leaving deletes the
 row. Anonymous experiments must opt into the public allowlist and have no
 personal or tenant preference.
+
+Tenant policies are manager data. The authenticated catalogue transport strips
+project and organisation policies unless the viewer holds
+`featureFlags:manageExperiments` on that exact scope.
 
 ## Persistence
 

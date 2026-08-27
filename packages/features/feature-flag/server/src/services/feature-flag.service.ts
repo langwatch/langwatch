@@ -1,12 +1,8 @@
 import {
-  bucketingIdForTarget,
-  distinctIdForTarget,
   isExperimentVisibleToTarget,
   evaluateRules,
   FeatureFlagService as FeatureFlagServiceContract,
-  organizationIdForTarget,
-  projectIdForTarget,
-  publicAnonymousFlagMapSchema,
+  ruleContextForTarget,
   resolveExperimentDecision,
   resolveEffectiveForListing,
   type ExperimentCatalogueEntry,
@@ -14,7 +10,6 @@ import {
   type ExperimentTenantPolicy,
   type ExperimentTenantScope,
   type AuthenticatedExperimentTarget,
-  type FeatureFlagEvaluateOptions,
   type FeatureFlagConfig,
   type FeatureFlagKey,
   type FeatureFlagRegistry,
@@ -25,7 +20,7 @@ import {
   type FrontendFeatureFlagMap,
   type OperatorFeatureFlagCatalogue,
   type RuleEvaluationContext,
-  type StoredFeatureFlag,
+  type FeatureFlagTarget,
   FeatureFlagExperimentUnavailableError,
   UnknownFeatureFlagError,
   UnknownFeatureFlagExperimentError,
@@ -64,23 +59,25 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     );
   }
 
-  async isEnabled(flagKey: FeatureFlagKey, options: FeatureFlagEvaluateOptions): Promise<boolean> {
+  async isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> {
     const definition = this.registry.resolve(flagKey);
-    if (!definition) throw new UnknownFeatureFlagError(flagKey);
+    if (!definition) {
+      throw new UnknownFeatureFlagError(flagKey);
+    }
 
     const override = this.config.overrides.get(flagKey);
-    if (override !== undefined) return override;
+    if (override !== undefined) {
+      return override;
+    }
 
-    if (this.config.forceEnabled.has(flagKey)) return true;
+    if (this.config.forceEnabled.has(flagKey)) {
+      return true;
+    }
 
-    const context = {
-      projectId: options.projectId,
-      organizationId: options.organizationId,
-      bucketingId: options.bucketingId,
-    };
-
-    const stored = await this.tryGetStoredValue(flagKey, context);
-    if (stored !== null) return stored;
+    const stored = await this.tryResolveStoredValue(flagKey, ruleContextForTarget(target));
+    if (stored !== null) {
+      return stored;
+    }
 
     return definition.defaultValue;
   }
@@ -88,15 +85,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
   async resolveFrontendFlags(
     target: AuthenticatedExperimentTarget,
   ): Promise<FrontendFeatureFlagMap> {
-    const options = {
-      distinctId: distinctIdForTarget(target),
-      projectId: projectIdForTarget(target),
-      organizationId: organizationIdForTarget(target),
-      bucketingId: bucketingIdForTarget(target),
-    };
     const availability = await Promise.all(
       this.registry.browserVisibleKeys.map(
-        async (flag) => [flag, await this.isEnabled(flag, options)] as const,
+        async (flag) => [flag, await this.isEnabled(flag, target)] as const,
       ),
     );
     const decided = await this.decideExperiments({
@@ -113,17 +104,13 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     kind: "anonymous";
     anonymousId: string;
   }): Promise<PublicAnonymousFlagMap> {
-    const options = {
-      distinctId: distinctIdForTarget(target),
-      bucketingId: bucketingIdForTarget(target),
-    };
     const resolved = await Promise.all(
       this.registry.publicAnonymousKeys.map(
-        async (flag) => [flag, await this.isEnabled(flag, options)] as const,
+        async (flag) => [flag, await this.isEnabled(flag, target)] as const,
       ),
     );
 
-    return publicAnonymousFlagMapSchema.parse(Object.fromEntries(resolved));
+    return this.registry.publicAnonymousMapSchema.parse(Object.fromEntries(resolved));
   }
 
   /** Every browser-visible key, present exactly once, parsed not asserted. */
@@ -145,7 +132,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     const visible = this.registry
       .experiments()
       .filter(({ experiment }) => isExperimentVisibleToTarget({ experiment, target }));
-    if (visible.length === 0) return [];
+    if (visible.length === 0) {
+      return [];
+    }
 
     const settings = await this.readSettings({
       target,
@@ -154,12 +143,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
 
     const entries = await Promise.all(
       visible.map(async ({ key, experiment }) => {
-        const available = await this.isEnabled(key, {
-          distinctId: distinctIdForTarget(target),
-          projectId: projectIdForTarget(target),
-          organizationId: organizationIdForTarget(target),
-          bucketingId: bucketingIdForTarget(target),
-        });
+        const available = await this.isEnabled(key, target);
         const projectPolicy = settings.policyFor("PROJECT", key);
         const organizationPolicy = settings.policyFor("ORGANIZATION", key);
         const { enabled, decision } = resolveExperimentDecision({
@@ -175,7 +159,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
         // experiment, so an unavailable one is omitted rather than listed
         // as present-and-off. A tenant-disabled experiment is still
         // available, so it stays visible for the owner to re-enable.
-        if (!available) return undefined;
+        if (!available) {
+          return undefined;
+        }
 
         return {
           key,
@@ -215,19 +201,17 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
         subjectType: "USER",
         subjectId: target.userId,
       });
+
       return;
     }
 
     // Joining is only possible for someone the experiment is actually open
     // to, so an enrolment row can never exist for a person outside the
     // rollout.
-    const available = await this.isEnabled(flagKey, {
-      distinctId: distinctIdForTarget(target),
-      projectId: projectIdForTarget(target),
-      organizationId: organizationIdForTarget(target),
-      bucketingId: bucketingIdForTarget(target),
-    });
-    if (!available) throw new FeatureFlagExperimentUnavailableError();
+    const available = await this.isEnabled(flagKey, target);
+    if (!available) {
+      throw new FeatureFlagExperimentUnavailableError();
+    }
 
     await this.experiments.upsert({
       flagKey,
@@ -264,6 +248,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
 
     if (policy === "inherit") {
       await this.experiments.remove({ flagKey, ...subject });
+
       return;
     }
 
@@ -293,7 +278,10 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
         decided.set(key, false);
       }
     }
-    if (visible.length === 0) return decided;
+
+    if (visible.length === 0) {
+      return decided;
+    }
 
     const settings = await this.readSettings({
       target,
@@ -328,9 +316,11 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     if (target.kind !== "anonymous") {
       subjects.push({ subjectType: "USER", subjectId: target.userId });
     }
+
     if (target.kind === "project") {
       subjects.push({ subjectType: "PROJECT", subjectId: target.projectId });
     }
+
     if (target.kind === "project" || target.kind === "organization") {
       subjects.push({ subjectType: "ORGANIZATION", subjectId: target.organizationId });
     }
@@ -343,43 +333,32 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     return {
       policyFor: (subjectType, flagKey) => {
         const stored = bySubject.get(`${subjectType} ${flagKey}`);
-        if (stored === undefined) return "inherit";
+        if (stored === undefined) {
+          return "inherit";
+        }
+
         return stored ? "enabled" : "disabled";
       },
       enrolled: (flagKey) => bySubject.get(`USER ${flagKey}`) === true,
     };
   }
 
-  async isEnabledFromStore(
-    flagKey: FeatureFlagKey,
-    context: RuleEvaluationContext = {},
-  ): Promise<boolean> {
-    const definition = this.registry.resolve(flagKey);
-    if (!definition) throw new UnknownFeatureFlagError(flagKey);
-
-    const stored = await this.tryGetStoredValue(flagKey, context);
-    if (stored !== null) return stored;
-
-    return definition.defaultValue;
-  }
-
-  async tryGetStoredValue(
+  private async tryResolveStoredValue(
     flagKey: string,
     context: RuleEvaluationContext = {},
   ): Promise<boolean | null> {
     const row = await this.rows.tryGetRow(flagKey);
-    if (row === null) return null;
+    if (row === null) {
+      return null;
+    }
 
     const ruleHit = evaluateRules(row.rules, context, flagKey);
+
     return ruleHit ?? row.enabled;
   }
 
-  async listStoredFlags(): Promise<StoredFeatureFlag[]> {
-    return await this.repository.findAll();
-  }
-
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {
-    const stored = await this.listStoredFlags();
+    const stored = await this.repository.findAll();
     const registeredKeys = new Set(this.registry.definitions.map(({ key }) => key));
     const flags = this.registry.definitions.map((definition) => {
       const row = stored.find(({ key }) => key === definition.key);
@@ -442,7 +421,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     enabled,
     lastEditedBy,
   }: FeatureFlagWrite & { enabled: boolean }): Promise<void> {
-    if (!this.registry.resolve(key)) throw new UnknownFeatureFlagError(key);
+    if (!this.registry.resolve(key)) {
+      throw new UnknownFeatureFlagError(key);
+    }
 
     await this.repository.upsertEnabled({ key, enabled, lastEditedBy });
     await this.rows.invalidate(key);
@@ -453,7 +434,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     rules,
     lastEditedBy,
   }: FeatureFlagWrite & { rules: FeatureFlagRules }): Promise<void> {
-    if (!this.registry.resolve(key)) throw new UnknownFeatureFlagError(key);
+    if (!this.registry.resolve(key)) {
+      throw new UnknownFeatureFlagError(key);
+    }
 
     await this.repository.upsertRules({
       key,

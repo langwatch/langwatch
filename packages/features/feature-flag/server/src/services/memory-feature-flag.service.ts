@@ -5,16 +5,13 @@ import {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,
   publicAnonymousFlagMapSchema,
   type ExperimentCatalogueEntry,
-  type FeatureFlagEvaluateOptions,
-  type FeatureFlagKey,
+  type FeatureFlagTarget,
   type FeatureFlagRules,
   type FeatureFlagWrite,
   type FrontendFeatureFlag,
   type FrontendFeatureFlagMap,
   type OperatorFeatureFlagCatalogue,
   type PublicAnonymousFlagMap,
-  type RuleEvaluationContext,
-  type StoredFeatureFlag,
 } from "@langwatch/feature-flag-contract";
 
 /**
@@ -31,7 +28,7 @@ export class MemoryFeatureFlagService extends FeatureFlagService {
     return new MemoryFeatureFlagService();
   }
 
-  async isEnabled(flagKey: string, _options: FeatureFlagEvaluateOptions): Promise<boolean> {
+  async isEnabled(flagKey: string, _target: FeatureFlagTarget): Promise<boolean> {
     return this.flags.get(flagKey) ?? false;
   }
 
@@ -67,24 +64,6 @@ export class MemoryFeatureFlagService extends FeatureFlagService {
         PUBLIC_ANONYMOUS_FEATURE_FLAGS.map((flag) => [flag, this.flags.get(flag) ?? false]),
       ),
     );
-  }
-
-  async isEnabledFromStore(
-    flagKey: FeatureFlagKey,
-    _context: RuleEvaluationContext,
-  ): Promise<boolean> {
-    return this.flags.get(flagKey) ?? false;
-  }
-
-  async tryGetStoredValue(
-    flagKey: string,
-    _context: RuleEvaluationContext,
-  ): Promise<boolean | null> {
-    return this.flags.get(flagKey) ?? null;
-  }
-
-  async listStoredFlags(): Promise<StoredFeatureFlag[]> {
-    return [];
   }
 
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {

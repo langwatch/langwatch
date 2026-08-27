@@ -8,7 +8,7 @@ import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "./ports/feature
 import { MemoryFeatureFlagExperimentRepository } from "./repositories/memory/feature-flag-experiment-setting.repository";
 import { MemoryFeatureFlagRepository } from "./repositories/memory/feature-flag.repository";
 import { FeatureFlagService } from "./services/feature-flag.service";
-import { FeatureFlagRowStore } from "./stores/feature-flag-row.store";
+import { CachedFeatureFlagRowAdapter } from "./adapters/cached.feature-flag-row.adapter";
 
 export { MemoryFeatureFlagExperimentRepository, MemoryFeatureFlagRepository };
 export { MemoryFeatureFlagService } from "./services/memory-feature-flag.service";
@@ -51,7 +51,7 @@ export function createInMemoryFeatureFlagService(options?: {
   const cache = new MemoryFeatureFlagCache();
   const service = FeatureFlagService.create({
     repository,
-    rows: FeatureFlagRowStore.create({ repository, cache, now }),
+    rows: CachedFeatureFlagRowAdapter.create({ repository, cache, now }),
     experiments,
     config,
     registry: options?.registry ?? FEATURE_FLAG_REGISTRY,

@@ -32,7 +32,11 @@ export {
   parseRules,
   resolveEffectiveForListing,
 } from "./feature-flag-rules";
-export type { FeatureFlagTarget, FeatureFlagTargetInput } from "./feature-flag-target";
+export type {
+  AuthenticatedFeatureFlagTargetInput,
+  FeatureFlagTarget,
+  FeatureFlagTargetInput,
+} from "./feature-flag-target";
 export {
   FeatureFlagExperimentUnavailableError,
   UnknownFeatureFlagError,
@@ -48,6 +52,8 @@ export type {
   FeatureFlagExperiment,
 } from "./feature-flag-experiment";
 export {
+  experimentCatalogueEntrySchema,
+  experimentDecisionSchema,
   experimentTenantPolicySchema,
   findExperimentDefinitionViolations,
   isExperimentVisibleToTarget,
@@ -65,13 +71,15 @@ export {
 export {
   bucketingIdForTarget,
   distinctIdForTarget,
+  authenticatedFeatureFlagTargetInputSchema,
+  anonymousFeatureFlagTargetSchema,
   featureFlagTargetInputSchema,
   organizationIdForTarget,
   projectIdForTarget,
+  ruleContextForTarget,
   SYSTEM_DISTINCT_ID,
 } from "./feature-flag-target";
 export type {
-  FeatureFlagEvaluateOptions,
   FrontendFeatureFlagMap,
   FeatureFlagWrite,
   OperatorFeatureFlag,

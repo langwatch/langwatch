@@ -1,6 +1,5 @@
 import { z } from "zod";
-import type { FeatureFlagTarget } from "./feature-flag-target";
-import type { FrontendFeatureFlag } from "./frontend-feature-flags";
+import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-feature-flags";
 
 /**
  * The targets an experiment can be evaluated for.
@@ -10,17 +9,14 @@ import type { FrontendFeatureFlag } from "./frontend-feature-flags";
  * neither enrol nor be bucketed. Excluding it from the type makes the
  * unanswerable case unrepresentable instead of silently answering it.
  */
-export type ExperimentEvaluationTarget = Exclude<FeatureFlagTarget, { kind: "system" }>;
+export type AuthenticatedExperimentTarget =
+  | { kind: "project"; userId: string; projectId: string; organizationId: string }
+  | { kind: "organization"; userId: string; organizationId: string }
+  | { kind: "user"; userId: string };
 
-/**
- * The targets that carry a person, and so the only ones an enrolment can be
- * written for. Excluding `anonymous` here is what stops a browser id ever
- * reaching the enrolment table.
- */
-export type AuthenticatedExperimentTarget = Exclude<
-  ExperimentEvaluationTarget,
-  { kind: "anonymous" }
->;
+export type ExperimentEvaluationTarget =
+  | AuthenticatedExperimentTarget
+  | { kind: "anonymous"; anonymousId: string };
 
 /**
  * Experiment metadata on a flag definition.
@@ -76,6 +72,15 @@ export type ExperimentDecision =
   | "user-not-enrolled"
   | "anonymous-bucket";
 
+export const experimentDecisionSchema = z.enum([
+  "unavailable",
+  "tenant-disabled",
+  "tenant-enabled",
+  "user-enrolled",
+  "user-not-enrolled",
+  "anonymous-bucket",
+]);
+
 /**
  * One experiment as a viewer sees it.
  *
@@ -98,6 +103,20 @@ export interface ExperimentCatalogueEntry {
   projectPolicy?: ExperimentTenantPolicy;
   organizationPolicy?: ExperimentTenantPolicy;
 }
+
+export const experimentCatalogueEntrySchema = z
+  .object({
+    key: frontendFeatureFlagSchema,
+    title: z.string(),
+    summary: z.string(),
+    catalogueVersion: z.number().int().positive(),
+    enabled: z.boolean(),
+    decision: experimentDecisionSchema,
+    userEnrolled: z.boolean(),
+    projectPolicy: experimentTenantPolicySchema.optional(),
+    organizationPolicy: experimentTenantPolicySchema.optional(),
+  })
+  .strict();
 
 /**
  * Whether this target may see the experiment at all.

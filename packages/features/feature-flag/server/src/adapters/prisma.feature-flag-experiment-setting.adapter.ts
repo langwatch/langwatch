@@ -2,7 +2,7 @@ import {
   FeatureFlagExperimentRepository,
   type ExperimentSetting,
   type ExperimentSubject,
-} from "./feature-flag-experiment-setting.repository";
+} from "../repositories/feature-flag-experiment-setting.repository";
 
 type DelegateCall<TResult> = {
   bivariant(input: object): Promise<TResult>;
@@ -18,13 +18,15 @@ export type FeatureFlagExperimentDatabase = {
   featureFlagExperimentSetting: ExperimentSettingDelegate;
 };
 
-export class PrismaFeatureFlagExperimentRepository extends FeatureFlagExperimentRepository {
+export class PrismaFeatureFlagExperimentSettingAdapter extends FeatureFlagExperimentRepository {
   private constructor(private readonly database: FeatureFlagExperimentDatabase) {
     super();
   }
 
-  static create(database: FeatureFlagExperimentDatabase): PrismaFeatureFlagExperimentRepository {
-    return new PrismaFeatureFlagExperimentRepository(database);
+  static create(
+    database: FeatureFlagExperimentDatabase,
+  ): PrismaFeatureFlagExperimentSettingAdapter {
+    return new PrismaFeatureFlagExperimentSettingAdapter(database);
   }
 
   async findForSubjects({
@@ -36,7 +38,7 @@ export class PrismaFeatureFlagExperimentRepository extends FeatureFlagExperiment
   }): Promise<ExperimentSetting[]> {
     if (flagKeys.length === 0 || subjects.length === 0) return [];
 
-    return await this.database.featureFlagExperimentSetting.findMany({
+    return this.database.featureFlagExperimentSetting.findMany({
       where: {
         flagKey: { in: [...flagKeys] },
         OR: subjects.map((subject) => ({

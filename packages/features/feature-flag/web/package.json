@@ -2,7 +2,7 @@
   "name": "@langwatch/feature-flag-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe anonymous id for feature flag bucketing.",
+  "description": "Feature flag browser behaviour and controlled presentation.",
   "files": [
     "src"
   ],

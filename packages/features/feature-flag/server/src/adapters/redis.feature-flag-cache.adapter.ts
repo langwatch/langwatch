@@ -1,5 +1,4 @@
 import { KILL_SWITCH_CACHE_TTL_MS, featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import { z } from "zod";
 import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "../ports/feature-flag-cache.port";
 
@@ -18,14 +17,20 @@ type MemoryEntry = {
   expiresAt: number;
 };
 
-export class RedisFeatureFlagCache extends FeatureFlagCachePort {
+export interface FeatureFlagRedisConnection {
+  get(key: string): Promise<string | null>;
+  setex(key: string, ttlSeconds: number, value: string): Promise<unknown>;
+  del(key: string): Promise<unknown>;
+}
+
+export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
   private readonly memory = new Map<string, MemoryEntry>();
 
-  static create(redis: RedisConnection | null): RedisFeatureFlagCache {
-    return new RedisFeatureFlagCache(redis);
+  static create(redis: FeatureFlagRedisConnection | null): RedisFeatureFlagCacheAdapter {
+    return new RedisFeatureFlagCacheAdapter(redis);
   }
 
-  private constructor(private readonly redis: RedisConnection | null) {
+  private constructor(private readonly redis: FeatureFlagRedisConnection | null) {
     super();
   }
 

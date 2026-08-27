@@ -27,6 +27,6 @@ export type PublicAnonymousFeatureFlag = (typeof PUBLIC_ANONYMOUS_FEATURE_FLAGS)
  * bound that matters is the allowlist itself, enforced where the map is
  * built.
  */
-export const publicAnonymousFlagMapSchema = z.record(z.string(), z.boolean());
+export const publicAnonymousFlagMapSchema = z.object({}).strict();
 
-export type PublicAnonymousFlagMap = z.infer<typeof publicAnonymousFlagMapSchema>;
+export type PublicAnonymousFlagMap = Record<string, boolean>;

@@ -12,6 +12,8 @@ import { createInMemoryFeatureFlagService } from "../src/testing";
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
+const SYSTEM_TARGET = { kind: "system" } as const;
+const USER_TARGET = { kind: "user", userId: "user-1" } as const;
 function buildService(source: Readonly<Record<string, unknown>> = {}) {
   return createInMemoryFeatureFlagService({
     config: resolveFeatureFlagConfig(source),
@@ -39,9 +41,7 @@ describe("FeatureFlagService", () => {
         });
         await writeEnabled(service, NON_ENV_OVERRIDABLE_FLAG, false);
 
-        const enabled = await service.isEnabled(NON_ENV_OVERRIDABLE_FLAG, {
-          distinctId: "user-1",
-        });
+        const enabled = await service.isEnabled(NON_ENV_OVERRIDABLE_FLAG, USER_TARGET);
 
         expect(enabled).toBe(false);
       });
@@ -53,9 +53,7 @@ describe("FeatureFlagService", () => {
       it("resolves to the registry default", async () => {
         const { service } = buildService();
 
-        const enabled = await service.isEnabled(SYSTEM_FLAG, {
-          distinctId: "tenant-a",
-        });
+        const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
         expect(enabled).toBe(false);
       });
@@ -66,9 +64,7 @@ describe("FeatureFlagService", () => {
         const { service } = buildService();
         await writeEnabled(service, SYSTEM_FLAG, true);
 
-        const enabled = await service.isEnabled(SYSTEM_FLAG, {
-          distinctId: "tenant-a",
-        });
+        const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
         expect(enabled).toBe(true);
       });
@@ -81,9 +77,7 @@ describe("FeatureFlagService", () => {
         });
         await writeEnabled(service, SYSTEM_FLAG, false);
 
-        const enabled = await service.isEnabled(SYSTEM_FLAG, {
-          distinctId: "tenant-a",
-        });
+        const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
         expect(enabled).toBe(true);
       });
@@ -95,9 +89,7 @@ describe("FeatureFlagService", () => {
           LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: "1",
         });
 
-        const enabled = await service.isEnabled(SYSTEM_FLAG, {
-          distinctId: "tenant-a",
-        });
+        const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
         expect(enabled).toBe(true);
       });
@@ -109,9 +101,7 @@ describe("FeatureFlagService", () => {
       it("resolves to the registry default", async () => {
         const { service } = buildService();
 
-        const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
-        });
+        const enabled = await service.isEnabled(PRODUCT_FLAG, USER_TARGET);
 
         expect(enabled).toBe(true);
       });
@@ -122,9 +112,7 @@ describe("FeatureFlagService", () => {
         const { service } = buildService();
         await writeEnabled(service, PRODUCT_FLAG, true);
 
-        const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
-        });
+        const enabled = await service.isEnabled(PRODUCT_FLAG, USER_TARGET);
 
         expect(enabled).toBe(true);
       });
@@ -135,9 +123,7 @@ describe("FeatureFlagService", () => {
         const { service } = buildService();
         await writeEnabled(service, PRODUCT_FLAG, false);
 
-        const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
-        });
+        const enabled = await service.isEnabled(PRODUCT_FLAG, USER_TARGET);
 
         expect(enabled).toBe(false);
       });
@@ -153,7 +139,8 @@ describe("FeatureFlagService", () => {
         });
 
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
+          kind: "organization",
+          userId: "user-1",
           organizationId: "org_lw",
         });
 
@@ -172,7 +159,8 @@ describe("FeatureFlagService", () => {
         });
 
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
+          kind: "organization",
+          userId: "user-1",
           organizationId: "org_other",
         });
 
@@ -191,7 +179,8 @@ describe("FeatureFlagService", () => {
         });
 
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
-          distinctId: "user-1",
+          kind: "organization",
+          userId: "user-1",
           organizationId: "org_self",
         });
 
@@ -207,9 +196,7 @@ describe("FeatureFlagService", () => {
       });
       await writeEnabled(service, SYSTEM_FLAG, false);
 
-      const enabled = await service.isEnabled(SYSTEM_FLAG, {
-        distinctId: "tenant-a",
-      });
+      const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
       expect(enabled).toBe(true);
     });

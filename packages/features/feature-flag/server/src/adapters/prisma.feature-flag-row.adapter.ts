@@ -4,7 +4,7 @@ import {
   type StoredFeatureFlag,
 } from "@langwatch/feature-flag-contract";
 import type { FeatureFlagRow } from "../ports/feature-flag-cache.port";
-import { FeatureFlagRepository } from "./feature-flag.repository";
+import { FeatureFlagRepository } from "../repositories/feature-flag.repository";
 
 type DelegateCall<TResult> = {
   bivariant(input: object): Promise<TResult>;
@@ -32,13 +32,13 @@ export type FeatureFlagDatabase = { featureFlag: FeatureFlagDelegate };
  * it is exempt from the tenancy middleware by design. Every query here is
  * keyed by flag key alone.
  */
-export class PrismaFeatureFlagRepository extends FeatureFlagRepository {
+export class PrismaFeatureFlagRowAdapter extends FeatureFlagRepository {
   private constructor(private readonly database: FeatureFlagDatabase) {
     super();
   }
 
-  static create(database: FeatureFlagDatabase): PrismaFeatureFlagRepository {
-    return new PrismaFeatureFlagRepository(database);
+  static create(database: FeatureFlagDatabase): PrismaFeatureFlagRowAdapter {
+    return new PrismaFeatureFlagRowAdapter(database);
   }
 
   async tryFindByKey(key: string): Promise<FeatureFlagRow | null> {

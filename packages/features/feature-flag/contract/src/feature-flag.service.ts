@@ -1,5 +1,5 @@
 import type { FeatureFlagKey } from "./feature-flag";
-import type { FeatureFlagRules, RuleEvaluationContext } from "./feature-flag-rules";
+import type { FeatureFlagRules } from "./feature-flag-rules";
 import type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
@@ -10,24 +10,7 @@ import type {
 import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags";
 import type { FrontendFeatureFlag } from "./frontend-feature-flags";
 import type { FeatureFlagScope } from "./feature-flag";
-
-/**
- * Options for evaluating a single feature flag.
- *
- * `distinctId` is required because every resolution needs an identity to
- * evaluate and trace against. The rest are optional knobs.
- */
-export interface FeatureFlagEvaluateOptions {
-  distinctId: string;
-  projectId?: string;
-  organizationId?: string;
-  /**
-   * The identity a percentage targeting rule buckets on. Set for a person
-   * resolving flags for themselves; absent for backend callers, which
-   * therefore never satisfy a percentage rule.
-   */
-  bucketingId?: string;
-}
+import type { FeatureFlagTarget } from "./feature-flag-target";
 
 /** One operator-written row, as the operator surfaces read it back. */
 export interface StoredFeatureFlag {
@@ -87,10 +70,7 @@ export abstract class FeatureFlagService {
    *
    * Throws `UnknownFeatureFlagError` for a key the registry does not define.
    */
-  abstract isEnabled(
-    flagKey: FeatureFlagKey,
-    options: FeatureFlagEvaluateOptions,
-  ): Promise<boolean>;
+  abstract isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean>;
 
   /**
    * Every browser-visible flag for one signed-in target, in one pass.
@@ -159,34 +139,6 @@ export abstract class FeatureFlagService {
     policy: ExperimentTenantPolicy;
     changedByUserId: string;
   }): Promise<void>;
-
-  /**
-   * Operator store with its targeting rules, then the registry default.
-   *
-   * For hot-path callers that need only operator-store and registry resolution.
-   * Reading the raw store instead would make an absent row read as "off"
-   * and strand the registry default, so a default-on flag would never
-   * reach a deployment with no operator row.
-   */
-  abstract isEnabledFromStore(
-    flagKey: FeatureFlagKey,
-    context: RuleEvaluationContext,
-  ): Promise<boolean>;
-
-  /**
-   * Raw store resolution. `null` means no operator row exists, which is a
-   * distinct state from a row holding `false`.
-   */
-  abstract tryGetStoredValue(
-    flagKey: string,
-    context: RuleEvaluationContext,
-  ): Promise<boolean | null>;
-
-  /**
-   * Every operator row, registered or not, so orphaned rows from removed
-   * flags stay visible and cleanable.
-   */
-  abstract listStoredFlags(): Promise<StoredFeatureFlag[]>;
 
   abstract listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
 
