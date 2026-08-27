@@ -4,9 +4,13 @@ Feature: Filing a test case into a test suite
   So that the case list stays organised as it grows
 
   Background: what a case shows.
-    A test case names at most one test suite. A case that names none is
-    unfiled. The case list groups cases under their suite name and keeps the
-    unfiled cases in a group of their own.
+    A test case belongs to exactly one test suite. A case written without one
+    named is filed into the project's Default suite, which is created on that
+    first write if the project has none, so no case is ever loose.
+
+    The column stays nullable, because an archived case keeps whatever suite it
+    had and a code-pushed case has no row at all. The rule is kept by the
+    service on the write path. See specs/suites/default-suite.feature.
 
     The folder side of this rule is in
     specs/suites/folder-membership-invariant.feature. This file covers what the
@@ -22,11 +26,11 @@ Feature: Filing a test case into a test suite
     And it appears under the "Refunds" group in the case list
 
   @integration
-  Scenario: A case created from the All test cases view starts unfiled
-    Given the All test cases view is open
+  Scenario: A case created without naming a test suite is filed into Default
+    Given a project whose cases are created without naming a test suite
     When New test case is chosen and the case is saved
-    Then the case names no test suite
-    And it appears in the unfiled group of the case list
+    Then the case is filed in the project's Default suite
+    And the Default suite is created if the project had none
 
   @integration
   Scenario: The case editor offers the test suites of the project
@@ -46,11 +50,11 @@ Feature: Filing a test case into a test suite
     And no run history is lost
 
   @integration
-  Scenario: Unfiling a case moves it to the unfiled group
+  Scenario: Taking a case out of its suite moves it to Default
     Given a case filed in "Refunds"
-    When the case is unfiled
-    Then the row moves to the loose cases at the root
-    And the case is still listed in All test cases
+    When the case is taken out of "Refunds"
+    Then the row moves under the Default suite
+    And "Refunds" no longer lists it
 
   @integration
   Scenario: Duplicating a case copies its suite

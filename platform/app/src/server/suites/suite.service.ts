@@ -9,7 +9,6 @@ import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
 import type {
   Prisma,
   PrismaClient,
@@ -45,8 +44,10 @@ import {
   SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
 } from "./errors";
-import { isDynamicScope, parseSuiteScope } from "./scope";
+import { normalizePlanScope, sortSuiteTargets } from "./plan-config";
+import { isDynamicScope, parseSuiteScope, type SuiteScope } from "./scope";
 import { readScopeMembership } from "./scope-membership";
+import { pickFreeSlug } from "./slug";
 import {
   type CreateSuiteInput,
   SuiteRepository,
@@ -767,6 +768,138 @@ export class SuiteService {
   }
 
   /**
+   * Starts a run under a NAME, which is what identifies a run plan.
+   *
+   * - the name matches a run plan of this project: the run joins that plan and
+   *   the plan's config is replaced with what the caller sent;
+   * - nothing matches: a plan is created with that name and that config.
+   *
+   * So keeping the suggested name lands a person on the plan they expect, and
+   * typing a new one forks a plan.
+   *
+   * Two things this deliberately does, both of which were bugs in the
+   * prototype:
+   *
+   * - The name is written back explicitly on the match, and the plan's slug is
+   *   left alone. A plan whose name was only ever suggested must not rename
+   *   itself when its config is replaced, or it stops answering to the name the
+   *   caller just resolved it by, and its run history moves address.
+   * - Neither the plan id nor the plan slug is derived from the config. Two
+   *   plans may hold one config and differ only by name, so a config-derived
+   *   key collides. The slug comes from the NAME, through the same
+   *   numeric-suffix retry every other suite slug uses.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  async runPlan(params: {
+    projectId: string;
+    organizationId: string;
+    name: string;
+    config: {
+      scope: SuiteScope;
+      targets: SuiteTarget[];
+      repeatCount?: number;
+      simulatorModel?: string | null;
+      judgeModel?: string | null;
+    };
+    idempotencyKey: string;
+    batchRunId?: string;
+    parameters?: RunParameterValues;
+    note?: string;
+  }): Promise<SuiteRunResult & { suiteId: string; planName: string; created: boolean }> {
+    return tracer.withActiveSpan(
+      "SuiteService.runPlan",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        const name = params.name.trim();
+        if (!name) {
+          throw new ValidationError("A run needs a name", {
+            meta: { fieldErrors: { name: ["A run needs a name"] } },
+          });
+        }
+
+        // Normalised before the plan is matched and before anything is stored,
+        // so hand-picking every suite and pressing Run all reach one plan.
+        const scope = await normalizePlanScope({
+          projectId: params.projectId,
+          scope: params.config.scope,
+          prisma: this.prisma,
+        });
+        const storedConfig = {
+          scope: scope as unknown as Prisma.InputJsonValue,
+          targets: sortSuiteTargets(params.config.targets),
+          repeatCount: params.config.repeatCount ?? 1,
+          simulatorModel: params.config.simulatorModel ?? null,
+          judgeModel: params.config.judgeModel ?? null,
+        };
+
+        const existing = await this.repository.findPlanByName({
+          projectId: params.projectId,
+          name,
+        });
+
+        let suite: SimulationSuite;
+        if (existing) {
+          // The name is written back with the config. The slug is NOT, so the
+          // plan keeps the address its run history is read under.
+          suite = await this.repository.update({
+            id: existing.id,
+            projectId: params.projectId,
+            data: { name, ...storedConfig },
+          });
+        } else {
+          const baseSlug = slugify(name) || "run-plan";
+          const initialSlug = await this.generateUniqueSlug({
+            baseSlug,
+            projectId: params.projectId,
+          });
+          suite = await this.saveWithSlugRetry({
+            initialSlug,
+            execute: (slug) =>
+              this.repository.create({
+                projectId: params.projectId,
+                name,
+                slug,
+                kind: "custom",
+                scenarioIds: [],
+                labels: [],
+                ...storedConfig,
+              }),
+            regenerateSlug: () =>
+              this.generateUniqueSlug({
+                baseSlug,
+                projectId: params.projectId,
+              }),
+          });
+        }
+        span.setAttribute("suite.id", suite.id);
+        span.setAttribute("suite.plan_created", existing === null);
+
+        const result = await this.run({
+          suite,
+          projectId: params.projectId,
+          organizationId: params.organizationId,
+          idempotencyKey: params.idempotencyKey,
+          batchRunId: params.batchRunId,
+          parameters: params.parameters,
+          note: params.note,
+        });
+        return {
+          ...result,
+          suiteId: suite.id,
+          planName: suite.name,
+          created: existing === null,
+        };
+      },
+    );
+  }
+
+  /**
    * Resolve human-readable names for archived scenario and target IDs.
    * Used by the suite edit UI to show meaningful labels in warnings.
    */
@@ -855,36 +988,21 @@ export class SuiteService {
 
   /**
    * Picks a slug not taken by any suite in the project, appending an
-   * incrementing numeric suffix (-2, -3, ...) on collision and falling back
-   * to a random suffix after 100 candidates. Mirrors the experiment service's
-   * generateUniqueSlug. A TOCTOU race between this check and the insert is
-   * closed by {@link SuiteService.saveWithSlugRetry}.
+   * incrementing numeric suffix (-2, -3, ...) on collision. A TOCTOU race
+   * between this check and the insert is closed by
+   * {@link SuiteService.saveWithSlugRetry}.
    */
   private async generateUniqueSlug(params: {
     baseSlug: string;
     projectId: string;
   }): Promise<string> {
-    const escaped = params.baseSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const suffixPattern = new RegExp(`^${escaped}(-\\d+)?$`);
-    const existingSlugs = new Set(
-      (
-        await this.repository.findSlugsByPrefix({
-          projectId: params.projectId,
-          slugPrefix: params.baseSlug,
-        })
-      ).filter((slug) => suffixPattern.test(slug)),
-    );
-
-    if (!existingSlugs.has(params.baseSlug)) {
-      return params.baseSlug;
-    }
-    for (let index = 2; index <= 102; index++) {
-      const candidate = `${params.baseSlug}-${index}`;
-      if (!existingSlugs.has(candidate)) {
-        return candidate;
-      }
-    }
-    return `${params.baseSlug}-${nanoid(8)}`;
+    return pickFreeSlug({
+      baseSlug: params.baseSlug,
+      takenSlugs: await this.repository.findSlugsByPrefix({
+        projectId: params.projectId,
+        slugPrefix: params.baseSlug,
+      }),
+    });
   }
 
   /**
