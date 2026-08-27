@@ -59,6 +59,8 @@ Take the evaluator type slug from `langwatch evaluator types --format json`, nev
 
 **Attach it, never build a comparison column for it.** `workbench.addEvaluator` with no `comparison` field adds the evaluator as a score on every target column, so it grades the baseline now and the duplicate later with nothing to wire twice. A `comparison` field instead makes the evaluator a column of its own that judges the other columns against each other, and only the Comparison judge (`langevals/select_best_compare`) may be one. Any other type carrying a `comparison` is refused. The last row of the table is the only case that needs such a column.
 
+**Name each one for what it checks.** `name` is required, and it is what the person reading the page sees on every chip. One board often carries several evaluators of one type, so the type name alone leaves three identical chips and no way to tell which score is which. Grading three label levels gives `l1 exact match`, `l2 exact match` and `l3 exact match`, never three evaluators all called `Exact Match`.
+
 **Then map it, before the first run.** `workbench.setEvaluatorMapping` takes `evaluatorId`, `datasetId`, `targetId`, `inputField` and the mapping, one call per field. For exact match that is `output` from the target column and `expected_output` from the dataset's golden column. Adding an evaluator fills the gaps it can infer, so read the state back and set every field that did not resolve.
 
 Sometimes the best move is a step back: a judge for a quality aspect the user cares about can matter more than the mechanical match. Name the option; let the user pick.
