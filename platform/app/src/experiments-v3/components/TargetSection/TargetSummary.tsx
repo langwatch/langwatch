@@ -3,6 +3,7 @@ import { memo } from "react";
 import {
   LuChevronRight,
   LuClock,
+  LuTriangleAlert,
   LuTriangleRight,
   LuZap,
 } from "react-icons/lu";
@@ -10,6 +11,7 @@ import {
   CostStatsTooltip,
   LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
+import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import {
   getPassRateGradientColor,
   PassRateCircle,
@@ -66,6 +68,11 @@ export const TargetSummary = memo(function TargetSummary({
     aggregates.completedRows > 0 ||
     aggregates.errorRows > 0 ||
     aggregates.totalCost !== null;
+
+  const coverage = passRateCoverage({
+    completedRows: aggregates.completedRows,
+    totalRows: aggregates.totalRows,
+  });
 
   // Build tooltip content
   const tooltipContent = (
@@ -265,10 +272,25 @@ export const TargetSummary = memo(function TargetSummary({
         overflow="hidden"
       >
         {/* Running progress */}
-        {isRunning && aggregates.completedRows < aggregates.totalRows && (
+        {isRunning && !coverage.isComplete && (
           <HStack gap={1}>
             <Icon as={LuZap} boxSize={3} color="blue.fg" />
             <Text color="blue.fg" fontWeight="medium">
+              {aggregates.completedRows}/{aggregates.totalRows}
+            </Text>
+          </HStack>
+        )}
+
+        {/*
+          A rate that covers part of the dataset never stands on its own.
+          The score beside it is worked out over the rows that answered, so
+          without the count a column at 30 of 40 rows reads as finished and
+          invites a comparison against a column that did answer every row.
+        */}
+        {!isRunning && !coverage.isComplete && hasResults && (
+          <HStack gap={1}>
+            <Icon as={LuTriangleAlert} boxSize={3} color="orange.fg" />
+            <Text color="orange.fg" fontWeight="medium">
               {aggregates.completedRows}/{aggregates.totalRows}
             </Text>
           </HStack>
