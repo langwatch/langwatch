@@ -72,6 +72,7 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 ## References
 
 - Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
-- Offload module: `platform/app/src/server/app-layer/evaluations/evaluation-inputs-offload.ts`
-- Unconditional caps: `platform/app/src/server/app-layer/evaluations/evaluation-column-caps.ts`
+- Offload service: `packages/features/evaluation/server/src/services/evaluation-inputs-offload.service.ts`
+- App infrastructure adapter: `platform/app/src/runtime/app/features/evaluation.ts`
+- Unconditional caps: `packages/features/evaluation/server/src/repositories/clickhouse/clickhouse-evaluation.repository.ts`
 - Related ADRs: [ADR-022](./022-event-log-source-of-truth.md) (event-log source of truth and transient spool) and the [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md).

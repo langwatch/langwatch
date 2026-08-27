@@ -82,6 +82,7 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   getResolvedDefaultForFeature,
   type ReadCtx,
@@ -1028,17 +1029,36 @@ export const getEvaluatorIncludingCustom = async (
  */
 export const resolveEvaluatorSettingsDefaults = async (
   projectId: string,
+  modelProviders?: ModelProviderService,
 ): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {
   const ctx: ReadCtx = { prisma, session: null };
   const [resolvedDefault, resolvedEmbeddings] = await Promise.all([
-    getResolvedDefaultForFeature(ctx, {
-      projectId,
-      featureKey: "evaluator.create_default",
-    }),
-    getResolvedDefaultForFeature(ctx, {
-      projectId,
-      featureKey: "analytics.topic_clustering_embeddings",
-    }),
+    modelProviders
+      ? getResolvedDefaultForFeature(
+          ctx,
+          {
+            projectId,
+            featureKey: "evaluator.create_default",
+          },
+          modelProviders,
+        )
+      : getResolvedDefaultForFeature(ctx, {
+          projectId,
+          featureKey: "evaluator.create_default",
+        }),
+    modelProviders
+      ? getResolvedDefaultForFeature(
+          ctx,
+          {
+            projectId,
+            featureKey: "analytics.topic_clustering_embeddings",
+          },
+          modelProviders,
+        )
+      : getResolvedDefaultForFeature(ctx, {
+          projectId,
+          featureKey: "analytics.topic_clustering_embeddings",
+        }),
   ]);
 
   return {
@@ -1252,7 +1272,7 @@ async function handleEvaluatorCall(
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
             evaluatorDefinition,
-            await resolveEvaluatorSettingsDefaults(project.id),
+            await resolveEvaluatorSettingsDefaults(project.id, c.app.modelProviders),
           )
         : {}),
       ...(settings as Record<string, unknown>),

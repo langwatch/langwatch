@@ -10,7 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import { resolveEvaluatorSettingsWithSource } from "~/server/event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { EvaluatorSettingsService } from "@langwatch/evaluation-server/internal";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
@@ -330,7 +330,7 @@ describe("EvaluationExecutionService", () => {
       // resolves the model env from the RECOVERED settings, so the resolver has
       // to sit in the path: revert it and `settings` collapses to the (absent)
       // monitor parameters, the model key disappears, and this goes red.
-      const { settings: RECOVERED } = resolveEvaluatorSettingsWithSource({
+      const { settings: RECOVERED } = EvaluatorSettingsService.create().resolve({
         config: {
           evaluatorType: "custom/settings-eval",
           prompt: "Score this answer for factual accuracy.",
@@ -381,8 +381,9 @@ describe("EvaluationExecutionService", () => {
           settings: { ...USER_SETTINGS },
         });
 
-        const payload = (mockClient.evaluate as ReturnType<typeof vi.fn>).mock
-          .calls[0]?.[0] as { settings?: Record<string, unknown> };
+        const payload = (mockClient.evaluate as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+          settings?: Record<string, unknown>;
+        };
 
         // Guard FIRST: an empty capture would make the equality below vacuous.
         expect(Object.keys(payload?.settings ?? {})).not.toHaveLength(0);
@@ -683,10 +684,7 @@ describe("maxCausalityDepthOfSpans", () => {
 
   it("returns 0 when no span has the attribute", () => {
     expect(
-      maxCausalityDepthOfSpans([
-        { attributes: { "service.name": "x" } },
-        { attributes: null },
-      ]),
+      maxCausalityDepthOfSpans([{ attributes: { "service.name": "x" } }, { attributes: null }]),
     ).toBe(0);
   });
 
@@ -734,8 +732,6 @@ describe("maxCausalityDepthOfSpans", () => {
   });
 
   it("falls back to dot-notation key when nested ns is absent", () => {
-    expect(
-      maxCausalityDepthOfSpans([{ params: { "langwatch.causality_depth": "2" } }]),
-    ).toBe(2);
+    expect(maxCausalityDepthOfSpans([{ params: { "langwatch.causality_depth": "2" } }])).toBe(2);
   });
 });

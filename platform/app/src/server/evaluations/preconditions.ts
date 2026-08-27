@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import safe from "safe-regex2";
-import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
@@ -197,7 +197,7 @@ export function checkEvaluatorRequiredFields({
   expectedOutput,
 }: {
   evaluatorType: string;
-  spans: Span[];
+  spans: Array<{ type: string; model?: string | null }>;
   expectedOutput?: { value: string } | null;
 }): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);
@@ -355,7 +355,7 @@ export function buildPreconditionTraceDataFromCommand({
     spanModels:
       data.spanModels ??
       spans
-        .map((span) => (span as LLMSpan).model)
+        .map((span) => span.model)
         .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: data.customMetadata ?? null,
     annotationIds: [], // Not available at command time

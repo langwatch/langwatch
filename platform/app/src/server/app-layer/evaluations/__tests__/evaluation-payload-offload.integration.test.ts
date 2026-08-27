@@ -34,8 +34,18 @@ import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clic
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
-import type { EvaluationReportedEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
+} from "@langwatch/evaluation-contract";
+import type { EvaluationReportedEvent } from "@langwatch/evaluation-contract";
+import {
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+  EVAL_INPUTS_PREVIEW_BYTES,
+  EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+  EvaluationInputStoragePort,
+  EvaluationInputsOffloadService,
+  isStoredObjectMarker,
+  STORED_OBJECT_MARKER_KEY,
+} from "~/runtime/app/features/evaluation";
 import { LocalFilesystemDriver } from "~/server/stored-objects/local-filesystem-driver";
 import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
@@ -46,15 +56,6 @@ import {
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
-import {
-  EVAL_INPUTS_HARD_CEILING_BYTES,
-  EVAL_INPUTS_INLINE_MAX_BYTES,
-  EVAL_INPUTS_STORED_OBJECT_PURPOSE,
-  isStoredObjectMarker,
-  offloadInputsIfOversized,
-  resolveInputsMarker,
-  STORED_OBJECT_MARKER_KEY,
-} from "../evaluation-inputs-offload";
 import type { EvaluationRunData } from "../types";
 
 // Route the stored-objects repository (which resolves its client internally)
@@ -81,7 +82,69 @@ function buildStoredObjects(): StoredObjectsService {
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId, sha256 }) =>
     mintFileStoredObjectUri({ root: tmpDir, projectId, sha256 });
-  return new StoredObjectsService(repository, registry, mintUri);
+  return StoredObjectsService.create(repository, registry, mintUri);
+}
+
+class StoredObjectEvaluationInputStorage extends EvaluationInputStoragePort {
+  constructor(private readonly storedObjects: StoredObjectsService) {
+    super();
+  }
+
+  async store(input: {
+    tenantId: string;
+    evaluationId: string;
+    bytes: Uint8Array;
+  }): Promise<{ id: string }> {
+    const stored = await this.storedObjects.storeFromBytes({
+      projectId: input.tenantId,
+      purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+      ownerKind: "evaluation",
+      ownerId: input.evaluationId,
+      mediaType: "application/json",
+      bytes: Buffer.from(input.bytes),
+    });
+    return { id: stored.id };
+  }
+
+  async tryRead(input: {
+    tenantId: string;
+    id: string;
+  }): Promise<AsyncIterable<Uint8Array> | null> {
+    const result = await this.storedObjects.getById({
+      projectId: input.tenantId,
+      id: input.id,
+    });
+    if (!result || !("stream" in result)) return null;
+    return readStoredObjectStream(result.stream);
+  }
+}
+
+async function* readStoredObjectStream(
+  stream: AsyncIterable<Uint8Array>,
+): AsyncIterable<Uint8Array> {
+  for await (const chunk of stream) yield chunk;
+}
+
+function buildOffloadService(
+  storedObjects: StoredObjectsService,
+): EvaluationInputsOffloadService {
+  return EvaluationInputsOffloadService.create({
+    storage: new StoredObjectEvaluationInputStorage(storedObjects),
+    config: {
+      inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
+      hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
+      previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
+    },
+  });
+}
+
+function markerOf(value: Record<string, unknown> | null) {
+  if (!isStoredObjectMarker(value)) throw new Error("expected stored object marker");
+  return value[STORED_OBJECT_MARKER_KEY];
+}
+
+function wasOffloaded(value: Record<string, unknown> | null): boolean {
+  return isStoredObjectMarker(value) && value[STORED_OBJECT_MARKER_KEY].id !== "";
 }
 
 /** Builds an inputs object whose JSON serialization is at least `bytes` long. */
@@ -198,16 +261,15 @@ describe("evaluation inputs offload (integration)", () => {
         meta: { rag: ["chunk-a", "chunk-b"], q: "café ☕" },
       };
       const originalSerialized = JSON.stringify(originalInputs);
+      const offloadService = buildOffloadService(storedObjects);
 
       // Offload → marker + durable object (the write-time step in emitReported).
-      const { inputs: offloaded, offloaded: didOffload } = await offloadInputsIfOversized(
-        {
-          inputs: originalInputs,
-          projectId: tenantId,
-          evaluationId,
-          storedObjects,
-        },
-      );
+      const offloaded = await offloadService.offload({
+        inputs: originalInputs,
+        tenantId,
+        evaluationId,
+      });
+      const didOffload = wasOffloaded(offloaded);
       expect(didOffload).toBe(true);
       expect(isStoredObjectMarker(offloaded)).toBe(true);
 
@@ -254,7 +316,7 @@ describe("evaluation inputs offload (integration)", () => {
       );
 
       // (c) a stored_objects row exists with the correct size_bytes + project_id.
-      const marker = (offloaded as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
+      const marker = markerOf(offloaded);
       const soResult = await ch.query({
         query: `
           SELECT project_id, size_bytes, purpose, owner_id
@@ -281,10 +343,9 @@ describe("evaluation inputs offload (integration)", () => {
 
       // (d) resolve returns byte-identical original inputs.
       const parsedRowInputs = JSON.parse(rowInputs!) as Record<string, unknown>;
-      const resolved = await resolveInputsMarker({
+      const resolved = await offloadService.tryResolve({
         inputs: parsedRowInputs,
-        projectId: tenantId,
-        storedObjects,
+        tenantId,
       });
       expect(resolved).toEqual(originalInputs);
     });
@@ -293,16 +354,16 @@ describe("evaluation inputs offload (integration)", () => {
   describe("given an evaluation run whose inputs are under the threshold", () => {
     it("keeps them inline and writes no stored object", async () => {
       const storedObjects = buildStoredObjects();
+      const offloadService = buildOffloadService(storedObjects);
       const evaluationId = `eval-small-${nanoid()}`;
       const inputs = { question: "what?", answer: "this", nested: { n: 1 } };
 
-      const { inputs: maybeOffloaded, offloaded } = await offloadInputsIfOversized({
+      const maybeOffloaded = await offloadService.offload({
         inputs,
-        projectId: tenantId,
+        tenantId,
         evaluationId,
-        storedObjects,
       });
-      expect(offloaded).toBe(false);
+      expect(wasOffloaded(maybeOffloaded)).toBe(false);
       expect(maybeOffloaded).toBe(inputs);
 
       await getApp().evaluations.upsertRun({
@@ -319,6 +380,7 @@ describe("evaluation inputs offload (integration)", () => {
     /** @scenario "inputs beyond the hard ceiling are bounded with an observable marker" */
     it("bounds the row with a preview-only marker and writes no stored object", async () => {
       const storedObjects = buildStoredObjects();
+      const offloadService = buildOffloadService(storedObjects);
       const evaluationId = `eval-ceiling-${nanoid()}`;
       const inputs = inputsOfSize(EVAL_INPUTS_HARD_CEILING_BYTES + 8192);
 
@@ -326,15 +388,14 @@ describe("evaluation inputs offload (integration)", () => {
         projectId: tenantId,
       });
 
-      const { inputs: bounded, offloaded } = await offloadInputsIfOversized({
+      const bounded = await offloadService.offload({
         inputs,
-        projectId: tenantId,
+        tenantId,
         evaluationId,
-        storedObjects,
       });
-      expect(offloaded).toBe(false);
+      expect(wasOffloaded(bounded)).toBe(false);
       expect(isStoredObjectMarker(bounded)).toBe(true);
-      const marker = (bounded as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
+      const marker = markerOf(bounded);
       expect(marker.ceilingExceeded).toBe(true);
       expect(marker.id).toBe("");
 
@@ -359,21 +420,21 @@ describe("evaluation inputs offload (integration)", () => {
     /** @scenario "when the offload PUT fails, the evaluation completes with a bounded preview marker" */
     it("keeps event_log bounded with a preview-only marker instead of the raw inputs", async () => {
       const storedObjects = buildStoredObjects();
+      const offloadService = buildOffloadService(storedObjects);
       vi.spyOn(storedObjects, "storeFromBytes").mockRejectedValueOnce(
         new Error("s3 down"),
       );
       const evaluationId = `eval-put-fail-${nanoid()}`;
       const originalInputs = inputsOfSize(EVAL_INPUTS_INLINE_MAX_BYTES + 4096);
 
-      const { inputs: bounded, offloaded } = await offloadInputsIfOversized({
+      const bounded = await offloadService.offload({
         inputs: originalInputs,
-        projectId: tenantId,
+        tenantId,
         evaluationId,
-        storedObjects,
       });
-      expect(offloaded).toBe(false);
+      expect(wasOffloaded(bounded)).toBe(false);
       expect(isStoredObjectMarker(bounded)).toBe(true);
-      const marker = (bounded as Record<string, any>)[STORED_OBJECT_MARKER_KEY];
+      const marker = markerOf(bounded);
       expect(marker.offloadFailed).toBe(true);
       expect(marker.id).toBe("");
 

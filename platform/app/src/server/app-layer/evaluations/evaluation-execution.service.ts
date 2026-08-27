@@ -42,11 +42,7 @@ import type { ManagedProviderService } from "@langwatch/enterprise-managed-provi
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";
-import {
-  EvaluatorConfigError,
-  EvaluatorNotFoundError,
-  TraceNotEvaluatableError,
-} from "./errors";
+import { EvaluatorConfigError, EvaluatorNotFoundError, TraceNotEvaluatableError } from "./errors";
 import type { EvaluationExecutionResult } from "./evaluation-execution.types";
 
 // Evaluations need full access to trace data — no user-facing redaction.
@@ -161,11 +157,7 @@ export function maxCausalityDepthOfSpans(
     const raw = pickCausalityDepth(span);
     if (raw === undefined || raw === null) continue;
     const n =
-      typeof raw === "number"
-        ? raw
-        : typeof raw === "string"
-          ? Number.parseInt(raw, 10)
-          : NaN;
+      typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
     if (Number.isFinite(n) && n > max) max = n;
   }
   return max;
@@ -205,7 +197,11 @@ type DataForEvaluation =
 // ---------------------------------------------------------------------------
 
 export class EvaluationExecutionService {
-  constructor(private readonly deps: EvaluationExecutionDeps) {}
+  static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
+    return new EvaluationExecutionService(deps);
+  }
+
+  private constructor(private readonly deps: EvaluationExecutionDeps) {}
 
   async executeForTrace(params: {
     projectId: string;
@@ -215,9 +211,18 @@ export class EvaluationExecutionService {
     mappings: MappingState | null;
     level?: "trace" | "thread";
     workflowId?: string | null;
+    idempotencyKey?: string;
   }): Promise<EvaluationExecutionResult> {
-    const { projectId, traceId, evaluatorType, settings, mappings, level, workflowId } =
-      params;
+    const {
+      projectId,
+      traceId,
+      evaluatorType,
+      settings,
+      mappings,
+      level,
+      workflowId,
+      idempotencyKey,
+    } = params;
 
     // 1. Fetch trace. Evaluators must see the FULL IO values (not the 64 KB
     // preview), so opt into blob resolution (#4888). Under the per-call gate
@@ -290,8 +295,7 @@ export class EvaluationExecutionService {
     });
 
     // 5. Execute evaluation
-    const normalizedSettings =
-      settings && typeof settings === "object" ? settings : undefined;
+    const normalizedSettings = settings && typeof settings === "object" ? settings : undefined;
 
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.
@@ -309,6 +313,7 @@ export class EvaluationExecutionService {
       trace,
       workflowId,
       parentCausalityDepth,
+      idempotencyKey,
     });
 
     const isError = result.status === "error";
@@ -327,9 +332,7 @@ export class EvaluationExecutionService {
       error: isError ? (rawDetails ?? "Evaluator failed") : undefined,
       errorDetails: traceback,
       cost:
-        result.status === "processed" && "cost" in result && result.cost
-          ? result.cost
-          : undefined,
+        result.status === "processed" && "cost" in result && result.cost ? result.cost : undefined,
       evaluationThreadId,
       inputs: data.data as Record<string, unknown>,
     };
@@ -412,18 +415,13 @@ export class EvaluationExecutionService {
     // service with no route for it and come back as a bare 404.
     const unavailable = evaluatorUnavailability({ evaluatorType });
     if (unavailable) {
-      throw new EvaluatorConfigError(
-        unavailableEvaluatorMessage({ unavailability: unavailable }),
-        {
-          meta: { evaluatorType },
-        },
-      );
+      throw new EvaluatorConfigError(unavailableEvaluatorMessage({ unavailability: unavailable }), {
+        meta: { evaluatorType },
+      });
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
-    const filtered = Object.fromEntries(
-      fields.map((field) => [field, data[field] ?? ""]),
-    );
+    const filtered = Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
 
     return { type: "default", data: filtered };
   }
@@ -434,16 +432,12 @@ export class EvaluationExecutionService {
     mappings: MappingState | null,
   ): Promise<Record<string, unknown>> {
     if (!mappings) {
-      throw new EvaluatorConfigError(
-        "Mapping state is required for thread-based evaluation",
-      );
+      throw new EvaluatorConfigError("Mapping state is required for thread-based evaluation");
     }
 
     const threadId = trace.metadata?.thread_id;
     if (!threadId) {
-      throw new EvaluatorConfigError(
-        "Trace does not have a thread_id for thread-based evaluation",
-      );
+      throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
     }
 
     const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
@@ -460,9 +454,7 @@ export class EvaluationExecutionService {
         ("type" in mappingConfig && mappingConfig.type === "thread") ||
         ("source" in mappingConfig &&
           (mappingConfig.source in THREAD_MAPPINGS ||
-            (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
-              mappingConfig.source,
-            )));
+            (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)));
 
       if (isThreadMapping && "source" in mappingConfig) {
         const source = mappingConfig.source;
@@ -477,9 +469,7 @@ export class EvaluationExecutionService {
         } else {
           const threadSource = source as keyof typeof THREAD_MAPPINGS;
           const selectedFields =
-            ("selectedFields" in mappingConfig
-              ? mappingConfig.selectedFields
-              : undefined) ?? [];
+            ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
           result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
             { thread_id: threadId, traces: threadTraces },
             selectedFields as (keyof typeof TRACE_MAPPINGS)[],
@@ -487,9 +477,7 @@ export class EvaluationExecutionService {
         }
       } else if ("source" in mappingConfig) {
         // Regular trace mapping
-        if (
-          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)
-        ) {
+        if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
           if (mappingConfig.source === "formatted_trace") {
             result[targetField] = await formatSpansDigest(trace.spans ?? []);
           }
@@ -530,6 +518,7 @@ export class EvaluationExecutionService {
     trace?: Trace;
     workflowId?: string | null;
     parentCausalityDepth?: number;
+    idempotencyKey?: string;
   }): Promise<SingleEvaluationResult> {
     const {
       projectId,
@@ -539,6 +528,7 @@ export class EvaluationExecutionService {
       trace,
       workflowId,
       parentCausalityDepth,
+      idempotencyKey,
     } = params;
 
     // Custom/workflow/code evaluators
@@ -603,6 +593,7 @@ export class EvaluationExecutionService {
       data: data.data,
       settings: settings ?? {},
       env: evaluatorEnv,
+      idempotencyKey,
     });
 
     return augmentEvaluationResult({

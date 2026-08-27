@@ -27,7 +27,7 @@ import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   AZURE_SAFETY_PROVIDER_KEY,
   isAzureEvaluatorType,
-} from "../azure-safety-env";
+} from "@langwatch/evaluation-contract";
 import { getAzureSafetyEnvFromProject } from "../azure-safety-env.server";
 
 describe("azure-safety-env constants", () => {

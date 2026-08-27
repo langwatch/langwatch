@@ -1,33 +1,75 @@
-import { generate } from "@langwatch/ksuid";
-import {
-  CostReferenceType,
-  CostType,
-  type PrismaClient,
-} from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "../../../utils/constants";
+import { EvaluationCostRecorderPort } from "@langwatch/evaluation-server";
+import { CostReferenceType, CostType, Prisma, type PrismaClient } from "~/generated/prisma/client";
 
-/**
- * Interface for recording evaluation costs.
- * Consumers (command handlers) depend on this interface; the Prisma
- * implementation lives alongside it in the app-layer.
- */
-export interface EvaluationCostRecorder {
-  recordCost(params: {
-    projectId: string;
-    isGuardrail: boolean;
-    evaluatorName: string;
-    evaluatorId: string;
-    traceId: string;
-    amount: number;
-    currency: string;
-  }): Promise<string>;
+export type EvaluationCostWrite = {
+  id: string;
+  projectId: string;
+  isGuardrail: boolean;
+  evaluatorName: string;
+  evaluatorId: string;
+  traceId: string;
+  amount: number;
+  currency: string;
+};
+
+/** Named persistence seam for the Cost table's create-or-reuse protocol. */
+export abstract class EvaluationCostPersistence {
+  abstract create(input: EvaluationCostWrite): Promise<void>;
+
+  abstract tryGetId(input: { id: string }): Promise<string | null>;
+}
+
+class PrismaEvaluationCostPersistence extends EvaluationCostPersistence {
+  static create(prisma: PrismaClient): PrismaEvaluationCostPersistence {
+    return new PrismaEvaluationCostPersistence(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
+
+  async create(input: EvaluationCostWrite): Promise<void> {
+    await this.prisma.cost.create({
+      data: {
+        id: input.id,
+        projectId: input.projectId,
+        costType: input.isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
+        costName: input.evaluatorName,
+        referenceType: CostReferenceType.CHECK,
+        referenceId: input.evaluatorId,
+        amount: input.amount,
+        currency: input.currency,
+        extraInfo: { trace_id: input.traceId },
+      },
+    });
+  }
+
+  async tryGetId(input: { id: string }): Promise<string | null> {
+    const existing = await this.prisma.cost.findUnique({
+      where: { id: input.id },
+      select: { id: true },
+    });
+    return existing?.id ?? null;
+  }
 }
 
 /**
  * Records evaluation costs in the database via Prisma.
  */
-export class PrismaEvaluationCostRecorder implements EvaluationCostRecorder {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaEvaluationCostRecorder extends EvaluationCostRecorderPort {
+  static create(prisma: PrismaClient): PrismaEvaluationCostRecorder {
+    return new PrismaEvaluationCostRecorder(PrismaEvaluationCostPersistence.create(prisma));
+  }
+
+  static createWithPersistence(
+    persistence: EvaluationCostPersistence,
+  ): PrismaEvaluationCostRecorder {
+    return new PrismaEvaluationCostRecorder(persistence);
+  }
+
+  private constructor(private readonly persistence: EvaluationCostPersistence) {
+    super();
+  }
 
   async recordCost(params: {
     projectId: string;
@@ -35,23 +77,30 @@ export class PrismaEvaluationCostRecorder implements EvaluationCostRecorder {
     evaluatorName: string;
     evaluatorId: string;
     traceId: string;
+    idempotencyKey: string;
     amount: number;
     currency: string;
   }): Promise<string> {
-    const costId = generate(KSUID_RESOURCES.COST).toString();
-    await this.prisma.cost.create({
-      data: {
+    const costId = `evaluation-cost:${params.idempotencyKey}`;
+    try {
+      await this.persistence.create({
         id: costId,
         projectId: params.projectId,
-        costType: params.isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-        costName: params.evaluatorName,
-        referenceType: CostReferenceType.CHECK,
-        referenceId: params.evaluatorId,
+        isGuardrail: params.isGuardrail,
+        evaluatorName: params.evaluatorName,
+        evaluatorId: params.evaluatorId,
+        traceId: params.traceId,
         amount: params.amount,
         currency: params.currency,
-        extraInfo: { trace_id: params.traceId },
-      },
-    });
-    return costId;
+      });
+      return costId;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      const existingCostId = await this.persistence.tryGetId({ id: costId });
+      if (!existingCostId) throw error;
+      return existingCostId;
+    }
   }
 }

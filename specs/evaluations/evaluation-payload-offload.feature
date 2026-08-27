@@ -19,17 +19,17 @@ Feature: Evaluation payload offload
 
   # Implementation notes (bindings live on the test cases as @scenario tags):
   #   - Offload decision + marker shaping + resolve fail-safe:
-  #     src/server/app-layer/evaluations/evaluation-inputs-offload.ts
+  #     packages/features/evaluation/server/src/services/evaluation-inputs-offload.service.ts
   #     (EVAL_INPUTS_INLINE_MAX_BYTES = 1 MiB, HARD_CEILING = 50 MiB, preview 16 KiB).
   #   - Write-time wiring (event carries the marker): the offload runs inside
-  #     emitReported in executeEvaluation.command.ts BEFORE EventUtils.createEvent,
+  #     emitReported in evaluation-execution-intent.service.ts BEFORE EventUtils.createEvent,
   #     flag-gated + fail-open at the composition root (pipelineRegistry.ts) on
   #     ON by default; the SYSTEM flag ops_evaluation_payload_offload_disabled
   #     is the operator kill switch. Disabled = inputs flow inline EXCEPT
   #     the unconditional repository cap below.
   #   - Belt-and-braces UNCONDITIONAL row cap (merge-safety, flag-independent):
-  #     evaluation-run.clickhouse.repository.ts toClickHouseRecord via
-  #     evaluation-column-caps.ts (Inputs -> valid-JSON __lw_truncated marker at
+  #     clickhouse-evaluation.repository.ts toClickHouseRecord via
+  #     its row cap helpers (Inputs -> valid-JSON __lw_truncated marker at
   #     8 MiB; Details/Error/ErrorDetails -> observable text truncation).
   #   - Read resolution seam: EvaluationService.getEvaluationInputs
   #     (evaluation.service.ts) resolves the marker; folds/subscribers get it raw.
@@ -39,7 +39,7 @@ Feature: Evaluation payload offload
   # Integration coverage:
   #   src/server/app-layer/evaluations/__tests__/evaluation-payload-offload.integration.test.ts
   #   Unit coverage:
-  #   evaluation-inputs-offload.unit.test.ts, evaluation-column-caps.unit.test.ts
+  #   packages/features/evaluation/server/tests/evaluation-inputs-offload.service.unit.test.ts
 
   Background:
     Given the evaluations pipeline persists evaluator inputs with each run

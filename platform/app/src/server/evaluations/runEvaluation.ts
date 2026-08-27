@@ -30,7 +30,7 @@ import {
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   isAzureEvaluatorType,
-} from "../app-layer/evaluations/azure-safety-env";
+} from "@langwatch/evaluation-contract";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import {
   extractParentTraceForNlpgo,
@@ -47,16 +47,13 @@ import {
   type TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../tracer/tracesMapping";
-import { WorkflowEvaluationRunner } from "../workflows/runWorkflow";
+import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
 import {
   DEFAULT_MAPPINGS,
   mappingsReadEvaluationsSource,
   migrateLegacyMappings,
 } from "./evaluationMappings";
-import {
-  hasThreadMappings,
-  resolveThreadMappingsIntoData,
-} from "./threadMappingResolver";
+import { hasThreadMappings, resolveThreadMappingsIntoData } from "./threadMappingResolver";
 
 export type DataForEvaluation =
   | {
@@ -85,9 +82,7 @@ const buildThreadData = async (
   }
   const threadId = trace.metadata?.thread_id;
   if (!threadId) {
-    throw new EvaluatorConfigError(
-      "Trace does not have a thread_id for thread-based evaluation",
-    );
+    throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
   }
 
   // #4991: evaluators score against content, so the thread read must resolve
@@ -96,12 +91,9 @@ const buildThreadData = async (
     blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
     traceCanonicalisation,
   });
-  const threadTraces = await traceService.getTracesByThreadId(
-    projectId,
-    threadId,
-    protections,
-    { full: true },
-  );
+  const threadTraces = await traceService.getTracesByThreadId(projectId, threadId, protections, {
+    full: true,
+  });
 
   const result: Record<string, any> = {};
 
@@ -110,9 +102,7 @@ const buildThreadData = async (
       ("type" in mappingConfig && mappingConfig.type === "thread") ||
       ("source" in mappingConfig &&
         (mappingConfig.source in THREAD_MAPPINGS ||
-          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
-            mappingConfig.source,
-          )));
+          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)));
 
     if (isThreadMapping && "source" in mappingConfig) {
       const source = mappingConfig.source;
@@ -127,18 +117,14 @@ const buildThreadData = async (
       } else {
         const threadSource = source as keyof typeof THREAD_MAPPINGS;
         const selectedFields =
-          ("selectedFields" in mappingConfig
-            ? mappingConfig.selectedFields
-            : undefined) ?? [];
+          ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
         result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
           { thread_id: threadId, traces: threadTraces },
           selectedFields as (keyof typeof TRACE_MAPPINGS)[],
         );
       }
     } else if ("source" in mappingConfig) {
-      if (
-        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)
-      ) {
+      if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
         if (mappingConfig.source === "formatted_trace") {
           result[targetField] = await formatSpansDigest(trace.spans ?? []);
         }
@@ -201,13 +187,7 @@ const buildDataForEvaluation = async (
   let data: Record<string, any>;
 
   if (isThreadLevel) {
-    data = await buildThreadData(
-      projectId,
-      trace,
-      mappings,
-      protections,
-      traceCanonicalisation,
-    );
+    data = await buildThreadData(projectId, trace, mappings, protections, traceCanonicalisation);
   } else {
     const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
@@ -418,9 +398,9 @@ export const runEvaluation = async ({
     );
   }
 
-  const builtInEvaluatorType = (
-    Object.keys(AVAILABLE_EVALUATORS) as EvaluatorTypes[]
-  ).find((k) => k === evaluatorType);
+  const builtInEvaluatorType = (Object.keys(AVAILABLE_EVALUATORS) as EvaluatorTypes[]).find(
+    (k) => k === evaluatorType,
+  );
 
   if (!builtInEvaluatorType) {
     throw new EvaluatorNotFoundError(evaluatorType);
@@ -666,15 +646,13 @@ const customEvaluation = async (
 
   const parentTrace = extractParentTraceForNlpgo(trace);
 
-  const response = await WorkflowEvaluationRunner.run(
-    workflows,
-    resolvedWorkflowId,
+  const response = await WorkflowEvaluationAdapter.create(workflows).run({
+    workflowId: resolvedWorkflowId,
     projectId,
-    requestBody,
-    undefined,
-    parentCausalityDepth,
+    inputs: requestBody,
+    causalityDepth: parentCausalityDepth,
     parentTrace,
-  );
+  });
 
   const { result, status } = response;
 

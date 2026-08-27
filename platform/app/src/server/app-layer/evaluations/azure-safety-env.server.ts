@@ -1,6 +1,6 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "../../api/routers/modelProviders.utils";
-import { AZURE_SAFETY_PROVIDER_KEY } from "./azure-safety-env";
+import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 
 /**
  * Resolves Azure Content Safety credentials for a project from its per-project

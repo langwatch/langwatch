@@ -8,7 +8,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   AZURE_SAFETY_ENV_VARS,
   isAzureEvaluatorType,
-} from "../../app-layer/evaluations/azure-safety-env";
+} from "@langwatch/evaluation-contract";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import {
   AVAILABLE_EVALUATORS,

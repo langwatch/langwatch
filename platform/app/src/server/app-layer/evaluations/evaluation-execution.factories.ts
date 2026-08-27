@@ -7,7 +7,7 @@ import type { ManagedProviderService } from "@langwatch/enterprise-managed-provi
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
-import { isAzureEvaluatorType } from "./azure-safety-env";
+import { isAzureEvaluatorType } from "@langwatch/evaluation-contract";
 import { getAzureSafetyEnvFromProject } from "./azure-safety-env.server";
 import { EvaluatorConfigError } from "./errors";
 import type { ModelEnvResolver } from "./evaluation-execution.service";
