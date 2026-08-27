@@ -1586,6 +1586,55 @@ describe("the run name", () => {
 
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
   });
+
+  /** @scenario "A stored run plan opens on the name it is stored under" */
+  it("opens a stored run plan on its stored name, naming the agent once", () => {
+    renderDialog(
+      suiteSubject({
+        suiteId: "plan_1",
+        name: "Refunds prod-agent",
+        planName: "Refunds prod-agent",
+        initialTarget: { type: "http", id: "agent_1" },
+      }),
+    );
+
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Refunds prod-agent",
+    );
+  });
+
+  /** @scenario "A stored run plan that took a note opens the note field ready" */
+  it("opens the note block of a stored plan whose last run took a note", async () => {
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        // The read carries the fact, never the text. The text below stands in
+        // for a note leaking onto an entry: it must reach no field.
+        {
+          ...configurationEntry({ planId: "plan_1", usesNote: true }),
+          note: "checking the stricter criterion",
+        },
+      ],
+      isLoading: false,
+    });
+
+    renderDialog(
+      suiteSubject({
+        suiteId: "plan_1",
+        name: "Refunds prod-agent",
+        planName: "Refunds prod-agent",
+        scope: { mode: "folders", folderIds: ["suite_refunds"] },
+        initialTarget: { type: "http", id: "agent_1" },
+        // The plan carries its own remembered target, which is what used to
+        // stop the dialog reading the history at all.
+        persistedTarget: { type: "http", referenceId: "agent_1" },
+      }),
+    );
+
+    const note = await screen.findByTestId("run-note-field");
+    expect(within(note).getByRole("textbox")).toHaveValue("");
+    expect(note).not.toHaveTextContent("stricter criterion");
+    expect(screen.queryByTestId("customize-chip-note")).not.toBeInTheDocument();
+  });
 });
 
 describe("what the run covers", () => {

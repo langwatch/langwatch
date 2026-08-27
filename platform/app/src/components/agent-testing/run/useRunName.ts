@@ -6,6 +6,10 @@
  * reads "Refunds dev-agent vs prod-agent". Typing a name, or picking one from
  * the dropdown, pins it and stops it following.
  *
+ * A dialog opened on a stored run plan opens on the plan's own name, pinned
+ * from the first render. The plan already answers to that name, and deriving
+ * one again would append the target to a name that ends with it.
+ *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
@@ -122,6 +126,7 @@ function labelsOfTargets({
 
 export function useRunName({
   subjectKey,
+  planName,
   scopeLabel,
   targets,
   targetLabels,
@@ -129,17 +134,20 @@ export function useRunName({
 }: {
   /** One key per open of the dialog, so the name resets with the subject. */
   subjectKey: string;
+  /** The name of the stored run plan the dialog opened on, if it opened on one. */
+  planName: string | null;
   scopeLabel: string;
   targets: readonly NonNullable<TargetValue>[];
   targetLabels: ReadonlyMap<string, string>;
   /** The configurations this scope ran with, newest first. */
   entries: readonly RunConfigurationEntry[];
 }) {
-  // The name of one's own, or nothing while the name still follows the run.
+  // The name of one's own, or nothing while the name still follows the run. A
+  // stored run plan starts here, because its name is already its own.
   // Holding only the taken-over name keeps the field's value a plain read of
   // what the dialog holds, so it can never render one frame behind the agent
   // or the scope it names.
-  const [takenOverName, setTakenOverName] = useState<string | null>(null);
+  const [takenOverName, setTakenOverName] = useState<string | null>(planName);
   const openedOn = useRef(subjectKey);
 
   const derivedName = useMemo(
@@ -151,10 +159,11 @@ export function useRunName({
     [scopeLabel, targets, targetLabels],
   );
 
-  // The dialog opened on another subject: the name follows again.
+  // The dialog opened on another subject: the name follows again, unless the
+  // subject is a stored run plan, whose own name it opens on.
   if (openedOn.current !== subjectKey) {
     openedOn.current = subjectKey;
-    if (takenOverName !== null) setTakenOverName(null);
+    if (takenOverName !== planName) setTakenOverName(planName);
   }
 
   const runName = takenOverName ?? derivedName;

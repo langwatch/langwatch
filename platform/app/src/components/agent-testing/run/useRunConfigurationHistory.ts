@@ -22,6 +22,19 @@ import {
   type RunScope,
 } from "./run-configuration";
 
+/** The configurations of one scope, and whether the read has answered yet. */
+export type RunConfigurationHistory = {
+  /** Newest first. Empty is the ordinary state of a scope that never ran. */
+  entries: RunConfigurationEntry[];
+  /**
+   * Whether the read has answered.
+   *
+   * What the dialog opens on comes from this read, so the dialog waits for it
+   * rather than deciding on an empty list it is still waiting for.
+   */
+  isLoaded: boolean;
+};
+
 /**
  * The configurations of this scope, newest first.
  *
@@ -34,7 +47,7 @@ export function useRunConfigurationHistory({
 }: {
   scope: RunScope | null;
   isEnabled: boolean;
-}): RunConfigurationEntry[] {
+}): RunConfigurationHistory {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
@@ -43,8 +56,10 @@ export function useRunConfigurationHistory({
     { enabled: isEnabled && !!projectId },
   );
 
-  return useMemo(() => {
+  const scoped = useMemo(() => {
     if (!scope || !entries) return [];
     return configurationsForScope({ entries, scope });
   }, [entries, scope]);
+
+  return { entries: scoped, isLoaded: !!entries };
 }

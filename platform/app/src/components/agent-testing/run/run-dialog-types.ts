@@ -33,6 +33,18 @@ export type RunDialogSubject =
        */
       scope?: RunScope;
       /**
+       * The name the row already answers to as a run plan.
+       *
+       * The dialog opens on it unchanged. A plan is identified by its name,
+       * and that name already ends with the target the plan runs against, so a
+       * name derived again would end with the target twice and the run would
+       * go out under a name no plan answers to, forking the plan.
+       *
+       * A test suite names none: it answers to no plan name, so a run of it
+       * derives one from the scope and the target.
+       */
+      planName?: string;
+      /**
        * The run options the suite carries from its last run: the target, its
        * bindings and its parameter overrides. The dialog opens on them, so a
        * repeat run is one click for everyone on the team.

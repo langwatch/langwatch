@@ -14,10 +14,9 @@
 
 import { create } from "zustand";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useAgentTestingStore } from "../useAgentTestingStore";
-import { scopeOfStoredPlan } from "./plan-scope";
+import { storedPlanSubject } from "./plan-scope";
 import { RunDialog } from "./RunDialog";
 import type { RunDialogSubject } from "./run-dialog-types";
 
@@ -64,20 +63,7 @@ export function RunPlanDialogHost() {
     if (openOn.kind === "new") return { kind: "plan", initialTarget: null };
     // The dialog waits for the plan rather than opening on an empty one.
     if (!suite || suite.id !== suiteId) return null;
-    const targets = parseSuiteTargets(suite.targets);
-    const first = targets[0];
-    return {
-      kind: "suite",
-      suiteId: suite.id,
-      name: suite.name,
-      scenarioIds: suite.scenarioIds,
-      // The plan's own rule. Without it the run would go out covering the
-      // scenarios filed in a folder with this plan's id, which is none, and
-      // would write that over the plan's real scope.
-      scope: scopeOfStoredPlan(suite),
-      initialTarget: first ? { type: first.type, id: first.referenceId } : null,
-      persistedTarget: first ?? null,
-    };
+    return storedPlanSubject(suite);
   })();
 
   return (

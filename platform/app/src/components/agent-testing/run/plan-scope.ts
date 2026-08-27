@@ -1,5 +1,5 @@
 /**
- * What a stored row covers, as the run dialog holds it.
+ * What a stored row covers, and how the run dialog opens on it.
  *
  * A test suite is only a grouping, so it covers itself: the scenarios filed in
  * it. A run plan carries its own rule instead, and a hand-picked one carries
@@ -15,14 +15,18 @@
  */
 
 import { parseSuiteScope } from "~/server/suites/scope";
+import { parseSuiteTargets } from "~/server/suites/types";
 import type { RunScope } from "./run-configuration";
+import type { RunDialogSubject } from "./run-dialog-types";
 
-/** A stored suite row, as much of it as the scope needs. */
+/** A stored suite row, as much of it as the run dialog needs. */
 export type StoredPlanRow = {
   id: string;
+  name: string;
   kind: string;
   scope: unknown;
   scenarioIds: string[];
+  targets: unknown;
 };
 
 export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
@@ -34,4 +38,28 @@ export function scopeOfStoredPlan(plan: StoredPlanRow): RunScope {
     return { mode: "cases", caseIds: [...plan.scenarioIds] };
   }
   return stored;
+}
+
+/**
+ * The run dialog subject of a stored row, however the Results tab reached it.
+ *
+ * One builder for both ways in, so the plan header, the plan row menu and the
+ * Run button on an open plan can never disagree about what the dialog is
+ * opened on.
+ */
+export function storedPlanSubject(
+  plan: StoredPlanRow,
+): Extract<RunDialogSubject, { kind: "suite" }> {
+  const first = parseSuiteTargets(plan.targets)[0];
+  return {
+    kind: "suite",
+    suiteId: plan.id,
+    name: plan.name,
+    scenarioIds: plan.scenarioIds,
+    scope: scopeOfStoredPlan(plan),
+    // A folder answers to no run plan name, so a run of it derives one.
+    ...(plan.kind === "folder" ? {} : { planName: plan.name }),
+    initialTarget: first ? { type: first.type, id: first.referenceId } : null,
+    persistedTarget: first ?? null,
+  };
 }

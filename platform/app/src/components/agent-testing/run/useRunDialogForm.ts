@@ -108,6 +108,19 @@ function rememberedSecretRows(
   return names.map((name) => ({ name, value: "", secret: true }));
 }
 
+/** The parameter block as the subject remembers it, block by block. */
+function rememberedParameters(subject: RunDialogSubject | null) {
+  const line = rememberedParameterLine(subject);
+  const secretRows = rememberedSecretRows(subject);
+  const hasSecretRows = secretRows.length > 0;
+  return {
+    show: line !== "" || hasSecretRows,
+    line,
+    rowsRequested: hasSecretRows,
+    rows: hasSecretRows ? [...rowsFromLine(line), ...secretRows] : null,
+  };
+}
+
 /** The fields of the dialog, reset whenever it opens on a new subject. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
   const [target, setTarget] = useState<TargetValue>(null);
@@ -125,12 +138,15 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<unknown>(null);
   const [missingProvider, setMissingProvider] = useState(false);
+  // The subject the fields below already hold the opening values of. Anything
+  // that reads the fields waits for this, because the reset runs in an effect
+  // and the render that opens the dialog is one render ahead of it.
+  const [resetFor, setResetFor] = useState("closed");
   const agentTargetBeforePrompt = useRef<TargetValue>(null);
 
   const subjectKey = subjectKeyOf(subject);
   const initialTarget = subject?.initialTarget ?? null;
-  const initialParameterLine = rememberedParameterLine(subject);
-  const initialSecretRows = rememberedSecretRows(subject);
+  const remembered = rememberedParameters(subject);
   useEffect(() => {
     setTarget(initialTarget);
     setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
@@ -138,17 +154,14 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     // is for, so it starts empty every time.
     setShowNote(false);
     setNote("");
-    setShowParams(initialParameterLine !== "" || initialSecretRows.length > 0);
-    setParameterLine(initialParameterLine);
-    setRowsRequested(initialSecretRows.length > 0);
-    setParameterRows(
-      initialSecretRows.length > 0
-        ? [...rowsFromLine(initialParameterLine), ...initialSecretRows]
-        : null,
-    );
+    setShowParams(remembered.show);
+    setParameterLine(remembered.line);
+    setRowsRequested(remembered.rowsRequested);
+    setParameterRows(remembered.rows);
     setSecretValues({});
     setInlineError(null);
     setMissingProvider(false);
+    setResetFor(subjectKey);
     agentTargetBeforePrompt.current = null;
     // Reset exactly once per subject; the target of a subject does not move
     // under an open dialog.
@@ -177,6 +190,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setInlineError,
     missingProvider,
     setMissingProvider,
+    resetFor,
     agentTargetBeforePrompt,
   };
 }
@@ -650,13 +664,16 @@ function useRunDialogNaming({
     [planFields.scope, choices.folders],
   );
 
-  const historyEntries = useRunConfigurationHistory({
+  const history = useRunConfigurationHistory({
     scope: subject ? runScope : null,
     isEnabled: !!subject,
   });
+  const historyEntries = history.entries;
 
   const name = useRunName({
     subjectKey,
+    // A stored run plan opens on its own name; every other subject derives one.
+    planName: subject?.kind === "suite" ? (subject.planName ?? null) : null,
     scopeLabel: subject
       ? scopeLabelOf({
           subject,
@@ -688,6 +705,7 @@ function useRunDialogNaming({
     subject,
     subjectKey,
     entries: historyEntries,
+    isLoaded: history.isLoaded,
     fields,
     planFields,
   });

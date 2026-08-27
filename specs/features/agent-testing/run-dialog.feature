@@ -39,6 +39,25 @@ Feature: The run dialog
     And no text under it explains what the name does
 
   @integration
+  Scenario: A stored run plan opens on the name it is stored under
+    Given a stored run plan named "Refunds prod-agent"
+    When the run dialog is opened on that plan
+    Then the run name reads "Refunds prod-agent"
+    And the agent is not added to the name a second time
+
+    A plan is identified by its name, and the name of a plan already ends with
+    the target it runs against. A name derived again would end with the target
+    twice, the run would go out under a name no plan answers to, and that
+    creates a second plan and forks the one the person opened.
+
+  @unit
+  Scenario: A folder answers to no plan name, so its run still derives one
+    Given a suite of kind folder and a run plan of kind custom
+    When each is opened in the run dialog from the Results tab
+    Then the run plan opens on the name it is stored under
+    And the folder opens on a name derived from its scope and its target
+
+  @integration
   Scenario: The derived name follows the agent until the person types
     Given the run dialog open on the test suite "Refunds"
     When another agent is chosen
@@ -79,6 +98,17 @@ Feature: The run dialog
     Then the note block is open
     And the note field is empty
     And the note chip is no longer offered
+
+  @integration
+  Scenario: A stored run plan that took a note opens the note field ready
+    Given a stored run plan whose last run carried a note
+    When the run dialog is opened on that plan
+    Then the note block is open
+    And the note field is empty
+    And "Add a note" is no longer offered
+
+    The plan remembers that it takes a note. The words of the note belong to
+    one run, and they never leave the run store.
 
   @integration
   Scenario: Picking a configuration refills the dialog and opens what it used

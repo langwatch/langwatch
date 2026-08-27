@@ -15,10 +15,9 @@ import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useRunStartedHandler } from "../cases/useCaseRunActions";
-import { scopeOfStoredPlan } from "../run/plan-scope";
+import { storedPlanSubject } from "../run/plan-scope";
 import type { RunDialogSubject } from "../run/RunDialog";
 import type { RunPlan } from "./run-plans";
 
@@ -52,19 +51,7 @@ export function useRunPlanRunDialog({
 
   const runPlan = useCallback(() => {
     if (!suite) return;
-    const persisted = parseSuiteTargets(suite.targets)[0];
-    setSubject({
-      kind: "suite",
-      suiteId: suite.id,
-      name: suite.name,
-      scenarioIds: suite.scenarioIds,
-      // The plan's own rule, never a folder rule built from its id.
-      scope: scopeOfStoredPlan(suite),
-      initialTarget: persisted
-        ? { type: persisted.type, id: persisted.referenceId }
-        : null,
-      persistedTarget: persisted ?? null,
-    });
+    setSubject(storedPlanSubject(suite));
   }, [suite]);
 
   const rerunCase = useCallback(
