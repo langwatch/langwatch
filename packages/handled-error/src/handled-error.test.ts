@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { HandledErrorFault } from "./index";
 import {
   HandledError,
   handledErrorFromHerr,
@@ -17,6 +16,21 @@ class TestError extends HandledError {
     super("test_error", message, options);
     this.name = "TestError";
   }
+}
+
+async function duplicatedHandledError(
+  code: string,
+  message: string,
+  httpStatus = 404,
+): Promise<HandledError> {
+  vi.resetModules();
+  const duplicateModule = await import("./handled-error");
+  class DuplicatedHandledError extends duplicateModule.HandledError {
+    constructor() {
+      super(code, message, { httpStatus });
+    }
+  }
+  return new DuplicatedHandledError();
 }
 
 describe("HandledError.serialize", () => {
@@ -41,6 +55,18 @@ describe("HandledError.serialize", () => {
     expect(serialized.retryable).toBe(true);
     expect(serialized.tips).toEqual(["Try a smaller time range", "Select fewer fields"]);
     expect(serialized.docsUrl).toBe("https://docs.langwatch.ai/traces");
+  });
+
+  it("serializes trusted errors through the package implementation", () => {
+    class OverriddenSerializerError extends TestError {
+      override serialize(): never {
+        throw new Error("untrusted override called");
+      }
+    }
+
+    const serialized = HandledError.serializeTrusted(new OverriddenSerializerError());
+
+    expect(serialized.code).toBe("test_error");
   });
 
   it("carries remediation fields through nested reasons and masks plain errors", () => {
@@ -175,45 +201,31 @@ describe("NotFoundError", () => {
   });
 });
 
-/**
- * Stand-in for a HandledError raised from a second copy of this package: same
- * brand, same fields, same `serialize` — but not an instance of *this* copy's
- * HandledError, exactly as a duplicated bundle produces. Next.js/turbopack does
- * this across route and server boundaries, and bare `instanceof` misses it,
- * which silently downgrades a handled 4xx to an unhandled 500.
- */
-class DuplicatedHandledError extends Error {
-  readonly isHandled = true as const;
-  readonly meta: Record<string, unknown> = {};
-  readonly traceId: string | undefined = undefined;
-  readonly spanId: string | undefined = undefined;
-  readonly reasons: readonly Error[] = [];
-  readonly tips: readonly string[] = [];
-  readonly docsUrl: string | undefined = undefined;
-  readonly fault: HandledErrorFault = "customer";
-  readonly retryable = false;
-
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly httpStatus = 404,
-  ) {
-    super(message);
-    this.name = code;
-  }
-}
-
 describe("HandledError.isHandled", () => {
   it("matches a real HandledError instance", () => {
     expect(HandledError.isHandled(new TestError())).toBe(true);
   });
 
-  it("matches an instance whose class identity the bundler duplicated", () => {
-    const duplicate = new DuplicatedHandledError("span_not_found", "gone");
+  it("matches an instance constructed through a duplicated module evaluation", async () => {
+    const duplicate = await duplicatedHandledError("span_not_found", "gone");
 
-    // The premise: bare instanceof does not see it.
-    expect(duplicate instanceof HandledError).toBe(false);
+    expect(duplicate instanceof HandledError).toBe(true);
     expect(HandledError.isHandled(duplicate)).toBe(true);
+  });
+
+  it("shares trace URL configuration across duplicated module evaluations", async () => {
+    vi.resetModules();
+    const duplicateModule = await import("./handled-error");
+    duplicateModule.setTraceUrlProvider((traceId) =>
+      traceId ? `https://traces.example/${traceId}` : void 0,
+    );
+
+    const error = new TestError("boom", { traceId: "trace-1" });
+
+    expect(HandledError.serializeTrusted(error).traceUrl).toBe(
+      "https://traces.example/trace-1",
+    );
+    setTraceUrlProvider(() => void 0);
   });
 
   it.each([
@@ -232,8 +244,8 @@ describe("HandledError.isHandled", () => {
 });
 
 describe("HandledError.isUnhandled", () => {
-  it("does not treat a duplicated HandledError as infrastructure failure", () => {
-    const duplicate = new DuplicatedHandledError("span_not_found", "gone");
+  it("does not treat a registry-issued HandledError as infrastructure failure", () => {
+    const duplicate = new TestError();
     expect(HandledError.isUnhandled(duplicate)).toBe(false);
   });
 
@@ -248,18 +260,16 @@ describe("HandledError.is", () => {
     expect(NotFoundError.is(new TestError())).toBe(false);
   });
 
-  it("stays instanceof-only, so a duplicated identity does not match", () => {
-    // Subclass narrowing cannot be brand-based — the brand says "handled", not
-    // "which subclass". Cross-boundary callers compare `code` instead.
-    const duplicate = new DuplicatedHandledError("test_error", "gone");
+  it("stays subclass-specific across a duplicated module evaluation", async () => {
+    const duplicate = await duplicatedHandledError("test_error", "gone");
     expect(TestError.is(duplicate)).toBe(false);
     expect(duplicate.code).toBe("test_error");
   });
 });
 
 describe("HandledError.toUserMessage", () => {
-  it("forwards the message of a duplicated HandledError", () => {
-    const duplicate = new DuplicatedHandledError(
+  it("forwards the message of a duplicated HandledError", async () => {
+    const duplicate = await duplicatedHandledError(
       "span_not_found",
       "That span no longer exists",
     );
@@ -278,9 +288,10 @@ describe("HandledError.toUserMessage", () => {
 });
 
 describe("serialising a reason chain", () => {
-  it("keeps the code of a duplicated nested reason instead of masking it", () => {
+  it("keeps the code of a duplicated nested reason instead of masking it", async () => {
+    const duplicate = await duplicatedHandledError("span_not_found", "no span");
     const error = new TestError("could not build preview", {
-      reasons: [new DuplicatedHandledError("span_not_found", "no span")],
+      reasons: [duplicate],
     });
 
     expect(error.serialize().reasons).toEqual([

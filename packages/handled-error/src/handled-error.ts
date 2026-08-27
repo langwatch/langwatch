@@ -40,22 +40,26 @@ export interface HerrEnvelope {
  */
 export type TraceUrlProvider = (traceId: string | undefined) => string | undefined;
 
-let traceUrlProvider: TraceUrlProvider = () => undefined;
-
 export function setTraceUrlProvider(provider: TraceUrlProvider): void {
-  traceUrlProvider = provider;
+  HandledError.configureTraceUrlProvider(provider);
 }
+
+/** One runtime constructor shared by every copy of this package in a realm. */
+const HANDLED_ERROR_RUNTIME = Symbol.for("@langwatch/handled-error/runtime/v1");
 
 /**
  * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not
- * `instanceof`, across process boundaries. {@link HandledError.isHandled} also
- * survives duplicated bundle identities.
+ * `instanceof`, across process boundaries. Copies of this package loaded in
+ * one realm share the same runtime constructor, so provenance survives a
+ * duplicated bundle without trusting a forgeable structural brand.
  *
  * Trace IDs come from the active OTel span unless supplied from a wire error.
  * Nested handled causes retain their code; unknown causes are masked. `fault`,
  * `tips`, and `docsUrl` are client-safe remediation metadata.
  */
-export abstract class HandledError extends Error {
+abstract class HandledErrorRuntime extends Error {
+  static #traceUrlProvider: TraceUrlProvider = () => undefined;
+  readonly #issuedByHandledError = true;
   readonly isHandled = true as const;
   readonly meta: Record<string, unknown>;
   readonly traceId: string | undefined;
@@ -104,7 +108,7 @@ export abstract class HandledError extends Error {
   serialize(): SerializedHandledError {
     // traceId is the real trace id for handled errors, so it links straight to
     // the trace when a trace URL provider is wired (the app uses Grafana).
-    const traceUrl = traceUrlProvider(this.traceId);
+    const traceUrl = HandledErrorRuntime.#traceUrlProvider(this.traceId);
     return {
       code: this.code,
       // Deprecated back-compat alias — see SerializedHandledError.kind.
@@ -123,16 +127,33 @@ export abstract class HandledError extends Error {
   }
 
   /**
+   * Serialize through the package-owned implementation rather than a possibly
+   * overridden method on the thrown object.
+   */
+  static serializeTrusted(error: HandledErrorRuntime): SerializedHandledError {
+    if (!HandledErrorRuntime.hasProvenance(error)) {
+      throw new TypeError("Only a registry-issued HandledError can be serialized");
+    }
+
+    return HandledErrorRuntime.prototype.serialize.call(error);
+  }
+
+  /** @internal Realm-wide configuration behind {@link setTraceUrlProvider}. */
+  static configureTraceUrlProvider(provider: TraceUrlProvider): void {
+    HandledErrorRuntime.#traceUrlProvider = provider;
+  }
+
+  /**
    * Narrows `error` to the concrete subclass this is called on:
    *
    *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
    *   NotFoundError.is(err)             // error is NotFoundError
    *
-   * This is a plain `instanceof`, so it only holds within one module graph.
-   * At a boundary, ask {@link HandledError.isHandled} instead ("is this
-   * handled at all?"), or compare `err.code` to pick out one subclass.
+   * This is a subclass-specific `instanceof`. At a boundary, ask
+   * {@link HandledError.isHandled} instead ("is this handled at all?"), or
+   * compare `err.code` to pick out one subclass.
    */
-  static is<T extends HandledError>(
+  static is<T extends HandledErrorRuntime>(
     this: abstract new (...args: never) => T,
     error: unknown,
   ): error is T {
@@ -140,13 +161,11 @@ export abstract class HandledError extends Error {
   }
 
   /**
-   * True when `error` is a handled error, including one whose class identity a
-   * bundler duplicated — see {@link hasHandledErrorBrand}. Prefer this over
-   * `instanceof HandledError` anywhere an error may have crossed a module
-   * boundary (route handlers, tRPC middleware, error formatters).
+   * True only for an error issued by this package's realm-wide runtime
+   * constructor. Prefer this over `instanceof` at route/error boundaries.
    */
-  static isHandled(error: unknown): error is HandledError {
-    return error instanceof HandledError || hasHandledErrorBrand(error);
+  static isHandled(error: unknown): error is HandledErrorRuntime {
+    return HandledErrorRuntime.hasProvenance(error);
   }
 
   /** True when `error` is an unhandled infrastructure Error. */
@@ -172,30 +191,39 @@ export abstract class HandledError extends Error {
     log?.(error);
     return "An unknown error occurred";
   }
+
+  private static hasProvenance(error: unknown): error is HandledErrorRuntime {
+    return (
+      typeof error === "object" && error !== null && #issuedByHandledError in error
+    );
+  }
 }
 
 /**
- * Structural test for the `isHandled` brand.
- *
- * `instanceof` compares class identity, which breaks when a bundler includes
- * this module twice — Next.js/turbopack does this across route and server
- * boundaries, so an error can be a genuine HandledError raised from a *second*
- * copy of this class and still fail `instanceof`. Every instance carries the
- * `isHandled` brand as an own property, so matching on that recognises those
- * duplicates while still rejecting unrelated objects.
- *
- * The `instanceof Error` requirement is load-bearing, not belt-and-braces: the
- * brand is an own *enumerable* field, so `JSON.parse(JSON.stringify(err))` — or
- * a worker `postMessage` structured clone — produces a plain object that still
- * carries `isHandled: true` but has no prototype, and therefore none of the
- * methods this guard promises (`serialize`). Requiring a real `Error` rejects
- * those while still admitting bundler duplicates, since `Error` is the realm's
- * shared global. Wire payloads go through the boundary schema instead —
- * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
+ * Reuse the first runtime constructor installed in this JavaScript realm.
+ * Turbopack may evaluate this module more than once, but every copy still
+ * exports and subclasses this one constructor. Its private field is the
+ * provenance check: copying public fields or changing an object's prototype
+ * cannot manufacture it.
  */
-function hasHandledErrorBrand(error: unknown): error is HandledError {
-  return error instanceof Error && (error as { isHandled?: unknown }).isHandled === true;
+function handledErrorConstructor(): typeof HandledErrorRuntime {
+  const scope = globalThis as typeof globalThis & {
+    [HANDLED_ERROR_RUNTIME]?: typeof HandledErrorRuntime;
+  };
+  const existing = scope[HANDLED_ERROR_RUNTIME];
+  if (existing) return existing;
+
+  Object.defineProperty(scope, HANDLED_ERROR_RUNTIME, {
+    configurable: false,
+    enumerable: false,
+    value: HandledErrorRuntime,
+    writable: false,
+  });
+  return HandledErrorRuntime;
 }
+
+export type HandledError = HandledErrorRuntime;
+export const HandledError: typeof HandledErrorRuntime = handledErrorConstructor();
 
 /**
  * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra`
@@ -204,6 +232,11 @@ function hasHandledErrorBrand(error: unknown): error is HandledError {
  * identity is the `code` discriminant (see the class doc), exactly as if it
  * had been raised locally. Belongs in boundary middleware (wire schemas):
  * downstream code only ever receives the HandledError.
+ *
+ * SECURITY: call this only in an adapter that authenticated the backend source
+ * before parsing its envelope. It deliberately preserves backend-authored
+ * metadata, tips and documentation URLs; arbitrary public input must never be
+ * promoted through this function.
  */
 export function handledErrorFromHerr(
   body: HerrEnvelope,
