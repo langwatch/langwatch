@@ -212,6 +212,16 @@ export const experimentResultsCommand = async ({
           /** `--limit` applies to the printed table only. */
           tableLimit: limit,
           tableTruncated,
+          /**
+           * Which run these rows came from, and whether the caller chose it.
+           *
+           * Without `--run-id` this resolves to whichever run is newest at the
+           * moment of the call. Every scoped execution mints its own run, so
+           * two calls made either side of one produce numbers from two
+           * different runs. A caller comparing a before against an after has
+           * to pin the run, and cannot know to unless it is told.
+           */
+          runSelection: options.runId ? "explicit" : "latest-at-call-time",
           filter,
           evaluator: evaluatorFilter ?? null,
         },
