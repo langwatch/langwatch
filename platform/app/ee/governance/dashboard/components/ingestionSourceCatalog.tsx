@@ -148,6 +148,14 @@ export const SOURCE_TYPE_OPTIONS = [
     icon: <OpenAI />,
   },
   {
+    value: "openai_admin",
+    label: "OpenAI Admin",
+    mode: "pull",
+    blurb:
+      "Reads your OpenAI organization's daily spend with an Admin API key (sk-admin-...), broken down by project, line item, the person who spent it and the API key it was billed to. A regular project key is refused. Only ever create one per organization — a second source would count the same spend twice.",
+    icon: <OpenAI />,
+  },
+  {
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
@@ -250,11 +258,6 @@ export interface GatedSourceTypeOption extends SourceTypeOption {
  * only surface that reads this list, and the composer is only reachable
  * through the menu's onPick — so this one gate covers both. Never re-filter
  * SOURCE_TYPE_OPTIONS at a callsite, or a locked type leaks through.
- *
- * Retired types drop out here rather than being locked. A locked entry is a
- * sales message — "this is what Enterprise unlocks" — and a retired source is
- * not something anyone should be sold. It stays in SOURCE_TYPE_OPTIONS only
- * so rows already configured on it keep a label.
  */
 export function gatedSourceTypeOptions({
   isEnterprise,
@@ -283,6 +286,7 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "claude_compliance",
   "anthropic_admin",
   "openai_compliance",
+  "openai_admin",
   "http_custom",
 ]);
 
