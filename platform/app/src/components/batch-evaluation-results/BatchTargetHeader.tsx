@@ -389,7 +389,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
           icon={getTargetIcon()}
         />
         <Text fontSize="13px" fontWeight="medium" truncate>
-          {target.name}
+          {target.displayName ?? target.name}
         </Text>
       </HStack>
 
