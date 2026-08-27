@@ -90,8 +90,17 @@ const tenantOrgCache = new Map<string, string>();
  *
  * Grows with the number of DISTINCT users a process resolves, which unlike
  * projects and organizations is not bounded by how many exist: a backfill
- * walks the whole user table. Acceptable because the entries are ids, and
+ * walks the whole user table. Accepted because the entries are ids, and
  * because the lookups it saves are on the hot path of every identity append.
+ *
+ * Deleting a user does NOT evict them, also deliberately. Their id keeps
+ * answering "shared" instead of throwing, and that is not a residency
+ * question: shared is where that person's history already sits, so a late
+ * append lands beside its own siblings rather than on somebody else's
+ * instance. The only guarantee it softens is that an id we cannot place
+ * throws. Erasure appends for a user around their deletion, so evicting on
+ * delete would have to be ordered against that — for a case where the wrong
+ * answer is "wrote to the right instance anyway".
  */
 const userTenantCache = new Set<string>();
 
