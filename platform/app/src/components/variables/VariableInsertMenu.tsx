@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 import { ComponentIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType } from "@langwatch/workflow-contract";
-import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web";
+import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web/surfaces/variable-type";
 import { Popover } from "@langwatch/design-system/popover";
 import type { AvailableSource, FieldType, SourceType } from "./VariableMappingInput";
 

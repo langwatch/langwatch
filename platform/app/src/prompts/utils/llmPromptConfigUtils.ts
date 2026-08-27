@@ -28,7 +28,7 @@ import {
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { kebabCase } from "~/utils/stringCasing";
 
-import { generateUniqueIdentifier } from "@langwatch/prompt-web";
+import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,

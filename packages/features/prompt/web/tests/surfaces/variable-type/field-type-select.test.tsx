@@ -6,7 +6,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type FieldTypeOption, FieldTypeSelect } from "../src";
+import { type FieldTypeOption, FieldTypeSelect } from "../../../src/surfaces/variable-type";
 
 const OPTIONS: FieldTypeOption[] = [
   { value: "str", label: "Text" },

@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";

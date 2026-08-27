@@ -17,7 +17,7 @@ import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import { getDisplayHandle } from "@langwatch/prompt-web";
+import { getDisplayHandle } from "@langwatch/prompt-web/surfaces/prompt-reference";
 
 export type PromptListDrawerProps = {
   open?: boolean;

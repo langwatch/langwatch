@@ -6,8 +6,7 @@ import {
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { parsePromptTraceReference } from "@langwatch/prompt-contract";
-import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
+import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";

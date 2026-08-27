@@ -5,7 +5,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { VersionBadge } from "../src";
+import { VersionBadge } from "../../../src/surfaces/prompt-version";
 
 const renderWithChakra = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -30,18 +30,14 @@ describe("VersionBadge", () => {
   describe("when outdated with onUpgrade", () => {
     it("renders badge with version number", () => {
       const onUpgrade = vi.fn();
-      renderWithChakra(
-        <VersionBadge version={3} latestVersion={5} onUpgrade={onUpgrade} />,
-      );
+      renderWithChakra(<VersionBadge version={3} latestVersion={5} onUpgrade={onUpgrade} />);
 
       expect(screen.getAllByText("v3").length).toBeGreaterThan(0);
     });
 
     it("renders clickable element with button role", () => {
       const onUpgrade = vi.fn();
-      renderWithChakra(
-        <VersionBadge version={3} latestVersion={5} onUpgrade={onUpgrade} />,
-      );
+      renderWithChakra(<VersionBadge version={3} latestVersion={5} onUpgrade={onUpgrade} />);
 
       // Verify the button role is present for accessibility
       expect(screen.getAllByRole("button").length).toBeGreaterThan(0);

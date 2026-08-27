@@ -1,4 +1,4 @@
-import { PromptBrowserTab as PromptBrowserTabView } from "@langwatch/prompt-web";
+import { PromptBrowserTab as PromptBrowserTabView } from "@langwatch/prompt-web/screens/prompt-studio";
 import { usePromptBrowserTabController } from "./usePromptBrowserTabController";
 
 interface PromptBrowserTabProps {

@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { TabIdProvider } from "@langwatch/prompt-web";
+import { TabIdProvider } from "@langwatch/prompt-web/screens/prompt-studio";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "@langwatch/design-system/tooltip";

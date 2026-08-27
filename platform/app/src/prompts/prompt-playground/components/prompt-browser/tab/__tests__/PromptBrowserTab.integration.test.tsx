@@ -9,7 +9,7 @@
  * on a close button it has no room for.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TabIdProvider } from "@langwatch/prompt-web";
+import { TabIdProvider } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

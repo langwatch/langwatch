@@ -1,5 +1,6 @@
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
-import { NEW_PROMPT_TITLE, shouldShowVersionBadge } from "@langwatch/prompt-web";
+import { NEW_PROMPT_TITLE } from "@langwatch/prompt-web/surfaces/prompt-reference";
+import { shouldShowVersionBadge } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabById } from "../../../prompt-playground-store/useTabById";

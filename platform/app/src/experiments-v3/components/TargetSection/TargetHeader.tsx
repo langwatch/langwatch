@@ -31,7 +31,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
-import { VersionBadge } from "@langwatch/prompt-web";
+import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 

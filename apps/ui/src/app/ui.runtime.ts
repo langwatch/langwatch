@@ -11,11 +11,7 @@ export type UiRuntimeOptions = {
 
 export class UiRuntime {
   static create(options: UiRuntimeOptions): UiRuntime {
-    return new UiRuntime(
-      options.document,
-      options.shell,
-      options.rootElementId ?? "root",
-    );
+    return new UiRuntime(options.document, options.shell, options.rootElementId ?? "root");
   }
 
   private root: Root | undefined;

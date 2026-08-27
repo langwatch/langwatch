@@ -2,7 +2,7 @@ import { HStack, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import { VersionBadge } from "@langwatch/prompt-web";
+import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 
 import { useResetFormWithLatestDatabaseVersion } from "../signature-properties-panel/hooks/useResetFormWithLatestDatabaseVersion";
 import { useVersionDrift } from "../signature-properties-panel/hooks/useVersionDrift";

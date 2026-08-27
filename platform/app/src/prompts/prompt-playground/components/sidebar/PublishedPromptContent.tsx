@@ -1,5 +1,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { getDisplayHandle, OrganizationBadge } from "@langwatch/prompt-web";
+import {
+  getDisplayHandle,
+  OrganizationBadge,
+} from "@langwatch/prompt-web/surfaces/prompt-reference";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { PublishedPromptActions } from "./PublishedPromptActions";
 

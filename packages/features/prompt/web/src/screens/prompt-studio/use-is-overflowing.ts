@@ -1,9 +1,6 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useState } from "react";
 
-export function useIsOverflowing(
-  ref: RefObject<HTMLElement | null>,
-  watch: unknown,
-): boolean {
+export function useIsOverflowing(ref: RefObject<HTMLElement | null>, watch: unknown): boolean {
   const [isOverflowing, setIsOverflowing] = useState(false);
 
   const measure = useCallback(() => {

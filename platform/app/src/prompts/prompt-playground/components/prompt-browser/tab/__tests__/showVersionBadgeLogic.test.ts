@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-import { shouldShowVersionBadge } from "@langwatch/prompt-web";
+import { shouldShowVersionBadge } from "@langwatch/prompt-web/screens/prompt-studio";
 
 describe("showVersionBadge logic", () => {
   describe("when prompt is outdated (behind DB version)", () => {

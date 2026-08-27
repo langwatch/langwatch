@@ -1,5 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   createContext,
@@ -25,7 +25,7 @@ import { PromptTabbedSection } from "./PromptTabbedSection";
 const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
-export { useTabId } from "@langwatch/prompt-web";
+export { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 
 export type LayoutMode = "vertical" | "horizontal";
 

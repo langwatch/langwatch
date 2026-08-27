@@ -7,12 +7,22 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "./screens/prompt-studio": {
+      "types": "./src/screens/prompt-studio/index.ts",
+      "default": "./src/screens/prompt-studio/index.ts"
+    },
+    "./surfaces/variable-type": {
+      "types": "./src/surfaces/variable-type/index.ts",
+      "default": "./src/surfaces/variable-type/index.ts"
+    },
+    "./surfaces/prompt-version": {
+      "types": "./src/surfaces/prompt-version/index.ts",
+      "default": "./src/surfaces/prompt-version/index.ts"
+    },
+    "./surfaces/prompt-reference": {
+      "types": "./src/surfaces/prompt-reference/index.ts",
+      "default": "./src/surfaces/prompt-reference/index.ts"
     }
   },
   "scripts": {

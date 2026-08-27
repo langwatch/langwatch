@@ -1,7 +1,7 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
-import { PromptTabSwitcher as PromptTabSwitcherView } from "@langwatch/prompt-web";
+import { PromptTabSwitcher as PromptTabSwitcherView } from "@langwatch/prompt-web/screens/prompt-studio";
 import type { RefObject } from "react";
-import { getDisplayHandle, getPromptFolder } from "@langwatch/prompt-web";
+import { getDisplayHandle, getPromptFolder } from "@langwatch/prompt-web/surfaces/prompt-reference";
 import { usePromptTabSummary } from "../tab/usePromptTabSummary";
 
 interface PromptTabSwitcherProps {

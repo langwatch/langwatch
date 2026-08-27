@@ -19,8 +19,11 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import type { Field } from "@langwatch/workflow-contract";
-import { FieldTypeSelect } from "@langwatch/prompt-web";
-import { TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-web";
+import {
+  FieldTypeSelect,
+  TYPE_LABELS,
+  VariableTypeIcon,
+} from "@langwatch/prompt-web/surfaces/variable-type";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import { generateUniqueIdentifier, normalizeIdentifier } from "~/utils/identifierUtils";
 

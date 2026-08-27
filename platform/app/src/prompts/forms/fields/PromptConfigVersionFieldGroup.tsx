@@ -6,7 +6,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompts";
 import { TypeSelector } from "~/prompts/components/ui/TypeSelector";
-import { generateUniqueIdentifier } from "@langwatch/prompt-web";
+import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
 
 /**
  * ConfigFieldGroup

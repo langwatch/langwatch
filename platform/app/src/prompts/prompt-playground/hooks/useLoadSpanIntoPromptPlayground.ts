@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
+import { LLM_PARAMETER_MAP } from "@langwatch/prompt-contract";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
