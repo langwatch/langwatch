@@ -38,6 +38,7 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
+import { actorMappingFields, resolveActorKind } from "./actorMapping";
 
 import type {
   NormalizedPullEvent,
@@ -55,6 +56,7 @@ const eventMappingSchema = z.object({
   source_event_id: z.string().min(1),
   event_timestamp: z.string().min(1),
   actor: z.string().min(1),
+  ...actorMappingFields,
   action: z.string().min(1),
   target: z.string().min(1),
   cost_usd: z.string().optional(),
@@ -410,6 +412,11 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       source_event_id: asString(get(config.eventMapping.source_event_id)),
       event_timestamp: asString(get(config.eventMapping.event_timestamp)),
       actor: asString(get(config.eventMapping.actor)),
+      actor_id: asString(get(config.eventMapping.actor_id)),
+      actor_kind: resolveActorKind({
+        mapping: config.eventMapping.actor_kind,
+        read: get,
+      }),
       action: asString(get(config.eventMapping.action)),
       target: asString(get(config.eventMapping.target)),
       cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),

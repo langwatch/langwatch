@@ -20,6 +20,7 @@ import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
+import type { UsageAttributionLedgerClickHouseRepository } from "../../../ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -278,6 +279,11 @@ export interface AppDependencies {
     /** The /governance activity-monitor read side (spend rollups, per-source
      *  events and health). Undefined on a deployment without ClickHouse. */
     activityMonitor: ActivityMonitorClickHouseRepository | undefined;
+    /** The usage-attribution report's ledger read (ADR-094) — who acted,
+     *  how often and at what cost, across both governance tables. */
+    usageAttributionLedger:
+      | UsageAttributionLedgerClickHouseRepository
+      | undefined;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */

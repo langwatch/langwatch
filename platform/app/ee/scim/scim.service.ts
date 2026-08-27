@@ -3,6 +3,7 @@ import { DepartmentService } from "@ee/governance/services/department/department
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { GrantsService } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
   type OrganizationUserRole,
@@ -16,6 +17,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { grantsService } from "~/server/app-layer/authz/runtime";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -34,6 +36,17 @@ import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
 import { resolveHighestRole } from "./scim-role-resolver";
 import { scimSyncLifecycle } from "./scim-sync.runtime";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
+
+const logger = createLogger("langwatch:scim");
+
+const GUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The `scimSource` value that marks a membership as directory-managed. */
+const SCIM_SOURCE = "scim";
+
+/** The membership fields the SCIM representation of a person is built from. */
+type ScimMembership = { externalId: string | null; disabledAt: Date | null };
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
@@ -57,6 +70,14 @@ export class ScimService {
     grants?: GrantsService;
     syncLifecycle?: ScimSyncLifecycle;
   };
+  /**
+   * Directory traffic is org-scoped by definition — the token that carried
+   * this request belongs to one organization's IdP. Every activate /
+   * deactivate below therefore goes through the membership lifecycle rather
+   * than the global account flag, or one tenant's directory decides a
+   * person's state inside every other tenant (#6976, ADR-094 Decision 4).
+   */
+  private readonly membershipLifecycle: MembershipLifecycleService;
 
   constructor({
     prisma,
@@ -74,6 +95,7 @@ export class ScimService {
     this.userService = UserService.create(prisma);
     this.departmentService = DepartmentService.create(prisma);
     this.directoryIdentity = ScimDirectoryIdentityService.create(prisma);
+    this.membershipLifecycle = MembershipLifecycleService.create(prisma);
     this.injected = { grants, syncLifecycle };
   }
 
@@ -357,6 +379,7 @@ export class ScimService {
         await this.createMembership({
           userId: existingUser.id,
           organizationId,
+          request,
         });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
@@ -374,7 +397,10 @@ export class ScimService {
             externalId,
             op: "create",
           });
-          return this.toScimUser(existingUser);
+          return await this.toScimUserInOrg({
+            user: existingUser,
+            organizationId,
+          });
         }
         throw e;
       }
@@ -384,9 +410,14 @@ export class ScimService {
         organizationId,
       });
 
-      if (existingUser.deactivatedAt) {
-        await this.userService.reactivate({ id: existingUser.id });
-      }
+      // Re-provisioning restores the membership in THIS organization and
+      // lifts the global flag only if it was set. It deliberately does not
+      // restore usage-attribution links — an admin relinks (ADR-094
+      // Decision 4).
+      await this.membershipLifecycle.onMembershipReactivated({
+        organizationId,
+        userId: existingUser.id,
+      });
 
       await this.syncCostCenterFromScim({
         userId: existingUser.id,
@@ -408,13 +439,20 @@ export class ScimService {
       if (!reloadedUser) {
         return this.scimError({ status: "404", detail: "User not found" });
       }
-      return this.toScimUser(reloadedUser);
+      return await this.toScimUserInOrg({
+        user: reloadedUser,
+        organizationId,
+      });
     }
 
     const newUser = await this.userService.create({ name, email });
 
     try {
-      await this.createMembership({ userId: newUser.id, organizationId });
+      await this.createMembership({
+        userId: newUser.id,
+        organizationId,
+        request,
+      });
     } catch (e) {
       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         return this.scimError({
@@ -444,7 +482,7 @@ export class ScimService {
       op: "create",
     });
 
-    return this.toScimUser(newUser);
+    return await this.toScimUserInOrg({ user: newUser, organizationId });
   }
 
   /**
@@ -492,9 +530,11 @@ export class ScimService {
   private async createMembership({
     userId,
     organizationId,
+    request,
   }: {
     userId: string;
     organizationId: string;
+    request: ScimCreateUserRequest;
   }): Promise<void> {
     const asserted = await this.directoryAssertedRole({
       userId,
@@ -505,6 +545,10 @@ export class ScimService {
         userId,
         organizationId,
         role: this.organizationRoleFor(asserted),
+        // The anchor is written with the row, not after it: the response
+        // below echoes it straight back, and a directory that cannot see
+        // the anchor it wrote provisions the person again.
+        ...this.anchorFromRequest({ request, organizationId }),
       },
     });
   }
@@ -570,7 +614,7 @@ export class ScimService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    return this.toScimUser(membership.user);
+    return this.toScimUser(membership.user, membership);
   }
 
   async listUsers({
@@ -584,16 +628,20 @@ export class ScimService {
     startIndex?: number;
     count?: number;
   }): Promise<ScimListResponse<ScimUser>> {
-    const emailFilter = this.parseUserNameFilter(filter);
+    const parsedFilter = this.parseUserFilter(filter);
 
     const whereClause: Record<string, unknown> = {
       organizationId,
     };
 
-    if (emailFilter) {
+    if (parsedFilter?.attribute === "userName") {
       whereClause.user = {
-        email: { equals: emailFilter, mode: "insensitive" },
+        email: { equals: parsedFilter.value, mode: "insensitive" },
       };
+    } else if (parsedFilter?.attribute === "externalId") {
+      // The anchor is matched on the membership column, exactly (an id is an
+      // id — case-folding it would collide two distinct directory subjects).
+      whereClause.externalId = parsedFilter.value;
     }
 
     const [memberships, totalCount] = await Promise.all([
@@ -611,7 +659,7 @@ export class ScimService {
       totalResults: totalCount,
       startIndex,
       itemsPerPage: count,
-      Resources: memberships.map((m) => this.toScimUser(m.user)),
+      Resources: memberships.map((m) => this.toScimUser(m.user, m)),
     };
   }
 
@@ -638,6 +686,7 @@ export class ScimService {
     if (!membership) {
       const returning = await this.reinstateSignIn({
         id,
+        organizationId,
         connectionId,
         active: request.active !== false,
       });
@@ -651,17 +700,26 @@ export class ScimService {
     const name = this.buildNameFromRequest(request);
     const active = request.active !== false;
 
-    const updatedUser = await this.userService.updateProfile({
+    await this.userService.updateProfile({
       id,
       name,
       email: request.userName,
     });
 
-    if (active && updatedUser.deactivatedAt) {
-      await this.reactivate({ id });
-    } else if (!active && !updatedUser.deactivatedAt) {
+    // Branch on the MEMBERSHIP, not the account: `active: false` from this
+    // directory ends this membership, and only the person's last active
+    // membership takes the account with it (ADR-094 Decision 4).
+    if (active && membership.disabledAt) {
+      await this.reactivate({ id, organizationId });
+    } else if (!active && !membership.disabledAt) {
       await this.deactivate({ id, organizationId, connectionId });
     }
+
+    await this.persistAnchor({
+      userId: id,
+      organizationId,
+      externalId: request.externalId,
+    });
 
     await this.syncCostCenterFromScim({
       userId: id,
@@ -681,7 +739,7 @@ export class ScimService {
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
-    return this.toScimUser(reloadedUser);
+    return await this.toScimUserInOrg({ user: reloadedUser, organizationId });
   }
 
   /**
@@ -718,7 +776,14 @@ export class ScimService {
         op: "deactivate_user",
       });
     }
-    await this.userService.deactivate({ id });
+    // The MEMBERSHIP ends here, not the account: a directory speaks for its
+    // own organization, and only the person's last active membership takes
+    // the account with it (#6976, ADR-094 Decision 4). The closing
+    // usage-attribution rows share this transaction.
+    await this.membershipLifecycle.onMembershipDeactivated({
+      organizationId,
+      userId: id,
+    });
   }
 
   /**
@@ -730,8 +795,17 @@ export class ScimService {
    * gone until an administrator gives it again, because nothing here knows
    * that it was ever meant.
    */
-  private async reactivate({ id }: { id: string }): Promise<void> {
-    await this.userService.reactivate({ id });
+  private async reactivate({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.membershipLifecycle.onMembershipReactivated({
+      organizationId,
+      userId: id,
+    });
   }
 
   /**
@@ -757,10 +831,12 @@ export class ScimService {
    */
   private async reinstateSignIn({
     id,
+    organizationId,
     connectionId,
     active,
   }: {
     id: string;
+    organizationId: string;
     connectionId: string | null;
     active: boolean;
   }): Promise<ScimUser | null> {
@@ -773,7 +849,10 @@ export class ScimService {
 
     const user = await this.userService.findById({ id });
     if (!user) return null;
-    if (user.deactivatedAt) await this.reactivate({ id });
+    // Still creates nothing: `onMembershipReactivated` only ever updates
+    // rows, so this lifts the sign-in block and re-enables a membership
+    // this organization had disabled, and leaves a removed one removed.
+    await this.reactivate({ id, organizationId });
 
     const reloaded = (await this.userService.findById({ id })) ?? user;
     return this.toScimUser(reloaded);
@@ -820,6 +899,7 @@ export class ScimService {
     if (!membership) {
       const returning = await this.reinstateSignIn({
         id,
+        organizationId,
         connectionId,
         active: patchRequest.Operations.some(
           (operation) => this.activeInPatchOp(operation) === true,
@@ -853,12 +933,23 @@ export class ScimService {
       if (operation.op !== "replace") continue;
 
       // Handle path="active" with a scalar boolean value (e.g. Okta/Azure AD style)
+      if (operation.path === "externalId") {
+        if (typeof operation.value === "string") {
+          await this.persistAnchor({
+            userId: id,
+            organizationId,
+            externalId: operation.value,
+          });
+        }
+        continue;
+      }
+
       if (operation.path === "active") {
         if (operation.value === false || operation.value === "false") {
           await this.deactivate({ id, organizationId, connectionId });
           op = "deactivate";
         } else {
-          await this.reactivate({ id });
+          await this.reactivate({ id, organizationId });
         }
         continue;
       }
@@ -874,8 +965,16 @@ export class ScimService {
           await this.deactivate({ id, organizationId, connectionId });
           op = "deactivate";
         } else {
-          await this.reactivate({ id });
+          await this.reactivate({ id, organizationId });
         }
+      }
+
+      if ("externalId" in value && typeof value.externalId === "string") {
+        await this.persistAnchor({
+          userId: id,
+          organizationId,
+          externalId: value.externalId,
+        });
       }
 
       if ("userName" in value && typeof value.userName === "string") {
@@ -921,7 +1020,7 @@ export class ScimService {
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
-    return this.toScimUser(reloadedUser);
+    return await this.toScimUserInOrg({ user: reloadedUser, organizationId });
   }
 
   async deleteUser({
@@ -982,12 +1081,31 @@ export class ScimService {
         revokedGrantIds: visibleGrants.map((row) => row.id),
         actor: ScimService.ACTOR,
       });
-      await this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
-      });
     }
 
-    await this.userService.deactivate({ id });
+    // Both paths end the membership HERE, after the access is gone: the row
+    // is removed, the person's open usage-attribution links are closed in the
+    // same transaction, and their last active membership takes the account
+    // with it (ADR-094 Decision 4).
+    //
+    // Never before `removeAccess`. That proof re-collects the person's
+    // effective permissions and fails loudly if anything still resolves, and
+    // `isOrgMember` is false for a membership that is merely DISABLED
+    // (packages/authz-server/src/authz-collector.service.ts:333) — so ending
+    // the membership first would satisfy the proof's `stillOrgMember` leg
+    // because of us rather than because the row went, and catching a
+    // membership that survived the offboard is that leg's whole job.
+    //
+    // Safe on the path where `removeAccess` already deleted the row:
+    // `deleteMany` tolerates a row that is gone, and closing the links reads
+    // only `ProviderIdentityLink`, never the membership, so it closes the
+    // same rows either way.
+    await this.membershipLifecycle.onMembershipDeactivated({
+      organizationId,
+      userId: id,
+      membershipChange: "remove",
+    });
+
     await this.forgetDirectoryIdentity({ connectionId, userId: id });
     await this.recordPush({
       organizationId,
@@ -1018,12 +1136,21 @@ export class ScimService {
     });
   }
 
-  toScimUser(user: User): ScimUser {
+  /**
+   * The SCIM view of a person. The membership is what makes `active` mean
+   * active HERE (ADR-094 Decision 4): the account stays alive for the person's
+   * other organizations after this directory suspends them, and reporting them
+   * as still active would tell the IdP its own instruction did not take. It
+   * also carries the directory anchor back, so the IdP can confirm what it
+   * wrote. Absent for callers that hold no membership row.
+   */
+  toScimUser(user: User, membership?: ScimMembership | null): ScimUser {
     const { givenName, familyName } = this.splitName(user.name ?? "");
 
     return {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
       id: user.id,
+      ...(membership?.externalId ? { externalId: membership.externalId } : {}),
       userName: user.email ?? "",
       name: {
         givenName,
@@ -1036,13 +1163,80 @@ export class ScimService {
           type: "work",
         },
       ],
-      active: user.deactivatedAt === null,
+      active: user.deactivatedAt === null && !membership?.disabledAt,
       meta: {
         resourceType: "User",
         created: user.createdAt.toISOString(),
         lastModified: user.updatedAt.toISOString(),
       },
     };
+  }
+
+  /**
+   * The anchor columns to write when the membership row is CREATED, so the
+   * directory's id lands with the row rather than in a follow-up update that
+   * could be lost between the two.
+   *
+   * A null externalId means "this payload carries no anchor" and writes
+   * nothing — Entra sends an explicit null when the mapped attribute is empty,
+   * and a directory that has not populated the attribute yet must not be read
+   * as one asserting the person has no directory id.
+   */
+  private anchorFromRequest({
+    request,
+    organizationId,
+  }: {
+    request: ScimCreateUserRequest;
+    organizationId: string;
+  }): { externalId?: string; scimSource?: string } {
+    const externalId = request.externalId;
+    if (externalId == null) return {};
+    this.warnIfAnchorLooksMutable({ externalId, organizationId });
+    return { externalId, scimSource: SCIM_SOURCE };
+  }
+
+  /** The SCIM view of a person, with their membership of this organization. */
+  private async toScimUserInOrg({
+    user,
+    organizationId,
+  }: {
+    user: User;
+    organizationId: string;
+  }): Promise<ScimUser> {
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId: user.id, organizationId } },
+      select: { externalId: true, disabledAt: true },
+    });
+    return this.toScimUser(user, membership);
+  }
+
+  /**
+   * Write the directory anchor onto the membership. `scimSource` is what makes
+   * the row directory-owned — the discriminator shipped code already keys on,
+   * not "externalId is set" (ADR-094 Decision 7). Storing the anchor creates
+   * NO usage-attribution link: matching a login to a person stays an admin
+   * decision, and this only gives that decision something to propose from.
+   *
+   * Null is absent, not "clear it". Writing null over a stored anchor would
+   * quietly detach a person from their directory identity on any sync where
+   * the attribute happened to be empty, and the anchor has no history to
+   * recover it from.
+   */
+  private async persistAnchor({
+    userId,
+    organizationId,
+    externalId,
+  }: {
+    userId: string;
+    organizationId: string;
+    externalId: string | null | undefined;
+  }): Promise<void> {
+    if (externalId == null) return;
+    this.warnIfAnchorLooksMutable({ externalId, organizationId });
+    await this.prisma.organizationUser.updateMany({
+      where: { userId, organizationId },
+      data: { externalId, scimSource: SCIM_SOURCE },
+    });
   }
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {
@@ -1071,10 +1265,48 @@ export class ScimService {
     };
   }
 
-  private parseUserNameFilter(filter?: string): string | null {
+  /**
+   * SCIM filters this surface answers: `userName eq <value>` and
+   * `externalId eq <value>`, each with or without double quotes.
+   *
+   * Both halves matter for Microsoft Entra, whose documented retrieve is a
+   * straight unquoted `externalId eq jyoung`. We used to match only quoted
+   * `userName`, so an Entra retrieve fell through to null, returned every
+   * member instead of the one asked for, and — since Entra provisions a new
+   * user whenever a query finds none — silently created a duplicate person.
+   */
+  private parseUserFilter(
+    filter?: string,
+  ): { attribute: "userName" | "externalId"; value: string } | null {
     if (!filter) return null;
-    const match = filter.match(/^userName\s+eq\s+"([^"]+)"$/);
-    return match?.[1] ?? null;
+    const match = filter
+      .trim()
+      .match(/^(userName|externalId)\s+eq\s+(?:"([^"]*)"|(\S+))$/);
+    if (!match) return null;
+    const value = match[2] ?? match[3];
+    if (!value) return null;
+    return { attribute: match[1] as "userName" | "externalId", value };
+  }
+
+  /**
+   * Entra's DEFAULT user mapping sends `mailNickname` — a mutable nickname —
+   * as the external id, and only a customer who remaps `objectId` gets a
+   * stable anchor. Warn rather than reject: Okta's immutable id is not a GUID
+   * either and has to keep working, so refusing non-GUIDs would break a
+   * directory that is doing nothing wrong.
+   */
+  private warnIfAnchorLooksMutable({
+    externalId,
+    organizationId,
+  }: {
+    externalId: string;
+    organizationId: string;
+  }): void {
+    if (GUID_PATTERN.test(externalId)) return;
+    logger.warn(
+      { organizationId },
+      "SCIM user externalId is not a GUID. If this directory is Microsoft Entra, its default mapping sends a mutable nickname — remap objectId to externalId, or the person's usage attribution anchor moves when they are renamed.",
+    );
   }
 
   private scimError({

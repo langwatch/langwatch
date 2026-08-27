@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createFakePrisma,
+  type FakePrisma,
+} from "../../../users/__tests__/fake-prisma";
 import { createInnerTRPCContext } from "../../trpc";
 import { userRouter } from "../user";
 
@@ -16,7 +20,7 @@ vi.mock("../../../../../ee/admin/isAdmin", () => ({
   ),
 }));
 
-// An App carrying no Redis, so the revoke helper UserService.deactivate calls
+// An App carrying no Redis, so the revoke helper the deactivation path calls
 // takes its Postgres-only path instead of talking to a real Redis.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -35,12 +39,20 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 describe("userRouter", () => {
-  let prismaUpdateMock: ReturnType<typeof vi.fn>;
+  let prisma: FakePrisma;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    prismaUpdateMock = vi.fn().mockResolvedValue({ id: "user-1" });
+    prisma = createFakePrisma({
+      users: [
+        { id: "user-1", deactivatedAt: null },
+        { id: "caller-1", deactivatedAt: null },
+      ],
+    });
   });
+
+  const deactivatedAtOf = (id: string) =>
+    prisma.user.rows.find((row) => row.id === id)?.deactivatedAt;
 
   const createCaller = (email = "admin@example.com") => {
     const ctx = createInnerTRPCContext({
@@ -49,15 +61,7 @@ describe("userRouter", () => {
         expires: "2099-01-01",
       },
     });
-    (ctx as any).prisma = {
-      user: { update: prismaUpdateMock },
-      // UserService.deactivate also revokes all sessions for the user;
-      // mock the session model so the revocation completes cleanly.
-      session: {
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
-    };
+    (ctx as any).prisma = prisma;
     return userRouter.createCaller(ctx);
   };
 
@@ -68,10 +72,9 @@ describe("userRouter", () => {
         const before = new Date();
         await createCaller().deactivate({ userId: "user-1" });
 
-        const callArgs = prismaUpdateMock.mock.calls[0]![0];
-        expect(callArgs.where).toEqual({ id: "user-1" });
-        expect(callArgs.data.deactivatedAt).toBeInstanceOf(Date);
-        expect(callArgs.data.deactivatedAt.getTime()).toBeGreaterThanOrEqual(
+        const deactivatedAt = deactivatedAtOf("user-1");
+        expect(deactivatedAt).toBeInstanceOf(Date);
+        expect((deactivatedAt as Date).getTime()).toBeGreaterThanOrEqual(
           before.getTime(),
         );
       });
@@ -83,9 +86,7 @@ describe("userRouter", () => {
           userId: "caller-1",
         });
 
-        expect(prismaUpdateMock).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { id: "caller-1" } }),
-        );
+        expect(deactivatedAtOf("caller-1")).toBeInstanceOf(Date);
       });
 
       it("rejects the request", async () => {
@@ -93,7 +94,7 @@ describe("userRouter", () => {
           createCaller("member@example.com").deactivate({ userId: "user-1" }),
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-        expect(prismaUpdateMock).not.toHaveBeenCalled();
+        expect(deactivatedAtOf("user-1")).toBeNull();
       });
     });
   });
@@ -102,11 +103,11 @@ describe("userRouter", () => {
     describe("when called", () => {
       /** @scenario user.reactivate clears deactivatedAt on the user */
       it("clears deactivatedAt to null", async () => {
+        prisma.user.rows[0]!.deactivatedAt = new Date();
+
         await createCaller().reactivate({ userId: "user-1" });
 
-        const callArgs = prismaUpdateMock.mock.calls[0]![0];
-        expect(callArgs.where).toEqual({ id: "user-1" });
-        expect(callArgs.data.deactivatedAt).toBeNull();
+        expect(deactivatedAtOf("user-1")).toBeNull();
       });
     });
 
@@ -116,7 +117,7 @@ describe("userRouter", () => {
           createCaller("member@example.com").reactivate({ userId: "user-1" }),
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-        expect(prismaUpdateMock).not.toHaveBeenCalled();
+        expect(deactivatedAtOf("user-1")).toBeNull();
       });
     });
   });

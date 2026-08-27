@@ -7,6 +7,7 @@
  *
  * Mounted by `src/server/api-router.ts`. Exposes:
  *   - POST|DELETE /api/admin/impersonate
+ *   - POST        /api/admin/identity-erasure  (dry run by default)
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
 
@@ -29,6 +30,8 @@ import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/l
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
+import { IdentityErasureService } from "~/server/identity-links/identity-erasure.service";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import { adminSurfaceHidden } from "../adminSurfaceHidden";
 import {
@@ -178,6 +181,77 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 
   return c.json({ message: "Impersonation started" });
 }
+
+// ---------- POST /api/admin/identity-erasure ----------
+//
+// Right-to-be-forgotten for one person in one organization (ADR-094 Decision
+// 9). It sits here rather than inside `POST /admin/:resource` because that
+// route validates against a closed react-admin resource allowlist and answers
+// with row data; erasure is neither a resource nor a row edit.
+//
+// COUNT FIRST, ALWAYS (ADR-094 Gates: "human review, always + count-first dry
+// run printed before execution"). The default is the dry run: a request with
+// no `confirm` reports what would be destroyed and writes nothing. The
+// operator reads those numbers, then repeats the request with `confirm: true`.
+// Defaulting the other way would make a mistyped user id irreversible on the
+// first attempt.
+
+secured.access(adminAuth).post("/admin/identity-erasure", async (c) => {
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const user = session?.user.impersonator ?? session?.user;
+
+  if (!session || !user || !isAdmin(user)) {
+    throw adminSurfaceHidden();
+  }
+
+  const body = await readJsonBody(c);
+  const organizationId = asNonEmptyString(body.organizationId);
+  const userId = asNonEmptyString(body.userId);
+  if (!organizationId || !userId) {
+    const missing = [
+      ...(organizationId ? [] : ["organizationId"]),
+      ...(userId ? [] : ["userId"]),
+    ];
+    throw new ValidationError("Identity erasure request is missing fields", {
+      meta: {
+        fieldErrors: Object.fromEntries(
+          missing.map((field) => [field, ["This is required."]]),
+        ),
+      },
+    });
+  }
+
+  const service = IdentityErasureService.create(prisma);
+
+  // Anything that is not literally `true` is a dry run. A truthy-ish value —
+  // `"false"`, `1`, `{}` — must not be able to trigger an irreversible write.
+  if (body.confirm !== true) {
+    return c.json({
+      dryRun: true,
+      ...(await service.preview({ organizationId, userId })),
+    });
+  }
+
+  const result = await service.erase({ organizationId, userId, confirm: true });
+
+  // Audited after the fact, and deliberately naming only ids and counts: an
+  // audit entry for an erasure must not be the one place the erased person's
+  // identifiers survive.
+  await auditLog({
+    userId: user.id,
+    action: "admin/identity-erasure",
+    args: {
+      organizationId,
+      erasedUserId: userId,
+      linkRows: result.linkRows,
+      directoryAnchors: result.directoryAnchors,
+      agentSnapshots: result.agentSnapshots,
+    },
+    req: c.req.raw as any,
+  });
+
+  return c.json({ dryRun: false, ...result });
+});
 
 /**
  * The request body as an object, or a handled 400.
@@ -444,7 +518,21 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
           payload: { id: userId, reactivate: true },
         });
       } else if (typeof v === "string" || v instanceof Date) {
-        await userService.deactivate({ id: userId });
+        // The lifecycle hook is the single deactivation implementation
+        // (ADR-094 Decision 4): the account flag, the closing link rows for
+        // every organization the person was still active in, and the
+        // revocations.
+        //
+        // It runs on the real clock, NOT on the admin's picked date. The
+        // picked date is a label on the account flag, which every reader
+        // null-checks; the closing rows are a money paper trail, and dating
+        // them in the past would silently move spend from an already-reported
+        // period out of the person's name (ADR-094 Decision 3 allows
+        // backdating, but never silently — that notice is the report batch's).
+        await MembershipLifecycleService.create(prisma).onUserDeactivated({
+          userId,
+          actorUserId: user?.id ?? null,
+        });
         delete data.deactivatedAt;
         handledSideEffect = true;
         const pickedDate = v instanceof Date ? v : new Date(v);

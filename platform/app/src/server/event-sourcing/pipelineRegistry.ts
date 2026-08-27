@@ -58,6 +58,7 @@ import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import { runOrphanLinkSweep } from "~/server/users/orphan-link-sweep";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
@@ -172,6 +173,7 @@ import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pi
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createIdentityLinksMaintenancePipeline } from "./pipelines/identity-links-maintenance/pipeline";
 import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
@@ -620,6 +622,20 @@ export class PipelineRegistry {
         sandboxKeyReap: {
           reap: () =>
             reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Usage-attribution link maintenance, on the same footing. The offboarding
+    // paths write their closing rows transactionally, so this normally finds
+    // nothing — it is the backstop for the paths that do not exist yet
+    // (ADR-094 Decision 4).
+    this.deps.eventSourcing.register(
+      createIdentityLinksMaintenancePipeline({
+        orphanSweep: {
+          sweep: () => runOrphanLinkSweep({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

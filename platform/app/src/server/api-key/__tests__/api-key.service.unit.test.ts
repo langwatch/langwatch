@@ -148,9 +148,17 @@ describe("ApiKeyService", () => {
 
         expect(result.token).toBe("sk-lw-testlookup1234_testsecret");
         expect(result.apiKey.id).toBe("ak_1");
+        // An ACTIVE membership, not merely a row: a directory offboarding
+        // disables the membership and leaves the row in place, so asking only
+        // whether it exists would keep minting keys for someone who has been
+        // removed from the organization.
         expect(prisma.organizationUser.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { userId: "user_1", organizationId: "org_1" },
+            where: {
+              userId: "user_1",
+              organizationId: "org_1",
+              disabledAt: null,
+            },
           }),
         );
       });

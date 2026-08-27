@@ -20,6 +20,7 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
+import { closeOpenLinksForMembership } from "~/server/users/close-open-links";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -119,6 +120,28 @@ async function lockActiveAdmins({
     ORDER BY "userId"
     FOR UPDATE
   `;
+}
+
+/**
+ * Refuses to disable the last remaining active admin of an organization.
+ *
+ * Extracted from `setMemberDisabled`'s transaction callback so that
+ * callback's cognitive complexity stays under the biome limit. The
+ * `FOR UPDATE` lock inside `lockActiveAdmins` is the same one the member-
+ * removal path uses: two concurrent disables aimed at the last two admins
+ * serialize here.
+ */
+async function guardLastAdmin(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  member: { role: OrganizationUserRole },
+): Promise<void> {
+  if (member.role !== OrganizationUserRole.ADMIN) return;
+
+  const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+  if (activeAdmins.length <= 1) {
+    throw new CannotDisableLastAdminError();
+  }
 }
 
 /** A credential-bearing settings value encrypted at rest; cleared values store null. */
@@ -1240,26 +1263,31 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         throw new MemberNotFoundError(userId);
       }
 
-      // Same guard as demoting the last admin: an organization with no admin
-      // who can sign in cannot be recovered from inside the product. Locked
-      // for the same reason the removal guard locks: a disable and a removal
-      // aimed at the two remaining admins would otherwise both pass.
-      if (disabled && member.role === OrganizationUserRole.ADMIN) {
-        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-
-        if (activeAdmins.length <= 1) {
-          // Handled rather than a TRPCError: the tRPC boundary maps a 400
-          // HandledError to BAD_REQUEST anyway, and the REST surface answers
-          // the stable code instead of flattening this refusal to an unknown
-          // 500.
-          throw new CannotDisableLastAdminError();
-        }
+      if (disabled) {
+        await guardLastAdmin(tx, organizationId, member);
       }
 
+      const now = new Date();
       await tx.organizationUser.update({
         where: { userId_organizationId: { userId, organizationId } },
-        data: { disabledAt: disabled ? new Date() : null },
+        data: { disabledAt: disabled ? now : null },
       });
+
+      // A disabled membership is an offboarding from this organization, so
+      // the person's open usage-attribution links here get their closing
+      // rows — in this transaction, beside the membership write and under
+      // the same last-admin lock, because appending after the commit is the
+      // loss window ADR-094 Decision 4 bans. Re-enabling never re-opens
+      // them: an admin relinks.
+      if (disabled) {
+        await closeOpenLinksForMembership({
+          tx,
+          organizationId,
+          userId,
+          actorUserId: null,
+          now,
+        });
+      }
     });
 
     if (disabled) {

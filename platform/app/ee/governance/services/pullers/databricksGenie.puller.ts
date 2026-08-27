@@ -53,6 +53,7 @@
  *   instead of minting a second one.
  */
 
+import { DEFAULT_ACTOR_KIND } from "@langwatch/identity-links";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -2575,6 +2576,17 @@ export class DatabricksGeniePuller
       // an empty `actor` would drop it out of every actor-filtered SIEM view —
       // present-but-not-an-email beats absent.
       actor: identity.email || identity.key,
+      // Empty on purpose, which is what this row already carried before the
+      // actor fields existed. ADR-094 declares Databricks namespaces
+      // (`numeric_id`, `scim_external_id`, `email`) and an adapter must write
+      // exactly ONE of them, but `identity.key` is a precedence chain across
+      // all three — feeding it here would put three namespaces in the join
+      // column and match the wrong person. Picking the namespace is its own
+      // change; until then the row stays unattributed rather than mis-attributed.
+      actor_id: "",
+      // The provider tells us nothing about the principal type here, so this
+      // is the schema's documented default (ADR-094 Decision 5).
+      actor_kind: DEFAULT_ACTOR_KIND,
       action: "genie_query",
       target: space.title ?? space.space_id,
       // Zero at the point the message is built, always. Genie bills nothing per

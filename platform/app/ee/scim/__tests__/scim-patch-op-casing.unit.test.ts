@@ -45,10 +45,17 @@ function createMockPrisma() {
     user: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     organizationUser: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([{ userId: "user-1" }]),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    providerIdentityLink: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
     },
     roleBinding: {
       create: vi.fn().mockResolvedValue({}),
@@ -82,7 +89,9 @@ function createMockPrisma() {
     },
     $transaction: vi
       .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+      .mockImplementation((ops: unknown[] | ((tx: unknown) => unknown)) =>
+        typeof ops === "function" ? ops(mock) : Promise.all(ops),
+      ),
   };
   return mock as unknown as PrismaClient & typeof mock;
 }
@@ -145,8 +154,20 @@ describe("SCIM PATCH op casing", () => {
           }),
         });
 
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: "user-1" },
+        // The membership goes first, and it is the LAST one, so the account
+        // follows (ADR-094 Decision 4). `updateMany` guarded on
+        // `deactivatedAt: null`, not `update`: a repeated deactivate must not
+        // slide the timestamp forward.
+        expect(prisma.organizationUser.updateMany).toHaveBeenCalledWith({
+          where: {
+            userId: "user-1",
+            organizationId: "org-1",
+            disabledAt: null,
+          },
+          data: { disabledAt: expect.any(Date) },
+        });
+        expect(prisma.user.updateMany).toHaveBeenCalledWith({
+          where: { id: "user-1", deactivatedAt: null },
           data: { deactivatedAt: expect.any(Date) },
         });
         expect(result).toHaveProperty("active", false);

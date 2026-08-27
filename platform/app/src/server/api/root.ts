@@ -8,6 +8,7 @@ import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources"
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
+import { usageAttributionRouter } from "@ee/governance/routers/usageAttribution";
 import { createTRPCRouter } from "~/server/api/trpc";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
@@ -174,6 +175,7 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
+  usageAttribution: usageAttributionRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
   gatewayBudgets: gatewayBudgetsRouter,
