@@ -249,7 +249,7 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
   # question asked wrongly: a paused connection and one already being removed
   # are both "not active", neither can be discarded, and the screen offered
   # both a button whose only outcome was a refusal.
-  @integration @unimplemented
+  @integration
   Scenario: Which removal a press sends is read from where the connection stands
     Given "acme"'s connection is paused, or already scheduled for removal
     When "ana" removes it from the setup page

@@ -210,6 +210,18 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/access")),
       },
       {
+        // The identity provider's own journey and the connectors that
+        // provision people are routes rather than modes of the overview —
+        // see `AuthenticationLayout`. Registered before the index so the
+        // more specific path is matched first.
+        path: "/settings/authentication/provider",
+        ...page(() => import("./pages/settings/authentication/provider")),
+      },
+      {
+        path: "/settings/authentication/connectors",
+        ...page(() => import("./pages/settings/authentication/connectors")),
+      },
+      {
         path: "/settings/authentication",
         ...page(() => import("./pages/settings/authentication")),
       },
@@ -719,10 +731,6 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/users",
     ...page(() => import("./pages/ops/backoffice/users")),
-  },
-  {
-    path: "/ops/backoffice/identity-lookup",
-    ...page(() => import("./pages/ops/backoffice/identity-lookup")),
   },
   {
     path: "/ops/backoffice/organizations",

@@ -404,7 +404,7 @@ Feature: The people and access settings, as one cluster
       unavailable rather than as zero
       And no groups tab is offered
 
-    @integration @unimplemented
+    @integration
     Scenario: The protocol keeps its name in the body copy
       When "ana" reads where her identity provider sends people
       Then the copy names SCIM, for the administrator who searched for it
@@ -546,14 +546,14 @@ Feature: The people and access settings, as one cluster
 
   Rule: the state with no data carries the first step
 
-    @integration @unimplemented
+    @integration
     Scenario: An organization with no connection is offered the way to set one up
       Given "acme" has never registered an identity provider
       When "ana" opens the directory page
       Then she is told no identity provider is connected
       And she is offered the way to the page that registers one
 
-    @integration @unimplemented
+    @integration
     Scenario: The first step is not offered to somebody who would be refused it
       Given "ana" may see single sign-on but may not manage it
       When she opens the directory page with no connection registered
@@ -573,7 +573,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: a live connection is read rather than configured
 
-    @integration @unimplemented
+    @integration
     Scenario: The overview names the connection by the protocol it speaks
       Given "acme" has a live OpenID Connect connection to "okta"
       When "ana" opens the authentication page
@@ -581,14 +581,14 @@ Feature: The people and access settings, as one cluster
       And it names "okta" as the identity provider
       And where the connection stands is said in words, never as a state name
 
-    @integration @unimplemented
+    @integration
     Scenario: A domain whose record has gone says so on the overview
       Given "acme" proved "acme.com" and its published record has been missing
       for two days
       When "ana" opens the authentication page
       Then "acme.com" is listed as missing its record rather than as proved
 
-    @integration @unimplemented
+    @integration
     Scenario: A connection that is on but carrying nobody says both
       When "ana" opens the authentication page
       Then the sign-on card says who the connection routes as well as whether
@@ -605,7 +605,7 @@ Feature: The people and access settings, as one cluster
       And a reader who may not see single sign-on is told who can tell them,
       rather than shown a failure
 
-    @integration @unimplemented
+    @integration
     Scenario: The overview offers only what the connection really has
       Given "acme" has a live OpenID Connect connection
       When "ana" opens the authentication page
@@ -613,7 +613,7 @@ Feature: The people and access settings, as one cluster
       And no service provider metadata is offered, since only SAML publishes it
       And no signing certificate expiry is shown, since none is read from it
 
-    @unit @unimplemented
+    @unit
     Scenario: Every state a connection can be in has customer words
       When each state a connection can rest in is put to the status chip
       Then each one answers with words a customer reads
@@ -621,7 +621,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: how accounts arrive is on the same page as how people sign in
 
-    @integration @unimplemented
+    @integration
     Scenario: The directory card carries the organization's real numbers
       Given "acme" has a directory that manages three of its four members
       When "ana" opens the authentication page
@@ -629,7 +629,7 @@ Feature: The people and access settings, as one cluster
       And it says the fourth arrived another way
       And it offers the way to the provisioned members
 
-    @integration @unimplemented
+    @integration
     Scenario: A reader who may not read membership is told so
       Given "ana" may see single sign-on but may not manage the organization
       When she opens the authentication page
@@ -647,20 +647,20 @@ Feature: The people and access settings, as one cluster
   # provider, days later, rather than here where the choice was made.
   Rule: a provisioning token is only offered the connections that could carry it
 
-    @integration @unimplemented
+    @integration
     Scenario: Only live connections are offered when issuing a provisioning token
       Given "acme" has a live connection and one that was never turned on
       When "ana" goes to issue a provisioning token
       Then only the live connection is offered to bind it to
 
-    @integration @unimplemented
+    @integration
     Scenario: An organization with nothing live says so rather than offering an empty choice
       Given "acme" has no connection that is live
       When "ana" goes to issue a provisioning token
       Then she is told no connection is live yet
       And issuing is not offered until one is
 
-    @integration @unimplemented
+    @integration
     Scenario: A token issued against a connection since retired still names it
       Given "acme" holds a token issued against a connection that has been torn down
       When "ana" reads the provisioning tokens
@@ -668,20 +668,20 @@ Feature: The people and access settings, as one cluster
 
   Rule: setting up and checking are two modes of one page
 
-    @integration @unimplemented
+    @integration
     Scenario: An organization with no connection gets the journey
       Given "acme" has never registered an identity provider
       When "ana" opens the authentication page
       Then she is offered the first step of setting one up
 
-    @integration @unimplemented
+    @integration
     Scenario: Managing a live connection stays on the same page
       Given "acme" has a live connection
       When "ana" opens the authentication page and chooses to manage it
       Then the setup journey is on the same page
       And she can go back to the overview
 
-    @integration @unimplemented
+    @integration
     Scenario: The page points at where the reader's own sign-in lives
       Given "acme" has a live connection
       When "ana" opens the authentication page
@@ -696,7 +696,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: an organization that cannot set it up still reads the page
 
-    @integration @unimplemented
+    @integration
     Scenario: The reason sits above the page rather than replacing it
       Given "acme" is not switched on for setting single sign-on up itself
       When "ana" opens the authentication page
@@ -705,7 +705,7 @@ Feature: The people and access settings, as one cluster
       And her directory's own facts are still on it
       And her own sign-in methods are still pointed at
 
-    @integration @unimplemented
+    @integration
     Scenario: Nothing is offered that would be refused
       Given "acme" is not switched on for setting single sign-on up itself
       When "ana" opens the authentication page
@@ -734,7 +734,7 @@ Feature: The people and access settings, as one cluster
       When somebody opens the old access address
       Then they are taken to the directory page
 
-    @integration @unimplemented
+    @integration
     Scenario: Who may join is asked beside the connection whose domains it reads
       When "ana" opens the authentication page
       Then the who-may-join policy is on it
