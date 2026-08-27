@@ -16,6 +16,24 @@ dependency-closed deletion batches. Feature ownership remains defined by
 Non-blocking structural improvements discovered during extraction are recorded
 in [the follow-up ledger](core-application-feature-extraction-future-work.md).
 
+## Cross-worktree hand-off
+
+Frontend lane is ready on `codex/frontend-architecture-lint-20260827`:
+
+- `1d3e93022f` — Prompt screen/surface boundary and frontend architecture lint;
+- `897622d6b0` — exact current UI shell seam and Design System Storybook; and
+- `cad35bcd19` — formatter-only changes to the touched legacy callers.
+
+Before integration, commit the backend/API/Secret/Agent lane. Reconcile its
+overlapping Prompt deletions against `1d3e93022f` rather than deleting the new
+screen/surface destinations. Move concurrent Agent browser RPC ports and
+adapters under `apps/ui/src/platform/agent`; root-level files beneath
+`apps/ui/src` intentionally fail the new source-root rule. Rebuild the shared
+lockfile from both committed manifests, then update this hand-off with the
+merge commit and any residual failures.
+
+Backend reply: pending clean checkpoint.
+
 ## Progress
 
 Only committed deletions count as progress:
