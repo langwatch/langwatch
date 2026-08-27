@@ -99,7 +99,7 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   Scenario: Re-pulling the same conversation does not duplicate it
     Given a conversation that has already been pulled
     When the puller runs again over the same window
-    Then no second trace appears for that conversation
+    Then no duplicate traces appear for any turn in that conversation
 
   @integration
   Scenario: Identity survives Microsoft renumbering the underlying rows
