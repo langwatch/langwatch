@@ -153,3 +153,25 @@ Feature: Private ClickHouse Routing
     When a row is inserted via the routed client for this project
     Then the row exists in container B
     And the row does NOT exist in container A
+
+  # ── The third tenant kind ──────────────────────────────────────────────
+  #
+  # A tenant was a project, then a project or an organization, and now a
+  # user as well: `user_identity` keeps one aggregate per PERSON, so its
+  # tenantId is a user id and every append asked the resolver a question it
+  # could not answer. A user is NOT resolved into an organization on the way
+  # - somebody can be in several, and picking one would put their identity
+  # history on an instance chosen by accident.
+
+  @integration
+  Scenario: A user is a tenant in its own right
+    Given a user who belongs to no private-dataplane organization
+    When the routed client is resolved for that user as the tenant
+    Then it answers the shared ClickHouse
+    And the user is not resolved into any organization to get there
+
+  @integration
+  Scenario: A user inside a private-dataplane organization is refused
+    Given a user who is a member of an organization with a private ClickHouse
+    When the routed client is resolved for that user as the tenant
+    Then the resolution is refused rather than falling back to the shared instance

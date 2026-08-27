@@ -85,13 +85,27 @@ async function createTestOrgWithProject({
   const teamSlug = `--test-ch-team-${namespace}-${nanoid(6)}`;
   const projectSlug = `--test-ch-proj-${namespace}-${nanoid(6)}`;
 
-  const organization = await prisma.organization.create({
-    data: {
-      ...(organizationId ? { id: organizationId } : {}),
-      name: `Test CH Routing Org ${namespace}`,
-      slug: orgSlug,
-    },
-  });
+  // Upserted rather than created when the caller names the id, because two
+  // scenarios want a routed organization at the SAME id — the routing env var
+  // is keyed by it — and the rows live until `afterAll`. Creating twice made
+  // whichever ran second fail on the primary key, which is an ordering
+  // dependency rather than anything either scenario is about.
+  const organization = organizationId
+    ? await prisma.organization.upsert({
+        where: { id: organizationId },
+        update: {},
+        create: {
+          id: organizationId,
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      })
+    : await prisma.organization.create({
+        data: {
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      });
 
   const team = await prisma.team.create({
     data: {
@@ -122,6 +136,7 @@ async function createTestOrgWithProject({
 const createdProjectIds: string[] = [];
 const createdTeamIds: string[] = [];
 const createdOrgIds: string[] = [];
+const createdUserIds: string[] = [];
 
 /**
  * Mock the shared client to return our shared test container client.
@@ -169,6 +184,13 @@ describe("ClickHouse routing via env vars", () => {
     await clearCustomClientCache();
     clearTenantOrgCache();
 
+    // Memberships name both an organization and a user, so they have to go
+    // before either does; nothing cascades here.
+    if (createdOrgIds.length > 0) {
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: { in: createdOrgIds } },
+      });
+    }
     if (createdProjectIds.length > 0) {
       await prisma.project.deleteMany({
         where: { id: { in: createdProjectIds } },
@@ -181,6 +203,9 @@ describe("ClickHouse routing via env vars", () => {
       await prisma.organization.deleteMany({
         where: { id: { in: createdOrgIds } },
       });
+    }
+    if (createdUserIds.length > 0) {
+      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
 
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
@@ -321,7 +346,73 @@ describe("ClickHouse routing via env vars", () => {
     });
   });
 
-  describe("when the tenant names neither a project nor an organization", () => {
+  describe("when the tenant is a user rather than a project", () => {
+    /**
+     * The identity aggregate is keyed by USER (D01, ADR-101 §6), so this is
+     * the id its event-store writes arrive with. The resolver knew two kinds
+     * of tenant and refused this one, which meant no identity event ever
+     * appended, the fold never ran, and the backfill's parity proof reported
+     * `identifier_missing` for every user on every pass — forever.
+     *
+     * A user is not resolved into an organization, and deliberately so: a
+     * tenant is a PROJECT id, one user reaches many projects across many
+     * organizations, and there is no single one of them to call theirs.
+     * Identity history is platform-level, so it routes to the shared
+     * instance.
+     */
+    /** @scenario A user is a tenant in its own right */
+    it("routes a user with no private membership to the shared instance", async () => {
+      const { getClickHouseClientForTenant } = await import(
+        "../clickhouseClient"
+      );
+
+      const user = await prisma.user.create({
+        data: { email: `ch-routing-${nanoid(8)}@example.com`, name: "CH User" },
+      });
+      createdUserIds.push(user.id);
+
+      expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
+    });
+
+    /**
+     * The one case the refusal is actually for. This person's identity events
+     * would land in the shared platform log while their organization's own
+     * data stays on its private instance, so there is no answer to give and
+     * the resolver says so rather than picking one.
+     */
+    /** @scenario A user inside a private-dataplane organization is refused */
+    it("refuses a user who belongs to a private-dataplane organization", async () => {
+      const { getClickHouseClientForTenant } = await import(
+        "../clickhouseClient"
+      );
+
+      const { organizationId, teamId, projectId } =
+        await createTestOrgWithProject({
+          namespace: "private-member",
+          organizationId: PRIVATE_ORG_ID,
+        });
+      createdProjectIds.push(projectId);
+      createdTeamIds.push(teamId);
+      createdOrgIds.push(organizationId);
+
+      const user = await prisma.user.create({
+        data: {
+          email: `ch-private-${nanoid(8)}@example.com`,
+          name: "CH Private User",
+        },
+      });
+      createdUserIds.push(user.id);
+      await prisma.organizationUser.create({
+        data: { userId: user.id, organizationId, role: "MEMBER" },
+      });
+
+      await expect(getClickHouseClientForTenant(user.id)).rejects.toThrow(
+        user.id,
+      );
+    });
+  });
+
+  describe("when the tenant names no project, organization or user", () => {
     /** @scenario A tenant that names neither a project nor an organization is refused */
     it("refuses rather than falling back to the shared client", async () => {
       const { getClickHouseClientForTenant } = await import(
