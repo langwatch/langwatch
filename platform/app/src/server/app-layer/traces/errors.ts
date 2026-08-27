@@ -37,10 +37,7 @@ export class SpanNotFoundError extends NotFoundError {
 export class QueryTimeoutError extends HandledError {
   declare readonly code: "query_timeout";
 
-  constructor(
-    durationMs: number,
-    options: { hint?: string; reasons?: readonly Error[] } = {},
-  ) {
+  constructor(durationMs: number, options: { hint?: string; reasons?: readonly Error[] } = {}) {
     const { hint, reasons } = options;
     const base = remediation("query_timeout");
     super("query_timeout", `Query timed out (${(durationMs / 1000).toFixed(1)}s)`, {

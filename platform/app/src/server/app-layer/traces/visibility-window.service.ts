@@ -28,9 +28,7 @@ export const teaserOf = (text: string): string => {
   return text.length <= keep ? text : text.slice(0, keep) + TEASER_ELLIPSIS;
 };
 
-const teaserOfError = (
-  error: ErrorCapture | null | undefined,
-): ErrorCapture | null | undefined => {
+const teaserOfError = (error: ErrorCapture | null | undefined): ErrorCapture | null | undefined => {
   if (!error) return error;
   // The stacktrace is content too (errors routinely embed prompts) —
   // tease the joined trace, not each frame, so N frames can't leak N teasers.
@@ -50,15 +48,11 @@ const teaserOfSpanIO = (
   // chat_messages value that isn't an array) — serialize-and-tease those.
   const teaserAsRaw = (): SpanInputOutput => ({
     type: "raw",
-    value: teaserOf(
-      typeof io.value === "string" ? io.value : JSON.stringify(io.value ?? null),
-    ),
+    value: teaserOf(typeof io.value === "string" ? io.value : JSON.stringify(io.value ?? null)),
   });
   switch (io.type) {
     case "text":
-      return typeof io.value === "string"
-        ? { ...io, value: teaserOf(io.value) }
-        : teaserAsRaw();
+      return typeof io.value === "string" ? { ...io, value: teaserOf(io.value) } : teaserAsRaw();
     case "chat_messages":
       if (!Array.isArray(io.value)) return teaserAsRaw();
       return {
@@ -99,10 +93,7 @@ const deepTeaseStrings = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(deepTeaseStrings);
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
-        k,
-        deepTeaseStrings(v),
-      ]),
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepTeaseStrings(v)]),
     );
   }
   return value;
@@ -131,21 +122,15 @@ const teaserOfParams = (
  */
 export const redactTraceContent = (trace: Trace): Trace => ({
   ...trace,
-  input: trace.input
-    ? { ...trace.input, value: teaserOf(trace.input.value) }
-    : trace.input,
-  output: trace.output
-    ? { ...trace.output, value: teaserOf(trace.output.value) }
-    : trace.output,
+  input: trace.input ? { ...trace.input, value: teaserOf(trace.input.value) } : trace.input,
+  output: trace.output ? { ...trace.output, value: teaserOf(trace.output.value) } : trace.output,
   expected_output: trace.expected_output
     ? { ...trace.expected_output, value: teaserOf(trace.expected_output.value) }
     : trace.expected_output,
   contexts: trace.contexts?.map((context) => ({
     ...context,
     content: teaserOf(
-      typeof context.content === "string"
-        ? context.content
-        : JSON.stringify(context.content),
+      typeof context.content === "string" ? context.content : JSON.stringify(context.content),
     ),
   })),
   error: teaserOfError(trace.error),

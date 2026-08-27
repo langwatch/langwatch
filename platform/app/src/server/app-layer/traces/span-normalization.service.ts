@@ -5,11 +5,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import crypto from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import type {
-  OtlpInstrumentationScope,
-  OtlpResource,
-  OtlpSpan,
-} from "@langwatch/trace-contract";
+import type { OtlpInstrumentationScope, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
@@ -88,12 +84,8 @@ export class SpanNormalizationPipelineService {
   ): NormalizedSpan {
     // decode span data
     const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
-    const startTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.startTimeUnixNano,
-    );
-    const endTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.endTimeUnixNano,
-    );
+    const startTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(otlpSpan.startTimeUnixNano);
+    const endTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(otlpSpan.endTimeUnixNano);
     const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
     const endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(endTimeUnixNano);
     const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
@@ -134,17 +126,13 @@ export class SpanNormalizationPipelineService {
       statusCode: TraceRequestUtils.normalizeOtlpStatusCode(otlpSpan.status.code),
       statusMessage: otlpSpan.status.message ?? null,
 
-      resourceAttributes: TraceRequestUtils.normalizeOtlpAttributes(
-        otlpResource?.attributes ?? [],
-      ),
+      resourceAttributes: TraceRequestUtils.normalizeOtlpAttributes(otlpResource?.attributes ?? []),
       spanAttributes: TraceRequestUtils.normalizeOtlpAttributes(otlpSpan.attributes),
 
       events: otlpSpan.events
         .filter((e) => Boolean(e))
         .map((event) => {
-          const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-            event.timeUnixNano,
-          );
+          const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(event.timeUnixNano);
           const attributes = TraceRequestUtils.normalizeOtlpAttributes(event.attributes);
 
           return {
@@ -246,10 +234,7 @@ function extractChunkTextualContent(object: unknown): string {
 
 /** @internal Exported for unit testing */
 export function generateDocumentId(content: unknown): string {
-  return crypto
-    .createHash("md5")
-    .update(extractChunkTextualContent(content))
-    .digest("hex");
+  return crypto.createHash("md5").update(extractChunkTextualContent(content)).digest("hex");
 }
 
 /**
@@ -269,9 +254,7 @@ export function enrichRagContextIds(span: NormalizedSpan): void {
     if ("document_id" in ctxObj && ctxObj.document_id) return ctxObj;
     return {
       ...ctxObj,
-      document_id: generateDocumentId(
-        ctxObj.content !== undefined ? ctxObj.content : ctx,
-      ),
+      document_id: generateDocumentId(ctxObj.content !== undefined ? ctxObj.content : ctx),
     };
   });
 

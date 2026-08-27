@@ -216,9 +216,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       expect(page2.rows.map((r) => r.traceId)).toEqual(expected);
     });
 
-    it("reads heavy columns for fewer traces than the naive single-scan form", async ({
-      skip,
-    }) => {
+    it("reads heavy columns for fewer traces than the naive single-scan form", async ({ skip }) => {
       // The assertion compares per-query peak memory, which only
       // system.query_log records. A server started with log_queries=0 never
       // creates that table, so say why the check cannot run rather than
@@ -298,8 +296,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
         })
       ).json()) as Array<{ query_id: string; mem: string }>;
 
-      const memOf = (id: string) =>
-        Number(memRows.find((r) => r.query_id === id)?.mem ?? 0);
+      const memOf = (id: string) => Number(memRows.find((r) => r.query_id === id)?.mem ?? 0);
       const naiveMem = memOf(naiveId);
       const pagedMem = memOf(pagedId);
 

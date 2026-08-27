@@ -84,13 +84,7 @@ function logStore(
   return { getLogsByTraceId } as unknown as LogRecordStorageService;
 }
 
-function enrich({
-  spans,
-  logRecords,
-}: {
-  spans: Span[];
-  logRecords: LogRecordStorageService;
-}) {
+function enrich({ spans, logRecords }: { spans: Span[]; logRecords: LogRecordStorageService }) {
   return enrichCodingAgentSpansFromLogs({
     logRecords,
     tenantId: PROJECT_ID,

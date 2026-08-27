@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import {
   mapNormalizedSpansToSpans,
@@ -21,7 +21,7 @@ import type {
   TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
-import type { SpanInsertData } from "./types";
+import type { SpanInsertData } from "@langwatch/trace-contract";
 import { redactSpanContent } from "./visibility-window.service";
 
 /**
@@ -113,10 +113,7 @@ export class SpanStorageService {
       ioExtractionService: this.blobResolutionDeps.ioExtractionService,
       logger: this.logger,
     });
-    return applyVisibilityGate(
-      mapNormalizedSpansToSpans(resolvedSpans),
-      params.visibilityCutoffMs,
-    );
+    return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
   }
 
   async getNormalizedSpansByTraceId(
@@ -141,9 +138,7 @@ export class SpanStorageService {
    * the read omits those columns because no consumer here reads them and they
    * are what it fails on. Rendering a span is `getSpanById`'s job, not this.
    */
-  async getNormalizedSpanById(
-    params: NormalizedSpanByIdParams,
-  ): Promise<NormalizedSpan | null> {
+  async getNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return this.repository.findNormalizedSpanById(params);
   }
 
@@ -207,9 +202,7 @@ export class SpanStorageService {
     return this.repository.getSpanSummaryByTraceId(params);
   }
 
-  async getLangwatchSignalsByTraceId(
-    params: ByTraceId,
-  ): Promise<SpanLangwatchSignalsRow[]> {
+  async getLangwatchSignalsByTraceId(params: ByTraceId): Promise<SpanLangwatchSignalsRow[]> {
     return this.repository.findLangwatchSignalsByTraceId(params);
   }
 

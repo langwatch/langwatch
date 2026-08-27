@@ -19,10 +19,7 @@ export { buildEvaluatorFacetQuery } from "./evaluator";
 export { buildEventAttributeKeysFacetQuery } from "./event-attribute-keys";
 export { buildEventsFacetQuery } from "./events";
 export { buildLabelFacetQuery } from "./label";
-export {
-  buildMetadataKeysFacetQuery,
-  buildTraceMetadataKeysFacetQuery,
-} from "./metadata-keys";
+export { buildMetadataKeysFacetQuery, buildTraceMetadataKeysFacetQuery } from "./metadata-keys";
 export { buildSpanAttributeKeysFacetQuery } from "./span-attribute-keys";
 export {
   EVALUATOR_FACET,

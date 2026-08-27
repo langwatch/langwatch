@@ -57,10 +57,7 @@ import {
   LARGE_VALUE,
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
-import {
-  BlobStore,
-  type S3ClientResolver,
-} from "~/server/app-layer/traces/blob-store.service";
+import { BlobStore, type S3ClientResolver } from "~/server/app-layer/traces/blob-store.service";
 import {
   EVENTREF_ATTR_PREFIX,
   leanForProjection,
@@ -79,22 +76,17 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "@langwatch/trace-contract";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  resolveOffloadedTraces,
-  type WarnLogger,
-} from "~/server/traces/resolve-offloaded-traces";
+} from "@langwatch/trace-contract";
+import { resolveOffloadedTraces, type WarnLogger } from "~/server/traces/resolve-offloaded-traces";
 
 // Gate identically to the canonical event_log integration test: skip when no
 // real ClickHouse is reachable, run against the testcontainer otherwise.
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL);
 
 /**
  * Builds a SpanReceived domain Event whose `langwatch.input` carries `value`.
@@ -254,9 +246,7 @@ class StagedSpanRepository extends NullSpanStorageRepository {
  */
 function makeRealBlobStore(client: ClickHouseClient): BlobStore {
   const s3Resolver = async () => {
-    throw new Error(
-      "S3 resolver must not be called on the event_log read path in this test",
-    );
+    throw new Error("S3 resolver must not be called on the event_log read path in this test");
   };
   return new BlobStore({
     resolveS3Client: s3Resolver as unknown as S3ClientResolver,
@@ -339,9 +329,7 @@ describe.skipIf(!hasTestcontainers)(
         // 3) Drive the REAL v2 read entry point with the REAL BlobStore.
         const service = new SpanStorageService(new StagedSpanRepository([leanedSpan]), {
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const spans = await service.getSpansByTraceId({ tenantId, traceId });
@@ -396,24 +384,17 @@ describe.skipIf(!hasTestcontainers)(
           projectId: tenantId,
           normalizedSpans: [leanedSpan],
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
           logger,
         });
 
         // Full value restored byte-identically from real CH.
-        const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<
-          string,
-          string
-        >;
+        const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<string, string>;
         expect(resolvedAttrs["langwatch.input"]).toBe(LARGE_VALUE);
         expect(resolvedAttrs["langwatch.input"]).toContain(UNIQUE_TAIL);
 
         // Reserved eventref namespace never leaks to the UI.
-        const hasRef = Object.keys(resolvedAttrs).some((k) =>
-          k.startsWith(EVENTREF_ATTR_PREFIX),
-        );
+        const hasRef = Object.keys(resolvedAttrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
         expect(hasRef).toBe(false);
         expect(result.anyResolved).toBe(true);
       });
@@ -486,26 +467,19 @@ describe.skipIf(!hasTestcontainers)(
           projectId: tenantId,
           normalizedSpans: [spanWithBodyRef],
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
           logger,
         });
 
         // The full body comes back from CH via the field==="body" branch, keyed
         // under the resolved attribute name "body".
-        const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<
-          string,
-          string
-        >;
+        const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<string, string>;
         expect(resolvedAttrs.body).toBe(LARGE_VALUE);
         expect(resolvedAttrs.body).toContain(UNIQUE_TAIL);
         expect(resolvedAttrs.body!.length).toBe(LARGE_VALUE.length);
 
         // eventref stripped; resolution succeeded.
-        const hasRef = Object.keys(resolvedAttrs).some((k) =>
-          k.startsWith(EVENTREF_ATTR_PREFIX),
-        );
+        const hasRef = Object.keys(resolvedAttrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
         expect(hasRef).toBe(false);
         expect(result.anyResolved).toBe(true);
       });

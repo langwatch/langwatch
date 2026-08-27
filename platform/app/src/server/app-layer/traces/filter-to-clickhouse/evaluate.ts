@@ -9,12 +9,7 @@ import {
 } from "liqe";
 import { MAX_NODE_COUNT, normalizeQuery, translateFilterToClickHouse } from "./ast";
 import { FIELD_DEF_BY_NAME } from "./build-handlers";
-import {
-  type FieldNeeds,
-  type InMemoryTrace,
-  UNSUPPORTED,
-  type Unsupported,
-} from "./field-def";
+import { type FieldNeeds, type InMemoryTrace, UNSUPPORTED, type Unsupported } from "./field-def";
 import { existenceNeeds } from "./meta-handlers";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -140,11 +135,7 @@ function evaluateNode(
   }
 }
 
-function evaluateTag(
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
+function evaluateTag(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean | Unsupported {
   if (tag.field.type === "ImplicitField") {
     return evaluateFreeText(tag, negated, trace);
   }
@@ -199,11 +190,7 @@ function evaluateTag(
   return def.evaluateInMemory(tag, negated, trace);
 }
 
-function evaluateFreeText(
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean {
+function evaluateFreeText(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean {
   // Mirrors `translateFreeText`'s `(ComputedInput ILIKE %v% OR ComputedOutput
   // ILIKE %v% OR ifNull(TraceName,'') ILIKE %v% OR <span-name subquery>)`,
   // including ClickHouse's three-valued logic over the Nullable(String) I/O
@@ -231,8 +218,7 @@ function evaluateFreeText(
   // a summary built from a fold state that predates the field would throw here
   // and take the whole evaluation (including trigger dispatch) down with it.
   const nameMatch = (trace.summary.traceName ?? "").toLowerCase().includes(value);
-  const spanMatch =
-    trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
+  const spanMatch = trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
 
   const matched =
     inputMatch === true || outputMatch === true || nameMatch || spanMatch
@@ -245,10 +231,7 @@ function evaluateFreeText(
 }
 
 /** `column ILIKE %value%` with SQL semantics: NULL column → NULL, not false. */
-function ilikeContains(
-  column: string | null | undefined,
-  lowerValue: string,
-): boolean | null {
+function ilikeContains(column: string | null | undefined, lowerValue: string): boolean | null {
   if (column == null) return null;
   return column.toLowerCase().includes(lowerValue);
 }

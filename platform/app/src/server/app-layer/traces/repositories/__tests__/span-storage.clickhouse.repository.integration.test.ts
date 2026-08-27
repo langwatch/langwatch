@@ -19,7 +19,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import type { SpanInsertData } from "../../types";
+import type { SpanInsertData } from "@langwatch/trace-contract";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
 import { MAX_EVENT_NAMES_PER_TRACE } from "../span-storage.repository";
 
@@ -240,25 +240,19 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           { ts: t(10), name: "exception", attrs: { type: "TimeoutError" } },
           { ts: t(20), name: "span.end", attrs: { phase: "done" } },
         ]),
-        makeEventRow("evt-span-2", [
-          { ts: t(5), name: "process.tick", attrs: { iter: "1" } },
-        ]),
+        makeEventRow("evt-span-2", [{ ts: t(5), name: "process.tick", attrs: { iter: "1" } }]),
         // Stale earlier version of evt-span-1 — dedup must drop it. Override
         // StartTime as well as UpdatedAt: stored_spans is
         // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
         // collapse the live row at insert time (rows in one INSERT land in a
         // single part, and the engine resolves ties unpredictably). A strictly
         // older StartTime makes the stale row deterministically lose the merge.
-        makeEventRow(
-          "evt-span-1",
-          [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }],
-          {
-            StartTime: new Date(base - 60_000),
-            EndTime: new Date(base - 60_000 + 50),
-            UpdatedAt: new Date(base - 60_000),
-            CreatedAt: new Date(base - 60_000),
-          },
-        ),
+        makeEventRow("evt-span-1", [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }], {
+          StartTime: new Date(base - 60_000),
+          EndTime: new Date(base - 60_000 + 50),
+          UpdatedAt: new Date(base - 60_000),
+          CreatedAt: new Date(base - 60_000),
+        }),
       ]);
     });
 
@@ -291,11 +285,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         traceId: eventsTraceId,
       });
 
-      expect(events.map((e) => e.event_type)).toEqual([
-        "span.end",
-        "process.tick",
-        "span.start",
-      ]);
+      expect(events.map((e) => e.event_type)).toEqual(["span.end", "process.tick", "span.start"]);
       expect(events.find((e) => e.event_type === "exception")).toBeUndefined();
       expect(events.find((e) => e.event_type === "stale.skip")).toBeUndefined();
     });
@@ -472,9 +462,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         timeRange,
       });
 
-      expect(Object.keys(rollups).sort()).toEqual(
-        [feedbackTraceId, chattyTraceId].sort(),
-      );
+      expect(Object.keys(rollups).sort()).toEqual([feedbackTraceId, chattyTraceId].sort());
     });
 
     /** @scenario A trace with no events shows the empty marker */
@@ -648,9 +636,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
             return Reflect.get(target, prop, receiver);
           },
         }) as ClickHouseClient;
-        const recordingRepo = new SpanStorageClickHouseRepository(
-          async () => recordingClient,
-        );
+        const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
         const events = await recordingRepo.getTraceEventsByTraceId({
           tenantId: hintlessTenantId,
@@ -764,9 +750,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
@@ -801,9 +785,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
@@ -836,9 +818,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
@@ -899,9 +879,7 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
 
   beforeAll(async () => {
     const containers = await startTestContainers();
-    costRepo = new SpanStorageClickHouseRepository(
-      async () => containers.clickHouseClient,
-    );
+    costRepo = new SpanStorageClickHouseRepository(async () => containers.clickHouseClient);
 
     await costRepo.insertSpans([
       makeSpanInsert("span-billed", 0.0123, null),

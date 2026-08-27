@@ -202,9 +202,7 @@ describe("given a requested span-read limit", () => {
 
   describe("when the requested limit exceeds the ceiling", () => {
     it("clamps to the ceiling so a leaked trace_id cannot raise it", () => {
-      expect(clampSpanReadLimit(MAX_DERIVATION_SPANS + 50_000)).toBe(
-        MAX_DERIVATION_SPANS,
-      );
+      expect(clampSpanReadLimit(MAX_DERIVATION_SPANS + 50_000)).toBe(MAX_DERIVATION_SPANS);
     });
   });
 
@@ -340,9 +338,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
         sinceStartTimeMs: Date.now(),
       });
 
-      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
-        `LIMIT ${MAX_DERIVATION_SPANS}`,
-      );
+      expect(query.mock.calls[0]?.[0]?.query as string).toContain(`LIMIT ${MAX_DERIVATION_SPANS}`);
     });
   });
 });

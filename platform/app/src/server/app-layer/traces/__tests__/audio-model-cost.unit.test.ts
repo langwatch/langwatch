@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProviderModelOptions } from "../../../modelProviders/registry";
+import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { estimateCost } from "../../../tracer/collector/cost";
 import { computeSpanCost } from "../model-cost-matching";
 

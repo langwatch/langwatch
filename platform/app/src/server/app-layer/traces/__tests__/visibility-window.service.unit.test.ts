@@ -54,9 +54,7 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
 describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
     it("caps the teaser at TEASER_MAX_CHARS", () => {
-      expect(teaserOf("a".repeat(5000))).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
 
     it("keeps 10% when that lands between the floor and the cap", () => {
@@ -76,9 +74,7 @@ describe("given the teaser truncation rule", () => {
 
   describe("when the text length equals the floor boundary", () => {
     it("keeps TEASER_MIN_CHARS plus the ellipsis for a 60-char text", () => {
-      expect(teaserOf("d".repeat(60))).toHaveLength(
-        TEASER_MIN_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(teaserOf("d".repeat(60))).toHaveLength(TEASER_MIN_CHARS + TEASER_ELLIPSIS.length);
     });
   });
 });
@@ -87,19 +83,11 @@ describe("given a trace beyond the visibility window", () => {
   describe("when redactTraceContent runs", () => {
     it("truncates input, output, and error bodies to the teaser", () => {
       const redacted = redactTraceContent(makeTrace());
-      expect(redacted.input?.value).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
-      expect(redacted.output?.value).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
-      expect(redacted.error?.message).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       // joined stacktrace is 503 chars -> ceil(10%) = 51 kept
-      expect(redacted.error?.stacktrace.join("")).toHaveLength(
-        51 + TEASER_ELLIPSIS.length,
-      );
+      expect(redacted.error?.stacktrace.join("")).toHaveLength(51 + TEASER_ELLIPSIS.length);
     });
 
     it("marks the trace as redacted by the visibility window", () => {
@@ -156,9 +144,7 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       const messages = (redacted.input as { value: { content?: string | null }[] }).value;
-      expect(messages[0]?.content).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(messages[1]?.content).toBe("hi");
     });
 
@@ -217,9 +203,9 @@ describe("given a span beyond the visibility window", () => {
       expect((content[0]!.text as string).length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
-      expect(
-        (content[1]!.args as Record<string, string>).query!.length,
-      ).toBeLessThanOrEqual(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect((content[1]!.args as Record<string, string>).query!.length).toBeLessThanOrEqual(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
 
     it("teases a list value that is not an array as raw", () => {
@@ -248,9 +234,7 @@ describe("given the visibility window service", () => {
   describe("when the plan has no visibility window", () => {
     it("returns null so nothing is redacted", async () => {
       const service = makeService({ free: false, visibilityDays: null });
-      await expect(
-        service.getVisibilityCutoffMs({ organizationId: "org-1" }),
-      ).resolves.toBeNull();
+      await expect(service.getVisibilityCutoffMs({ organizationId: "org-1" })).resolves.toBeNull();
     });
   });
 
@@ -268,9 +252,9 @@ describe("given the visibility window service", () => {
   describe("when plan resolution throws", () => {
     it("propagates the error so the caller can fail closed without caching", async () => {
       const service = makeService(null, true);
-      await expect(
-        service.getVisibilityCutoffMs({ organizationId: "org-1" }),
-      ).rejects.toThrow("db down");
+      await expect(service.getVisibilityCutoffMs({ organizationId: "org-1" })).rejects.toThrow(
+        "db down",
+      );
     });
   });
 });

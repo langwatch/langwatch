@@ -1,4 +1,4 @@
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 
 /**
  * Returns the first non-empty string value found at any of the provided
@@ -9,10 +9,7 @@ import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processin
  * `ai.model`). Callers pass their own key priority because cost
  * enrichment prefers `request` while token estimation prefers `response`.
  */
-export function extractModelName(
-  span: OtlpSpan,
-  attributeKeys: readonly string[],
-): string | null {
+export function extractModelName(span: OtlpSpan, attributeKeys: readonly string[]): string | null {
   for (const key of attributeKeys) {
     for (const attr of span.attributes) {
       if (

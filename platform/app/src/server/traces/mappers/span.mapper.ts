@@ -1,9 +1,6 @@
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
-import type {
-  NormalizedAttributes,
-  NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
+import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import type {
   BaseSpan,
   ChatMessage,

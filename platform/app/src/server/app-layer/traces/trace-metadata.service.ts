@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import type { CustomMetadata, ReservedTraceMetadata } from "~/server/tracer/types";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 
@@ -36,12 +36,7 @@ export type TraceMetadataUpdate = z.infer<typeof traceMetadataUpdateSchema>;
 
 /** Metadata keys that map onto the trace's first-class identity fields rather
  *  than free-form custom metadata. */
-const RESERVED_METADATA_KEYS = new Set<string>([
-  "user_id",
-  "customer_id",
-  "thread_id",
-  "labels",
-]);
+const RESERVED_METADATA_KEYS = new Set<string>(["user_id", "customer_id", "thread_id", "labels"]);
 
 function splitMetadata(metadata: TraceMetadataUpdate): {
   reserved: ReservedTraceMetadata;

@@ -13,9 +13,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  */
 export function buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("OccurredAt");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
-    : "";
+  const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
   // Same I/O optimisation as `span-attribute-keys.ts`: stay entirely on the
   // keys subcolumn so the values side of the Map never gets loaded. The

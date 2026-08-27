@@ -12,7 +12,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import type { SpanInsertData } from "@langwatch/trace-contract";
 import { prisma } from "~/server/db";
 import type { EventRecord } from "@langwatch/eventing";
 import {

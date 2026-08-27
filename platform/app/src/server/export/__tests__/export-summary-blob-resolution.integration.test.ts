@@ -55,7 +55,7 @@ import {
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "@langwatch/trace-contract";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import type { ExportRequest } from "../types";
 

@@ -21,7 +21,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 import type { BlobStore } from "../blob-store.service";
 import { BlobNotFoundError } from "../blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "../lean-for-projection";

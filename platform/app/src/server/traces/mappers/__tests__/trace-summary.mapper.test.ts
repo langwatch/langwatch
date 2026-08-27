@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { Span } from "~/server/tracer/types";
 import {
   extractEventsFromSpans,

@@ -50,10 +50,7 @@ function modelSpan({ atMs, cost = 0.5 }: { atMs: number; cost?: number }): SpanD
   } as unknown as SpanDetail;
 }
 
-function log(
-  attributes: Record<string, unknown>,
-  timestampMs: number,
-): TranscriptLogRecord {
+function log(attributes: Record<string, unknown>, timestampMs: number): TranscriptLogRecord {
   return { timestampMs, attributes };
 }
 
@@ -494,9 +491,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     it("keeps the reply, skips the thinking, and ignores the router call", () => {
       const transcript = buildCodingAgentTranscript({ spans, logs });
 
-      const replies = transcript.entries.filter(
-        (entry) => entry.kind === "assistant_message",
-      );
+      const replies = transcript.entries.filter((entry) => entry.kind === "assistant_message");
       expect(replies).toHaveLength(1);
       expect(replies[0]).toMatchObject({
         text: "pong",
@@ -509,9 +504,9 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     it("derives the user prompt, the tool call, and the model call", () => {
       const transcript = buildCodingAgentTranscript({ spans, logs });
 
-      expect(
-        transcript.entries.find((entry) => entry.kind === "user_prompt"),
-      ).toMatchObject({ text: "reply with the single word pong" });
+      expect(transcript.entries.find((entry) => entry.kind === "user_prompt")).toMatchObject({
+        text: "reply with the single word pong",
+      });
       expect(transcript.entries.find((entry) => entry.kind === "tool")).toMatchObject({
         name: "read_file",
         durationMs: 42,
@@ -544,9 +539,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
         logs,
       });
 
-      const replies = transcript.entries.filter(
-        (entry) => entry.kind === "assistant_message",
-      );
+      const replies = transcript.entries.filter((entry) => entry.kind === "assistant_message");
       expect(replies.map((reply) => reply.text)).toEqual(["pong", "second answer"]);
     });
   });
@@ -609,9 +602,9 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       });
 
       expect(transcript.totals.modelCalls).toBe(1);
-      expect(
-        transcript.entries.find((entry) => entry.kind === "assistant_message"),
-      ).toMatchObject({ text: "pong" });
+      expect(transcript.entries.find((entry) => entry.kind === "assistant_message")).toMatchObject({
+        text: "pong",
+      });
     });
   });
 
@@ -903,9 +896,7 @@ describe("buildCodingAgentTranscript injected session context", () => {
       const system = transcript.entries.find((e) => e.kind === "system_prompt");
       expect(system).toBeDefined();
       expect((system as { text: string }).text).toContain("always use pnpm");
-      expect((system as { text: string }).text).not.toContain(
-        "Read hello.py and explain it",
-      );
+      expect((system as { text: string }).text).not.toContain("Read hello.py and explain it");
     });
   });
 
@@ -1029,12 +1020,7 @@ describe("given a codex trace whose conversation was recovered", () => {
 
       const readable = transcript.entries.filter((e) => e.kind !== "model_call");
       expect(readable.map((e) => e.kind)).toEqual(
-        expect.arrayContaining([
-          "system_prompt",
-          "user_prompt",
-          "tool",
-          "assistant_message",
-        ]),
+        expect.arrayContaining(["system_prompt", "user_prompt", "tool", "assistant_message"]),
       );
       const prompt = readable.find((e) => e.kind === "user_prompt");
       expect(prompt).toMatchObject({
@@ -1129,9 +1115,7 @@ describe("given a recovered codex turn whose first user message is the agent's o
       });
 
       const context = transcript.entries.find((e) => e.kind === "system_prompt");
-      expect(context?.kind === "system_prompt" && context.text).toContain(
-        "recommended_plugins",
-      );
+      expect(context?.kind === "system_prompt" && context.text).toContain("recommended_plugins");
     });
   });
 });
@@ -1486,9 +1470,9 @@ describe("given a prompt pasting tens of thousands of unclosed tags", () => {
       const elapsedMs = performance.now() - startedAtMs;
 
       expect(elapsedMs).toBeLessThan(100);
-      expect(
-        transcript.entries.find((entry) => entry.kind === "user_prompt"),
-      ).toMatchObject({ text: pasted });
+      expect(transcript.entries.find((entry) => entry.kind === "user_prompt")).toMatchObject({
+        text: pasted,
+      });
     });
   });
 });
@@ -1503,10 +1487,7 @@ function isTagsOnlyByBacktrackingStrip(content: string): boolean {
   const trimmed = content.trim();
   if (!trimmed.startsWith("<")) return false;
   if (trimmed.length > 64_000) return false;
-  return (
-    trimmed.replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "").trim().length ===
-    0
-  );
+  return trimmed.replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "").trim().length === 0;
 }
 
 /**
@@ -1553,9 +1534,7 @@ describe("given the tag shapes a recovered prompt can carry", () => {
           ],
           logs: [],
         });
-        const prompts = transcript.entries.filter(
-          (entry) => entry.kind === "user_prompt",
-        );
+        const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
 
         expect({ content, prompts: prompts.length }).toEqual({
           content,

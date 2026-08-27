@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { BlobStore } from "../blob-store.service";
 import { maybeSpool, type SpoolLogger } from "../edge-spool";
 import { COMMAND_INLINE_THRESHOLD } from "../lean-for-projection";
@@ -60,11 +60,7 @@ function makeCommandData({ outputSize }: { outputSize: number }): RecordSpanComm
 }
 
 /** Builds a fake BlobStore where putSpool returns a spool ref string. */
-function makeBlobStore({
-  putSpoolResult,
-}: {
-  putSpoolResult: "success" | "fail";
-}): BlobStore {
+function makeBlobStore({ putSpoolResult }: { putSpoolResult: "success" | "fail" }): BlobStore {
   return {
     putSpool: vi.fn().mockImplementation(async () => {
       if (putSpoolResult === "fail") {
@@ -133,9 +129,7 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD (256 KB) and the S3
       expect(typeof result.spoolRef).toBe("string");
 
       // The large output attr must NOT be in the returned command's span
-      const outputAttr = result.span.attributes?.find(
-        (a) => a.key === "langwatch.output",
-      );
+      const outputAttr = result.span.attributes?.find((a) => a.key === "langwatch.output");
       const outputSize = Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8");
       // Returned command must be well under the threshold (it carries only id fields)
       expect(outputSize).toBeLessThan(COMMAND_INLINE_THRESHOLD);
@@ -161,12 +155,8 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PU
       expect(result.spoolRef).toBeUndefined();
 
       // Full payload is intact in the returned command
-      const outputAttr = result.span.attributes?.find(
-        (a) => a.key === "langwatch.output",
-      );
-      expect(Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8")).toBe(
-        300 * 1024,
-      );
+      const outputAttr = result.span.attributes?.find((a) => a.key === "langwatch.output");
+      expect(Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8")).toBe(300 * 1024);
     });
 
     it("emits a warn log containing 'oversize protection skipped'", async () => {
@@ -178,9 +168,7 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PU
 
       expect(logger.warn).toHaveBeenCalledOnce();
       const warnArg: unknown = logger.warn.mock.calls[0]?.[0];
-      expect(typeof warnArg === "string" ? warnArg : "").toContain(
-        "oversize protection skipped",
-      );
+      expect(typeof warnArg === "string" ? warnArg : "").toContain("oversize protection skipped");
     });
   });
 });

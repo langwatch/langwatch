@@ -136,9 +136,7 @@ export type AiActionError = {
 const aiActionSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("apply_query"),
-    query: z
-      .string()
-      .describe("The trace query language string to apply to the current view."),
+    query: z.string().describe("The trace query language string to apply to the current view."),
   }),
   z.object({
     kind: z.literal("create_lens"),
@@ -159,9 +157,7 @@ const aiActionSchema = z.discriminatedUnion("kind", [
  * categorical values, then validates the output. If parse/validate fails,
  * loops up to `MAX_ATTEMPTS` times feeding the error back to the model.
  */
-export async function generateTraceQueryFromPrompt(
-  input: AiQueryInput,
-): Promise<AiQueryResult> {
+export async function generateTraceQueryFromPrompt(input: AiQueryInput): Promise<AiQueryResult> {
   const fieldsBlock = await input.traces.buildQueryFieldCatalogue({
     projectId: input.projectId,
     timeRange: input.timeRange,
@@ -232,10 +228,7 @@ function sanitizeLlmOutput(raw: string): string {
   let out = raw.trim();
   out = out.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
   out = out.replace(/^(?:query|filter|q)\s*[:=]\s*/i, "");
-  if (
-    (out.startsWith('"') && out.endsWith('"')) ||
-    (out.startsWith("'") && out.endsWith("'"))
-  ) {
+  if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
     out = out.slice(1, -1);
   }
   return out.trim();
@@ -391,10 +384,8 @@ export function summarizeProviderError(
     typeof structured?.statusCode === "number" ? structured.statusCode : undefined;
 
   const statusMatch =
-    cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
-    cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
-  const httpStatus =
-    structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
+    cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ?? cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
+  const httpStatus = structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
 
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,

@@ -1,5 +1,5 @@
 import { estimateModelCost } from "@langwatch/model-provider-contract";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 
 /**
@@ -32,8 +32,5 @@ export function computeSpanCost({
   promptTokens: number | null;
   completionTokens: number | null;
 }): number {
-  return estimateModelCost(
-    { attrs, model, promptTokens, completionTokens },
-    getStaticModelCosts(),
-  );
+  return estimateModelCost({ attrs, model, promptTokens, completionTokens }, getStaticModelCosts());
 }

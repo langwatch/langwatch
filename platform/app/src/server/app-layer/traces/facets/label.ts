@@ -1,8 +1,4 @@
-import type {
-  FacetQuery,
-  FacetQueryContext,
-  QueryBuilderCategoricalDef,
-} from "../facet-registry";
+import type { FacetQuery, FacetQueryContext, QueryBuilderCategoricalDef } from "../facet-registry";
 import { baseParams, buildTimeWhere } from "./helpers";
 
 /**

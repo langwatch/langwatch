@@ -1,9 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { TopicService } from "@langwatch/topic-contract";
-import type {
-  EvaluationService,
-  EvaluationSummary,
-} from "@langwatch/evaluation-contract";
+import type { EvaluationService, EvaluationSummary } from "@langwatch/evaluation-contract";
 import { resolveNonBilledCost } from "@langwatch/trace-contract";
 import {
   deriveTraceOrigin,
@@ -37,7 +34,7 @@ import type {
   RangeFacetDef,
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
-import type { TraceSummaryData } from "./types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { teaserOf } from "./visibility-window.service";
 
 export interface TraceListItem {
@@ -249,10 +246,7 @@ interface CachedDiscover {
   timestamp: number;
 }
 
-const DISCOVER_CACHE = new TtlCache<CachedDiscover>(
-  DISCOVER_TTL_MS,
-  "tracesV2:discover:",
-);
+const DISCOVER_CACHE = new TtlCache<CachedDiscover>(DISCOVER_TTL_MS, "tracesV2:discover:");
 
 /**
  * Cross-pod refresh lock — separate cache because the leadership lease
@@ -261,10 +255,7 @@ const DISCOVER_CACHE = new TtlCache<CachedDiscover>(
  * the value cache for locks the failure mode would be 30 min of stale
  * data after a refresher crash.
  */
-const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(
-  60_000,
-  "tracesV2:discover:refresh-lock:",
-);
+const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "tracesV2:discover:refresh-lock:");
 
 /**
  * Optional sink for "discover finished refreshing" SSE pushes. Set
@@ -514,9 +505,7 @@ export class TraceListService {
     // Position reads pay for every skipped row, so their depth is bounded;
     // cursor reads are keyset and stay open-ended. The pagination bar greys
     // out the pages this refuses, so the error is for callers that bypass it.
-    const offset = params.cursor
-      ? 0
-      : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize;
+    const offset = params.cursor ? 0 : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize;
     if (offset + params.pageSize > TRACE_LIST_MAX_OFFSET_ROWS) {
       throw new PageTooDeepError(TRACE_LIST_MAX_OFFSET_ROWS);
     }
@@ -575,17 +564,15 @@ export class TraceListService {
   }
 
   async getFacets(params: FacetParams): Promise<FacetCounts> {
-    const facetPromises = Object.entries(FACET_EXPRESSIONS).map(
-      async ([name, expression]) => {
-        const result = await this.repository.findFacetCounts({
-          tenantId: params.tenantId,
-          timeRange: params.timeRange,
-          facetExpression: expression,
-          filterWhere: params.filterWhere,
-        });
-        return [name, result.values] as const;
-      },
-    );
+    const facetPromises = Object.entries(FACET_EXPRESSIONS).map(async ([name, expression]) => {
+      const result = await this.repository.findFacetCounts({
+        tenantId: params.tenantId,
+        timeRange: params.timeRange,
+        facetExpression: expression,
+        filterWhere: params.filterWhere,
+      });
+      return [name, result.values] as const;
+    });
 
     const modelFacetPromise = this.repository.findFacetCounts({
       tenantId: params.tenantId,
@@ -615,14 +602,13 @@ export class TraceListService {
       }),
     };
 
-    const [facetResults, modelResult, tokensRange, costRange, latencyRange] =
-      await Promise.all([
-        Promise.all(facetPromises),
-        modelFacetPromise,
-        rangePromises.tokens,
-        rangePromises.cost,
-        rangePromises.latency,
-      ]);
+    const [facetResults, modelResult, tokensRange, costRange, latencyRange] = await Promise.all([
+      Promise.all(facetPromises),
+      modelFacetPromise,
+      rangePromises.tokens,
+      rangePromises.cost,
+      rangePromises.latency,
+    ]);
 
     const facets: Record<string, Record<string, number>> = {};
     for (const [name, values] of facetResults) {
@@ -743,10 +729,7 @@ export class TraceListService {
             {
               tenantId: params.tenantId,
               cacheKey,
-              error:
-                broadcastErr instanceof Error
-                  ? broadcastErr.message
-                  : String(broadcastErr),
+              error: broadcastErr instanceof Error ? broadcastErr.message : String(broadcastErr),
             },
             "discover_updated broadcast failed; clients will see new payload on next read",
           );
@@ -1021,10 +1004,7 @@ export class TraceListService {
     return result;
   }
 
-  private refreshFacetValuesInBackground(
-    params: FacetValuesParams,
-    cacheKey: string,
-  ): void {
+  private refreshFacetValuesInBackground(params: FacetValuesParams, cacheKey: string): void {
     if (this.facetValuesRefreshing.has(cacheKey)) return;
     this.facetValuesRefreshing.add(cacheKey);
 
@@ -1049,9 +1029,7 @@ export class TraceListService {
       });
   }
 
-  private async computeFacetValues(
-    params: FacetValuesParams,
-  ): Promise<FacetValuesResult> {
+  private async computeFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     // Dynamic per-attribute drill: "attribute.<key>" — not in the static registry.
     if (params.facetKey.startsWith("attribute.")) {
       return this.attributeFacetValues(params);
@@ -1098,9 +1076,7 @@ export class TraceListService {
     return result;
   }
 
-  private async attributeFacetValues(
-    params: FacetValuesParams,
-  ): Promise<FacetValuesResult> {
+  private async attributeFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     const attributeKey = params.facetKey.slice("attribute.".length);
     if (!attributeKey || !ATTRIBUTE_KEY_REGEX.test(attributeKey)) {
       throw new Error(`Invalid attribute key: ${attributeKey}`);
@@ -1233,9 +1209,7 @@ export function parseLabels(raw: string | undefined): string[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (label): label is string => typeof label === "string" && label !== "",
-    );
+    return parsed.filter((label): label is string => typeof label === "string" && label !== "");
   } catch {
     return [];
   }
@@ -1292,8 +1266,7 @@ function presentMediaRefs(serialized: string | undefined): TraceMediaRef[] | und
 export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
-  const totalTokens =
-    (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+  const totalTokens = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
 
   return {
     traceId: row.traceId,
@@ -1313,18 +1286,12 @@ export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     totalTokens,
     inputTokens: row.totalPromptTokenCount,
     outputTokens: row.totalCompletionTokenCount,
-    cacheReadTokens: parseTokenCount(
-      row.attributes["langwatch.reserved.cache_read_tokens"],
-    ),
+    cacheReadTokens: parseTokenCount(row.attributes["langwatch.reserved.cache_read_tokens"]),
     cacheCreationTokens: parseTokenCount(
       row.attributes["langwatch.reserved.cache_creation_tokens"],
     ),
-    reasoningTokens: parseTokenCount(
-      row.attributes["langwatch.reserved.reasoning_tokens"],
-    ),
-    contextSizeTokens: parseTokenCount(
-      row.attributes["langwatch.reserved.context_size_tokens"],
-    ),
+    reasoningTokens: parseTokenCount(row.attributes["langwatch.reserved.reasoning_tokens"]),
+    contextSizeTokens: parseTokenCount(row.attributes["langwatch.reserved.context_size_tokens"]),
     models: row.models,
     labels: parseLabels(row.attributes["langwatch.labels"]),
     promptId: row.lastUsedPromptId,

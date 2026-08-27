@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   OtlpSpanTokenEstimationService,
   type OtlpSpanTokenEstimationServiceDependencies,
@@ -36,6 +37,7 @@ function createTestSpan(
 
 function createMockDeps(): OtlpSpanTokenEstimationServiceDependencies {
   return {
+    featureFlags: MemoryFeatureFlagService.create(),
     tokenizer: {
       countTokens: vi.fn(async (_model: string, text: string | undefined) => {
         if (!text) return undefined;
@@ -91,15 +93,11 @@ describe("OtlpSpanTokenEstimationService", () => {
 
         await service.estimateSpanTokens({ span });
 
-        const inputTokensAttr = span.attributes.find(
-          (a) => a.key === "gen_ai.usage.input_tokens",
-        );
+        const inputTokensAttr = span.attributes.find((a) => a.key === "gen_ai.usage.input_tokens");
         const outputTokensAttr = span.attributes.find(
           (a) => a.key === "gen_ai.usage.output_tokens",
         );
-        const estimatedAttr = span.attributes.find(
-          (a) => a.key === "langwatch.tokens.estimated",
-        );
+        const estimatedAttr = span.attributes.find((a) => a.key === "langwatch.tokens.estimated");
 
         expect(inputTokensAttr).toBeDefined();
         expect(inputTokensAttr!.value.intValue).toBeGreaterThan(0);
@@ -135,9 +133,7 @@ describe("OtlpSpanTokenEstimationService", () => {
 
         await service.estimateSpanTokens({ span });
 
-        const inputTokensAttr = span.attributes.find(
-          (a) => a.key === "gen_ai.usage.input_tokens",
-        );
+        const inputTokensAttr = span.attributes.find((a) => a.key === "gen_ai.usage.input_tokens");
         const outputTokensAttr = span.attributes.find(
           (a) => a.key === "gen_ai.usage.output_tokens",
         );
@@ -206,9 +202,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           {
             key: "langwatch.output",
             value: {
-              stringValue: JSON.stringify([
-                { role: "assistant", content: "Response text" },
-              ]),
+              stringValue: JSON.stringify([{ role: "assistant", content: "Response text" }]),
             },
           },
         ]);
@@ -438,12 +432,12 @@ describe("OtlpSpanTokenEstimationService", () => {
 
     describe("when global kill switch is enabled", () => {
       it("skips estimation entirely", async () => {
-        const featureFlagService = {
-          isEnabled: vi.fn(async () => true),
-        };
+        const featureFlags = MemoryFeatureFlagService.create();
+        featureFlags.setFlag("token-estimation-killswitch", true);
+        vi.spyOn(featureFlags, "isEnabled");
         const service = new OtlpSpanTokenEstimationService({
           ...deps,
-          featureFlagService,
+          featureFlags,
         });
 
         const span = createTestSpan([
@@ -471,27 +465,20 @@ describe("OtlpSpanTokenEstimationService", () => {
 
         expect(span.attributes.length).toBe(originalAttrCount);
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
-        expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
-          "token-estimation-killswitch",
-          expect.objectContaining({
-            distinctId: "global",
-            defaultValue: false,
-            cacheTtlMs: expect.any(Number),
-          }),
-        );
+        expect(featureFlags.isEnabled).toHaveBeenCalledWith("token-estimation-killswitch", {
+          kind: "system",
+        });
       });
     });
 
     describe("when per-project kill switch is enabled", () => {
       it("skips estimation for that project", async () => {
-        const featureFlagService = {
-          isEnabled: vi.fn(async (key: string) => {
-            return key === "token-estimation-project-killswitch";
-          }),
-        };
+        const featureFlags = MemoryFeatureFlagService.create();
+        featureFlags.setFlag("token-estimation-project-killswitch", true);
+        vi.spyOn(featureFlags, "isEnabled");
         const service = new OtlpSpanTokenEstimationService({
           ...deps,
-          featureFlagService,
+          featureFlags,
         });
 
         const span = createTestSpan([
@@ -519,26 +506,17 @@ describe("OtlpSpanTokenEstimationService", () => {
 
         expect(span.attributes.length).toBe(originalAttrCount);
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
-        expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
-          "token-estimation-project-killswitch",
-          expect.objectContaining({
-            distinctId: "project-456",
-            defaultValue: false,
-            projectId: "project-456",
-            cacheTtlMs: expect.any(Number),
-          }),
-        );
+        expect(featureFlags.isEnabled).toHaveBeenCalledWith("token-estimation-project-killswitch", {
+          kind: "project",
+          projectId: "project-456",
+        });
       });
     });
 
     describe("when kill switches are disabled", () => {
       it("estimates tokens normally", async () => {
-        const featureFlagService = {
-          isEnabled: vi.fn(async () => false),
-        };
         const service = new OtlpSpanTokenEstimationService({
           ...deps,
-          featureFlagService,
         });
 
         const span = createTestSpan([
@@ -563,44 +541,9 @@ describe("OtlpSpanTokenEstimationService", () => {
 
         await service.estimateSpanTokens({ span, tenantId: "project-789" });
 
-        const inputTokensAttr = span.attributes.find(
-          (a) => a.key === "gen_ai.usage.input_tokens",
-        );
+        const inputTokensAttr = span.attributes.find((a) => a.key === "gen_ai.usage.input_tokens");
         expect(inputTokensAttr).toBeDefined();
         expect(deps.tokenizer.countTokens).toHaveBeenCalled();
-      });
-    });
-
-    describe("when no feature flag service is provided", () => {
-      it("estimates tokens normally (no kill switch check)", async () => {
-        const service = new OtlpSpanTokenEstimationService(deps);
-
-        const span = createTestSpan([
-          {
-            key: "langwatch.span.type",
-            value: { stringValue: "llm" },
-          },
-          {
-            key: "gen_ai.request.model",
-            value: { stringValue: "gpt-4o-mini" },
-          },
-          {
-            key: "langwatch.input",
-            value: {
-              stringValue: JSON.stringify({
-                type: "chat_messages",
-                value: [{ role: "user", content: "Hello" }],
-              }),
-            },
-          },
-        ]);
-
-        await service.estimateSpanTokens({ span });
-
-        const inputTokensAttr = span.attributes.find(
-          (a) => a.key === "gen_ai.usage.input_tokens",
-        );
-        expect(inputTokensAttr).toBeDefined();
       });
     });
   });

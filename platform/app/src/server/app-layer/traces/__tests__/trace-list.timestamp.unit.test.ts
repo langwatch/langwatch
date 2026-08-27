@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { mapTraceSummaryToHeader } from "~/server/api/routers/tracesV2";
 import { mapToTraceListItem } from "../trace-list.service";
-import type { TraceSummaryData } from "../types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 const ANCHOR_MS = 1_787_122_009_599;
 
@@ -45,9 +45,7 @@ describe("the trace times a reader sees", () => {
   describe("given a trace whose only signal is a log record", () => {
     /** @scenario "The trace list shows the same fallback time, not the epoch" */
     it("the list row falls back to the storage anchor", () => {
-      const item = mapToTraceListItem(
-        summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }),
-      );
+      const item = mapToTraceListItem(summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }));
 
       expect(item.timestamp).toBe(ANCHOR_MS);
     });

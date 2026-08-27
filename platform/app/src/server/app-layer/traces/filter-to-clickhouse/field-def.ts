@@ -1,7 +1,6 @@
 import type { TagToken } from "liqe";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { TraceSummaryData } from "../types";
+import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import type { FieldHandler } from "./value-helpers";
 
 /**
@@ -51,9 +50,7 @@ export type Unsupported = typeof UNSUPPORTED;
 export type FieldNeeds = "evaluations" | "events" | "spans";
 
 /** In-memory accessor mirroring a categorical field's ClickHouse `expression`. */
-export type CategoricalRead = (
-  trace: InMemoryTrace,
-) => string | string[] | null | Unsupported;
+export type CategoricalRead = (trace: InMemoryTrace) => string | string[] | null | Unsupported;
 
 /** In-memory accessor mirroring a range field's ClickHouse `expression`. */
 export type RangeRead = (trace: InMemoryTrace) => number | number[] | null | Unsupported;

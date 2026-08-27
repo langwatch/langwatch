@@ -65,10 +65,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
       );
       return result === "OK";
     } catch (error) {
-      logger.error(
-        { error, tenantId, traceId, spanId },
-        "Failed to acquire span dedup lock",
-      );
+      logger.error({ error, tenantId, traceId, spanId }, "Failed to acquire span dedup lock");
       return null;
     }
   }
@@ -76,11 +73,7 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Extend the key TTL after successful processing.
    */
-  async tryConfirmProcessed(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<void> {
+  async tryConfirmProcessed(tenantId: string, traceId: string, spanId: string): Promise<void> {
     try {
       await this.redis.expire(buildKey(tenantId, traceId, spanId), CONFIRMED_TTL_SECONDS);
     } catch (error) {
@@ -91,18 +84,11 @@ export class RedisSpanDedupeService implements SpanDedupService {
   /**
    * Delete the key so retries can proceed immediately after a failure.
    */
-  async tryReleaseOnFailure(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): Promise<void> {
+  async tryReleaseOnFailure(tenantId: string, traceId: string, spanId: string): Promise<void> {
     try {
       await this.redis.del(buildKey(tenantId, traceId, spanId));
     } catch (error) {
-      logger.error(
-        { error, tenantId, traceId, spanId },
-        "Failed to release span dedup lock",
-      );
+      logger.error({ error, tenantId, traceId, spanId }, "Failed to release span dedup lock");
     }
   }
 }
@@ -119,21 +105,11 @@ export class NullSpanDedupeService implements SpanDedupService {
   ): Promise<null> {
     return null;
   }
-  async tryConfirmProcessed(
-    _tenantId: string,
-    _traceId: string,
-    _spanId: string,
-  ): Promise<void> {}
-  async tryReleaseOnFailure(
-    _tenantId: string,
-    _traceId: string,
-    _spanId: string,
-  ): Promise<void> {}
+  async tryConfirmProcessed(_tenantId: string, _traceId: string, _spanId: string): Promise<void> {}
+  async tryReleaseOnFailure(_tenantId: string, _traceId: string, _spanId: string): Promise<void> {}
 }
 
-export function createSpanDedupeService(
-  redis: IORedis | Cluster | null,
-): SpanDedupService {
+export function createSpanDedupeService(redis: IORedis | Cluster | null): SpanDedupService {
   if (!redis) return new NullSpanDedupeService();
   return traced(new RedisSpanDedupeService(redis), "SpanDedupeService");
 }

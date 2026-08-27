@@ -26,10 +26,7 @@ import {
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type {
-  NormalizedAttributes,
-  NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 import type { ResolvedTraceSpans, WarnLogger } from "./resolve-offloaded-traces";
 

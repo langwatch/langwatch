@@ -1,9 +1,6 @@
 import type { TenantId } from "@langwatch/eventing";
 import { env } from "~/env.mjs";
-import type {
-  PiiLevel,
-  ResolvedDataPrivacy,
-} from "~/server/data-privacy/dataPrivacy.types";
+import type { PiiLevel, ResolvedDataPrivacy } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import {
@@ -32,14 +29,9 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] = PRESIDIO_STRICT_ENTITIES.fil
 );
 
 import { createLogger } from "@langwatch/observability";
-import { featureFlagService } from "~/server/featureFlag";
-import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type {
-  OtlpAnyValue,
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+import type { OtlpAnyValue, OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**
@@ -84,6 +76,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * tenant (and most tests) don't need to provide it.
    */
   dataPrivacyResolver?: DataPrivacyResolver;
+  featureFlags?: FeatureFlagService;
 }
 
 /**
@@ -154,10 +147,7 @@ function requestLevelToPiiLevel(level: PIIRedactionLevel): PiiLevel {
  * so it wins; at the default we honor the per-request level, so a single
  * ingestion call can still escalate or relax redaction without a policy rule.
  */
-function reconcilePiiLevel(
-  policyLevel: PiiLevel,
-  requestLevel: PIIRedactionLevel,
-): PiiLevel {
+function reconcilePiiLevel(policyLevel: PiiLevel, requestLevel: PIIRedactionLevel): PiiLevel {
   if (policyLevel !== "essential") return policyLevel;
   return requestLevelToPiiLevel(requestLevel);
 }
@@ -200,9 +190,7 @@ type RedactionBatch = {
  */
 export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
-  private readonly logger = createLogger(
-    "langwatch:trace-processing:span-pii-redaction-service",
-  );
+  private readonly logger = createLogger("langwatch:trace-processing:span-pii-redaction-service");
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
     const merged = { ...PII_DEFAULTS, ...deps };
@@ -311,9 +299,7 @@ export class OtlpSpanPiiRedactionService {
     return null;
   }
 
-  private nativeSecretPatterns(
-    policy: ResolvedDataPrivacy,
-  ): readonly RegExp[] | undefined {
+  private nativeSecretPatterns(policy: ResolvedDataPrivacy): readonly RegExp[] | undefined {
     return policy.secrets.enabled ? compilePolicySecretPatterns(policy) : undefined;
   }
 
@@ -328,9 +314,7 @@ export class OtlpSpanPiiRedactionService {
     return {
       secrets: this.nativeSecretPatterns(policy),
       piiExceptions:
-        policy.pii.exceptPatterns.length > 0
-          ? compilePolicyPiiExceptions(policy)
-          : undefined,
+        policy.pii.exceptPatterns.length > 0 ? compilePolicyPiiExceptions(policy) : undefined,
     };
   }
 
@@ -567,10 +551,7 @@ export class OtlpSpanPiiRedactionService {
       typeof span.status.message === "string" &&
       span.status.message.length > 0
     ) {
-      if (
-        totalLength + span.status.message.length >
-        this.deps.piiRedactionMaxAttributeLength
-      ) {
+      if (totalLength + span.status.message.length > this.deps.piiRedactionMaxAttributeLength) {
         anySkipped = true;
       } else {
         entries.push({
@@ -771,10 +752,11 @@ export class OtlpSpanPiiRedactionService {
     entities?: readonly string[],
     exceptPatterns?: readonly string[],
   ): Promise<PIICheckOptions | null> {
-    const disabled = await featureFlagService.isEnabled(
-      "ops_pii_strict_presidio_redaction_disabled",
-      { distinctId: "span-pii-service", defaultValue: false },
-    );
+    const disabled = this.deps.featureFlags
+      ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
+          kind: "system",
+        })
+      : false;
     if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;
 
@@ -826,10 +808,7 @@ export class OtlpSpanPiiRedactionService {
     };
   }
 
-  private collectRecordEntries(
-    batch: RedactionBatch,
-    record: Record<string, string>,
-  ): void {
+  private collectRecordEntries(batch: RedactionBatch, record: Record<string, string>): void {
     for (const key of Object.keys(record)) {
       if (record[key]) {
         batch.tryPush(record, key, record[key]!);

@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /**
@@ -20,9 +20,7 @@ import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-c
  */
 export class TraceIOExtractionService {
   constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.io-extraction",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.io-extraction");
 
   /**
    * Extracts the first meaningful input from the trace with rich JSON data.
@@ -215,10 +213,7 @@ export class TraceIOExtractionService {
     },
   } as const;
 
-  extractRichIOFromSpan(
-    span: NormalizedSpan,
-    type: "input" | "output",
-  ): ExtractedIO | null {
+  extractRichIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
     const attrs = span.spanAttributes;
     const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
 
@@ -258,10 +253,7 @@ export class TraceIOExtractionService {
    * prefer `extractRichIOFromSpan` so a fallback match never shadows a real
    * semantic match on another span in the same trace.
    */
-  extractFallbackIOFromSpan(
-    span: NormalizedSpan,
-    type: "input" | "output",
-  ): ExtractedIO | null {
+  extractFallbackIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
     const attrs = span.spanAttributes;
     const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
     const langwatchValue = attrs[keys.langwatch];
@@ -343,9 +335,7 @@ export class TraceIOExtractionService {
   }
 
   private getHttpStatusFallback(tree: SpanTreeNode[]): string | null {
-    const topSpan = this.flattenSpanTree(tree, "outside-in").find(
-      (span) => !span.parentSpanId,
-    );
+    const topSpan = this.flattenSpanTree(tree, "outside-in").find((span) => !span.parentSpanId);
 
     if (topSpan) {
       const status = topSpan.spanAttributes["http.status_code"];
@@ -426,10 +416,7 @@ const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
  * Handles common wrapper patterns like `{ input: "hello" }` or
  * `{ question: "what is 2+2?" }` that are used by various frameworks.
  */
-function extractTextFromPlainJson(
-  obj: Record<string, unknown>,
-  depth = 0,
-): string | null {
+function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): string | null {
   if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) return null;
 
   for (const key of COMMON_TEXT_KEYS) {
@@ -447,10 +434,7 @@ function extractTextFromPlainJson(
   // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
   const wrapper = obj.inputs ?? obj.outputs;
   if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
-    const nested = extractTextFromPlainJson(
-      wrapper as Record<string, unknown>,
-      depth + 1,
-    );
+    const nested = extractTextFromPlainJson(wrapper as Record<string, unknown>, depth + 1);
     if (nested) return nested;
   }
 
@@ -477,10 +461,7 @@ function extractTextFromPlainJson(
  * {} }`, `{ result: [] }`, `{ a: { b: "" } }`) are treated as empty. Uses a
  * WeakSet to guard against circular references.
  */
-function hasMeaningfulLeaf(
-  value: unknown,
-  seen: WeakSet<object> = new WeakSet(),
-): boolean {
+function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.length > 0;
   if (typeof value === "number" || typeof value === "boolean") return true;
@@ -488,9 +469,7 @@ function hasMeaningfulLeaf(
   if (seen.has(value as object)) return false;
   seen.add(value as object);
   if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
-  return Object.values(value as Record<string, unknown>).some((v) =>
-    hasMeaningfulLeaf(v, seen),
-  );
+  return Object.values(value as Record<string, unknown>).some((v) => hasMeaningfulLeaf(v, seen));
 }
 
 /**
@@ -532,10 +511,7 @@ function stringifyForText(value: unknown): string | null {
  * stays array; a JSON string is parsed-and-renormalized when possible,
  * otherwise returned unchanged).
  */
-function normalizeChatPayload(
-  value: unknown,
-  seen: WeakSet<object> = new WeakSet(),
-): unknown {
+function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {

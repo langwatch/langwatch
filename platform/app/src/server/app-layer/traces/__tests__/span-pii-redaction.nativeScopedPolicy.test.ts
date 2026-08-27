@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 
 import {
   EMPTY_AUDIENCE,
@@ -6,22 +7,12 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
-import type {
-  OtlpKeyValue,
-  OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import {
   type BatchClearPIIFunction,
   type DataPrivacyResolver,
   OtlpSpanPiiRedactionService,
 } from "../span-pii-redaction.service";
-
-// The PII analysis service is the one true external boundary; everything else
-// (the redaction engines, the routing) is exercised for real. The feature flag
-// resolves to its default so the strict path reaches the batch deterministically.
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: vi.fn(async () => false) },
-}));
 
 // Mocked only for the strict-only-entities exception-scoping tests below,
 // which need the REAL defaultBatchClearPII wiring (mainMethod selection,
@@ -35,7 +26,6 @@ vi.mock("~/server/tracer/collector/piiCheck", () => ({
 }));
 
 import { createTenantId } from "@langwatch/eventing";
-import { featureFlagService } from "~/server/featureFlag";
 import { batchPresidioClearPII } from "~/server/tracer/collector/piiCheck";
 
 const TENANT = createTenantId("project-web-app");
@@ -94,9 +84,7 @@ function attr(span: OtlpSpan, key: string): string | undefined {
 }
 
 function makeService(policy: ResolvedDataPrivacy) {
-  const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
-    texts.map(() => "[REDACTED]"),
-  );
+  const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
   const service = new OtlpSpanPiiRedactionService({
     batchClearPII: batchSpy,
     isLangevalsConfigured: true,
@@ -270,9 +258,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 
     /** @scenario Strict falls back to the native essential floor when the analysis service is unavailable */
     it("still redacts essential PII natively when the analysis service is unavailable", async () => {
-      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
-        texts.map(() => "[REDACTED]"),
-      );
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
       // isLangevalsConfigured: false + not production -> buildOptions returns
       // null, so the strict batch is never sent. The native floor is all that
       // runs, and it must still scrub the pattern-based entities.
@@ -390,14 +376,13 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         isLangevalsConfigured,
         isProduction,
         dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+        featureFlags: MemoryFeatureFlagService.create(),
       });
     }
 
     /** @scenario An incomplete strict redaction is marked on the trace */
     it("marks the span incomplete when the analysis service is not configured", async () => {
-      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
-        texts.map(() => "[REDACTED]"),
-      );
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
       const service = strictService({
         isLangevalsConfigured: false,
         isProduction: false,
@@ -436,14 +421,15 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // The strict-PII analysis kill switch is on, so buildOptions returns null
       // even though langevals is configured. That is a deliberate opt-out, not an
       // outage, so the incomplete marker must NOT show.
-      vi.mocked(featureFlagService.isEnabled).mockResolvedValueOnce(true);
-      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
-        texts.map(() => "[REDACTED]"),
-      );
-      const service = strictService({
+      const featureFlags = MemoryFeatureFlagService.create();
+      featureFlags.setFlag("ops_pii_strict_presidio_redaction_disabled", true);
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
+      const service = new OtlpSpanPiiRedactionService({
         isLangevalsConfigured: true,
         isProduction: false,
         batchClearPII: batchSpy,
+        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+        featureFlags,
       });
       const span = spanWith({ input: "mail a@b.com, I am John from New York" });
 
@@ -479,9 +465,7 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
         "gen_ai.prompt": "reservation 00528000043000 for test@example.com",
       });
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-      expect(attr(span, "gen_ai.prompt")).toBe(
-        "reservation 00528000043000 for [EMAIL_ADDRESS]",
-      );
+      expect(attr(span, "gen_ai.prompt")).toBe("reservation 00528000043000 for [EMAIL_ADDRESS]");
     });
   });
 

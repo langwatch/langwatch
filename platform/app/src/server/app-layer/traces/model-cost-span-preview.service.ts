@@ -3,10 +3,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/tracer/collector/cost";
+import { estimateCost, matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import { compileSafeRegex } from "~/utils/safeRegex";
 import type { SpanStorageService } from "./span-storage.service";
 

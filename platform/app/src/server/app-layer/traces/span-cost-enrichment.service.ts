@@ -4,7 +4,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
 import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
-import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   ATTR_KEYS,
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,

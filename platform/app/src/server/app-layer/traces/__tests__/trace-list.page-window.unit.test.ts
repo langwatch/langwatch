@@ -39,9 +39,7 @@ describe("TraceListService.getList position window", () => {
       const service = serviceWithRepository(findAll);
 
       const pastTheWindow = TRACE_LIST_MAX_OFFSET_ROWS / listParams.pageSize + 1;
-      await expect(
-        service.getList({ ...listParams, page: pastTheWindow }),
-      ).rejects.toMatchObject({
+      await expect(service.getList({ ...listParams, page: pastTheWindow })).rejects.toMatchObject({
         code: "page_too_deep",
         meta: { maxRows: TRACE_LIST_MAX_OFFSET_ROWS },
       });

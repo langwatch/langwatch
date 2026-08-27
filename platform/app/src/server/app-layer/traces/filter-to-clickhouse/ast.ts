@@ -176,11 +176,7 @@ function collectFreeTextTerms(node: LiqeQuery, negated: boolean, terms: string[]
       return;
     }
     case "ParenthesizedExpression":
-      collectFreeTextTerms(
-        (node as ParenthesizedExpressionToken).expression,
-        negated,
-        terms,
-      );
+      collectFreeTextTerms((node as ParenthesizedExpressionToken).expression, negated, terms);
       return;
     default:
       return;
@@ -200,11 +196,7 @@ function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
   return value.length > 0 ? value : null;
 }
 
-function translateNode(
-  node: LiqeQuery,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateNode(node: LiqeQuery, negated: boolean, ctx: TranslationContext): string {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_NODE_COUNT) {
     throw new FilterParseError("Query too complex");
@@ -237,9 +229,7 @@ function translateNode(
     }
 
     default:
-      throw new FilterParseError(
-        `Unsupported query syntax: ${(node as { type: string }).type}`,
-      );
+      throw new FilterParseError(`Unsupported query syntax: ${(node as { type: string }).type}`);
   }
 }
 
@@ -377,11 +367,7 @@ function translateSpanAttribute(
   );
 }
 
-function translateFreeText(
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateFreeText(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const paramName = nextParam(ctx, "freeText");

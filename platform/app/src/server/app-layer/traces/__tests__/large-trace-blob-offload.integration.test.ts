@@ -35,17 +35,14 @@ import {
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  resolveOffloadedTraces,
-  type WarnLogger,
-} from "~/server/traces/resolve-offloaded-traces";
+} from "@langwatch/trace-contract";
+import { resolveOffloadedTraces, type WarnLogger } from "~/server/traces/resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
 // Mock langwatch tracer (passthrough in tests)
@@ -395,9 +392,7 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
     });
 
     it("no eventref attribute is present in the lean attrs", () => {
-      const hasRef = Object.keys(leanAttrs).some((k) =>
-        k.startsWith(EVENTREF_ATTR_PREFIX),
-      );
+      const hasRef = Object.keys(leanAttrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
       expect(hasRef).toBe(false);
     });
   });
@@ -431,9 +426,7 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
       expect(result.anyResolved).toBe(false);
 
       // Full value preserved
-      expect(result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"]).toBe(
-        SMALL_OUTPUT,
-      );
+      expect(result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"]).toBe(SMALL_OUTPUT);
     });
   });
 });

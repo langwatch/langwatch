@@ -13,10 +13,7 @@ import {
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
-function computeClaudeSpanEnrichment(input: {
-  spans: ClaudeSpanRef[];
-  logs: ClaudeContentLog[];
-}) {
+function computeClaudeSpanEnrichment(input: { spans: ClaudeSpanRef[]; logs: ClaudeContentLog[] }) {
   return computeClaudeSpanEnrichmentWithService({
     ...input,
     traceCanonicalisation,
@@ -61,13 +58,7 @@ function responseBody(text: string): string {
   });
 }
 
-function requestBody({
-  system,
-  userText,
-}: {
-  system?: string;
-  userText: string;
-}): string {
+function requestBody({ system, userText }: { system?: string; userText: string }): string {
   return JSON.stringify({
     model: "claude-sonnet-4",
     ...(system !== undefined ? { system } : {}),
@@ -304,9 +295,7 @@ describe("computeClaudeSpanEnrichment", () => {
 
   describe("given the request body is truncated (unparseable JSON)", () => {
     it("falls back to the user_prompt text for the span input", () => {
-      const spans: ClaudeSpanRef[] = [
-        { spanId: "span-1", requestId: "req_a", querySource: REPL },
-      ];
+      const spans: ClaudeSpanRef[] = [{ spanId: "span-1", requestId: "req_a", querySource: REPL }];
       const logs: ClaudeContentLog[] = [
         {
           eventName: "user_prompt",
@@ -350,8 +339,10 @@ describe("computeClaudeSpanEnrichment", () => {
         },
       ];
 
-      const output = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")
-        ?.output as { type: "text"; value: string };
+      const output = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.output as {
+        type: "text";
+        value: string;
+      };
 
       expect(output.value.length).toBeLessThan(huge.length);
       expect(Buffer.byteLength(output.value, "utf8")).toBeLessThanOrEqual(256 * 1024);
@@ -462,9 +453,8 @@ describe("computeClaudeSpanEnrichment", () => {
 
       expect(enrichment?.output).toEqual({ type: "text", value: "hello!" });
       expect(enrichment?.input?.type).toBe("chat_messages");
-      const messages = (
-        enrichment?.input as { value: Array<{ role: string; content: string }> }
-      ).value;
+      const messages = (enrichment?.input as { value: Array<{ role: string; content: string }> })
+        .value;
       expect(messages).toEqual([
         { role: "system", content: "You are helpful" },
         { role: "user", content: "hi there" },
@@ -887,15 +877,17 @@ describe("computeClaudeSpanEnrichment when spans carry no query_source", () => {
 
       const first = result.get("span-1")?.input;
       expect(first?.type).toBe("chat_messages");
-      expect(
-        (first as { value: Array<{ role: string; content: string }> }).value[0],
-      ).toEqual({ role: "system", content: "You are Claude Code" });
+      expect((first as { value: Array<{ role: string; content: string }> }).value[0]).toEqual({
+        role: "system",
+        content: "You are Claude Code",
+      });
 
       const second = result.get("span-2")?.input;
       expect(second?.type).toBe("chat_messages");
-      expect(
-        (second as { value: Array<{ role: string; content: string }> }).value,
-      ).toContainEqual({ role: "user", content: "two" });
+      expect((second as { value: Array<{ role: string; content: string }> }).value).toContainEqual({
+        role: "user",
+        content: "two",
+      });
     });
   });
 

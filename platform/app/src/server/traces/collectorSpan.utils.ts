@@ -1,10 +1,6 @@
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type {
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import type {
   CustomMetadata,
   ReservedTraceMetadata,

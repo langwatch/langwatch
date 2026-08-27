@@ -22,7 +22,7 @@ import {
   ensureStringRecord,
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -30,12 +30,12 @@ import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
 } from "~/server/evaluations/evaluation-run.mappers";
-import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";

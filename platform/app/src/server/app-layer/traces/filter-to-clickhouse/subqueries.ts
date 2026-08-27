@@ -1,8 +1,4 @@
-export function boundedSubquery(
-  table: string,
-  timeCol: string,
-  innerWhere: string,
-): string {
+export function boundedSubquery(table: string, timeCol: string, innerWhere: string): string {
   return `TraceId IN (SELECT DISTINCT TraceId FROM ${table} WHERE TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere})`;
 }
 

@@ -2,16 +2,16 @@ import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
-  buildCodingAgentTranscript,
+  type CodingAgentService,
   type CodingAgentTranscript,
   type LogContentCategory,
-  logContentKeys,
 } from "@langwatch/coding-agent-contract";
 import {
   resolveNonBilledCost,
   spanTreeDeltaTransportInputSchema,
   spanTreeTransportInputSchema,
 } from "@langwatch/trace-contract";
+import { deriveTraceStatus, deriveTraceTimestamp } from "@langwatch/trace-contract";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
@@ -29,8 +29,6 @@ import {
 
 const logger = createLogger("langwatch:api:traces-v2");
 
-import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
-import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-timestamp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
@@ -47,7 +45,7 @@ import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
 } from "~/server/app-layer/traces/trace-metadata.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,
@@ -59,12 +57,9 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  TRACE_NAME_MAX_LENGTH,
-  TRACE_NAME_MIN_LENGTH,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+import { changeTraceNameInputSchema } from "@langwatch/trace-contract";
+import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "@langwatch/trace-contract";
 import { buildDisplayInput, stringifySpanIO } from "~/server/tracer/spanIOStringify";
 import type { Span } from "~/server/tracer/types";
 import {
@@ -880,6 +875,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
       modelCallRefs: mapSummaryRowsToClaudeRefs(summaryRows),
       logRows,
       traceCanonicalisation: app.traces.canonicalisation,
+      codingAgents: app.codingAgents,
     });
   } catch (error) {
     logger.warn(
@@ -946,6 +942,7 @@ async function loadSpansFullWithProtections({
     spans: storedSpans,
     occurredAtMs: input.occurredAtMs,
     traceCanonicalisation: app.traces.canonicalisation,
+    codingAgents: app.codingAgents,
   });
 
   const redactions = buildSpanContentRedactions(spans, protections);
@@ -970,14 +967,16 @@ async function loadSpansFullWithProtections({
 async function loadProtectedTraceLogs({
   input,
   ctx,
+  codingAgents,
 }: {
   input: { projectId: string; traceId: string; occurredAtMs?: number };
   ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+  codingAgents: CodingAgentService;
 }): Promise<TraceLogRecordDto[]> {
   const protections = await getUserProtectionsForProject(ctx as never, {
     projectId: input.projectId,
   });
-  return loadTraceLogsWithProtections({ ...input, protections });
+  return loadTraceLogsWithProtections({ ...input, protections, codingAgents });
 }
 
 async function loadTraceLogsWithProtections({
@@ -985,11 +984,13 @@ async function loadTraceLogsWithProtections({
   traceId,
   occurredAtMs,
   protections,
+  codingAgents,
 }: {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
+  codingAgents: CodingAgentService;
 }): Promise<TraceLogRecordDto[]> {
   const app = getApp();
   const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
@@ -1011,6 +1012,7 @@ async function loadTraceLogsWithProtections({
       },
       protections,
       visibilityCutoffMs,
+      codingAgents,
     ),
   );
 }
@@ -1028,19 +1030,24 @@ export async function readCodingAgentTranscriptWithProtections({
   traceId,
   occurredAtMs,
   protections,
+  codingAgents,
 }: {
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
+  codingAgents: CodingAgentService;
 }): Promise<CodingAgentTranscript> {
   const args = { projectId, traceId, occurredAtMs, protections };
   const [spans, logs] = await Promise.all([
     loadSpansFullWithProtections(args),
-    loadTraceLogsWithProtections(args),
+    loadTraceLogsWithProtections({
+      ...args,
+      codingAgents,
+    }),
   ]);
 
-  return buildCodingAgentTranscript({
+  return codingAgents.buildTranscript({
     spans,
     logs: logs.map((row) => ({
       timestampMs: row.timeUnixMs,
@@ -1724,6 +1731,7 @@ export const tracesV2Router = createTRPCRouter({
       return readCodingAgentTranscriptWithProtections({
         ...input,
         protections,
+        codingAgents: ctx.app.codingAgents,
       });
     }),
 
@@ -1976,7 +1984,7 @@ export const tracesV2Router = createTRPCRouter({
       // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
       // session row — which already spans every trace of the run, so no
       // conversation-membership fan-out is needed here anymore.
-      return ctx.app.codingAgents.sessions.tryGetSessionForTrace({
+      return ctx.app.codingAgents.tryGetSessionForTrace({
         projectId: input.projectId,
         traceId: input.traceId,
       });
@@ -2009,7 +2017,11 @@ export const tracesV2Router = createTRPCRouter({
       // The free-plan teaser window and the viewer's captured-content
       // permissions are both applied inside the loader, which the transcript
       // endpoint shares — so the two reads cannot diverge on what they hide.
-      return loadProtectedTraceLogs({ input, ctx });
+      return loadProtectedTraceLogs({
+        input,
+        ctx,
+        codingAgents: ctx.app.codingAgents,
+      });
     }),
 });
 
@@ -2076,6 +2088,7 @@ export function redactTraceLogContent(
     capturedInputVisibleTo?: string | null;
     capturedOutputVisibleTo?: string | null;
   },
+  codingAgents: CodingAgentService,
 ): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
   const canSeeInput = protections.canSeeCapturedInput === true;
@@ -2087,7 +2100,7 @@ export function redactTraceLogContent(
         ? canSeeOutput
         : canSeeInput && canSeeOutput;
 
-  const contentKeys = logContentKeys(eventName);
+  const contentKeys = codingAgents.logContentKeys(eventName);
   const hiddenKeys = contentKeys.filter((entry) => {
     const value = row.attributes[entry.key];
     return typeof value === "string" && value.length > 0 && !canSee(entry.category);
@@ -2165,6 +2178,7 @@ export function gateTraceLogVisibility(
     capturedOutputVisibleTo?: string | null;
   },
   visibilityCutoffMs: number | null,
+  codingAgents: CodingAgentService,
 ): TraceLogRecordDto {
   const isBeforeCutoff =
     visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
@@ -2173,5 +2187,6 @@ export function gateTraceLogVisibility(
     isBeforeCutoff
       ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
       : protections,
+    codingAgents,
   );
 }

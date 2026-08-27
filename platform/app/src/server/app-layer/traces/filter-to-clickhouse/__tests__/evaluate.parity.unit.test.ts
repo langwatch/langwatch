@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { FilterFieldUnknownError } from "../../errors";
 import {
   type ExpressionCategoricalDef,
   FACET_REGISTRY,
   type RangeFacetDef,
 } from "../../facet-registry";
-import type { TraceSummaryData } from "../../types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { translateFilterToClickHouse } from "../ast";
 import { evaluateQueryInMemory, queryNeeds } from "../evaluate";
 import { type InMemoryTrace, UNSUPPORTED } from "../field-def";
@@ -301,28 +301,19 @@ const cases: Case[] = [
   {
     name: "evaluatorVerdict unknown for null passed",
     query: "evaluatorVerdict:unknown",
-    trace: makeTrace(
-      {},
-      { evaluations: [makeEval({ status: "processed", passed: null })] },
-    ),
+    trace: makeTrace({}, { evaluations: [makeEval({ status: "processed", passed: null })] }),
     expected: true,
   },
   {
     name: "evaluatorVerdict skipped is its own bucket",
     query: "evaluatorVerdict:skipped",
-    trace: makeTrace(
-      {},
-      { evaluations: [makeEval({ status: "skipped", passed: null })] },
-    ),
+    trace: makeTrace({}, { evaluations: [makeEval({ status: "skipped", passed: null })] }),
     expected: true,
   },
   {
     name: "evaluatorVerdict:unknown misses a skipped run",
     query: "evaluatorVerdict:unknown",
-    trace: makeTrace(
-      {},
-      { evaluations: [makeEval({ status: "skipped", passed: null })] },
-    ),
+    trace: makeTrace({}, { evaluations: [makeEval({ status: "skipped", passed: null })] }),
     expected: false,
   },
   {
@@ -746,9 +737,9 @@ describe("given a filter field that collides with an Object.prototype member", (
     });
 
     it("fails closed when the poisoned tag is OR-ed with a matching one", () => {
-      expect(
-        evaluateQueryInMemory("topic:t1 OR constructor:x", makeTrace({ topicId: "t1" })),
-      ).toBe(false);
+      expect(evaluateQueryInMemory("topic:t1 OR constructor:x", makeTrace({ topicId: "t1" }))).toBe(
+        false,
+      );
     });
   });
 
@@ -768,12 +759,8 @@ describe("given a filter field that collides with an Object.prototype member", (
       // `Attributes['constructor'] != ''` is false in ClickHouse for every
       // trace that never carried the key; the in-memory read must agree rather
       // than hand back the inherited `Object.prototype.constructor`.
-      expect(evaluateQueryInMemory("has:attribute.constructor", makeTrace({}))).toBe(
-        false,
-      );
-      expect(evaluateQueryInMemory("none:attribute.constructor", makeTrace({}))).toBe(
-        true,
-      );
+      expect(evaluateQueryInMemory("has:attribute.constructor", makeTrace({}))).toBe(false);
+      expect(evaluateQueryInMemory("none:attribute.constructor", makeTrace({}))).toBe(true);
     });
 
     it("still matches an attribute genuinely named constructor", () => {
@@ -921,9 +908,7 @@ describe("free text compiled to ClickHouse", () => {
 
   it("binds one parameter reused across every branch", () => {
     const compiled = compile("codex");
-    const freeTextParams = Object.keys(compiled!.params).filter((k) =>
-      k.startsWith("freeText"),
-    );
+    const freeTextParams = Object.keys(compiled!.params).filter((k) => k.startsWith("freeText"));
     expect(freeTextParams).toHaveLength(1);
     // Four branches: input, output, trace name, span name.
     const name = freeTextParams[0]!;

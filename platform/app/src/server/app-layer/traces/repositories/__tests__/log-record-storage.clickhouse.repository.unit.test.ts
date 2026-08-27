@@ -110,12 +110,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     it("returns only the oldest rows up to a caller-narrowed limit", async () => {
       const { repo } = repoCapturingQuery([storedRow(0), storedRow(1), storedRow(2)]);
 
-      const rows = await repo.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-        2,
-      );
+      const rows = await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000, 2);
 
       expect(rows.map((row) => row.spanId)).toEqual(["span-0", "span-1"]);
     });
@@ -151,11 +146,7 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
         },
       ]);
 
-      const rows = await repo.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-      );
+      const rows = await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
 
       expect(rows).toEqual([
         {

@@ -14,16 +14,13 @@ import type { Event } from "@langwatch/eventing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type {
-  OtlpResource,
-  OtlpSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "@langwatch/trace-contract";
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
-} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "@langwatch/trace-server";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -180,6 +177,7 @@ export function structuredIoPreview(value: string, maxBytes: number): string | n
  * @returns A new event with IO attributes replaced by previews + eventrefs, or the original
  *   event if no leaning was necessary.
  */
+export function leanForProjection<EventType extends Event>(event: EventType): EventType;
 export function leanForProjection(event: Event): Event {
   if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
     return leanSpanReceivedEvent(event);
@@ -252,9 +250,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   // the IO-lean pass and capOversizedAttributes — operate on independent copies.
   // structuredClone creates a fully independent deep copy; no shared object references remain.
   const clonedSpan: OtlpSpan = structuredClone(data.span);
-  const clonedResource: OtlpResource | null = data.resource
-    ? structuredClone(data.resource)
-    : null;
+  const clonedResource: OtlpResource | null = data.resource ? structuredClone(data.resource) : null;
 
   // Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
   if (hasLargeIoAttr) {
@@ -315,10 +311,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
     attributes?: Record<string, string>;
   };
 
-  if (
-    typeof data.body !== "string" ||
-    Buffer.byteLength(data.body, "utf8") <= IO_PREVIEW_BYTES
-  ) {
+  if (typeof data.body !== "string" || Buffer.byteLength(data.body, "utf8") <= IO_PREVIEW_BYTES) {
     return event;
   }
 

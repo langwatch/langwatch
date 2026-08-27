@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { SpanNormalizationPipelineService } from "../span-normalization.service";
 
-const service = new SpanNormalizationPipelineService(
-  TraceCanonicalisationService.create(),
-);
+const service = new SpanNormalizationPipelineService(TraceCanonicalisationService.create());
 
 function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpSpan {
   return {
@@ -50,12 +48,8 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
 
       const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
 
-      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
-        "toxicity",
-      );
-      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(
-        0.95,
-      );
+      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe("toxicity");
+      expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(0.95);
     });
 
     it("does not set langwatch.reserved.evaluations (no metadata leakage)", () => {
@@ -66,9 +60,7 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
 
       const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
 
-      expect(
-        normalized.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
-      ).toBeUndefined();
+      expect(normalized.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
     });
 
     it("preserves the original event on the normalized span", () => {

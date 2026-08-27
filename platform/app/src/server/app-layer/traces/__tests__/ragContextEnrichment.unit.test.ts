@@ -15,10 +15,7 @@ describe("generateDocumentId", () => {
   describe("when content is an object", () => {
     it("returns MD5 hash of JSON-stringified content", () => {
       const content = { text: "hello" };
-      const expected = crypto
-        .createHash("md5")
-        .update(JSON.stringify(content))
-        .digest("hex");
+      const expected = crypto.createHash("md5").update(JSON.stringify(content)).digest("hex");
 
       expect(generateDocumentId(content)).toBe(expected);
     });

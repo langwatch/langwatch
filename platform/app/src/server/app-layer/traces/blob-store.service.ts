@@ -86,9 +86,7 @@ export class BlobNotFoundError extends Error {
     readonly field: string,
     readonly tenantId: string,
   ) {
-    super(
-      `event_log row not found for eventId=${eventId} field=${field} tenantId=${tenantId}`,
-    );
+    super(`event_log row not found for eventId=${eventId} field=${field} tenantId=${tenantId}`);
     this.name = "BlobNotFoundError";
   }
 }
@@ -483,9 +481,7 @@ export class BlobStore {
     aggregateId: string;
   }): Promise<string> {
     if (!this.resolveClickHouseClient) {
-      throw new Error(
-        "ClickHouseClient not configured — cannot read from event_log (ADR-022)",
-      );
+      throw new Error("ClickHouseClient not configured — cannot read from event_log (ADR-022)");
     }
 
     const clickHouseClient = await this.resolveClickHouseClient(tenantId);
@@ -657,9 +653,7 @@ export class BlobStore {
    */
   private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-    const { Body } = await s3Client.send(
-      new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
-    );
+    const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }));
     if (!Body) {
       throw new Error(
         `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,

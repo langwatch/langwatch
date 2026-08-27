@@ -49,10 +49,7 @@ describe("long-context [1m] model cost matching", () => {
     });
 
     expect(result).toBeGreaterThan(0);
-    expect(result).toBeCloseTo(
-      20540 * OPUS_5_CACHE_READ + 22994 * OPUS_5_CACHE_WRITE,
-      10,
-    );
+    expect(result).toBeCloseTo(20540 * OPUS_5_CACHE_READ + 22994 * OPUS_5_CACHE_WRITE, 10);
   });
 
   /** @scenario "A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost" */

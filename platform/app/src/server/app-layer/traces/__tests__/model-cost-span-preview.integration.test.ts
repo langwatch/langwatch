@@ -248,8 +248,7 @@ afterAll(async () => {
       query_params: { a: tenantId, b: otherTenantId },
     });
     await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})",
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})",
       query_params: { a: tenantId, b: otherTenantId },
     });
   }
@@ -270,9 +269,7 @@ describe("previewCostRuleMatchingSpans", () => {
       });
 
       expect(preview.matchedModels).toHaveLength(1);
-      expect(preview.matchedModels[0]!.model).toBe(
-        "bedrock/eu.anthropic.claude-sonnet-4-6",
-      );
+      expect(preview.matchedModels[0]!.model).toBe("bedrock/eu.anthropic.claude-sonnet-4-6");
       expect(preview.totalMatchedSpans).toBe(1);
 
       expect(preview.sampleSpans).toHaveLength(1);
@@ -367,9 +364,7 @@ describe("previewCostRuleMatchingSpans", () => {
       });
 
       expect(preview.matchedModels.map((m) => m.model)).toContain(`response-model-${ns}`);
-      expect(preview.unmatchedModels.map((m) => m.model)).not.toContain(
-        `request-model-${ns}`,
-      );
+      expect(preview.unmatchedModels.map((m) => m.model)).not.toContain(`request-model-${ns}`);
     });
 
     it("excludes spans outside the preview window", async () => {

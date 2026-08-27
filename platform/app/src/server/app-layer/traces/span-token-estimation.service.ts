@@ -1,6 +1,5 @@
-import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
-import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import { extractModelName } from "./utils/spanModel";
 
@@ -30,7 +29,7 @@ const PROJECT_KILL_SWITCH_KEY = "token-estimation-project-killswitch";
  */
 export interface OtlpSpanTokenEstimationServiceDependencies {
   tokenizer: Pick<TokenizerClient, "countTokens">;
-  featureFlagService?: FeatureFlagServiceInterface;
+  featureFlags: FeatureFlagService;
 }
 
 /**
@@ -132,38 +131,19 @@ export class OtlpSpanTokenEstimationService {
     }
   }
 
-  private async isDisabledByKillSwitch({
-    tenantId,
-  }: {
-    tenantId?: string;
-  }): Promise<boolean> {
-    if (!this.deps.featureFlagService) return false;
-
+  private async isDisabledByKillSwitch({ tenantId }: { tenantId?: string }): Promise<boolean> {
     // Global kill switch — disables for all projects.
-    // Both checks pass cacheTtlMs to widen the cache window beyond the
-    // 5s frontend-flag default, since this method runs on the per-span
-    // hot path and a cache miss = one billable PostHog /flags request.
-    const globalDisabled = await this.deps.featureFlagService.isEnabled(
-      GLOBAL_KILL_SWITCH_KEY,
-      {
-        distinctId: "global",
-        defaultValue: false,
-        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-      },
-    );
+    const globalDisabled = await this.deps.featureFlags.isEnabled(GLOBAL_KILL_SWITCH_KEY, {
+      kind: "system",
+    });
     if (globalDisabled) return true;
 
     // Per-project kill switch
     if (tenantId) {
-      const projectDisabled = await this.deps.featureFlagService.isEnabled(
-        PROJECT_KILL_SWITCH_KEY,
-        {
-          distinctId: tenantId,
-          defaultValue: false,
-          projectId: tenantId,
-          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-        },
-      );
+      const projectDisabled = await this.deps.featureFlags.isEnabled(PROJECT_KILL_SWITCH_KEY, {
+        kind: "project",
+        projectId: tenantId,
+      });
       if (projectDisabled) return true;
     }
 
@@ -240,13 +220,7 @@ export class OtlpSpanTokenEstimationService {
     return null;
   }
 
-  private getStringAttribute({
-    span,
-    key,
-  }: {
-    span: OtlpSpan;
-    key: string;
-  }): string | null {
+  private getStringAttribute({ span, key }: { span: OtlpSpan; key: string }): string | null {
     for (const attr of span.attributes) {
       if (attr.key === key && typeof attr.value.stringValue === "string") {
         return attr.value.stringValue;

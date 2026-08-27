@@ -9,11 +9,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { Readable } from "node:stream";
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  PutObjectCommand,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StreamTooLargeError } from "~/utils/streamToBuffer";
@@ -506,9 +502,9 @@ describe("getSpool — given a v1-shaped reference naming another tenant", () =>
         spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
       });
 
-      await expect(
-        store.getSpool({ spoolRef: victimKey, ...spoolCoords }),
-      ).rejects.toThrow(/authenticated as "orgA"/);
+      await expect(store.getSpool({ spoolRef: victimKey, ...spoolCoords })).rejects.toThrow(
+        /authenticated as "orgA"/,
+      );
     });
   });
 });
@@ -566,9 +562,9 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
       // whole object before anything can check its size — so the cap that
       // guards the v2 path did not apply to the one input written before this
       // deploy, which is exactly the input it exists to distrust.
-      await expect(
-        store.getSpool({ spoolRef: legacyKey, ...spoolCoords }),
-      ).rejects.toThrow(StreamTooLargeError);
+      await expect(store.getSpool({ spoolRef: legacyKey, ...spoolCoords })).rejects.toThrow(
+        StreamTooLargeError,
+      );
     });
   });
 });
@@ -593,9 +589,9 @@ describe("getSpool — given an object larger than the read cap", () => {
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
-      await expect(
-        store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
-      ).rejects.toThrow(StreamTooLargeError);
+      await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow(
+        StreamTooLargeError,
+      );
     });
   });
 });
@@ -609,9 +605,7 @@ describe("getSpool — given the object is missing", () => {
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
-      await expect(
-        store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
-      ).rejects.toThrow();
+      await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow();
     });
   });
 });

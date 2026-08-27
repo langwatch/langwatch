@@ -1,11 +1,6 @@
 import type { TagToken } from "liqe";
 import { FilterParseError } from "../errors";
-import {
-  type FieldDef,
-  type InMemoryTrace,
-  UNSUPPORTED,
-  type Unsupported,
-} from "./field-def";
+import { type FieldDef, type InMemoryTrace, UNSUPPORTED, type Unsupported } from "./field-def";
 import { boundedSubquery, scenarioRunSubquery } from "./subqueries";
 import {
   extractStringValue,
@@ -81,11 +76,7 @@ function stripTraceAttributePrefix(value: string): string | null {
 // trace / traceId
 // ---------------------------------------------------------------------------
 
-function translateTraceId(
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const p = nextParam(ctx, "traceId");
@@ -111,11 +102,7 @@ const TRACE_ID_DEF: FieldDef = {
 // has / none — existence categories
 // ---------------------------------------------------------------------------
 
-function translateExistence(
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
 
@@ -141,11 +128,7 @@ function translateExistence(
 
     case "feedback":
       return wrap(
-        boundedSubquery(
-          "stored_spans",
-          "StartTime",
-          "has(`Events.Name`, 'user_feedback')",
-        ),
+        boundedSubquery("stored_spans", "StartTime", "has(`Events.Name`, 'user_feedback')"),
         negated,
       );
 
@@ -333,8 +316,7 @@ const PROMPT_DEF: FieldDef = {
   },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
-    const promptIds =
-      parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ?? [];
+    const promptIds = parseJsonStringArray(trace.summary.attributes["langwatch.prompt_ids"]) ?? [];
     const matched = promptIds.includes(value);
     return negated ? !matched : matched;
   },
@@ -355,10 +337,7 @@ const SPAN_ID_DEF: FieldDef = {
       );
     }
     ctx.params[p] = value;
-    return wrap(
-      boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`),
-      negated,
-    );
+    return wrap(boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`), negated);
   },
   evaluateInMemory: () => UNSUPPORTED,
 };

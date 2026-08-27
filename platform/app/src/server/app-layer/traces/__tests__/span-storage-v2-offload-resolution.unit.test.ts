@@ -45,7 +45,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -142,9 +142,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const spans = await service.getSpansByTraceId({
@@ -169,9 +167,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const spans = await service.getSpansByTraceId({
@@ -193,9 +189,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const span = await service.getSpanById({
@@ -218,9 +212,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const span = await service.getSpanById({
@@ -255,9 +247,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         } as unknown as BlobStore;
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         const spans = await service.getSpansByTraceId({
@@ -329,9 +319,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const blobStore = makeBlobStore({}); // empty — will throw BlobNotFoundError
         const service = new SpanStorageService(repo, {
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(
-            TraceCanonicalisationService.create(),
-          ),
+          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         });
 
         await expect(

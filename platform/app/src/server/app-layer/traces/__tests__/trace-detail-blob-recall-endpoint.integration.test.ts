@@ -51,21 +51,16 @@ import { generateTestTenantId } from "~/server/event-sourcing/__tests__/integrat
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "@langwatch/trace-contract";
 import type { Span, Trace } from "~/server/tracer/types";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 
 // Gate identically to the canonical event_log integration tests: skip unless a
 // real ClickHouse is reachable, run against the testcontainer otherwise.
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL);
 
 // Mock the ClickHouse routing module so BOTH the read path
 // (ClickHouseTraceService.resolveClient -> getClickHouseClientForTenant) AND the
@@ -292,9 +287,7 @@ function spanIoValue(span: Span, ioField: IoField): string {
     | undefined;
   expect(io).toBeTruthy();
   if (!io)
-    throw new Error(
-      `span.${ioField === "langwatch.input" ? "input" : "output"} is null/undefined`,
-    );
+    throw new Error(`span.${ioField === "langwatch.input" ? "input" : "output"} is null/undefined`);
   expect(typeof io.value).toBe("string");
   return io.value as string;
 }
@@ -337,9 +330,7 @@ describe.skipIf(!hasTestcontainers)(
 
       // Wire the mocked routing module to the testcontainer client, so both the
       // read path and the blob resolver dial the real `ch`.
-      vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(
-        client,
-      );
+      vi.mocked(clickhouseClientModule.getClickHouseClientForTenant).mockResolvedValue(client);
 
       // buildTraceBlobResolutionDeps()'s resolver now takes the canonicalisation
       // service from the composition root and its default client resolver from
@@ -347,8 +338,7 @@ describe.skipIf(!hasTestcontainers)(
       // resolver dials the same (mocked) testcontainer client above.
       await resetApp();
       installClickHouseTestApp({
-        resolveClient: (tenantId) =>
-          clickhouseClientModule.getClickHouseClientForTenant(tenantId),
+        resolveClient: (tenantId) => clickhouseClientModule.getClickHouseClientForTenant(tenantId),
       });
     }, 60_000);
 
@@ -427,8 +417,7 @@ describe.skipIf(!hasTestcontainers)(
 
       // Staging guard: preview is truncated and the eventref key IS present.
       expect(preview).toBeDefined();
-      if (!preview)
-        throw new Error(`leanAttrs missing "${ioField}" after leanForProjection`);
+      if (!preview) throw new Error(`leanAttrs missing "${ioField}" after leanForProjection`);
       expect(preview).not.toContain(UNIQUE_TAIL);
       expect(leanAttrs[`${EVENTREF_ATTR_PREFIX}${ioField}`]).toBeDefined();
 
@@ -487,9 +476,7 @@ describe.skipIf(!hasTestcontainers)(
             expect(value).not.toContain(UNIQUE_TAIL);
             expect(value).toBe(preview);
             // Preview is ≤ 64 KB + the 1-codepoint ellipsis ("…" = 3 UTF-8 bytes).
-            expect(Buffer.byteLength(value, "utf-8")).toBeLessThanOrEqual(
-              IO_PREVIEW_BYTES + 4,
-            );
+            expect(Buffer.byteLength(value, "utf-8")).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
 
             // BUG: the reserved eventref is STILL on the span — never resolved.
             expect(spanCarriesEventref(span)).toBe(true);
@@ -527,9 +514,7 @@ describe.skipIf(!hasTestcontainers)(
             expect(value).toBe(LARGE_VALUE);
             expect(value).toContain(UNIQUE_TAIL);
             expect(value.length).toBe(LARGE_VALUE.length);
-            expect(Buffer.byteLength(value, "utf-8")).toBe(
-              Buffer.byteLength(LARGE_VALUE, "utf-8"),
-            );
+            expect(Buffer.byteLength(value, "utf-8")).toBe(Buffer.byteLength(LARGE_VALUE, "utf-8"));
           });
 
           it(`strips the reserved eventref namespace from the returned ${ioField} span attributes (AC3)`, async () => {
@@ -552,8 +537,9 @@ describe.skipIf(!hasTestcontainers)(
             // FIX: no reserved eventref namespace leaks to the returned Span.
             expect(spanCarriesEventref(span)).toBe(false);
             const params = (span.params ?? {}) as Record<string, unknown>;
-            const reserved = (params.langwatch as Record<string, unknown> | undefined)
-              ?.reserved as Record<string, unknown> | undefined;
+            const reserved = (params.langwatch as Record<string, unknown> | undefined)?.reserved as
+              | Record<string, unknown>
+              | undefined;
             expect(reserved?.eventref).toBeUndefined();
           });
 

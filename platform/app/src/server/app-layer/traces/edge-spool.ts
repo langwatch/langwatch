@@ -12,7 +12,7 @@
  *                       logs warn "oversize protection skipped; queue carries full payload"
  */
 
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { BlobStore } from "./blob-store.service";
 import { COMMAND_INLINE_THRESHOLD } from "./lean-for-projection";
 

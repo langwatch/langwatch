@@ -31,7 +31,7 @@ import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */

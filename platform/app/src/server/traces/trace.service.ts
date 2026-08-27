@@ -15,7 +15,7 @@ import type { LogRecordStorageService } from "~/server/app-layer/traces/log-reco
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";

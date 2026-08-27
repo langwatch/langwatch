@@ -7,12 +7,7 @@ import {
 import { EVALUATOR_DEF, LABEL_DEF, MODEL_DEF } from "./custom-handlers";
 import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "./field-def";
 import { UNSUPPORTED } from "./field-def";
-import {
-  categorical,
-  crossTableCategorical,
-  crossTableRange,
-  range,
-} from "./generic-translators";
+import { categorical, crossTableCategorical, crossTableRange, range } from "./generic-translators";
 import { META_FIELD_DEFS } from "./meta-handlers";
 
 // ---------------------------------------------------------------------------
@@ -57,11 +52,7 @@ function rangeFacet(key: string): FieldDef {
  * read iterates `trace.evaluations` / `trace.spans` and fails closed when the
  * collection isn't loaded).
  */
-function crossCategoricalFacet(
-  key: string,
-  needs: FieldNeeds,
-  read: CategoricalRead,
-): FieldDef {
+function crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
   const def = expressionFacet(key);
   if (def.kind !== "categorical") {
     throw new Error(`facet '${key}' is not a categorical facet`);
@@ -127,9 +118,7 @@ const evaluatorLabelRead: CategoricalRead = (t) =>
     : t.evaluations.flatMap((e) => (e.label == null ? [] : [e.label]));
 
 const spanTypeRead: CategoricalRead = (t) =>
-  t.spans == null
-    ? UNSUPPORTED
-    : t.spans.map((s) => s.attributes["langwatch.span.type"] ?? "");
+  t.spans == null ? UNSUPPORTED : t.spans.map((s) => s.attributes["langwatch.span.type"] ?? "");
 
 const spanNameRead: CategoricalRead = (t) =>
   t.spans == null ? UNSUPPORTED : t.spans.map((s) => s.name);
@@ -137,9 +126,7 @@ const spanNameRead: CategoricalRead = (t) =>
 const spanStatusRead: CategoricalRead = (t) =>
   t.spans == null
     ? UNSUPPORTED
-    : t.spans.map((s) =>
-        s.statusCode === 2 ? "error" : s.statusCode === 1 ? "ok" : "unset",
-      );
+    : t.spans.map((s) => (s.statusCode === 2 ? "error" : s.statusCode === 1 ? "ok" : "unset"));
 
 // ---------------------------------------------------------------------------
 // FIELD_DEFS — the exhaustive registry of filter fields.
@@ -240,22 +227,10 @@ export const FIELD_DEFS = {
   spans: rangeFacet("spans"),
   size: rangeFacet("size"),
   evaluator: EVALUATOR_DEF,
-  evaluatorStatus: crossCategoricalFacet(
-    "evaluatorStatus",
-    "evaluations",
-    evaluatorStatusRead,
-  ),
-  evaluatorVerdict: crossCategoricalFacet(
-    "evaluatorVerdict",
-    "evaluations",
-    evaluatorVerdictRead,
-  ),
+  evaluatorStatus: crossCategoricalFacet("evaluatorStatus", "evaluations", evaluatorStatusRead),
+  evaluatorVerdict: crossCategoricalFacet("evaluatorVerdict", "evaluations", evaluatorVerdictRead),
   evaluatorScore: crossRangeFacet("evaluatorScore", "evaluations", evaluatorScoreRead),
-  evaluatorLabel: crossCategoricalFacet(
-    "evaluatorLabel",
-    "evaluations",
-    evaluatorLabelRead,
-  ),
+  evaluatorLabel: crossCategoricalFacet("evaluatorLabel", "evaluations", evaluatorLabelRead),
   spanType: crossCategoricalFacet("spanType", "spans", spanTypeRead),
   spanName: crossCategoricalFacet("spanName", "spans", spanNameRead),
   spanStatus: crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
@@ -275,11 +250,7 @@ export const FIELD_DEFS = {
   // Back-compat alias for the renamed `evaluatorVerdict` field. Any saved
   // query/lens using the old key keeps working; the SQL + predicate are the
   // same as `evaluatorVerdict`.
-  evaluatorPassed: crossCategoricalFacet(
-    "evaluatorVerdict",
-    "evaluations",
-    evaluatorVerdictRead,
-  ),
+  evaluatorPassed: crossCategoricalFacet("evaluatorVerdict", "evaluations", evaluatorVerdictRead),
 } satisfies Record<KnownField, FieldDef>;
 
 /**
@@ -294,9 +265,7 @@ export const FIELD_DEFS = {
  * function` straight out of the supposedly fail-closed matcher). `Map.get`
  * has own-key semantics, so an inherited name is simply an unknown field.
  */
-export const FIELD_DEF_BY_NAME: ReadonlyMap<string, FieldDef> = new Map(
-  Object.entries(FIELD_DEFS),
-);
+export const FIELD_DEF_BY_NAME: ReadonlyMap<string, FieldDef> = new Map(Object.entries(FIELD_DEFS));
 
 /** All known filter field names, in registry + meta order. */
 export const KNOWN_FIELDS = Object.keys(FIELD_DEFS);

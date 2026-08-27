@@ -22,12 +22,9 @@
  * read paths call: it gates, reads the logs, and never fails the read.
  */
 import type { Logger } from "pino";
-import {
-  contentAttrKeys,
-  type CodingAgentService,
-} from "@langwatch/coding-agent-contract";
+import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "@langwatch/trace-server";
 import type { Span } from "~/server/tracer/types";
 import {
   type ClaudeContentLog,
@@ -78,8 +75,7 @@ function readContentBody(
   attrs: Record<string, string>,
   codingAgents?: CodingAgentService,
 ): string | null {
-  for (const key of codingAgents?.contentAttrKeys(eventName) ??
-    contentAttrKeys(eventName)) {
+  for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(eventName)) {
     const value = nonEmptyOrNull(attrs[key]);
     if (value !== null) return value;
   }

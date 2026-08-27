@@ -430,9 +430,7 @@ function traceEventRollupQuery(): string {
 }
 
 /** Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace. */
-function toTraceEventRollups(
-  rows: TraceEventRollupRow[],
-): Record<string, TraceEventRollup> {
+function toTraceEventRollups(rows: TraceEventRollupRow[]): Record<string, TraceEventRollup> {
   const rollups: Record<string, TraceEventRollup> = {};
   for (const row of rows) {
     const rollup = (rollups[row.traceId] ??= {
@@ -457,8 +455,7 @@ function toTraceEventRollups(
  */
 const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   prompt: "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
-  scenario:
-    "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
+  scenario: "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
   user: "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
   thread:
     "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
@@ -548,22 +545,17 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
       attrs: {
         [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: row.ResponseModel || undefined,
         [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: row.Model || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
-          row.CacheReadTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
-          row.CacheCreationTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: row.CacheReadTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: row.CacheCreationTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]:
           row.CacheCreation1hTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: row.InputAudioTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: row.OutputAudioTokens || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
-          row.CustomInputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
-          row.CustomOutputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
-          row.CustomCacheReadRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: row.CustomInputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: row.CustomOutputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: row.CustomCacheReadRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
           row.CustomCacheCreationRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]:
@@ -706,10 +698,7 @@ export function ensureStringRecord(raw: Record<string, unknown>): Record<string,
     if (typeof value === "string") {
       result[key] = value;
     } else {
-      logger.warn(
-        { key, type: typeof value },
-        "Non-string attribute value from ClickHouse",
-      );
+      logger.warn({ key, type: typeof value }, "Non-string attribute value from ClickHouse");
     }
   }
   return result;
@@ -722,9 +711,7 @@ export function ensureStringRecord(raw: Record<string, unknown>): Record<string,
  *
  * @internal Exported for unit testing
  */
-export function deserializeAttributes(
-  attrs: Record<string, string>,
-): Record<string, unknown> {
+export function deserializeAttributes(attrs: Record<string, string>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
     // Boolean strings
@@ -755,11 +742,7 @@ export function deserializeAttributes(
     // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
     // attributes is correct; pure string numerics may lose their string type.
     // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
-    if (
-      trimmed !== "" &&
-      DECIMAL_NUMBER_RE.test(trimmed) &&
-      Number.isFinite(Number(trimmed))
-    ) {
+    if (trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed))) {
       const num = Number(trimmed);
       if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
         result[key] = value;
@@ -781,9 +764,7 @@ export function deserializeAttributes(
  *
  * @internal Exported for unit testing
  */
-export function serializeAttributes(
-  attrs: Record<string, unknown>,
-): Record<string, string> {
+export function serializeAttributes(attrs: Record<string, unknown>): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined) continue;
@@ -913,16 +894,12 @@ export function mapChRowToNormalized(row: FullSpanRow) {
     events: (row.Events_Timestamp ?? []).map((ts, i) => ({
       name: row.Events_Name?.[i] ?? "",
       timeUnixMs: ts,
-      attributes: deserializeAttributes(
-        ensureStringRecord(row.Events_Attributes?.[i] ?? {}),
-      ),
+      attributes: deserializeAttributes(ensureStringRecord(row.Events_Attributes?.[i] ?? {})),
     })),
     links: (row.Links_TraceId ?? []).map((lt, i) => ({
       traceId: lt,
       spanId: row.Links_SpanId?.[i] ?? "",
-      attributes: deserializeAttributes(
-        ensureStringRecord(row.Links_Attributes?.[i] ?? {}),
-      ),
+      attributes: deserializeAttributes(ensureStringRecord(row.Links_Attributes?.[i] ?? {})),
     })),
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
@@ -1023,10 +1000,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     limit?: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpansByTraceId",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.getSpansByTraceId");
 
     // Hard ceiling, applied unconditionally: a leaked trace_id with a huge span
     // count can never load the pipeline through this path, regardless of caller.
@@ -1153,10 +1127,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<Span | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpanByIds",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.getSpanByIds");
 
     try {
       return await this.readTraceSpans<Span | null>(
@@ -1429,9 +1400,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
     const windowPredicate =
-      sinceMs !== undefined
-        ? "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})"
-        : "";
+      sinceMs !== undefined ? "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})" : "";
     const result = await client.query({
       query: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
@@ -1440,8 +1409,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           AND TraceId = {traceId:String}
           ${windowPredicate}
       `,
-      query_params:
-        sinceMs !== undefined ? { tenantId, traceId, sinceMs } : { tenantId, traceId },
+      query_params: sinceMs !== undefined ? { tenantId, traceId, sinceMs } : { tenantId, traceId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
@@ -1470,15 +1438,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * which is the `hintMs === null` branch inside `queryWindowed`.
    */
   private async readTraceEvents<T>(
-    {
-      tenantId,
-      traceId,
-      occurredAtMs,
-    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
     return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
@@ -1518,16 +1481,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * `hintMs === null` branch inside {@link queryWindowed}.
    */
   private async readTraceSpans<T>(
-    {
-      tenantId,
-      traceId,
-      occurredAtMs,
-    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
     isEmpty: (result: T) => boolean,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
     return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
@@ -1597,8 +1555,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           const rows = (await result.json()) as TraceEventRow[];
           return rows.map((r) => ({
             spanId: r.spanId,
-            timestamp:
-              typeof r.timestamp === "string" ? parseInt(r.timestamp, 10) : r.timestamp,
+            timestamp: typeof r.timestamp === "string" ? parseInt(r.timestamp, 10) : r.timestamp,
             name: r.name,
             attributes: r.attributes ?? {},
           }));
@@ -1673,10 +1630,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getEventsByTraceId",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.getEventsByTraceId");
 
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
@@ -1746,10 +1700,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpanEvents",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.getSpanEvents");
 
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
@@ -1923,9 +1874,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           .filter((r) => Array.isArray(r.Signals) && r.Signals.length > 0)
           .map((r) => ({
             spanId: r.SpanId,
-            signals: r.Signals.filter((s): s is LangwatchSignalBucket =>
-              validBuckets.has(s),
-            ),
+            signals: r.Signals.filter((s): s is LangwatchSignalBucket => validBuckets.has(s)),
           }))
           .filter((r) => r.signals.length > 0);
       },
@@ -1944,10 +1893,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     limit: number;
     offset: number;
   } & OccurredAtHint): Promise<{ spans: Span[]; total: number }> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpansPaginated",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.findSpansPaginated");
 
     return this.readTraceSpans<{ spans: Span[]; total: number }>(
       { tenantId, traceId, occurredAtMs },
@@ -2021,18 +1967,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     sinceStartTimeMs: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpansSince",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.findSpansSince");
 
     // Poll reader: `StartTime > sinceStartTimeMs` is already a partition-pruning
     // lower bound, so this does NOT resolve or clamp to the trace's OccurredAt
     // window. A `StartTime <= OccurredAt + 2d` upper bound would silently hide
     // new spans on a trace still active more than 2 days after its
     // trace_summaries.OccurredAt (the live delta view would just stop updating).
-    const sinceFilter =
-      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+    const sinceFilter = "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `

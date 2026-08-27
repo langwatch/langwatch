@@ -19,8 +19,8 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "@langwatch/trace-contract";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/trace-server";
 import {
   EVENTREF_ATTR_PREFIX,
   IO_ATTR_KEYS,
@@ -48,11 +48,7 @@ const LARGE_VALUE = "x".repeat(100 * 1024);
 /** 10 KB string — under IO_PREVIEW_BYTES. */
 const SMALL_VALUE = "y".repeat(10 * 1024);
 
-function makeSpanReceivedEvent({
-  attributes,
-}: {
-  attributes: Record<string, string>;
-}): Event {
+function makeSpanReceivedEvent({ attributes }: { attributes: Record<string, string> }): Event {
   return {
     ...BASE_EVENT_FIELDS,
     type: SPAN_RECEIVED_EVENT_TYPE,
@@ -203,9 +199,9 @@ describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(
-        Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
+      expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
+      );
     });
 
     it("attaches a langwatch.reserved.eventref.langwatch.output attr containing { field: 'langwatch.output' }", () => {
@@ -252,9 +248,7 @@ describe("given a SpanReceived event with no IO attrs", () => {
 
       expect(attrs["custom.attr"]).toBe("some value");
       // No eventref should be present
-      const eventrefKeys = Object.keys(attrs).filter((k) =>
-        k.startsWith(EVENTREF_ATTR_PREFIX),
-      );
+      const eventrefKeys = Object.keys(attrs).filter((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
       expect(eventrefKeys).toHaveLength(0);
     });
   });
@@ -306,12 +300,12 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
       const attrs = extractSpanAttributes(leaned);
 
       // Both previews are within budget
-      expect(
-        Buffer.byteLength(attrs["langwatch.input"] ?? "", "utf-8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
-      expect(
-        Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
+      expect(Buffer.byteLength(attrs["langwatch.input"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
+      );
+      expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
+      );
 
       // Each gets its own eventref
       expect(attrs[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBeDefined();
@@ -343,9 +337,9 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(
-        Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
+      expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
+      );
       const eventrefKey = `${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`;
       expect(attrs[eventrefKey]).toBeDefined();
       const ref = JSON.parse(attrs[eventrefKey]!) as { field: string };
@@ -499,16 +493,14 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
           attributes: Array<{ key: string; value: { stringValue?: string } }>;
         };
       };
-      const originalValue = originalData.span.attributes.find(
-        (a) => a.key === "langwatch.params",
-      )?.value.stringValue;
+      const originalValue = originalData.span.attributes.find((a) => a.key === "langwatch.params")
+        ?.value.stringValue;
 
       leanForProjection(event);
 
       // Original must be completely unmodified after leanForProjection
-      const valueAfter = originalData.span.attributes.find(
-        (a) => a.key === "langwatch.params",
-      )?.value.stringValue;
+      const valueAfter = originalData.span.attributes.find((a) => a.key === "langwatch.params")
+        ?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
       expect(valueAfter).toHaveLength(300 * 1024);
     });
@@ -521,9 +513,7 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      const eventrefKeys = Object.keys(attrs).filter((k) =>
-        k.startsWith(EVENTREF_ATTR_PREFIX),
-      );
+      const eventrefKeys = Object.keys(attrs).filter((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
       expect(eventrefKeys).toHaveLength(0);
     });
   });
@@ -559,9 +549,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
           }>;
         };
       };
-      const leanedAttr = leanedData.span.attributes.find(
-        (a) => a.key === "langwatch.params",
-      );
+      const leanedAttr = leanedData.span.attributes.find((a) => a.key === "langwatch.params");
       const firstItem = leanedAttr?.value.arrayValue?.values[0];
 
       expect(firstItem?.stringValue).toMatch(/\[truncated:/);
@@ -597,9 +585,8 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
 
       leanForProjection(event);
 
-      const valueAfter = originalData.span.attributes.find(
-        (a) => a.key === "langwatch.params",
-      )?.value.arrayValue?.values[0]?.stringValue;
+      const valueAfter = originalData.span.attributes.find((a) => a.key === "langwatch.params")
+        ?.value.arrayValue?.values[0]?.stringValue;
 
       expect(valueAfter).toBe(originalNestedValue);
       expect(valueAfter).toHaveLength(300 * 1024);
@@ -621,9 +608,9 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
       const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
-      expect(
-        Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 4);
+      expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
+        IO_PREVIEW_BYTES + 4,
+      );
       const eventrefKey = `${EVENTREF_ATTR_PREFIX}gen_ai.input.messages`;
       expect(attrs[eventrefKey]).toBeDefined();
       const ref = JSON.parse(attrs[eventrefKey]!) as { field: string };
@@ -645,9 +632,8 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
 
       leanForProjection(event);
 
-      const valueAfter = originalData.span.attributes.find(
-        (a) => a.key === "gen_ai.input.messages",
-      )?.value.stringValue;
+      const valueAfter = originalData.span.attributes.find((a) => a.key === "gen_ai.input.messages")
+        ?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
       expect(valueAfter).toHaveLength(300 * 1024);
     });
@@ -864,15 +850,13 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
           attributes: Array<{ key: string; value: { stringValue?: string } }>;
         };
       };
-      const originalValue = originalData.resource?.attributes.find(
-        (a) => a.key === "service.name",
-      )?.value.stringValue;
+      const originalValue = originalData.resource?.attributes.find((a) => a.key === "service.name")
+        ?.value.stringValue;
 
       leanForProjection(event);
 
-      const valueAfter = originalData.resource?.attributes.find(
-        (a) => a.key === "service.name",
-      )?.value.stringValue;
+      const valueAfter = originalData.resource?.attributes.find((a) => a.key === "service.name")
+        ?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
       expect(valueAfter?.length).toBeGreaterThan(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES);
     });
@@ -965,12 +949,8 @@ describe("given a span with a small structured non-IO attribute", () => {
           }>;
         };
       };
-      const leanedAttr = leanedData.span.attributes.find(
-        (a) => a.key === "langwatch.params",
-      );
-      const blobEntry = leanedAttr?.value.kvlistValue?.values.find(
-        (e) => e.key === "blob",
-      );
+      const leanedAttr = leanedData.span.attributes.find((a) => a.key === "langwatch.params");
+      const blobEntry = leanedAttr?.value.kvlistValue?.values.find((e) => e.key === "blob");
 
       expect(blobEntry?.value.stringValue).toMatch(/\[truncated:/);
     });

@@ -23,9 +23,7 @@ describe("given plain free text", () => {
 describe("given a mix of structured tags and free text", () => {
   describe("when extracting the content terms", () => {
     it("keeps only the free-text terms", () => {
-      expect(extractFreeTextTerms('service:api "checkout failed"')).toEqual([
-        "checkout failed",
-      ]);
+      expect(extractFreeTextTerms('service:api "checkout failed"')).toEqual(["checkout failed"]);
     });
 
     it("skips negated terms", () => {

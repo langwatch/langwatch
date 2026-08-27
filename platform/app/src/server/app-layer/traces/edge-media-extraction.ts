@@ -32,21 +32,17 @@
  */
 
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import {
   computeDropMatchers,
   computeDroppedKeys,
   rolesDroppedFromChatArrays,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type {
-  OtlpKeyValue,
-  OtlpSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { featureFlagService } from "~/server/featureFlag";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import { getEdgeMediaExtractFailOpenCounter } from "~/server/metrics";
 import type { ExtractedRef } from "~/server/stored-objects/content-extractor";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
   createExtractionBudget,
   type ExtractionBudget,
@@ -63,26 +59,15 @@ export interface EdgeMediaExtractionLogger {
   warn(context: Record<string, unknown>, msg: string): void;
 }
 
-/** Injectable dependencies; production defaults fill any omitted field. */
+/** Injectable policy and storage dependencies for the extraction hook. */
 export interface EdgeMediaExtractionDeps {
-  /** Per-project flag read for `release_trace_media_extraction`. */
-  isEnabled: (projectId: string) => Promise<boolean>;
+  featureFlags: FeatureFlagService;
   /** True when the project's resolved data-privacy policy drops any span content. */
-  hasContentDropRules: (projectId: string) => Promise<boolean>;
-  /** Stored-objects service factory scoped to the owning project. */
-  createService: (projectId: string) => StoredObjectsService;
-}
-
-async function defaultIsEnabled(projectId: string): Promise<boolean> {
-  // Read through the layered service, NOT the raw postgres store: the store
-  // returns null when no operator row exists, and only the service applies
-  // the full layering (env force-on → store row → PostHog rule → registry
-  // default). The flag ships default OFF until stored-objects retention
-  // lands (#5951), so enabling is an explicit per-project opt-in.
-  return await featureFlagService.isEnabled("release_trace_media_extraction", {
-    distinctId: projectId,
-    projectId,
-  });
+  hasContentDropRules?: (projectId: string) => Promise<boolean>;
+  /** Process-composed stored-objects capability for production ingestion. */
+  service?: StoredObjectsService;
+  /** Compatibility seam retained for focused tests that build local storage. */
+  createService?: (projectId: string) => StoredObjectsService;
 }
 
 async function defaultHasContentDropRules(projectId: string): Promise<boolean> {
@@ -178,33 +163,37 @@ export async function maybeExtractSpanMedia({
   logger,
 }: {
   data: RecordSpanCommandData;
-  deps?: Partial<EdgeMediaExtractionDeps>;
+  deps: EdgeMediaExtractionDeps;
   logger: EdgeMediaExtractionLogger;
 }): Promise<RecordSpanCommandData> {
   const span = data.span;
   if (!spanCarriesMediaMarkers(span)) return data;
 
-  const resolved: EdgeMediaExtractionDeps = {
-    isEnabled: deps?.isEnabled ?? defaultIsEnabled,
-    hasContentDropRules: deps?.hasContentDropRules ?? defaultHasContentDropRules,
-    createService:
-      deps?.createService ??
-      ((projectId: string) => createStoredObjectsService({ projectId })),
+  const resolved = {
+    featureFlags: deps.featureFlags,
+    hasContentDropRules: deps.hasContentDropRules ?? defaultHasContentDropRules,
+    service: deps.service,
+    createService: deps.createService,
   };
 
   const projectId = data.tenantId;
-  const traceId = span.traceId as string;
-  const spanId = span.spanId as string;
+  const traceId = span.traceId;
+  const spanId = span.spanId;
 
   let stage: "flag_store" | "privacy_probe" | "storage" = "flag_store";
   try {
-    if (!(await resolved.isEnabled(projectId))) return data;
+    const enabled = await resolved.featureFlags.isEnabled("release_trace_media_extraction", {
+      kind: "project",
+      projectId,
+    });
+    if (!enabled) return data;
 
     stage = "privacy_probe";
     if (await resolved.hasContentDropRules(projectId)) return data;
 
     stage = "storage";
-    const service = resolved.createService(projectId);
+    const service = resolved.service ?? resolved.createService?.(projectId);
+    if (!service) return data;
     const refs: ExtractedRef[] = [];
     // One budget for the WHOLE span: the part cap and the deadline apply
     // across every attribute and event-attribute value, so a span cannot
@@ -241,11 +230,7 @@ export async function maybeExtractSpanMedia({
     // Budget drops are fail-open per part, never silent: the affected parts
     // ride through inline (today's behavior) and the drop is logged and
     // counted so a sustained rate is alertable.
-    if (
-      budget.droppedByCap > 0 ||
-      budget.droppedByDeadline > 0 ||
-      budget.failedParts > 0
-    ) {
+    if (budget.droppedByCap > 0 || budget.droppedByDeadline > 0 || budget.failedParts > 0) {
       if (budget.droppedByCap > 0)
         getEdgeMediaExtractFailOpenCounter("part_cap").inc(budget.droppedByCap);
       if (budget.droppedByDeadline > 0)

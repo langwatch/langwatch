@@ -29,12 +29,8 @@ describe("given a trace summary read with a visibility gate", () => {
       const summary = await service.getByTraceId("project-1", "trace-1", {
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect(summary.computedInput).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
-      expect(summary.computedOutput).toHaveLength(
-        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
-      );
+      expect(summary.computedInput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(summary.computedOutput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(summary.errorMessage!.length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );

@@ -26,17 +26,14 @@ import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-ext
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+} from "@langwatch/trace-contract";
+import type { SpanReceivedEvent } from "@langwatch/trace-server";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  resolveOffloadedTraces,
-  type WarnLogger,
-} from "~/server/traces/resolve-offloaded-traces";
+} from "@langwatch/trace-contract";
+import { resolveOffloadedTraces, type WarnLogger } from "~/server/traces/resolve-offloaded-traces";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
@@ -711,9 +708,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
       });
 
       expect(result).toBe(BIG_OUTPUT);
-      expect(Buffer.byteLength(result, "utf8")).toBe(
-        Buffer.byteLength(BIG_OUTPUT, "utf8"),
-      );
+      expect(Buffer.byteLength(result, "utf8")).toBe(Buffer.byteLength(BIG_OUTPUT, "utf8"));
       expect(result.length).toBeGreaterThan(65536);
     });
   });
@@ -839,16 +834,11 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         projectId: TENANT_A,
         normalizedSpans: [stagedSpan],
         blobStore,
-        ioExtractionService: new TraceIOExtractionService(
-          TraceCanonicalisationService.create(),
-        ),
+        ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
         logger,
       });
 
-      const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<
-        string,
-        string
-      >;
+      const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<string, string>;
       // FULL value restored from the mixed-type EventPayload — not the preview.
       expect(resolvedAttrs["langwatch.input"]).toBe(BIG);
       expect(resolvedAttrs["langwatch.input"]!.length).toBeGreaterThan(65536);

@@ -32,7 +32,7 @@
  * never hardcodes which attribute keys the caller reads. It is idempotent and a
  * no-op (empty map) when there are no claude content logs.
  */
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "@langwatch/trace-server";
 import type { ChatMessage, SpanInputOutput } from "~/server/tracer/types";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
@@ -99,14 +99,7 @@ const ASSISTANT_RESPONSE_EVENT = "assistant_response";
  */
 const NULL_QUERY_SOURCE_KEY = "\u0000__null_query_source__";
 
-const CHAT_ROLES = [
-  "system",
-  "user",
-  "assistant",
-  "function",
-  "tool",
-  "unknown",
-] as const;
+const CHAT_ROLES = ["system", "user", "assistant", "function", "tool", "unknown"] as const;
 type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
@@ -132,8 +125,7 @@ export function computeClaudeSpanEnrichment({
   const inputBySpanId = buildInputIndex({ spans, logs, traceCanonicalisation });
 
   for (const span of spans) {
-    const output =
-      span.requestId !== null ? (outputByRequestId.get(span.requestId) ?? null) : null;
+    const output = span.requestId !== null ? (outputByRequestId.get(span.requestId) ?? null) : null;
     const input = inputBySpanId.get(span.spanId) ?? null;
     if (input !== null || output !== null) {
       result.set(span.spanId, { input, output });
@@ -236,9 +228,7 @@ function buildInputIndex({
   const requestBodiesByQuerySource = new Map<string, ClaudeContentLog[]>();
   const promptsByQuerySource = new Map<string, ClaudeContentLog[]>();
   for (const log of logs) {
-    const key = spansDeclareQuerySource
-      ? querySourceKey(log.querySource)
-      : NULL_QUERY_SOURCE_KEY;
+    const key = spansDeclareQuerySource ? querySourceKey(log.querySource) : NULL_QUERY_SOURCE_KEY;
     if (log.eventName === INPUT_BODY_EVENT) {
       pushInto(requestBodiesByQuerySource, key, log);
     } else if (log.eventName === USER_PROMPT_EVENT) {
@@ -501,19 +491,13 @@ export function computeClaudeToolSpanEnrichment({
     if (log.toolUseId === null) continue;
     if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
       resultByUseId.set(log.toolUseId, log);
-    } else if (
-      log.eventName === TOOL_DECISION_EVENT &&
-      !decisionByUseId.has(log.toolUseId)
-    ) {
+    } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
       decisionByUseId.set(log.toolUseId, log);
     }
   }
   if (resultByUseId.size === 0 && decisionByUseId.size === 0) return result;
 
-  const resultContentByUseId = buildToolResultContentIndex(
-    contentLogs,
-    traceCanonicalisation,
-  );
+  const resultContentByUseId = buildToolResultContentIndex(contentLogs, traceCanonicalisation);
 
   for (const span of spans) {
     const toolResult = resultByUseId.get(span.toolUseId) ?? null;
@@ -563,10 +547,7 @@ function buildToolInput({
   decision: ClaudeToolLog | null;
 }): SpanInputOutput | null {
   const raw =
-    toolResult?.toolInput ??
-    toolResult?.toolParameters ??
-    decision?.toolParameters ??
-    null;
+    toolResult?.toolInput ?? toolResult?.toolParameters ?? decision?.toolParameters ?? null;
   if (raw === null || raw.length === 0) return null;
   return toJsonOrText(capPayloadString(raw, undefined, "tool_input"));
 }

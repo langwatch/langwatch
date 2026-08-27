@@ -19,9 +19,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
  */
 export function buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("StartTime");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
-    : "";
+  const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
   return {
     sql: `

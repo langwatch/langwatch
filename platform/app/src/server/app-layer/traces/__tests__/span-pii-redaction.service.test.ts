@@ -1,11 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PIICheckOptions } from "~/server/tracer/collector/piiCheck";
-import type { PIIRedactionLevel } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type {
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import {
   type BatchClearPIIFunction,
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
@@ -47,51 +44,33 @@ function createMockBatchClearPII(): {
   mockBatchClearPII: BatchClearPIIFunction;
   batchSpy: ReturnType<typeof vi.fn>;
 } {
-  const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
-    texts.map(() => "[REDACTED]"),
-  );
+  const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
 
   return { mockBatchClearPII: batchSpy, batchSpy };
 }
 
-/**
- * The only variable this suite touches, cleared on both sides of every test.
- *
- * Restore it by key, never by assigning a fresh object to `process.env`:
- * `process.env` is node's env store, and writing to it is what runs
- * `setenv()`/`tzset()` and notifies V8 that the timezone changed. Replacing it
- * with a plain clone silently detaches every later write, and under
- * `pool: "vmForks"` with `isolate: false` (see vitest.config.ts) the whole
- * worker shares one `process`, so the clone outlives this file: the ClickHouse
- * DateTime64 suites set `process.env.TZ` at module scope and would then read
- * the host zone instead, passing vacuously on a UTC host.
- */
-const KILL_SWITCH_ENV_VAR = "OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED";
-
 describe("OtlpSpanPiiRedactionService", () => {
   let service: OtlpSpanPiiRedactionService;
   let batchSpy: ReturnType<typeof vi.fn>;
+  let featureFlags: MemoryFeatureFlagService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env[KILL_SWITCH_ENV_VAR];
+    featureFlags = MemoryFeatureFlagService.create();
     const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
     batchSpy = spy;
     service = new OtlpSpanPiiRedactionService({
       batchClearPII: mockBatchClearPII,
       isLangevalsConfigured: true,
       isProduction: false,
+      featureFlags,
     });
-  });
-
-  afterEach(() => {
-    delete process.env[KILL_SWITCH_ENV_VAR];
   });
 
   describe("redactSpan", () => {
     describe("when the strict-PII analysis kill switch is enabled", () => {
       it("does not modify the span regardless of redaction level", async () => {
-        process.env[KILL_SWITCH_ENV_VAR] = "1";
+        featureFlags.setFlag("ops_pii_strict_presidio_redaction_disabled", true);
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
         ]);
@@ -104,7 +83,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
 
       it("skips redaction even for ESSENTIAL level", async () => {
-        process.env[KILL_SWITCH_ENV_VAR] = "1";
+        featureFlags.setFlag("ops_pii_strict_presidio_redaction_disabled", true);
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
         ]);
@@ -268,18 +247,14 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
 
       it("handles attributes with null or undefined stringValue", async () => {
-        const span = createMockOtlpSpan([
-          { key: "gen_ai.prompt", value: { stringValue: null } },
-        ]);
+        const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: null } }]);
 
         await expect(service.redactSpan(span, null, "STRICT")).resolves.not.toThrow();
         expect(batchSpy).not.toHaveBeenCalled();
       });
 
       it("passes correct options to batchClearPII including piiRedactionLevel and mainMethod", async () => {
-        const span = createMockOtlpSpan([
-          { key: "gen_ai.prompt", value: { stringValue: "test" } },
-        ]);
+        const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
         await service.redactSpan(span, null, "ESSENTIAL");
 
@@ -392,9 +367,7 @@ describe("OtlpSpanPiiRedactionService", () => {
 
     describe("enforced option based on NODE_ENV", () => {
       it("sets enforced to false in test environment (default mock)", async () => {
-        const span = createMockOtlpSpan([
-          { key: "gen_ai.prompt", value: { stringValue: "test" } },
-        ]);
+        const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
         await service.redactSpan(span, null, "STRICT");
 
@@ -406,17 +379,13 @@ describe("OtlpSpanPiiRedactionService", () => {
 
     describe("error handling", () => {
       it("propagates errors from batchClearPII", async () => {
-        const errorBatchClearPII = vi
-          .fn()
-          .mockRejectedValue(new Error("PII service unavailable"));
+        const errorBatchClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
         const errorService = new OtlpSpanPiiRedactionService({
           batchClearPII: errorBatchClearPII,
           isLangevalsConfigured: true,
           isProduction: false,
         });
-        const span = createMockOtlpSpan([
-          { key: "gen_ai.prompt", value: { stringValue: "test" } },
-        ]);
+        const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
         await expect(errorService.redactSpan(span, null, "STRICT")).rejects.toThrow(
           "PII service unavailable",

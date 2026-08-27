@@ -22,7 +22,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 

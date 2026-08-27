@@ -27,19 +27,13 @@ describe("SearchBar / sidebar parity", () => {
   const SEARCH_BAR_EXEMPT = new Set<FacetDefinition["kind"]>(["dynamic_keys"]);
 
   it.each(
-    FACET_REGISTRY.filter((d) => !SEARCH_BAR_EXEMPT.has(d.kind)).map((d) => [
-      d.key,
-      d.label,
-    ]),
-  )(
-    "[%s] is registered in SEARCH_FIELDS so the search bar dropdown can suggest it",
-    (key) => {
-      expect(
-        SEARCH_FIELDS[key],
-        `facet "${key}" exists in FACET_REGISTRY but not SEARCH_FIELDS — the search bar won't surface it`,
-      ).toBeDefined();
-    },
-  );
+    FACET_REGISTRY.filter((d) => !SEARCH_BAR_EXEMPT.has(d.kind)).map((d) => [d.key, d.label]),
+  )("[%s] is registered in SEARCH_FIELDS so the search bar dropdown can suggest it", (key) => {
+    expect(
+      SEARCH_FIELDS[key],
+      `facet "${key}" exists in FACET_REGISTRY but not SEARCH_FIELDS — the search bar won't surface it`,
+    ).toBeDefined();
+  });
 });
 
 describe("FACET_REGISTRY shape", () => {
@@ -70,10 +64,7 @@ describe("FACET_REGISTRY shape", () => {
           label,
         );
         const match = stripped.match(TITLE_CASE_OFFENDER);
-        expect(
-          match,
-          `label "${label}" looks Title Case — expected sentence case`,
-        ).toBeNull();
+        expect(match, `label "${label}" looks Title Case — expected sentence case`).toBeNull();
       },
     );
 
@@ -96,13 +87,7 @@ describe("FACET_REGISTRY shape", () => {
   it("declares the canonical span-level facets in registry order (`spanType` first)", () => {
     const spanKeys = FACET_REGISTRY.filter((d) => d.group === "span").map((d) => d.key);
     expect(spanKeys).toEqual(
-      expect.arrayContaining([
-        "spanType",
-        "event",
-        "spanName",
-        "spanStatus",
-        "spanAttributeKeys",
-      ]),
+      expect.arrayContaining(["spanType", "event", "spanName", "spanStatus", "spanAttributeKeys"]),
     );
   });
 
@@ -121,9 +106,7 @@ describe("FACET_REGISTRY shape", () => {
       const def = FACET_REGISTRY.find((d) => d.key === "scenarioRun");
       expect(def?.kind).toBe("categorical");
       expect(def?.table).toBe("trace_summaries");
-      expect(def && "expression" in def && def.expression).toBe(
-        "Attributes['scenario.run_id']",
-      );
+      expect(def && "expression" in def && def.expression).toBe("Attributes['scenario.run_id']");
     });
 
     it("keeps `user` and `conversation` as registry-driven categoricals", () => {

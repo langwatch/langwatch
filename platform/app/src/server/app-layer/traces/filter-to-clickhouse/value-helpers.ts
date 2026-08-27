@@ -41,11 +41,7 @@ export interface TranslationContext {
   timeRange: { from: number; to: number };
 }
 
-export type FieldHandler = (
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-) => string;
+export type FieldHandler = (tag: TagToken, negated: boolean, ctx: TranslationContext) => string;
 
 export function extractStringValue(tag: TagToken): string {
   if (tag.expression.type === "LiteralExpression") {
@@ -84,9 +80,7 @@ export function nextParam(ctx: TranslationContext, base = "f"): string {
 
 export function validateValueLength(value: string): void {
   if (value.length > MAX_VALUE_LENGTH) {
-    throw new FilterParseError(
-      `Filter value too long (max ${MAX_VALUE_LENGTH} characters)`,
-    );
+    throw new FilterParseError(`Filter value too long (max ${MAX_VALUE_LENGTH} characters)`);
   }
 }
 

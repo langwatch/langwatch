@@ -1,8 +1,4 @@
-import type {
-  FacetQuery,
-  FacetQueryContext,
-  QueryBuilderCategoricalDef,
-} from "../facet-registry";
+import type { FacetQuery, FacetQueryContext, QueryBuilderCategoricalDef } from "../facet-registry";
 import { baseParams, buildTimeWhere } from "./helpers";
 
 /**
@@ -16,9 +12,7 @@ import { baseParams, buildTimeWhere } from "./helpers";
  */
 export function buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
   const where = buildTimeWhere("StartTime");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(name) ILIKE concat({prefix:String}, '%')"
-    : "";
+  const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
   return {
     sql: `
       SELECT

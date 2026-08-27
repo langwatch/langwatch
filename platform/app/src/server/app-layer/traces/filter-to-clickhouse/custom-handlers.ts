@@ -55,8 +55,7 @@ export const LABEL_DEF: FieldDef = {
   },
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
-    const labels =
-      parseJsonStringArray(trace.summary.attributes["langwatch.labels"]) ?? [];
+    const labels = parseJsonStringArray(trace.summary.attributes["langwatch.labels"]) ?? [];
     const matched = labels.includes(value);
     return negated ? !matched : matched;
   },

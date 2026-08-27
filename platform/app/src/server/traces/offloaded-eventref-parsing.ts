@@ -6,7 +6,7 @@
  * in exactly one place.
  */
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "@langwatch/trace-contract";
 
 /** One decoded eventref pointer ready to fetch from event_log. */
 export interface EventRefEntry {

@@ -1,5 +1,5 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type {
   ErrorCapture,
   Event,

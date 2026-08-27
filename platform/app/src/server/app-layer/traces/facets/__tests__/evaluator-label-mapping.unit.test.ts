@@ -6,8 +6,7 @@ import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
-const translate = (query: string) =>
-  translateFilterToClickHouse(query, TENANT, TIME_RANGE);
+const translate = (query: string) => translateFilterToClickHouse(query, TENANT, TIME_RANGE);
 
 /**
  * `evaluatorLabel` is wired the same way as `evaluatorVerdict`: a categorical

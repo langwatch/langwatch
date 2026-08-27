@@ -3,7 +3,7 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { createHash } from "crypto";
 import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";

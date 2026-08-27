@@ -29,8 +29,7 @@ describe("dynamic attribute prefix translation", () => {
       // SQL shape is identical — only the param names differ by counter,
       // which is a function of how the query is parsed not which prefix
       // was used. Compare by stripping param identifiers.
-      const stripped = (s: string) =>
-        s.replace(/\{[a-zA-Z]+_\d+:[A-Za-z0-9()]+\}/g, "{P}");
+      const stripped = (s: string) => s.replace(/\{[a-zA-Z]+_\d+:[A-Za-z0-9()]+\}/g, "{P}");
       expect(stripped(a!.sql)).toBe(stripped(b!.sql));
     });
 
@@ -68,8 +67,7 @@ describe("dynamic attribute prefix translation", () => {
     it("aliases the legacy single-dot `event.<key>` form", () => {
       const a = translate("event.attribute.exception.type:ValueError");
       const b = translate("event.exception.type:ValueError");
-      const stripped = (s: string) =>
-        s.replace(/\{[a-zA-Z]+_\d+:[A-Za-z0-9()]+\}/g, "{P}");
+      const stripped = (s: string) => s.replace(/\{[a-zA-Z]+_\d+:[A-Za-z0-9()]+\}/g, "{P}");
       expect(stripped(a!.sql)).toBe(stripped(b!.sql));
     });
 

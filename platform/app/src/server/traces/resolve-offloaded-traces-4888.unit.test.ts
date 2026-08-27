@@ -57,7 +57,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------

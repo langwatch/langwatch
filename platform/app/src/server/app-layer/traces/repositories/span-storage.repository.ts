@@ -1,7 +1,7 @@
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
-import type { SpanInsertData } from "../types";
+import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**
  * Per-trace safety ceiling for read-time derivation queries (trace events +
@@ -263,9 +263,7 @@ export interface SpanStorageRepository {
    * Consumers of this read lift scalar span/resource attributes; a caller that
    * needs a whole span wants `getSpanByIds`.
    */
-  findNormalizedSpanById(
-    params: NormalizedSpanByIdParams,
-  ): Promise<NormalizedSpan | null>;
+  findNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
@@ -374,9 +372,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findNormalizedSpanById(
-    _params: NormalizedSpanByIdParams,
-  ): Promise<NormalizedSpan | null> {
+  async findNormalizedSpanById(_params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return null;
   }
 

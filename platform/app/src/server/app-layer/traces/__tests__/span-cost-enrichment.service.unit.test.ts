@@ -2,11 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
-import {
-  matchModelCostWithFallbacks,
-  stripProviderSubtype,
-} from "~/server/tracer/collector/cost";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { matchModelCostWithFallbacks, stripProviderSubtype } from "~/server/tracer/collector/cost";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
@@ -254,9 +251,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
       it("returns without querying the database", async () => {
         const deps = createMockDeps();
         const service = new OtlpSpanCostEnrichmentService(deps);
-        const span = createTestSpan([
-          { key: "some.other.attr", value: { stringValue: "value" } },
-        ]);
+        const span = createTestSpan([{ key: "some.other.attr", value: { stringValue: "value" } }]);
 
         await service.enrichSpan(span, "project-1");
 
@@ -585,10 +580,7 @@ describe("matchModelCostWithFallbacks", () => {
 
   describe("when model has provider subtype and date suffix", () => {
     it("matches openai.responses/gpt-5-mini-2025-08-07 via subtype stripping + prefix regex", () => {
-      const result = matchModelCostWithFallbacks(
-        "openai.responses/gpt-5-mini-2025-08-07",
-        costs,
-      );
+      const result = matchModelCostWithFallbacks("openai.responses/gpt-5-mini-2025-08-07", costs);
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
   });
@@ -679,10 +671,7 @@ describe("matchModelCostWithFallbacks", () => {
 
     describe("when model has provider subtype and non-standard date suffix (@regression)", () => {
       it("matches openai.responses/gpt-5.2-0315 to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks(
-          "openai.responses/gpt-5.2-0315",
-          realCosts,
-        );
+        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.2-0315", realCosts);
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 

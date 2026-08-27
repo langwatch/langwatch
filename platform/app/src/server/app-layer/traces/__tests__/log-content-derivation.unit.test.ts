@@ -88,9 +88,7 @@ describe("deriveLogContentAttributes", () => {
     it("derives nothing rather than throwing", () => {
       const truncated = RESPONSE_BODY.slice(0, 60);
 
-      expect(() =>
-        derive({ "event.name": "api_response_body", body: truncated }),
-      ).not.toThrow();
+      expect(() => derive({ "event.name": "api_response_body", body: truncated })).not.toThrow();
     });
   });
 
@@ -99,10 +97,7 @@ describe("deriveLogContentAttributes", () => {
       expect(derive({ "event.name": "user_prompt", prompt: "hi" })).toEqual({});
       expect(derive({ "event.name": "api_request", cost_usd: "0.1" })).toEqual({});
       expect(
-        derive(
-          { "event.name": "api_response_body", body: RESPONSE_BODY },
-          "some.other.scope",
-        ),
+        derive({ "event.name": "api_response_body", body: RESPONSE_BODY }, "some.other.scope"),
       ).toEqual({});
     });
   });

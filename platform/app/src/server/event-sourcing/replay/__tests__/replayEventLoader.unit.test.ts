@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { ClickHouseEventRow } from "../replayEventLoader";
 import { rowToEvent } from "../replayEventLoader";
 

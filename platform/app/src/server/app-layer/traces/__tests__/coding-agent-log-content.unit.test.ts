@@ -164,9 +164,9 @@ describe("the derivation cannot read a content attribute the table misses", () =
       .join("\n");
     // `readString(attrs, "x")` / `readNumber(attrs, "x")` — the only way the
     // derivation reaches a log attribute by name.
-    const read = [
-      ...derivation.matchAll(/read(?:String|Number)\(attrs, "([^"]+)"\)/g),
-    ].map((match) => match[1]!);
+    const read = [...derivation.matchAll(/read(?:String|Number)\(attrs, "([^"]+)"\)/g)].map(
+      (match) => match[1]!,
+    );
     // A guard that matches nothing passes for the wrong reason. These are the
     // attributes the derivation demonstrably reads today, so if it moves to a
     // different accessor the count collapses and this fails rather than going

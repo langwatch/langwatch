@@ -84,8 +84,7 @@ function stringEqualityHandler(expression: string, name?: string): FieldHandler 
 }
 
 function numericComparisonHandler(expression: string, name?: string): FieldHandler {
-  return (tag, negated, ctx) =>
-    translateNumericField(expression, tag, negated, ctx, name);
+  return (tag, negated, ctx) => translateNumericField(expression, tag, negated, ctx, name);
 }
 
 function crossTableStringHandler(
@@ -99,10 +98,7 @@ function crossTableStringHandler(
     validateValueLength(value);
     const p = nextParam(ctx, name);
     ctx.params[p] = value;
-    return wrap(
-      boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
-      negated,
-    );
+    return wrap(boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`), negated);
   };
 }
 
@@ -145,10 +141,7 @@ function crossTableNumericHandler(
     if (!cmp) {
       throw new FilterParseError(`Unsupported operator: ${operator}`);
     }
-    return wrap(
-      boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`),
-      negated,
-    );
+    return wrap(boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`), negated);
   };
 }
 
@@ -221,15 +214,10 @@ function evaluateRange(
 // ---------------------------------------------------------------------------
 
 /** Direct string equality on a `trace_summaries` expression. */
-export function categorical(
-  expression: string,
-  read: CategoricalRead,
-  name?: string,
-): FieldDef {
+export function categorical(expression: string, read: CategoricalRead, name?: string): FieldDef {
   return {
     toClickHouse: stringEqualityHandler(expression, name),
-    evaluateInMemory: (tag, negated, trace) =>
-      evaluateCategorical(read, tag, negated, trace),
+    evaluateInMemory: (tag, negated, trace) => evaluateCategorical(read, tag, negated, trace),
   };
 }
 
@@ -257,8 +245,7 @@ export function crossTableCategorical(
   return {
     needs,
     toClickHouse: crossTableStringHandler(table, timeColumn, expression, name),
-    evaluateInMemory: (tag, negated, trace) =>
-      evaluateCategorical(read, tag, negated, trace),
+    evaluateInMemory: (tag, negated, trace) => evaluateCategorical(read, tag, negated, trace),
   };
 }
 
