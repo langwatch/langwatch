@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
-import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
+import { AuthShell } from "~/features/auth";
 import { SHAPE } from "~/features/auth/authTheme";
 import {
   AuthField,
@@ -45,10 +45,9 @@ const forgotPasswordSchema = z.object({
  */
 export default function ForgotPassword() {
   const publicEnv = usePublicEnv();
-  const auth = useIdentityAuthScreens();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
-  if (!publicEnv.data || !auth.isResolved) {
+  if (!publicEnv.data) {
     return null;
   }
 
@@ -65,11 +64,8 @@ export default function ForgotPassword() {
   // method-set policy governing, not the mode, and it stops governing when
   // those installations hold password identifiers.
   //
-  // Until the auth screens is enforced, the legacy rejection stands unchanged:
-  // in SSO and social deployments the identity provider owns the password.
-  const deploymentHoldsNoPasswords = auth.enabled
-    ? Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email"
-    : Boolean(isAuthProvider) && isAuthProvider !== "email";
+  const deploymentHoldsNoPasswords =
+    Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email";
 
   const screen = deploymentHoldsNoPasswords ? (
     <ManagedElsewhereCard>
@@ -90,10 +86,7 @@ export default function ForgotPassword() {
     <ForgotPasswordForm />
   );
 
-  // The shell is the auth screens' ground, so it appears where the auth screens
-  // does — the same condition `signin.tsx` composes on. The CARD is the same
-  // either way: the grammar is not the flag's to decide.
-  return auth.enabled ? <AuthShell>{screen}</AuthShell> : screen;
+  return <AuthShell>{screen}</AuthShell>;
 }
 
 /** Nothing to do here, and the honest reason why. */

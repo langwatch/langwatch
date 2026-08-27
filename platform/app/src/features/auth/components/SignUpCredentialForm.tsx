@@ -169,7 +169,7 @@ export function SignUpCredentialForm({
   // leave the proof unspent and the address asked for a second time. A passkey
   // is an offer once there is an account to enrol it against (D07).
   const offersPasskeys =
-    publicEnv.data?.PASSKEYS_ENABLED === true && !addressIsConfirmed;
+    !addressIsConfirmed;
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitError(null);

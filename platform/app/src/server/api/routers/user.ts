@@ -19,7 +19,6 @@ import { getApp } from "~/server/app-layer/app";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
 import {
   deploymentOffersTwoStepVerification,
-  deploymentSignsInWithPasskeys,
 } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
@@ -440,25 +439,17 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      const passkeysOffered = deploymentSignsInWithPasskeys();
       const twoStepOffered = deploymentOffersTwoStepVerification();
-      // Neither half exists on this deployment: nothing is read, because
-      // there is nothing any answer could change.
-      if (!passkeysOffered && !twoStepOffered) {
-        return { offer: false, passkey: false, twoStep: false };
-      }
 
       const [passkeys, user] = await Promise.all([
-        passkeysOffered
-          ? ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } })
-          : Promise.resolve(0),
+        ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
         ctx.prisma.user.findUnique({
           where: { id: ctx.session.user.id },
           select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true },
         }),
       ]);
 
-      const passkey = passkeysOffered && passkeys === 0;
+      const passkey = passkeys === 0;
       const twoStep = twoStepOffered && !(user?.twoFactorEnabled ?? false);
       if (!passkey && !twoStep) {
         return { offer: false, passkey: false, twoStep: false };

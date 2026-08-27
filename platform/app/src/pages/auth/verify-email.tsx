@@ -1,6 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { AuthCard } from "~/components/auth/AuthCard";
-import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
+import { AuthShell } from "~/features/auth";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 
@@ -41,15 +41,10 @@ import { useSearchParams } from "~/utils/compat/next-navigation";
  * specs/identity/signin-signup-screens.feature.
  */
 export default function VerifyEmail() {
-  const auth = useIdentityAuthScreens();
-
-  if (!auth.isResolved) return null;
-  return auth.enabled ? (
+  return (
     <AuthShell>
       <VerifyEmailLanding />
     </AuthShell>
-  ) : (
-    <VerifyEmailLanding />
   );
 }
 

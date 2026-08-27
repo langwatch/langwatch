@@ -16,6 +16,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { MemoryRouter } from "react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
@@ -178,12 +179,20 @@ vi.mock("~/utils/crispBubblePolicy", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useUtils: () => ({
+      joinRequests: { offer: { invalidate: vi.fn() } },
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
+    }),
     limits: {
       getUsage: { useQuery: () => ({ data: undefined }) },
     },
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: mockIsAdmin } }) },
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     governance: {
       recordWorkspaceView: {
@@ -204,6 +213,18 @@ vi.mock("~/utils/api", () => ({
       isEnabledForEachOrganization: {
         useQuery: () => ({ data: undefined }),
       },
+    },
+    // The shell carries the organization's two-step gate and the join-your-team
+    // takeover now, so the stand-in has to answer for both or the whole tree
+    // fails to render before a single assertion runs.
+    twoStepVerification: {
+      standing: { useQuery: () => ({ data: undefined }) },
+    },
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      dismissOffer: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
   },
 }));
@@ -252,9 +273,11 @@ import { captureSettingsReturnPath } from "../logic/resolveSettingsBackTarget";
 function renderSettings() {
   return render(
     <ChakraProvider value={defaultSystem}>
+      <MemoryRouter>
       <SettingsLayout>
         <div data-testid="settings-page-content" />
       </SettingsLayout>
+      </MemoryRouter>
     </ChakraProvider>,
   );
 }
@@ -264,9 +287,11 @@ function renderOpsPage(pathname: string) {
   mockPathname = pathname;
   return render(
     <ChakraProvider value={defaultSystem}>
+      <MemoryRouter>
       <DashboardLayout>
         <div data-testid="ops-page-content" />
       </DashboardLayout>
+      </MemoryRouter>
     </ChakraProvider>,
   );
 }

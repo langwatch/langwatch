@@ -51,13 +51,14 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # session already records what was proven, so the refinement is a policy
   # reading a claim that exists.
   #
-  # Everything ships behind PASSKEYS_ENABLED, which defaults off. The
-  # rollback is the flag; nothing about it is one-way.
+  # There is no setting. The plugin is mounted on every deployment, because a
+  # deployment where the button exists and the endpoint does not is a state
+  # nobody could be in on purpose.
 
   Background:
     Given an organization "acme" with a member "sam"
     And the identity pipeline is registered with the event-sourcing framework
-    And passkeys are available behind their flag
+    And passkeys are available
 
   # ── Registering ────────────────────────────────────────────────────────
 
@@ -67,16 +68,6 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     When "sam" registers a passkey from their security settings
     Then the passkey appears in "sam"'s list of sign-in methods
     And "sam" can sign in with it from then on
-
-  # The nudge (ADR-120) offers a way IN, and only the identifier-first
-  # screens accept one — so a deployment still signing everybody in the old
-  # way must not mint credentials its own auth screens cannot take.
-  @unit
-  Scenario: The nudge stays silent while the old sign-in screens are the way in
-    Given the deployment mints passkeys behind their flag
-    But the identifier-first sign-in screens are not enforced
-    When the signed-in shell asks whether to offer "sam" a passkey
-    Then no passkey is offered
 
   # ONE offer, two halves (D06 follow-up). A person is asked once about their
   # ACCOUNT rather than once about a passkey and again about two-step
@@ -351,18 +342,11 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     And the screen says it did not go through, with a trace identifier
     And the real cause is logged
 
-  # ── The flag ───────────────────────────────────────────────────────────
+  # ── Always there ───────────────────────────────────────────────────────
 
   @unit
-  Scenario: With the flag off, passkeys do not exist
-    Given the passkey flag is off
+  Scenario: A passkey is offered on every deployment, not on some of them
+    Given any installation of LangWatch
     When the method picker is rendered and the security settings are opened
-    Then no passkey is offered, registered or accepted
-    And every other sign-in method behaves exactly as it did before
-
-  @unit @unimplemented
-  Scenario: Turning the flag off leaves registered passkeys alone
-    Given members of "acme" registered passkeys
-    When the flag is turned off
-    Then no passkey is deleted and no identifier is detached
-    And turning it back on offers the same passkeys again
+    Then a passkey can be registered and accepted
+    And the endpoint behind every passkey button is mounted

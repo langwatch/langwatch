@@ -24,7 +24,7 @@ import { readHandledError } from "~/features/errors/logic/readHandledError";
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides
  * whether anyone is offered one: the server registers its half only when
- * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
+ * the passkey plugin is mounted, and the sign-in router never names a passkey
  * unless the same env says so. Gating the client half too would mean a second
  * place for the two to disagree, and the failure would be a button that
  * exists calling an endpoint that does not.

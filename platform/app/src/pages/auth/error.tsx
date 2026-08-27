@@ -2,7 +2,7 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
-import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
+import { AuthShell } from "~/features/auth";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { isSameOrigin, useSession } from "~/utils/auth-client";
@@ -97,15 +97,10 @@ const errorTitle = (error: string): string => {
  * and the page they land on should be recognisably the page they were on.
  */
 export default function Error() {
-  const auth = useIdentityAuthScreens();
-
-  if (!auth.isResolved) return null;
-  return auth.enabled ? (
+  return (
     <AuthShell>
       <SignInErrorScreen />
     </AuthShell>
-  ) : (
-    <SignInErrorScreen />
   );
 }
 

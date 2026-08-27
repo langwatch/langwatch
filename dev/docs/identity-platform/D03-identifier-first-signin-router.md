@@ -1,6 +1,6 @@
 # D03 — Identifier-first sign-in router + cutover
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · Flag: `IDENTITY_ROUTER_V2` (shadow → enforce) · **Highest-risk deliverable**
+Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · SHIPPED: the router decides every sign-in; the flag it flipped on is removed · **Highest-risk deliverable**
 
 # Overview
 
@@ -20,7 +20,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method auth screens with identifier-first ro
   - No match at all → JIT if the connection allows, else deny with guidance.
 - `pendingSsoSetup`: reconciled once against identifier data, column dropped.
 - ADR-027 amendment: the global `before` hook's path blocking becomes per-method policy on the router. License-gate semantics preserved (SSO requires license; credential paths stay open). Carry over ADR-027's constants table and the `ssoRouteTableCanary.test.ts` discipline — every auth route keeps a reviewed classification.
-- Shadow mode: `IDENTITY_ROUTER_V2` shadow-compares every login against the legacy path before the flip.
+- Shadow mode compared every login against the legacy path before the flip. Both are gone: there is no legacy path left to compare against.
 
 # Out of Scope
 

@@ -224,7 +224,7 @@ describe("given the sign-up screen", () => {
 
       await fillPasswordPair(container, "a-good-password");
       await userEvent.click(
-        screen.getByRole("button", { name: /create|continue|sign up/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
 
       await waitFor(() => {
@@ -357,7 +357,7 @@ describe("given the sign-up screen", () => {
 
       await fillPasswordPair(container, "a-good-password");
       await userEvent.click(
-        screen.getByRole("button", { name: /create|continue|sign up/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
 
       // The page quietly becomes the log-in step: same address, same methods,
@@ -476,13 +476,41 @@ describe("given the sign-up screen", () => {
         "shortish",
       );
       await userEvent.click(
-        screen.getByRole("button", { name: /create account/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
 
       expect(
         await screen.findByText(/use at least 8 characters/i),
       ).toBeTruthy();
       expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Mismatched passwords say so" */
+    it("says the two passwords are not the same, on the field that differs", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+      });
+
+      renderScreen();
+      await screen.findByTestId("method-picker");
+
+      await userEvent.type(
+        screen.getByLabelText(/^password$/i),
+        "a-long-enough-password",
+      );
+      await userEvent.type(
+        screen.getByLabelText(/confirm password/i),
+        "a-different-password",
+      );
+      await userEvent.tab();
+
+      expect(
+        await screen.findByText(/the two passwords are not the same/i),
+      ).toBeTruthy();
+      expect(registerMock).not.toHaveBeenCalled();
     });
 
     /** @scenario A rejected field says what to fix, next to the field */
@@ -546,7 +574,7 @@ describe("given the sign-up screen", () => {
     };
 
     beforeEach(() => {
-      publicEnvRef.current = { IS_SAAS: true, PASSKEYS_ENABLED: true };
+      publicEnvRef.current = { IS_SAAS: true };
     });
 
     it("offers a passkey as well as a password, not instead of one", async () => {
@@ -643,20 +671,6 @@ describe("given the sign-up screen", () => {
       // Nobody is stranded: the other door is on the card, carrying the
       // address they typed.
       expect(screen.getByTestId("go-to-sign-in")).toBeTruthy();
-    });
-  });
-
-  describe("when this deployment never mounted passkeys", () => {
-    it("offers no passkey, because there is no endpoint behind one", async () => {
-      renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-      await screen.findByTestId("signup-identifier");
-      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
   });
 });

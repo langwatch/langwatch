@@ -85,6 +85,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityBridgeCeremonies: () => ({}),
   identityCeremonies: () => ({}),
   identityStorageAdapter: () => () => stubBetterAuthAdapter,
+  organizationMfa: () => ({}),
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));

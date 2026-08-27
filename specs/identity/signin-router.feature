@@ -20,10 +20,10 @@ Feature: The identifier-first sign-in router - one auth screens, routed by data
   # deny/guidance states (D13) and the ops surface's routing view (D05).
   # Domain lookup reads ssoDomain strings until D04's SsoConnection
   # projection takes over behind SSOCONN_ROUTING. The whole deliverable
-  # flips with D13 on IDENTITY_ROUTER_V2, shadow-compared first.
+  # ships with D13: the router decides, and the screens render what it decided.
 
   Background:
-    Given an installation with the identifier-first router available behind its flag
+    Given an installation with the identifier-first router
 
   # ── Routing decisions ──────────────────────────────────────────────────
 
@@ -137,7 +137,6 @@ Feature: The identifier-first sign-in router - one auth screens, routed by data
   @unit
   Scenario: The provider env becomes the default method set
     Given a self-hosted installation configured with a single OAuth provider
-    And the identifier-first router is enforced
     When the sign-in page is requested
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
@@ -197,22 +196,6 @@ Feature: The identifier-first sign-in router - one auth screens, routed by data
     Then a user is provisioned and signed in
     But on a connection that forbids JIT the sign-in is refused
     And the refusal carries the reason code "jit_disabled"
-
-  # ── Cutover ────────────────────────────────────────────────────────────
-
-  @unit
-  Scenario: Shadow mode compares every login and changes nothing
-    Given the router flag is in shadow
-    When a user signs in through the legacy path
-    Then the router's decision is computed and compared against the legacy outcome
-    And a mismatch is logged with both decisions and the reason code
-    And the user's sign-in is untouched either way
-
-  @unit
-  Scenario: The flag off restores the legacy path entirely
-    Given the router flag is enforced and then turned off
-    When the sign-in page is requested
-    Then the legacy path answers exactly as before the flip
 
   @integration @unimplemented
   Scenario: The pending SSO setup flag is reconciled once and retired

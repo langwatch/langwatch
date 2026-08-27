@@ -31,11 +31,11 @@ Feature: Join before create - the choice happens before an organization is minte
   # ones already there are a separate question.
   #
   # On for everybody — the JOIN_REQUESTS flag is retired (see
-  # specs/identity/join-requests.feature) — rendered by screens behind
-  # IDENTITY_ROUTER_V2.
+  # specs/identity/join-requests.feature) — and rendered by the sign-up
+  # screen, which is now the only one.
 
   Background:
-    Given the first-party sign-up screens are enforced
+    Given the first-party sign-up screen
     And "sam" is signing up with "sam@acme.com"
 
   # ── The order of the two offers ────────────────────────────────────────
@@ -130,9 +130,9 @@ Feature: Join before create - the choice happens before an organization is minte
   # ── What the operator can see ──────────────────────────────────────────
 
   @unit
-  Scenario: Organizations nobody meant to create are countable before the flag flips
+  Scenario: Organizations nobody meant to create are countable across the change
     Given organizations created by people who joined another organization on
       the same domain within thirty days
     When the sign-up health reporting is read
     Then those organizations are reported as the rate this step exists to reduce
-    And the rate is readable for the period before the flag was turned on
+    And the rate is readable for the period before this step existed
