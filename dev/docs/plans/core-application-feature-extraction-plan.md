@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `31b214a0f1`
+**Committed baseline:** `ef6c41f1f7`
 
 **Goal:** delete `platform/app`.
 
@@ -21,38 +21,48 @@ Only committed deletions count as progress:
 git ls-tree -r --name-only HEAD platform/app | wc -l
 ```
 
-| Ledger item                                          |             Count | Status                                  |
-| ---------------------------------------------------- | ----------------: | --------------------------------------- |
-| Committed `platform/app` at `31b214a0f1`             |       6,225 files | Authoritative baseline                  |
-| Current physical tree from `rg --files platform/app` | about 5,908 files | Working-tree queue only; not progress   |
-| Automation cut                                       |         321 files | Committed; removed 73 application files |
+| Ledger item                                          |       Count | Status                                |
+| ---------------------------------------------------- | ----------: | ------------------------------------- |
+| Original application baseline                       | 6,398 files | Reference                             |
+| Committed `platform/app` at `ef6c41f1f7`             | 6,144 files | Authoritative current progress        |
+| Current physical tree from `rg --files platform/app` | 5,909 files | Working-tree queue only; not progress |
+| Automation cut                                       |    73 fewer | Committed                             |
+| Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
+| Trace processing cut                                 |    45 fewer | Committed                             |
 
-Automation contract, server and web have 559 passing package tests. The focused
-app composition suite has 21. The displaced app-layer and eventing roots are
-empty.
+The Automation contract, server and web packages have 559 passing tests, and
+their displaced application roots are empty. Coding Agent/GitHub has 266
+passing Coding Agent tests, 87 passing GitHub tests with 31 deliberately
+skipped, and both old application pipeline roots are empty.
 
 ## Current gate
 
-| Area                    | Current fact                                                                                                                                                                                                           | Exit condition                                                                                                                                                                                   |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Coding Agent and GitHub | This is the next deletion-sized batch.                                                                                                                                                                                 | Move the two pipelines to their feature owners and delete the 37 old pipeline files; leave only process registration and ordering in worker composition.                                         |
-| Trace                   | Package consolidation is committed, but the final application cut is not ready. Physical residue remains: `event-sourcing/pipelines/trace-processing` 80 files, `server/app-layer/traces` 134, and `server/traces` 83. | Resolve the current 160 architecture errors and 182 application test/typecheck diagnostics, preserve all query/event/persistence parity, then define exact dependency-closed deletion manifests. |
-| API framework           | The future REST surface is package-only and must not be adopted by existing callers yet.                                                                                                                               | During the `apps/api` cut, adopt one Zod input/output contract and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header.                      |
+| Area          | Current fact                                                                                                                                                                                                                                                                | Exit condition                                                                                                                                                                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trace process | The 154-file cut is committed at `ef6c41f1f7`: `+2,208/-12,378`, with 50 application deletions and five named runtime adapters, for a net 45-file application reduction. The old 128-file processing root is now 18 files. Trace package tests pass: 39 files and 611 tests. | Repair the two recorded clean-index failures: remove the dependency on an unstaged Eventing builder API and replace the remaining old Trace schema import reached by Coding tests. Then re-run typechecks, package tests, the focused application cohort and boundary review. |
+| Trace reads   | At committed `HEAD`, `server/app-layer/traces` has 137 files and `server/traces` has 83. These are not one safe move.                                                                                                                                                        | Cut dependency-closed read cohorts while preserving every response field and keeping `trace_analytics`, `trace_summaries` and timeseries rollups distinct.                                                                                                            |
+| API framework | The first-class REST surface is implemented only in the unstaged `packages/api` queue. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first.                                                     |
 
-The Trace package commit is ownership progress, not proof that the three old
-application roots can be deleted. Physical movement in the shared worktree is
-also not progress until the corresponding paths are reviewed and committed.
+Physical movement in the shared worktree is not progress until its exact paths
+are reviewed and committed. There is no time estimate in this ledger: the next
+status changes when a named proof or commit changes.
 
 ## Deletion queue
 
 The next committed batches are:
 
-1. **Coding Agent/GitHub:** delete the 37 displaced pipeline files after package
-   ownership and worker composition are proven.
-2. **Trace follow-up cuts:** split the remaining 297 files across the three old
-   Trace roots into the smallest dependency-closed manifests only after the
-   architecture and application diagnostics are cleared.
-3. **API composition:** adopt the package-only REST surface when `apps/api` is
+1. **Trace processing repair:** clear the two explicitly recorded clean-index
+   failures in the committed cut without restoring displaced application code.
+2. **Trace projection persistence:** move the 11 repository/adapter files for
+   Trace summaries, Trace analytics and analytics rollups without merging their
+   tables or query semantics.
+3. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
+   one dependency-closed read-side collaborator.
+4. **Trace edit overlay and protection:** move the 18-file edit/protection core
+   and its behavioural coverage.
+5. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
+   not into the Trace service merely because they currently live under Trace.
+6. **API composition:** adopt the parked REST surface when `apps/api` is
    created; do not churn current routes before that physical cut.
 
 Feature Flag, Evaluation and the other feature slices remain open. They are not
