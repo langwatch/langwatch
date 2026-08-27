@@ -25,6 +25,108 @@ async function runGuard(params: GuardParams): Promise<unknown> {
   return guardProjectId(params, next);
 }
 
+describe("guardProjectId — FeatureFlagExperimentSetting", () => {
+  it("rejects a bare read that would expose every subject's experiment settings", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "findMany",
+        args: { where: {} },
+      }),
+    ).rejects.toThrow(/flagKey and exact subject/);
+  });
+
+  it("permits the feature service's flag set and exact subject alternatives", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "findMany",
+        args: {
+          where: {
+            flagKey: { in: ["release_ui_ai_gateway_menu_enabled"] },
+            OR: [
+              { subjectType: "USER", subjectId: "user_01" },
+              { subjectType: "ORGANIZATION", subjectId: "org_01" },
+              { subjectType: "PROJECT", subjectId: "project_01" },
+            ],
+          },
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("rejects an OR branch without a complete subject", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "findMany",
+        args: {
+          where: {
+            flagKey: "release_ui_ai_gateway_menu_enabled",
+            OR: [
+              { subjectType: "USER", subjectId: "user_01" },
+              { subjectType: "ORGANIZATION" },
+            ],
+          },
+        },
+      }),
+    ).rejects.toThrow(/flagKey and exact subject/);
+  });
+
+  it("permits the compound key used by experiment policy upserts", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "upsert",
+        args: {
+          where: {
+            flagKey_subjectType_subjectId: {
+              flagKey: "release_ui_ai_gateway_menu_enabled",
+              subjectType: "PROJECT",
+              subjectId: "project_01",
+            },
+          },
+          create: {
+            flagKey: "release_ui_ai_gateway_menu_enabled",
+            subjectType: "PROJECT",
+            subjectId: "project_01",
+            enabled: true,
+          },
+          update: { enabled: true },
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("permits removing one experiment setting by its flag and subject", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "deleteMany",
+        args: {
+          where: {
+            flagKey: "release_ui_ai_gateway_menu_enabled",
+            subjectType: "PROJECT",
+            subjectId: "project_01",
+          },
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("requires every created setting to name its flag and subject", async () => {
+    await expect(
+      runGuard({
+        model: "FeatureFlagExperimentSetting",
+        action: "create",
+        args: {
+          data: { flagKey: "release_ui_ai_gateway_menu_enabled", enabled: true },
+        },
+      }),
+    ).rejects.toThrow(/flagKey, subjectType, and subjectId/);
+  });
+});
+
 describe("guardProjectId — exempt org-scoped gateway models", () => {
   describe("findMany on GatewayBudget with only organizationId filter", () => {
     it("does NOT throw (org-scoped; projectId is not applicable)", async () => {

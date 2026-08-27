@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { PrismaLangySessionKeyRepository } from "../../../../../packages/features/langy/server/src/repositories/prisma/prisma.langy-session-key.repository";
+import type { LangyDatabase } from "../../../../../packages/features/langy/server/src/repositories/prisma/langy-database.port";
 import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
 import type { GuardParams } from "../dbGuardMiddleware";
@@ -21,6 +23,15 @@ import {
 async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
   return guardOrganizationId(params, next);
+}
+
+function reapExpiredLangySessionApiKeys(input: {
+  prisma: PrismaClient;
+  now: Date;
+}): Promise<number> {
+  return PrismaLangySessionKeyRepository.create(
+    input.prisma as unknown as LangyDatabase,
+  ).reapExpired(input.now, LANGY_SESSION_API_KEY_NAME);
 }
 
 describe("guardOrganizationId — original three models preserved", () => {

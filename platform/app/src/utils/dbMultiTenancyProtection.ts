@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
 
@@ -44,8 +45,7 @@ const GLOBAL_MODELS = [
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
-  // Cluster-wide kill switches; one row per flag key, no tenant column. Keeps
-  // system-scoped flags off PostHog (see /ops/feature-flags).
+  // Cluster-wide operator rows; one row per flag key and no tenant column.
   "FeatureFlag",
   // Issue reports sent by customers' coding agents (`langwatch report`). A
   // global support inbox read from the admin backoffice; `linkedProjectId` is
@@ -236,9 +236,74 @@ const parentEntryScoped = (): ScopedModelConfig => ({
   },
 });
 
+const featureFlagExperimentSubjectSchema = z.object({
+  subjectType: z.enum(["USER", "ORGANIZATION", "PROJECT"]),
+  subjectId: z.string().min(1),
+});
+
+const featureFlagExperimentFlagSelectorSchema = z.union([
+  z.string().min(1),
+  z.object({ in: z.array(z.string().min(1)).min(1) }).strict(),
+]);
+
+const featureFlagExperimentCompoundKeySchema = z
+  .object({
+    flagKey: z.string().min(1),
+    subjectType: z.enum(["USER", "ORGANIZATION", "PROJECT"]),
+    subjectId: z.string().min(1),
+  })
+  .strict();
+
+const featureFlagExperimentWhereSchema = z.union([
+  z
+    .object({
+      flagKey_subjectType_subjectId: featureFlagExperimentCompoundKeySchema,
+    })
+    .strict(),
+  z
+    .object({
+      flagKey: featureFlagExperimentFlagSelectorSchema,
+      subjectType: z.enum(["USER", "ORGANIZATION", "PROJECT"]),
+      subjectId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      flagKey: featureFlagExperimentFlagSelectorSchema,
+      OR: z.array(featureFlagExperimentSubjectSchema).min(1),
+    })
+    .strict(),
+]);
+
+const featureFlagExperimentCreateRecordSchema = featureFlagExperimentSubjectSchema
+  .extend({ flagKey: z.string().min(1) })
+  .passthrough();
+
+const featureFlagExperimentCreateDataSchema = z.union([
+  featureFlagExperimentCreateRecordSchema,
+  z.array(featureFlagExperimentCreateRecordSchema).min(1),
+]);
+
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // Experiment settings are keyed by a flag and one exact subject. A subject
+  // can be a user, organization, or project, so these rows cannot use the
+  // ordinary projectId rule or a global exemption. The feature service reads
+  // an explicitly authorized subject set and writes the compound key; admit
+  // only those complete shapes.
+  FeatureFlagExperimentSetting: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a flagKey and exact subject, or the flagKey_subjectType_subjectId compound key";
+      return featureFlagExperimentWhereSchema.safeParse(where).success ? null : reason;
+    },
+    validateCreateData: (data) => {
+      return featureFlagExperimentCreateDataSchema.safeParse(data).success
+        ? null
+        : "create requires flagKey, subjectType, and subjectId in the data payload";
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the
