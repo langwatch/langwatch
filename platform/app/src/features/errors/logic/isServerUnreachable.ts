@@ -40,6 +40,18 @@ const TRANSPORT_FAILURES = [
 ];
 
 /**
+ * What an intermediary returns when it could not get an answer out of us.
+ *
+ * A proxy in front of a rolling deploy — haven's locally, an ingress in
+ * production — answers 502/503/504 with an empty body while the app behind it
+ * is still coming up. A Response object exists, so this is not a transport
+ * failure by the test above, but it carries no answer of OURS: no envelope, no
+ * code, nothing the registry could look up. That is "nothing answered" wearing
+ * an HTTP status, and it is the most common way a reader meets this screen.
+ */
+const NO_UPSTREAM_STATUSES = [502, 503, 504];
+
+/**
  * Whether this failure never got an answer.
  *
  * Also true when the browser itself says it is offline, which is the one case
@@ -58,6 +70,15 @@ export function isServerUnreachable(error: unknown): boolean {
   // loop spent it in three minutes and then hammered a 429 for the rest of
   // the hour.
   if (carriesAResponse(error)) return false;
+
+  // A PROXY ANSWERED; WE DID NOT. Below `carriesAResponse` on purpose, and the
+  // order is the whole safety of it: our own upstream failures — `circuit_open`,
+  // `gateway_unavailable`, `auth_upstream_unavailable`, `code_block_timeout` —
+  // use these same statuses AND carry a code, so they are already gone by here
+  // and keep their own, better copy. What is left is a gateway status with no
+  // answer attached, which only an intermediary sends.
+  const status = responseStatusOf(error);
+  if (status !== null && NO_UPSTREAM_STATUSES.includes(status)) return true;
 
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return true;
@@ -86,6 +107,23 @@ function messageOf(error: unknown): string | null {
  * Any trace of a reply. tRPC hangs the server's answer off `data`, and a
  * transport failure has none of it — no HTTP status, no code, no shape.
  */
+/**
+ * The status of the raw reply, when one arrived without a tRPC envelope.
+ *
+ * `data` is where tRPC puts an answer it could PARSE; a 502 with an empty body
+ * has none, and the only trace of the reply is the Response the link hangs off
+ * `meta` (`@trpc/client` 11: `meta: { response }`).
+ */
+function responseStatusOf(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null;
+  const { meta } = error as { meta?: unknown };
+  if (!meta || typeof meta !== "object") return null;
+  const { response } = meta as { response?: unknown };
+  if (!response || typeof response !== "object") return null;
+  const { status } = response as { status?: unknown };
+  return typeof status === "number" ? status : null;
+}
+
 function carriesAResponse(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const { data } = error as { data?: unknown };

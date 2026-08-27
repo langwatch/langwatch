@@ -72,3 +72,55 @@ describe("given no failure at all", () => {
     expect(isServerUnreachable({})).toBe(false);
   });
 });
+
+/**
+ * The proxy in front of a rolling deploy. Captured from haven: with the api
+ * lane down, `POST /api/trpc/auth.route` answers 502 with an EMPTY body, so
+ * there is no envelope to parse and the message is whatever the JSON parser
+ * said. Before this, that read as a named fault and sent somebody who was
+ * part-way through signing in back to a signed-out page with an apology.
+ */
+describe("given an intermediary answering while the app is still coming up", () => {
+  it.each([[502], [503], [504]])(
+    "treats a bodiless %i as nothing having answered",
+    (status) => {
+      expect(
+        isServerUnreachable({
+          message: "Unexpected end of JSON input",
+          meta: { response: { status } },
+        }),
+      ).toBe(true);
+    },
+  );
+
+  describe("when the same status carries one of our own codes", () => {
+    it.each([
+      ["gateway_unavailable", 502],
+      ["circuit_open", 503],
+      ["code_block_timeout", 504],
+    ])("leaves %s to the registry, which says it better", (code, status) => {
+      // The status alone cannot decide this. These are real, named upstream
+      // failures with remediation of their own, and calling them a network
+      // blip would tell the reader to wait for something that will not
+      // change on its own.
+      expect(
+        isServerUnreachable({
+          message: code,
+          data: { httpStatus: status, code },
+          meta: { response: { status } },
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the raw status is not one an intermediary sends", () => {
+    it("stays a fault", () => {
+      expect(
+        isServerUnreachable({
+          message: "Unexpected end of JSON input",
+          meta: { response: { status: 500 } },
+        }),
+      ).toBe(false);
+    });
+  });
+});
