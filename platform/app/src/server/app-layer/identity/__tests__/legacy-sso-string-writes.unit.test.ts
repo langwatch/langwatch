@@ -142,8 +142,8 @@ describe("the legacy sso string columns", () => {
      * Enforced by scanning the source rather than by convention, because the
      * failure mode is somebody adding the write later in good faith.
      *
-     * @scenario "After the flip, the strings stop being written"
      */
+    /** @scenario "After the flip, the strings stop being written" */
     it("has exactly one writer of the SsoConnection table: the fold's store", () => {
       const roots = [
         join(REPO_ROOT, "platform/app/src"),

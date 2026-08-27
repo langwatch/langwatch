@@ -832,8 +832,8 @@ describe("given the identifier-first sign-in screen", () => {
      * things — "no account for that email yet", then "already registered" —
      * and the second one was a dead end.
      *
-     * @scenario Sign-up with an address that already has an account becomes a log-in
      */
+    /** @scenario Sign-up with an address that already has an account becomes a log-in */
     it("becomes the log-in picker when the address turns out to be held", async () => {
       // Mount, then the address (nobody holds it), then the re-ask after
       // `user.register` says otherwise.

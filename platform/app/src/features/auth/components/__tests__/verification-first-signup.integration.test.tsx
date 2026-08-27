@@ -614,8 +614,8 @@ describe("given the sign-up screen", () => {
      * landed silently in a different account, having been shown nothing that
      * said so — and it looked like the sign-up had worked.
      *
-     * @scenario The sign-up door never offers to use a passkey that already exists
      */
+    /** @scenario The sign-up door never offers to use a passkey that already exists */
     it("never offers an existing passkey, on the address step or after it", async () => {
       routeMock.mockResolvedValue({
         outcome: "method_picker",

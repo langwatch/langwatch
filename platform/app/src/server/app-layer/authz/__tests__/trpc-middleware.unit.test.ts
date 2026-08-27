@@ -263,8 +263,8 @@ describe("checkDeclaredPermission", () => {
      * The regression this whole split exists for: a routine bad request used
      * to land on the error dashboard as a platform fault and page the team.
      *
-     * @scenario "A scope id the caller left blank is answered as invalid input"
      */
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
     it("does not report the caller's blank id as an internal error", async () => {
       await rejection(() =>
         checkDeclaredPermission({ permission: "traces:view" })(
