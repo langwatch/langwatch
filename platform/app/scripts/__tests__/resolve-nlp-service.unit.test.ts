@@ -84,133 +84,155 @@ echo "__LANGWATCH_NLP_SERVICE=\${LANGWATCH_NLP_SERVICE:-}"
 
 describe("resolve-nlp-service.sh", () => {
   describe("given the app's env file pins an address", () => {
-    /** @scenario "The engine follows the address pinned in the app's env file" */
-    it("resolves the pinned address rather than this worktree's port slot", () => {
-      const appDir = appDirWith({
-        ".env": 'PORT=5560\nLANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+    describe("when the launcher resolves the address", () => {
+      /** @scenario "The engine follows the address pinned in the app's env file" */
+      it("resolves the pinned address rather than this worktree's port slot", () => {
+        const appDir = appDirWith({
+          ".env": 'PORT=5560\nLANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        });
+
+        const r = runHelper({
+          appDir,
+          env: { PORT: "5590", LANGWATCH_NLP_SERVICE: undefined },
+        });
+
+        expect(r.exitCode).toBe(0);
+        expect(r.nlpService).toBe("http://localhost:5571");
       });
 
-      const r = runHelper({
-        appDir,
-        env: { PORT: "5590", LANGWATCH_NLP_SERVICE: undefined },
+      /** @scenario "The engine follows the address pinned in the app's env file" */
+      it("names the file it read the address from", () => {
+        const appDir = appDirWith({
+          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        });
+
+        const r = runHelper({ appDir });
+
+        expect(r.stdout).toMatch(
+          /LANGWATCH_NLP_SERVICE=http:\/\/localhost:5571/,
+        );
+        expect(r.stdout).toMatch(/from \.env/);
       });
 
-      expect(r.exitCode).toBe(0);
-      expect(r.nlpService).toBe("http://localhost:5571");
-    });
+      /** @scenario "An address pinned in a file beats one exported for a single run" */
+      it("keeps the pinned address over one exported into the shell", () => {
+        const appDir = appDirWith({
+          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        });
 
-    /** @scenario "The engine follows the address pinned in the app's env file" */
-    it("names the file it read the address from", () => {
-      const appDir = appDirWith({
-        ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        const r = runHelper({
+          appDir,
+          env: { LANGWATCH_NLP_SERVICE: "http://localhost:5591" },
+        });
+
+        expect(r.nlpService).toBe("http://localhost:5571");
       });
 
-      const r = runHelper({ appDir });
+      it("reads an unquoted value with an inline comment", () => {
+        const appDir = appDirWith({
+          ".env": "LANGWATCH_NLP_SERVICE=http://localhost:5571 # the engine\n",
+        });
 
-      expect(r.stdout).toMatch(/LANGWATCH_NLP_SERVICE=http:\/\/localhost:5571/);
-      expect(r.stdout).toMatch(/from \.env/);
-    });
+        const r = runHelper({ appDir });
 
-    /** @scenario "An address pinned in a file beats one exported for a single run" */
-    it("keeps the pinned address over one exported into the shell", () => {
-      const appDir = appDirWith({
-        ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        expect(r.nlpService).toBe("http://localhost:5571");
       });
 
-      const r = runHelper({
-        appDir,
-        env: { LANGWATCH_NLP_SERVICE: "http://localhost:5591" },
+      it("reads an external host the same way, so no local engine is started", () => {
+        const appDir = appDirWith({
+          ".env": "LANGWATCH_NLP_SERVICE='https://nlp.example.internal'\n",
+        });
+
+        const r = runHelper({ appDir });
+
+        expect(r.nlpService).toBe("https://nlp.example.internal");
       });
-
-      expect(r.nlpService).toBe("http://localhost:5571");
-    });
-
-    it("reads an unquoted value with an inline comment", () => {
-      const appDir = appDirWith({
-        ".env": "LANGWATCH_NLP_SERVICE=http://localhost:5571 # the engine\n",
-      });
-
-      const r = runHelper({ appDir });
-
-      expect(r.nlpService).toBe("http://localhost:5571");
-    });
-
-    it("reads an external host the same way, so no local engine is started", () => {
-      const appDir = appDirWith({
-        ".env": "LANGWATCH_NLP_SERVICE='https://nlp.example.internal'\n",
-      });
-
-      const r = runHelper({ appDir });
-
-      expect(r.nlpService).toBe("https://nlp.example.internal");
     });
   });
 
   describe("given a haven overlay alongside the env file", () => {
-    /** @scenario "The haven overlay wins over the plain env file" */
-    it("resolves the overlay's address, the one the app loads last", () => {
-      const appDir = appDirWith({
-        ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
-        ".env.portless":
-          'LANGWATCH_NLP_SERVICE="http://nlp.plum.langwatch.localhost"\n',
+    describe("when the launcher resolves the address", () => {
+      /** @scenario "The haven overlay wins over the plain env file" */
+      it("resolves the overlay's address, the one the app loads last", () => {
+        const appDir = appDirWith({
+          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+          ".env.portless":
+            'LANGWATCH_NLP_SERVICE="http://nlp.plum.langwatch.localhost"\n',
+        });
+
+        const r = runHelper({ appDir });
+
+        expect(r.nlpService).toBe("http://nlp.plum.langwatch.localhost");
       });
 
-      const r = runHelper({ appDir });
+      /** @scenario "An overlay that clears the address is not read past" */
+      it("treats an empty overlay assignment as the answer, not as a gap", () => {
+        const appDir = appDirWith({
+          ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+          ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
+        });
 
-      expect(r.nlpService).toBe("http://nlp.plum.langwatch.localhost");
-    });
+        const r = runHelper({ appDir });
 
-    /** @scenario "An overlay that clears the address is not read past" */
-    it("treats an empty overlay assignment as the answer, not as a gap", () => {
-      const appDir = appDirWith({
-        ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
-        ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
+        expect(r.nlpService).toBe("");
       });
 
-      const r = runHelper({ appDir });
+      /** @scenario "An overlay that clears the address drops one exported for a single run" */
+      it("clears an address the shell exported", () => {
+        const appDir = appDirWith({
+          ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
+        });
 
-      expect(r.nlpService).toBe("");
+        const r = runHelper({
+          appDir,
+          env: { LANGWATCH_NLP_SERVICE: "http://localhost:5591" },
+        });
+
+        expect(r.nlpService).toBe("");
+      });
     });
   });
 
   describe("given nothing pins an address", () => {
-    /** @scenario "Nothing pinned leaves the launcher to derive the port slot" */
-    it("leaves the address unset for the launcher to derive", () => {
-      const appDir = appDirWith({ ".env": "PORT=5560\n" });
+    describe("when the launcher resolves the address", () => {
+      /** @scenario "Nothing pinned leaves the launcher to derive the port slot" */
+      it("leaves the address unset for the launcher to derive", () => {
+        const appDir = appDirWith({ ".env": "PORT=5560\n" });
 
-      const r = runHelper({ appDir });
+        const r = runHelper({ appDir });
 
-      expect(r.exitCode).toBe(0);
-      expect(r.nlpService).toBe("");
-    });
-
-    /** @scenario "Nothing pinned leaves the launcher to derive the port slot" */
-    it("says nothing", () => {
-      const appDir = appDirWith({ ".env": "PORT=5560\n" });
-
-      const r = runHelper({ appDir });
-
-      expect(r.stdout).not.toMatch(/nlpgo:/);
-    });
-
-    /** @scenario "A commented-out pin is not an address" */
-    it("ignores a commented-out pin", () => {
-      const appDir = appDirWith({
-        ".env": '# LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        expect(r.exitCode).toBe(0);
+        expect(r.nlpService).toBe("");
       });
 
-      const r = runHelper({ appDir });
+      /** @scenario "Nothing pinned leaves the launcher to derive the port slot" */
+      it("says nothing", () => {
+        const appDir = appDirWith({ ".env": "PORT=5560\n" });
 
-      expect(r.nlpService).toBe("");
-    });
+        const r = runHelper({ appDir });
 
-    it("survives an app directory with no env file at all", () => {
-      const appDir = appDirWith({});
+        expect(r.stdout).not.toMatch(/nlpgo:/);
+      });
 
-      const r = runHelper({ appDir });
+      /** @scenario "A commented-out pin is not an address" */
+      it("ignores a commented-out pin", () => {
+        const appDir = appDirWith({
+          ".env": '# LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        });
 
-      expect(r.exitCode).toBe(0);
-      expect(r.nlpService).toBe("");
+        const r = runHelper({ appDir });
+
+        expect(r.nlpService).toBe("");
+      });
+
+      it("survives an app directory with no env file at all", () => {
+        const appDir = appDirWith({});
+
+        const r = runHelper({ appDir });
+
+        expect(r.exitCode).toBe(0);
+        expect(r.nlpService).toBe("");
+      });
     });
   });
 });

@@ -72,6 +72,13 @@ Feature: `pnpm dev` starts the Langy agent manager
       And it does not fall back to the address in the plain env file
 
     @unit
+    Scenario: An overlay that clears the agent address drops one exported for a single run
+      Given an agent URL exported into the shell
+      And the haven overlay assigns the agent URL an empty value
+      When the launcher resolves the agent address
+      Then it derives the port slot, because the file beats the exported value
+
+    @unit
     Scenario: A commented-out pin is not an agent address
       Given platform/app/.env has its agent URL commented out
       When the launcher resolves the agent address

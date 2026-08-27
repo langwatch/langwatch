@@ -78,8 +78,10 @@ resolve_service_address() {
     fi
     # An empty assignment is this file's answer, not a gap to look past. The app
     # would read an empty string here, so the launcher derives its own address
-    # rather than exporting the value a lower-precedence file still holds.
+    # rather than exporting the value a lower-precedence file still holds. An
+    # address exported into the shell goes too, because the file overrides it.
     if [ "$status" -eq 2 ]; then
+      unset "$var"
       echo "  ✓ ${label}: ${var} cleared by $(basename "$file")"
       return 0
     fi
