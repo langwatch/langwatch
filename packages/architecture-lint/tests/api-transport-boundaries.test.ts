@@ -210,22 +210,20 @@ describe("strict feature API transport boundaries", () => {
           patch(...args: unknown[]): void;
           delete(...args: unknown[]): void;
         };
-        rest.get("/widgets/:id", "2026-08-28", async (context, input) => {
+        rest.get("/widgets/:id", "2026-08-28", (endpoint) => endpoint.handle(async (context, input) => {
           await context.authorize(input.projectId);
           return context.app.widgets.get(input);
-        });
-        rest.post("/widgets", "2026-08-28", async (context, input) => {
+        }));
+        rest.post("/widgets", "2026-08-28", (endpoint) => endpoint.handle(async (context, input) => {
           await context.app.widgets.create(input);
           return context.app.widgets.get(input);
-        });
-        rest.put("/widgets/:id", "2026-08-28", async (context, input) => {
+        }));
+        rest.put("/widgets/:id", "2026-08-28", (endpoint) => endpoint.handle(async (context, input) => {
           if (input.archived) return context.app.widgets.archive(input);
           return context.app.widgets.update(input);
-        });
-        rest.patch("/widgets/:id", "2026-08-28", () => WidgetService.create());
-        rest.delete("/widgets/:id", "2026-08-28", (context, input) =>
-          context.app.widgets.delete(input),
-        );
+        }));
+        rest.patch("/widgets/:id", "2026-08-28", (endpoint) => endpoint.handle(() => WidgetService.create()));
+        rest.delete("/widgets/:id", "2026-08-28", (endpoint) => endpoint.handle((context, input) => context.app.widgets.delete(input)));
       `,
     );
 

@@ -237,13 +237,41 @@ function handlerForEndpoint(
   call: ts.CallExpression,
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
-  if (
-    !ts.isPropertyAccessExpression(call.expression) ||
-    !MODERN_API_METHODS.has(call.expression.name.text)
-  ) {
+  if (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "handle") {
+    const registration = enclosingRestRegistration(call);
+    if (!registration) return null;
+    return resolveHandler(call.arguments[0], functions);
+  }
+  if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "register") {
     return null;
   }
-  const candidate = call.arguments[2];
+  return resolveHandler(call.arguments[2], functions);
+}
+
+function enclosingRestRegistration(call: ts.CallExpression): ts.CallExpression | null {
+  let current: ts.Node = call;
+  while (current.parent) {
+    current = current.parent;
+    if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
+    const parent = current.parent;
+    if (
+      ts.isCallExpression(parent) &&
+      ts.isPropertyAccessExpression(parent.expression) &&
+      MODERN_API_METHODS.has(parent.expression.name.text) &&
+      parent.expression.name.text !== "register" &&
+      parent.arguments[2] === current
+    ) {
+      return parent;
+    }
+    return null;
+  }
+  return null;
+}
+
+function resolveHandler(
+  candidate: ts.Expression | undefined,
+  functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
+): ts.FunctionLikeDeclaration | null {
   if (!candidate) return null;
   if (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate)) return candidate;
   if (ts.isIdentifier(candidate)) return functions.get(candidate.text) ?? null;
