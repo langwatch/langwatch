@@ -374,7 +374,6 @@ export function PasskeysSection() {
 
   // A deployment that never mounted the plugin has no endpoint behind any of
   // this. Rendering the hero there would be an offer we cannot honour.
-  if (publicEnv.data?.PASSKEYS_ENABLED !== true) return null;
 
   const held = passkeys.data ?? [];
 

@@ -21,8 +21,6 @@ const envState = vi.hoisted(() => ({
   env: {
     NEXTAUTH_PROVIDER: "email",
     BASE_HOST: "http://localhost:5560",
-    PASSKEYS_ENABLED: "on",
-    IDENTITY_ROUTER_V2: "off",
     MFA_ENROLLMENT_OPEN: "off",
   } as Record<string, string>,
 }));
@@ -38,8 +36,6 @@ describe("userRouter.secureAccountNudge", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    envState.env.PASSKEYS_ENABLED = "on";
-    envState.env.IDENTITY_ROUTER_V2 = "off";
     envState.env.MFA_ENROLLMENT_OPEN = "off";
     passkeyCount = vi.fn().mockResolvedValue(0);
     userFindUnique = vi.fn().mockResolvedValue({
@@ -63,33 +59,8 @@ describe("userRouter.secureAccountNudge", () => {
     return userRouter.createCaller(ctx).secureAccountNudge({});
   };
 
-  describe("given passkeys are minted but the legacy screens are the way in", () => {
-    /** @scenario The nudge stays silent while the old sign-in screens are the way in */
-    it("offers nothing while the identifier-first screens are off", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "off";
-
-      await expect(call()).resolves.toEqual({
-        offer: false,
-        passkey: false,
-        twoStep: false,
-      });
-      // Decided from deployment shape alone — nobody's account is read to
-      // reach an answer that cannot depend on it.
-      expect(passkeyCount).not.toHaveBeenCalled();
-      expect(userFindUnique).not.toHaveBeenCalled();
-    });
-
-    /** @scenario The nudge stays silent while the old sign-in screens are the way in */
-    it("offers nothing in shadow, which changes nothing a person can see", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "shadow";
-
-      await expect(call()).resolves.toMatchObject({ offer: false });
-    });
-  });
-
-  describe("given the identifier-first screens are enforced", () => {
+  describe("given somebody who signs in with a password alone", () => {
     it("offers a passkey to somebody holding none who was never asked", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "enforce";
 
       await expect(call()).resolves.toEqual({
         offer: true,
@@ -99,7 +70,6 @@ describe("userRouter.secureAccountNudge", () => {
     });
 
     it("offers nothing to somebody who already holds one", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "enforce";
       passkeyCount.mockResolvedValue(1);
 
       await expect(call()).resolves.toMatchObject({
@@ -108,26 +78,18 @@ describe("userRouter.secureAccountNudge", () => {
       });
     });
 
-    it("still offers nothing when the plugin itself is off", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "enforce";
-      envState.env.PASSKEYS_ENABLED = "off";
-
-      await expect(call()).resolves.toEqual({
-        offer: false,
-        passkey: false,
-        twoStep: false,
-      });
-    });
   });
 
   describe("given two-step verification is offered on this deployment", () => {
     beforeEach(() => {
       envState.env.MFA_ENROLLMENT_OPEN = "on";
+      // Holding a passkey already, so the passkey half is settled and what
+      // these assertions read is the two-step half on its own.
+      passkeyCount.mockResolvedValue(1);
     });
 
     /** @scenario "Only what the deployment offers is offered" */
     it("offers it to somebody who has not set one up", async () => {
-      envState.env.PASSKEYS_ENABLED = "off";
 
       await expect(call()).resolves.toEqual({
         offer: true,
@@ -138,7 +100,6 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "Each half disappears once the person has it" */
     it("offers nothing to somebody who already has one", async () => {
-      envState.env.PASSKEYS_ENABLED = "off";
       userFindUnique.mockResolvedValue({
         passkeyNudgeDismissedAt: null,
         twoFactorEnabled: true,
@@ -153,7 +114,7 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "The offer covers whichever of the two the person lacks" */
     it("offers both halves at once to somebody who has neither", async () => {
-      envState.env.IDENTITY_ROUTER_V2 = "enforce";
+      passkeyCount.mockResolvedValue(0);
 
       await expect(call()).resolves.toEqual({
         offer: true,
@@ -165,7 +126,6 @@ describe("userRouter.secureAccountNudge", () => {
 
   describe("given somebody who has said not now", () => {
     beforeEach(() => {
-      envState.env.IDENTITY_ROUTER_V2 = "enforce";
       envState.env.MFA_ENROLLMENT_OPEN = "on";
     });
 

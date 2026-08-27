@@ -15,54 +15,25 @@ Feature: Signing up never strands an account
   #
   # The account is not the problem. Dead-ending on it is.
   #
-  # Amended at D13 (ADR-117 §6): under the identifier-first auth screens the
+  # Amended at D13 (ADR-117 §6): under the identifier-first screens the
   # mechanism changes and the guarantee does not. Signing up with an address
   # that already has an account no longer refuses at all - the page quietly
   # becomes the log-in step for that address, with the reset link on the same
   # card - so the door into a half-created account is wider than it was, never
-  # narrower. The scenarios below stay bound to the screens that answer before
-  # the flip; the new screen's behavior is bound in
-  # specs/identity/signin-signup-screens.feature ("Sign-up with an address
-  # that already has an account becomes a log-in").
-
-  Background:
-    Given a credentials installation
-    And I am on the sign-up screen
-
-  @integration
-  Scenario: A sign-up whose second leg fails still says what happened
-    Given creating my account succeeds
-    But signing me in afterwards fails for a reason the screen has no wording for
-    Then the screen tells me the account was created and to sign in
-    And the screen never replaces that with a fixed "failed to sign up" line
-
-  @integration
-  Scenario: Submitting the same details again signs me in
-    Given my previous attempt created my account and failed to sign me in
-    When I fill the form in again with the same email and password
-    Then I am signed in and continue to where I was heading
-    And I am not told the email is already registered
-
-  # An invite lands a signed-out visitor on the sign-in screen. Someone who was
-  # a member before (removed, then invited back) still has their account, and
-  # reaches for "Sign up" because that is what the invite asked them to do.
-  @integration
-  Scenario: An email that belongs to an account I cannot open points at the way in
-    Given an account already exists for that email
-    When I fill the form in with a password that is not its password
-    Then the screen tells me an account with that email already exists
-    And the screen offers me signing in and resetting my password
-    And the screen never shows an internal error code
-
-  # The recovery sign-in rides the same endpoint and rate limit as the sign-in
-  # screen, so a refusal there is not a password problem and must not be
-  # answered as one. Guessing is not cheaper through this door.
-  @integration
-  Scenario: A rate-limited recovery says to wait, not to reset the password
-    Given an account already exists for that email
-    When the sign-in attempt is refused for too many attempts
-    Then the screen tells me to wait before trying again
-    And the screen does not send me to reset my password
+  # narrower.
+  #
+  # Amended again now the flip is done and the old screens are deleted. Four
+  # scenarios here described that screen's recovery: fill the same email and
+  # password in a second time and be signed in rather than walled. There is no
+  # form to fill in twice any more - the address is confirmed before a password
+  # is ever asked for, which is what stops the account being half-created in
+  # the first place. They are gone rather than rewritten, because the screen
+  # they described is gone; what replaced them is bound in
+  # specs/identity/signin-signup-screens.feature ("Sign-up with an address that
+  # already has an account becomes a log-in").
+  #
+  # What remains here is the half nothing about the screens changed: the server
+  # refusing, adopting or reviving an address, whoever asked.
 
   @unit
   Scenario: The refusal carries a code the screen can act on

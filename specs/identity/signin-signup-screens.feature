@@ -7,8 +7,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
 
   # D13 (ADR-117). The screens render the router's decisions and never
   # contain routing logic: every screen state is keyed by a routing reason
-  # code, the same vocabulary the ops surface reads. Ships dark behind
-  # IDENTITY_ROUTER_V2 and appears at the enforce flip together with D03.
+  # code, the same vocabulary the ops surface reads. These ARE the screens:
+  # there is no other sign-in page and no setting that reaches one.
   #
   #   /auth/signin            email step → routed outcome (picker | redirect)
   #   /auth/signin?local=1    self-hosted break-glass local login
@@ -34,7 +34,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   # no-oracle invariant is scoped to sign-in and reset, epic Q12).
 
   Background:
-    Given the identifier-first router and screens are enforced
+    Given the identifier-first router and screens
 
   # ── Sign-in ────────────────────────────────────────────────────────────
 
@@ -503,7 +503,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   # reset is offered on an installation that signs in through a provider, and
   # the response is the same neutral sentence either way. That the reset then
   # completes, revokes every session and expires after one use is
-  # password-reset.feature's, bound there and unchanged by the flip.
+  # password-reset.feature's, and bound there.
   @integration
   Scenario: Reset follows the identifier, not the deployment mode
     Given my account holds a password identifier on a cloud installation
@@ -693,18 +693,12 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
 
   # ── The surface is ours ────────────────────────────────────────────────
 
-  # Swept over the ENFORCED screens only, on purpose: the legacy path still
-  # exists until the bake ends and still redirects to whatever provider the
-  # deployment names, so sweeping it would fail on behavior the flag is meant
-  # to keep. An identity provider is reached by dialling it from our own
-  # origin; its pages are never rendered or linked.
+  # An identity provider is reached by dialling it from our own origin; its
+  # pages are never rendered or linked. The sweep covers every screen there
+  # is, which is what makes it an answer about the product rather than about
+  # one configuration of it.
   @integration
   Scenario: No unauthenticated journey touches an Auth0-hosted page
     When every unauthenticated journey is walked
     Then no page, asset, or redirect resolves to an Auth0-hosted surface
 
-  @integration
-  Scenario: The legacy screens return untouched when the flag is off
-    Given the flag is turned off during the bake
-    When the sign-in page is requested
-    Then the legacy screens answer exactly as before the flip

@@ -528,6 +528,40 @@ exists to prevent, and it would make the shadow comparison unable to say
 - The SAML engine decision is a named debt of this ADR, due at D04
   implementation as a revision.
 
+## Amendment (2026-08-27): the cutover happened, and the flag is gone
+
+§7 planned a flip and a rollback: one flag over the router and the screens,
+shadow first, legacy path and legacy screens kept intact until bake end and
+then deleted. Bake end is here. `IDENTITY_ROUTER_V2` and `PASSKEYS_ENABLED`
+are both removed, and with them everything that only existed to have two
+answers:
+
+- **Shadow mode is deleted.** It compared the router against the legacy path
+  on every live login. There is no legacy path to compare against, so the
+  comparison has no second party and the module that ran it is gone.
+- **The legacy screens are deleted** — the credential sign-in form, the
+  password-up-front sign-up form, and the invitation landing that preceded
+  `InviteLanding`. `/auth/signin` and `/auth/signup` are now the screen and
+  nothing else, twenty-five and thirty-three lines respectively.
+- **Passkeys are not a setting.** The plugin is mounted on every deployment.
+  The state the flag made possible — a button on the screen with no endpoint
+  behind it — is not one anybody could have wanted, and `deploymentOffersPasskeys`
+  and `deploymentSignsInWithPasskeys` are gone with it.
+- **`useAcceptInviteOnce` is deleted**, having had no caller left once the
+  legacy invitation landing went.
+
+One behaviour changed rather than simply losing a branch, and it is the
+enforced rule §6 already described: **password reset follows the identifier,
+not the deployment.** The old code refused a reset on any deployment naming a
+provider; the rule that ships refuses only on the hosted product. A
+self-hosted installation that federates keeps self-recovery reachable — which
+is the case that matters, because the identity provider is often the thing
+that is broken when somebody needs it.
+
+What did NOT change: the router's decisions, the reason-code vocabulary, the
+enforcement backstop in the `before` hook, and `SSOCONN_ROUTING`, which is a
+different flag over a different projection and is untouched here.
+
 ## References
 
 - Epic: `dev/docs/identity-platform-redesign.md` (R3, R5, R8, Q5;

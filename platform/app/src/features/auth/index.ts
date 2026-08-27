@@ -4,7 +4,6 @@
  * logic of their own — see `logic/routingReasonCopy.ts` for the one place a
  * reason code becomes words.
  *
- * Behind `IDENTITY_ROUTER_V2`: `useIdentityAuthScreens()` is what a page asks
  * before rendering any of this, and the legacy screens answer until the flip.
  */
 export { AuthShell } from "./components/AuthShell";
@@ -15,7 +14,6 @@ export { JoinBeforeCreateInterstitial } from "./components/JoinBeforeCreateInter
 export { JoinInsteadNotice } from "./components/JoinInsteadNotice";
 export { SignInMethodPicker } from "./components/SignInMethodPicker";
 export { VerificationFirstSignUp } from "./components/VerificationFirstSignUp";
-export { useIdentityAuthScreens } from "./hooks/useIdentityAuthScreens";
 export type {
   JoinableOrganization,
   JoinBeforeCreateDecision,

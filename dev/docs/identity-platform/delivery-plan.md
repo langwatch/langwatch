@@ -87,7 +87,7 @@ Parallel tracks; staff in any order capacity allows.
 
 # Sequencing rationale
 
-- **D03 and D13 flip together** — one flag (`IDENTITY_ROUTER_V2`): the router is the logic, the screens are the experience, and shipping either alone would mean building throwaway UI or an invisible engine. Shadow mode exercises the router only; the screens appear at the enforce flip.
+- **D03 and D13 flipped together** — one flag (`IDENTITY_ROUTER_V2`): the router is the logic, the screens are the experience, and shipping either alone would have meant throwaway UI or an invisible engine. Both are now live and the flag is removed, along with shadow mode and the legacy screens.
 - **D03 is the highest-risk deliverable** — every human's auth screens. It lands only after D01's replay parity is green.
 - **D11 was pulled out of the old combined deliverable into Wave 2**: identifier-aware acceptance and one-click resend need only D01's identifiers — they fix the loudest support pain and shouldn't wait for the router. Resend UI lands in the existing members/invitations area; the org-admin surface absorbs it at D05.
 - **D06/D07/D08/D12 are mutually independent** after D03/D05. Suggested order: D06 → D07 → D08. **D12 needs only D13's interstitial hook** (which rides D03's flag): its approvals land in the existing `/settings/members` area beside D11's invitations, on the `organization:manage` permission that already gates inviting, so it does not wait on D05's org-admin surface or on anything from the authz checklist.
@@ -98,17 +98,17 @@ Parallel tracks; staff in any order capacity allows.
 | # | Flag(s) | Exit gate | Rollback | Risk |
 |---|---|---|---|---|
 | D01 | — (write gate is data, ships closed) | Replay rebuilds `Identifier` from CH and matches live table; backfill parity self-proving per user; adapter routing-table coverage: every better-auth model+operation explicitly routed, unrouted writes fail | Un-enroll / roll back migration state — adapter stops emitting, protocol writes untouched; table additive, nothing reads it until D03 | Low |
-| D03 | `IDENTITY_ROUTER_V2` (shadow → enforce) | Zero unexplained shadow mismatches over bake; sign-in success ≥ baseline | Flag off | **Highest** |
+| D03 | SHIPPED, flag removed | Zero unexplained shadow mismatches over bake; sign-in success ≥ baseline | None — the legacy path is deleted | **Highest** |
 | D04 | `SSOCONN_ROUTING` (shadow → enforce) | Routing parity silent vs `ssoDomain` strings; string writes stopped | Flag off, strings still dual-written | Medium |
 | D05 | `SELF_SERVE_SSO` (per-org) | New enterprise customer onboards with exactly one LangWatch action (approval click); ops surface resolves a real support case | Per-org flag off | Medium |
 | D06 | `MFA_ENROLLMENT_OPEN` | Enroll → challenge → backup-code → disable round-trips; the enrollment gate holds and releases and ends no session; a connection-asserted factor satisfies the condition and an asserting-nothing connection does not; disable refused under a requirement; lockout verified; turning the requirement on is observably session-neutral | Flag off. Columns are additive and nullable, so nothing is irreversible | Medium |
-| D07 | `PASSKEYS_ENABLED` | Register / sign-in / no-email sign-in / delete round-trips, platform + cross-platform authenticators | Flag off | Low |
+| D07 | SHIPPED, flag removed | Register / sign-in / no-email sign-in / delete round-trips, platform + cross-platform authenticators | None — mounted everywhere | Low |
 | D08 | `SCIM_V2_GRANTS` | Push/group/deactivate round-trip; token scoping enforced; offboard postcondition asserted in integration test | Legacy write path behind flag | Medium |
 | D09 | per-customer | Per customer: all active users linked, quiet grace, shim hits at zero, teardown event. Program: zero ACTIVE legacy connections | Both-connections-active grace IS the rollback | Customer-facing |
 | D10 (program exit criterion — customer-paced) | — | Repository-wide `grep -ri auth0` → allowlist only (changelog, tombstoned history, retained `dev/docs/` planning documents); secrets blob + deployment config verified Auth0-free; deploy pipeline green; agents-box QA green | Tagged restore point + secret escrow, retired only after the observation window (see D10) | Low |
 | D11 | invite changes additive | Round-trips: invite → wrong-method → accepted; expiry → resend → accepted; Slack invite cases replay green | Additive; old flow flag-restorable during bake | Low |
 | D12 | `JOIN_REQUESTS` | request → approve → member round-trip; domain auto-join round-trip (org opt-in, never public email domains); reminder/expiry wakes verified; matching/privacy specs green; orphaned-org creation rate visibly down | `JOIN_REQUESTS` off | Low |
-| D13 | `IDENTITY_ROUTER_V2` (with D03) | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | Flag off — legacy screens intact until bake end | Medium (rides the D03 flip) |
+| D13 | SHIPPED, flag removed | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | None — the legacy screens are deleted | Medium (rode the D03 flip) |
 
 # Wave 1 — PR breakdown
 
@@ -266,7 +266,7 @@ Gherkin specs to write fresh: none outstanding - every Wave 3 deliverable now ha
 
 # Flag inventory
 
-`IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12).
+`IDENTITY_ROUTER_V2` (D03 + D13 — flipped, then removed) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07 — flipped, then removed) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12).
 
 House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, Redis-loss seam drops/fail-opens, join-request funnel (incl. auto-joins), invite resend/expiry rates, sign-up funnel + orphaned-organization creation rate, per-customer migration progress + shim hits, sign-in success vs baseline.
 

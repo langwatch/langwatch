@@ -463,7 +463,7 @@ describe("given the identifier-first sign-in screen", () => {
       // And held to a length. A single character never reaches the server,
       // where the other test in this block proves a real password does.
       await userEvent.click(
-        screen.getByRole("button", { name: /create account/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
       expect(registerMock).not.toHaveBeenCalled();
     });
@@ -807,7 +807,7 @@ describe("given the identifier-first sign-in screen", () => {
 
       await fillPasswordPair(container, "a-strong-enough-password");
       await userEvent.click(
-        screen.getByRole("button", { name: /create account/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
 
       // The account and the link are made by the same call, which is what
@@ -856,7 +856,7 @@ describe("given the identifier-first sign-in screen", () => {
       await screen.findByTestId("unknown-identifier");
       await fillPasswordPair(container, "a-strong-enough-password");
       await userEvent.click(
-        screen.getByRole("button", { name: /create account/i }),
+        screen.getByRole("button", { name: "Create account" }),
       );
 
       expect(await screen.findByTestId("method-picker")).toBeTruthy();

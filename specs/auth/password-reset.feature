@@ -14,21 +14,12 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # endpoints; this feature wires the previously-missing `sendResetPassword`
   # callback to the mailer and adds the two user-facing pages.
 
-  # --- Sign-in entry point ---
-
-  @integration
-  Scenario: The credential sign-in form shows a Forgot password link
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
-    When I open /auth/signin
-    Then I see the email and password fields
-    And I see a "Forgot password?" link pointing to /auth/forgot-password
-
-  @integration
-  Scenario: SSO sign-in renders no credential form and no Forgot password link
-    Given the tenant runs on a social provider (NEXTAUTH_PROVIDER is not "email")
-    When I open /auth/signin
-    Then the credential form is not rendered
-    And there is no "Forgot password?" link
+  # The sign-in entry point used to be described here as a property of the
+  # credential form: email and password fields with a reset link beside them,
+  # absent on a social deployment. There is no credential form on the sign-in
+  # screen now. The router says which methods an address is offered, and the
+  # reset link travels with the password method wherever it appears - bound in
+  # specs/identity/signin-signup-screens.feature.
 
   @integration
   Scenario: The forgot and reset pages are reachable without signing in
@@ -146,17 +137,10 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # method-set policy speaking (ADR-027's semantics, kept), and it stops
   # speaking when those installations hold password identifiers.
 
-  @integration
-  Scenario: Password reset stays a credential-mode concept before the flip
-    Given the deployment signs in through an identity provider
-    And the identifier-first auth screens is not enforced
-    When I open the reset screen
-    Then I am told my password is managed by my identity provider
 
   @integration
-  Scenario: Password reset follows the identifier once the auth screens is enforced
+  Scenario: Password reset follows the identifier
     Given an installation that federates but holds passwords of its own
-    And the identifier-first auth screens is enforced
     When I request a password reset
     Then the reset is offered
     And the answer is the same confirmation whether or not the address has an account
@@ -192,13 +176,6 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     When I dismiss the offer
     Then the confirmation and the way to sign in are both still there
     And the offer does not come back on this screen
-
-  @unit
-  Scenario: No passkey is offered where the auth screens cannot take one
-    Given the deployment does not sign people in with passkeys
-    When a reset completes
-    Then no passkey is offered
-    And the screen is the confirmation it always was
 
   # --- Full end-to-end (manual dogfood) ---
 

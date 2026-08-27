@@ -29,7 +29,7 @@ const LAST_YEAR = Date.parse("2025-06-01T00:00:00.000Z");
 
 describe("given organizations founded by people who joined their real team later", () => {
   describe("when the rate is worked out", () => {
-    /** @scenario Organizations nobody meant to create are countable before the flag flips */
+    /** @scenario Organizations nobody meant to create are countable across the change */
     it("counts the ones whose founder joined elsewhere inside thirty days", () => {
       const health = resolveSignUpHealth({
         founded: [
@@ -60,7 +60,7 @@ describe("given organizations founded by people who joined their real team later
       expect(health.orphanedRate).toBe(0.5);
     });
 
-    /** @scenario Organizations nobody meant to create are countable before the flag flips */
+    /** @scenario Organizations nobody meant to create are countable across the change */
     it("stops counting at thirty days", () => {
       const founded = [
         {
@@ -126,7 +126,7 @@ describe("given organizations founded by people who joined their real team later
 
 describe("given the sign-up health reporting", () => {
   describe("when a window that closed before the flag went on is read", () => {
-    /** @scenario Organizations nobody meant to create are countable before the flag flips */
+    /** @scenario Organizations nobody meant to create are countable across the change */
     it("answers for that window, off rows nobody had to instrument", async () => {
       const repository = {
         findAllFoundedBetween: vi.fn(async () => [
@@ -161,7 +161,7 @@ describe("given the sign-up health reporting", () => {
       });
     });
 
-    /** @scenario Organizations nobody meant to create are countable before the flag flips */
+    /** @scenario Organizations nobody meant to create are countable across the change */
     it("looks thirty days past the window for the joins that orphan it", async () => {
       const repository = {
         findAllFoundedBetween: vi.fn(async () => [

@@ -9,8 +9,9 @@ Feature: BetterAuth config (unmounted)
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.
   #
-  # Retiring at the IDENTITY_ROUTER_V2 flip (D03/D13, ADR-117), and kept until
-  # then because each one is still the live mechanism behind the flag:
+  # Three mechanisms here were superseded by the router (D03/D13, ADR-117).
+  # They are described as what they became rather than deleted, because the
+  # rows they wrote are still in the database:
   #
   #   - the `NEXTAUTH_PROVIDER` matrix below no longer decides WHERE anyone
   #     signs in. Routing is the router's (specs/identity/signin-router.feature),
@@ -20,10 +21,10 @@ Feature: BetterAuth config (unmounted)
   #   - `isSsoProviderMatch` is replaced by callback linking on the router
   #     (ADR-117 §3: two-sided evidence, or a proposal a human resolves).
   #   - `pendingSsoSetup` is reconciled once against identifier data and the
-  #     column dropped at bake end (D03 plan item 5).
+  #     column then dropped (D03 plan item 5).
   #
-  # Nothing here is deleted while the legacy path still answers: rollback is
-  # the flag, so the behavior it rolls back to has to stay covered.
+  # What stays here is what is still live: which providers get mounted, and
+  # the email/password gate that comes with them.
 
   Background:
     Given the BetterAuth instance is exported from `~/server/better-auth`
@@ -163,15 +164,14 @@ Feature: BetterAuth config (unmounted)
   # mechanism underneath swapped.
   #
   # The plugin allow-list moved too, and for a reason this block could not
-  # have carried: which plugins are registered is a question about FLAGS now.
-  # The two-factor plugin joins generic OAuth when MFA_ENROLLMENT_OPEN is on
-  # and the passkey plugin when PASSKEYS_ENABLED is, so "only genericOAuth"
-  # was an assertion about one configuration of several. What survives is the
+  # have carried: the passkey plugin is mounted on every deployment and the
+  # two-factor plugin joins generic OAuth when MFA_ENROLLMENT_OPEN is on, so
+  # "only genericOAuth" was never a statement about the product. What survives is the
   # part that was ever load-bearing — BetterAuth's `admin()` plugin is
   # deliberately NOT registered, because it expects `User.role` / `User.banned`
   # columns our schema does not have and would take impersonation over — and
-  # that lives with the flag scenarios in
-  # specs/identity/mfa-and-session-shape.feature and specs/identity/passkeys.feature.
+  # that lives in specs/identity/mfa-and-session-shape.feature and
+  # specs/identity/passkeys.feature.
   # ============================================================================
 
   # ============================================================================
