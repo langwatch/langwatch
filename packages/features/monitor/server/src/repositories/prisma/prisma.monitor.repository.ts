@@ -1,11 +1,14 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  enabledGuardrailMonitorSchema,
   monitorMappingsInputSchema,
   monitorSchema,
   monitorSummarySchema,
   monitorWithEvaluatorSchema,
+  type EnabledGuardrailMonitor,
   type Monitor,
   type MonitorCreateInput,
+  type MonitorEnabledGuardrailInput,
   type MonitorNameAvailabilityInput,
   type MonitorMappingState,
   type MonitorSummary,
@@ -29,12 +32,15 @@ function mapSummary(row: unknown): MonitorSummary {
   return monitorSummarySchema.parse(row);
 }
 
+function mapEnabledGuardrail(row: unknown): EnabledGuardrailMonitor {
+  return enabledGuardrailMonitorSchema.parse(row);
+}
+
 function normalizeRow(row: unknown): unknown {
   if (row === null || typeof row !== "object" || !("mappings" in row)) {
     return row;
   }
-  const mappings =
-    row.mappings === null ? null : monitorMappingsInputSchema.parse(row.mappings);
+  const mappings = row.mappings === null ? null : monitorMappingsInputSchema.parse(row.mappings);
   return { ...row, mappings };
 }
 
@@ -70,6 +76,31 @@ export class PrismaMonitorRepository extends MonitorRepository {
     return rows.map(mapSummary);
   }
 
+  async listEnabledGuardrails(
+    input: MonitorEnabledGuardrailInput,
+  ): Promise<EnabledGuardrailMonitor[]> {
+    if (input.evaluatorIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.database.monitor.findMany({
+      where: {
+        projectId: input.projectId,
+        evaluatorId: { in: input.evaluatorIds },
+        executionMode: "AS_GUARDRAIL",
+        enabled: true,
+      },
+      select: {
+        id: true,
+        evaluatorId: true,
+        checkType: true,
+        parameters: true,
+      },
+    });
+
+    return rows.map(mapEnabledGuardrail);
+  }
+
   async tryFindById(input: {
     id: string;
     projectId: string;
@@ -81,10 +112,7 @@ export class PrismaMonitorRepository extends MonitorRepository {
     return row ? mapMonitorWithEvaluator(row) : null;
   }
 
-  async findAllByIds(input: {
-    monitorIds: string[];
-    projectId: string;
-  }): Promise<Monitor[]> {
+  async findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     if (input.monitorIds.length === 0) return [];
     const rows = await this.database.monitor.findMany({
       where: { id: { in: input.monitorIds }, projectId: input.projectId },
@@ -137,9 +165,7 @@ export class PrismaMonitorRepository extends MonitorRepository {
         preconditions: input.preconditions as Prisma.InputJsonValue,
         parameters: input.parameters as Prisma.InputJsonValue,
         mappings:
-          input.mappings === null
-            ? Prisma.JsonNull
-            : (input.mappings as Prisma.InputJsonValue),
+          input.mappings === null ? Prisma.JsonNull : (input.mappings as Prisma.InputJsonValue),
         sample: input.sample,
         enabled: input.enabled,
         executionMode: input.executionMode,
@@ -183,10 +209,7 @@ export class PrismaMonitorRepository extends MonitorRepository {
     });
   }
 
-  async deleteForExperiment(input: {
-    projectId: string;
-    experimentId: string;
-  }): Promise<void> {
+  async deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     await this.database.monitor.deleteMany({ where: input });
   }
 

@@ -39,6 +39,9 @@ class FakeRepository extends MonitorRepository {
   async findEnabledOnMessage() {
     return [];
   }
+  async listEnabledGuardrails() {
+    return [];
+  }
   async tryFindById() {
     return this.value ? { ...this.value, evaluator: null } : null;
   }
@@ -145,12 +148,14 @@ class FakeEvaluatorService extends EvaluatorService {
 }
 
 const evaluator = new FakeEvaluatorService();
+const generateId = () => "monitor_test";
 
 describe("MonitorService", () => {
   it("requires an evaluator on create", async () => {
     const service = MonitorService.create({
       repository: new FakeRepository(),
       evaluators: evaluator,
+      generateId,
     });
     await expect(
       service.create({
@@ -168,7 +173,7 @@ describe("MonitorService", () => {
 
   it("preserves omitted evaluator and normalises mappings on update", async () => {
     const repository = new FakeRepository();
-    const service = MonitorService.create({ repository, evaluators: evaluator });
+    const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
     const updated = await service.update({
       id: "monitor_1",
       projectId: "project_1",
@@ -188,6 +193,7 @@ describe("MonitorService", () => {
     const service = MonitorService.create({
       repository: new FakeRepository(),
       evaluators: evaluator,
+      generateId,
     });
     await expect(
       service.update({
@@ -208,7 +214,7 @@ describe("MonitorService", () => {
   it("throws for a missing monitor", async () => {
     const repository = new FakeRepository();
     repository.value = null;
-    const service = MonitorService.create({ repository, evaluators: evaluator });
+    const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
     await expect(service.getById({ id: "missing", projectId: "project_1" })).rejects.toBeInstanceOf(
       MonitorNotFoundError,
     );

@@ -3,14 +3,17 @@ import {
   MonitorNotFoundError,
   MonitorService as MonitorServiceContract,
   monitorCreateInputSchema,
+  monitorEnabledGuardrailInputSchema,
   monitorIdInputSchema,
   monitorMappingsInputSchema,
   monitorNameAvailabilityInputSchema,
   monitorReplicationInputSchema,
   monitorToggleInputSchema,
   monitorUpdateInputSchema,
+  type EnabledGuardrailMonitor,
   type Monitor,
   type MonitorCreateInput,
+  type MonitorEnabledGuardrailInput,
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
   type MonitorReplicationInput,
@@ -25,11 +28,8 @@ import type { MonitorRepository } from "../repositories/monitor.repository";
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
   evaluators: EvaluatorService;
-  generateId?: () => string;
+  generateId: () => string;
 };
-
-const defaultGenerateId = (): string =>
-  `monitor_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 function slugify(value: string): string {
   return (
@@ -58,10 +58,22 @@ export class MonitorService extends MonitorServiceContract {
     return this.options.repository.findEnabledOnMessage(projectId);
   }
 
+  listEnabledGuardrailMonitors(
+    input: MonitorEnabledGuardrailInput,
+  ): Promise<EnabledGuardrailMonitor[]> {
+    const parsed = monitorEnabledGuardrailInputSchema.parse(input);
+
+    return this.options.repository.listEnabledGuardrails(parsed);
+  }
+
   async getById(input: MonitorIdInput): Promise<MonitorWithEvaluator> {
     const parsed = monitorIdInputSchema.parse(input);
     const monitor = await this.options.repository.tryFindById(parsed);
-    if (!monitor) throw new MonitorNotFoundError(parsed.id);
+
+    if (!monitor) {
+      throw new MonitorNotFoundError(parsed.id);
+    }
+
     return monitor;
   }
 
@@ -76,20 +88,26 @@ export class MonitorService extends MonitorServiceContract {
   async toggle(input: MonitorToggleInput): Promise<{ success: true }> {
     const parsed = monitorToggleInputSchema.parse(input);
     await this.options.repository.setEnabled(parsed);
+
     return { success: true };
   }
 
   async create(input: MonitorCreateInput): Promise<Monitor> {
     const parsed = monitorCreateInputSchema.parse(input);
-    if (!parsed.evaluatorId) throw new MonitorEvaluatorRequiredError();
+
+    if (!parsed.evaluatorId) {
+      throw new MonitorEvaluatorRequiredError();
+    }
+
     await this.options.evaluators.getById({
       id: parsed.evaluatorId,
       projectId: parsed.projectId,
     });
 
     const name = await this.uniqueName(parsed.projectId, parsed.name);
-    const id = (this.options.generateId ?? defaultGenerateId)();
+    const id = this.options.generateId();
     const mappings = monitorMappingsInputSchema.parse(parsed.mappings);
+
     return this.options.repository.create({
       ...parsed,
       id,
@@ -101,14 +119,20 @@ export class MonitorService extends MonitorServiceContract {
 
   async update(input: MonitorUpdateInput): Promise<Monitor> {
     const parsed = monitorUpdateInputSchema.parse(input);
-    if (parsed.evaluatorId === null) throw new MonitorEvaluatorRequiredError();
+
+    if (parsed.evaluatorId === null) {
+      throw new MonitorEvaluatorRequiredError();
+    }
+
     if (parsed.evaluatorId !== undefined) {
       await this.options.evaluators.getById({
         id: parsed.evaluatorId,
         projectId: parsed.projectId,
       });
     }
+
     const mappings = monitorMappingsInputSchema.parse(parsed.mappings);
+
     return this.options.repository.update({
       ...parsed,
       slug: slugify(parsed.name),
@@ -119,20 +143,17 @@ export class MonitorService extends MonitorServiceContract {
   async delete(input: MonitorIdInput): Promise<{ success: true }> {
     const parsed = monitorIdInputSchema.parse(input);
     await this.options.repository.delete(parsed);
+
     return { success: true };
   }
 
-  async deleteForExperiment(input: {
-    projectId: string;
-    experimentId: string;
-  }): Promise<void> {
+  async deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     await this.options.repository.deleteForExperiment(input);
   }
 
-  async isNameAvailable(
-    input: MonitorNameAvailabilityInput,
-  ): Promise<{ available: boolean }> {
+  async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {
     const parsed = monitorNameAvailabilityInputSchema.parse(input);
+
     return { available: await this.options.repository.isNameAvailable(parsed) };
   }
 
@@ -142,6 +163,7 @@ export class MonitorService extends MonitorServiceContract {
       id: parsed.sourceMonitorId,
       projectId: parsed.sourceProjectId,
     });
+
     if (parsed.evaluatorId) {
       await this.options.evaluators.getById({
         id: parsed.evaluatorId,
@@ -150,7 +172,8 @@ export class MonitorService extends MonitorServiceContract {
     }
 
     const name = await this.uniqueName(parsed.targetProjectId, source.name);
-    const id = (this.options.generateId ?? defaultGenerateId)();
+    const id = this.options.generateId();
+
     return this.options.repository.createReplica({
       ...source,
       id,
@@ -168,7 +191,9 @@ export class MonitorService extends MonitorServiceContract {
     if (await this.options.repository.isNameAvailable({ projectId, name: baseName })) {
       return baseName;
     }
+
     let suffix = 2;
+
     while (
       !(await this.options.repository.isNameAvailable({
         projectId,
@@ -177,6 +202,7 @@ export class MonitorService extends MonitorServiceContract {
     ) {
       suffix += 1;
     }
+
     return `${baseName} (${suffix})`;
   }
 }

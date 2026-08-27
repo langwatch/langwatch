@@ -44,7 +44,9 @@ import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contrac
 import { VirtualKeyRepository } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
-const projects = createTestApp().projects;
+const testApp = createTestApp();
+const projects = testApp.projects;
+const monitors = testApp.monitors;
 const ORG_ID = `org-mat-${suffix}`;
 const TEAM_ID = `team-mat-${suffix}`;
 const PROJECT_ID = `proj-mat-${suffix}`;
@@ -466,13 +468,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     await prisma.virtualKey.deleteMany({
       where: {
         id: {
-          in: [
-            VK_ID,
-            VK_NO_RP_ID,
-            VK_NO_PROJECT_ID,
-            VK_TAGSTORM_ID,
-            VK_POLICY_ALLOWLIST_ID,
-          ],
+          in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID, VK_TAGSTORM_ID, VK_POLICY_ALLOWLIST_ID],
         },
       },
     });
@@ -720,7 +716,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
 
   describe("when GatewayGuardrailService.create gates on AS_GUARDRAIL monitor", () => {
     it("accepts an evaluator with at least one enabled AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma, evaluatorService);
+      const service = GatewayGuardrailService.create(prisma, evaluatorService, monitors);
       const row = await service.create({
         projectId: PROJECT_ID,
         name: `Accept guardrail ${suffix}`,
@@ -736,7 +732,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
 
     it("rejects an evaluator with no AS_GUARDRAIL monitor in the project", async () => {
-      const service = GatewayGuardrailService.create(prisma, evaluatorService);
+      const service = GatewayGuardrailService.create(prisma, evaluatorService, monitors);
       await expect(
         service.create({
           projectId: PROJECT_ID,
@@ -808,9 +804,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           MP_ANTHROPIC_KEYLESS_ID,
         ]),
       );
-      expect(bundle.access_excluded_providers.map((p) => p.id)).not.toContain(
-        MP_SAFETY_ID,
-      );
+      expect(bundle.access_excluded_providers.map((p) => p.id)).not.toContain(MP_SAFETY_ID);
       expect(bundle.routing_policy_name).toBe(`mat-rp-${suffix}`);
     });
   });

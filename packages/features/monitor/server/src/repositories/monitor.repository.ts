@@ -1,6 +1,8 @@
 import type {
+  EnabledGuardrailMonitor,
   Monitor,
   MonitorCreateInput,
+  MonitorEnabledGuardrailInput,
   MonitorMappingState,
   MonitorNameAvailabilityInput,
   MonitorSummary,
@@ -12,14 +14,14 @@ import type {
 export abstract class MonitorRepository {
   abstract findAll(input: { projectId: string }): Promise<MonitorWithEvaluator[]>;
   abstract findEnabledOnMessage(projectId: string): Promise<MonitorSummary[]>;
+  abstract listEnabledGuardrails(
+    input: MonitorEnabledGuardrailInput,
+  ): Promise<EnabledGuardrailMonitor[]>;
   abstract tryFindById(input: {
     id: string;
     projectId: string;
   }): Promise<MonitorWithEvaluator | null>;
-  abstract findAllByIds(input: {
-    monitorIds: string[];
-    projectId: string;
-  }): Promise<Monitor[]>;
+  abstract findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]>;
   abstract setEnabled(input: MonitorToggleInput): Promise<void>;
   abstract create(
     input: MonitorCreateInput & {
@@ -33,9 +35,6 @@ export abstract class MonitorRepository {
     input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState },
   ): Promise<Monitor>;
   abstract delete(input: { id: string; projectId: string }): Promise<void>;
-  abstract deleteForExperiment(input: {
-    projectId: string;
-    experimentId: string;
-  }): Promise<void>;
+  abstract deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void>;
   abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<boolean>;
 }

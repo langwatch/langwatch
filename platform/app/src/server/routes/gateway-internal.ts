@@ -199,8 +199,7 @@ async function verifyGatewaySignature(c: Context, next: Next) {
         error: {
           type: "permission_denied",
           code: "missing_signature",
-          message:
-            "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
+          message: "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
         },
       },
       401,
@@ -484,9 +483,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
  *           codex_not_connected
  */
 secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
-  const parsed = codexRefreshRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
+  const parsed = codexRefreshRequestSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(
       {
@@ -724,7 +721,7 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  const verdict = await GatewayGuardrailEvaluationService.create(prisma, (input) =>
+  const verdict = await GatewayGuardrailEvaluationService.create(prisma, c.app.monitors, (input) =>
     runEvaluation({
       ...input,
       modelProviders: c.app.modelProviders,
@@ -933,9 +930,7 @@ function pricedOutcomeData(data: Record<string, unknown>): Record<string, unknow
  *  priced on the way through. */
 function toSpendCommandData(
   record: SpendCommandRecord,
-):
-  | { ok: true; data: Record<string, unknown> }
-  | { ok: false; reject: SpendCommandReject } {
+): { ok: true; data: Record<string, unknown> } | { ok: false; reject: SpendCommandReject } {
   const wire = record.payload;
   const projectId = wire.project_id;
   if (typeof projectId !== "string" || projectId.length === 0) {
@@ -978,9 +973,7 @@ function toSpendCommandData(
 /** The wire fields that identify a rejected record, so the log line can be
  *  reconciled against the gateway's own. Read defensively: a record is only
  *  rejected because its payload did not hold up. */
-function rejectedRecordIdentity(
-  record: SpendCommandRecord,
-): Record<string, string | null> {
+function rejectedRecordIdentity(record: SpendCommandRecord): Record<string, string | null> {
   const wireString = (key: string): string | null => {
     const value = record.payload[key];
     return typeof value === "string" && value.length > 0 ? value : null;
@@ -1077,8 +1070,7 @@ async function touchAdmittedVirtualKeys(
   const staleIds = virtualKeys
     .filter(
       (vk) =>
-        !vk.lastUsedAt ||
-        now.getTime() - vk.lastUsedAt.getTime() > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
+        !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
     )
     .map((vk) => vk.id);
   if (staleIds.length === 0) return;
@@ -1204,9 +1196,7 @@ async function enrichAttributedCommands({
   // Admission is what marks a key used. An outcome is the same request
   // arriving a second time, so touching on both would double the writes to
   // say the same thing.
-  const admittedKeyIds = new Set(
-    identities.slice(0, admits.length).map((i) => i.virtualKeyId),
-  );
+  const admittedKeyIds = new Set(identities.slice(0, admits.length).map((i) => i.virtualKeyId));
   await touchAdmittedVirtualKeys(
     virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
     new Date(),
@@ -1369,17 +1359,14 @@ const reportRealtimeUsageSchema = z.object({
  * said no.
  */
 secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
-  const parsed = reserveRealtimeSessionSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
+  const parsed = reserveRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(
       {
         error: {
           type: "bad_request",
           code: "invalid_reservation",
-          message:
-            "a session reservation names the session, its tenancy, its key and its vendor",
+          message: "a session reservation names the session, its tenancy, its key and its vendor",
         },
       },
       400,
@@ -1421,17 +1408,14 @@ secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
  * booking whose mint never produced a credential.
  */
 secured.access(gatewayPolicy()).patch("/realtime-sessions/:session_id", async (c) => {
-  const parsed = patchRealtimeSessionSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
+  const parsed = patchRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json(
       {
         error: {
           type: "bad_request",
           code: "invalid_session_patch",
-          message:
-            "project_id is required, with a vendor_conversation_id or a terminal status",
+          message: "project_id is required, with a vendor_conversation_id or a terminal status",
         },
       },
       400,
@@ -1479,46 +1463,42 @@ secured.access(gatewayPolicy()).patch("/realtime-sessions/:session_id", async (c
  * which those numbers reach billing. The gateway has already made the audio
  * and text counts disjoint.
  */
-secured
-  .access(gatewayPolicy())
-  .post("/realtime-sessions/:session_id/usage", async (c) => {
-    const parsed = reportRealtimeUsageSchema.safeParse(
-      await c.req.json().catch(() => null),
+secured.access(gatewayPolicy()).post("/realtime-sessions/:session_id/usage", async (c) => {
+  const parsed = reportRealtimeUsageSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_usage_report",
+          message:
+            "project_id, virtual_key_id and a usage object of integer quantities are required",
+        },
+      },
+      400,
     );
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_usage_report",
-            message:
-              "project_id, virtual_key_id and a usage object of integer quantities are required",
-          },
-        },
-        400,
-      );
-    }
-    const sessionId = c.req.param("session_id");
-    const outcome = await reportRealtimeSessionUsage({
-      sessionId,
-      projectId: parsed.data.project_id,
-      virtualKeyId: parsed.data.virtual_key_id,
-      usage: parsed.data.usage,
-    });
-    if (outcome === "not_found") {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "realtime_session_not_found",
-            message: "no session with that id belongs to this project",
-          },
-        },
-        404,
-      );
-    }
-    return c.json({ session_id: sessionId, status: "CLOSED" });
+  }
+  const sessionId = c.req.param("session_id");
+  const outcome = await reportRealtimeSessionUsage({
+    sessionId,
+    projectId: parsed.data.project_id,
+    virtualKeyId: parsed.data.virtual_key_id,
+    usage: parsed.data.usage,
   });
+  if (outcome === "not_found") {
+    return c.json(
+      {
+        error: {
+          type: "not_found",
+          code: "realtime_session_not_found",
+          message: "no session with that id belongs to this project",
+        },
+      },
+      404,
+    );
+  }
+  return c.json({ session_id: sessionId, status: "CLOSED" });
+});
 
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 

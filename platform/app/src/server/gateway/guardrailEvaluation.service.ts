@@ -12,15 +12,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayGuardrailDirection,
-  Monitor,
-  PrismaClient,
-} from "~/generated/prisma/client";
-import type {
-  EvaluatorTypes,
-  SingleEvaluationResult,
-} from "@langwatch/evaluator-contract";
+import type { EnabledGuardrailMonitor, MonitorService } from "@langwatch/monitor-contract";
+import type { GatewayGuardrailDirection, PrismaClient } from "~/generated/prisma/client";
+import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 
@@ -50,18 +44,13 @@ export type GuardrailCheckVerdict = {
   policies_triggered: string[];
 };
 
-const WIRE_DIRECTION_TO_STORED: Record<
-  GuardrailWireDirection,
-  GatewayGuardrailDirection
-> = {
+const WIRE_DIRECTION_TO_STORED: Record<GuardrailWireDirection, GatewayGuardrailDirection> = {
   request: "PRE",
   response: "POST",
   stream_chunk: "STREAM_CHUNK",
 };
 
-export function storedDirectionFor(
-  direction: GuardrailWireDirection,
-): GatewayGuardrailDirection {
+export function storedDirectionFor(direction: GuardrailWireDirection): GatewayGuardrailDirection {
   return WIRE_DIRECTION_TO_STORED[direction];
 }
 
@@ -118,21 +107,21 @@ export type EvaluatorRunInput = {
   settings?: Record<string, unknown>;
 };
 
-export type EvaluatorRunner = (
-  args: EvaluatorRunInput,
-) => Promise<SingleEvaluationResult>;
+export type EvaluatorRunner = (args: EvaluatorRunInput) => Promise<SingleEvaluationResult>;
 
 export class GatewayGuardrailEvaluationService {
   private constructor(
     private readonly prisma: PrismaClient,
+    private readonly monitors: MonitorService,
     private readonly runEvaluator: EvaluatorRunner,
   ) {}
 
   static create(
     prisma: PrismaClient,
+    monitors: MonitorService,
     runEvaluator: EvaluatorRunner,
   ): GatewayGuardrailEvaluationService {
-    return new GatewayGuardrailEvaluationService(prisma, runEvaluator);
+    return new GatewayGuardrailEvaluationService(prisma, monitors, runEvaluator);
   }
 
   async check({
@@ -204,18 +193,14 @@ export class GatewayGuardrailEvaluationService {
   }: {
     projectId: string;
     evaluatorIds: string[];
-  }): Promise<Map<string, Monitor>> {
-    const monitors = await this.prisma.monitor.findMany({
-      where: {
-        projectId,
-        evaluatorId: { in: evaluatorIds },
-        executionMode: "AS_GUARDRAIL",
-        enabled: true,
-      },
+  }): Promise<Map<string, EnabledGuardrailMonitor>> {
+    const monitors = await this.monitors.listEnabledGuardrailMonitors({
+      projectId,
+      evaluatorIds,
     });
-    const byEvaluator = new Map<string, Monitor>();
+    const byEvaluator = new Map<string, EnabledGuardrailMonitor>();
     for (const monitor of monitors) {
-      if (monitor.evaluatorId && !byEvaluator.has(monitor.evaluatorId)) {
+      if (!byEvaluator.has(monitor.evaluatorId)) {
         byEvaluator.set(monitor.evaluatorId, monitor);
       }
     }
@@ -229,7 +214,7 @@ export class GatewayGuardrailEvaluationService {
     projectId,
   }: {
     guardrail: { id: string; name: string; failureMode: string };
-    monitor: Monitor;
+    monitor: EnabledGuardrailMonitor;
     data: { input: string; output: string };
     projectId: string;
   }): Promise<GuardrailCheckVerdict> {
@@ -242,10 +227,7 @@ export class GatewayGuardrailEvaluationService {
         settings: (monitor.parameters ?? {}) as Record<string, unknown>,
       });
     } catch (error) {
-      logger.warn(
-        { guardrailId: guardrail.id, projectId, error },
-        "guardrail evaluator threw",
-      );
+      logger.warn({ guardrailId: guardrail.id, projectId, error }, "guardrail evaluator threw");
       return this.onFailure({
         guardrail,
         reason: "guardrail evaluator failed to run",

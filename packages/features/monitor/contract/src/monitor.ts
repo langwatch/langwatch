@@ -1,11 +1,7 @@
 import { evaluatorSchema } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 
-export const monitorExecutionModeSchema = z.enum([
-  "ON_MESSAGE",
-  "AS_GUARDRAIL",
-  "MANUALLY",
-]);
+export const monitorExecutionModeSchema = z.enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"]);
 export type MonitorExecutionMode = z.infer<typeof monitorExecutionModeSchema>;
 
 export const monitorMappingStateSchema = z
@@ -18,12 +14,7 @@ export type MonitorMappingState = z.infer<typeof monitorMappingStateSchema>;
 
 /** Legacy `{}`/malformed mappings are persisted as a safe empty mapping. */
 export const monitorMappingsInputSchema = z.preprocess((value) => {
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    "mapping" in value
-  ) {
+  if (value !== null && typeof value === "object" && !Array.isArray(value) && "mapping" in value) {
     return value;
   }
   return { mapping: {}, expansions: [] };
@@ -83,6 +74,24 @@ export const monitorSummarySchema = z
   .strict();
 export type MonitorSummary = z.infer<typeof monitorSummarySchema>;
 
+export const enabledGuardrailMonitorSchema = z
+  .object({
+    id: z.string().min(1),
+    evaluatorId: z.string().min(1),
+    checkType: z.string().min(1),
+    parameters: z.json(),
+  })
+  .strict();
+export type EnabledGuardrailMonitor = z.infer<typeof enabledGuardrailMonitorSchema>;
+
+export const monitorEnabledGuardrailInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    evaluatorIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export type MonitorEnabledGuardrailInput = z.infer<typeof monitorEnabledGuardrailInputSchema>;
+
 export const monitorSettingsSchema = z.record(z.string(), z.json());
 
 export const monitorCreateInputSchema = z
@@ -138,9 +147,7 @@ export const monitorNameAvailabilityInputSchema = z
     checkId: z.string().min(1).optional(),
   })
   .strict();
-export type MonitorNameAvailabilityInput = z.infer<
-  typeof monitorNameAvailabilityInputSchema
->;
+export type MonitorNameAvailabilityInput = z.infer<typeof monitorNameAvailabilityInputSchema>;
 
 /**
  * Copies the monitor configuration into another project. The evaluator, when

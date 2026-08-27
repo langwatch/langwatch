@@ -9,10 +9,7 @@
  */
 
 import { z } from "zod";
-import {
-  GatewayGuardrailDirection,
-  GatewayGuardrailFailureMode,
-} from "~/generated/prisma/client";
+import { GatewayGuardrailDirection, GatewayGuardrailFailureMode } from "~/generated/prisma/client";
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 
@@ -26,7 +23,11 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma, ctx.app.evaluators);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+        ctx.app.monitors,
+      );
       return await service.list(input.projectId);
     }),
 
@@ -34,7 +35,11 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma, ctx.app.evaluators);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+        ctx.app.monitors,
+      );
       return await service.get(input.id, input.projectId);
     }),
 
@@ -51,7 +56,11 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     )
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma, ctx.app.evaluators);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+        ctx.app.monitors,
+      );
       return await service.create({
         projectId: input.projectId,
         name: input.name,
@@ -77,7 +86,11 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     )
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma, ctx.app.evaluators);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+        ctx.app.monitors,
+      );
       return await service.update({
         id: input.id,
         projectId: input.projectId,
@@ -94,7 +107,11 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayGuardrailService.create(ctx.prisma, ctx.app.evaluators);
+      const service = GatewayGuardrailService.create(
+        ctx.prisma,
+        ctx.app.evaluators,
+        ctx.app.monitors,
+      );
       await service.archive({
         id: input.id,
         projectId: input.projectId,

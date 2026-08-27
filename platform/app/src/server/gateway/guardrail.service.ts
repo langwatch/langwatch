@@ -18,6 +18,7 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 
 import type { GatewayAuditPort } from "@langwatch/gateway-server";
 import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
@@ -54,14 +55,16 @@ export class GatewayGuardrailService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly evaluators: EvaluatorService,
+    private readonly monitors: MonitorService,
     private readonly auditLog: GatewayAuditPort = createGatewayAuditPort(prisma),
   ) {}
 
   static create(
     prisma: PrismaClient,
     evaluators: EvaluatorService,
+    monitors: MonitorService,
   ): GatewayGuardrailService {
-    return new GatewayGuardrailService(prisma, evaluators);
+    return new GatewayGuardrailService(prisma, evaluators, monitors);
   }
 
   async list(projectId: string): Promise<GatewayGuardrail[]> {
@@ -159,10 +162,7 @@ export class GatewayGuardrailService {
     return row;
   }
 
-  private async assertEvaluatorInProject(
-    evaluatorId: string,
-    projectId: string,
-  ): Promise<void> {
+  private async assertEvaluatorInProject(evaluatorId: string, projectId: string): Promise<void> {
     const evaluator = await this.evaluators.tryGetById({
       id: evaluatorId,
       projectId,
@@ -179,16 +179,12 @@ export class GatewayGuardrailService {
     // executionMode is AS_GUARDRAIL. Without this gate, an operator
     // could bind any evaluator the gateway is not authorised to invoke
     // synchronously, per spec guardrails-project-scope.feature L46-49.
-    const monitorRow = await this.prisma.monitor.findFirst({
-      where: {
-        evaluatorId,
-        projectId,
-        executionMode: "AS_GUARDRAIL",
-        enabled: true,
-      },
-      select: { id: true },
+    const monitors = await this.monitors.listEnabledGuardrailMonitors({
+      projectId,
+      evaluatorIds: [evaluatorId],
     });
-    if (!monitorRow) {
+
+    if (monitors.length === 0) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message:

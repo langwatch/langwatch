@@ -9,7 +9,7 @@ import {
 export type PostgresMonitorAdapterOptions = {
   database: MonitorDatabase;
   evaluators: EvaluatorService;
-  generateId?: () => string;
+  generateId: () => string;
 };
 
 export class PostgresMonitorAdapter {

@@ -18,6 +18,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
@@ -55,8 +56,10 @@ const skipped: SingleEvaluationResult = {
   details: "input below the minimum length",
 };
 
+const monitors = createTestApp().monitors;
+
 const serviceReturning = (result: SingleEvaluationResult) =>
-  GatewayGuardrailEvaluationService.create(prisma, async () => result);
+  GatewayGuardrailEvaluationService.create(prisma, monitors, async () => result);
 
 async function createGuardrail({
   id,
@@ -150,9 +153,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
           // Distinct parameters per evaluator so a test can route a verdict
           // to one guardrail and not the other within a single check.
           parameters:
-            evaluatorId === SECOND_EVALUATOR_ID
-              ? { verdict: "fail" }
-              : { verdict: "pass" },
+            evaluatorId === SECOND_EVALUATOR_ID ? { verdict: "fail" } : { verdict: "pass" },
         },
       });
     }
@@ -313,6 +314,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
       // two guardrails genuinely behave differently in a single check.
       const routed = GatewayGuardrailEvaluationService.create(
         prisma,
+        monitors,
         async ({ settings }) =>
           (settings as { verdict?: string })?.verdict === "fail" ? failing : passing,
       );
