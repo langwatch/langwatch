@@ -50,7 +50,6 @@ export interface RunResultsPersistence {
   actor: WorkbenchActor;
 }
 
-/** What one attempt at the write needs to know. */
 interface WriteAttempt {
   persistence: RunResultsPersistence;
   projectId: string;
@@ -60,7 +59,6 @@ interface WriteAttempt {
   draft: RunResultsDraft;
 }
 
-/** Folds the run's cells into the saved state and takes the next version. */
 const writeCells = async ({
   persistence,
   projectId,
