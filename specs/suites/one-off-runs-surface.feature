@@ -19,14 +19,14 @@ Feature: One-off runs are a run plan of their own
   # --- What already works ---
 
   @unit
-  Scenario: A single test case run goes to the project internal run set
+  Scenario: A single scenario run goes to the project internal run set
     Given a test case and a target
     When the case is run on its own
     Then the run is filed in the internal run set of the project
     And no run plan record is created for it
 
   @unit
-  Scenario: A one-off batch carries the name of the test case that ran
+  Scenario: A one-off batch carries the name of the scenario that ran
     Given a one-off run of the test case "Angry refund request"
     When the batch is read back
     Then the batch holds exactly one entry

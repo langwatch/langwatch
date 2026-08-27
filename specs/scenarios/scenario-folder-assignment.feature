@@ -64,14 +64,7 @@ Feature: Filing a test case into a test suite
     And the copy carries the situation, the criteria, the labels and the parameters of the original
     And the copy starts its own version history at version 1
 
-  # --- Display of an unfiled case ---
-
-  @integration
-  Scenario: All test cases lists the loose cases below the folder rows
-    Given the project has two test suites and three cases with no test suite
-    When the All test cases view is opened
-    Then the suite folder rows come first
-    And the three loose cases read as their own rows below
+  # --- Running one case on its own ---
 
   @integration
   Scenario: An unfiled case runs on its own and lands in One-off runs

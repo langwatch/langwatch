@@ -39,7 +39,7 @@ Feature: A note on a run
     And the note reads the same as a note written in the platform dialog
 
   @integration
-  Scenario: A note on a single test case run is stored with that run
+  Scenario: A note on a single scenario run is stored with that run
     Given a test case row with a last target already chosen
     When Run is chosen, a note is typed and the run is confirmed
     Then the one-off run carries the note

@@ -1643,7 +1643,7 @@ describe("what the run covers", () => {
   });
 
   /** @scenario "A run can hold a hand-picked list of scenarios" */
-  /** @scenario "A custom run plan can select single test cases grouped by their folder" */
+  /** @scenario "A custom run plan can select single scenarios grouped by their folder" */
   it("lists the scenarios under their test suite and runs the ticked ones", async () => {
     const user = userEvent.setup();
     renderDialog(planSubject());

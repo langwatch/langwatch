@@ -442,14 +442,14 @@ describe("suites.folders integration", () => {
       const kept = await prisma.scenario.findFirst({
         where: { id: scenario.id, projectId },
       });
-      expect(kept?.folderId).toBeNull();
+      expect(kept?.folderId).toBe(scenario.folderId);
     });
   });
 
   describe("moving a case over tRPC", () => {
     /** @scenario "Moving a case from its row menu regroups the case list" */
-    /** @scenario "Unfiling a case moves it to the unfiled group" */
-    it("moves and unfiles a case, keeping its id and history key", async () => {
+    /** @scenario "Taking a case out of its suite moves it to Default" */
+    it("moves a case between suites and back to Default, keeping its id and history key", async () => {
       const refunds = await caller.suites.folders.create({
         projectId,
         name: "Refunds",
@@ -476,12 +476,15 @@ describe("suites.folders integration", () => {
       expect(moved.id).toBe(scenario.id);
       expect(moved.folderId).toBe(checkout.id);
 
-      const unfiled = await caller.scenarios.moveToFolder({
+      const takenOut = await caller.scenarios.moveToFolder({
         projectId,
         scenarioId: scenario.id,
         folderId: null,
       });
-      expect(unfiled.folderId).toBeNull();
+      const defaultSuite = await prisma.simulationSuite.findFirst({
+        where: { projectId, kind: "folder", name: "Default", archivedAt: null },
+      });
+      expect(takenOut.folderId).toBe(defaultSuite?.id);
 
       const listed = await caller.scenarios.getAll({ projectId });
       expect(listed.map((s) => s.id)).toContain(scenario.id);

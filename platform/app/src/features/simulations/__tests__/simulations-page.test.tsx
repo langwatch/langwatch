@@ -7,6 +7,7 @@
  * are sorted by last run date.
  *
  * @see specs/scenarios/internal-set-namespace.feature
+ * @see specs/suites/one-off-runs-surface.feature
  */
 import { describe, expect, it } from "vitest";
 import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
@@ -33,6 +34,7 @@ describe("sortScenarioSets()", () => {
     ];
 
     describe("when sorting the sets", () => {
+      /** @scenario "The internal run set is pinned in the run set list" */
       it("pins internal set to the top of the list", () => {
         const sorted = sortScenarioSets(testSets);
 

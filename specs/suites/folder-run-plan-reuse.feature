@@ -115,7 +115,7 @@ Feature: Running a folder reuses the run plan path
     And neither folder is changed
 
   @integration
-  Scenario: A custom run plan can select single test cases grouped by their folder
+  Scenario: A custom run plan can select single scenarios grouped by their folder
     Given folders "Refunds" and "Checkout" each holding two test cases
     When a custom run plan is created and its case picker is opened
     Then the cases are listed under their folder names

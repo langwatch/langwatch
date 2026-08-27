@@ -90,7 +90,7 @@ Feature: A test suite is a folder of test cases
   # --- Case membership ---
 
   @unit
-  Scenario: A test case belongs to at most one folder
+  Scenario: A scenario belongs to at most one folder
     Given a test case in the folder "Refunds"
     When the case is moved to the folder "Checkout"
     Then the case is in "Checkout" only
