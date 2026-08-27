@@ -119,8 +119,10 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           key,
           signal: options.signal,
         });
-        const parsed = this.parseBody({ body, config });
-        for (const raw of parsed) {
+        const { records, unreadable } = this.parseBody({ body, config });
+        errorCount += unreadable;
+        await this.reportUnreadableLines({ key, unreadable });
+        for (const raw of records) {
           try {
             events.push(this.mapEvent(raw, config));
           } catch (error) {
@@ -275,38 +277,84 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     return Buffer.concat(chunks).toString("utf-8");
   }
 
+  /**
+   * Say that a file carried lines nothing could parse.
+   *
+   * Reported once per file with the count rather than once per line: a
+   * truncated upload makes every remaining line unreadable, and that is one
+   * incident, not a thousand. A file with nothing wrong reports nothing.
+   */
+  private async reportUnreadableLines({
+    key,
+    unreadable,
+  }: {
+    key: string;
+    unreadable: number;
+  }): Promise<void> {
+    if (unreadable === 0) return;
+    logger.warn(
+      { adapter: this.id, key, unreadable },
+      "skipping unparseable lines",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("adapter", this.id);
+      scope.setExtra?.("key", key);
+      scope.setExtra?.("unreadableLines", unreadable);
+      captureException(
+        new Error(`s3_polling: ${unreadable} unparseable line(s) in ${key}`),
+      );
+    });
+  }
+
+  /**
+   * The records a file yielded, and the count it could not read.
+   *
+   * `unreadable` exists because a line that never parses never reaches
+   * `mapEvent`, so the caller's `catch` around `mapEvent` cannot see it. It was
+   * therefore dropped in silence: `errorCount` stayed 0, no `captureException`
+   * fired, and the cursor advanced past the file anyway. That is worse than
+   * the stall it replaced, because corrupt input leaves no signal at all.
+   */
   private parseBody({
     body,
     config,
   }: {
     body: string;
     config: S3PollingConfig;
-  }): unknown[] {
+  }): { records: unknown[]; unreadable: number } {
     switch (config.parser) {
       case "ndjson":
         return this.parseNdjson(body);
       case "json-array":
-        return this.parseJsonArray(body);
+        return { records: this.parseJsonArray(body), unreadable: 0 };
       case "csv":
-        return this.parseCsv(body);
+        // A CSV row cannot fail to parse: short rows are padded, so there is
+        // no such thing as a line this drops.
+        return { records: this.parseCsv(body), unreadable: 0 };
     }
   }
 
-  private parseNdjson(body: string): unknown[] {
-    const out: unknown[] = [];
+  private parseNdjson(body: string): {
+    records: unknown[];
+    unreadable: number;
+  } {
+    const records: unknown[] = [];
+    let unreadable = 0;
     for (const line of body.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        out.push(JSON.parse(trimmed));
+        records.push(JSON.parse(trimmed));
       } catch {
-        // Skip malformed line — caller increments errorCount + the
-        // captureException happens in the runOnce loop where we have
-        // bucket/key context.
-        continue;
+        // Counted rather than dropped. The caller cannot see this line any
+        // other way: it never becomes a record, so it never reaches the
+        // `mapEvent` catch that increments `errorCount` for a record it could
+        // not map. The captureException happens in the runOnce loop, which has
+        // the bucket and key.
+        unreadable += 1;
       }
     }
-    return out;
+    return { records, unreadable };
   }
 
   private parseJsonArray(body: string): unknown[] {
