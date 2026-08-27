@@ -1,8 +1,5 @@
-import type {
-  AuthzPermission,
-  AuthzService,
-  EnforcedScopeFields,
-} from "@langwatch/authz-contract";
+import type { AuthzPermission, AuthzService, EnforcedScopeFields } from "@langwatch/authz-contract";
+import type { OpsService } from "@langwatch/ops-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
@@ -14,13 +11,13 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { type Resource, Resources } from "~/utils/rbacVocabulary";
-import { isAdmin } from "~/runtime/app/features/admin";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -462,10 +459,7 @@ export function hasPermissionWithHierarchy(
 /**
  * Check if a team role has a specific permission
  */
-export function teamRoleHasPermission(
-  role: TeamUserRole,
-  permission: Permission,
-): boolean {
+export function teamRoleHasPermission(role: TeamUserRole, permission: Permission): boolean {
   return hasPermissionWithHierarchy(TEAM_ROLE_PERMISSIONS[role], permission);
 }
 
@@ -554,6 +548,7 @@ export type PermissionMiddlewareParams<InputType> = {
   ctx: {
     prisma: PrismaClient;
     session: Session;
+    app?: RequestAppServices;
     permissionChecked: boolean;
     publiclyShared: boolean;
     organizationRole?: OrganizationUserRole | null;
@@ -651,11 +646,7 @@ export const checkTeamPermission =
  */
 export const checkOrganizationPermission =
   (permission: Permission) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ organizationId: string }>) => {
+  async ({ ctx, input, next }: PermissionMiddlewareParams<{ organizationId: string }>) => {
     if (!(await hasOrganizationPermission(ctx, input.organizationId, permission))) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -781,8 +772,7 @@ async function checkPermissionFromBindings({
       // OrganizationUser role is authoritative for EXTERNAL restrictions.
       if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission))
-        return true;
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
       continue;
     }
 
@@ -1319,40 +1309,12 @@ async function hasOrganizationPermissionLegacy(
 }
 
 /**
- * Batched team + project permission check used by surfaces that need to
- * test the SAME permission across many scopes inside one organization
- * (e.g. the model-defaults settings page enumerating every team +
- * project the caller can read/write). One scoped permission check costs
- * ~3-5 queries (team/project lookup, organizationUser, groupMembership,
- * roleBinding, optional customRole). N team + M project checks ran in a
- * Promise.all fan-out, that's hundreds of queries per page load on large
- * orgs.
+ * Data shared by every permission question for an organization's scopes.
  *
- * This helper does the four lookups ONCE — groupMembership, roleBinding
- * (with scopeId IN the union of all team/project/org ids), customRole
- * (for any binding referencing one), and legacy teamUser — then
- * resolves each id in-memory against the same rules
- * `checkPermissionFromBindings` applies.
- *
- * Project resolution still needs to know the project's team so a
- * team-scoped binding inherits to its projects. Callers pass the
- * project→teamId map alongside the project ids.
- */
-/**
- * The permission-INDEPENDENT half of a scoped permission check, loaded once.
- *
- * Every lookup a scoped check makes — the caller's org membership, their group
- * memberships, the role bindings on the scopes in play, the custom roles those
- * bindings reference, and the legacy TeamUser fallback — is the same regardless
- * of WHICH permission is being asked about. Only `bindingGrants` consults the
- * permission, and it is pure.
- *
- * Separating the two is what lets a caller ask about N permissions for the price
- * of one round of queries instead of N rounds. That is not merely a speed-up: a
- * caller that fanned N checks out concurrently wanted N connections from the
- * Prisma pool AT ONCE, and starved anything sharing it — including an interactive
- * transaction with a 5s budget, which then aborted and failed the request
- * outright. Fewer queries is the fix; making the same queries faster is not.
+ * Load it once before resolving a matrix of team/project permissions: org and
+ * group membership, role bindings, referenced custom roles, and the legacy
+ * TeamUser fallback. `bindingGrants` is then the only permission-specific step.
+ * Project callers must supply project→team mappings so team bindings inherit.
  */
 type ScopeResolution = {
   organizationRole: OrganizationUserRole | null;
@@ -1370,8 +1332,7 @@ type ResolvedBinding = {
   scopeId: string;
 };
 
-const scopeKey = (scopeType: RoleBindingScopeType, scopeId: string) =>
-  `${scopeType}::${scopeId}`;
+const scopeKey = (scopeType: RoleBindingScopeType, scopeId: string) => `${scopeType}::${scopeId}`;
 
 /**
  * Loads everything a scoped permission decision needs, in ~4 queries, for ANY
@@ -1476,10 +1437,7 @@ async function loadScopeResolution(
     customRoleById: new Map(customRoles.map((c) => [c.id, c])),
     needsLegacyFallback,
     legacyByTeam: new Map(
-      legacyTeamUser.map((t) => [
-        t.teamId,
-        { role: t.role, assignedRoleId: t.assignedRoleId },
-      ]),
+      legacyTeamUser.map((t) => [t.teamId, { role: t.role, assignedRoleId: t.assignedRoleId }]),
     ),
   };
 }
@@ -1506,9 +1464,7 @@ function bindingGrants(
   if (binding.customRoleId) {
     const custom = resolution.customRoleById.get(binding.customRoleId);
     if (custom) {
-      const perms = Array.isArray(custom.permissions)
-        ? (custom.permissions as string[])
-        : [];
+      const perms = Array.isArray(custom.permissions) ? (custom.permissions as string[]) : [];
       if (perms.length > 0) {
         return hasPermissionWithHierarchy(perms, permission);
       }
@@ -1683,11 +1639,7 @@ export async function batchTeamsPermissions(
     result.set(
       teamId,
       args.permissions.filter((permission) =>
-        teamGrants(
-          resolution,
-          { organizationId: args.organizationId, teamId },
-          permission,
-        ),
+        teamGrants(resolution, { organizationId: args.organizationId, teamId }, permission),
       ),
     );
   }
@@ -1724,11 +1676,7 @@ async function legacyBatchScopePermissions(
   const resolution = await loadScopeResolution(ctx, {
     organizationId: args.organizationId,
     scopeIds: [
-      ...new Set([
-        ...args.teamIds,
-        ...args.projectIds,
-        ...Object.values(args.projectTeamId),
-      ]),
+      ...new Set([...args.teamIds, ...args.projectIds, ...Object.values(args.projectTeamId)]),
     ],
   });
   if (!resolution) {
@@ -1740,11 +1688,7 @@ async function legacyBatchScopePermissions(
   for (const teamId of args.teamIds) {
     teamsMap.set(
       teamId,
-      teamGrants(
-        resolution,
-        { organizationId: args.organizationId, teamId },
-        args.permission,
-      ),
+      teamGrants(resolution, { organizationId: args.organizationId, teamId }, args.permission),
     );
   }
 
@@ -1933,15 +1877,14 @@ export type OpsScope = { kind: "none" } | { kind: "platform" };
 export function resolveOpsScope({
   userEmail,
   impersonatorEmail,
+  ops,
 }: {
-  userId: string;
   userEmail: string | null | undefined;
   /** Email of the real admin behind an impersonation session, if any. */
   impersonatorEmail?: string | null;
-  permission: Permission;
-  prisma: unknown;
+  ops: OpsService;
 }): OpsScope {
-  if (isAdmin({ email: userEmail }) || isAdmin({ email: impersonatorEmail })) {
+  if (ops.isAdmin({ email: userEmail }) || ops.isAdmin({ email: impersonatorEmail })) {
     return { kind: "platform" };
   }
 
@@ -1967,13 +1910,12 @@ export const checkOpsPermission = ({
       if (!user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+      const ops = ctx.app?.ops ?? getApp().ops;
 
       const opsScope = await resolveOpsScope({
-        userId: user.id,
         userEmail: user.email,
         impersonatorEmail: user.impersonator?.email,
-        permission,
-        prisma: ctx.prisma,
+        ops,
       });
 
       // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status

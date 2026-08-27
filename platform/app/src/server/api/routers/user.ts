@@ -16,7 +16,6 @@ import { resolveSupportContact } from "~/server/organizations/resolveSupportCont
 import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
-import { isAdmin as checkIsAdmin } from "~/runtime/app/features/admin";
 import { env } from "../../../env.mjs";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
@@ -54,7 +53,7 @@ export const userRouter = createTRPCRouter({
     })
     .query(({ ctx }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      return { isAdmin: checkIsAdmin({ email: user.email }) };
+      return { isAdmin: ctx.app.ops.isAdmin({ email: user.email }) };
     }),
   register: publicProcedure
     .input(
@@ -461,7 +460,10 @@ export const userRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      if (input.userId !== ctx.session.user.id && !checkIsAdmin({ email: user.email })) {
+      if (
+        input.userId !== ctx.session.user.id &&
+        !ctx.app.ops.isAdmin({ email: user.email })
+      ) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -478,7 +480,7 @@ export const userRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      if (!checkIsAdmin({ email: user.email })) {
+      if (!ctx.app.ops.isAdmin({ email: user.email })) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -598,7 +600,7 @@ export const userRouter = createTRPCRouter({
       });
 
       const defaultPolicy =
-        await ctx.app.governance.routingPolicies.tryResolveDefaultForUser({
+        await ctx.app.governance.tryResolveDefaultRoutingPolicyForUser({
           organizationId: input.organizationId,
           personalTeamId: workspace.team.id,
         });
@@ -676,7 +678,7 @@ export const userRouter = createTRPCRouter({
             }
           : undefined;
 
-      const usage = ctx.app.governance.personalUsage;
+      const usage = ctx.app.governance;
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
@@ -697,19 +699,19 @@ export const userRouter = createTRPCRouter({
       // isn't fetched here.
       const ingestionTenantId = governanceProject?.id;
       const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary({
+        usage.personalUsageSummary({
           personalProjectId: workspace.project.id,
           window,
           userId,
           ingestionTenantId,
         }),
-        usage.dailyBuckets({
+        usage.personalUsageDailyBuckets({
           personalProjectId: workspace.project.id,
           window,
           userId,
           ingestionTenantId,
         }),
-        usage.breakdownByModel({
+        usage.personalUsageBreakdownByModel({
           personalProjectId: workspace.project.id,
           window,
           userId,
@@ -756,7 +758,7 @@ export const userRouter = createTRPCRouter({
       });
       if (!workspace) return { status: "ok" as const };
 
-      const vks = await ctx.app.governance.personalVirtualKeys.list({
+      const vks = await ctx.app.governance.personalVirtualKeyList({
         userId,
         organizationId: input.organizationId,
       });
@@ -855,7 +857,7 @@ export const userRouter = createTRPCRouter({
     )
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.gateway.budgetOverview.overviewForUser({
+      return await ctx.app.governance.personalBudgetOverviewForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
         includeTopModels: input.includeTopModels,
@@ -886,7 +888,7 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.cliBootstrap.resolve({
+      return await ctx.app.governance.cliBootstrapResolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });

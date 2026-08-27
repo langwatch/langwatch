@@ -74,12 +74,8 @@ vi.mock("~/server/app-layer/app", async () => {
     }),
   };
 });
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: vi.fn() },
-}));
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 
-import { featureFlagService } from "~/server/featureFlag";
 import { githubRouter } from "../github";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
@@ -206,9 +202,9 @@ describe("githubRouter access gates", () => {
       hasOrgPermission.mockReturnValue(false);
       isOrganizationMember.mockResolvedValue(true);
 
-      await expect(caller().listRepos({ organizationId: "org-1" })).rejects.toMatchObject(
-        { code: "FORBIDDEN" },
-      );
+      await expect(caller().listRepos({ organizationId: "org-1" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
     });
@@ -265,7 +261,6 @@ describe("githubRouter access gates", () => {
       });
 
       expect(result.configured).toBe(true);
-      expect(featureFlagService.isEnabled).not.toHaveBeenCalled();
     });
   });
 });

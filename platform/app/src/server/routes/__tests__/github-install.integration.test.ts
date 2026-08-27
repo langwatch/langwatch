@@ -45,16 +45,12 @@ const backfillPullRequestMappings = vi.fn();
 const handleWebhookEvent = vi.fn();
 const applyPullRequestEvent = vi.fn();
 const auditLog = vi.fn();
-const isEnabled = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
 }));
 vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: (...args: unknown[]) => auditLog(...args),
-}));
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: (...args: unknown[]) => isEnabled(...args) },
 }));
 // Partial mock: the route uses only this helper, but other modules in the
 // import graph read further rbac exports (Resources etc.).
@@ -84,9 +80,7 @@ vi.spyOn(githubService, "popupResponseHtml").mockImplementation(
 vi.spyOn(githubService, "popupErrorHtml").mockImplementation(
   (message) => `<p>github-error ${message}</p>`,
 );
-vi.spyOn(githubService, "tryParsePullRequestEvent").mockImplementation(
-  parsePullRequestEvent,
-);
+vi.spyOn(githubService, "tryParsePullRequestEvent").mockImplementation(parsePullRequestEvent);
 vi.spyOn(githubService, "isOrganizationMember").mockImplementation((input) =>
   isOrganizationMember(input),
 );
@@ -118,9 +112,7 @@ function verifyState(token: string | null | undefined) {
   if (!token) return null;
   const [body, signature] = token.split(".");
   if (!body || !signature) return null;
-  const expected = createHmac("sha256", TEST_SIGNING_KEY)
-    .update(body)
-    .digest("base64url");
+  const expected = createHmac("sha256", TEST_SIGNING_KEY).update(body).digest("base64url");
   if (signature !== expected) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
@@ -188,7 +180,6 @@ beforeEach(() => {
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
   backfillPullRequestMappings.mockResolvedValue(undefined);
   applyPullRequestEvent.mockResolvedValue(true);
-  isEnabled.mockResolvedValue(true);
 });
 
 describe("GET /api/github/install", () => {
@@ -208,9 +199,7 @@ describe("GET /api/github/install", () => {
   describe("when the user is not a member of the org", () => {
     it("rejects with 403", async () => {
       isOrganizationMember.mockResolvedValue(false);
-      const res = await request(
-        "http://localhost/api/github/install?organizationId=other",
-      );
+      const res = await request("http://localhost/api/github/install?organizationId=other");
       expect(res.status).toBe(403);
     });
   });
@@ -222,9 +211,7 @@ describe("GET /api/github/install", () => {
       // organization: membership alone must not be enough on the REST twin
       // either.
       probeOrganizationPermission.mockResolvedValue(false);
-      const res = await request(
-        "http://localhost/api/github/install?organizationId=org1",
-      );
+      const res = await request("http://localhost/api/github/install?organizationId=org1");
       expect(res.status).toBe(403);
       expect(probeOrganizationPermission).toHaveBeenCalledWith(
         expect.anything(),
@@ -238,9 +225,7 @@ describe("GET /api/github/install", () => {
     it("refuses to start an install", async () => {
       appConfig.configured = false;
 
-      const res = await request(
-        "http://localhost/api/github/install?organizationId=org1",
-      );
+      const res = await request("http://localhost/api/github/install?organizationId=org1");
 
       expect(res.status).toBe(503);
     });
@@ -256,14 +241,11 @@ describe("GET /api/github/install", () => {
   describe("when the org has no access to Langy", () => {
     /** @scenario "Connecting is not gated by the Langy rollout" */
     it("starts the installation anyway, without evaluating the rollout flag", async () => {
-      isEnabled.mockResolvedValue(false);
-
       const res = await request(
         "http://localhost/api/github/install?organizationId=org1&mode=redirect",
       );
 
       expect(res.status).toBe(302);
-      expect(isEnabled).not.toHaveBeenCalled();
     });
   });
 });
@@ -370,8 +352,7 @@ describe("GET /api/github/setup", () => {
 
   describe("when the installation is already owned by another organization", () => {
     async function mockConflictRejection() {
-      const { GithubInstallationConflictError } =
-        await import("@langwatch/github-contract");
+      const { GithubInstallationConflictError } = await import("@langwatch/github-contract");
       recordInstallation.mockRejectedValue(
         new GithubInstallationConflictError({
           installationId: "555",

@@ -10,10 +10,6 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("~/runtime/app/features/admin", () => ({
-  isAdmin: vi.fn(({ email }: { email: string }) => email === "admin@example.com"),
-}));
-
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
@@ -41,7 +37,10 @@ describe("userRouter", () => {
         user: { id: "caller-1", name: "Caller", email },
         expires: "2099-01-01",
       },
-      app: { users: { deactivate, reactivate } } as never,
+      app: {
+        users: { deactivate, reactivate },
+        ops: { isAdmin: ({ email }: { email: string }) => email === "admin@example.com" },
+      } as never,
     });
     return userRouter.createCaller(ctx);
   };

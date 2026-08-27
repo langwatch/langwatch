@@ -58,6 +58,12 @@ async function ensureOrganizationMember(
 const enforceOrganizationMembership: PermissionMiddleware<{
   organizationId: string;
 }> = async ({ ctx, input, next }) => {
+  if (!ctx.app) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Request application services are unavailable",
+    });
+  }
   await ensureOrganizationMember(
     ctx.session.user.id,
     input.organizationId,

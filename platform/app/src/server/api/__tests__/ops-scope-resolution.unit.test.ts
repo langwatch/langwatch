@@ -11,25 +11,28 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { OpsService } from "@langwatch/ops-contract";
 
-// Pre-stub the admin lookup so the test isn't coupled to ADMIN_EMAILS env.
-vi.mock("~/runtime/app/features/admin", () => ({
-  isAdmin: ({ email }: { email: string | null | undefined }) =>
-    email === "admin@langwatch.ai",
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    permissions: {},
+  }),
 }));
 
-// We import after the mock so the module sees our stubbed isAdmin.
 import { checkOpsPermission, resolveOpsScope } from "../rbac";
+
+const ops = {
+  isAdmin: ({ email }: { email: string | null | undefined }) =>
+    email === "admin@langwatch.ai",
+} as OpsService;
 
 describe("resolveOpsScope (lw#3584)", () => {
   describe("when the caller is a non-admin user", () => {
     /** @scenario resolveOpsScope returns kind=none for non-ops users instead of null */
     it("returns { kind: 'none' } so the response is data, not an error", () => {
       const scope = resolveOpsScope({
-        userId: "user-1",
         userEmail: "person@example.com",
-        permission: "ops:view",
-        prisma: {} as unknown,
+        ops,
       });
       expect(scope).toEqual({ kind: "none" });
     });
@@ -39,10 +42,8 @@ describe("resolveOpsScope (lw#3584)", () => {
     /** @scenario resolveOpsScope returns kind=platform for admin users */
     it("returns { kind: 'platform' }", () => {
       const scope = resolveOpsScope({
-        userId: "admin-1",
         userEmail: "admin@langwatch.ai",
-        permission: "ops:view",
-        prisma: {} as unknown,
+        ops,
       });
       expect(scope).toEqual({ kind: "platform" });
     });
@@ -52,11 +53,9 @@ describe("resolveOpsScope (lw#3584)", () => {
     /** @scenario Admin impersonating a customer keeps ops access */
     it("carries the impersonator's grant through: returns { kind: 'platform' }", () => {
       const scope = resolveOpsScope({
-        userId: "customer-1",
         userEmail: "person@example.com",
         impersonatorEmail: "admin@langwatch.ai",
-        permission: "ops:view",
-        prisma: {} as unknown,
+        ops,
       });
       expect(scope).toEqual({ kind: "platform" });
     });
@@ -66,11 +65,9 @@ describe("resolveOpsScope (lw#3584)", () => {
     /** @scenario Non-admin impersonator does not gain ops access */
     it("returns { kind: 'none' }", () => {
       const scope = resolveOpsScope({
-        userId: "customer-1",
         userEmail: "person@example.com",
         impersonatorEmail: "other-person@example.com",
-        permission: "ops:view",
-        prisma: {} as unknown,
+        ops,
       });
       expect(scope).toEqual({ kind: "none" });
     });
@@ -82,6 +79,7 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
     return {
       session: { user: { id: "u1", email } },
       prisma: {} as unknown,
+      app: { ops },
     } as unknown as Parameters<ReturnType<typeof checkOpsPermission>>[0]["ctx"];
   }
 
@@ -152,6 +150,7 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
         },
       },
       prisma: {} as unknown,
+      app: { ops },
     } as unknown as Parameters<ReturnType<typeof checkOpsPermission>>[0]["ctx"];
     const result = await middleware({
       ctx,
