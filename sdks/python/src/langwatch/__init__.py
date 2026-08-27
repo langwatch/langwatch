@@ -52,6 +52,8 @@ if TYPE_CHECKING:
     from .agents import AgentsFacade
     from .scenarios import ScenariosFacade
     from .suites import SuitesFacade
+    from .run_plans import RunPlansFacade
+    from .test_suites import TestSuitesFacade
     from .triggers import TriggersFacade
     from .workflows import WorkflowsFacade
     from .dashboards import DashboardsFacade
@@ -76,6 +78,8 @@ if TYPE_CHECKING:
     agents: AgentsFacade
     scenarios: ScenariosFacade
     suites: SuitesFacade
+    run_plans: RunPlansFacade
+    test_suites: TestSuitesFacade
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
@@ -123,6 +127,8 @@ _LAZY_FACADES = {
     "agents": (".agents", "AgentsFacade"),
     "scenarios": (".scenarios", "ScenariosFacade"),
     "suites": (".suites", "SuitesFacade"),
+    "run_plans": (".run_plans", "RunPlansFacade"),
+    "test_suites": (".test_suites", "TestSuitesFacade"),
     "triggers": (".triggers", "TriggersFacade"),
     "workflows": (".workflows", "WorkflowsFacade"),
     "dashboards": (".dashboards", "DashboardsFacade"),
@@ -258,6 +264,8 @@ __all__ = [
     "agents",
     "scenarios",
     "suites",
+    "run_plans",
+    "test_suites",
     "triggers",
     "workflows",
     "dashboards",
