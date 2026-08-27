@@ -4,6 +4,7 @@ import {
   type NlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda.config";
 import type { LangyWorkerHttpConfig } from "@langwatch/langy-server";
+import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -46,6 +47,9 @@ export interface AppConfig {
 
   /** Typed configuration for the process-owned NLP Lambda capability. */
   nlpLambda: NlpLambdaRuntimeConfig;
+
+  /** Feature overrides resolved once before the service graph is composed. */
+  featureFlags: FeatureFlagConfig;
 
   // Infrastructure
   databaseUrl: string;
@@ -101,6 +105,7 @@ export function createAppConfigFromEnv(overrides?: {
   return {
     nodeEnv: env.NODE_ENV,
     nlpLambda: resolveNlpLambdaRuntimeConfig(env),
+    featureFlags: resolveFeatureFlagConfig(process.env),
     databaseUrl: env.DATABASE_URL,
     clickhouseUrl: env.CLICKHOUSE_URL,
     redisUrl: env.REDIS_URL,

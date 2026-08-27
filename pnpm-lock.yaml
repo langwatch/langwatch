@@ -4452,6 +4452,15 @@ importers:
       '@langwatch/experiment-web':
         specifier: workspace:*
         version: link:../../packages/features/experiment/web
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/feature-flag/contract
+      '@langwatch/feature-flag-server':
+        specifier: workspace:*
+        version: link:../../packages/features/feature-flag/server
+      '@langwatch/feature-flag-web':
+        specifier: workspace:*
+        version: link:../../packages/features/feature-flag/web
       '@langwatch/gateway-server':
         specifier: workspace:*
         version: link:../../packages/features/gateway/server

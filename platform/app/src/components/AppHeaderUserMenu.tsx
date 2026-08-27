@@ -1,4 +1,5 @@
-import { Button, Portal } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal } from "@chakra-ui/react";
+import { ExperimentsDialog } from "@langwatch/feature-flag-web";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 import {
   DEFAULT_NAVIGATION_MODE,
@@ -16,6 +17,7 @@ import {
 } from "../stores/graphicsQualityOverrideStore";
 import { trackEvent } from "../utils/tracking";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
+import { useExperimentsMenuEntry } from "./use-experiments-menu-entry";
 import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "@langwatch/design-system/menu";
@@ -65,23 +67,21 @@ export function AppHeaderUserMenu({
   // The flag is org-targeted, so it must resolve on the org id - gating on
   // project would diverge from the /me pages (which key off the org) and
   // show the menu entry while the page it links to 404s.
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
-  );
+  const experiments = useExperimentsMenuEntry({ enabled: Boolean(session) && !publicPage });
+  const { enabled: governancePreviewEnabled } = useFeatureFlag("release_ui_ai_governance_enabled", {
+    organizationId: organization?.id,
+    enabled: !!organization?.id,
+  });
 
   // The navigation-mode picker only appears once the v2 flag is on; the
   // preference itself lives on the device (see navigationModeStore). The
   // gate matches useNavigationMode, which resolves the flag at user level
   // for a user with no organization: that persona reaches the new shells
   // on /me, so it must also reach the control that selects them.
-  const { enabled: navigationV2Enabled } = useFeatureFlag(
-    "release_ui_navigation_v2_enabled",
-    {
-      organizationId: organization?.id,
-      enabled: !isOrganizationLoading,
-    },
-  );
+  const { enabled: navigationV2Enabled } = useFeatureFlag("release_ui_navigation_v2_enabled", {
+    organizationId: organization?.id,
+    enabled: !isOrganizationLoading,
+  });
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
   const setStoredNavigationMode = useNavigationModeStore((s) => s.setStoredMode);
   // The picker only shows with the flag on, where a device that never
@@ -158,6 +158,23 @@ export function AppHeaderUserMenu({
               <Menu.Item value="settings" asChild>
                 <Link href="/settings">Settings</Link>
               </Menu.Item>
+              {experiments.isAvailable && (
+                <Menu.Item value="experiments" onSelect={experiments.onOpen}>
+                  <HStack gap={2}>
+                    <span>Experiments</span>
+                    {experiments.hasUnseen && (
+                      <Box
+                        aria-label="New experiments available"
+                        role="status"
+                        width="6px"
+                        height="6px"
+                        borderRadius="full"
+                        backgroundColor="blue.solid"
+                      />
+                    )}
+                  </HStack>
+                </Menu.Item>
+              )}
               {navigationV2Enabled && (
                 <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                   <Menu.TriggerItem value="navigation-mode">
@@ -213,6 +230,18 @@ export function AppHeaderUserMenu({
             </Menu.ItemGroup>
           </Menu.Content>
         </Portal>
+      )}
+
+      {session && !publicPage && (
+        <ExperimentsDialog
+          open={experiments.open}
+          onOpenChange={experiments.onOpenChange}
+          experiments={experiments.experiments}
+          isLoading={experiments.isLoading}
+          manageableScopes={experiments.manageableScopes}
+          onSetEnrolment={experiments.onSetEnrolment}
+          onSetTenantPolicy={experiments.onSetTenantPolicy}
+        />
       )}
     </Menu.Root>
   );

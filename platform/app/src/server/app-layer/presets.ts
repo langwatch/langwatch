@@ -7,6 +7,11 @@ import {
   REPORT_SCHEDULER_TARGET_TYPE,
   type AutomationService,
 } from "@langwatch/automation-contract";
+import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import {
+  PostgresFeatureFlagAdapter,
+  RedisFeatureFlagCacheAdapter,
+} from "@langwatch/feature-flag-server";
 import {
   BillingPriceCatalogue,
   getStripeEnvironmentFromNodeEnv,
@@ -485,6 +490,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     skip: config.skipRedis,
   });
   const redisShutdown = RedisShutdownService.create();
+  const featureFlags = PostgresFeatureFlagAdapter.create({
+    database: prisma,
+    cache: RedisFeatureFlagCacheAdapter.create(redis),
+    config: config.featureFlags,
+    now: Date.now,
+  });
   const nlpLambda = createProcessNlpLambdaRuntime({
     config: config.nlpLambda,
     redis,
@@ -2074,6 +2085,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     presence,
     traces,
     evaluations: evaluationService,
+    featureFlags,
     experiments,
     scenarios,
     suites,
@@ -2232,8 +2244,15 @@ export function createTestApp(
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
     nlpLambda: resolveNlpLambdaRuntimeConfig({}),
+    featureFlags: resolveFeatureFlagConfig({}),
     ...overrides?.config,
   };
+  const testFeatureFlags = PostgresFeatureFlagAdapter.create({
+    database: testPrisma,
+    cache: RedisFeatureFlagCacheAdapter.create(null),
+    config: config.featureFlags,
+    now: Date.now,
+  });
   const nlpLambda = createProcessNlpLambdaRuntime({
     config: config.nlpLambda,
     redis: null,
@@ -2571,6 +2590,7 @@ export function createTestApp(
       };
     })(),
     evaluations: testEvaluationService,
+    featureFlags: testFeatureFlags,
     analytics: AnalyticsAdapter.create({
       resolveClient: async () => {
         throw new Error("ClickHouse not available in test app");

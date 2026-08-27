@@ -3,11 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
-import type {
-  AppDependencies,
-  DataRetentionDependencies,
-  OpsDependencies,
-} from "./dependencies";
+import type { AppDependencies, DataRetentionDependencies, OpsDependencies } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -16,12 +12,7 @@ type SettleOutcome =
   | { status: "failed"; error: unknown }
   | { status: "timeout" };
 
-export const APP_SHUTDOWN_PHASES = [
-  "subscriber",
-  "redis",
-  "clickhouse",
-  "database",
-] as const;
+export const APP_SHUTDOWN_PHASES = ["subscriber", "redis", "clickhouse", "database"] as const;
 
 export type AppShutdownPhase = (typeof APP_SHUTDOWN_PHASES)[number];
 
@@ -55,10 +46,7 @@ export class AppShutdownResources {
       try {
         await resource.close();
       } catch (error) {
-        logger.error(
-          { phase, name: resource.name, error },
-          "Failed to close application resource",
-        );
+        logger.error({ phase, name: resource.name, error }, "Failed to close application resource");
       }
     }
   }
@@ -143,6 +131,7 @@ export class App {
   readonly opsExplain: AppDependencies["opsExplain"];
   readonly github: AppDependencies["github"];
   readonly langy: AppDependencies["langy"];
+  readonly featureFlags: AppDependencies["featureFlags"];
   readonly experiments: AppDependencies["experiments"];
   readonly scenarios: AppDependencies["scenarios"];
   readonly suites: AppDependencies["suites"];
@@ -244,6 +233,7 @@ export class App {
     this.opsExplain = deps.opsExplain;
     this.github = deps.github;
     this.langy = deps.langy;
+    this.featureFlags = deps.featureFlags;
     this.ops = deps.ops;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;

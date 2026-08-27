@@ -103,10 +103,6 @@ const UploadCSVDrawer = lazyDefault({
   factory: () => import("./datasets/UploadCSVDrawer"),
   key: "UploadCSVDrawer",
 });
-const FeatureFlagsDrawer = lazyDefault({
-  factory: () => import("./drawers/FeatureFlagsDrawer"),
-  key: "FeatureFlagsDrawer",
-});
 const GroupDetailDrawer = lazyDefault({
   factory: () => import("./ops/queues/groupDetail/GroupDetailDrawer"),
   key: "GroupDetailDrawer",
@@ -325,7 +321,6 @@ export const drawers = {
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
   // Dev tools
-  featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
   opsGroupDetail: GroupDetailDrawer,

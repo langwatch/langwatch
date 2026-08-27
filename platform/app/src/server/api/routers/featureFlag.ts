@@ -1,209 +1,340 @@
-import { createLogger } from "@langwatch/observability";
+import {
+  authenticatedFeatureFlagTargetInputSchema,
+  experimentCatalogueEntrySchema,
+  experimentTenantPolicySchema,
+  experimentTenantScopeSchema,
+  frontendFeatureFlagMapSchema,
+  frontendFeatureFlagSchema,
+  type AuthenticatedExperimentTarget,
+  type ExperimentCatalogueEntry,
+  type FrontendFeatureFlag,
+} from "@langwatch/feature-flag-contract";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { featureFlagService } from "../../featureFlag";
-import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
-import type { FeatureFlagKey } from "../../featureFlag/registry";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import type { Session } from "~/server/auth";
+import { authorizeInResolver } from "../rbac";
+import { createTRPCRouter, protectedProcedure, type TRPCContext } from "../trpc";
 
-const logger = createLogger("langwatch:feature-flag-router");
+const legacyFlagInputSchema = z
+  .object({
+    flag: frontendFeatureFlagSchema,
+    projectId: z.string().optional(),
+    organizationId: z.string().optional(),
+  })
+  .strict();
+const organizationFlagsInputSchema = z
+  .object({
+    flag: frontendFeatureFlagSchema,
+    organizationIds: z.array(z.string()),
+  })
+  .strict();
+const targetInputSchema = z.object({ target: authenticatedFeatureFlagTargetInputSchema }).strict();
+const enrolmentInputSchema = z
+  .object({
+    flag: frontendFeatureFlagSchema,
+    target: authenticatedFeatureFlagTargetInputSchema,
+    enrolled: z.boolean(),
+  })
+  .strict();
+const tenantPolicyInputSchema = z
+  .object({
+    flag: frontendFeatureFlagSchema,
+    scope: experimentTenantScopeSchema,
+    policy: experimentTenantPolicySchema,
+  })
+  .strict();
 
-const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
-  string,
-  ...string[],
-]);
+const enabledOutputSchema = z.object({ enabled: z.boolean() }).strict();
+const enabledByOrganizationOutputSchema = z
+  .object({ enabledByOrganizationId: z.record(z.string(), z.boolean()) })
+  .strict();
+const resolvedFlagsOutputSchema = z.object({ flags: frontendFeatureFlagMapSchema }).strict();
+const experimentsOutputSchema = z
+  .object({ experiments: z.array(experimentCatalogueEntrySchema) })
+  .strict();
+const mutationOutputSchema = z.object({ ok: z.literal(true) }).strict();
 
-/**
- * tRPC router for feature flag checks.
- *
- * Uses PostHog for flag evaluation with optional project/organization targeting.
- * Results are cached server-side (5s TTL) and client-side (React Query).
- *
- * @see dev/docs/adr/005-feature-flags.md for architecture decisions
- */
+type AuthenticatedTRPCContext = TRPCContext & { session: Session };
+type TargetInput = z.infer<typeof authenticatedFeatureFlagTargetInputSchema>;
+
+const authorizesExactTarget = authorizeInResolver({
+  projectId:
+    "the resolver authorizes project:view on this exact project and checks its organization",
+  organizationId: "the resolver authorizes organization:view on this exact organization",
+});
+
+const managesExactScope = authorizeInResolver({
+  projectId: "the resolver authorizes featureFlags:manageExperiments on this exact project",
+  organizationId:
+    "the resolver authorizes featureFlags:manageExperiments on this exact organization",
+});
+
 export const featureFlagRouter = createTRPCRouter({
-  /**
-   * Check if a feature flag is enabled for the current user.
-   *
-   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param projectId - Optional project ID for project-level targeting
-   * @param organizationId - Optional organization ID for org-level targeting
-   * @returns { enabled: boolean }
-   */
   isEnabled: protectedProcedure
-    .input(
-      z.object({
-        flag: frontendFeatureFlagSchema,
-        projectId: z.string().optional(),
-        organizationId: z.string().optional(),
-      }),
-    )
+    .input(legacyFlagInputSchema)
     .noPermission({
-      reason: "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "the resolver authorizes any tenant target before evaluating the caller's flag",
       allow: {
-        projectId: "for PostHog targeting, not resource access",
-        organizationId: "for PostHog targeting, not resource access",
+        projectId: "authorized by authorizeLegacyTarget",
+        organizationId: "authorized by authorizeLegacyTarget",
       },
     })
+    .output(enabledOutputSchema)
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-
-      logger.debug(
-        {
-          userId,
-          flag: input.flag,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
-        },
-        "Feature flag check requested",
-      );
-
-      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS
-      // (a subset of registered PRODUCT keys), so the cast is safe;
-      // FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum value
-      // type, hence the explicit FeatureFlagKey narrowing.
-      const enabled = await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
-        distinctId: userId,
-        defaultValue: false,
-        projectId: input.projectId,
-        organizationId: input.organizationId,
-      });
-
-      logger.debug({ userId, flag: input.flag, enabled }, "Feature flag check result");
+      const target = await authorizeLegacyTarget(ctx, input);
+      const enabled = await ctx.app.featureFlags.isEnabled(input.flag, target);
 
       return { enabled };
     }),
 
-  /**
-   * Check if a feature flag is enabled for ANY of the given organizations.
-   *
-   * Org-targeted flags can only be evaluated one organization at a time, but
-   * some UI (the workspace switcher's personal entry) gates on whether the
-   * user has the flag in any organization they belong to. Returns true as
-   * soon as one organization has it enabled.
-   *
-   * The procedure first intersects `organizationIds` with the caller's
-   * actual `OrganizationUser` memberships and silently drops the rest —
-   * otherwise an authenticated user could probe the flag state of arbitrary
-   * organizations they have no business knowing about. Silent drop (rather
-   * than throwing on the first unknown id) keeps the response shape
-   * indistinguishable between "flag off" and "not a member", so the
-   * procedure cannot be used as a membership oracle either.
-   *
-   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param organizationIds - Organizations to evaluate the flag against
-   * @returns { enabled: boolean }
-   */
   isEnabledForAnyOrganization: protectedProcedure
-    .input(
-      z.object({
-        flag: frontendFeatureFlagSchema,
-        organizationIds: z.array(z.string()),
-      }),
-    )
-    // Membership filtering below is the real authorization check; the
-    // rbac middleware's sensitive-key guard does not cover plural
-    // targeting params and is not relevant here.
+    .input(organizationFlagsInputSchema)
     .noPermission({
-      reason: "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "the resolver filters every organization through the caller's membership",
     })
+    .output(enabledOutputSchema)
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
+      const byOrganization = await resolveForMemberOrganizations({
+        ctx,
+        flag: input.flag,
+        organizationIds: input.organizationIds,
+      });
 
-      if (input.organizationIds.length === 0) {
-        return { enabled: false };
-      }
-
-      // OrganizationUser is org-scoped under the single-organization
-      // invariant of guardOrganizationId, so a single `in:` query would
-      // be rejected for spanning multiple orgs. Resolve memberships
-      // per-id; the user's org count is bounded by their workspace list.
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
-
-      if (allowedOrganizationIds.length === 0) {
-        return { enabled: false };
-      }
-
-      const results = await Promise.all(
-        allowedOrganizationIds.map((organizationId) =>
-          featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
-            distinctId: userId,
-            defaultValue: false,
-            organizationId,
-          }),
-        ),
-      );
-
-      return { enabled: results.some(Boolean) };
+      return { enabled: Object.values(byOrganization).some(Boolean) };
     }),
 
-  /**
-   * Per-organization flag state for the given organizations.
-   *
-   * Like {@link isEnabledForAnyOrganization} but returns the result for EACH
-   * organization rather than OR-ing them, so the workspace switcher can nest a
-   * personal "My Workspace" entry under exactly the organizations that enable
-   * governance (and omit it from the rest).
-   *
-   * Applies the same membership filtering: organizations the caller does not
-   * belong to are silently dropped from the result map (never present as
-   * `false`), so the procedure cannot be used as a membership oracle.
-   *
-   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param organizationIds - Organizations to evaluate the flag against
-   * @returns { enabledByOrganizationId: Record<string, boolean> }
-   */
   isEnabledForEachOrganization: protectedProcedure
-    .input(
-      z.object({
-        flag: frontendFeatureFlagSchema,
-        organizationIds: z.array(z.string()),
-      }),
-    )
+    .input(organizationFlagsInputSchema)
     .noPermission({
-      reason: "feature flags are read per authenticated user; no tenant data is exposed",
+      reason: "the resolver filters every organization through the caller's membership",
     })
+    .output(enabledByOrganizationOutputSchema)
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
+      const enabledByOrganizationId = await resolveForMemberOrganizations({
+        ctx,
+        flag: input.flag,
+        organizationIds: input.organizationIds,
+      });
 
-      if (input.organizationIds.length === 0) {
-        return { enabledByOrganizationId: {} as Record<string, boolean> };
-      }
+      return { enabledByOrganizationId };
+    }),
 
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
+  resolve: protectedProcedure
+    .input(targetInputSchema)
+    .use(authorizesExactTarget)
+    .output(resolvedFlagsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const target = await authorizeTarget(ctx, input.target);
+      const flags = await ctx.app.featureFlags.resolveFrontendFlags(target);
 
-      const entries = await Promise.all(
-        allowedOrganizationIds.map(async (organizationId): Promise<[string, boolean]> => [
-          organizationId,
-          await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
-            distinctId: userId,
-            defaultValue: false,
-            organizationId,
-          }),
-        ]),
-      );
+      return { flags };
+    }),
 
-      return {
-        enabledByOrganizationId: Object.fromEntries(entries) as Record<string, boolean>,
-      };
+  experiments: protectedProcedure
+    .input(targetInputSchema)
+    .use(authorizesExactTarget)
+    .output(experimentsOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const target = await authorizeTarget(ctx, input.target);
+      const entries = await ctx.app.featureFlags.resolveExperimentCatalogue(target);
+      const experiments = await stripUnauthorizedPolicies(ctx, target, entries);
+
+      return { experiments };
+    }),
+
+  setExperimentEnrolment: protectedProcedure
+    .input(enrolmentInputSchema)
+    .use(authorizesExactTarget)
+    .output(mutationOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const target = await authorizeTarget(ctx, input.target);
+      await ctx.app.featureFlags.setUserExperimentEnrolment({
+        flagKey: input.flag,
+        target,
+        enrolled: input.enrolled,
+      });
+
+      return { ok: true } as const;
+    }),
+
+  setExperimentTenantPolicy: protectedProcedure
+    .input(tenantPolicyInputSchema)
+    .use(managesExactScope)
+    .output(mutationOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await authorizeTenantPolicyChange(ctx, input.scope);
+      await ctx.app.featureFlags.setExperimentTenantPolicy({
+        flagKey: input.flag,
+        scope: input.scope,
+        policy: input.policy,
+        changedByUserId: ctx.session.user.id,
+      });
+
+      return { ok: true } as const;
     }),
 });
+
+async function authorizeTarget(
+  ctx: AuthenticatedTRPCContext,
+  target: TargetInput,
+): Promise<AuthenticatedExperimentTarget> {
+  const userId = ctx.session.user.id;
+
+  if (target.kind === "user") {
+    return { kind: "user", userId };
+  }
+
+  if (target.kind === "organization") {
+    await authorizeOrganizationView(ctx, target.organizationId);
+
+    return { kind: "organization", userId, organizationId: target.organizationId };
+  }
+
+  await authorizeProjectView(ctx, target.projectId);
+  const organizationId = await ctx.app.projects.getOrganizationId(target.projectId);
+  if (organizationId !== target.organizationId) {
+    throw forbidden("The project does not belong to that organization.");
+  }
+
+  return {
+    kind: "project",
+    userId,
+    projectId: target.projectId,
+    organizationId,
+  };
+}
+
+async function authorizeLegacyTarget(
+  ctx: AuthenticatedTRPCContext,
+  input: { projectId?: string; organizationId?: string },
+): Promise<AuthenticatedExperimentTarget> {
+  const userId = ctx.session.user.id;
+
+  if (input.projectId) {
+    await authorizeProjectView(ctx, input.projectId);
+    const organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
+    if (input.organizationId && organizationId !== input.organizationId) {
+      throw forbidden("The project does not belong to that organization.");
+    }
+
+    return { kind: "project", userId, projectId: input.projectId, organizationId };
+  }
+
+  if (input.organizationId) {
+    await authorizeOrganizationView(ctx, input.organizationId);
+
+    return { kind: "organization", userId, organizationId: input.organizationId };
+  }
+
+  return { kind: "user", userId };
+}
+
+async function resolveForMemberOrganizations({
+  ctx,
+  flag,
+  organizationIds,
+}: {
+  ctx: AuthenticatedTRPCContext;
+  flag: FrontendFeatureFlag;
+  organizationIds: string[];
+}): Promise<Record<string, boolean>> {
+  const userId = ctx.session.user.id;
+  const entries = await Promise.all(
+    organizationIds.map(async (organizationId) => {
+      const member = await ctx.app.organizations.isMember({ organizationId, userId });
+      if (!member) {
+        return void 0;
+      }
+
+      const enabled = await ctx.app.featureFlags.isEnabled(flag, {
+        kind: "organization",
+        userId,
+        organizationId,
+      });
+
+      return [organizationId, enabled] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries.filter((entry) => entry !== undefined));
+}
+
+async function stripUnauthorizedPolicies(
+  ctx: AuthenticatedTRPCContext,
+  target: AuthenticatedExperimentTarget,
+  entries: ExperimentCatalogueEntry[],
+): Promise<ExperimentCatalogueEntry[]> {
+  const userId = ctx.session.user.id;
+  const canManageProject =
+    target.kind === "project" &&
+    (await ctx.app.permissions.hasPermission({
+      userId,
+      permission: "featureFlags:manageExperiments",
+      projectId: target.projectId,
+    }));
+  const canManageOrganization =
+    (target.kind === "project" || target.kind === "organization") &&
+    (await ctx.app.permissions.hasPermission({
+      userId,
+      permission: "featureFlags:manageExperiments",
+      organizationId: target.organizationId,
+    }));
+
+  return entries.map((entry) => {
+    const { projectPolicy, organizationPolicy, ...viewerEntry } = entry;
+
+    return {
+      ...viewerEntry,
+      ...(canManageProject && projectPolicy ? { projectPolicy } : {}),
+      ...(canManageOrganization && organizationPolicy ? { organizationPolicy } : {}),
+    };
+  });
+}
+
+async function authorizeTenantPolicyChange(
+  ctx: AuthenticatedTRPCContext,
+  scope: z.infer<typeof experimentTenantScopeSchema>,
+): Promise<void> {
+  const permitted = await ctx.app.permissions.hasPermission({
+    userId: ctx.session.user.id,
+    permission: "featureFlags:manageExperiments",
+    ...(scope.kind === "project"
+      ? { projectId: scope.projectId }
+      : { organizationId: scope.organizationId }),
+  });
+  if (!permitted) {
+    throw forbidden("Not permitted to manage experiments for this scope.");
+  }
+}
+
+async function authorizeProjectView(
+  ctx: AuthenticatedTRPCContext,
+  projectId: string,
+): Promise<void> {
+  const permitted = await ctx.app.permissions.hasPermission({
+    userId: ctx.session.user.id,
+    permission: "project:view",
+    projectId,
+  });
+  if (!permitted) {
+    throw forbidden("Not permitted for this project.");
+  }
+}
+
+async function authorizeOrganizationView(
+  ctx: AuthenticatedTRPCContext,
+  organizationId: string,
+): Promise<void> {
+  const permitted = await ctx.app.permissions.hasPermission({
+    userId: ctx.session.user.id,
+    permission: "organization:view",
+    organizationId,
+  });
+  if (!permitted) {
+    throw forbidden("Not permitted for this organization.");
+  }
+}
+
+function forbidden(message: string): TRPCError {
+  return new TRPCError({ code: "FORBIDDEN", message });
+}

@@ -2,7 +2,7 @@ import type React from "react";
 
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import { LoadingScreen } from "./LoadingScreen";
 import { NotFoundScene } from "./NotFoundScene";
 

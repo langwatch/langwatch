@@ -51,10 +51,7 @@ import type { GatewayBudgetService } from "~/server/gateway/budget.service";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
-import type {
-  NotificationService,
-  NurturingService,
-} from "~/runtime/app/features/billing";
+import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
 import type { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
@@ -63,6 +60,7 @@ import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteService } from "@langwatch/suite-contract";
 import type { SimulationService } from "@langwatch/simulation-contract";
@@ -338,6 +336,8 @@ export interface AppDependencies {
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: LangyService;
+  /** The process-owned feature flag capability. */
+  featureFlags: FeatureFlagService;
   experiments: ExperimentService;
   scenarios: ScenarioService;
   suites: SuiteService;
