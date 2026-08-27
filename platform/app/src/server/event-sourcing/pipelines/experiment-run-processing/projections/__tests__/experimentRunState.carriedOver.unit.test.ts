@@ -209,12 +209,9 @@ describe("given a run that produced a cell itself", () => {
 
 describe("given a run that carried two columns and ran a third", () => {
   describe("when the run's totals are folded", () => {
-    /**
-     * Both halves of the rule in one case, so neither half can drift back on
-     * its own: three columns' verdicts, one column's money.
-     *
-     * @scenario "A run that carries two columns and runs one splits money from verdicts"
-     */
+    // Both halves of the rule in one case, so neither half can drift back on
+    // its own: three columns' verdicts, one column's money.
+    /** @scenario "A run that carries two columns and runs one splits money from verdicts" */
     it("scores all three columns and charges for only the one it ran", () => {
       const state = fold([
         targetResult({
