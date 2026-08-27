@@ -212,6 +212,18 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
   SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<SourceType, string>;
 
+export const PROTOCOL_LABEL: Record<SourceMode, string> = {
+  push: "OTel push",
+  pull: "API pull",
+  s3: "S3 pull",
+};
+
+export function modeForSourceType(sourceType: SourceType): SourceMode {
+  return (
+    SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull"
+  );
+}
+
 // Compile-time guard: routing runs inside `writePulledEvents`
 // (`pullers/pullerWorker.ts:325`), which nothing on the push path ever calls.
 // A push-mode entry claiming `routesConversations` would put a picker in the

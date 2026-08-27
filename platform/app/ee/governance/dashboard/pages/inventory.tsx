@@ -20,6 +20,8 @@ import {
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
 import {
   groupForMode,
+  modeForSourceType,
+  PROTOCOL_LABEL,
   routesConversations,
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
@@ -492,13 +494,17 @@ function useIngestionSourceMutations({
       void refetch();
       setComposing(false);
       setComposer(blankComposer());
-      setSecretModal({
-        title: "Source created - paste this secret upstream",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
+      if (data.ingestSecret) {
+        setSecretModal({
+          title: "Source created - paste this secret upstream",
+          secret: data.ingestSecret,
+          sourceId: data.source.id,
+          sourceName: data.source.name,
+          sourceType: data.source.sourceType as SourceType,
+        });
+      } else {
+        toaster.create({ title: "Source created", type: "success" });
+      }
     },
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
@@ -915,6 +921,8 @@ function SourceRow({
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
+  const mode = modeForSourceType(source.sourceType as SourceType);
+  const isPush = mode === "push";
   return (
     <HStack
       borderWidth="1px"
@@ -925,6 +933,10 @@ function SourceRow({
     >
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
+          <SourceTypeIconGlyph
+            sourceType={source.sourceType as SourceType}
+            size="16px"
+          />
           <Link
             href={`/governance/inventory/${source.id}`}
             color="fg"
@@ -936,6 +948,9 @@ function SourceRow({
           </Link>
           <Badge size="sm" variant="surface">
             {typeLabel}
+          </Badge>
+          <Badge size="sm" variant="outline">
+            {PROTOCOL_LABEL[mode]}
           </Badge>
         </HStack>
         {source.description && (
@@ -967,15 +982,17 @@ function SourceRow({
           >
             <Pencil size={14} /> Edit
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onRotate}
-            loading={isPendingRotate}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
+          {isPush && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRotate}
+              loading={isPendingRotate}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"

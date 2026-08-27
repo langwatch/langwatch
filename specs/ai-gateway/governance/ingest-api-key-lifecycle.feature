@@ -242,3 +242,50 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the key's `lastUsedAt` reflects the most recent trace timestamp
     But NO audit rows are emitted per trace
     And only the issue / rotate / revoke state-changes emit audit rows
+
+  # ---------------------------------------------------------------------------
+  # Pull-source key suppression — #7616
+  # ---------------------------------------------------------------------------
+  # Pull-mode and S3-mode sources authenticate outbound (workspace tokens,
+  # client secrets, S3 credentials stored in parserConfig). They never
+  # receive inbound OTLP pushes, so the `lw_is_*` ingest secret is dead
+  # weight: generated, hashed, stored, shown to the admin, never used.
+  #
+  # The `ingestSecretHash` column is non-nullable (String, not String?),
+  # so the suppression stores an empty-string sentinel rather than NULL.
+  # `findByIngestSecret` hashes inbound tokens before matching, so ""
+  # can never collide with a real hash — the sentinel is inert.
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a pull-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "copilot_studio_dataverse"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an S3-mode source does not generate an ingest secret
+    When jane creates an ingestion source with sourceType "openai_compliance"
+    Then the IngestionSource row has `ingestSecretHash` = "" (empty sentinel)
+    And the create response carries `ingestSecret` = null
+    And no secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating a push-mode source still generates an ingest secret
+    When jane creates an ingestion source with sourceType "claude_code"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a pull-mode source's secret is refused
+    Given jane has a pull-mode source with sourceType "databricks_genie"
+    When jane requests a secret rotation for that source
+    Then the rotation is refused with a validation error
+    And the source's ingestSecretHash remains "" (empty sentinel)
+
+  @bdd @ingest-api-key @pull-source @rotation-guard
+  Scenario: Rotating a push-mode source's secret still works
+    Given jane has a push-mode source with sourceType "otel_generic"
+    When jane requests a secret rotation for that source
+    Then a new secret is minted and the prior hash enters the grace window
