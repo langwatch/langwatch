@@ -85,6 +85,7 @@ const PUSH_SOURCE_TYPES: ReadonlySet<SourceType> = new Set([
   "claude_code",
   "claude_cowork",
   "workato",
+  "s3_custom", // webhook callback path authenticated by ingest secret
 ]);
 
 export function isPushSourceType(t: SourceType): boolean {

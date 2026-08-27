@@ -54,7 +54,7 @@ import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type { SourceType } from "../components/ingestionSourceCatalog";
-import { modeForSourceType } from "../components/ingestionSourceCatalog";
+import { needsIngestSecret } from "../components/ingestionSourceCatalog";
 import { SourceEventsTable } from "../components/SourceEventsTable";
 import {
   type SourceEventsPager,
@@ -179,7 +179,9 @@ function SourceDetailHeader({
           >
             <Pencil size={14} /> Edit
           </Button>
-          {modeForSourceType(source.sourceType as SourceType) === "push" && (
+          {needsIngestSecret({
+            sourceType: source.sourceType as SourceType,
+          }) && (
             <Button
               size="sm"
               variant="outline"

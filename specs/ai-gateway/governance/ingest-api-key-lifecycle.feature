@@ -271,6 +271,13 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And no secret modal is shown to the admin
 
   @bdd @ingest-api-key @pull-source @suppression
+  Scenario: Creating an s3_custom source generates a secret for webhook callback
+    When jane creates an ingestion source with sourceType "s3_custom"
+    Then the IngestionSource row has a real `ingestSecretHash` (non-empty)
+    And the create response carries `ingestSecret` with a valid `lw_is_` prefix
+    And the secret modal is shown to the admin
+
+  @bdd @ingest-api-key @pull-source @suppression
   Scenario: Creating a push-mode source still generates an ingest secret
     When jane creates an ingestion source with sourceType "claude_code"
     Then the IngestionSource row has a real `ingestSecretHash` (non-empty)

@@ -1,15 +1,17 @@
 /**
  * @vitest-environment node
  *
- * Pull-mode and S3-mode sources never receive inbound pushes, so the
- * `lw_is_*` ingest secret is dead weight. This file asserts:
+ * Pull-mode and pure-S3 sources never receive inbound pushes, so the
+ * `lw_is_*` ingest secret is dead weight. s3_custom is the exception:
+ * it uses the webhook callback path authenticated by ingest secret.
  *
- * 1. createSource for a pull type stores an empty-string sentinel in
- *    `ingestSecretHash` and returns `ingestSecret: null`.
- * 2. createSource for an S3 type does the same.
- * 3. createSource for a push type still generates a real secret.
- * 4. rotateSecret on a non-push source is refused.
- * 5. rotateSecret on a push source still works.
+ * This file asserts:
+ * 1. createSource for a pull type stores empty sentinel, returns null.
+ * 2. createSource for a pure-S3 type (openai_compliance) does the same.
+ * 3. createSource for s3_custom (webhook callback) generates a real secret.
+ * 4. createSource for a push type generates a real secret.
+ * 5. rotateSecret on a non-push source is refused.
+ * 6. rotateSecret on a push source still works.
  *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  *       "Pull-source key suppression — #7616"
@@ -71,7 +73,9 @@ function createServiceForRotate(existing: Record<string, unknown>) {
 }
 
 describe("pull-source key suppression (#7616)", () => {
-  describe("createSource", () => {
+  /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
+  /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */
+  describe("when createSource is called", () => {
     it("pull type → empty sentinel hash, null secret", async () => {
       const { service, captured } = createServiceForCreate();
 
@@ -94,15 +98,15 @@ describe("pull-source key suppression (#7616)", () => {
       expect(result.ingestSecret).toBeNull();
     });
 
-    it("S3 type → empty sentinel hash, null secret", async () => {
+    it("pure-S3 type (openai_compliance) → empty sentinel hash, null secret", async () => {
       const { service, captured } = createServiceForCreate();
 
       const result = await service.createSource({
         organizationId: "org_1",
-        sourceType: "s3_custom",
-        name: "s3-test",
+        sourceType: "openai_compliance",
+        name: "oai-compliance-test",
         pullConfig: {
-          adapter: "s3_custom",
+          adapter: "openai_compliance",
           bucketName: "test-bucket",
           region: "us-east-1",
           prefix: "logs/",
@@ -115,6 +119,29 @@ describe("pull-source key suppression (#7616)", () => {
 
       expect(captured.data?.ingestSecretHash).toBe("");
       expect(result.ingestSecret).toBeNull();
+    });
+
+    it("s3_custom (webhook callback) → real hash and lw_is_ secret", async () => {
+      const { service, captured } = createServiceForCreate();
+
+      const result = await service.createSource({
+        organizationId: "org_1",
+        sourceType: "s3_custom",
+        name: "s3-callback-test",
+        pullConfig: {
+          adapter: "s3_custom",
+          bucketName: "test-bucket",
+          region: "us-east-1",
+          prefix: "logs/",
+          schedule: "*/30 * * * *",
+          credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+        },
+        pullSchedule: "*/30 * * * *",
+        actorUserId: "user_1",
+      });
+
+      expect(captured.data?.ingestSecretHash).not.toBe("");
+      expect(result.ingestSecret).toMatch(/^lw_is_/);
     });
 
     it("push type → real hash and lw_is_ secret", async () => {
@@ -132,7 +159,7 @@ describe("pull-source key suppression (#7616)", () => {
     });
   });
 
-  describe("rotateSecret", () => {
+  describe("when rotateSecret is called", () => {
     it("pull-mode source is refused", async () => {
       const { service } = createServiceForRotate({
         id: "src_pull",

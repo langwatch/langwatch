@@ -21,6 +21,7 @@ import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddI
 import {
   groupForMode,
   modeForSourceType,
+  needsIngestSecret,
   PROTOCOL_LABEL,
   routesConversations,
   SOURCE_GROUP_META,
@@ -469,7 +470,13 @@ function useGroupedSources(sources: Source[] | undefined) {
     };
     for (const s of sources ?? []) {
       const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      out[groupForMode(meta?.mode ?? "push")].push(s);
+      out[
+        groupForMode(
+          modeForSourceType({
+            sourceType: (s.sourceType ?? "otel_generic") as SourceType,
+          }),
+        )
+      ].push(s);
     }
     return out;
   }, [sources]);
@@ -921,8 +928,12 @@ function SourceRow({
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
-  const mode = modeForSourceType(source.sourceType as SourceType);
-  const isPush = mode === "push";
+  const mode = modeForSourceType({
+    sourceType: source.sourceType as SourceType,
+  });
+  const hasSecret = needsIngestSecret({
+    sourceType: source.sourceType as SourceType,
+  });
   return (
     <HStack
       borderWidth="1px"
@@ -982,7 +993,7 @@ function SourceRow({
           >
             <Pencil size={14} /> Edit
           </Button>
-          {isPush && (
+          {hasSecret && (
             <Button
               size="sm"
               variant="ghost"

@@ -218,10 +218,24 @@ export const PROTOCOL_LABEL: Record<SourceMode, string> = {
   s3: "S3 pull",
 };
 
-export function modeForSourceType(sourceType: SourceType): SourceMode {
+export function modeForSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): SourceMode {
   return (
     SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull"
   );
+}
+
+export function needsIngestSecret({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  const opt = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  if (!opt) return true;
+  return opt.mode === "push" || sourceType === "s3_custom";
 }
 
 // Compile-time guard: routing runs inside `writePulledEvents`
