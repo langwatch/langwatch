@@ -49,40 +49,21 @@ describe("agent report discovery notices", () => {
     });
   });
 
-  describe("given the docs footer", () => {
-    /** @scenario "The docs footer note for agents reads in full" */
-    it("keeps the label short enough and un-clipped by the theme", () => {
-      const config = JSON.parse(read("docs/docs.json")) as {
-        footer: { links: { items: { label: string; href: string }[] }[] };
-      };
-      const link = config.footer.links
-        .flatMap((group) => group.items)
-        .find((item) => item.label.includes("report an issue"));
+  describe("given the attribution footer", () => {
+    /** @scenario "The attribution footer carries the report line on every page" */
+    it("injects the agent report line above the Powered by note", () => {
+      const script = read("docs/posthog.js");
+      expect(
+        script,
+        "posthog.js lost the footer injection",
+      ).toContain("lw-agent-report");
+      expect(script).toContain("npx langwatch report");
+      expect(script).toContain('href="/support"');
 
-      expect(link, "the docs footer lost the agent report link").toBeDefined();
-      // The theme renders no group header for a single group, so the label
-      // carries the framing, and the command is the point of the note.
-      expect(link!.label).toMatch(/^For agents:/);
-      expect(link!.label).toContain("npx langwatch report");
-      // The theme truncates footer labels at `max-w-36` (144px) from md up;
-      // style.css lifts that for this href, leaving the ~500px column as the
-      // real budget. The current label measures 361px, so cap the length with
-      // room to spare rather than letting it grow into a wrap on desktop.
-      expect(link!.label.length).toBeLessThanOrEqual(60);
-      // Mintlify strips the fragment from footer hrefs, so a `#section` deep
-      // link here silently lands on the page top. Keep the plain page URL.
-      expect(link!.href).not.toContain("#");
-
-      // The override has to still DO something: a surviving selector with the
-      // declarations removed would silently restore the clipping.
-      const escapedHref = link!.href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const rule = new RegExp(
-        `footer a\\[href="${escapedHref}"\\]\\s*\\{([^}]*)\\}`,
-      ).exec(read("docs/style.css"));
-      expect(rule, "style.css lost the footer link override").not.toBeNull();
-      expect(rule![1]).toContain("max-width: none");
-      expect(rule![1]).toContain("overflow: visible");
-      expect(rule![1]).toContain("text-overflow: clip");
+      const css = read("docs/style.css");
+      expect(css, "style.css lost the report line style").toContain(
+        ".lw-agent-report",
+      );
     });
   });
 

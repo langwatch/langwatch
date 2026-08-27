@@ -50,7 +50,7 @@ Connect my agent to LangWatch simulations
 You are using LangWatch for your AI agent project. Follow these instructions.
 
 IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
-Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
 # Connect Your Agent to LangWatch Simulations
 
@@ -314,13 +314,13 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs nothing else.
+For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 <Tabs>
   <Tab title="Python">

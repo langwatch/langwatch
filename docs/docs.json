@@ -513,10 +513,6 @@
           {
             "group": "Tools",
             "pages": [
-              "integration/tools/integrations/claude-code",
-              "integration/tools/integrations/openai-codex",
-              "integration/tools/integrations/github-copilot-cli",
-              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -743,8 +739,6 @@
             "group": "Get Started",
             "pages": [
               "ai-governance/overview",
-              "ai-governance/track-your-claude-code-usage",
-              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -823,6 +817,91 @@
               "ai-governance/api",
               "ai-governance/cli",
               "ai-governance/mcp"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "Coding Agents",
+        "icon": "square-terminal",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "coding-agents/overview",
+              "coding-agents/quickstart",
+              "coding-agents/claude-code-usage"
+            ]
+          },
+          {
+            "group": "Set Up Your Agent",
+            "pages": [
+              {
+                "group": "Claude Code",
+                "icon": "/images/logos/claude-code.svg",
+                "pages": [
+                  "coding-agents/claude-code"
+                ]
+              },
+              {
+                "group": "Codex",
+                "icon": "/images/logos/codex.svg",
+                "pages": [
+                  "coding-agents/openai-codex"
+                ]
+              },
+              {
+                "group": "GitHub Copilot",
+                "icon": "/images/logos/github-copilot.svg",
+                "pages": [
+                  "coding-agents/github-copilot-cli"
+                ]
+              },
+              {
+                "group": "Gemini CLI",
+                "icon": "/images/logos/gemini.svg",
+                "pages": [
+                  "coding-agents/gemini-cli"
+                ]
+              },
+              {
+                "group": "OpenCode",
+                "icon": "/images/logos/opencode.svg",
+                "pages": [
+                  "coding-agents/opencode"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "See Your Usage",
+            "pages": [
+              "coding-agents/sessions",
+              "coding-agents/pull-requests",
+              "coding-agents/usage-analytics",
+              "coding-agents/repository-and-pr-attribution"
+            ]
+          },
+          {
+            "group": "Teams & Fleets",
+            "pages": [
+              "coding-agents/team-projects",
+              "coding-agents/headless-and-ci"
+            ]
+          },
+          {
+            "group": "Privacy & Security",
+            "pages": [
+              "coding-agents/privacy",
+              "coding-agents/secrets-redaction"
+            ]
+          },
+          {
+            "group": "Investigate With Your Agent",
+            "pages": [
+              "coding-agents/explore-your-usage-with-your-own-agent",
+              "coding-agents/find-your-context-sweet-spot",
+              "coding-agents/compare-provider-costs"
             ]
           }
         ]
@@ -1518,16 +1597,6 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Sign In to LangWatch",
-          "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=sidebar-signin",
-          "icon": "house"
-        },
-        {
-          "anchor": "Visit GitHub",
-          "href": "https://github.com/langwatch/langwatch",
-          "icon": "github"
-        },
-        {
           "anchor": "Get Support",
           "href": "https://docs.langwatch.ai/support#email-support",
           "icon": "life-ring"
@@ -1551,26 +1620,6 @@
       "href": "https://github.com/langwatch/langwatch"
     }
   },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/langwatch/langwatch",
-      "website": "https://langwatch.ai",
-      "x-twitter": "https://x.com/langwatchai",
-      "linkedin": "https://www.linkedin.com/company/langwatch/",
-      "youtube": "https://www.youtube.com/@LangWatch"
-    },
-    "links": [
-      {
-        "header": "For agents",
-        "items": [
-          {
-            "label": "For agents: report an issue using npx langwatch report",
-            "href": "https://langwatch.ai/docs/support"
-          }
-        ]
-      }
-    ]
-  },
   "integrations": {
     "gtm": {
       "tagId": "GTM-KJ4S6Z9C"
@@ -1580,6 +1629,30 @@
     {
       "source": "/ci/cache/busted/1787752783",
       "destination": "/introduction"
+    },
+    {
+      "source": "/integration/tools/integrations/claude-code",
+      "destination": "/coding-agents/claude-code"
+    },
+    {
+      "source": "/integration/tools/integrations/openai-codex",
+      "destination": "/coding-agents/openai-codex"
+    },
+    {
+      "source": "/integration/tools/integrations/github-copilot-cli",
+      "destination": "/coding-agents/github-copilot-cli"
+    },
+    {
+      "source": "/integration/tools/integrations/opencode",
+      "destination": "/coding-agents/opencode"
+    },
+    {
+      "source": "/ai-governance/track-your-claude-code-usage",
+      "destination": "/coding-agents/claude-code-usage"
+    },
+    {
+      "source": "/ai-governance/explore-your-usage-with-your-own-agent",
+      "destination": "/coding-agents/explore-your-usage-with-your-own-agent"
     },
     {
       "source": "/langevals/:path*",
