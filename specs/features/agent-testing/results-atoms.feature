@@ -279,3 +279,13 @@ Feature: The results atom
     Given two projects holding a scenario run of the same id
     When the atoms of one project are read
     Then only the atom of that project is returned
+
+  @integration
+  Scenario: A row that names no scenario is not an atom
+    Given a stored run row that carries no scenario id
+    When the atoms are read
+    Then no atom of that row is returned
+
+    An atom is one scenario, one target, one run. A row that names no
+    scenario answers none of those, so it groups under an empty key and
+    reads as a row with no name.

@@ -282,6 +282,29 @@ describe("findAtoms", () => {
     });
   });
 
+  describe("given a stored row that names no scenario", () => {
+    /** @scenario "A row that names no scenario is not an atom" */
+    it("leaves it out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          scenarioId: "",
+        }),
+        makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms).toHaveLength(1);
+      expect(atoms[0]?.scenarioId).not.toBe("");
+    });
+  });
+
   describe("given two projects holding a run of the same id", () => {
     /** @scenario "Atoms never cross a project" */
     it("returns only the run of the project asked for", async () => {

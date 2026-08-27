@@ -196,7 +196,10 @@ interface FilterParts {
 
 /** The predicates that may run inside the dedup subquery. */
 function stableFilterParts(filter: ResultsFilter): FilterParts {
-  const parts: string[] = [];
+  // An atom is one scenario, one target, one run. A row that names no
+  // scenario answers none of those: it groups under an empty key and reads
+  // as a row with no name.
+  const parts: string[] = ["ScenarioId != ''"];
   const params: Record<string, string | string[]> = {};
 
   if (filter.scenarioSetIds && filter.scenarioSetIds.length > 0) {
