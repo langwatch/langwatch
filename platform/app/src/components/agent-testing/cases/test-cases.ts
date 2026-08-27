@@ -45,6 +45,30 @@ export type ExternalSetEntry = {
   lastRunTimestamp: number | null;
 };
 
+/**
+ * The name the Default suite carries, kept in step with
+ * `DEFAULT_SUITE_NAME` in `~/server/suites/default-suite`, which is what
+ * writes it. The name is read and never written here, so this module stays
+ * free of the Prisma the server module needs.
+ */
+export const DEFAULT_SUITE_NAME = "Default";
+
+/**
+ * The suites of the rail, with Default at the front.
+ *
+ * Default is an ordinary suite in every other way, so it is only moved and
+ * never marked. Existing projects got theirs from the migration, which makes
+ * it the newest row of the list rather than the first, and a person who
+ * renames it has an ordinary suite that keeps its place in the list.
+ */
+export function orderSuitesDefaultFirst(
+  suites: TestSuiteEntry[],
+): TestSuiteEntry[] {
+  const isDefault = (suite: TestSuiteEntry) =>
+    suite.name === DEFAULT_SUITE_NAME;
+  return [...suites.filter(isDefault), ...suites.filter((s) => !isDefault(s))];
+}
+
 /** The cases that carry at least one of the chosen labels. */
 export function filterCasesByLabels(
   cases: TestCase[],

@@ -15,7 +15,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api, type RouterOutputs } from "~/utils/api";
 import type { CaseLastResult } from "./CasesTable";
-import type { ExternalSetEntry, TestCase, TestSuiteEntry } from "./test-cases";
+import {
+  type ExternalSetEntry,
+  orderSuitesDefaultFirst,
+  type TestCase,
+  type TestSuiteEntry,
+} from "./test-cases";
 
 type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
 type FolderRows = RouterOutputs["suites"]["folders"]["getAll"];
@@ -113,13 +118,15 @@ function useSuiteEntries({
         (countByFolder.get(testCase.folderId) ?? 0) + 1,
       );
     }
-    return (folders ?? []).map((folder) => ({
-      id: folder.id,
-      name: folder.name,
-      slug: folder.slug,
-      caseCount: countByFolder.get(folder.id) ?? 0,
-      targets: parseSuiteTargets(folder.targets ?? []),
-    }));
+    return orderSuitesDefaultFirst(
+      (folders ?? []).map((folder) => ({
+        id: folder.id,
+        name: folder.name,
+        slug: folder.slug,
+        caseCount: countByFolder.get(folder.id) ?? 0,
+        targets: parseSuiteTargets(folder.targets ?? []),
+      })),
+    );
   }, [folders, cases]);
 }
 

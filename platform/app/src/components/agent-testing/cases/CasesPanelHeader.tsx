@@ -6,7 +6,14 @@
  */
 
 import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import { ChevronRight, Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  Folder,
+  FolderCode,
+  Pencil,
+  Play,
+  Plus,
+} from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";

@@ -10,7 +10,11 @@ import { format } from "date-fns";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { FG_MUTED } from "../shared/design";
 import type { CaseLastResult } from "./CasesTable";
-import { lastRunAtOf, summaryFromLastResults, type TestCase } from "./test-cases";
+import {
+  lastRunAtOf,
+  summaryFromLastResults,
+  type TestCase,
+} from "./test-cases";
 
 /** What the line reads before the date. */
 export const SUITE_LAST_RUN_LABEL = "Last run on";

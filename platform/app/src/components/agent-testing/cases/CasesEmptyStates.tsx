@@ -64,7 +64,10 @@ export function FirstSuiteEmptyState({
   onNewSuite: () => void;
 }) {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-first-suite-empty">
+    <EmptyState.Root
+      paddingY={12}
+      data-testid="agent-testing-first-suite-empty"
+    >
       <EmptyState.Content>
         <EmptyState.Indicator>
           <FolderPlus size={28} />

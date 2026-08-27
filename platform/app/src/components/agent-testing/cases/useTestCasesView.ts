@@ -57,7 +57,9 @@ export function useTestCasesView({
 
   const selectedSuite = useMemo<TestSuiteEntry | null>(() => {
     const namedSlug = selection.kind === "suite" ? selection.slug : null;
-    return suites.find((suite) => suite.slug === namedSlug) ?? suites[0] ?? null;
+    return (
+      suites.find((suite) => suite.slug === namedSlug) ?? suites[0] ?? null
+    );
   }, [selection, suites]);
 
   const visibleCases = useMemo(() => {

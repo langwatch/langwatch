@@ -15,7 +15,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
 import { SuiteNameDialog } from "../cases/SuiteNameDialog";
 import { SuiteRail } from "../cases/SuiteRail";
-import type { TestSuiteEntry } from "../cases/test-cases";
+import {
+  orderSuitesDefaultFirst,
+  type TestSuiteEntry,
+} from "../cases/test-cases";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -141,19 +144,36 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The Default suite is listed first" */
-  it("lists Default first, in the order the rail is given", () => {
-    renderRail({
-      suites: [
-        makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
-        makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
-        makeSuite(),
-      ],
-    });
+  it("moves Default to the front and keeps the rest in their order", () => {
+    // The migration wrote Default last, so the read hands it over last.
+    const asRead = [
+      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
+      makeSuite(),
+      makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
+    ];
+
+    renderRail({ suites: orderSuitesDefaultFirst(asRead) });
 
     expect(railEntries()).toEqual([
       "suite-rail-item-Default",
       "suite-rail-item-Checkout",
       "suite-rail-item-Refunds",
+    ]);
+  });
+
+  it("leaves a renamed Default where the read put it", () => {
+    const asRead = [
+      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
+      makeSuite({
+        id: "suite_default",
+        name: "Everything else",
+        slug: "default",
+      }),
+    ];
+
+    expect(orderSuitesDefaultFirst(asRead).map((suite) => suite.name)).toEqual([
+      "Checkout",
+      "Everything else",
     ]);
   });
 
@@ -447,9 +467,7 @@ describe("the test suites rail", () => {
       expect(
         within(dialog).queryByRole("button", { name: "Add scenarios" }),
       ).not.toBeInTheDocument();
-      expect(
-        within(dialog).queryByRole("checkbox"),
-      ).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
     /** @scenario "Saving the suite editor renames the suite" */
