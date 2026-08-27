@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { EventRecord, EventRepository } from "@langwatch/eventing";
+import { EventNotFoundError, type EventRecord, type EventRepository } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -132,6 +132,45 @@ export class EventRepositoryClickHouse implements EventRepository {
 
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
     return this.resolveClient(tenantId);
+  }
+
+  async getEventRecord(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventId: string;
+  }): Promise<EventRecord> {
+    const { tenantId, aggregateType, aggregateId, eventId } = request;
+    const client = await this.getClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          ${EVENT_LOG_SELECT_COLUMNS}
+        FROM event_log
+        WHERE TenantId = {tenantId:String}
+          AND AggregateType = {aggregateType:String}
+          AND AggregateId = {aggregateId:String}
+          AND EventId = {eventId:String}
+        ORDER BY EventTimestamp DESC
+        LIMIT 1
+      `,
+      query_params: {
+        tenantId,
+        aggregateType,
+        aggregateId,
+        eventId,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<EventLogRow>();
+    const records = mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
+
+    const record = records[0];
+    if (!record) {
+      throw new EventNotFoundError({ eventId, aggregateId, aggregateType });
+    }
+
+    return record;
   }
 
   async getEventRecords(

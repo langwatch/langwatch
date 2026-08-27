@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../../data-retention/retentionPolicy.schema";
-import type { RetentionPolicyResolver } from "../../../../data-retention/retentionPolicyResolver";
 import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 
@@ -46,7 +46,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when retention resolver returns a policy with traces=30", () => {
     it("stamps every event_log record with _retention_days = 30", async () => {
-      const resolver: RetentionPolicyResolver = {
+      const resolver: Pick<DataRetentionService, "resolve"> = {
         resolve: vi.fn().mockResolvedValue({
           traces: 30,
           scenarios: null,
@@ -92,7 +92,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when the tenant has no policy configured", () => {
     it("falls back to the platform default", async () => {
-      const resolver: RetentionPolicyResolver = {
+      const resolver: Pick<DataRetentionService, "resolve"> = {
         resolve: vi.fn().mockResolvedValue(null),
       };
       const store = new EventStoreClickHouse(

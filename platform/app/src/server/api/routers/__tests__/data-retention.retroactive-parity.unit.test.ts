@@ -20,7 +20,7 @@ vi.mock("~/server/data-retention/policy/dataRetentionPolicy.authz", () => policy
 vi.mock("~/server/data-retention/policy/dataRetentionPolicy.read", () => ({
   getRetentionPolicySnapshot: vi.fn(),
 }));
-vi.mock("~/server/data-retention/metering/storageMeter.read", () => ({
+vi.mock("~/server/data-retention/metering/storage-meter.read", () => ({
   resolveScopeStorageUsage: vi.fn(),
 }));
 vi.mock("~/server/api/rbac", async () => {

@@ -129,6 +129,32 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
   });
 });
 
+describe("EventRepositoryClickHouse.getEventRecord", () => {
+  it("binds the tenant, aggregate and immutable event identity", async () => {
+    const client = createMockClient({ value: "expected" });
+    const repository = new EventRepositoryClickHouse(async () => client);
+
+    await repository.getEventRecord({
+      tenantId: "tenant-a",
+      aggregateType: "trace",
+      aggregateId: "trace-a",
+      eventId: "event-a",
+    });
+
+    const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(call.query).toContain("TenantId = {tenantId:String}");
+    expect(call.query).toContain("AggregateType = {aggregateType:String}");
+    expect(call.query).toContain("AggregateId = {aggregateId:String}");
+    expect(call.query).toContain("EventId = {eventId:String}");
+    expect(call.query_params).toMatchObject({
+      tenantId: "tenant-a",
+      aggregateType: "trace",
+      aggregateId: "trace-a",
+      eventId: "event-a",
+    });
+  });
+});
+
 /**
  * The three reads answer the same record through the same mapping, so a
  * column one of them forgets to project decodes as `undefined` rather than
