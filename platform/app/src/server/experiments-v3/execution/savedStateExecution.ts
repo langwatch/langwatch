@@ -9,6 +9,7 @@ import {
 import type { EvaluationsV3State } from "~/experiments-v3/types";
 import { createInitialUIState } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import type { CellId } from "~/experiments-v3/utils/executionScope";
 import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { prisma } from "~/server/db";
@@ -18,7 +19,6 @@ import {
 } from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import type { CellId } from "~/experiments-v3/utils/executionScope";
 import { type ExecutionDataInputs, loadExecutionData } from "./dataLoader";
 import type { CarriedOverCell, ExecutionScope } from "./types";
 
