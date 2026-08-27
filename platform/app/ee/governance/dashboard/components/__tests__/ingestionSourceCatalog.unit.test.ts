@@ -79,7 +79,7 @@ describe("given the ingestion-source catalog", () => {
   });
 
   describe("when the old OpenAI compliance source has been retired", () => {
-    /** @scenario "The old OpenAI source can no longer be chosen" */
+    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
     it("is not offered on any plan", () => {
       for (const isEnterprise of [true, false]) {
         const offered = gatedSourceTypeOptions({ isEnterprise }).map(
