@@ -130,16 +130,36 @@ describe("frontend feature flags", () => {
     });
   });
 
-  describe("when the pinned lists are read", () => {
-    it("names exactly the keys each one covers", () => {
-      expect(UNREGISTERED_BY_DESIGN).toEqual([
-        "ops_ui_ops_menu_pinned",
-        "release_ui_identity_front_door_enabled",
-      ]);
-      expect(FRONTEND_SYSTEM_FLAGS).toEqual([
-        "release_langy_enabled",
-        "release_langy_ui_actions",
-      ]);
+  describe("when the exemption lists are read", () => {
+    /**
+     * The claim each list makes, asserted against the REGISTRY rather than
+     * against a copy of itself.
+     *
+     * This used to compare both arrays to the same literals written in this
+     * file, so it could not fail for any change to the product — only for an
+     * edit to the two lines above it, which a reviewer is already looking at.
+     * That mattered here: the exemption list was widened by this branch, and
+     * the only test mentioning the widening was the one that could not fail.
+     */
+    it("exempts from the registry only flags the registry has no definition for", () => {
+      // The claim `UNREGISTERED_BY_DESIGN` makes. A key that HAS a definition
+      // has no business here: exempting it hides a lever that works.
+      for (const key of UNREGISTERED_BY_DESIGN) {
+        expect(resolveFlagDefinition(key)).toBeUndefined();
+      }
+      for (const key of SIGNED_OUT_FLAGS) {
+        expect(resolveFlagDefinition(key)).toBeUndefined();
+      }
+    });
+
+    it("keeps the system flags registered, because that is a different claim", () => {
+      // `FRONTEND_SYSTEM_FLAGS` is not an exemption from the registry — it
+      // says these DO resolve and are operator-store-only. Asserting the same
+      // thing of both lists would collapse two different claims into one and
+      // stop either being checked.
+      for (const key of FRONTEND_SYSTEM_FLAGS) {
+        expect(resolveFlagDefinition(key)).toBeDefined();
+      }
     });
   });
 });

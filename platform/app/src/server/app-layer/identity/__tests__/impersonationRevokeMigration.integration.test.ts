@@ -61,6 +61,13 @@ const named = (suffix: string): string => {
 const REVOKE_SUFFIX = "_revoke_legacy_impersonating_sessions";
 
 /**
+ * Where this wave begins, so the claim below covers it and everything after
+ * rather than one month. Migrations sort lexically, so a string compare is
+ * the same order the runner applies them in.
+ */
+const WAVE_STARTS_AT = "20260825";
+
+/**
  * Every server source that names the legacy payload as a value — an object key
  * a Prisma call could pass, or a property read off a row.
  *
@@ -103,34 +110,63 @@ describe("given sessions carrying the legacy impersonation payload", () => {
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
     it("ends exactly the sessions carrying that payload", () => {
       const statements = statementsIn(sqlOf(named(REVOKE_SUFFIX)));
+      const deletes = statements.filter((statement) =>
+        /DELETE FROM "Session"/i.test(statement),
+      );
 
-      expect(statements).toEqual([
+      // One delete, and `impersonating IS NOT NULL` is the WHOLE predicate:
+      // no user id, no date range, no "while we are here".
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0]).toContain(
         'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
-      ]);
+      );
+    });
+
+    it("runs it only where the column still exists", () => {
+      // GUARDED, because this migration can arrive at a database that no
+      // longer has the column: an earlier numbering of this branch dropped it
+      // on developer databases, and the migration that repairs those sorts
+      // AFTER this one. Unguarded, the run aborted here and never reached the
+      // repair — so the repair was unreachable on every database that needed
+      // it.
+      const sql = sqlOf(named(REVOKE_SUFFIX));
+
+      expect(sql).toMatch(/information_schema\.columns/i);
+      expect(sql).toMatch(/column_name = 'impersonating'/i);
     });
 
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
     it("keeps every ordinary session, including the ones that proved nothing", () => {
+      // FROM THE WAVE ONWARD, rather than a single month.
+      //
+      // A prefix of `202608` scoped this to August, so a migration authored
+      // in September carrying `DELETE FROM "Session"` was invisible: it would
+      // leave `deletes` unchanged and the test green, while the comment below
+      // went on claiming one statement touches the table. The file warns
+      // against hard-coding a timestamp sixty lines above this.
+      //
+      // A lower bound rather than no bound, because the table WAS emptied
+      // once before, by `20260410233000_better_auth_destructive` — a
+      // deliberate cutover long since deployed. The claim being made is about
+      // this wave and everything after it, so that is what the scan covers.
       const deletes = migrationNames()
-        .filter((name) => name.startsWith("202608"))
+        .filter((name) => name >= WAVE_STARTS_AT)
         .flatMap((name) =>
           statementsIn(sqlOf(name)).map((statement) => ({ name, statement })),
         )
         .filter(
           ({ statement }) =>
-            /^DELETE FROM "Session"/i.test(statement) ||
-            /^TRUNCATE .*"Session"/i.test(statement),
+            /DELETE FROM "Session"/i.test(statement) ||
+            /TRUNCATE .*"Session"/i.test(statement),
         );
 
-      // One statement in the whole wave touches the session table, and it is
-      // the impersonation revoke. Nothing keys on `amr`, on `identifierId`,
-      // or on a session having recorded nothing.
-      expect(deletes).toEqual([
-        {
-          name: named(REVOKE_SUFFIX),
-          statement: 'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
-        },
-      ]);
+      // One statement from this wave onward touches the session table, and it
+      // is the impersonation revoke. Nothing keys on `amr`, on
+      // `identifierId`, or on a session having recorded nothing.
+      expect(deletes.map(({ name }) => name)).toEqual([named(REVOKE_SUFFIX)]);
+      expect(deletes[0]?.statement).toContain(
+        'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
+      );
     });
 
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
