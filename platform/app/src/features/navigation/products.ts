@@ -1,6 +1,6 @@
 import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
 import type { Permission } from "~/server/api/rbac";
-import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
 /**
  * The product registry: the platform is four products plus Settings, and

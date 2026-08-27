@@ -1,12 +1,6 @@
-import { Pin, PinOff, ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
-import {
-  setFeatureFlagOverride,
-  useFeatureFlagOverrides,
-} from "~/hooks/useFeatureFlagOverrides";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
-import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   actionCommands,
@@ -64,67 +58,11 @@ export function useFilteredCommands(
     return filterCommands(availableNavCommands, query);
   }, [query, availableNavCommands]);
 
-  const featureFlagOverrides = useFeatureFlagOverrides();
-  const featureFlagToggleCommands = useMemo<Command[]>(() => {
-    // In dev, and to ops admins in any environment: flipping a local override
-    // is a legitimate admin capability, and it only ever affects this browser.
-    if (!isDevMode && !hasOpsAccess) return [];
-    return FRONTEND_FEATURE_FLAGS.map((flag) => {
-      const current = featureFlagOverrides[flag];
-      const stateLabel =
-        current === undefined ? "server-resolved" : current ? "forced ON" : "forced OFF";
-      return {
-        id: `action-feature-flag-toggle:${flag}`,
-        label: `Toggle ${flag}`,
-        description: `Currently ${stateLabel} — cycles default → on → off`,
-        icon: ToggleLeft,
-        category: "actions",
-        keywords: ["feature", "flag", "flags", "toggle", "dev", "override", flag],
-        action: () => {
-          const next =
-            current === undefined ? true : current === true ? false : undefined;
-          setFeatureFlagOverride(flag, next);
-        },
-      };
-    });
-  }, [isDevMode, hasOpsAccess, featureFlagOverrides]);
-
-  // A per-browser pin for the Ops sidebar section, offered only to users who
-  // already have ops access. Unlike the dev-only feature-flag toggles above,
-  // this is available in every environment — it is the admin-facing way to
-  // flip `ops_ui_ops_menu_pinned` without a dev build or a settings page. The
-  // pin only affects visibility, and the sidebar still gates on ops access, so
-  // exposing it here widens nothing.
-  const opsPinCommand = useMemo<Command[]>(() => {
-    if (!hasOpsAccess) return [];
-    const pinned = featureFlagOverrides.ops_ui_ops_menu_pinned === true;
-    return [
-      {
-        id: "action-toggle-ops-pin",
-        label: pinned ? "Unpin Ops from sidebar" : "Pin Ops in sidebar",
-        description: pinned
-          ? "Remove the Ops sidebar pin (this browser)"
-          : "Keep Ops visible in the sidebar (this browser)",
-        icon: pinned ? PinOff : Pin,
-        category: "actions",
-        keywords: ["ops", "pin", "sidebar", "always", "show", "operations", "menu"],
-        action: () => {
-          setFeatureFlagOverride("ops_ui_ops_menu_pinned", pinned ? undefined : true);
-        },
-      },
-    ];
-  }, [hasOpsAccess, featureFlagOverrides]);
-
   const availableActionCommands = useMemo(() => {
-    let commands = hasOpsAccess
+    return hasOpsAccess
       ? actionCommands
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
-    // The Feature Flags drawer opens for dev builds and for ops admins anywhere.
-    if (!isDevMode && !hasOpsAccess) {
-      commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
-    }
-    return [...commands, ...featureFlagToggleCommands, ...opsPinCommand];
-  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands, opsPinCommand]);
+  }, [hasOpsAccess]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];

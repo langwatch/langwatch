@@ -108,10 +108,6 @@ export function handleCommandSelect(
       ctx.close();
       openDrawer("inviteMember");
       break;
-    case "action-feature-flags":
-      ctx.close();
-      openDrawer("featureFlags");
-      break;
   }
 }
 
