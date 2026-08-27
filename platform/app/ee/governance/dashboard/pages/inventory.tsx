@@ -3519,8 +3519,7 @@ function secretModalTargets(details: SecretDetails | null) {
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
     usesWebhookUrl:
-      details?.sourceType === "workato" ||
-      details?.sourceType === "s3_custom",
+      details?.sourceType === "workato" || details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }
