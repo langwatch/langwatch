@@ -1,4 +1,5 @@
 import {
+  SPAN_MAX_PAST_MS,
   spanTreeCursorSchema,
   spanTreeNodeSchema,
   spanTreePageSchema,
@@ -34,6 +35,10 @@ type NodeParity = [ContractNode] extends [LiveSpanTreeNodeShape]
 const nodeParity: NodeParity = true;
 
 describe("Trace span-tree contract", () => {
+  it("publishes the ingestion age limit for every transport", () => {
+    expect(SPAN_MAX_PAST_MS).toBe(31 * 24 * 60 * 60 * 1000);
+  });
+
   it("characterizes every live tracesV2 SpanTreeNode field", () => {
     expect(nodeParity).toBe(true);
     const node = spanTreeNodeSchema.parse({

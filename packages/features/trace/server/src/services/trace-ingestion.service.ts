@@ -6,6 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import {
   instrumentationScopeSchema,
   resourceSchema,
+  SPAN_MAX_PAST_MS,
   spanSchema,
   type OtlpInstrumentationScope,
   type OtlpResource,
@@ -13,11 +14,6 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Maximum accepted span age, shared by OTLP and REST collector intake. */
-export const SPAN_MAX_PAST_MS = 31 * ONE_DAY_MS;
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -62,9 +58,11 @@ function unixMillis(value: unknown): number {
   if (typeof value === "number") {
     return Math.floor(value / 1e6);
   }
+
   if (typeof value === "string") {
     return Math.floor(Number.parseInt(value, 10) / 1e6);
   }
+
   if (
     typeof value === "object" &&
     value !== null &&
@@ -233,6 +231,7 @@ export class TraceIngestionService {
       if (lockResult === false) {
         return { status: "deduped" };
       }
+
       lockAcquired = lockResult === true;
 
       const commandData: RecordSpanCommandData = {

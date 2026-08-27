@@ -10,10 +10,9 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "../schemas/events";
-import { isSpanReceivedEvent } from "../schemas/events";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { OtlpAnyValue, OtlpSpan } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:tracked-event-sync");
@@ -236,9 +235,7 @@ function reconstructTrackedEvent({
  * as their type, are skipped. Spans this path emitted itself are never
  * reconstructed at all.
  */
-export function extractTrackedEventsFromSpan(
-  span: OtlpSpan,
-): ReconstructedTrackedEvent[] {
+export function extractTrackedEventsFromSpan(span: OtlpSpan): ReconstructedTrackedEvent[] {
   const events: ReconstructedTrackedEvent[] = [];
 
   if (span.name === TRACK_EVENT_SPAN_NAME) return events;
@@ -317,11 +314,7 @@ function isValidTrackedEvent({
     return false;
   }
 
-  if (
-    !predefinedEventTypes.includes(
-      event.event_type as (typeof predefinedEventTypes)[number],
-    )
-  ) {
+  if (!predefinedEventTypes.includes(event.event_type as (typeof predefinedEventTypes)[number])) {
     return true;
   }
 
@@ -453,9 +446,6 @@ async function syncTrackedEventsFromSpan({
  */
 export function createTrackedEventSyncHandler(
   deps: TrackedEventSyncSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return (event, context) => syncTrackedEventsFromSpan({ event, context, deps });
 }

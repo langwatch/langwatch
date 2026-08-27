@@ -1,16 +1,13 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
-} from "@langwatch/trace-contract";
+import { SPAN_RECEIVED_EVENT_TYPE, TOPIC_ASSIGNED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
   isSpanReceivedEvent,
   isTopicAssignedEvent,
   parseSpanReferencedPayload,
   topicAssignedEventDataSchema,
   topicAssignedEventSchema,
-} from "../events";
+} from "@langwatch/trace-contract";
 
 describe("events schemas", () => {
   describe("spanReferencedPayloadSchema", () => {

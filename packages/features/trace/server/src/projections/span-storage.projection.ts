@@ -66,9 +66,7 @@ export class SpanStorageMapProjection
     // SpanCostService, run on the same normalized span the fold sees) so the
     // stored Cost / NonBilledCost match the span's contribution to the trace
     // total.
-    const rawCost = this.spanCostService.extractTokenMetrics(span).cost;
-    const cost = rawCost > 0 ? Number(rawCost.toFixed(6)) : null;
-    const nonBilledCost = this.spanCostService.isSpanCostNonBillable(span) ? cost : null;
+    const { cost, nonBilledCost } = this.spanCostService.deriveStorageCost(span);
     span.cost = cost;
     span.nonBilledCost = nonBilledCost;
     return span;

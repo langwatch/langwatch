@@ -3,14 +3,13 @@ import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL, SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "../api-key/auth-middleware";
-import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
 import { PlanLimitExceededError } from "../app-layer/usage/errors";
 import type { UsageLimitResult } from "../app-layer/usage/usage.service";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";

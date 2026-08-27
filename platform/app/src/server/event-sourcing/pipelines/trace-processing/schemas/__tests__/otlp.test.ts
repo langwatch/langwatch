@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  anyValueSchema,
-  bytesSchema,
-  idSchema,
-  spanSchema,
-} from "@langwatch/trace-contract";
+import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "@langwatch/trace-contract";
 
 describe("otlp schemas", () => {
   describe("idSchema", () => {
@@ -48,8 +43,8 @@ describe("otlp schemas", () => {
       it("handles standard 16-byte trace IDs", () => {
         // Typical OpenTelemetry trace ID (16 bytes)
         const bytes = new Uint8Array([
-          0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
-          0x77, 0x88, 0x99,
+          0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+          0x99,
         ]);
 
         const result = idSchema.safeParse(bytes);

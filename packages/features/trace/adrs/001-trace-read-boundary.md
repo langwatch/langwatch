@@ -1,107 +1,86 @@
-# ADR-001: Trace owns the viewer-safe span-tree read boundary
+# ADR-001: Trace owns reads, ingestion and deterministic processing
 
 **Status:** Accepted
 
-**Behavioural contract:** [Trace read service](../specs/trace-read-service.feature)
+**Behavioural contracts:** [Trace read service](../specs/trace-read-service.feature),
+[query language](../specs/trace-query-language.feature), and
+[canonicalisation](../specs/sdk-timing-and-metrics-canonicalisation.feature)
 
 ## Context
 
-The app owned paged span-tree reads, row-version delta reads and their
-ClickHouse queries. That duplicated Trace ownership while making transport
-parity difficult to prove.
+Trace reads and processing used to be implemented across app routers, app-layer
+services and the event-sourcing pipeline. That duplicated the feature boundary
+and made transport, replay and projection parity difficult to prove.
 
 ## Decision
 
-The Trace feature owns these reads through its canonical service and private
-persistence boundary. The app retains only transport and composition.
+Trace owns portable read, ingress and processing contracts plus the server
+implementation behind them. The app owns authentication, transport mapping and
+process composition.
 
-## Public surfaces and transports
+The canonical `TraceService` owns the characterized read methods: trace records,
+derived events, evaluation spans/events, paged span trees, row-version deltas,
+query-field catalogues, query classification, ingest-wait timing and summary
+lookup. Zod 4 schemas preserve the existing transport fields and nullability.
+The app's URLs and tRPC names do not change.
 
-Trace owns the live `tracesV2.spanTreePaginated` and `tracesV2.spanTreeDelta`
-reads. The portable contract uses Zod 4 schemas and preserves every field and
-nullish optionality in those responses. Every read carries the tenant/project
-id to persistence. A missing trace returns an empty page with a null cursor.
+Trace also owns OTLP traversal and validation, the portable ingestion age limit,
+command and event definitions, canonicalisation, and the deterministic
+`trace_processing` pipeline. The server package contains the trace-summary and
+trace-analytics folds, stored-span and timeseries-rollup map projections, their
+stores, and their pure derivation collaborators.
 
-The app's tRPC names and response shapes do not change. Browser code may use
-the Trace contract but does not fetch or reshape the response.
+## Composition and effects
 
-The contract also owns the portable Trace query language: field metadata,
-grammar, parsing, analysis and mutations. Browser callers execute these pure
-operations locally. Live categorical samples are read through `TraceService`;
-the server keeps the facet source behind a private composition port.
+Composition roots create one Trace service, ingestion service, canonicalisation
+service and processing graph per process. They inject ClickHouse resolution,
+deduplication, spool/blob access, privacy preparation, tokenization, pricing,
+media extraction and projection storage through named ports.
 
-## Dependencies
+Cross-feature and external effects remain app or owning-feature adapters. These
+include evaluation and automation dispatch, project metadata updates,
+simulation/experiment synchronization, governance subscribers and live UI
+broadcasts. They subscribe to the package-owned graph and do not reimplement its
+commands or projections.
 
-`TraceService` receives the Trace repository and the complete Model Provider
-service. Missing positive stored cost delegates to the latter's canonical
-pricing cascade; Trace does not implement another calculator.
+## Persistence and query parity
 
-## Persistence
+Paged trees and row-version deltas read `stored_spans`. A bounded
+`trace_summaries` lookup may supply the first-page occurrence hint; a stale hint
+falls back to an unbounded tenant-scoped read. `trace_analytics`,
+`trace_summaries` and the timeseries rollup are distinct projections and are
+never substituted for one another. Trace ingestion does not write to
+Elasticsearch.
 
-The server keeps one private Trace repository. Its ClickHouse implementation
-is composed by the server adapter and never crosses the package export
-boundary. Cost redaction is applied after persistence reads and before DTO
-validation.
+The ClickHouse implementation stays private to the server package. Tenant id is
+carried to every persistence call. Cost redaction happens after persistence and
+before DTO validation; missing positive stored cost delegates to the complete
+Model Provider service.
 
-Paged and delta reads use `stored_spans`. `trace_summaries` may provide the
-first-page occurrence hint; `trace_analytics` and its time-series rollup are
-not substitutes.
+## Compatibility gates
 
-## Runtime and registration
+Authenticated handlers use the composed service through `context.app` or
+`ctx.app`. Missing traces retain each existing route's successful-empty or
+not-found mapping. Invalid cursors and inputs still fail contract validation,
+and persistence errors keep their existing transport mapping.
 
-The app composition root creates one Trace service and exposes it through
-`context.app`. Request handlers do not construct repositories or services.
+Legacy full-detail and list/search composition remains authoritative wherever
+the package service still enters through an app adapter. Those adapters may
+resolve visibility protections, annotations, evaluations, enrichment, links,
+events and blob-backed payloads, but must contain no second Trace domain
+implementation. A residual moves only with a fixture proving its complete
+response, authorization, ordering, pagination and null-versus-omitted parity.
 
-Canonicalisation has a separate synchronous, deterministic lifecycle from the
-asynchronous tenant read service. One process-owned
-`TraceCanonicalisationService` is shared by trace summary, trace analytics,
-span storage and timeseries rollup projections, and by log and coding-agent
-callers. Its format adapters are private implementation details.
+## Browser boundary
 
-## Environment and configuration
-
-Trace reads no environment variables. The ClickHouse client and semantic
-configuration arrive through composition.
-
-## Errors
-
-Invalid cursors and inputs fail contract validation. Persistence failures
-propagate through the existing transport error mapping. A missing trace is a
-successful empty page, preserving the existing API.
-
-## Contracts and validation
-
-Zod 4 schemas define input, cursor and response DTOs. Service output is parsed
-before crossing the transport boundary, including nullish field behaviour.
+The web package owns reusable, transport-neutral presentation and loaded-row
+behaviour. The app supplies routing, data hooks and small named render ports for
+media, terminal and anchored-comment UI. Browser code does not authorize,
+compose services or reshape Trace responses.
 
 ## Consequences
 
-Portable response schemas now live in the Trace contract and the legacy router
-schema module is only a re-export. This slice does not move the corresponding
-header, full/detail, list/search, resource or signal reads, nor their app-owned
-projection/eventing implementations, overlays, evaluations, enrichment or
-logs. Canonicalisation itself is shared by the four existing projections and
-the trace/log/coding-agent readers.
-The browser package contains only display behaviour and cannot fetch,
-authorize, compose, or reshape a trace response. It also owns the
-transport-neutral loaded-row find behaviour and the flame-graph presentation.
-The transcript stack (content parsing, turn grouping, role presentation,
-reasoning/tool cards, and the virtualized conversation list) is likewise
-browser-safe and reusable. The app supplies only the media, terminal, and
-anchored-comment render ports needed by its concrete drawer.
-The app supplies loaded span rows, selection callbacks, its Kbd skin, and
-shortcut composition; a small `TraceFlameSpan` input keeps the response schema
-out of the web package. Those paths move only
-with their complete response parity characterized.
-
-## Compatibility gate
-
-The paged tree and row-version delta routes call the composed Trace service.
-The current drawer's whole-tree anchor, shared-trace payload, full/detail
-reads, resources, evaluations, annotations, redaction, enrichment, events,
-links and blob data remain legacy. Migrate those only after a fixture proves
-the complete payload, including null-versus-omitted fields, tenant isolation
-and full/blob fallback.
-
-The remaining transport gate is full-detail parity. Until that payload is
-complete, the old route remains authoritative.
+Displaced app command, projection, schema and store modules are deleted once
+their package coverage is canonical. Remaining app modules are explicit
+transport, composition or external-effect adapters; they are not a second
+processing stack.

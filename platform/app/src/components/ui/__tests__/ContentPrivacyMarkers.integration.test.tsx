@@ -6,7 +6,7 @@ import { cleanup, render } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ContentPrivacy } from "~/server/api/routers/tracesV2.schemas";
+import type { ContentPrivacy } from "@langwatch/trace-contract";
 import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../ContentPrivacyMarkers";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -131,11 +131,7 @@ describe("ContentPrivacyMarkers", () => {
     it("renders nothing when there is nothing to mark, even framed", () => {
       const { container } = render(
         <Wrapper>
-          <ContentPrivacyMarkers
-            privacy={privacy()}
-            categories={["system", "tools"]}
-            framed
-          />
+          <ContentPrivacyMarkers privacy={privacy()} categories={["system", "tools"]} framed />
         </Wrapper>,
       );
       expect(container.textContent).toBe("");

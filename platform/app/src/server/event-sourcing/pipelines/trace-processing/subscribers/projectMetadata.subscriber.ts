@@ -2,8 +2,8 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import { trackServerEvent } from "~/server/posthog";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
 
@@ -108,10 +108,7 @@ async function trackFirstTraceIntegrated({
  */
 export function createProjectMetadataHandler(
   deps: ProjectMetadataSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
 

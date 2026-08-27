@@ -1,8 +1,8 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
@@ -28,10 +28,7 @@ export const TRACE_UPDATE_BROADCAST_WINDOW_MS = 2_000;
  */
 export function createTraceUpdateBroadcastHandler(
   deps: TraceUpdateBroadcastSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, aggregateId: traceId } = context;
 

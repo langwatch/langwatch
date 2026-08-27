@@ -2,7 +2,7 @@ import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createHash } from "crypto";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type { SpanReceivedEvent } from "../schemas/events";
+import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 import { TraceRequestUtils } from "./traceRequest.utils";
 
 /**
@@ -26,14 +26,10 @@ function makeDeterministicKsuid({
     .update(String(timestampMs))
     .digest();
 
-  const instance = new Instance(
-    Instance.schemes.RANDOM,
-    new Uint8Array(hash.subarray(0, 8)),
-  );
+  const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(hash.subarray(0, 8)));
 
   // Use the next 4 bytes for the sequence to further ensure uniqueness
-  const sequence =
-    ((hash[8]! << 24) | (hash[9]! << 16) | (hash[10]! << 8) | hash[11]!) >>> 0;
+  const sequence = ((hash[8]! << 24) | (hash[9]! << 16) | (hash[10]! << 8) | hash[11]!) >>> 0;
 
   const ksuid = new Ksuid(
     getEnvironment(),
@@ -89,10 +85,7 @@ function generateDeterministicTraceSummaryIdFromData(
   traceId: string,
   startTimeUnixMs: number,
 ): string {
-  EventUtils.validateTenantId(
-    { tenantId },
-    "generateDeterministicTraceSummaryIdFromData",
-  );
+  EventUtils.validateTenantId({ tenantId }, "generateDeterministicTraceSummaryIdFromData");
   return makeDeterministicKsuid({
     hashKey: `${tenantId}:${traceId}`,
     resource: KSUID_RESOURCES.TRACE_SUMMARY,

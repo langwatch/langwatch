@@ -2,11 +2,10 @@ import crypto from "node:crypto";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
-import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
+import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "../schemas/events";
-import { isSpanReceivedEvent } from "../schemas/events";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
@@ -72,8 +71,7 @@ function readEvaluationPayload(event: OtlpSpanEvent): string | undefined {
 function parseEvaluation(jsonPayload: string): SdkEvaluation | undefined {
   try {
     const parsed: unknown = JSON.parse(jsonPayload);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-      return undefined;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
     const record = parsed as Record<string, unknown>;
     if (typeof record.name !== "string") return undefined;
     return record as unknown as SdkEvaluation;
@@ -146,10 +144,7 @@ export function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
  */
 export function createCustomEvaluationSyncHandler(
   deps: CustomEvaluationSyncSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (event, context) => {
     if (!hasSyncableEvaluations(event) || !isSpanReceivedEvent(event)) return;
 
@@ -247,8 +242,7 @@ function buildReportPayload({
 
   return {
     tenantId,
-    evaluationId:
-      evaluation.evaluation_id ?? deterministicEvaluationId({ traceId, evaluation }),
+    evaluationId: evaluation.evaluation_id ?? deterministicEvaluationId({ traceId, evaluation }),
     evaluatorId: evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
     evaluatorType: "custom",
     evaluatorName: evaluation.name,

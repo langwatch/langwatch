@@ -43,8 +43,7 @@ type FlattenResult = Record<string, AttributeValue>;
 
 const SEP = ".";
 
-const join = (prefix: string, key: string): string =>
-  prefix ? `${prefix}${SEP}${key}` : key;
+const join = (prefix: string, key: string): string => (prefix ? `${prefix}${SEP}${key}` : key);
 
 const indexKey = (prefix: string, i: number): string =>
   prefix ? `${prefix}${SEP}${i}` : String(i);
@@ -382,9 +381,7 @@ const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown>
  * Into:
  *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
  */
-const reconstructFlattenedArrays = (
-  attrs: NormalizedAttributes,
-): NormalizedAttributes => {
+const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const { patterns, matchedKeys } = detectArrayPatterns(attrs);
 
   // If no patterns found, return original
@@ -458,9 +455,7 @@ export function sanitizeInvalidJsonEscapes(json: string): string {
  * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
  */
 /** @internal Exported for unit testing */
-export const parseJsonStringValues = (
-  attrs: NormalizedAttributes,
-): NormalizedAttributes => {
+export const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const result: NormalizedAttributes = {};
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -546,9 +541,7 @@ const parseTraceFlags = (spanFlags: number | undefined | null): TraceFlagsInfo =
 
   const safeSpanFlags = spanFlags >>> 0; // force to uint32
   const hasRemoteFlag = (safeSpanFlags & TRACE_FLAGS_IS_REMOTE_MASK) !== 0;
-  const remoteFlag = hasRemoteFlag
-    ? safeSpanFlags & TRACE_FLAGS_HAS_IS_REMOTE_MASK
-    : void 0;
+  const remoteFlag = hasRemoteFlag ? safeSpanFlags & TRACE_FLAGS_HAS_IS_REMOTE_MASK : void 0;
 
   return {
     sampled: (safeSpanFlags & TRACE_FLAGS_MASK) !== 0,

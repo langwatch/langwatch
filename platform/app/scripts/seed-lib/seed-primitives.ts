@@ -58,7 +58,7 @@ export const DAY_MS = 24 * 60 * 60_000;
 
 /**
  * The collector refuses spans more than 31 days in the past
- * (SPAN_MAX_PAST_MS in trace-request-collection.service.ts) to protect
+ * (`SPAN_MAX_PAST_MS` in the Trace contract) to protect
  * ClickHouse partition pruning. Seeders keep a day of margin: traces older
  * than this go through the pipeline's recordSpan command seam instead of the
  * collector, so the public guard stays intact.

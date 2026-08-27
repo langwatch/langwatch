@@ -79,9 +79,7 @@ describe("parseJsonStringValues", () => {
     it("parses JSON with \\< invalid escape from PII redaction", () => {
       const brokenJson = '[{"role":"user","content":"SSN: \\<US_DRIVER_LICENSE>"}]';
       const result = parseJsonStringValues({ messages: brokenJson });
-      expect(result.messages).toEqual([
-        { role: "user", content: "SSN: <US_DRIVER_LICENSE>" },
-      ]);
+      expect(result.messages).toEqual([{ role: "user", content: "SSN: <US_DRIVER_LICENSE>" }]);
     });
 
     it("parses JSON with multiple PII tokens", () => {
@@ -105,9 +103,7 @@ describe("parseJsonStringValues", () => {
 describe("sanitizeInvalidJsonEscapes()", () => {
   describe("when given strings with PII-redaction escapes", () => {
     it("removes backslash before <", () => {
-      expect(sanitizeInvalidJsonEscapes("\\<US_DRIVER_LICENSE>")).toBe(
-        "<US_DRIVER_LICENSE>",
-      );
+      expect(sanitizeInvalidJsonEscapes("\\<US_DRIVER_LICENSE>")).toBe("<US_DRIVER_LICENSE>");
     });
 
     it("removes backslash before >", () => {
@@ -115,9 +111,7 @@ describe("sanitizeInvalidJsonEscapes()", () => {
     });
 
     it("handles multiple PII tokens", () => {
-      expect(sanitizeInvalidJsonEscapes("\\<PERSON> and \\<US_SSN>")).toBe(
-        "<PERSON> and <US_SSN>",
-      );
+      expect(sanitizeInvalidJsonEscapes("\\<PERSON> and \\<US_SSN>")).toBe("<PERSON> and <US_SSN>");
     });
   });
 

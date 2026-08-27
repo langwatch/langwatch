@@ -1,8 +1,8 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeExperimentRunMetricsCommandData } from "../../experiment-run-processing/schemas/commands";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:experiment-metrics-publisher");
 
@@ -10,9 +10,7 @@ export const EXPERIMENT_METRICS_SYNC_DELAY_MS = 60_000;
 export const EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS = 60_000;
 
 export interface ExperimentMetricsSyncSubscriberDeps {
-  computeExperimentRunMetrics: (
-    data: ComputeExperimentRunMetricsCommandData,
-  ) => Promise<void>;
+  computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
   lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
 }
 
@@ -41,10 +39,7 @@ export function hasExperimentCostMetrics(foldState: TraceSummaryData): boolean {
  */
 export function createExperimentMetricsSyncHandler(
   deps: ExperimentMetricsSyncSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
     if (!hasExperimentCostMetrics(foldState)) return;

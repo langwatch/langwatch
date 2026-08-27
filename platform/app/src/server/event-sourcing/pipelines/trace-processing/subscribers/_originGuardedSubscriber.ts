@@ -1,11 +1,8 @@
 import type { SubscriberSpec, TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import {
-  ORIGIN_RESOLVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
-} from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:origin-guarded-subscriber");
 
@@ -27,10 +24,7 @@ const MAX_TRACE_AGE_MS = 24 * 60 * 60 * 1000;
  * but must NOT fan out to side-effecting subscribers. `origin_resolved` is
  * here so deferred-origin traces still dispatch once their origin lands.
  */
-const MESSAGE_EVENT_TYPES = new Set<string>([
-  SPAN_RECEIVED_EVENT_TYPE,
-  ORIGIN_RESOLVED_EVENT_TYPE,
-]);
+const MESSAGE_EVENT_TYPES = new Set<string>([SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE]);
 
 /** Pure guard check, shared by the origin-guarded subscribers below and the
  *  EE trace-alert subscriber (ADR-052) so all stay in sync. Returns true when
@@ -121,8 +115,7 @@ export function defineOriginGuardedTraceSubscriber(opts: {
   const passes = (
     event: TraceProcessingEvent,
     context: TriggerContext<TraceSummaryData>,
-  ): boolean =>
-    passesTraceOriginGuards(event, context.state) && (opts.isRelevant?.(event) ?? true);
+  ): boolean => passesTraceOriginGuards(event, context.state) && (opts.isRelevant?.(event) ?? true);
 
   return {
     name: opts.name,

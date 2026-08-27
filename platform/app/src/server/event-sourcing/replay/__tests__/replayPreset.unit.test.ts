@@ -15,19 +15,19 @@ vi.mock("../../../app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock(
-  "../../../app-layer/traces/repositories/trace-summary.clickhouse.repository",
-  () => ({ TraceSummaryClickHouseRepository: class {} }),
-);
-
-vi.mock("../../pipelines/evaluation-processing/projections/evaluationRun.store", () => ({
-  EvaluationRunStore: class {},
+vi.mock("../../../app-layer/traces/repositories/trace-summary.clickhouse.repository", () => ({
+  TraceSummaryClickHouseRepository: class {},
 }));
 
-vi.mock(
-  "../../pipelines/experiment-run-processing/projections/experimentRunState.store",
-  () => ({ createExperimentRunStateFoldStore: vi.fn(() => ({})) }),
-);
+vi.mock("@langwatch/evaluation-server", () => ({
+  EvaluationEventingAdapter: {
+    createRunStore: vi.fn(() => ({})),
+  },
+}));
+
+vi.mock("../../pipelines/experiment-run-processing/projections/experimentRunState.store", () => ({
+  createExperimentRunStateFoldStore: vi.fn(() => ({})),
+}));
 
 vi.mock(
   "../../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository",
@@ -51,10 +51,6 @@ vi.mock("~/runtime/app/features/suite", () => ({
 
 vi.mock("../../pipelines/suite-run-processing/schemas/constants", () => ({
   SUITE_RUN_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
-}));
-
-vi.mock("../../pipelines/trace-processing/projections/traceSummary.store", () => ({
-  TraceSummaryStore: class {},
 }));
 
 vi.mock("../../projections/repositoryFoldStore", () => ({
@@ -89,7 +85,7 @@ function pipelineDef(params: {
 function stubApp(definitions: unknown[]) {
   mockedGetApp.mockReturnValue({
     eventSourcing: { definitions },
-    retentionPolicyCache: {},
+    dataRetention: { resolve: vi.fn() },
     clickhouse: { enabled: true, resolveClient: vi.fn() },
     evaluations: {},
   } as unknown as ReturnType<typeof getApp>);

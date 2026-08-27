@@ -371,10 +371,7 @@ describe("traceRequest.utils", () => {
   describe("normalizeOtlpAnyValue", () => {
     describe("when value is a scalar", () => {
       it("flattens stringValue with rootKey", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { stringValue: "hello" },
-          "my.key",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ stringValue: "hello" }, "my.key");
 
         expect(result).toEqual({ "my.key": "hello" });
       });
@@ -386,10 +383,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens intValue from string form", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { intValue: "999" },
-          "count",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: "999" }, "count");
 
         expect(result).toEqual({ count: 999 });
       });
@@ -405,28 +399,19 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens doubleValue", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: 3.14 },
-          "pi",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 3.14 }, "pi");
 
         expect(result).toEqual({ pi: 3.14 });
       });
 
       it("flattens doubleValue from string form", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: "2.718" },
-          "e",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: "2.718" }, "e");
 
         expect(result).toEqual({ e: 2.718 });
       });
 
       it("flattens boolValue true", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { boolValue: true },
-          "flag",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ boolValue: true }, "flag");
 
         expect(result).toEqual({ flag: true });
       });
@@ -434,10 +419,7 @@ describe("traceRequest.utils", () => {
       it("preserves boolValue false via !== null check", () => {
         // NOTE: The boolValue check uses `v.boolValue !== null` (not a truthy
         // check), so false IS correctly returned -- unlike intValue/doubleValue.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { boolValue: false },
-          "flag",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ boolValue: false }, "flag");
 
         expect(result).toEqual({ flag: false });
       });
@@ -471,20 +453,14 @@ describe("traceRequest.utils", () => {
       it("drops doubleValue 0 due to falsy check", () => {
         // BUG: scalar() checks `v.doubleValue` which is falsy for 0,
         // so doubleValue: 0 is never captured and returns undefined.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: 0 },
-          "value",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 0 }, "value");
 
         expect(result).toEqual({});
       });
 
       it("drops doubleValue 0.0 due to falsy check", () => {
         // BUG: 0.0 === 0 in JavaScript, still falsy.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: 0.0 },
-          "value",
-        );
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 0.0 }, "value");
 
         expect(result).toEqual({});
       });

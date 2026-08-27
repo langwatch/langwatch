@@ -2,10 +2,7 @@ import { Alert, HStack, Icon, Link, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { Eye, Lock, Slash } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  CategoryPrivacy,
-  ContentPrivacy,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract";
 import NextLink from "~/utils/compat/next-link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
@@ -97,11 +94,7 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
           <Text>{tooltip}</Text>
           {canOpenSettings && (
             <Link asChild color="inherit" textDecoration="underline">
-              <NextLink
-                href="/settings/data-privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
                 Open privacy settings
               </NextLink>
             </Link>
@@ -194,9 +187,8 @@ export const PiiIncompleteNotice: React.FC<{
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          Name and location redaction did not run for this span, so the content may still
-          contain names or locations. Emails, card numbers, and other identifiers were
-          still removed.
+          Name and location redaction did not run for this span, so the content may still contain
+          names or locations. Emails, card numbers, and other identifiers were still removed.
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>

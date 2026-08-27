@@ -170,7 +170,23 @@ export class SpanCostService {
     if (spanLevel !== undefined) {
       return markerIsTrue(spanLevel);
     }
+
     return markerIsTrue(span.resourceAttributes[NON_BILLABLE_ATTR]);
+  }
+
+  deriveStorageCost(span: NormalizedSpan): {
+    cost: number | null;
+    nonBilledCost: number | null;
+  } {
+    const rawCost = this.extractTokenMetrics(span).cost;
+    if (rawCost <= 0) {
+      return { cost: null, nonBilledCost: null };
+    }
+
+    const cost = Number(rawCost.toFixed(6));
+    const nonBilledCost = this.isSpanCostNonBillable(span) ? cost : null;
+
+    return { cost, nonBilledCost };
   }
 
   /**
@@ -197,6 +213,7 @@ export class SpanCostService {
       if (delta < 0) {
         continue;
       }
+
       if (
         FIRST_TOKEN_EVENTS.has(event.name) &&
         (timeToFirstToken === null || delta < timeToFirstToken)

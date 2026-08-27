@@ -81,7 +81,6 @@ export { TraceAnalyticsRollupStore } from "./stores/eventing/eventing.trace-roll
 export { TraceSummaryStore } from "./stores/eventing/eventing.trace-summary.store";
 export { SpanCostService } from "./services/span-cost.service";
 export {
-  SPAN_MAX_PAST_MS,
   TraceIngestionService,
   TraceIngressCommandPort,
   TraceIngressPayloadPort,
@@ -103,6 +102,12 @@ export {
   spanCommandGroupKey,
 } from "./services/trace-span-command-shard.rules";
 export { firstUsableAnchor } from "./services/trace-storage-anchor.rules";
+export { anchorStorageTime } from "./services/trace-storage-anchor.rules";
+export {
+  SPAN_STORAGE_MAP_SHARD_COUNT,
+  spanStorageMapGroupKey,
+  TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+} from "./services/trace-span-storage-group.rules";
 export { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.rules";
 export { TraceAttributeAccumulationService } from "./services/trace-attribute-accumulation.service";
 export { TraceOriginService } from "./services/trace-origin.service";
@@ -116,8 +121,10 @@ export { SpanStatusService } from "./services/span-status.service";
 export { SpanTimingService } from "./services/span-timing.service";
 export { TraceNameResolutionService } from "./services/trace-name-resolution.service";
 export { TracePromptAccumulationService } from "./services/trace-prompt-accumulation.service";
+export { TraceProjectionRuntimeService } from "./services/trace-projection-runtime.service";
 export {
   aggregateScenarioRoleMetrics,
   deriveScenarioRoleMetricsFromSpans,
+  type ScenarioRoleMetrics,
   type ScenarioRoleSpanInput,
 } from "./services/scenario-role-metrics.rules";

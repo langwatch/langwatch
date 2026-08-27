@@ -17,7 +17,6 @@ import {
   type OtlpSpan,
   type RecordSpanCommandData,
   type SpanReceivedEvent,
-  type TraceProcessingEvent,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -54,7 +53,7 @@ export type RecordSpanCommandOptions = {
 /** Turns one prepared raw span into Trace's one durable aggregate event. */
 export class EventingRecordSpanAdapter implements CommandHandler<
   Command<RecordSpanCommandData>,
-  TraceProcessingEvent
+  SpanReceivedEvent
 > {
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
@@ -77,7 +76,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     return new EventingRecordSpanAdapter(options);
   }
 
-  async handle(command: Command<RecordSpanCommandData>): Promise<TraceProcessingEvent[]> {
+  async handle(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
     return await this.tracer.withActiveSpan(
       "RecordSpanCommand.handle",
       {
@@ -133,7 +132,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     return `${payload.tenantId}:${payload.span.traceId}:${payload.span.spanId}`;
   }
 
-  private async record(command: Command<RecordSpanCommandData>): Promise<TraceProcessingEvent[]> {
+  private async record(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
     const tenantId = createTenantId(command.tenantId);
     const commandData = await this.resolveCommandData(command);
     const traceId = commandData.span.traceId;

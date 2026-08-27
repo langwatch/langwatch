@@ -1,8 +1,8 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeRunMetricsCommandData } from "../../simulation-processing/schemas/commands";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:simulation-metrics-publisher");
 
@@ -40,10 +40,7 @@ export function hasSimulationMetrics(foldState: TraceSummaryData): boolean {
  */
 export function createSimulationMetricsSyncHandler(
   deps: SimulationMetricsSyncSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
     if (!hasSimulationMetrics(foldState)) return;

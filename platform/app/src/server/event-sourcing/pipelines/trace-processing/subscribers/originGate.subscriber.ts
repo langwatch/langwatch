@@ -1,9 +1,8 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { ResolveOriginCommandData } from "../schemas/commands";
+import type { ResolveOriginCommandData, TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 
@@ -52,10 +51,7 @@ export function needsOriginResolution({
  */
 export function createOriginGateHandler(
   deps: OriginGateSubscriberDeps,
-): (
-  event: TraceProcessingEvent,
-  context: TriggerContext<TraceSummaryData>,
-) => Promise<void> {
+): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (event, context) => {
     const { tenantId, aggregateId: traceId, state: foldState } = context;
 

@@ -9,7 +9,7 @@ import {
   MessageFormat,
   OpenAIMessage,
   OpenTelemetryGenAIMessage,
-} from "../messageSchemas";
+} from "@langwatch/trace-contract";
 
 describe("messageSchemas", () => {
   describe("OpenTelemetryGenAIMessage", () => {
