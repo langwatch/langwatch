@@ -795,27 +795,32 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "A suite remembers the parameter overrides of its last run" */
-  it("opens the parameter block on the overrides the suite remembers", () => {
+  it("opens the parameter block on the overrides the newest run plan used", async () => {
     mockScenariosGetAll.mockReturnValue(
       casesDeclaring([
         { name: "model", defaultValue: "gpt-5-mini" },
         { name: "locale", defaultValue: "de" },
       ]),
     );
-    renderDialog(
-      suiteSubject({
-        initialTarget: { type: "http", id: "agent_1" },
-        persistedTarget: {
-          type: "http",
-          referenceId: "agent_1",
-          runParameters: { model: "gpt-5", locale: "nl" },
-        },
-      }),
-    );
+    // The suite row carries nothing: the memory is the newest run plan of the
+    // scope, which the dialog reads.
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        configurationEntry({ runParameters: { model: "gpt-5", locale: "nl" } }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
 
-    expect(screen.getByTestId("run-dialog-parameters")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("run-dialog-parameters"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
       "model=gpt-5, locale=nl",
+    );
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
     expect(
       screen.queryByTestId("customize-chip-params"),
@@ -823,18 +828,21 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "A suite remembers that it was run against a prompt" */
-  it("opens on the prompt picker when the suite was last run against a prompt", () => {
+  it("opens on the prompt picker when the newest run plan ran against a prompt", async () => {
     mockPromptsGetAll.mockReturnValue({
       data: [{ id: "prompt_1", handle: "refund-prompt", version: 3 }],
     });
-    renderDialog(
-      suiteSubject({
-        initialTarget: { type: "prompt", id: "prompt_1" },
-        persistedTarget: { type: "prompt", referenceId: "prompt_1" },
-      }),
-    );
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        configurationEntry({
+          targets: [{ type: "prompt", referenceId: "prompt_1" }],
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
 
-    expect(screen.getByText("Prompt to be tested")).toBeInTheDocument();
+    expect(await screen.findByText("Prompt to be tested")).toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-prompt-prompt_1")).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -871,14 +879,19 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "The note of a run is never remembered" */
-  it("never brings a note back, whatever the suite remembers", () => {
-    renderDialog(
-      suiteSubject({
-        initialTarget: { type: "http", id: "agent_1" },
-        persistedTarget: { type: "http", referenceId: "agent_1" },
-      }),
-    );
+  it("never brings a note back, whatever the run plan remembers", async () => {
+    mockRunConfigurations.mockReturnValue({
+      data: [configurationEntry({ usesNote: false })],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
 
+    await waitFor(() =>
+      expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
     expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
   });
@@ -960,26 +973,33 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "A secret row is remembered by its key alone" */
-  it("opens the remembered secret row empty, in rows mode, and waits for it", () => {
+  it("opens the remembered secret row empty, in rows mode, and waits for it", async () => {
     mockScenariosGetAll.mockReturnValue(
       casesDeclaring([
         { name: "model", defaultValue: "gpt-5" },
         { name: "api_token" },
       ]),
     );
-    renderDialog(
-      suiteSubject({
-        initialTarget: { type: "http", id: "agent_1" },
-        persistedTarget: {
-          type: "http",
-          referenceId: "agent_1",
+    mockRunConfigurations.mockReturnValue({
+      data: [
+        configurationEntry({
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_1",
+              runSecretParameterNames: ["api_token"],
+            },
+          ],
           runParameters: { model: "gpt-5" },
-          runSecretParameterNames: ["api_token"],
-        },
-      }),
-    );
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
 
-    expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("run-dialog-parameter-rows"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
       "model",
     );
@@ -1142,6 +1162,7 @@ describe("run entries on the Scenarios tab", () => {
       ],
       isLoading: false,
     });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
       batchRunId: "batch_new",
       jobCount: 1,
@@ -1152,6 +1173,34 @@ describe("run entries on the Scenarios tab", () => {
   });
 
   afterEach(cleanup);
+
+  /** @scenario "A suite run from the Scenarios tab opens on its newest run plan" */
+  it("preselects the agent of the newest run plan of the suite", async () => {
+    const user = userEvent.setup();
+    // The rail row carries no run option, so the preselection can only come
+    // from the run plans of the scope. The project holds one test suite, so
+    // that scope folds to every scenario, which is what the run plan of this
+    // suite was written under.
+    mockRunConfigurations.mockReturnValue({
+      data: [configurationEntry({ scope: { mode: "all" } })],
+      isLoading: false,
+    });
+    render(<TestCasesTab />, { wrapper: Wrapper });
+
+    await user.click(
+      screen.getByRole("button", { name: "Actions for Refunds" }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Run suite" }),
+    );
+
+    const dialog = await screen.findByTestId("run-dialog");
+    await waitFor(() =>
+      expect(
+        within(dialog).getByTestId("run-dialog-agent-agent_1"),
+      ).toHaveAttribute("aria-pressed", "true"),
+    );
+  });
 
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
@@ -1196,7 +1245,11 @@ function configurationEntry(
   overrides: {
     planId?: string;
     planName?: string;
-    targets?: { type: string; referenceId: string }[];
+    targets?: {
+      type: string;
+      referenceId: string;
+      runSecretParameterNames?: string[];
+    }[];
     repeatCount?: number;
     runParameters?: Record<string, string>;
     lastRunAt?: Date;

@@ -202,7 +202,6 @@ const suitePlan: RunPlan = {
   scopeLabel: "3 scenarios",
   scenarioSetId: SUITE_SET_ID,
   suiteId: "suite_1",
-  suiteKind: "custom",
   caseCount: 3,
   lastRun: null,
 };
@@ -550,8 +549,8 @@ describe("<RunPlanDetail/>", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "A test suite is run from the header of its run plan" */
-  it("opens the run dialog on the suite from the header Run control", async () => {
+  /** @scenario "A run plan is run again from the header of its results" */
+  it("opens the run dialog on the plan from the header Run control", async () => {
     const user = userEvent.setup();
     renderDetail();
 
@@ -593,7 +592,6 @@ describe("<RunPlanDetail/>", () => {
         scopeLabel: "from code",
         scenarioSetId: "nightly-ci",
         suiteId: null,
-        suiteKind: null,
         caseCount: null,
         lastRun: null,
       },

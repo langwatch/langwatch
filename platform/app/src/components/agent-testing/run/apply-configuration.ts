@@ -8,6 +8,7 @@
  */
 
 import { formatStoredParameterLine } from "./parameter-line";
+import { rowsFromLine } from "./parameter-rows";
 import type { RunConfigurationEntry } from "./run-configuration";
 import type { RunDialogFields } from "./useRunDialogForm";
 import type { RunPlanFields } from "./useRunPlanFields";
@@ -53,12 +54,20 @@ export function applyConfigurationTo({
   );
 
   const hasParameters = Object.keys(runParameters).length > 0;
-  fields.setShowParams(hasParameters);
-  fields.setParameterLine(
-    hasParameters ? formatStoredParameterLine(runParameters) : "",
+  const line = hasParameters ? formatStoredParameterLine(runParameters) : "";
+  // A run never writes a secret value down, so a remembered secret row comes
+  // back by its name alone and the next run asks for the value again.
+  const secretRows = (primary?.runSecretParameterNames ?? []).map((name) => ({
+    name,
+    value: "",
+    secret: true,
+  }));
+  fields.setShowParams(hasParameters || secretRows.length > 0);
+  fields.setParameterLine(line);
+  fields.setParameterRows(
+    secretRows.length > 0 ? [...rowsFromLine(line), ...secretRows] : null,
   );
-  fields.setParameterRows(null);
-  fields.setRowsRequested(false);
+  fields.setRowsRequested(secretRows.length > 0);
   fields.setSecretValues({});
 
   planFields.setRepeatCount(configuration.repeatCount);

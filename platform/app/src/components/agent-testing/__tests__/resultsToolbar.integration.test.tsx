@@ -171,7 +171,6 @@ function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
     slug: "checkout",
     scenarioIds: ["scen_1", "scen_2"],
     labels: [],
-    kind: "custom",
     scope: { mode: "cases" },
     ...overrides,
   };
@@ -243,8 +242,10 @@ function Harness(props: React.ComponentProps<typeof ResultsList>) {
 const onNewRunPlan = vi.fn();
 
 function renderList() {
+  const suite = makeSuite();
   const plans = buildRunPlans({
-    suites: [makeSuite()],
+    plans: [suite],
+    suiteNames: new Map([[suite.id, suite.name]]),
     suiteSummaries: {},
     externalSets: [],
   });

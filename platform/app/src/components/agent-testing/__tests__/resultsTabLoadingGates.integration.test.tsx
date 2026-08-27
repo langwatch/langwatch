@@ -1,15 +1,16 @@
 /**
  * @vitest-environment jsdom
  *
- * How the Results tab reads while a run plan is on its way in. The empty
- * "no plans yet" state is reserved for `!isLoading && !hasAnyPlans`. Between
- * "the URL names a plan" and "the plan record is in the store" the tab reads
- * as a skeleton, not as the plans list, and not as an empty state.
+ * How the Results tab reads while a run plan is on its way in, and which
+ * stored rows reach the list. The empty "no plans yet" state is reserved for
+ * `!isLoading && !hasAnyPlans`. Between "the URL names a plan" and "the plan
+ * record is in the store" the tab reads as a skeleton, not as the plans list,
+ * and not as an empty state.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResultsTab } from "../results/ResultsTab";
@@ -44,14 +45,9 @@ vi.mock("~/utils/api", () => ({
       getAll: { useQuery: mockSuitesGetAll },
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
-      // The row menu of a run plan archives it, through the suite call for a
-      // plan and the folder call for a test suite.
+      // The row menu of a run plan archives it. Every row is a stored plan,
+      // so there is one call and no folder branch.
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      folders: {
-        archive: {
-          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-        },
-      },
     },
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
@@ -153,6 +149,56 @@ describe("the Results tab loading gate", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  describe("given the project holds a test suite and a plan scoped to it", () => {
+    describe("when the Test Runs list is read", () => {
+      /** @scenario "The Test Runs list holds one row for every run plan" */
+      it("lists the plan alone and names the test suite in its scope", () => {
+        routerState.query = { project: "test-project", path: ["results"] };
+        routerState.asPath = "/test-project/agent-testing/results";
+        mockSuitesGetAll.mockReturnValue({
+          data: [
+            {
+              id: "folder_checkout",
+              name: "Checkout",
+              slug: "checkout",
+              scenarioIds: ["scen_1"],
+              labels: [],
+              kind: "folder",
+              scope: null,
+            },
+            {
+              id: "plan_nightly",
+              name: "Nightly checkout",
+              slug: "nightly-checkout",
+              scenarioIds: [],
+              labels: [],
+              kind: "custom",
+              scope: { mode: "folders", folderIds: ["folder_checkout"] },
+            },
+          ],
+          isLoading: false,
+        });
+
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+
+        // The test suite is a folder of scenarios, so it is no row of its own.
+        expect(
+          screen.getByTestId("run-plan-row-nightly-checkout"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("run-plan-row-checkout"),
+        ).not.toBeInTheDocument();
+
+        // Its name still reaches the list, as the scope of the plan that runs it.
+        expect(
+          within(screen.getByTestId("run-plan-row-nightly-checkout")).getByText(
+            "Checkout",
+          ),
+        ).toBeInTheDocument();
+      });
+    });
   });
 
   describe("given the URL names a plan the store does not know yet", () => {

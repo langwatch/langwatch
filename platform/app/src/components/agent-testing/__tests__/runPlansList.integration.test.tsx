@@ -11,9 +11,11 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
-import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
+import type {
+  ExternalSetSummary,
+  SuiteRunSummary,
+} from "~/server/scenarios/scenario-event.types";
 import {
-  FOLDER_PLAN_ARCHIVE_DESCRIPTION,
   PLAN_ARCHIVE_DESCRIPTION,
   PLAN_ARCHIVE_TITLE,
   type PlanRowModel,
@@ -48,7 +50,6 @@ function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
     slug: "checkout",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     labels: [],
-    kind: "custom",
     scope: { mode: "cases" },
     ...overrides,
   };
@@ -109,6 +110,33 @@ function renderRows(
   return { props, view };
 }
 
+/**
+ * The run plans of a project, built the way the Results tab builds them.
+ *
+ * `folders` are the test suites: never rows of the list, but named by a plan
+ * whose scope points at them.
+ */
+function plansOf({
+  plans = [],
+  folders = [],
+  suiteSummaries = {},
+  externalSets = [],
+}: {
+  plans?: RunPlanSuite[];
+  folders?: { id: string; name: string }[];
+  suiteSummaries?: Record<string, SuiteRunSummary>;
+  externalSets?: ExternalSetSummary[];
+}): RunPlan[] {
+  return buildRunPlans({
+    plans,
+    suiteNames: new Map(
+      [...plans, ...folders].map((suite) => [suite.id, suite.name]),
+    ),
+    suiteSummaries,
+    externalSets,
+  });
+}
+
 /** The plans of a project, with no run history attached. */
 function planRowsOf(plans: RunPlan[]): PlanRowModel[] {
   return plans.map((plan) => ({ plan, group: null }));
@@ -119,8 +147,8 @@ function oneSuiteRow(
   suite: Partial<RunPlanSuite> = {},
   group: ResultGroup | null = makeGroup(),
 ): PlanRowModel {
-  const plans = buildRunPlans({
-    suites: [makeSuite(suite)],
+  const plans = plansOf({
+    plans: [makeSuite(suite)],
     suiteSummaries: {},
     externalSets: [],
   });
@@ -146,8 +174,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Test Runs list holds one row for every run plan" */
   it("holds one row for every run plan and no bucket row", () => {
-    const plans = buildRunPlans({
-      suites: [
+    const plans = plansOf({
+      plans: [
         makeSuite(),
         makeSuite({ id: "suite_2", name: "Refunds", slug: "refunds" }),
         makeSuite({
@@ -198,8 +226,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Run plan column holds only the name" */
   it("holds only the name in the Run plan cell", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -214,8 +242,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Last run column reads the age, the scenarios and the runs" */
   it("reads the age, the scenarios and the runs in the Last run cell", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -231,8 +259,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Last run column reads the age, the scenarios and the runs" */
   it("says one scenario and one run without an s", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -250,8 +278,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "A run plan with no run in the period says so in the Last run column" */
   it("says nothing ran in the period on a quiet plan", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -268,19 +296,17 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Scope column says what the plan covers" */
   it("says what the plan covers in the Scope cell", () => {
-    const plans = buildRunPlans({
-      suites: [
+    const plans = plansOf({
+      plans: [
         makeSuite({ scope: { mode: "all" } }),
         makeSuite({
           id: "suite_2",
           name: "Everything nightly",
           slug: "nightly",
-          scope: { mode: "folders", folderIds: ["suite_1", "suite_3"] },
+          scope: { mode: "folders", folderIds: ["suite_1", "folder_refunds"] },
         }),
-        makeSuite({ id: "suite_3", name: "Refunds", slug: "refunds" }),
       ],
-      suiteSummaries: {},
-      externalSets: [],
+      folders: [{ id: "folder_refunds", name: "Refunds" }],
     });
 
     renderRows(planRowsOf(plans));
@@ -290,7 +316,9 @@ describe("the Test Runs list", () => {
         "All scenarios",
       ),
     ).toBeInTheDocument();
-    // A scope over other suites names them rather than counting them.
+    // A scope over test suites names them rather than counting them, and a
+    // test suite is no row of its own, so the name comes from the read that
+    // carries every suite of the project.
     expect(
       within(screen.getByTestId("run-plan-row-nightly")).getByText(
         "Checkout, Refunds",
@@ -300,8 +328,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Targets column names the agents the plan runs against" */
   it("names both agents in the Targets cell", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -319,8 +347,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The Pass column is a plain coloured percentage" */
   it("draws the pass rate as a plain percentage with no pill", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -341,8 +369,8 @@ describe("the Test Runs list", () => {
   // "0%" at the front and this assertion would fail rather than pass by luck.
   /** @scenario "The Trend column draws one bar per run, oldest first" */
   it("draws one trend bar per run, oldest first", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -373,8 +401,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "The trend bars are softer than the text beside them" */
   it("draws every trend bar at the one shared opacity", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -406,8 +434,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "A run plan row shows its last result" */
   it("carries the pass rate of the runs in the window", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -430,8 +458,8 @@ describe("the Test Runs list", () => {
   /** @scenario "A run plan row opens on a click and carries no chevron" */
   it("ends the row on its menu, with no chevron after it", async () => {
     const user = userEvent.setup();
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -497,21 +525,6 @@ describe("the Test Runs list", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "Archiving a run plan that is a test suite says the scenarios go with it" */
-  it("says the scenarios go with a plan that is a test suite", async () => {
-    renderRows([oneSuiteRow({ kind: "folder", scope: null })]);
-    const user = await openPlanMenu("Checkout");
-
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Archive run plan" }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByText(FOLDER_PLAN_ARCHIVE_DESCRIPTION),
-    ).toBeInTheDocument();
-  });
-
   /** @scenario "Leaving the archive dialog keeps the run plan" */
   it("archives nothing when the archive dialog is left without confirming", async () => {
     const { props } = renderRows([oneSuiteRow()]);
@@ -529,8 +542,8 @@ describe("the Test Runs list", () => {
 
   /** @scenario "A set that runs from code carries no archive action in its row menu" */
   it("offers neither archive nor edit on a set that runs from code", async () => {
-    const plans = buildRunPlans({
-      suites: [],
+    const plans = plansOf({
+      plans: [],
       suiteSummaries: {},
       externalSets: [makeExternalSet()],
     });
@@ -555,8 +568,8 @@ describe("the Test Runs list", () => {
   });
 
   it("lists a set written by code as a run plan of its own", () => {
-    const plans = buildRunPlans({
-      suites: [],
+    const plans = plansOf({
+      plans: [],
       suiteSummaries: {},
       externalSets: [makeExternalSet()],
     });
@@ -571,8 +584,8 @@ describe("the Test Runs list", () => {
 
 describe("the run plans of a project", () => {
   it("sorts every plan by its last run, newest first", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite()],
+    const plans = plansOf({
+      plans: [makeSuite()],
       suiteSummaries: {},
       externalSets: [
         {
@@ -602,8 +615,8 @@ describe("the run plans of a project", () => {
   });
 
   it("keeps the command line's throwaway suites out of the list", () => {
-    const plans = buildRunPlans({
-      suites: [
+    const plans = plansOf({
+      plans: [
         makeSuite(),
         makeSuite({
           id: "suite_cli",
@@ -620,20 +633,9 @@ describe("the run plans of a project", () => {
   });
 
   /** @scenario "The Scope column says what the plan covers" */
-  it("reads a folder as covering the scenarios filed in it", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite({ kind: "folder", scope: null })],
-      suiteSummaries: {},
-      externalSets: [],
-    });
-
-    expect(plans[0]?.scopeLabel).toBe("Scenarios in this suite");
-  });
-
-  /** @scenario "The Scope column says what the plan covers" */
   it("reads a hand-picked scope as how many scenarios it holds", () => {
-    const plans = buildRunPlans({
-      suites: [makeSuite({ scope: { mode: "cases" } })],
+    const plans = plansOf({
+      plans: [makeSuite({ scope: { mode: "cases" } })],
       suiteSummaries: {},
       externalSets: [],
     });
@@ -643,8 +645,8 @@ describe("the run plans of a project", () => {
 
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a label scope as the labels it names", () => {
-    const plans = buildRunPlans({
-      suites: [
+    const plans = plansOf({
+      plans: [
         makeSuite({ scope: { mode: "labels", labels: ["smoke", "critical"] } }),
       ],
       suiteSummaries: {},

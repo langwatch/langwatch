@@ -4,11 +4,11 @@ Feature: The Results tab
   So that I can go from "what ran" to "what happened" in two clicks
 
   Background: three levels.
-    The Results tab opens on a list titled "Test Runs". Each row is a run plan:
-    a test suite or a custom run plan. There is no bucket row that collects
-    runs belonging to no plan: a single scenario run gets a run plan of its
-    own, so iterating on one scenario reads as run 1, run 2, run 3 against
-    that agent.
+    The Results tab opens on a list titled "Test Runs". Each row is a run plan.
+    A test suite is a folder of scenarios and is never a row: the run plans
+    that run it are. There is no bucket row that collects runs belonging to no
+    plan either: a single scenario run gets a run plan of its own, so iterating
+    on one scenario reads as run 1, run 2, run 3 against that agent.
 
     Choosing a row opens that plan. The page title then reads the name of the
     plan. A sidebar on the left lists its runs, newest first, each with its
@@ -22,10 +22,11 @@ Feature: The Results tab
 
   @integration
   Scenario: The Test Runs list holds one row for every run plan
-    Given a project with two test suites and one custom run plan
+    Given a project with one test suite and one run plan that runs that suite
     When the Results tab is opened
     Then the list is titled "Test Runs"
-    And the two suites and the custom plan are listed
+    And the run plan is listed and the test suite is not a row
+    And the Scope cell of the plan names the test suite
     And no row collects the runs that belong to no plan
 
   @integration
@@ -132,12 +133,6 @@ Feature: The Results tab
     Then a dialog names the plan and says its runs are kept
     And confirming archives that plan
     And the row leaves the list
-
-  @integration
-  Scenario: Archiving a run plan that is a test suite says the scenarios go with it
-    Given a run plan that is a test suite
-    When "Archive run plan" is chosen in its row menu
-    Then the dialog says the scenarios filed in it are archived as well
 
   @integration
   Scenario: Leaving the archive dialog keeps the run plan
@@ -368,15 +363,15 @@ Feature: The Results tab
     And it offers "Rerun this scenario"
 
   @integration
-  Scenario: A test suite is run from the header of its run plan
-    Given a run plan that is a test suite
+  Scenario: A run plan is run again from the header of its results
+    Given a stored run plan
     When the top of the results is read
     Then a Run control is offered beside "Edit run plan"
-    And choosing it opens the run dialog on that suite
+    And choosing it opens the run dialog on that plan
 
   @integration
   Scenario: Edit run plan opens the run dialog on the configuration of the plan
-    Given a run plan that is a test suite
+    Given a stored run plan
     When the top of the results is read
     Then "Edit run plan" reads to the left of the Run control
     And choosing it opens the run dialog on that plan

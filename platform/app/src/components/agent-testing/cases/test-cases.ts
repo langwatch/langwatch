@@ -8,8 +8,6 @@
  * @see specs/scenarios/scenario-folder-assignment.feature
  */
 
-import type { SuiteTarget } from "~/server/suites/types";
-
 /** A scenario as the table reads it. */
 export type TestCase = {
   id: string;
@@ -29,11 +27,6 @@ export type TestSuiteEntry = {
   name: string;
   slug: string;
   caseCount: number;
-  /**
-   * The agents the last run of this suite chose, persisted on the suite row
-   * so the run dialog preselects them.
-   */
-  targets?: SuiteTarget[];
 };
 
 /** A set that a code run writes into. It is read-only in the platform. */

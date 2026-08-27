@@ -1,6 +1,10 @@
 /**
  * The run plans of the open project, read from the two places a plan lives:
- * the test suites, and the external sets a code run writes into.
+ * the stored run plans, and the external sets a code run writes into.
+ *
+ * A test suite is a folder of scenarios, so it is never a row of the Test Runs
+ * list. Its rows are read all the same, because a plan whose scope names test
+ * suites reads them by name.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
@@ -15,9 +19,9 @@ export type UseRunPlansResult = {
   plans: RunPlan[];
   isLoading: boolean;
   /**
-   * False while the project holds no run plan at all: no suite and no external
-   * run set. The table shows its first-use empty state from this, not from
-   * whether a plan has ever run.
+   * False while the project holds no run plan at all: no stored plan and no
+   * external run set. The table shows its first-use empty state from this, not
+   * from whether a plan has ever run.
    */
   hasAnyPlans: boolean;
 };
@@ -28,8 +32,8 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   const startDate = period.startDate.getTime();
   const endDate = period.endDate.getTime();
 
-  // Both kinds: a folder reads as a run plan of its own in the Test Runs
-  // list, next to the hand-assembled custom plans.
+  // Both kinds: the custom rows are the plans, and the folders are read only
+  // for the names a plan's scope may point at.
   const { data: suites, isLoading: isSuitesLoading } =
     api.suites.getAll.useQuery(
       { projectId, kinds: ["custom", "folder"] },
@@ -47,18 +51,25 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
       { enabled: !!project },
     );
 
+  const storedPlans = useMemo(
+    () => (suites ?? []).filter((suite) => suite.kind !== "folder"),
+    [suites],
+  );
+
   const plans = useMemo(
     () =>
       buildRunPlans({
-        suites: suites ?? [],
+        plans: storedPlans,
+        suiteNames: new Map(
+          (suites ?? []).map((suite) => [suite.id, suite.name]),
+        ),
         suiteSummaries: suiteSummaries ?? {},
         externalSets: externalSets ?? [],
       }),
-    [suites, suiteSummaries, externalSets],
+    [storedPlans, suites, suiteSummaries, externalSets],
   );
 
-  const hasAnyPlans =
-    (suites?.length ?? 0) > 0 || (externalSets?.length ?? 0) > 0;
+  const hasAnyPlans = storedPlans.length > 0 || (externalSets?.length ?? 0) > 0;
 
   return {
     plans,

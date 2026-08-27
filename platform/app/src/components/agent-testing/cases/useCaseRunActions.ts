@@ -13,7 +13,13 @@ import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { TestCase, TestSuiteEntry } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
 
-/** The run dialog subject of a whole suite, with the cases it holds. */
+/**
+ * The run dialog subject of a whole suite, with the cases it holds.
+ *
+ * A test suite carries no run option of its own, so the subject brings none.
+ * The dialog then preselects from the newest run plan of the suite, which is
+ * what `useRunHistorySeed` reads.
+ */
 function runSubjectForSuite({
   suite,
   cases,
@@ -21,7 +27,6 @@ function runSubjectForSuite({
   suite: TestSuiteEntry;
   cases: TestCase[];
 }): RunDialogSubject {
-  const persisted = suite.targets?.[0];
   return {
     kind: "suite",
     suiteId: suite.id,
@@ -29,10 +34,8 @@ function runSubjectForSuite({
     scenarioIds: cases
       .filter((testCase) => testCase.folderId === suite.id)
       .map((testCase) => testCase.id),
-    initialTarget: persisted
-      ? { type: persisted.type, id: persisted.referenceId }
-      : null,
-    persistedTarget: persisted ?? null,
+    initialTarget: null,
+    persistedTarget: null,
   };
 }
 

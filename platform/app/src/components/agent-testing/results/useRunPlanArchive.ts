@@ -5,9 +5,8 @@
  * abandoned experiment leaves a plan behind. Archiving takes the row out of
  * the list and keeps every run it already holds.
  *
- * A plan stored as a test suite folder is archived through the same call the
- * Scenarios rail uses, so the scenarios filed in it go with it and the two
- * tabs never disagree about what exists.
+ * A test suite is not a row of this list, so archiving here never takes
+ * scenarios with it.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
@@ -28,13 +27,8 @@ export function useRunPlanArchive(): RunPlanArchive {
   const projectId = project?.id ?? "";
   const utils = api.useUtils();
 
-  /**
-   * The four reads a plan row is drawn from: the two the Scenarios tab reads,
-   * plus the suite list and the run summaries of the Results tab.
-   */
+  /** The two reads a plan row is drawn from. */
   const invalidate = useCallback(() => {
-    void utils.scenarios.getAll.invalidate({ projectId });
-    void utils.suites.folders.getAll.invalidate({ projectId });
     void utils.suites.getAll.invalidate({ projectId });
     void utils.suites.getSummaries.invalidate({ projectId });
   }, [utils, projectId]);
@@ -47,20 +41,11 @@ export function useRunPlanArchive(): RunPlanArchive {
     onError,
   });
 
-  const archiveFolder = api.suites.folders.archive.useMutation({
-    onSuccess: invalidate,
-    onError,
-  });
-
   return {
-    isArchiving: archiveSuite.isPending || archiveFolder.isPending,
+    isArchiving: archiveSuite.isPending,
     archivePlan: (plan) => {
       // A set that runs from code has no stored plan to archive.
       if (!plan.suiteId) return;
-      if (plan.suiteKind === "folder") {
-        archiveFolder.mutate({ projectId, folderId: plan.suiteId });
-        return;
-      }
       archiveSuite.mutate({ projectId, id: plan.suiteId });
     },
   };

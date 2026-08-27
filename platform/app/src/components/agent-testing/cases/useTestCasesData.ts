@@ -12,7 +12,6 @@
 import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { parseSuiteTargets } from "~/server/suites/types";
 import { api, type RouterOutputs } from "~/utils/api";
 import type { CaseLastResult } from "./CasesTable";
 import {
@@ -124,7 +123,6 @@ function useSuiteEntries({
         name: folder.name,
         slug: folder.slug,
         caseCount: countByFolder.get(folder.id) ?? 0,
-        targets: parseSuiteTargets(folder.targets ?? []),
       })),
     );
   }, [folders, cases]);

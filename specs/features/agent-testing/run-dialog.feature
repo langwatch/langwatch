@@ -390,36 +390,48 @@ Feature: The run dialog
     And Run carries no dropdown
     And the footer holds no other count
 
+    A test suite carries no run option of its own. What a suite remembers is
+    the newest run plan of its scope, so the scenarios below are answered by
+    that plan and never by the suite row.
+
   @integration
   Scenario: Confirming a run remembers the target for next time
-    Given a test suite with no target used before
+    Given a test suite with no run plan yet
     When a target is chosen and the run is confirmed
     And the run dialog for that suite is opened again
     Then that target is already selected
+    And it comes from the run plan that run wrote
+
+  @integration
+  Scenario: A suite run from the Scenarios tab opens on its newest run plan
+    Given a test suite whose rail row carries no run option
+    And a run plan of that suite that ran against an agent
+    When "Run suite" is chosen in the rail
+    Then that agent is already selected
 
   @integration
   Scenario: A suite remembers the parameter overrides of its last run
-    Given a test suite run with parameter overrides
+    Given a test suite whose newest run plan carried parameter overrides
     When the run dialog for that suite is opened again
     Then the parameter block is already open
-    And it holds the values the last run used
+    And it holds the values that run plan used
 
   @integration
   Scenario: A suite remembers that it was run against a prompt
-    Given a test suite run against a published prompt
+    Given a test suite whose newest run plan ran against a published prompt
     When the run dialog for that suite is opened again
     Then the dialog opens on the prompt picker
     And that prompt is already selected
 
   @integration
   Scenario: The run options are remembered for the whole team
-    Given a test suite run with a target and parameter overrides by one person
+    Given a run plan of a suite written by one person, with a target and parameter overrides
     When another person opens the run dialog for that suite
     Then the same target and the same overrides are already selected
 
   @integration
   Scenario: The note of a run is never remembered
-    Given a test suite run with the note "checking the stricter criterion"
+    Given a run of a suite with the note "checking the stricter criterion"
     When the run dialog for that suite is opened again
     Then no note field is shown
     And "Add a note" is offered again
@@ -439,7 +451,7 @@ Feature: The run dialog
     Then the block opens in rows mode
     And the plain row holds the key and the value of the last run
     And the secret row holds its key with an empty value the run waits for
-    And no secret value was written onto the suite
+    And no secret value was written onto the run plan
 
   @integration
   Scenario: The dialog closes and the person stays where they were

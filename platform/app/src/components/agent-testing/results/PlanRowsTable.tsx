@@ -115,9 +115,6 @@ function LastRunCell({
 export const PLAN_ARCHIVE_TITLE = "Archive run plan?";
 export const PLAN_ARCHIVE_DESCRIPTION =
   "The plan leaves the list. Its runs are kept.";
-/** A folder plan takes the scenarios filed in it, so the dialog says so. */
-export const FOLDER_PLAN_ARCHIVE_DESCRIPTION =
-  "The scenarios filed in it are archived as well. Its runs are kept.";
 
 /** True while the plan has a run inside the window the table reads. */
 function hasRunInPeriod(group: ResultGroup | null): boolean {
@@ -300,11 +297,7 @@ export function PlanRowsTable({
         suiteName={planToArchive?.name ?? ""}
         isLoading={isArchiving}
         title={PLAN_ARCHIVE_TITLE}
-        description={
-          planToArchive?.suiteKind === "folder"
-            ? FOLDER_PLAN_ARCHIVE_DESCRIPTION
-            : PLAN_ARCHIVE_DESCRIPTION
-        }
+        description={PLAN_ARCHIVE_DESCRIPTION}
       />
     </ResultsTableCard>
   );
