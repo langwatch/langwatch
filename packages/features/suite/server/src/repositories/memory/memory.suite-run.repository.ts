@@ -5,12 +5,12 @@ import type {
   SuiteRunStateData,
   SuiteRunStateInput,
 } from "@langwatch/suite-contract";
-import { SuiteRunRepository } from "../suite-run.repository";
+import { SuiteRunReadRepository } from "../suite-run.repository";
 
 /** Eventing's no-ClickHouse store; service reads intentionally remain empty. */
 export class MemorySuiteRunRepository
   extends BaseMemoryProjectionStore<Projection<SuiteRunStateData>>
-  implements SuiteRunRepository
+  implements SuiteRunReadRepository
 {
   static create(): MemorySuiteRunRepository {
     return new MemorySuiteRunRepository();

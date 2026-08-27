@@ -1,8 +1,4 @@
-import type {
-  SuiteRunParameters,
-  SuiteRunResult,
-  SuiteTarget,
-} from "@langwatch/suite-contract";
+import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
 import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
 
 /**
@@ -16,6 +12,7 @@ export abstract class SuiteExecutionPort {
     projectId: string;
     activeScenarioIds: string[];
     scenarioNames: Map<string, string>;
+    scenarioVersions: Map<string, number>;
     scenarioConfigs: ScenarioRunConfig[];
     activeTargets: SuiteTarget[];
     repeatCount: number;
@@ -23,5 +20,6 @@ export abstract class SuiteExecutionPort {
     idempotencyKey: string;
     batchRunId?: string;
     parameters?: SuiteRunParameters;
+    note?: string;
   }): Promise<SuiteRunResult>;
 }

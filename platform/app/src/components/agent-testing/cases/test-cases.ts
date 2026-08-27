@@ -11,7 +11,7 @@
 import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
-import type { SuiteTarget } from "~/server/suites/types";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 
 /** The group that holds every case filed in no test suite. */
 export const UNFILED_GROUP_ID = "__unfiled__" as const;
@@ -58,14 +58,9 @@ export type CaseGroup = {
 };
 
 /** The cases that carry at least one of the chosen labels. */
-export function filterCasesByLabels(
-  cases: TestCase[],
-  activeLabels: string[],
-): TestCase[] {
+export function filterCasesByLabels(cases: TestCase[], activeLabels: string[]): TestCase[] {
   if (activeLabels.length === 0) return cases;
-  return cases.filter((testCase) =>
-    activeLabels.some((label) => testCase.labels.includes(label)),
-  );
+  return cases.filter((testCase) => activeLabels.some((label) => testCase.labels.includes(label)));
 }
 
 /** Every label used by any of the cases, in reading order. */
@@ -137,9 +132,7 @@ export function groupCasesByFolder({
   return groups;
 }
 
-const PASSED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
-  ScenarioRunStatus.SUCCESS,
-]);
+const PASSED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([ScenarioRunStatus.SUCCESS]);
 
 const FAILED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
   ScenarioRunStatus.FAILED,
@@ -152,9 +145,7 @@ const FAILED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
  * The shape is the one RunMetricsSummary reads. Duration and cost stay empty:
  * the last-result read carries a verdict per case, not the metrics of a run.
  */
-export function summaryFromLastResults(
-  results: ScenarioLastResultSummary[],
-): RunGroupSummary {
+export function summaryFromLastResults(results: ScenarioLastResultSummary[]): RunGroupSummary {
   let passedCount = 0;
   let failedCount = 0;
   let cancelledCount = 0;
@@ -189,9 +180,7 @@ export function summaryFromLastResults(
 }
 
 /** The newest run time among a set of last results, or nothing. */
-export function lastRunAtOf(
-  results: ScenarioLastResultSummary[],
-): number | null {
+export function lastRunAtOf(results: ScenarioLastResultSummary[]): number | null {
   let latest: number | null = null;
   for (const result of results) {
     if (latest === null || result.lastRunAt > latest) latest = result.lastRunAt;

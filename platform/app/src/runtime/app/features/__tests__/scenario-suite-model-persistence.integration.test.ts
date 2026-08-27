@@ -14,6 +14,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   AppScenarioClock,
+  AppScenarioFolderId,
   AppScenarioId,
   AppScenarioRuntime,
   AppScenarioSecretCipher,
@@ -74,6 +75,7 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
           database: prisma,
           simulations: Object.create(SimulationService.prototype) as SimulationService,
           ids: AppScenarioId.create(() => `scenario_${nanoid()}`),
+          folderIds: AppScenarioFolderId.create(() => `suite_${nanoid()}`),
           clock: AppScenarioClock.create(),
           secretCipher: new AppScenarioSecretCipher(),
         }).build();

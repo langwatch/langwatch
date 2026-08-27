@@ -110,6 +110,7 @@ import { AppExperimentEventingAdapter } from "~/runtime/app/features/experiment-
 import { AppExperimentRunHistoryObservability } from "~/runtime/app/features/experiment-run-history.observability";
 import {
   AppScenarioClock,
+  AppScenarioFolderId,
   AppScenarioId,
   AppScenarioRuntime,
   AppScenarioSecretCipher,
@@ -127,6 +128,7 @@ import {
   UnavailableCancellationPublisherAdapter,
 } from "@langwatch/scenario-server";
 import { AppSimulationRuntime } from "~/runtime/app/features/simulation";
+import { PostgresSuiteAdapter } from "@langwatch/suite-server";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -792,6 +794,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       database: prisma,
       simulations,
       ids: AppScenarioId.create(() => generate(KSUID_RESOURCES.SCENARIO).toString()),
+      folderIds: AppScenarioFolderId.create(() => `suite_${nanoid()}`),
       clock: scenarioClock,
       secretCipher: scenarioSecretCipher,
     }).build(),
@@ -942,7 +945,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // with Eventing during pipeline registration without a second service.
   const suiteStartRun = new Deferred<AppCommands["suiteRuns"]["startSuiteRun"]>("suiteStartRun");
   const suiteQueueRun = new Deferred<AppCommands["simulations"]["queueRun"]>("suiteQueueRun");
-  const suiteRuntime = AppSuiteRuntime.create({
+  const suiteAdapter = PostgresSuiteAdapter.create({
     database: prisma,
     agents,
     prompts,
@@ -956,6 +959,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }),
     generateId: () => `suite_${nanoid()}`,
   });
+  const suiteRuntime = AppSuiteRuntime.create(suiteAdapter);
   const suiteEventing = suiteRuntime.eventing();
   const suites = traced(suiteRuntime.build(), "SuiteService");
 
@@ -2543,6 +2547,7 @@ export function createTestApp(
     database: testPrisma,
     simulations: testSimulations,
     ids: AppScenarioId.create(() => generate(KSUID_RESOURCES.SCENARIO).toString()),
+    folderIds: AppScenarioFolderId.create(() => `suite_${nanoid()}`),
     clock: AppScenarioClock.create(),
     secretCipher: testScenarioSecretCipher,
   }).build();
@@ -2550,7 +2555,7 @@ export function createTestApp(
     store: null,
     clock: AppScenarioClock.create(),
   });
-  const testSuites = AppSuiteRuntime.create({
+  const testSuiteAdapter = PostgresSuiteAdapter.create({
     database: testPrisma,
     agents,
     prompts,
@@ -2563,7 +2568,8 @@ export function createTestApp(
       scenarios: testScenarios,
     }),
     generateId: () => `suite_${nanoid()}`,
-  }).build();
+  });
+  const testSuites = AppSuiteRuntime.create(testSuiteAdapter).build();
   const testLangWatchQL = new LangWatchQLService({
     executor: null,
     database: DEFAULT_LWQL_DATABASE,

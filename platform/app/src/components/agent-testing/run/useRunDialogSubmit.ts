@@ -1,10 +1,10 @@
 import { useCallback } from "react";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { readHandledError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { writeScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { toLineRunParameters } from "./parameter-line";
@@ -49,9 +49,7 @@ function toSuiteTargets({
         ? { scenarioMappings: persistedTarget.scenarioMappings }
         : {}),
       ...(runParameters ? { runParameters } : {}),
-      ...(secretParameterNames
-        ? { runSecretParameterNames: secretParameterNames }
-        : {}),
+      ...(secretParameterNames ? { runSecretParameterNames: secretParameterNames } : {}),
     },
   ];
 }
@@ -89,9 +87,7 @@ function useHasAnyTarget(subject: RunDialogSubject | null) {
   );
   const { data: prompts } = useAllPromptsForProject();
   const hasAgent = (agents ?? []).length > 0;
-  const hasPublishedPrompt = (prompts ?? []).some(
-    (prompt) => prompt.version > 0,
-  );
+  const hasPublishedPrompt = (prompts ?? []).some((prompt) => prompt.version > 0);
   return hasAgent || hasPublishedPrompt;
 }
 
@@ -123,9 +119,7 @@ function usePersistTargetChoice({
 }) {
   const utils = api.useUtils();
   const updateSuite = api.suites.update.useMutation();
-  const setLastRunTarget = useAgentTestingStore(
-    (state) => state.setLastRunTarget,
-  );
+  const setLastRunTarget = useAgentTestingStore((state) => state.setLastRunTarget);
 
   const persistTargetChoice = useCallback(async () => {
     if (!subject || !target) return;
@@ -154,15 +148,7 @@ function usePersistTargetChoice({
     }
     // Run all persists its targets through the run itself: the managed suite
     // may not exist before the first run.
-  }, [
-    subject,
-    target,
-    projectId,
-    suiteTargets,
-    updateSuite,
-    utils,
-    setLastRunTarget,
-  ]);
+  }, [subject, target, projectId, suiteTargets, updateSuite, utils, setLastRunTarget]);
 
   return { persistTargetChoice, isSaving: updateSuite.isPending };
 }
@@ -197,8 +183,7 @@ export function useRunDialogSubmit(input: RunDialogSubmitInput) {
     target: input.target,
     runParameters: input.storableRunParameters,
     secretParameterNames: input.storableSecretNames,
-    persistedTarget:
-      input.subject?.kind === "suite" ? input.subject.persistedTarget : null,
+    persistedTarget: input.subject?.kind === "suite" ? input.subject.persistedTarget : null,
   });
   const noteInput = toNoteInput(input.note);
   const hasAnyTarget = useHasAnyTarget(input.subject);

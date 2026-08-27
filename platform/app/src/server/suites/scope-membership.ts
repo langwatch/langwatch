@@ -15,7 +15,7 @@
  */
 
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
-import { isDynamicScope, type SuiteScope } from "./scope";
+import { isDynamicScope, type SuiteScope } from "@langwatch/suite-contract";
 
 /** The Prisma surface the resolve needs; a transaction client fits. */
 export type ScopeMembershipClient = Pick<

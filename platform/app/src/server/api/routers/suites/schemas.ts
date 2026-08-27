@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { suiteTargetSchema } from "@langwatch/suite-contract";
+import { suiteScopeSchema, suiteTargetSchema } from "@langwatch/suite-contract";
 
 export type { SuiteTarget } from "@langwatch/suite-contract";
 export { suiteTargetSchema } from "@langwatch/suite-contract";

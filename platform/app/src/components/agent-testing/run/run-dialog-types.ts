@@ -6,7 +6,7 @@
  */
 
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import type { SuiteTarget } from "~/server/suites/types";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 
 /** What the dialog is about to run. */
 export type RunDialogSubject =

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

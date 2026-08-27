@@ -3,11 +3,21 @@ import {
   ScenarioNotFoundError,
   ScenarioService as ScenarioServiceContract,
   scenarioCreateInputSchema,
+  scenarioFolderCreateInputSchema,
+  scenarioFolderIdInputSchema,
+  scenarioFolderRenameInputSchema,
+  scenarioFolderUpdateInputSchema,
   scenarioIdInputSchema,
   runParameterValuesSchema,
   scenarioUpdateInputSchema,
   type Scenario,
   type ScenarioCreateInput,
+  type ScenarioFolder,
+  type ScenarioFolderCreateInput,
+  type ScenarioFolderIdInput,
+  type ScenarioFolderRenameInput,
+  type ScenarioFolderRunDefinition,
+  type ScenarioFolderUpdateInput,
   type ScenarioIdInput,
   type ScenarioReferenceState,
   type ScenarioRunConfig,
@@ -23,7 +33,7 @@ import { createLogger } from "@langwatch/observability";
 import type { SimulationService } from "@langwatch/simulation-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
-import type { ScenarioIdPort } from "../ports/scenario-id.port";
+import type { ScenarioFolderIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
 import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
 
 const logger = createLogger("langwatch:scenarios");
@@ -32,6 +42,7 @@ export type ScenarioServiceOptions = {
   repository: ScenarioRepository;
   simulations: SimulationService;
   ids: ScenarioIdPort;
+  folderIds: ScenarioFolderIdPort;
   clock: ScenarioClockPort;
   secretCipher: ScenarioSecretCipherPort;
 };
@@ -67,9 +78,7 @@ export class ScenarioService extends ScenarioServiceContract {
   }
 
   tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.options.repository.tryFindByIdIncludingArchived(
-      scenarioIdInputSchema.parse(input),
-    );
+    return this.options.repository.tryFindByIdIncludingArchived(scenarioIdInputSchema.parse(input));
   }
 
   list(input: { projectId: string }): Promise<Scenario[]> {
@@ -108,26 +117,58 @@ export class ScenarioService extends ScenarioServiceContract {
       .pick({ projectId: true })
       .extend({ ids: scenarioIdInputSchema.shape.id.array().min(1) })
       .parse(input);
-    const results = await Promise.allSettled(
-      parsed.ids.map((id) => this.archive({ id, projectId: parsed.projectId })),
-    );
-    const archived: string[] = [];
-    const failed: { id: string; error: string }[] = [];
-    for (const [index, result] of results.entries()) {
-      const id = parsed.ids[index]!;
-      if (result.status === "fulfilled") {
-        archived.push(id);
-      } else {
-        failed.push({ id, error: String(result.reason) });
-      }
-    }
-    return { archived, failed };
+    const result = await this.options.repository.archiveMany({
+      ids: parsed.ids,
+      projectId: parsed.projectId,
+      archivedAt: this.options.clock.now(),
+    });
+    const failed = result.missing.map((id) => ({
+      id,
+      error: String(new ScenarioNotFoundError(id)),
+    }));
+    return { archived: result.archived, failed };
   }
 
-  getRunConfigs(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<ScenarioRunConfig[]> {
+  createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder> {
+    const parsed = scenarioFolderCreateInputSchema.parse(input);
+    return this.options.repository.createFolder({
+      ...parsed,
+      id: this.options.folderIds.next(),
+    });
+  }
+
+  tryGetFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null> {
+    return this.options.repository.tryFindFolder(scenarioFolderIdInputSchema.parse(input));
+  }
+
+  listFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
+    return this.options.repository.findFolders(
+      scenarioIdInputSchema.pick({ projectId: true }).parse(input),
+    );
+  }
+
+  async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
+    const parsed = scenarioFolderRenameInputSchema.parse(input);
+    return this.options.repository.renameFolder(parsed);
+  }
+
+  updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder> {
+    return this.options.repository.updateFolder(scenarioFolderUpdateInputSchema.parse(input));
+  }
+
+  getFolderRunDefinition(input: ScenarioFolderIdInput): Promise<ScenarioFolderRunDefinition> {
+    return this.options.repository.getFolderRunDefinition(scenarioFolderIdInputSchema.parse(input));
+  }
+
+  async archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder> {
+    const parsed = scenarioFolderIdInputSchema.parse(input);
+    return this.options.repository.archiveFolder({
+      ...parsed,
+      archivedAt: this.options.clock.now(),
+    });
+  }
+
+  getRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]> {
     return this.options.repository.findRunConfigs(input);
   }
 

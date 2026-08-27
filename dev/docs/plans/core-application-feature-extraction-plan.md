@@ -67,6 +67,7 @@ cutovers remain explicit ledger work.
 | API framework          | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                                                                                                | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first.      |
 | Feature Flag           | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                                                                          | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services.                                                                                |
 | Evaluation wave        | Evaluator application implementations and its displaced API middleware are deleted. Experiment, Simulation and Suite old eventing roots are deleted. Their package and caller work is checkpointed, but strict-layout findings, subscriber guarantees, nullable repository naming, execution adapters and some behavioural proof remain red. | Repair the named package findings, prove each singular feature, then drain the remaining transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature.                        |
+| Scenario and Suite     | The current checkpoint moves folder ownership, run-plan scope, `runAll`, folder-compatible Suite reads/runs, and Scenario folder locking into the canonical packages. Suite ClickHouse writes remain event-driven projections; the service receives only a read-model port. Suite server has 33 passing tests and focused contract/server/web typechecks pass. | Commit the reviewed checkpoint, then migrate the remaining Suite integration coverage and delete the now-uncalled app Suite service/repository/scope stack. Scenario versioning, restore, move and duplicate remain the named blockers to deleting the old Scenario stack. |
 | Trace boundary         | The old request-collection service, its app-owned types and its unit suite are deleted. Server and transport callers now use the Trace contract/server surfaces. The app-owned query/facet compiler and 18 trace-processing subscribers/utilities remain deliberate residue.                                                                 | Prove trace response and ingestion parity, then move the query/facet compiler, protection/edit and usage-reader cohorts without changing `trace_analytics`, `trace_summaries`, rollups or public response fields.        |
 | Integration checkpoint | The one merge of `origin/main` at `5a9cd02001` is committed at `5770224e31` with no unmerged paths, conflict markers, stale `@ee` imports, old Prisma migration root or `platform/app/ee`. Upstream added 600 net application files to the 5,804-file pre-merge checkpoint, leaving a 6,404-file integrated baseline.                        | Push the resolved merge, then resume deletion from the named residuals below. Do not count upstream integration as extraction progress.                                                                                  |
 
@@ -100,9 +101,10 @@ pretended to be complete.
 
 The next committed batches after the `origin/main` merge are:
 
-1. **Suite folder cut:** move the restored folder, scope, run-plan and secret
-   behaviour into the existing singular Suite and Scenario packages, rewire
-   callers, move behavioural coverage and delete the temporary app residual.
+1. **Suite folder cut:** commit the canonical folder/scope/run-plan checkpoint,
+   move the remaining integration coverage, then delete the uncalled app Suite
+   service, repository, scope, constants, types and set-ID residue. Keep only
+   the named Scenario versioning/restore residual until the next cut.
 2. **Experiment and Scenario version cut:** move the restored workbench and
    Scenario history implementations into their existing singular owners.
 3. **SCIM and Governance composition:** inject the SCIM lifecycle/config and
@@ -142,8 +144,6 @@ not completion fallout from the batches above:
 
 A later slice receives an exact file count only when it is inventoried against
 the then-current committed tree. Stale macro counts and low import counts are
-not deletion authority.
-
 ## Batch proof
 
 Every deletion batch records:
@@ -155,7 +155,12 @@ Every deletion batch records:
 5. Oxfmt, Oxc, architecture lint, test-quality review and `git diff --check`;
 6. a residue search showing no old implementation, with every deliberate
    compatibility or composition adapter named; and
-7. one coherent commit containing only the reviewed slice.
+7. a runtime-boundary review proving an `App*Runtime` depends only on a named
+   service/runtime adapter, never concrete infrastructure options; remove a
+   forwarding wrapper when it owns no application lifecycle, and introduce an
+   abstract base or inheritance only when multiple implementations justify it;
+   and
+8. one coherent commit containing only the reviewed slice.
 
 No batch is complete merely because files moved out of the physical tree.
 Transports, pages, workers, tests and documentation move with their owner or are

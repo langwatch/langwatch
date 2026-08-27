@@ -4,13 +4,23 @@ import {
   createSuiteCommandSchema,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  isDynamicScope,
+  parseSuiteScope,
+  RUN_ALL_SUITE_LABEL,
+  RUN_ALL_SUITE_NAME,
   suiteArchivedNamesInputSchema,
   suiteBatchHistoryInputSchema,
   suiteIdInputSchema,
+  suiteRunAllInputSchema,
   suiteRunInputSchema,
   suiteRunStateInputSchema,
+  suiteSchema,
+  SuiteFolderMembershipManagedError,
   SuiteNameTakenError,
   SuiteNotFoundError,
+  SuiteScopeEmptyError,
+  SuiteScopeNotAllowedError,
+  SuiteTargetsRequiredError,
   SuiteService as SuiteServiceContract,
   updateSuiteCommandSchema,
   type CreateSuiteCommand,
@@ -18,6 +28,8 @@ import {
   type SuiteArchivedNamesInput,
   type SuiteBatchHistoryInput,
   type SuiteIdInput,
+  type SuiteRunAllInput,
+  type SuiteRunAllResult,
   type SuiteRunInput,
   type SuiteRunResult,
   type SuiteRunStateData,
@@ -27,12 +39,17 @@ import {
 } from "@langwatch/suite-contract";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import {
+  jsonValueSchema,
+  ScenarioFolderNotFoundError,
+  type ScenarioFolder,
+  type ScenarioService,
+} from "@langwatch/scenario-contract";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteRepository } from "../repositories/suite.repository";
-import type { SuiteRunRepository } from "../repositories/suite-run.repository";
+import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
 
-const archivedSlugSuffix = "__archived";
+const archivedSlugSuffix = "--archived";
 
 function slugify(value: string): string {
   return (
@@ -59,13 +76,17 @@ function isAgentTarget(target: SuiteTarget): boolean {
   }
 }
 
+function folderToSuite(folder: ScenarioFolder): Suite {
+  return suiteSchema.parse(folder);
+}
+
 export type SuiteServiceOptions = {
   repository: SuiteRepository;
   scenarios: ScenarioService;
   agents: AgentService;
   prompts: PromptService;
   execution: SuiteExecutionPort;
-  runRepository: SuiteRunRepository;
+  runRepository: SuiteRunReadRepository;
   generateId?: () => string;
   now?: () => Date;
 };
@@ -77,7 +98,7 @@ export class SuiteService extends SuiteServiceContract {
     return new SuiteService(options);
   }
 
-  private readonly runRepository: SuiteRunRepository;
+  private readonly runRepository: SuiteRunReadRepository;
 
   private constructor(private readonly options: SuiteServiceOptions) {
     super();
@@ -90,13 +111,21 @@ export class SuiteService extends SuiteServiceContract {
 
   async get(input: SuiteIdInput): Promise<Suite> {
     const parsed = suiteIdInputSchema.parse(input);
-    const suite = await this.options.repository.tryFindById(parsed);
+    const suite = await this.tryGet(parsed);
     if (!suite) throw new SuiteNotFoundError(parsed.id);
     return suite;
   }
 
-  tryGet(input: SuiteIdInput): Promise<Suite | null> {
-    return this.options.repository.tryFindById(suiteIdInputSchema.parse(input));
+  async tryGet(input: SuiteIdInput): Promise<Suite | null> {
+    const parsed = suiteIdInputSchema.parse(input);
+    const suite = await this.options.repository.tryFindById(parsed);
+    if (suite) return suite;
+
+    const folder = await this.options.scenarios.tryGetFolder({
+      folderId: parsed.id,
+      projectId: parsed.projectId,
+    });
+    return folder ? folderToSuite(folder) : null;
   }
 
   async create(input: CreateSuiteCommand): Promise<Suite> {
@@ -112,6 +141,14 @@ export class SuiteService extends SuiteServiceContract {
 
   async update(input: UpdateSuiteCommand): Promise<Suite> {
     const parsed = updateSuiteCommandSchema.parse(input);
+    const existing = await this.get({ id: parsed.id, projectId: parsed.projectId });
+    if (existing.kind === "folder") {
+      if (parsed.scope !== void 0) throw new SuiteScopeNotAllowedError();
+      if (parsed.scenarioIds !== void 0) throw new SuiteFolderMembershipManagedError();
+
+      return this.updateFolder(parsed);
+    }
+
     const slug = parsed.name === undefined ? undefined : slugify(parsed.name);
     if (slug !== undefined) {
       await this.assertSlugAvailable({
@@ -136,6 +173,7 @@ export class SuiteService extends SuiteServiceContract {
       name,
       description: source.description,
       scenarioIds: source.scenarioIds,
+      ...(source.scope ? { scope: source.scope } : {}),
       targets: source.targets,
       repeatCount: source.repeatCount,
       labels: source.labels,
@@ -148,6 +186,10 @@ export class SuiteService extends SuiteServiceContract {
 
   async archive(input: SuiteIdInput): Promise<Suite> {
     const suite = await this.get(input);
+    if (suite.kind === "folder") {
+      return this.archiveFolder(suite);
+    }
+
     const archivedSlug = suite.slug.endsWith(archivedSlugSuffix)
       ? suite.slug
       : `${suite.slug}${archivedSlugSuffix}-${suite.id.slice(-6)}`;
@@ -165,9 +207,22 @@ export class SuiteService extends SuiteServiceContract {
       projectId: parsed.projectId,
     });
     const { scenarios, agents, prompts, execution } = this.options;
+    if (suite.targets.length === 0) {
+      throw new SuiteTargetsRequiredError();
+    }
+
+    const scope = parseSuiteScope(suite.scope);
+    const scenarioIds = await this.resolveRunMembership({
+      suite,
+      scopeIsDynamic: isDynamicScope(scope),
+      projectId: parsed.projectId,
+    });
+    if (isDynamicScope(scope) && scenarioIds.length === 0) {
+      throw new SuiteScopeEmptyError();
+    }
 
     const scenarioResolution = await this.resolveScenarioReferences({
-      scenarioIds: suite.scenarioIds,
+      scenarioIds,
       projectId: parsed.projectId,
       scenarios,
     });
@@ -204,9 +259,8 @@ export class SuiteService extends SuiteServiceContract {
       suiteId: suite.id,
       projectId: parsed.projectId,
       activeScenarioIds: scenarioResolution.active,
-      scenarioNames: new Map(
-        scenarioConfigs.map((scenario) => [scenario.id, scenario.name]),
-      ),
+      scenarioNames: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.name])),
+      scenarioVersions: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.version])),
       scenarioConfigs,
       activeTargets: targetResolution.active,
       repeatCount: suite.repeatCount,
@@ -217,7 +271,34 @@ export class SuiteService extends SuiteServiceContract {
       idempotencyKey: parsed.idempotencyKey,
       batchRunId: parsed.batchRunId,
       parameters: parsed.parameters,
+      note: parsed.note,
     });
+  }
+
+  async runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult> {
+    const parsed = suiteRunAllInputSchema.parse(input);
+    const scenarioIds = (await this.options.scenarios.list({ projectId: parsed.projectId })).map(
+      (scenario) => scenario.id,
+    );
+    const suite = await this.options.repository.saveManagedRunAll({
+      id: (this.options.generateId ?? defaultGenerateId)(),
+      projectId: parsed.projectId,
+      name: RUN_ALL_SUITE_NAME,
+      baseSlug: slugify(RUN_ALL_SUITE_NAME),
+      label: RUN_ALL_SUITE_LABEL,
+      scenarioIds,
+      targets: parsed.targets,
+    });
+    const result = await this.run({
+      id: suite.id,
+      projectId: parsed.projectId,
+      organizationId: parsed.organizationId,
+      idempotencyKey: parsed.idempotencyKey,
+      batchRunId: parsed.batchRunId,
+      parameters: parsed.parameters,
+      note: parsed.note,
+    });
+    return { ...result, suiteId: suite.id };
   }
 
   async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
@@ -241,9 +322,7 @@ export class SuiteService extends SuiteServiceContract {
             ids: parsed.scenarioIds,
             projectId: parsed.projectId,
           });
-    const agentIds = parsed.targets
-      .filter(isAgentTarget)
-      .map((target) => target.referenceId);
+    const agentIds = parsed.targets.filter(isAgentTarget).map((target) => target.referenceId);
     const promptIds = parsed.targets
       .filter((target) => target.type === "prompt")
       .map((target) => target.referenceId);
@@ -261,10 +340,72 @@ export class SuiteService extends SuiteServiceContract {
     ]);
     return {
       scenarios: Object.fromEntries(scenarioRows.map((row) => [row.id, row.name])),
-      targets: Object.fromEntries(
-        [...agentRows, ...promptRows].map((row) => [row.id, row.name]),
-      ),
+      targets: Object.fromEntries([...agentRows, ...promptRows].map((row) => [row.id, row.name])),
     };
+  }
+
+  private async updateFolder(input: UpdateSuiteCommand): Promise<Suite> {
+    try {
+      const folder = await this.options.scenarios.updateFolder({
+        folderId: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        description: input.description,
+        targets: input.targets?.map((target) => jsonValueSchema.parse(target)),
+        repeatCount: input.repeatCount,
+        labels: input.labels,
+        simulatorModel: input.simulatorModel,
+        judgeModel: input.judgeModel,
+      });
+      return folderToSuite(folder);
+    } catch (error) {
+      if (error instanceof ScenarioFolderNotFoundError) {
+        throw new SuiteNotFoundError(input.id);
+      }
+      throw error;
+    }
+  }
+
+  private async archiveFolder(suite: Suite): Promise<Suite> {
+    try {
+      const folder = await this.options.scenarios.archiveFolder({
+        folderId: suite.id,
+        projectId: suite.projectId,
+      });
+      return folderToSuite(folder);
+    } catch (error) {
+      if (error instanceof ScenarioFolderNotFoundError) {
+        throw new SuiteNotFoundError(suite.id);
+      }
+      throw error;
+    }
+  }
+
+  private async resolveRunMembership(input: {
+    suite: Suite;
+    scopeIsDynamic: boolean;
+    projectId: string;
+  }): Promise<string[]> {
+    if (input.suite.kind === "folder") {
+      try {
+        const definition = await this.options.scenarios.getFolderRunDefinition({
+          folderId: input.suite.id,
+          projectId: input.projectId,
+        });
+        return definition.scenarioIds;
+      } catch (error) {
+        if (error instanceof ScenarioFolderNotFoundError) {
+          throw new SuiteNotFoundError(input.suite.id);
+        }
+        throw error;
+      }
+    }
+    if (!input.scopeIsDynamic) return input.suite.scenarioIds;
+
+    return this.options.repository.resolveDynamicRunMembership({
+      id: input.suite.id,
+      projectId: input.projectId,
+    });
   }
 
   private async assertSlugAvailable(input: {
@@ -273,8 +414,7 @@ export class SuiteService extends SuiteServiceContract {
     excludeId?: string;
   }): Promise<void> {
     const existing = await this.options.repository.tryFindBySlug(input);
-    if (existing && existing.id !== input.excludeId)
-      throw new SuiteNameTakenError(existing.name);
+    if (existing && existing.id !== input.excludeId) throw new SuiteNameTakenError(existing.name);
   }
 
   private async resolveScenarioReferences(input: {

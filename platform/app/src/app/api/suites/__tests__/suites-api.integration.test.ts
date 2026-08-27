@@ -463,6 +463,17 @@ describe("Feature: Suites REST API", () => {
       expect(body.scenarioIds).toContain(scenario.id);
     });
 
+    it("preserves a dynamic scope in the response", async () => {
+      const res = await helpers.api.post("/api/suites", {
+        name: "All Cases",
+        scope: { mode: "all" },
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+      });
+
+      expect(res.status).toBe(201);
+      expect((await res.json()).scope).toEqual({ mode: "all" });
+    });
+
     it("rejects duplicate names", async () => {
       const scenario = await createScenario("Dupe Scenario");
       // Create first suite via the API so the service assigns the canonical slug

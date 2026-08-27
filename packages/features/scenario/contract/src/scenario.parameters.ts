@@ -39,9 +39,7 @@ export const scenarioParameterDefinitionSchema = z
     secret: z.boolean().optional(),
   })
   .strict();
-export type ScenarioParameterDefinition = z.infer<
-  typeof scenarioParameterDefinitionSchema
->;
+export type ScenarioParameterDefinition = z.infer<typeof scenarioParameterDefinitionSchema>;
 
 export const scenarioParameterDefinitionsSchema = z
   .array(scenarioParameterDefinitionSchema)
@@ -70,24 +68,13 @@ export const scenarioParameterDefinitionsSchema = z
     }
   });
 
-const runParameterKeySchema = z
-  .string()
-  .refine((name) => !reservedParameterNames.has(name), {
-    message: reservedNameMessage,
-  });
+const runParameterKeySchema = z.string().refine((name) => !reservedParameterNames.has(name), {
+  message: reservedNameMessage,
+});
 
-export const runParameterValuesSchema = z.preprocess(
-  (value) => {
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      Object.keys(value).some((name) => reservedParameterNames.has(name))
-    ) {
-      return undefined;
-    }
-    return value;
-  },
-  z.record(runParameterKeySchema, parameterValueSchema).superRefine((values, context) => {
+const runParameterValuesObjectSchema = z
+  .record(runParameterKeySchema, parameterValueSchema)
+  .superRefine((values, context) => {
     const names = Object.keys(values);
     for (const name of names) {
       if (!SCENARIO_PARAMETER_NAME_PATTERN.test(name)) {
@@ -104,21 +91,31 @@ export const runParameterValuesSchema = z.preprocess(
         message: `A run can supply at most ${MAX_RUN_PARAMETER_KEYS} parameter values`,
       });
     }
-    if (
-      new TextEncoder().encode(JSON.stringify(values)).length > MAX_RUN_PARAMETER_BYTES
-    ) {
+    if (new TextEncoder().encode(JSON.stringify(values)).length > MAX_RUN_PARAMETER_BYTES) {
       context.addIssue({
         code: "custom",
         message: `Parameter values are limited to ${MAX_RUN_PARAMETER_BYTES} bytes in total`,
       });
     }
-  }),
-);
+  });
+
+export const runParameterValuesSchema = z.preprocess<
+  unknown,
+  typeof runParameterValuesObjectSchema,
+  z.input<typeof runParameterValuesObjectSchema>
+>((value) => {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    Object.keys(value).some((name) => reservedParameterNames.has(name))
+  ) {
+    return undefined;
+  }
+  return value;
+}, runParameterValuesObjectSchema);
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
 
-export function parseScenarioParameterDefinitions(
-  value: unknown,
-): ScenarioParameterDefinition[] {
+export function parseScenarioParameterDefinitions(value: unknown): ScenarioParameterDefinition[] {
   if (value === null || value === undefined) return [];
   const parsed = scenarioParameterDefinitionsSchema.safeParse(value);
   return parsed.success ? parsed.data : [];

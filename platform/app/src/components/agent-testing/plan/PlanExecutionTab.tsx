@@ -9,21 +9,13 @@
  */
 
 import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import {
-  DIALOG_FIELD_STYLE,
-  FieldError,
-  FieldLabel,
-} from "../shared/DialogFields";
+import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
+import { DIALOG_FIELD_STYLE, FieldError, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
 /** How many times each scenario and target pair runs. */
-function RepeatCountField({
-  form,
-}: {
-  form: PlanEditorState["suiteForm"]["form"];
-}) {
+function RepeatCountField({ form }: { form: PlanEditorState["suiteForm"]["form"] }) {
   const errors = form.formState.errors;
 
   return (
@@ -46,13 +38,11 @@ function RepeatCountField({
           fontSize="12px"
           aria-label="Repeat count"
           min={1}
-          max={MAX_REPEAT_COUNT}
+          max={MAX_SUITE_REPEAT_COUNT}
           {...form.register("repeatCount", { valueAsNumber: true })}
           borderColor={errors.repeatCount ? "red.500" : "border"}
         />
-        <Text color={FG_MUTED}>
-          times per scenario x target (max {MAX_REPEAT_COUNT})
-        </Text>
+        <Text color={FG_MUTED}>times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})</Text>
       </HStack>
       <FieldError message={errors.repeatCount?.message} />
     </Box>
@@ -66,8 +56,7 @@ export function PlanExecutionTab({ editor }: { editor: PlanEditorState }) {
       <Box>
         <FieldLabel>Agents and prompts</FieldLabel>
         <Text fontSize="11.5px" color={FG_MUTED}>
-          Chosen when the run starts. The last choice is offered again next
-          time.
+          Chosen when the run starts. The last choice is offered again next time.
         </Text>
       </Box>
     </VStack>

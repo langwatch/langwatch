@@ -9,9 +9,9 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
+import type { SuiteKind } from "@langwatch/suite-contract";
 import type { Prisma, PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import { ARCHIVED_SLUG_SUFFIX } from "./constants";
-import type { SuiteKind } from "./types";
 
 /**
  * The client a repository write runs on: the repository's own PrismaClient by

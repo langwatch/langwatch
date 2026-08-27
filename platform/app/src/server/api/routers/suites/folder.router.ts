@@ -9,34 +9,24 @@
  */
 
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { ScenarioFolderNotFoundError } from "@langwatch/scenario-contract";
+import { SuiteNotFoundError } from "@langwatch/suite-contract";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { SuiteService } from "~/server/suites/suite.service";
 import { projectSchema } from "./schemas";
-
-function createSuiteService(prisma: PrismaClient) {
-  return SuiteService.create({
-    prisma,
-    suiteRunService: getApp().suiteRuns.runs,
-  });
-}
 
 export const folderRouter = createTRPCRouter({
   create: protectedProcedure
     .input(projectSchema.extend({ name: z.string().trim().min(1) }))
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      return service.createFolder(input);
+      return ctx.app.scenarios.createFolder(input);
     }),
 
   getAll: protectedProcedure
     .input(projectSchema)
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      const folders = await service.getAllFolders(input);
+      const folders = await ctx.app.scenarios.listFolders(input);
       // scenarioIds is the reconciled member cache; exposed as caseIds so the
       // UI reads the concept it renders.
       return folders.map((folder) => ({
@@ -54,15 +44,27 @@ export const folderRouter = createTRPCRouter({
     )
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      return service.renameFolder(input);
+      try {
+        return await ctx.app.scenarios.renameFolder(input);
+      } catch (error) {
+        if (error instanceof ScenarioFolderNotFoundError) {
+          throw new SuiteNotFoundError(input.folderId);
+        }
+        throw error;
+      }
     }),
 
   archive: protectedProcedure
     .input(projectSchema.extend({ folderId: z.string() }))
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      return service.archiveFolder(input);
+      try {
+        return await ctx.app.scenarios.archiveFolder(input);
+      } catch (error) {
+        if (error instanceof ScenarioFolderNotFoundError) {
+          throw new SuiteNotFoundError(input.folderId);
+        }
+        throw error;
+      }
     }),
 });

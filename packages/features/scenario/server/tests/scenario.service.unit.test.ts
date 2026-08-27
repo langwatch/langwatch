@@ -1,7 +1,14 @@
 import {
+  ScenarioFolderNotFoundError,
   ScenarioNotFoundError,
   type Scenario,
   type ScenarioCreateInput,
+  type ScenarioFolder,
+  type ScenarioFolderCreateInput,
+  type ScenarioFolderIdInput,
+  type ScenarioFolderRenameInput,
+  type ScenarioFolderRunDefinition,
+  type ScenarioFolderUpdateInput,
   type ScenarioReferenceState,
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
@@ -11,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../src/repositories/scenario.repository";
 import { ScenarioService } from "../src/services/scenario.service";
 import { ScenarioClockPort } from "../src/ports/scenario-clock.port";
-import { ScenarioIdPort } from "../src/ports/scenario-id.port";
+import { ScenarioFolderIdPort, ScenarioIdPort } from "../src/ports/scenario-id.port";
 import { ScenarioSecretCipherPort } from "../src/ports/scenario-secret-cipher.port";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
@@ -20,6 +27,16 @@ class TestScenarioId extends ScenarioIdPort {
   constructor(private readonly value: string) {
     super();
   }
+  next(): string {
+    return this.value;
+  }
+}
+
+class TestScenarioFolderId extends ScenarioFolderIdPort {
+  constructor(private readonly value: string) {
+    super();
+  }
+
   next(): string {
     return this.value;
   }
@@ -53,6 +70,7 @@ function serviceOptions(
     repository,
     simulations,
     ids: new TestScenarioId(id),
+    folderIds: new TestScenarioFolderId(`folder_${id}`),
     clock,
     secretCipher: new TestScenarioSecretCipher(),
   };
@@ -60,6 +78,7 @@ function serviceOptions(
 
 class MemoryScenarioRepository extends ScenarioRepository {
   readonly rows = new Map<string, Scenario>();
+  readonly folders = new Map<string, ScenarioFolder>();
 
   async create(input: ScenarioCreateInput & { id: string }): Promise<Scenario> {
     const row: Scenario = {
@@ -69,6 +88,8 @@ class MemoryScenarioRepository extends ScenarioRepository {
       judgeModel: input.judgeModel ?? null,
       maxTurns: input.maxTurns ?? null,
       minTurns: input.minTurns ?? null,
+      folderId: input.folderId ?? null,
+      version: 1,
       lastUpdatedById: input.lastUpdatedById ?? null,
       archivedAt: null,
       createdAt: new Date(0),
@@ -85,10 +106,7 @@ class MemoryScenarioRepository extends ScenarioRepository {
     );
   }
 
-  tryFindByIdIncludingArchived(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Scenario | null> {
+  tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario | null> {
     const row = this.rows.get(input.id);
     return Promise.resolve(row?.projectId === input.projectId ? row : null);
   }
@@ -126,15 +144,32 @@ class MemoryScenarioRepository extends ScenarioRepository {
     return row;
   }
 
-  async findRunConfigs(input: {
+  async archiveMany(input: {
     ids: string[];
     projectId: string;
-  }): Promise<ScenarioRunConfig[]> {
+    archivedAt: Date;
+  }): Promise<{ archived: string[]; missing: string[] }> {
+    const archived: string[] = [];
+    const missing: string[] = [];
+    for (const id of input.ids) {
+      const row = await this.tryArchive({
+        id,
+        projectId: input.projectId,
+        archivedAt: input.archivedAt,
+      });
+      if (row) archived.push(id);
+      else missing.push(id);
+    }
+    return { archived, missing };
+  }
+
+  async findRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]> {
     return [...this.rows.values()]
       .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, name, situation, criteria, parameters }) => ({
+      .map(({ id, name, version, situation, criteria, parameters }) => ({
         id,
         name,
+        version,
         situation,
         criteria,
         parameters,
@@ -158,6 +193,76 @@ class MemoryScenarioRepository extends ScenarioRepository {
       .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
       .map(({ id, name }) => ({ id, name }));
   }
+
+  async createFolder(input: ScenarioFolderCreateInput & { id: string }): Promise<ScenarioFolder> {
+    const folder: ScenarioFolder = {
+      id: input.id,
+      projectId: input.projectId,
+      name: input.name,
+      slug: input.name.toLowerCase(),
+      description: null,
+      scenarioIds: [],
+      targets: [],
+      repeatCount: 1,
+      labels: [],
+      simulatorModel: null,
+      judgeModel: null,
+      kind: "folder",
+      scope: null,
+      archivedAt: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    this.folders.set(folder.id, folder);
+    return folder;
+  }
+
+  findFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
+    return Promise.resolve(
+      [...this.folders.values()].filter(
+        (folder) => folder.projectId === input.projectId && folder.archivedAt === null,
+      ),
+    );
+  }
+
+  tryFindFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null> {
+    const folder = this.folders.get(input.folderId);
+    return Promise.resolve(
+      folder?.projectId === input.projectId && folder.archivedAt === null ? folder : null,
+    );
+  }
+
+  async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
+    return this.updateFolder(input);
+  }
+
+  async updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder> {
+    const folder = await this.tryFindFolder(input);
+    if (!folder) throw new ScenarioFolderNotFoundError();
+
+    const { folderId: _, projectId: __, ...changes } = input;
+    const updated = { ...folder, ...changes, updatedAt: new Date(1) };
+    this.folders.set(updated.id, updated);
+    return updated;
+  }
+
+  async getFolderRunDefinition(input: ScenarioFolderIdInput): Promise<ScenarioFolderRunDefinition> {
+    const folder = await this.tryFindFolder(input);
+    if (!folder) throw new ScenarioFolderNotFoundError();
+
+    return { folder, scenarioIds: folder.scenarioIds };
+  }
+
+  async archiveFolder(
+    input: ScenarioFolderIdInput & { archivedAt: Date },
+  ): Promise<ScenarioFolder> {
+    const folder = this.folders.get(input.folderId);
+    if (!folder || folder.projectId !== input.projectId) throw new ScenarioFolderNotFoundError();
+
+    const archived = { ...folder, archivedAt: folder.archivedAt ?? input.archivedAt };
+    this.folders.set(archived.id, archived);
+    return archived;
+  }
 }
 
 describe("ScenarioService", () => {
@@ -172,9 +277,7 @@ describe("ScenarioService", () => {
       labels: [],
     });
 
-    expect(
-      await service.tryGetById({ id: "scenario_1", projectId: "project-b" }),
-    ).toBeNull();
+    expect(await service.tryGetById({ id: "scenario_1", projectId: "project-b" })).toBeNull();
     await expect(
       service.getById({ id: "scenario_1", projectId: "project-b" }),
     ).rejects.toBeInstanceOf(ScenarioNotFoundError);
@@ -234,6 +337,7 @@ describe("ScenarioService", () => {
       {
         id: "scenario_1",
         name: "Refund flow",
+        version: 1,
         situation: "A {{ params.region }} customer asks for a refund",
         criteria: ["Answers the question"],
         parameters: [
@@ -309,6 +413,7 @@ describe("ScenarioService", () => {
           {
             id: "scenario_1",
             name: "Refund flow",
+            version: 1,
             situation: "A {{ params.region }} customer asks for help",
             criteria: [],
             parameters: [
@@ -339,6 +444,7 @@ describe("ScenarioService", () => {
           {
             id: "scenario_1",
             name: "Refund flow",
+            version: 1,
             situation: "A customer asks for help",
             criteria: [],
             parameters: [{ name: "region", defaultValue: "eu" }],
@@ -349,26 +455,51 @@ describe("ScenarioService", () => {
     ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
   });
 
-  it("archives valid batch members while reporting missing members independently", async () => {
+  it("preserves order, duplicates, retry success, and exact failures in a batch archive", async () => {
     const repository = new MemoryScenarioRepository();
-    const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
-    await service.create({
+    const firstService = ScenarioService.create(serviceOptions(repository, "scenario_1"));
+    const secondService = ScenarioService.create(serviceOptions(repository, "scenario_2"));
+    await firstService.create({
       projectId: "project-a",
       name: "Refund flow",
       situation: "A customer asks for a refund",
       criteria: [],
       labels: [],
     });
+    await secondService.create({
+      projectId: "project-a",
+      name: "Checkout flow",
+      situation: "A customer checks out",
+      criteria: [],
+      labels: [],
+    });
+    await secondService.archive({ id: "scenario_2", projectId: "project-a" });
 
     await expect(
-      service.batchArchive({
+      firstService.batchArchive({
         projectId: "project-a",
-        ids: ["scenario_1", "scenario_missing"],
+        ids: [
+          "scenario_2",
+          "scenario_1",
+          "scenario_2",
+          "scenario_missing",
+          "scenario_1",
+          "scenario_missing",
+        ],
       }),
-    ).resolves.toMatchObject({
-      archived: ["scenario_1"],
-      failed: [{ id: "scenario_missing" }],
+    ).resolves.toEqual({
+      archived: ["scenario_2", "scenario_1", "scenario_2", "scenario_1"],
+      failed: [
+        {
+          id: "scenario_missing",
+          error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+        },
+        {
+          id: "scenario_missing",
+          error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+        },
+      ],
     });
-    await expect(service.list({ projectId: "project-a" })).resolves.toEqual([]);
+    await expect(firstService.list({ projectId: "project-a" })).resolves.toEqual([]);
   });
 });

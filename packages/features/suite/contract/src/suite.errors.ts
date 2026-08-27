@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 
 export class SuiteNotFoundError extends NotFoundError {
   declare readonly code: "suite_not_found";
@@ -72,5 +72,42 @@ export class AllTargetsArchivedError extends SuiteExecutionError {
       "All targets in this suite are archived. Update the suite to include active targets.",
     );
     this.name = "AllTargetsArchivedError";
+  }
+}
+
+export class SuiteTargetsRequiredError extends SuiteExecutionError {
+  constructor() {
+    super(
+      "suite_targets_required",
+      "This suite has no target to run against. Choose one, then run.",
+    );
+    this.name = "SuiteTargetsRequiredError";
+  }
+}
+
+export class SuiteScopeEmptyError extends SuiteExecutionError {
+  constructor() {
+    super("suite_scope_empty", "This run plan covers no test case. Widen its scope, then run.");
+    this.name = "SuiteScopeEmptyError";
+  }
+}
+
+export class SuiteScopeNotAllowedError extends SuiteExecutionError {
+  constructor() {
+    super(
+      "suite_scope_not_allowed",
+      "A test suite runs the test cases filed in it, so it takes no scope.",
+    );
+    this.name = "SuiteScopeNotAllowedError";
+  }
+}
+
+export class SuiteFolderMembershipManagedError extends ValidationError {
+  constructor() {
+    const message = "A folder's scenarios are managed by filing scenarios into it";
+    super(message, {
+      meta: { fieldErrors: { scenarioIds: [message] } },
+    });
+    this.name = "SuiteFolderMembershipManagedError";
   }
 }

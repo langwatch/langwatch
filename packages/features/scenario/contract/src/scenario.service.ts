@@ -1,6 +1,12 @@
 import type {
   Scenario,
   ScenarioCreateInput,
+  ScenarioFolder,
+  ScenarioFolderCreateInput,
+  ScenarioFolderIdInput,
+  ScenarioFolderRenameInput,
+  ScenarioFolderRunDefinition,
+  ScenarioFolderUpdateInput,
   ScenarioIdInput,
   ScenarioReferenceState,
   ScenarioRunConfig,
@@ -51,10 +57,16 @@ export abstract class ScenarioService {
     ids: string[];
     projectId: string;
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }>;
-  abstract getRunConfigs(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<ScenarioRunConfig[]>;
+  abstract createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder>;
+  abstract tryGetFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null>;
+  abstract listFolders(input: { projectId: string }): Promise<ScenarioFolder[]>;
+  abstract renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder>;
+  abstract updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder>;
+  abstract getFolderRunDefinition(
+    input: ScenarioFolderIdInput,
+  ): Promise<ScenarioFolderRunDefinition>;
+  abstract archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder>;
+  abstract getRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]>;
   abstract getReferenceStates(input: {
     ids: string[];
     projectId: string;

@@ -1,4 +1,4 @@
-export { PrismaScenarioAdapter } from "./adapters/prisma-scenario.adapter";
+export { PrismaScenarioAdapter } from "./repositories/prisma/prisma.scenario.adapter";
 export * from "./ports/cancellation-channel.port";
 export * from "./ports/scenario-clock.port";
 export * from "./ports/scenario-child-bootstrap.port";

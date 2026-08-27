@@ -1,4 +1,15 @@
 import { z } from "zod";
+import {
+  MAX_PARAMETER_NAME_LENGTH,
+  MAX_RUN_PARAMETER_KEYS,
+  runNoteSchema,
+  runParameterValuesSchema,
+} from "@langwatch/scenario-contract";
+import { suiteKindSchema } from "./suite.kind";
+import { suiteScopeSchema } from "./suite.scope";
+
+export const RUN_ALL_SUITE_LABEL = "managed:run-all";
+export const RUN_ALL_SUITE_NAME = "All test cases";
 
 export const suiteTargetTypeSchema = z.enum(["prompt", "http", "code", "workflow"]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
@@ -20,6 +31,11 @@ const suiteTargetBaseSchema = z
     type: suiteTargetTypeSchema,
     referenceId: z.string().min(1),
     scenarioMappings: z.record(z.string(), suiteFieldMappingSchema).optional(),
+    runParameters: runParameterValuesSchema.optional(),
+    runSecretParameterNames: z
+      .array(z.string().max(MAX_PARAMETER_NAME_LENGTH))
+      .max(MAX_RUN_PARAMETER_KEYS)
+      .optional(),
   })
   .strict();
 
@@ -47,8 +63,10 @@ export const suiteSchema = z
     projectId: z.string().min(1),
     name: z.string().min(1),
     slug: z.string().min(1),
+    kind: suiteKindSchema,
     description: z.string().nullable(),
     scenarioIds: z.array(z.string()),
+    scope: suiteScopeSchema.nullable(),
     targets: z.array(suiteTargetSchema),
     repeatCount: z.number().int().positive(),
     labels: z.array(z.string()),
@@ -75,9 +93,16 @@ export const suiteRunInputSchema = z
     idempotencyKey: z.string().min(1),
     batchRunId: z.string().min(1).optional(),
     parameters: suiteRunParametersSchema.optional(),
+    note: runNoteSchema,
   })
   .strict();
 export type SuiteRunInput = z.infer<typeof suiteRunInputSchema>;
+
+export const suiteRunAllInputSchema = suiteRunInputSchema
+  .omit({ id: true })
+  .extend({ targets: z.array(suiteTargetSchema).optional() })
+  .strict();
+export type SuiteRunAllInput = z.infer<typeof suiteRunAllInputSchema>;
 
 export const suiteArchivedNamesInputSchema = z
   .object({
@@ -104,6 +129,8 @@ export type SuiteRunResult = {
     name: string | undefined;
   }>;
 };
+
+export type SuiteRunAllResult = SuiteRunResult & { suiteId: string };
 
 /** The durable fold state exposed by the Suite run read model. */
 export const suiteRunStateDataSchema = z

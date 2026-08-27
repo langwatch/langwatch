@@ -11,10 +11,10 @@
  */
 
 import { useCallback, useState } from "react";
+import { parseSuiteTargets } from "@langwatch/suite-contract";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useRunStartedHandler } from "../cases/useCaseRunActions";
 import type { RunDialogSubject } from "../run/RunDialog";
@@ -56,9 +56,7 @@ export function useRunPlanRunDialog({
       suiteId: suite.id,
       name: suite.name,
       scenarioIds: suite.scenarioIds,
-      initialTarget: persisted
-        ? { type: persisted.type, id: persisted.referenceId }
-        : null,
+      initialTarget: persisted ? { type: persisted.type, id: persisted.referenceId } : null,
       persistedTarget: persisted ?? null,
     });
   }, [suite]);

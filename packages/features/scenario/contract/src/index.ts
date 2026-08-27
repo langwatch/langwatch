@@ -4,6 +4,7 @@ export * from "./field-mapping";
 export * from "./http-template-engine";
 export * from "./resolve-field-mappings";
 export * from "./run-secret-ciphertext";
+export * from "./run-note";
 export * from "./scenario-content-template";
 export * from "./scenario-dev-tunnel-error";
 export * from "./scenario-failure-results";

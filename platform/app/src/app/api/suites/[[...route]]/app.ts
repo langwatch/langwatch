@@ -1,9 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
+  isSuiteKind,
+  SuiteScopeNotAllowedError,
   type Suite,
   SuiteExecutionError,
   SuiteNotFoundError,
+  suiteScopeSchema,
   suiteTargetSchema,
 } from "@langwatch/suite-contract";
 import { describeRoute, resolver } from "hono-openapi";
@@ -11,7 +14,8 @@ import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { ScenarioFolderNotFoundError, type ScenarioFolder } from "@langwatch/scenario-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -31,7 +35,7 @@ const suiteResponseSchema = z.object({
     ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
-  scope: scopeSchema.nullable(),
+  scope: suiteScopeSchema.nullable(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
@@ -60,16 +64,14 @@ function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["scope"],
-      message:
-        "A test suite runs the test cases filed in it, so it takes no scope",
+      message: "A test suite runs the test cases filed in it, so it takes no scope",
     });
   }
   if (body.scenarioIds.length > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["scenarioIds"],
-      message:
-        "A folder is created empty; file scenarios into it after creating it",
+      message: "A folder is created empty; file scenarios into it after creating it",
     });
   }
   if (body.targets.length > 0) {
@@ -121,7 +123,7 @@ const createSuiteInputSchema = z
       ),
     description: z.string().optional(),
     scenarioIds: z.array(z.string()).default([]),
-    scope: scopeSchema.optional(),
+    scope: suiteScopeSchema.optional(),
     targets: z.array(suiteTargetSchema).default([]),
     repeatCount: z.number().int().min(1).max(100).default(1),
     labels: z.array(z.string()).default([]),
@@ -146,7 +148,7 @@ const listSuitesQuerySchema = z.object({
 const updateSuiteInputSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
-  scope: scopeSchema.optional(),
+  scope: suiteScopeSchema.optional(),
   scenarioIds: z.array(z.string()).min(1).optional(),
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
@@ -192,11 +194,31 @@ function toSuiteResponse(suite: Suite) {
     kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
     description: suite.description,
     scenarioIds: suite.scenarioIds,
+    scope: suite.scope,
     targets: suite.targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
+  };
+}
+
+function toFolderResponse(folder: ScenarioFolder) {
+  const targets = z.array(suiteTargetSchema).parse(folder.targets);
+
+  return {
+    id: folder.id,
+    name: folder.name,
+    slug: folder.slug,
+    kind: "folder" as const,
+    description: folder.description,
+    scenarioIds: folder.scenarioIds,
+    scope: null,
+    targets,
+    repeatCount: folder.repeatCount,
+    labels: folder.labels,
+    createdAt: folder.createdAt.toISOString(),
+    updatedAt: folder.updatedAt.toISOString(),
   };
 }
 
@@ -226,11 +248,14 @@ secured.access(requires("scenarios:view")).get(
     const { kind } = c.req.valid("query");
     logger.info({ projectId: project.id, kind }, "Listing suites");
 
-    const suites = await c.app.suites.list({ projectId: project.id });
+    const suites =
+      kind === "folder"
+        ? (await c.app.scenarios.listFolders({ projectId: project.id })).map(toFolderResponse)
+        : (await c.app.suites.list({ projectId: project.id })).map(toSuiteResponse);
 
     return c.json(
       suites.map((s) => ({
-        ...toSuiteResponse(s),
+        ...s,
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/simulations/run-plans/${s.slug}`,
@@ -268,12 +293,27 @@ secured.access(requires("scenarios:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
 
-    let suite: Suite;
+    let suite: Suite | undefined;
     try {
       suite = await c.app.suites.get({ id, projectId: project.id });
     } catch (error) {
       if (!(error instanceof SuiteNotFoundError)) throw error;
-      return c.json({ error: "Suite not found" }, 404);
+    }
+
+    if (!suite) {
+      const folder = await c.app.scenarios.tryGetFolder({
+        folderId: id,
+        projectId: project.id,
+      });
+      if (!folder) return c.json({ error: "Suite not found" }, 404);
+
+      return c.json({
+        ...toFolderResponse(folder),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${folder.slug}`,
+        }),
+      });
     }
 
     return c.json({
@@ -315,13 +355,24 @@ secured.access(requires("scenarios:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, kind: body.kind }, "Creating suite");
 
-    const suite = await c.app.suites.create({
-      ...body,
-      projectId: project.id,
-    });
+    const { kind, ...definition } = body;
+    const suite =
+      kind === "folder"
+        ? toFolderResponse(
+            await c.app.scenarios.createFolder({
+              projectId: project.id,
+              name: definition.name,
+            }),
+          )
+        : toSuiteResponse(
+            await c.app.suites.create({
+              ...definition,
+              projectId: project.id,
+            }),
+          );
     return c.json(
       {
-        ...toSuiteResponse(suite),
+        ...suite,
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/simulations/run-plans/${suite.slug}`,
@@ -362,6 +413,39 @@ secured.access(requires("scenarios:update")).patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
+
+    const folder = await c.app.scenarios.tryGetFolder({
+      folderId: id,
+      projectId: project.id,
+    });
+    if (folder) {
+      if (body.scope !== undefined) {
+        throw new SuiteScopeNotAllowedError();
+      }
+      if (body.scenarioIds !== undefined) {
+        throw new ValidationError("A folder's scenarios are managed by filing scenarios into it", {
+          meta: {
+            fieldErrors: {
+              scenarioIds: ["A folder's scenarios are managed by filing scenarios into it"],
+            },
+          },
+        });
+      }
+
+      const { scope: _scope, scenarioIds: _scenarioIds, ...folderInput } = body;
+      const updatedFolder = await c.app.scenarios.updateFolder({
+        ...folderInput,
+        folderId: id,
+        projectId: project.id,
+      });
+      return c.json({
+        ...toFolderResponse(updatedFolder),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${updatedFolder.slug}`,
+        }),
+      });
+    }
 
     let suite: Suite;
     try {
@@ -537,6 +621,16 @@ secured.access(requires("scenarios:manage")).delete(
     const project = c.get("project");
     const { id } = c.req.param();
     logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
+
+    try {
+      await c.app.scenarios.archiveFolder({
+        folderId: id,
+        projectId: project.id,
+      });
+      return c.json({ id, archived: true });
+    } catch (error) {
+      if (!(error instanceof ScenarioFolderNotFoundError)) throw error;
+    }
 
     try {
       await c.app.suites.archive({ id, projectId: project.id });

@@ -15,6 +15,7 @@ import {
   type RunParameterValues,
   type RunSecretCiphertext,
 } from "@langwatch/scenario-contract";
+import { isDynamicScope, parseSuiteScope, type SuiteKind } from "@langwatch/suite-contract";
 import type { Prisma, PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import type { SuiteRunResult, SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
@@ -35,15 +36,9 @@ import {
   SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
 } from "./errors";
-import { isDynamicScope, parseSuiteScope } from "./scope";
 import { readScopeMembership } from "./scope-membership";
 import { type CreateSuiteInput, SuiteRepository, type UpdateSuiteInput } from "./suite.repository";
-import {
-  isSuiteAgentTargetType,
-  parseSuiteTargets,
-  type SuiteKind,
-  type SuiteTarget,
-} from "./types";
+import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");

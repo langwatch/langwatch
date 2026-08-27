@@ -41,7 +41,7 @@ export function useSuiteForm({
   agents,
   prompts,
 }: UseSuiteFormParams) {
-  const form = useForm<SuiteFormData>({
+  const form = useForm<z.input<typeof suiteFormSchema>, unknown, SuiteFormData>({
     defaultValues: suiteFormDefaultValues,
     resolver: zodResolver(suiteFormSchema),
     mode: "onSubmit",
@@ -53,15 +53,12 @@ export function useSuiteForm({
   const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(null);
 
   const selectedScenarioIds = form.watch("selectedScenarioIds");
-  const selectedTargets = form.watch("selectedTargets");
+  const selectedTargets = z.array(suiteTargetSchema).parse(form.watch("selectedTargets"));
   const labels = form.watch("labels");
   const simulatorModel = form.watch("simulatorModel");
   const judgeModel = form.watch("judgeModel");
 
-  const availableTargets = useMemo(
-    () => getAvailableTargets(agents, prompts),
-    [agents, prompts],
-  );
+  const availableTargets = useMemo(() => getAvailableTargets(agents, prompts), [agents, prompts]);
 
   const archivedScenarioIds = useMemo(
     () => getArchivedScenarioIds(selectedScenarioIds, scenarios),
@@ -133,26 +130,20 @@ export function useSuiteForm({
     identifier: string;
     mapping: FieldMapping | undefined;
   }) => {
-    const next = form
-      .getValues("selectedTargets")
-      .map((candidate) =>
-        isSameTarget(candidate, target)
-          ? withTargetMapping({ target: candidate, identifier, mapping })
-          : candidate,
-      );
+    const next = selectedTargets.map((candidate) =>
+      isSameTarget(candidate, target)
+        ? withTargetMapping({ target: candidate, identifier, mapping })
+        : candidate,
+    );
     form.setValue("selectedTargets", next, { shouldDirty: true });
   };
 
   const isTargetSelected = (type: string, referenceId: string) =>
-    selectedTargets.some(
-      (target) => target.type === type && target.referenceId === referenceId,
-    );
+    selectedTargets.some((target) => target.type === type && target.referenceId === referenceId);
 
   const selectAllTargets = () => {
     const current = form.getValues("selectedTargets");
-    const currentKeys = new Set(
-      current.map((target) => `${target.type}:${target.referenceId}`),
-    );
+    const currentKeys = new Set(current.map((target) => `${target.type}:${target.referenceId}`));
     const newTargets = filteredTargets
       .filter((target) => !currentKeys.has(`${target.type}:${target.referenceId}`))
       .map((target) => ({ type: target.type, referenceId: target.referenceId }));
@@ -172,10 +163,7 @@ export function useSuiteForm({
   const selectAllScenarios = () => {
     if (filteredScenarios) {
       const current = form.getValues("selectedScenarioIds");
-      const merged = new Set([
-        ...current,
-        ...filteredScenarios.map((scenario) => scenario.id),
-      ]);
+      const merged = new Set([...current, ...filteredScenarios.map((scenario) => scenario.id)]);
       form.setValue("selectedScenarioIds", Array.from(merged));
     }
   };

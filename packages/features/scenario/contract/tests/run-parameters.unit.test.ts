@@ -22,6 +22,7 @@ function scenario(overrides: Partial<ScenarioRunConfig> = {}): ScenarioRunConfig
   return {
     id: "scen_1",
     name: "Refund flow",
+    version: 1,
     situation: "A customer asks for a refund",
     criteria: ["Answers the question"],
     parameters: null,

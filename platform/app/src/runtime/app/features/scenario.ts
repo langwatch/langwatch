@@ -2,6 +2,7 @@ import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
   PrismaScenarioAdapter,
   ScenarioClockPort,
+  ScenarioFolderIdPort,
   ScenarioIdPort,
   ScenarioSecretCipherPort,
 } from "@langwatch/scenario-server";
@@ -14,6 +15,7 @@ export class AppScenarioRuntime {
     database: PrismaClient;
     simulations: SimulationService;
     ids: ScenarioIdPort;
+    folderIds: ScenarioFolderIdPort;
     clock: ScenarioClockPort;
     secretCipher: ScenarioSecretCipherPort;
   }): AppScenarioRuntime {
@@ -25,6 +27,7 @@ export class AppScenarioRuntime {
       database: PrismaClient;
       simulations: SimulationService;
       ids: ScenarioIdPort;
+      folderIds: ScenarioFolderIdPort;
       clock: ScenarioClockPort;
       secretCipher: ScenarioSecretCipherPort;
     },
@@ -35,6 +38,7 @@ export class AppScenarioRuntime {
       prisma: this.options.database,
       simulations: this.options.simulations,
       ids: this.options.ids,
+      folderIds: this.options.folderIds,
       clock: this.options.clock,
       secretCipher: this.options.secretCipher,
     });
@@ -44,6 +48,20 @@ export class AppScenarioRuntime {
 export class AppScenarioId extends ScenarioIdPort {
   static create(next: () => string): AppScenarioId {
     return new AppScenarioId(next);
+  }
+
+  private constructor(private readonly generate: () => string) {
+    super();
+  }
+
+  next(): string {
+    return this.generate();
+  }
+}
+
+export class AppScenarioFolderId extends ScenarioFolderIdPort {
+  static create(next: () => string): AppScenarioFolderId {
+    return new AppScenarioFolderId(next);
   }
 
   private constructor(private readonly generate: () => string) {

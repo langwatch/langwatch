@@ -41,6 +41,8 @@ describe("Scenario contract", () => {
       judgeModel: "openai/gpt-5-nano",
       maxTurns: 5,
       minTurns: 1,
+      folderId: null,
+      version: 1,
       lastUpdatedById: null,
       archivedAt: null,
       createdAt: new Date(0),

@@ -2,6 +2,8 @@ export * from "./suite";
 export * from "./suite.commands";
 export * from "./suite.errors";
 export * from "./suite.service";
+export * from "./suite.kind";
+export * from "./suite.scope";
 export * from "./suite-set-id";
 export * from "./suite-run.commands";
 export * from "./suite-run.constants";

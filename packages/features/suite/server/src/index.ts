@@ -1,8 +1,11 @@
 export {
   PostgresSuiteAdapter,
   type PostgresSuiteAdapterOptions,
-  type SuiteEventingCapabilities,
 } from "./adapters/postgres.suite.adapter";
+export type {
+  SuiteEventingCapabilities,
+  SuiteRuntimeAdapter,
+} from "./adapters/suite-runtime.adapter";
 export {
   ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,

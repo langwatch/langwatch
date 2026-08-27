@@ -1,40 +1,39 @@
-import type { Projection, ProjectionStore } from "@langwatch/eventing";
+import type { AgentService } from "@langwatch/agent-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteService as SuiteServiceContract } from "@langwatch/suite-contract";
-import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import {
-  PrismaSuiteRepository,
-  type SuiteDatabase,
-} from "../repositories/prisma/prisma.suite.repository";
+import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
+import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
-import type { SuiteRunRepository } from "../repositories/suite-run.repository";
+import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
-import { SuiteService, type SuiteServiceOptions } from "../services/suite.service";
+import { SuiteService } from "../services/suite.service";
+import type { SuiteEventingCapabilities, SuiteRuntimeAdapter } from "./suite-runtime.adapter";
 
-export type PostgresSuiteAdapterOptions = Omit<
-  SuiteServiceOptions,
-  "repository" | "runRepository"
-> & {
-  database: SuiteDatabase;
+export type PostgresSuiteAdapterOptions = {
+  database: PrismaClient;
+  scenarios: ScenarioService;
+  agents: AgentService;
+  prompts: PromptService;
+  execution: SuiteExecutionPort;
   resolveClickHouseClient: ((projectId: string) => Promise<SuiteClickHouseClient>) | null;
   defaultRetentionDays: number;
+  generateId?: () => string;
+  now?: () => Date;
 };
 
-/** Application-facing Eventing capability; the repository itself stays private. */
-export type SuiteEventingCapabilities = {
-  suiteRunState: ProjectionStore<Projection<SuiteRunStateData>>;
-};
-
-export class PostgresSuiteAdapter {
+export class PostgresSuiteAdapter implements SuiteRuntimeAdapter {
   static create(options: PostgresSuiteAdapterOptions): PostgresSuiteAdapter {
     return new PostgresSuiteAdapter(options);
   }
 
-  private readonly runRepository: SuiteRunRepository;
+  private readonly runState: SuiteEventingCapabilities["suiteRunState"] & SuiteRunReadRepository;
   private readonly service: SuiteServiceContract;
 
   private constructor(options: PostgresSuiteAdapterOptions) {
-    this.runRepository = options.resolveClickHouseClient
+    this.runState = options.resolveClickHouseClient
       ? ClickHouseSuiteRunRepository.create({
           resolveClient: options.resolveClickHouseClient,
           defaultRetentionDays: options.defaultRetentionDays,
@@ -42,7 +41,7 @@ export class PostgresSuiteAdapter {
       : MemorySuiteRunRepository.create();
     this.service = SuiteService.create({
       repository: PrismaSuiteRepository.create(options.database),
-      runRepository: this.runRepository,
+      runRepository: this.runState,
       scenarios: options.scenarios,
       agents: options.agents,
       prompts: options.prompts,
@@ -57,6 +56,6 @@ export class PostgresSuiteAdapter {
   }
 
   eventing(): SuiteEventingCapabilities {
-    return { suiteRunState: this.runRepository };
+    return { suiteRunState: this.runState };
   }
 }

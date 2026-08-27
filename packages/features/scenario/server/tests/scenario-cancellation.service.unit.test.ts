@@ -15,7 +15,7 @@ import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../src/repositories/scenario.repository";
 import { ScenarioService } from "../src/services/scenario.service";
 import { ScenarioClockPort } from "../src/ports/scenario-clock.port";
-import { ScenarioIdPort } from "../src/ports/scenario-id.port";
+import { ScenarioFolderIdPort, ScenarioIdPort } from "../src/ports/scenario-id.port";
 import { ScenarioSecretCipherPort } from "../src/ports/scenario-secret-cipher.port";
 
 class CancellationTestSecretCipher extends ScenarioSecretCipherPort {
@@ -31,6 +31,12 @@ class CancellationTestSecretCipher extends ScenarioSecretCipherPort {
 class CancellationTestId extends ScenarioIdPort {
   next(): string {
     return "unused";
+  }
+}
+
+class CancellationTestFolderId extends ScenarioFolderIdPort {
+  next(): string {
+    return "folder_unused";
   }
 }
 
@@ -84,6 +90,7 @@ function createService(simulations: SimulationService): ScenarioService {
     repository,
     simulations,
     ids: new CancellationTestId(),
+    folderIds: new CancellationTestFolderId(),
     clock: new CancellationTestClock(),
     secretCipher: new CancellationTestSecretCipher(),
   });

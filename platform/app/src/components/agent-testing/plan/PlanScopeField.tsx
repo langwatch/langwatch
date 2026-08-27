@@ -12,10 +12,10 @@
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
+import type { SuiteScopeMode } from "@langwatch/suite-contract";
 import { PICKER_UNFILED_GROUP_NAME } from "~/components/suites/ScenarioPicker";
 import { Checkbox } from "~/components/ui/checkbox";
 import { TagPill } from "~/components/ui/TagPill";
-import type { SuiteScopeMode } from "~/server/suites/scope";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
@@ -27,13 +27,7 @@ const SCOPE_CHOICES: { mode: SuiteScopeMode; label: string }[] = [
 ];
 
 /** What the chosen rule needs picked. "All test cases" needs nothing. */
-function ScopeDetail({
-  mode,
-  editor,
-}: {
-  mode: SuiteScopeMode;
-  editor: PlanEditorState;
-}) {
+function ScopeDetail({ mode, editor }: { mode: SuiteScopeMode; editor: PlanEditorState }) {
   if (mode === "folders") return <FolderChoices editor={editor} />;
   if (mode === "labels") return <LabelChoices editor={editor} />;
   if (mode === "cases") return <CaseChoices editor={editor} />;
@@ -56,13 +50,7 @@ function ScopeChoice({
 }) {
   return (
     <Box>
-      <chakra.label
-        display="flex"
-        alignItems="center"
-        gap={2}
-        fontSize="12.5px"
-        cursor="pointer"
-      >
+      <chakra.label display="flex" alignItems="center" gap={2} fontSize="12.5px" cursor="pointer">
         <chakra.input
           type="radio"
           name="plan-scope"
@@ -87,8 +75,7 @@ function ScopeChoice({
 function FolderChoices({ editor }: { editor: PlanEditorState }) {
   const { suiteForm } = editor;
   const folders = editor.folders ?? [];
-  const chosen =
-    suiteForm.scope.mode === "folders" ? suiteForm.scope.folderIds : [];
+  const chosen = suiteForm.scope.mode === "folders" ? suiteForm.scope.folderIds : [];
 
   if (folders.length === 0) {
     return (
@@ -118,8 +105,7 @@ function FolderChoices({ editor }: { editor: PlanEditorState }) {
 /** Every label a test case of the project carries, as a chip that turns on. */
 function LabelChoices({ editor }: { editor: PlanEditorState }) {
   const { suiteForm } = editor;
-  const chosen =
-    suiteForm.scope.mode === "labels" ? suiteForm.scope.labels : [];
+  const chosen = suiteForm.scope.mode === "labels" ? suiteForm.scope.labels : [];
 
   if (suiteForm.allLabels.length === 0) {
     return (
@@ -162,9 +148,7 @@ function CaseChoices({ editor }: { editor: PlanEditorState }) {
     ...folders.map((folder) => ({
       id: folder.id,
       name: folder.name,
-      scenarios: scenarios.filter(
-        (scenario) => scenario.folderId === folder.id,
-      ),
+      scenarios: scenarios.filter((scenario) => scenario.folderId === folder.id),
     })),
     {
       id: "__unfiled__",
@@ -193,12 +177,7 @@ function CaseChoices({ editor }: { editor: PlanEditorState }) {
     >
       {groups.map((group) => (
         <Box key={group.id}>
-          <HStack
-            gap={1.5}
-            fontSize="11px"
-            fontWeight="semibold"
-            color={FG_MUTED}
-          >
+          <HStack gap={1.5} fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
             <Folder size={11} />
             <Text>{group.name}</Text>
           </HStack>
@@ -255,9 +234,7 @@ export function PlanScopeField({
         />
       ))}
       <Text paddingTop={1} fontSize="11px" color={FG_MUTED}>
-        {count === 1
-          ? "1 test case will run."
-          : `${count} test cases will run.`}
+        {count === 1 ? "1 test case will run." : `${count} test cases will run.`}
       </Text>
     </VStack>
   );

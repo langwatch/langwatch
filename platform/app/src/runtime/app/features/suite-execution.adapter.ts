@@ -9,6 +9,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
+  withNote,
   type RunSecretCiphertext,
   type ScenarioRunConfig,
   type ScenarioService,
@@ -68,6 +69,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     projectId: string;
     activeScenarioIds: string[];
     scenarioNames: Map<string, string>;
+    scenarioVersions: Map<string, number>;
     scenarioConfigs: ScenarioRunConfig[];
     activeTargets: SuiteTarget[];
     repeatCount: number;
@@ -75,6 +77,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     idempotencyKey: string;
     batchRunId?: string;
     parameters?: SuiteRunParameters;
+    note?: string;
   }): Promise<SuiteRunResult> {
     const scenarioParameters = await this.scenarios.resolveRunParametersForScenarios({
       scenarios: input.scenarioConfigs,
@@ -148,7 +151,12 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
           scenarioSetId: setId,
           name: input.scenarioNames.get(item.scenarioId),
           metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+            langwatch: {
+              targetReferenceId: item.target.referenceId,
+              targetType: item.target.type,
+              scenarioVersion: input.scenarioVersions.get(item.scenarioId),
+            },
+            ...withNote(input.note),
             ...withParameters(parametersByScenarioId.get(item.scenarioId)),
             ...withSecretParameterNames(secretParameters),
           },

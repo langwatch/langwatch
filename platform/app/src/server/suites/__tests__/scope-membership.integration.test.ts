@@ -16,7 +16,7 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
-import type { SuiteScope } from "../scope";
+import type { SuiteScope } from "@langwatch/suite-contract";
 import { SuiteService } from "../suite.service";
 
 const projectId = `test-suite-scope-${nanoid(8)}`;

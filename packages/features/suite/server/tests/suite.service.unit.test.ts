@@ -3,6 +3,8 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  SuiteScopeNotAllowedError,
+  suiteSchema,
   type Suite,
   type SuiteRunResult,
   SuiteNameTakenError,
@@ -10,30 +12,60 @@ import {
 } from "@langwatch/suite-contract";
 import { AgentService } from "@langwatch/agent-contract";
 import { PromptService } from "@langwatch/prompt-contract";
-import { ScenarioService } from "@langwatch/scenario-contract";
+import {
+  ScenarioFolderNotFoundError,
+  ScenarioService,
+  scenarioSchema,
+  type Scenario,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import { SuiteExecutionPort } from "../src/ports/suite-execution.port";
 import { SuiteRepository } from "../src/repositories/suite.repository";
 import { MemorySuiteRunRepository } from "../src/repositories/memory/memory.suite-run.repository";
 import { SuiteService, type SuiteServiceOptions } from "../src/services/suite.service";
 
-const suite = (overrides: Partial<Suite> = {}): Suite => ({
-  id: "suite_original",
-  projectId: "project_1",
-  name: "Critical path",
-  slug: "critical-path",
-  description: null,
-  scenarioIds: ["scenario_1"],
-  targets: [{ type: "prompt", referenceId: "prompt_1" }],
-  repeatCount: 1,
-  labels: [],
-  simulatorModel: null,
-  judgeModel: null,
-  archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  ...overrides,
-});
+const suite = (overrides: Partial<Suite> = {}): Suite =>
+  suiteSchema.parse({
+    id: "suite_original",
+    projectId: "project_1",
+    name: "Critical path",
+    slug: "critical-path",
+    kind: "custom",
+    description: null,
+    scenarioIds: ["scenario_1"],
+    scope: null,
+    targets: [{ type: "prompt", referenceId: "prompt_1" }],
+    repeatCount: 1,
+    labels: [],
+    simulatorModel: null,
+    judgeModel: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+
+const scenario = (overrides: Partial<Scenario> = {}): Scenario =>
+  scenarioSchema.parse({
+    id: "scenario_1",
+    projectId: "project_1",
+    name: "Scenario",
+    situation: "A situation",
+    criteria: [],
+    labels: [],
+    parameters: null,
+    simulatorModel: null,
+    judgeModel: null,
+    maxTurns: null,
+    minTurns: null,
+    folderId: null,
+    version: 1,
+    lastUpdatedById: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
 
 function repository(overrides: Partial<SuiteRepository> = {}): SuiteRepository {
   return {
@@ -57,8 +89,7 @@ class CapturingExecutionPort extends SuiteExecutionPort {
   readonly execute = vi.fn(async (input) => ({
     batchRunId: "batch_1",
     setId: "suite:set_1",
-    jobCount:
-      input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount,
+    jobCount: input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount,
     skippedArchived: input.skippedArchived,
     items: [],
   }));
@@ -70,7 +101,7 @@ function serviceOptions(
 ): SuiteServiceOptions {
   return {
     repository: repo,
-    scenarios: {} as ScenarioService,
+    scenarios: mockScenarioService({ tryGetFolder: vi.fn().mockResolvedValue(null) }),
     agents: {} as AgentService,
     prompts: {} as PromptService,
     execution: new UnusedExecutionPort(),
@@ -108,9 +139,7 @@ describe("SuiteService", () => {
     });
 
     expect(created.id).toBe("suite_created");
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: "critical-path" }),
-    );
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ slug: "critical-path" }));
   });
 
   it("throws a domain error when a definition is absent", async () => {
@@ -361,9 +390,7 @@ describe("SuiteService", () => {
         ),
       }),
       scenarios: mockScenarioService({
-        getReferenceStates: vi
-          .fn()
-          .mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
+        getReferenceStates: vi.fn().mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
         getRunConfigs: vi.fn(),
         getNamesByIds: vi.fn(),
       }),
@@ -398,9 +425,7 @@ describe("SuiteService", () => {
         ),
       }),
       scenarios: mockScenarioService({
-        getReferenceStates: vi
-          .fn()
-          .mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
+        getReferenceStates: vi.fn().mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
         getRunConfigs: vi.fn(),
         getNamesByIds: vi.fn(),
       }),
@@ -424,6 +449,244 @@ describe("SuiteService", () => {
       }),
     ).rejects.toBeInstanceOf(AllTargetsArchivedError);
     expect(execution.execute).not.toHaveBeenCalled();
+  });
+
+  it("refreshes and runs the managed all-cases suite", async () => {
+    const execution = new CapturingExecutionPort();
+    const managed = suite({
+      id: "suite_all_cases",
+      name: "All test cases",
+      labels: ["__managed_all_test_cases__"],
+      scenarioIds: ["scenario_1", "scenario_2"],
+      targets: [{ type: "http", referenceId: "agent_1" }],
+    });
+    const saveManagedRunAll = vi.fn().mockResolvedValue(managed);
+    const scenarios = mockScenarioService({
+      list: vi
+        .fn()
+        .mockResolvedValue([
+          scenario({ id: "scenario_1" }),
+          scenario({ id: "scenario_2", name: "Second scenario" }),
+        ]),
+      getReferenceStates: vi.fn().mockResolvedValue([
+        { id: "scenario_1", archivedAt: null },
+        { id: "scenario_2", archivedAt: null },
+      ]),
+      getRunConfigs: vi.fn().mockResolvedValue([
+        {
+          id: "scenario_1",
+          name: "Scenario",
+          version: 1,
+          situation: "A situation",
+          criteria: [],
+          parameters: null,
+        },
+        {
+          id: "scenario_2",
+          name: "Second scenario",
+          version: 2,
+          situation: "Another situation",
+          criteria: [],
+          parameters: null,
+        },
+      ]),
+    });
+    const service = SuiteService.create({
+      ...serviceOptions(
+        repository({
+          saveManagedRunAll,
+          tryFindById: vi.fn().mockResolvedValue(managed),
+        }),
+        { scenarios, execution },
+      ),
+      agents: mockAgentService({
+        getReferenceStates: vi.fn().mockResolvedValue([{ id: "agent_1", archivedAt: null }]),
+      }),
+      prompts: mockPromptService({ getExistingIds: vi.fn() }),
+    });
+
+    const result = await service.runAll({
+      projectId: "project_1",
+      organizationId: "org_1",
+      idempotencyKey: "all-cases-1",
+      targets: [{ type: "http", referenceId: "agent_1" }],
+      note: "nightly",
+    });
+
+    expect(result).toMatchObject({ suiteId: "suite_all_cases", jobCount: 2 });
+    expect(saveManagedRunAll).toHaveBeenCalledWith({
+      id: expect.any(String),
+      projectId: "project_1",
+      name: "All test cases",
+      baseSlug: "all-test-cases",
+      label: "managed:run-all",
+      scenarioIds: ["scenario_1", "scenario_2"],
+      targets: [{ type: "http", referenceId: "agent_1" }],
+    });
+    expect(execution.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        suiteId: "suite_all_cases",
+        activeScenarioIds: ["scenario_1", "scenario_2"],
+        idempotencyKey: "all-cases-1",
+        note: "nightly",
+      }),
+    );
+
+    await service.runAll({
+      projectId: "project_1",
+      organizationId: "org_1",
+      idempotencyKey: "all-cases-2",
+      note: "reuse targets",
+    });
+    expect(saveManagedRunAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        scenarioIds: ["scenario_1", "scenario_2"],
+        targets: undefined,
+      }),
+    );
+    expect(execution.execute).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeTargets: [{ type: "http", referenceId: "agent_1" }],
+        note: "reuse targets",
+      }),
+    );
+  });
+
+  it("runs a folder through ScenarioService membership and reports archived cases", async () => {
+    const execution = new CapturingExecutionPort();
+    const folder = suite({
+      id: "suite_folder",
+      kind: "folder",
+      scenarioIds: [],
+      targets: [{ type: "prompt", referenceId: "prompt_1" }],
+    });
+    const scenarios = mockScenarioService({
+      getFolderRunDefinition: vi.fn().mockResolvedValue({
+        folder,
+        scenarioIds: ["scenario_1", "scenario_archived"],
+      }),
+      getReferenceStates: vi.fn().mockResolvedValue([
+        { id: "scenario_1", archivedAt: null },
+        { id: "scenario_archived", archivedAt: new Date() },
+      ]),
+      getRunConfigs: vi.fn().mockResolvedValue([
+        {
+          id: "scenario_1",
+          name: "Scenario",
+          version: 1,
+          situation: "A situation",
+          criteria: [],
+          parameters: null,
+        },
+      ]),
+    });
+    const service = SuiteService.create({
+      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+        scenarios,
+        execution,
+      }),
+      agents: mockAgentService({}),
+      prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+    });
+
+    const result = await service.run({
+      id: folder.id,
+      projectId: folder.projectId,
+      organizationId: "org_1",
+      idempotencyKey: "folder-run-1",
+    });
+
+    expect(result.skippedArchived.scenarios).toEqual(["scenario_archived"]);
+    expect(execution.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        suiteId: folder.id,
+        activeScenarioIds: ["scenario_1"],
+      }),
+    );
+    expect(scenarios.getFolderRunDefinition).toHaveBeenCalledWith({
+      folderId: folder.id,
+      projectId: folder.projectId,
+    });
+  });
+
+  it("loads a folder through ScenarioService when no custom suite exists", async () => {
+    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
+    const tryGetFolder = vi.fn().mockResolvedValue(folder);
+    const service = SuiteService.create(
+      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(null) }), {
+        scenarios: mockScenarioService({ tryGetFolder }),
+      }),
+    );
+
+    await expect(service.get({ id: folder.id, projectId: folder.projectId })).resolves.toEqual(
+      folder,
+    );
+    expect(tryGetFolder).toHaveBeenCalledWith({
+      folderId: folder.id,
+      projectId: folder.projectId,
+    });
+  });
+
+  it("keeps folder membership managed by ScenarioService and maps folder errors", async () => {
+    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
+    const updateFolder = vi.fn().mockResolvedValue(folder);
+    const scenarios = mockScenarioService({
+      tryGetFolder: vi.fn().mockResolvedValue(folder),
+      updateFolder,
+    });
+    const service = SuiteService.create(
+      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+        scenarios,
+      }),
+    );
+
+    await expect(
+      service.update({ id: folder.id, projectId: folder.projectId, name: "Renamed" }),
+    ).resolves.toEqual(folder);
+    expect(updateFolder).toHaveBeenCalledWith({
+      folderId: folder.id,
+      projectId: folder.projectId,
+      name: "Renamed",
+    });
+    await expect(
+      service.update({
+        id: folder.id,
+        projectId: folder.projectId,
+        scope: { mode: "all" },
+      }),
+    ).rejects.toBeInstanceOf(SuiteScopeNotAllowedError);
+    const missingService = SuiteService.create(
+      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+        scenarios: mockScenarioService({
+          tryGetFolder: vi.fn().mockResolvedValue(folder),
+          updateFolder: vi.fn().mockRejectedValue(new ScenarioFolderNotFoundError()),
+        }),
+      }),
+    );
+    await expect(
+      missingService.update({ id: folder.id, projectId: folder.projectId, name: "Renamed" }),
+    ).rejects.toBeInstanceOf(SuiteNotFoundError);
+  });
+
+  it("maps a missing folder membership definition to SuiteNotFoundError", async () => {
+    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
+    const service = SuiteService.create({
+      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) })),
+      scenarios: mockScenarioService({
+        tryGetFolder: vi.fn().mockResolvedValue(folder),
+        getFolderRunDefinition: vi.fn().mockRejectedValue(new ScenarioFolderNotFoundError()),
+        getReferenceStates: vi.fn(),
+      }),
+    });
+
+    await expect(
+      service.run({
+        id: folder.id,
+        projectId: folder.projectId,
+        organizationId: "org_1",
+        idempotencyKey: "missing-folder-run",
+      }),
+    ).rejects.toBeInstanceOf(SuiteNotFoundError);
   });
 
   it("resolves archived names through the canonical feature services", async () => {
@@ -469,11 +732,11 @@ describe("SuiteService", () => {
     const repo = repository({
       tryFindById: vi.fn().mockResolvedValue(original),
       create: vi.fn().mockImplementation(async (input) => suite(input)),
-      archive: vi.fn().mockImplementation(async (input) =>
+      archive: vi.fn().mockResolvedValue(
         suite({
-          ...input,
-          archivedAt: input.archivedAt,
-          slug: input.archivedSlug,
+          id: "suite_1",
+          archivedAt: new Date("2026-08-25T00:00:00.000Z"),
+          slug: "critical-path--archived-uite_1",
         }),
       ),
     });
@@ -499,7 +762,7 @@ describe("SuiteService", () => {
       expect.objectContaining({
         id: "suite_1",
         projectId: "project_1",
-        archivedSlug: "critical-path__archived-uite_1",
+        archivedSlug: "critical-path--archived-uite_1",
       }),
     );
   });

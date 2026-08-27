@@ -6,16 +6,18 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { ValidationError } from "@langwatch/handled-error";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
 import type { SuiteRunSummary } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId } from "@langwatch/suite-contract";
 import {
-  createSuiteSchema,
-  projectSchema,
-  suiteTargetSchema,
-  updateSuiteSchema,
-} from "./schemas";
+  SuiteNotFoundError,
+  SuiteScopeNotAllowedError,
+  SUITE_KINDS,
+  tryExtractSuiteId,
+} from "@langwatch/suite-contract";
+import { folderRouter } from "./folder.router";
+import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
 export const suiteRouter = createTRPCRouter({
   folders: folderRouter,
@@ -37,20 +39,87 @@ export const suiteRouter = createTRPCRouter({
     )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      return ctx.app.suites.list(input);
+      const kinds = input.kinds ?? ["custom"];
+      const [suites, folders] = await Promise.all([
+        kinds.includes("custom")
+          ? ctx.app.suites.list({ projectId: input.projectId })
+          : Promise.resolve([]),
+        kinds.includes("folder")
+          ? ctx.app.scenarios.listFolders({ projectId: input.projectId })
+          : Promise.resolve([]),
+      ]);
+
+      return [...suites, ...folders].sort(
+        (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
+      );
     }),
 
   getById: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      return ctx.app.suites.get(input);
+      try {
+        return await ctx.app.suites.get(input);
+      } catch (error) {
+        if (!(error instanceof SuiteNotFoundError)) throw error;
+      }
+
+      const folder = await ctx.app.scenarios.tryGetFolder({
+        folderId: input.id,
+        projectId: input.projectId,
+      });
+      if (!folder) throw new SuiteNotFoundError(input.id);
+      return folder;
     }),
 
   update: protectedProcedure
     .input(updateSuiteSchema)
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
+      const folder = await ctx.app.scenarios.tryGetFolder({
+        folderId: input.id,
+        projectId: input.projectId,
+      });
+      if (folder) {
+        if (input.scope !== undefined) {
+          throw new SuiteScopeNotAllowedError();
+        }
+        if (input.scenarioIds !== undefined) {
+          throw new ValidationError(
+            "A folder's scenarios are managed by filing scenarios into it",
+            {
+              meta: {
+                fieldErrors: {
+                  scenarioIds: ["A folder's scenarios are managed by filing scenarios into it"],
+                },
+              },
+            },
+          );
+        }
+
+        const {
+          id,
+          projectId,
+          name,
+          description,
+          targets,
+          repeatCount,
+          labels,
+          simulatorModel,
+          judgeModel,
+        } = input;
+        return ctx.app.scenarios.updateFolder({
+          name,
+          description,
+          targets,
+          repeatCount,
+          labels,
+          simulatorModel,
+          judgeModel,
+          projectId,
+          folderId: id,
+        });
+      }
       return ctx.app.suites.update(input);
     }),
 
@@ -169,8 +238,7 @@ export const suiteRouter = createTRPCRouter({
           message: "Organization not found for project",
         });
       }
-      const service = createSuiteService(ctx.prisma);
-      const result = await service.runAll({
+      const result = await ctx.app.suites.runAll({
         projectId: input.projectId,
         organizationId,
         idempotencyKey: input.idempotencyKey,
