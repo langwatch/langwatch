@@ -16,6 +16,9 @@ image:
   repository: langwatch/clickhouse-serverless
   # Both tags are side-loaded into kind by the harness; Never keeps the run
   # offline and makes the AC20 digest comparison meaningful.
+  # TARGET=eks overrides this to IfNotPresent via --set: nothing is side-loaded
+  # there, and having the kubelet pull the arm64 child from the real registry is
+  # the property that leg exists to prove.
   pullPolicy: Never
 replicas: 3
 memory: 1Gi

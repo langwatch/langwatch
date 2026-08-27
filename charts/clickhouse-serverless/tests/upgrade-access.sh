@@ -10,6 +10,12 @@
 #
 #   Server-and-chart only: kubectl exec + clickhouse-client, no app in the loop.
 #
+#   Two substrates, selected by TARGET. TARGET=kind (default) creates and
+#   destroys its own cluster and side-loads images. TARGET=eks runs against a
+#   cluster the OPERATOR supplies out of band: the harness never creates or
+#   deletes a cluster, never side-loads an image, and refuses to run unless the
+#   current kubectl context matches EXPECT_CLUSTER.
+#
 # A RED RUN IS A RESULT, NOT A SETBACK
 #   Phases p1_4 and p1_5 are EXPECTED to fail. Failure is the finding. The exit
 #   codes below exist so a genuine AC failure is never confused with a harness
@@ -24,9 +30,34 @@
 #       the expected exit of AC24(b): `REPLICAS=1 bash tests/upgrade-access.sh`.
 #   30  AC FAILURE — a real acceptance criterion failed. The failing AC is named
 #       in the [FAIL <AC>] line and its measurement is printed verbatim above it.
-#   40  usage error.
+#   40  usage error — including the TARGET=eks safety gate: an unset or
+#       non-matching EXPECT_CLUSTER, or an unknown TARGET.
 #
 # ENVIRONMENT
+#   TARGET=kind|eks     which substrate to run on (default kind).
+#                       kind — creates a fresh cluster per run, side-loads both
+#                              image tags, AC20 compares LOCAL image ids.
+#                       eks  — uses the CURRENT kubectl context as-is. Never
+#                              creates or deletes a cluster. Never side-loads:
+#                              the kubelet pulls from the real registry, which
+#                              is the point of this leg. AC20 compares the
+#                              registry manifest digest (crane) against the
+#                              digest the pods report.
+#   EXPECT_CLUSTER      REQUIRED under TARGET=eks, ignored under kind. The run
+#                       aborts with exit 40 unless this string is a SUBSTRING of
+#                       `kubectl config current-context`. This is a hard safety
+#                       gate: the harness destroys namespaces, PVCs and Secrets,
+#                       so hitting production by accident must be impossible.
+#   NODE_SELECTOR_KEY   optional, both targets. When both are set, every
+#   NODE_SELECTOR_VALUE ClickHouse and Keeper replica is pinned via the chart's
+#                       scheduling.nodeSelector (values.yaml:214). Used to run
+#                       the same ladder once with all replicas on ONE node and
+#                       once unpinned across several. Dots in the key are
+#                       escaped for helm --set automatically, so
+#                       NODE_SELECTOR_KEY=kubernetes.io/hostname works verbatim.
+#   PLATFORM            container platform for the image identity (default:
+#                       linux/arm64 under eks; the operator machine's own
+#                       architecture under kind).
 #   REPLICAS=3|1        topology (default 3). 1 is the AC24(b) negative control
 #                       and MUST exit 20 — it is not a supported green path.
 #   OLD_TAG             released tag installed first (default 0.3.0 —
@@ -42,16 +73,35 @@
 #   NEGATIVE_CONTROL_DROP_ENTITY=user|grant|policy|profile|collection
 #                       AC24(a): drop one seeded entity on every pod immediately
 #                       before the AC8 check. The harness MUST then exit 30.
-#   REUSE_CLUSTER=true  skip the fresh-kind-cluster create (debugging only —
-#                       violates R6 substrate hygiene, printed as a warning).
-#   KEEP_CLUSTER=true   do not delete the kind cluster on exit (debugging).
-#   CLUSTER_NAME        kind cluster name (default ch-upgrade).
-#   TIMEOUT             helm --wait timeout in seconds (default 600).
+#   REUSE_CLUSTER=true  TARGET=kind only: skip the fresh-kind-cluster create
+#                       (debugging — violates R6 substrate hygiene, warned).
+#   KEEP_CLUSTER=true   TARGET=kind only: do not delete the cluster on exit.
+#                       Under eks no cluster is ever deleted, so it is a no-op.
+#   CLUSTER_NAME        TARGET=kind only: kind cluster name (default
+#                       ch-upgrade). Under eks the context is the operator's.
+#   TIMEOUT             helm --wait timeout in seconds. Default 600 under kind,
+#                       1200 under eks — real EBS attach/detach is slower than
+#                       a kind hostPath. Overridable on both.
+#   EKS_PURGE_TIMEOUT_S TARGET=eks only: how long the R6 purge may wait for the
+#                       namespace to disappear (default 900). PVC deletion
+#                       blocks on the EBS detach, so this is not the helm
+#                       timeout.
 #
 # REQUIREMENTS
-#   kind, docker, helm, kubectl. No crane: the AC20 digest comparison is done
-#   against the LOCAL image id, because kind side-loads and there is no registry
-#   in the loop. The crane/manifest-list form of AC20 belongs to the EKS legs.
+#   TARGET=kind: kind, docker, helm, kubectl. No crane — kind side-loads and
+#     there is no registry in the loop, so AC20 compares the LOCAL image id.
+#   TARGET=eks:  helm, kubectl, crane, aws. NOT kind and NOT docker: nothing is
+#     built or side-loaded. crane is REQUIRED — a missing crane is a harness
+#     error (exit 10), never a silently skipped AC20.
+#
+# R6 SUBSTRATE HYGIENE UNDER EKS
+#   kind gets a brand-new cluster per run and R6 is free. EKS cannot, so the
+#   equivalent purge is explicit and VERIFIED: uninstall the release, delete the
+#   PVCs, delete the Secret that carries helm.sh/resource-policy: keep
+#   (templates/secret.yaml:56), delete the namespace, wait until it is really
+#   gone, and only then assert that neither the namespace nor any PVC survived.
+#   A leftover PVC or Secret manufactures a false "survived the upgrade" pass —
+#   that is the exact failure these assertions exist to prevent.
 #
 # ANTI-SILENCE (plan §5.2)
 #   Every assertion prints what it measured. An empty or missing measurement is
@@ -62,6 +112,14 @@
 set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────────────
+
+# Which substrate this run is on. Every eks-specific branch below is gated on
+# this single variable, so TARGET=kind is exactly the behaviour that shipped.
+TARGET="${TARGET:-kind}"
+case "$TARGET" in
+  kind|eks) ;;
+  *) echo "TARGET must be 'kind' or 'eks' (got '${TARGET}')" >&2; exit 40 ;;
+esac
 
 REPLICAS="${REPLICAS:-3}"
 IMAGE_REPO="${IMAGE_REPO:-langwatch/clickhouse-serverless}"
@@ -75,7 +133,28 @@ FULLNAME="${RELEASE}-clickhouse"
 KEEPER_STS="${FULLNAME}-keeper"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VALUES="${CHART_DIR}/tests/values-upgrade.yaml"
-TIMEOUT="${TIMEOUT:-600}"
+# kind's hostPath volumes attach instantly; EBS does not. A 600s helm --wait
+# that is generous on kind is a coin-flip on EKS, and a timeout there reads as a
+# harness error rather than the AC result it is not.
+if [[ "$TARGET" == "eks" ]]; then
+  TIMEOUT="${TIMEOUT:-1200}"
+else
+  TIMEOUT="${TIMEOUT:-600}"
+fi
+
+# TARGET=eks safety gate. Substring-matched against `kubectl config
+# current-context`. Unset under eks is a usage error, never a default.
+EXPECT_CLUSTER="${EXPECT_CLUSTER:-}"
+
+# Optional replica pinning via the chart's scheduling.nodeSelector. Both must be
+# set for the pin to apply; one alone is a usage error rather than a silent
+# no-op, because "run 2a was pinned" is a claim the run has to be able to keep.
+NODE_SELECTOR_KEY="${NODE_SELECTOR_KEY:-}"
+NODE_SELECTOR_VALUE="${NODE_SELECTOR_VALUE:-}"
+
+# How long the eks R6 purge may wait for the namespace to actually disappear.
+# Namespace deletion blocks on PVC finalizers, which block on the EBS detach.
+EKS_PURGE_TIMEOUT_S="${EKS_PURGE_TIMEOUT_S:-900}"
 
 # AC23(b): the enforced propagation bound. Capped at 15 by the AC so the
 # threshold cannot be made vacuous by writing 600.
@@ -107,8 +186,25 @@ NEW_IMAGE_ID=""
 CLUSTER_SECRET_BEFORE=""
 OLD_REVISION=""
 
+# test-helpers.sh unsets KUBECONFIG on purpose, so a leaked env var can never
+# route a kind run at a real cluster. Under TARGET=eks the operator's kubeconfig
+# is the ONLY way to reach the cluster, so capture it before the sanitisation
+# and put it back afterwards — for eks only.
+OPERATOR_KUBECONFIG="${KUBECONFIG:-}"
+
 # shellcheck source=../../lib/test-helpers.sh
 source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
+
+# The three below-quorum probes in P1.6 strip KUBECONFIG explicitly for the same
+# reason the helper does. Under eks that would strip the only route to the
+# cluster, so the prefix is resolved per target instead of hardcoded.
+KUBECTL_ENV=(env -u KUBECONFIG)
+if [[ "$TARGET" == "eks" ]]; then
+  if [[ -n "$OPERATOR_KUBECONFIG" ]]; then
+    export KUBECONFIG="$OPERATOR_KUBECONFIG"
+    KUBECTL_ENV=(env "KUBECONFIG=${OPERATOR_KUBECONFIG}")
+  fi
+fi
 
 # ─── Failure attribution ─────────────────────────────────────────────────────
 # CURRENT_AC is the attribution channel. While it is HARNESS, any failure —
@@ -302,7 +398,53 @@ probe_query() {
 # helm.sh/resource-policy: keep (templates/secret.yaml:56). Leftover Keeper data
 # and leftover credentials are exactly how a second run manufactures a false
 # "survived the upgrade" pass. Both are removed explicitly.
+usage_error() {
+  echo -e "\n${RED}[USAGE]${NC} $*" >&2
+  exit 40
+}
+
+# ─── TARGET=eks safety gate ──────────────────────────────────────────────────
+# The harness deletes namespaces, PVCs and a Secret marked resource-policy: keep.
+# On kind that is contained by construction — the cluster is created and thrown
+# away by this script. On a real cluster nothing contains it, so the operator has
+# to name the cluster they mean and the harness has to refuse everything else.
+# EXPECT_CLUSTER is matched as a SUBSTRING of the current context, because the
+# context name and the cluster name are only sometimes the same string.
+eks_context_gate() {
+  local ctx=""
+  ctx="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "${ctx//[[:space:]]/}" ]]; then
+    usage_error "TARGET=eks but there is NO current kubectl context. This harness never selects a context for you — set one (kubectl config use-context ...) and re-run."
+  fi
+  if [[ -z "${EXPECT_CLUSTER//[[:space:]]/}" ]]; then
+    usage_error "TARGET=eks requires EXPECT_CLUSTER. Refusing to run destructive substrate purges against context '${ctx}' with no expectation declared. Re-run with EXPECT_CLUSTER=<substring of the intended context>."
+  fi
+  if [[ "$ctx" != *"$EXPECT_CLUSTER"* ]]; then
+    echo -e "\n${RED}[REFUSING TO RUN]${NC} current kubectl context is:" >&2
+    echo -e "${RED}    ${ctx}${NC}" >&2
+    echo -e "${RED}[REFUSING TO RUN]${NC} EXPECT_CLUSTER='${EXPECT_CLUSTER}' is NOT a substring of it." >&2
+    echo -e "${RED}[REFUSING TO RUN]${NC} This harness DESTROYS namespaces, PVCs and a Secret carrying" >&2
+    echo -e "${RED}[REFUSING TO RUN]${NC} helm.sh/resource-policy: keep. It will not touch a cluster the" >&2
+    echo -e "${RED}[REFUSING TO RUN]${NC} operator did not name. Nothing has been changed." >&2
+    usage_error "EXPECT_CLUSTER mismatch — aborting before any cluster mutation."
+  fi
+  KUBE_CTX="$ctx"
+  pass "TARGET=eks safety gate: context '${ctx}' matches EXPECT_CLUSTER='${EXPECT_CLUSTER}'"
+
+  # Reachability. wait_api polls the same context; a context that parses but
+  # cannot be reached is an environment error, not an AC result.
+  wait_api
+  measure_allow_empty "eks cluster nodes" kubectl --context "$KUBE_CTX" get nodes -o wide
+  if [[ "$MEASURED_RC" -ne 0 ]] || [[ -z "${MEASURED//[[:space:]]/}" ]]; then
+    harness_error "context '${ctx}' is selected but not usable: 'kubectl get nodes' returned rc=${MEASURED_RC} with no node list. If the nightly shutdown has scaled the nodegroup to 0 there is nothing to schedule onto and every AC below would be measuring an empty cluster."
+  fi
+}
+
 purge_substrate() {
+  if [[ "$TARGET" == "eks" ]]; then
+    purge_substrate_eks
+    return
+  fi
   info "$(ts) Purging substrate (R6): release, PVCs, kept Secret, namespace"
   hc uninstall "$RELEASE" --wait >/dev/null 2>&1 || true
   kc delete pvc --all --ignore-not-found --wait=true >/dev/null 2>&1 || true
@@ -320,7 +462,86 @@ purge_substrate() {
   pass "substrate purged"
 }
 
+# R6 under eks. Same intent as the kind path, but nothing here is implied by a
+# fresh cluster, so every step is explicit and every outcome is ASSERTED. The
+# order matters: PVCs carry a pvc-protection finalizer that only clears once no
+# pod references them, so the release goes first; the namespace goes last so its
+# own deletion is not the thing waiting on the EBS detach.
+purge_substrate_eks() {
+  CURRENT_AC="HARNESS"
+  info "$(ts) Purging substrate (R6, eks): release, PVCs, kept Secret, namespace"
+  info "$(ts)   context=${KUBE_CTX} namespace=${NAMESPACE} release=${RELEASE}"
+
+  if kubectl --context "$KUBE_CTX" get namespace "$NAMESPACE" &>/dev/null; then
+    hc uninstall "$RELEASE" --wait --timeout "${TIMEOUT}s" >/dev/null 2>&1 || true
+    kc delete pod "$PROBE_CLIENT_POD" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+
+    # StatefulSet PVCs are NOT removed by helm uninstall — the chart declares no
+    # persistentVolumeClaimRetentionPolicy. Leftover Keeper data is precisely how
+    # a second run manufactures a false "survived the upgrade" pass.
+    measure_allow_empty "PVCs present before the purge" \
+      kc get pvc -o custom-columns=NAME:.metadata.name,STATUS:.status.phase --no-headers
+    kc delete pvc --all --ignore-not-found --wait=true --timeout="${EKS_PURGE_TIMEOUT_S}s" \
+      >/dev/null 2>&1 || true
+
+    # templates/secret.yaml:56 carries helm.sh/resource-policy: keep, so helm
+    # leaves it behind on uninstall. A surviving Secret carries the previous
+    # clusterSecret and password into the next run and makes AC18 vacuous.
+    kc delete secret "$FULLNAME" --ignore-not-found >/dev/null 2>&1 || true
+
+    # Assert BEFORE the namespace goes away, while the queries can still see it.
+    measure_allow_empty "PVCs surviving the explicit delete (expected: none)" \
+      kc get pvc -o name --no-headers
+    if [[ -n "${MEASURED//[[:space:]]/}" ]] && [[ "$MEASURED_RC" -eq 0 ]]; then
+      harness_error "PVCs survived the R6 purge in ${NAMESPACE}: ${MEASURED}. A leftover PVC carries the previous run's access store and can manufacture a false 'survived the upgrade' pass. Refusing to install onto a dirty substrate."
+    fi
+    measure_allow_empty "kept Secret ${FULLNAME} surviving the explicit delete (expected: none)" \
+      kc get secret "$FULLNAME" -o name --no-headers
+    if [[ -n "${MEASURED//[[:space:]]/}" ]] && [[ "$MEASURED_RC" -eq 0 ]]; then
+      harness_error "the credentials Secret ${FULLNAME} survived the R6 purge. It carries helm.sh/resource-policy: keep and would hand the next install the PREVIOUS run's clusterSecret, making AC18 pass by construction. Refusing to install onto a dirty substrate."
+    fi
+
+    kubectl --context "$KUBE_CTX" delete namespace "$NAMESPACE" --wait=false >/dev/null 2>&1 || true
+  else
+    info "$(ts)   namespace ${NAMESPACE} is already absent — nothing to uninstall"
+  fi
+
+  local waited=0
+  while kubectl --context "$KUBE_CTX" get namespace "$NAMESPACE" &>/dev/null \
+        && [[ "$waited" -lt "$EKS_PURGE_TIMEOUT_S" ]]; do
+    sleep 5; waited=$((waited + 5))
+    if (( waited % 60 == 0 )); then
+      info "$(ts)   still waiting for namespace ${NAMESPACE} to terminate (${waited}s/${EKS_PURGE_TIMEOUT_S}s)"
+    fi
+  done
+
+  # Final, unconditional assertions. These run whether or not the namespace was
+  # there to begin with, so "already clean" is proven rather than assumed.
+  if kubectl --context "$KUBE_CTX" get namespace "$NAMESPACE" &>/dev/null; then
+    measure_allow_empty "namespace ${NAMESPACE} that refused to terminate" \
+      kubectl --context "$KUBE_CTX" get namespace "$NAMESPACE" -o yaml
+    harness_error "namespace ${NAMESPACE} still present after ${EKS_PURGE_TIMEOUT_S}s — refusing to run on a dirty substrate (R6). A stuck namespace is usually a PVC finalizer waiting on an EBS detach; clear it by hand before re-running."
+  fi
+  pass "R6 (eks): namespace ${NAMESPACE} is absent"
+
+  measure_allow_empty "any PVC left anywhere in namespace ${NAMESPACE} (expected: none)" \
+    sh -c "kubectl --context '${KUBE_CTX}' get pvc --all-namespaces --no-headers 2>/dev/null | awk '\$1 == \"${NAMESPACE}\"' || true"
+  if [[ -n "${MEASURED//[[:space:]]/}" ]]; then
+    harness_error "PVCs still exist in namespace ${NAMESPACE} after it was reported gone: ${MEASURED}. Refusing to install onto a dirty substrate (R6)."
+  fi
+  pass "R6 (eks): no PVC survives in ${NAMESPACE}"
+  pass "substrate purged"
+}
+
 setup_substrate() {
+  # eks: the operator owns the cluster. Never create one, never delete one; the
+  # only hygiene available is the explicit, verified purge above.
+  if [[ "$TARGET" == "eks" ]]; then
+    info "$(ts) TARGET=eks — using the operator-supplied context ${KUBE_CTX}."
+    info "$(ts) No cluster is created and none will be deleted by this run."
+    purge_substrate_eks
+    return
+  fi
   if [[ "${REUSE_CLUSTER:-false}" == "true" ]]; then
     warn "REUSE_CLUSTER=true — reusing the existing kind cluster. This violates R6"
     warn "substrate hygiene; a green result on a reused substrate is not trustworthy."
@@ -347,6 +568,14 @@ setup_substrate() {
 PLATFORM="${PLATFORM:-}"
 resolve_platform() {
   [[ -n "$PLATFORM" ]] && return 0
+  # eks: the architecture that matters is the NODE's, not the operator laptop's.
+  # This leg exists to prove the arm64 child of the manifest list actually runs,
+  # so the default is stated rather than inferred from `uname -m` on a machine
+  # that is not in the cluster.
+  if [[ "$TARGET" == "eks" ]]; then
+    PLATFORM="linux/arm64"
+    return 0
+  fi
   case "$(uname -m)" in
     aarch64|arm64) PLATFORM="linux/arm64" ;;
     x86_64|amd64)  PLATFORM="linux/amd64" ;;
@@ -401,7 +630,71 @@ load_image() {
   rm -f "$tarball"
 }
 
+# AC20 under eks — the manifest-list form.
+#
+# Nothing is side-loaded here, so there is no local archive to read an identity
+# out of; the expectation has to come from the REGISTRY, which is the whole
+# point of this leg. `crane digest --platform linux/arm64 <repo>:<tag>` resolves
+# the manifest list and returns the digest of the arm64 CHILD — the thing an
+# arm64 kubelet actually pulls.
+#
+# Which digest a pod reports in .status.containerStatuses[].imageID varies by
+# CRI and containerd version: some report the platform manifest digest, some the
+# index (manifest-list) digest, some the config digest. All three are legitimate
+# identities of the SAME image, and every one of them still discriminates OLD
+# from NEW, so all three are accepted and all three are printed. This is the
+# same accept-any-form rule the kind path already uses for archives; it does not
+# widen AC20 across images, only across spellings of one image.
+registry_identities() {
+  local ref="$1" plat="$2" ids="" d=""
+  d="$(crane digest --platform "$plat" "$ref" 2>&1)" \
+    || harness_error "crane digest --platform ${plat} ${ref} failed: ${d}"
+  [[ "$d" == sha256:* ]] \
+    || harness_error "crane digest --platform ${plat} ${ref} did not return a sha256 digest: '${d}'"
+  ids="$d"
+  # The index digest, for a CRI that reports the list rather than the child.
+  d="$(crane digest "$ref" 2>/dev/null || true)"
+  [[ "$d" == sha256:* ]] && ids+=$'\n'"$d"
+  # The config digest (classic docker "image id"), best-effort: a crane without
+  # `config --platform` must not fail the run, because the manifest digest above
+  # is the identity this AC is specified on.
+  d="$(crane config --platform "$plat" "$ref" 2>/dev/null | sha256_hex || true)"
+  [[ -n "${d//[[:space:]]/}" ]] && ids+=$'\n'"sha256:${d}"
+  printf '%s' "$ids"
+}
+
+sha256_hex() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+# eks: resolve both tags from the registry and side-load NOTHING. The kubelet
+# pulls, which is the property this leg is here to exercise.
+resolve_registry_images() {
+  resolve_platform
+  info "$(ts) TARGET=eks — resolving registry digests with crane (${PLATFORM}); no image is side-loaded"
+  OLD_IMAGE_ID="$(registry_identities "${IMAGE_REPO}:${OLD_TAG}" "$PLATFORM")" \
+    || harness_error "could not resolve ${IMAGE_REPO}:${OLD_TAG} from the registry (see the crane error above)"
+  NEW_IMAGE_ID="$(registry_identities "${IMAGE_REPO}:${NEW_TAG}" "$PLATFORM")" \
+    || harness_error "could not resolve ${IMAGE_REPO}:${NEW_TAG} from the registry (see the crane error above)"
+  [[ -n "${OLD_IMAGE_ID//[[:space:]]/}" ]] \
+    || harness_error "could not resolve any registry identity for ${IMAGE_REPO}:${OLD_TAG}"
+  [[ -n "${NEW_IMAGE_ID//[[:space:]]/}" ]] \
+    || harness_error "could not resolve any registry identity for ${IMAGE_REPO}:${NEW_TAG}"
+  [[ "$OLD_IMAGE_ID" != "$NEW_IMAGE_ID" ]] \
+    || harness_error "old and new tags resolve to the SAME registry digest (${OLD_IMAGE_ID}) — the upgrade would change nothing"
+  info "old ${OLD_TAG} accepted identities: $(tr '\n' ' ' <<< "$OLD_IMAGE_ID")"
+  info "new ${NEW_TAG} accepted identities: $(tr '\n' ' ' <<< "$NEW_IMAGE_ID")"
+}
+
 load_images() {
+  if [[ "$TARGET" == "eks" ]]; then
+    resolve_registry_images
+    return
+  fi
   resolve_platform
   load_image "${IMAGE_REPO}:${OLD_TAG}" OLD_IMAGE_ID
   load_image "${IMAGE_REPO}:${NEW_TAG}" NEW_IMAGE_ID
@@ -425,12 +718,37 @@ load_images() {
   done
 }
 
+# Every --set that is NOT image.tag. Identical on both sides of the upgrade, so
+# D5 still holds: image.tag remains the only thing that changes.
+EXTRA_SET=()
+
+resolve_extra_set() {
+  EXTRA_SET=()
+  if [[ "$TARGET" == "eks" ]]; then
+    # values-upgrade.yaml pins pullPolicy: Never so a kind run stays offline.
+    # Under eks that would make every pod ImagePullBackOff, and it would also
+    # defeat the purpose: this leg exists to make the kubelet pull the arm64
+    # child from the real registry.
+    EXTRA_SET+=(--set "image.pullPolicy=IfNotPresent")
+  fi
+  if [[ -n "$NODE_SELECTOR_KEY" || -n "$NODE_SELECTOR_VALUE" ]]; then
+    if [[ -z "$NODE_SELECTOR_KEY" || -z "$NODE_SELECTOR_VALUE" ]]; then
+      usage_error "NODE_SELECTOR_KEY and NODE_SELECTOR_VALUE must be set together (got key='${NODE_SELECTOR_KEY}' value='${NODE_SELECTOR_VALUE}'). Half a pin is not a pin, and a run that believes it is pinned when it is not reports the wrong topology."
+    fi
+    # helm --set treats an unescaped '.' as a path separator, so
+    # kubernetes.io/hostname would create a nested map instead of one key.
+    local escaped="${NODE_SELECTOR_KEY//./\\.}"
+    EXTRA_SET+=(--set "scheduling.nodeSelector.${escaped}=${NODE_SELECTOR_VALUE}")
+  fi
+}
+
 install_at_tag() {
   local tag="$1"; shift
   helm_install \
     -f "$VALUES" \
     --set "replicas=${REPLICAS}" \
     --set "image.tag=${tag}" \
+    ${EXTRA_SET[@]+"${EXTRA_SET[@]}"} \
     "$@"
 }
 
@@ -442,6 +760,7 @@ upgrade_to_tag() {
     -f "$VALUES" \
     --set "replicas=${REPLICAS}" \
     --set "image.tag=${tag}" \
+    ${EXTRA_SET[@]+"${EXTRA_SET[@]}"} \
     --wait --timeout "${TIMEOUT}s" \
     "$@"
 }
@@ -510,10 +829,14 @@ ac7b_config_merged() {
 }
 
 # ─── AC20 — the running image is the image we built ──────────────────────────
-# Local form of AC20: kind side-loads, there is no registry in the loop, so the
-# comparison is against the local image id rather than a registry digest. The
-# crane/manifest-list form (a scratch tag pulled from a registry, where a pod may
-# report the arm64 child rather than the list digest) belongs to the EKS legs.
+# One comparison, two sources for the expectation, chosen by TARGET.
+#   kind — side-loaded, no registry in the loop, so the expectation is the LOCAL
+#          image id read out of the archive (archive_identities).
+#   eks  — nothing side-loaded, so the expectation is the REGISTRY digest read
+#          with `crane digest --platform linux/arm64` (registry_identities); a
+#          pod may report the arm64 child, the list, or the config digest.
+# The assertion itself is unchanged: every pod must report one of the accepted
+# identities of the image we expect, and a pod matching none is a FAIL.
 ac20_image_digest() {
   local expected_ids="$1" label="$2"
   ac "AC20" "every pod runs the image we loaded (${label})"
@@ -745,9 +1068,14 @@ p1_3_seed() {
 
 start_probe_client() {
   kc get pod "$PROBE_CLIENT_POD" >/dev/null 2>&1 && return 0
+  # Never keeps a kind run offline against a side-loaded image. Under eks there
+  # is no side-loaded image and the kubelet has to pull, so Never would leave the
+  # AC12 probe client stuck in ImagePullBackOff and take AC12 down with it.
+  local probe_pull_policy="Never"
+  [[ "$TARGET" == "eks" ]] && probe_pull_policy="IfNotPresent"
   kc run "$PROBE_CLIENT_POD" \
     --image="${IMAGE_REPO}:${NEW_TAG}" \
-    --image-pull-policy=Never \
+    --image-pull-policy="$probe_pull_policy" \
     --restart=Never \
     --command -- sleep infinity >/dev/null
   kc wait pod "$PROBE_CLIENT_POD" --for=condition=Ready --timeout=180s >/dev/null \
@@ -1173,7 +1501,7 @@ p1_6_keeper_quorum() {
   # UNMEASURED when it does not hold.
   local probe_precondition="present"
   measure_allow_empty "AC19 precondition: can ${PROBE_USER} authenticate at FULL quorum?" \
-    timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
+    timeout "$KEEPER_ERROR_TIMEOUT_S" "${KUBECTL_ENV[@]}" kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
       exec "$(ch_pods | head -1)" -- clickhouse-client --user "$PROBE_USER" --password "$PROBE_PW" -q "SELECT 1"
   if [[ "$MEASURED" != *"1"* ]] || [[ "$MEASURED_RC" -ne 0 ]]; then
     probe_precondition="absent"
@@ -1188,7 +1516,7 @@ p1_6_keeper_quorum() {
 
   # shellcheck disable=SC2016  # $(cat ...) is expanded inside the pod, not here
   measure "default (users.xml) still authenticates below quorum on ${target}" \
-    timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
+    timeout "$KEEPER_ERROR_TIMEOUT_S" "${KUBECTL_ENV[@]}" kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
       exec "$target" -- sh -c 'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "SELECT 1"'
   ac_assert_eq "default authenticates below quorum" "$MEASURED" "1"
 
@@ -1196,7 +1524,7 @@ p1_6_keeper_quorum() {
     ac_unmeasured "skipping the below-quorum ${PROBE_USER} probe — precondition absent (see above)."
   else
     measure_allow_empty "SQL user ${PROBE_USER} auth attempt below quorum (${KEEPER_ERROR_TIMEOUT_S}s budget)" \
-      timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
+      timeout "$KEEPER_ERROR_TIMEOUT_S" "${KUBECTL_ENV[@]}" kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
         exec "$target" -- clickhouse-client --user "$PROBE_USER" --password "$PROBE_PW" -q "SELECT 1"
     local probe_rc="$MEASURED_RC" probe_out="$MEASURED"
     if [[ "$probe_rc" -eq 124 ]]; then
@@ -1375,14 +1703,25 @@ p1_8_negative_controls() {
 # ─── Entry point ─────────────────────────────────────────────────────────────
 
 usage() {
-  sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'
+  # The header IS the interface contract, so print all of it rather than a
+  # hardcoded line range that silently truncates when a variable is documented.
+  awk 'NR > 1 { if (substr($0, 1, 1) != "#") exit; sub(/^# ?/, ""); print }' "$0"
   exit 40
 }
 
 require_tools() {
-  local t
-  for t in kind docker helm kubectl; do
-    command -v "$t" >/dev/null 2>&1 || harness_error "required tool not found: ${t}"
+  local t tools
+  if [[ "$TARGET" == "eks" ]]; then
+    # No kind and no docker: nothing is built and nothing is side-loaded.
+    # crane is REQUIRED — AC20's registry-digest form has no fallback, and a
+    # missing crane must be a loud harness error, never a silently skipped AC.
+    tools="helm kubectl crane aws"
+  else
+    tools="kind docker helm kubectl"
+  fi
+  for t in $tools; do
+    command -v "$t" >/dev/null 2>&1 \
+      || harness_error "required tool not found: ${t} (TARGET=${TARGET} requires: ${tools})"
   done
 }
 
@@ -1390,7 +1729,14 @@ on_exit() {
   local rc=$?
   echo
   info "run artifacts (captures, AC12 samples, helm log): ${RUN_DIR}"
-  cleanup_cluster
+  # eks: the cluster is the operator's. cleanup_cluster runs `kind delete
+  # cluster`, which is meaningless here at best. The release and namespace are
+  # deliberately LEFT for post-mortem; the next run's R6 purge removes them.
+  if [[ "$TARGET" == "eks" ]]; then
+    info "TARGET=eks — leaving the cluster untouched. Namespace ${NAMESPACE} is left in place for inspection; the next run purges it (R6)."
+  else
+    cleanup_cluster
+  fi
   exit "$rc"
 }
 
@@ -1410,9 +1756,28 @@ main() {
   esac
 
   require_tools
+  resolve_extra_set
+
   sep
   info "upgrade-access harness — langwatch-saas#1168"
-  info "  REPLICAS=${REPLICAS}  ${OLD_TAG} -> ${NEW_TAG}  cluster=${CLUSTER_NAME}"
+  info "  TARGET=${TARGET}"
+  if [[ "$TARGET" == "eks" ]]; then
+    # Before the banner claims anything else, prove we are on the right cluster.
+    eks_context_gate
+    info "  context=${KUBE_CTX}  (operator-supplied; never created, never deleted)"
+  else
+    info "  cluster=${CLUSTER_NAME}"
+  fi
+  info "  REPLICAS=${REPLICAS}  ${OLD_TAG} -> ${NEW_TAG}"
+  if [[ ${#EXTRA_SET[@]} -gt 0 ]]; then
+    info "  extra --set: ${EXTRA_SET[*]}"
+  fi
+  if [[ -n "$NODE_SELECTOR_KEY" ]]; then
+    info "  replicas PINNED to ${NODE_SELECTOR_KEY}=${NODE_SELECTOR_VALUE}"
+  else
+    info "  replicas UNPINNED (scheduler places them)"
+  fi
+  info "  TIMEOUT=${TIMEOUT}s"
   info "  PHASES=${PHASES}"
   info "  PROPAGATION_TIMEOUT_S=${PROPAGATION_TIMEOUT_S} (AC23 cap ${PROPAGATION_CAP_S})"
   info "  artifacts: ${RUN_DIR}"
