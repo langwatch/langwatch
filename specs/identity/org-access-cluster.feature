@@ -90,66 +90,66 @@ Feature: The people and access settings, as one cluster
 
   Rule: people, invitations and requests are three cuts of one list
 
-    @integration @unimplemented
+    @integration
     Scenario: The directory's people tab opens on everybody
       When "ana" opens the directory page
       Then she sees the people tab open, listing members, invitations and
       requests together
       And the seat usage is on the page without being the subject of it
 
-    @integration @unimplemented
+    @integration
     Scenario: A cut that is waiting on somebody says how many
       Given two invitations are outstanding and one colleague has asked to join
       When "ana" opens the directory page
       Then the invited chip carries the number two
       And the waiting-to-join chip carries the number one
 
-    @integration @unimplemented
+    @integration
     Scenario: A cut with nobody in it says so rather than emptying the table
       Given nobody has asked to join
       When "ana" selects the waiting-to-join cut
       Then it says nobody is waiting
       And it offers nothing to approve
 
-    @integration @unimplemented
+    @integration
     Scenario: The old members address forwards onto the tab it became
       When somebody opens the old members address
       Then they are taken to the directory page's people tab
 
-    @integration @unimplemented
+    @integration
     Scenario: The old teams address forwards onto the tab it became
       When somebody opens the old teams and projects address
       Then they are taken to the directory page's teams and projects tab
 
   Rule: everybody who is listed is listed the same way
 
-    @integration @unimplemented
+    @integration
     Scenario: One identity row carries a person wherever they appear
       When "ana" opens the members page
       Then each person shows their name, their address and why they are here
       And an invited person shows the same row, marked as invited
       And somebody waiting to join shows the same row, with the domain matched
 
-    @integration @unimplemented
+    @integration
     Scenario: A member the directory owns says so
       Given "sam" was created by "acme"'s identity provider
       When "ana" opens the members page
       Then "sam" carries a chip naming the directory as the reason he is here
 
-    @integration @unimplemented
+    @integration
     Scenario: A member who walked in on the domain policy says nobody approved
       Given "sam" joined "acme" automatically on a matching domain
       When "ana" opens the members page
       Then "sam" carries a chip naming the domain
       And it says that nobody approved it
 
-    @integration @unimplemented
+    @integration
     Scenario: A member we cannot explain carries no chip rather than a guess
       Given "ana" created "acme" herself
       When "ana" opens the members page
       Then no chip claims a reason she is here
 
-    @unit @unimplemented
+    @unit
     Scenario: The reason somebody is here is asked for separately
       Given the read that explains each member fails
       When "ana" opens the members page
@@ -160,13 +160,13 @@ Feature: The people and access settings, as one cluster
 
   Rule: a person is an address, not a dialog
 
-    @integration @unimplemented
+    @integration
     Scenario: Opening a person puts them in the address bar
       When "ana" opens "sam" from the members list
       Then the address names the person drawer and "sam"
       And pasting that address opens the same drawer on the same person
 
-    @integration @unimplemented
+    @integration
     Scenario: The drawer answers who, what and what next
       When "ana" opens "sam"
       Then she sees the address he signs in with and whether he proved it
@@ -175,12 +175,12 @@ Feature: The people and access settings, as one cluster
       And she sees his organization role, his role assignments and his groups
       And she is offered his seat and his membership, and nothing else
 
-    @integration @unimplemented
+    @integration
     Scenario: Signing in as somebody is not offered here
       When "ana" opens "sam"
       Then nothing on the drawer offers to sign in as him
 
-    @integration @unimplemented
+    @integration
     Scenario: An administrator cannot change their own organization role
       When "ana" opens herself
       Then the role picker is replaced by the reason it is not offered
@@ -189,24 +189,24 @@ Feature: The people and access settings, as one cluster
 
   Rule: the definitions and the grants of them are one page
 
-    @unit @unimplemented
+    @unit
     Scenario: The old role bindings address forwards onto the tab it became
       When somebody opens the old role bindings address
       Then they are taken to the roles page, on the assignments tab
 
-    @integration @unimplemented
+    @integration
     Scenario: The screen says role assignment, never binding
       When "ana" opens the assignments tab
       Then every word on it is the industry's, not the engine's
       And no screen in the cluster shows the word "binding"
 
-    @integration @unimplemented
+    @integration
     Scenario: A scope is named in full
       Given "sam" holds a role on a team called "Platform"
       When "ana" opens the assignments tab
       Then the scope reads "Team Platform" rather than an abbreviation
 
-    @integration @unimplemented
+    @integration
     Scenario: Reading the assignments does not depend on a second answer
       Given the assignments fail to load
       When "ana" opens the assignments tab
@@ -218,14 +218,14 @@ Feature: The people and access settings, as one cluster
 
   Rule: the assignments are gathered onto whoever holds them
 
-    @integration @unimplemented
+    @integration
     Scenario: One row per holder, however many grants they have
       Given "sam" holds the same role on the organization and on three teams
       When "ana" opens the assignments tab
       Then "sam" is one row, not four
       And the count above the list says one member or group
 
-    @integration @unimplemented
+    @integration
     Scenario: Identical grants are summarised rather than repeated
       Given "sam" holds the same role on the organization and on three teams
       When "ana" opens the assignments tab
@@ -233,7 +233,7 @@ Feature: The people and access settings, as one cluster
       And it does not name each team until she asks for them
       And asking shows every one of them, named in full
 
-    @integration @unimplemented
+    @integration
     Scenario: Every holder is named, whatever kind of holder it is
       Given two API keys hold roles in "acme"
       When "ana" opens the assignments tab
@@ -241,7 +241,7 @@ Feature: The people and access settings, as one cluster
       And a key with no name of its own says so in a sentence
       And no row on the screen is nameless
 
-    @integration @unimplemented
+    @integration
     Scenario: The scope filter carries the real numbers
       When "ana" opens the assignments tab
       Then All, Organization, Teams and Projects each carry how many
@@ -252,7 +252,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: a role card says what the role really grants
 
-    @unit @unimplemented
+    @unit
     Scenario: A predefined role card describes the role it actually is
       When "ana" opens the roles tab
       Then Admin, Member and Viewer each carry a sentence in plain words
@@ -260,7 +260,7 @@ Feature: The people and access settings, as one cluster
       And each card shows permission identifiers the role really grants
       And each card says how many permissions there are in total
 
-    @integration @unimplemented
+    @integration
     Scenario: A predefined role card counts the people who hold it
       Given two people hold Admin, one of them through a group
       When "ana" opens the roles tab
@@ -268,7 +268,7 @@ Feature: The people and access settings, as one cluster
       And nobody is counted twice for holding it two ways
       And a count that could not be read says so rather than showing a zero
 
-    @integration @unimplemented
+    @integration
     Scenario: A custom role card names who holds it and where
       Given "acme" has a custom role assigned on a project and through a group
       When "ana" opens the roles tab
@@ -277,20 +277,20 @@ Feature: The people and access settings, as one cluster
       And it names the people holding it, and the group they hold it through
       And a role nobody holds says so rather than showing an empty strip
 
-    @integration @unimplemented
+    @integration
     Scenario: Every permission a role holds can be read in full
       When "ana" asks to see everything a role grants
       Then every permission is listed, grouped by the part of the product it
       is about
       And each one carries both its identifier and a sentence
 
-    @integration @unimplemented
+    @integration
     Scenario: Reading the roles does not depend on a second answer
       Given the roles fail to load
       When "ana" opens the roles tab
       Then she is told what failed, in words, with a trace to quote
 
-    @integration @unimplemented
+    @integration
     Scenario: Role changes are tied to the audit log that records them
       When "ana" opens the roles tab
       Then she is offered the audit log as the record of role changes
@@ -300,7 +300,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: a role is written against a description of what it will do
 
-    @integration @unimplemented
+    @integration
     Scenario: A role is built one part of the product at a time
       When "ana" starts a new role
       Then the permissions are grouped by the part of the product they are
@@ -309,27 +309,27 @@ Feature: The people and access settings, as one cluster
       And the individual actions are there for a role that needs them
       And she can search the list by the name of a screen or a permission
 
-    @unit @unimplemented
+    @unit
     Scenario: Picking an action that needs another brings it along
       Given "ana" is writing a role
       When she grants the ability to change something
       Then the ability to see it is granted with it
       And taking the ability to see it away takes the changes with it
 
-    @unit @unimplemented
+    @unit
     Scenario: Every permission the picker offers is explained in words
       When "ana" reads the permission list
       Then every resource the engine knows carries a name and a sentence
       And no permission is offered with nothing but its identifier
 
-    @integration @unimplemented
+    @integration
     Scenario: The preview describes the role as it is built
       When "ana" grants a role the ability to read traces
       Then the preview says the role can view traces
       And it counts the permissions and the areas they fall in
       And a role that grants nothing cannot be saved, and says why
 
-    @integration @unimplemented
+    @integration
     Scenario: The preview says which permissions do nothing at that scope
       Given a role that grants something only the organization can grant
       When "ana" previews it assigned on a team
@@ -340,31 +340,31 @@ Feature: The people and access settings, as one cluster
 
   Rule: every group is managed where the directory reports on them
 
-    @unit @unimplemented
+    @unit
     Scenario: The old groups address forwards onto the tab it became
       When somebody opens the old groups address
       Then they are taken to the directory page, on the groups tab
 
-    @integration @unimplemented
+    @integration
     Scenario: The groups tab holds the hand-made ones as well as the sent ones
       Given "acme" has a group its identity provider sends and one made by hand
       When "ana" opens the groups tab of the directory page
       Then she sees both
       And she is offered the way to add another
 
-    @integration @unimplemented
+    @integration
     Scenario: A directory group is marked in the list
       Given "acme" has a group its identity provider sends
       When "ana" opens the groups tab of the directory page
       Then that group carries a chip naming the directory
 
-    @integration @unimplemented
+    @integration
     Scenario: The groups the directory sent say what they grant
       When "ana" opens the groups tab of the directory page
       Then each group from the directory names the roles it carries
       And a group that grants nothing says so rather than showing a blank
 
-    @integration @unimplemented
+    @integration
     Scenario: A directory group says why its membership cannot be edited
       When "ana" opens a group its identity provider sends
       Then she is told the provider owns who is in it
@@ -375,12 +375,12 @@ Feature: The people and access settings, as one cluster
 
   Rule: the status is the first thing on the page
 
-    @unit @unimplemented
+    @unit
     Scenario: The old directory sync address forwards onto the page it became
       When somebody opens the old directory sync address
       Then they are taken to the directory page
 
-    @integration @unimplemented
+    @integration
     Scenario: The page leads with whether it is working
       When "ana" opens the directory page
       Then the first thing she reads is which sources are connected
@@ -388,7 +388,7 @@ Feature: The people and access settings, as one cluster
       it sent
       And the status stands above the tabs, so every tab is read against it
 
-    @integration @unimplemented
+    @integration
     Scenario: The people the directory did not put here are counted too
       Given "acme" has members its identity provider never created
       When "ana" opens the directory page
@@ -396,7 +396,7 @@ Feature: The people and access settings, as one cluster
       And she is told that removing them from the directory will not remove
       them here
 
-    @integration @unimplemented
+    @integration
     Scenario: A reader who may not read groups is told nothing they cannot have
       Given "ana" may see single sign-on but may not manage the organization
       When she opens the directory page
@@ -421,19 +421,19 @@ Feature: The people and access settings, as one cluster
 
   Rule: the tabs are four subjects drawn one way
 
-    @integration @unimplemented
+    @integration
     Scenario: Every tab puts its action in the same place
       When "ana" moves between the directory tabs
       Then each tab's own action sits at the end of that tab's first heading row
       And no two tabs draw that action differently
 
-    @integration @unimplemented
+    @integration
     Scenario: A tab that names a count names it the same way as its siblings
       When "ana" opens the directory page
       Then every tab that carries a number carries it as a badge on the tab
       And a tab with nothing in it still carries its zero
 
-    @integration @unimplemented
+    @integration
     Scenario: The tabs name the subjects this page owns
       When "ana" opens the directory page
       Then the people, the teams and the groups each have a tab
@@ -447,39 +447,39 @@ Feature: The people and access settings, as one cluster
 
   Rule: the departments are reported on here and managed under Governance
 
-    @integration @unimplemented
+    @integration
     Scenario: The departments tab joins only where there is anything to put on it
       Given "acme" has departments
       When "ana" opens the directory page
       Then a departments tab is offered, carrying how many there are
       And an organization with none is offered no such tab
 
-    @integration @unimplemented
+    @integration
     Scenario: The departments tab references what Governance manages
       When "ana" opens the directory page at the departments
       Then the departments are what she is looking at
 
-    @integration @unimplemented
+    @integration
     Scenario: A reader who may not view governance is offered no departments tab
       Given "ana" may manage the organization but may not view governance
       When she opens the directory page at an address naming the departments
       Then no departments tab is offered
       And she lands on the people rather than on a refusal
 
-    @integration @unimplemented
+    @integration
     Scenario: A department says how much it holds, in its own words
       When "ana" reads the departments
       Then each one names the people, the teams and the projects it holds
       And a part it holds none of is left out rather than read out as a zero
       And a department holding nobody says so plainly
 
-    @integration @unimplemented
+    @integration
     Scenario: The people no department holds are counted underneath
       When "ana" reads the departments
       Then the people no department holds are counted beneath them
       And no department is invented to hold them
 
-    @integration @unimplemented
+    @integration
     Scenario: Assignment stays where it is managed
       When "ana" reads the departments
       Then she is offered the way to Governance, where they are assigned
@@ -493,14 +493,14 @@ Feature: The people and access settings, as one cluster
 
   Rule: the people the directory manages are named, not only counted
 
-    @integration @unimplemented
+    @integration
     Scenario: A member's department is readable at a glance
       When "ana" reads the people the directory manages
       Then a member a department holds carries its name beside their own
       And a member no department holds carries nothing rather than an empty
       label
 
-    @integration @unimplemented
+    @integration
     Scenario: The directory's own people are listed by name
       Given "acme" has members its identity provider created
       When "ana" opens the directory page
@@ -508,34 +508,34 @@ Feature: The people and access settings, as one cluster
       they hold
       And each row says the directory is where they came from
 
-    @integration @unimplemented
+    @integration
     Scenario: The people who arrived another way are not in that list
       Given "acme" has members its identity provider never created
       When "ana" opens the directory page
       Then they are not listed among the people the directory manages
 
-    @integration @unimplemented
+    @integration
     Scenario: Somebody managed whose access is switched off is still listed
       Given the directory manages somebody whose access here is switched off
       When "ana" opens the directory page
       Then they are still a row, marked as switched off
       And an ordinary member is marked nothing at all
 
-    @integration @unimplemented
+    @integration
     Scenario: A directory that has provisioned nobody says so honestly
       Given "acme" has members and its identity provider created none of them
       When "ana" opens the directory page
       Then she is told the directory has provisioned nobody yet
       And she is told those members arrived another way
 
-    @integration @unimplemented
+    @integration
     Scenario: A roster that could not be read is not drawn as an empty one
       Given the read that says who the directory manages fails
       When "ana" opens the directory page
       Then she is told what could not be read, in words, with a trace to quote
       And nobody is listed as managed on the strength of the half that answered
 
-    @integration @unimplemented
+    @integration
     Scenario: A reader who may not read membership is not shown a roster
       Given "ana" may see single sign-on but may not manage the organization
       When she opens the directory page
@@ -595,7 +595,7 @@ Feature: The people and access settings, as one cluster
       it is on
       And neither of the two ever stands in for the other
 
-    @integration @unimplemented
+    @integration
     Scenario: Verifying a domain is answerable from here
       When "ana" reads the domains on the authentication page
       Then each one says whether it is proved or still waiting on her
@@ -635,7 +635,7 @@ Feature: The people and access settings, as one cluster
       When she opens the authentication page
       Then the counts she may not read say so rather than reading zero
 
-    @unit @unimplemented
+    @unit
     Scenario: One source that stopped is never summarised as working
       Given one source is syncing and another needs attention
       When the sources are summarised into one chip
@@ -729,7 +729,7 @@ Feature: The people and access settings, as one cluster
 
   Rule: the three ways in are asked on one page
 
-    @unit @unimplemented
+    @unit
     Scenario: The old access address forwards onto the page it became
       When somebody opens the old access address
       Then they are taken to the directory page
@@ -740,13 +740,13 @@ Feature: The people and access settings, as one cluster
       Then the who-may-join policy is on it
       And it is not on the directory page
 
-    @integration @unimplemented
+    @integration
     Scenario: The second-factor requirement is asked with the sign-in it guards
       When "ana" opens the authentication page
       Then the second-factor requirement is on it
       And it is not on the directory page
 
-    @integration @unimplemented
+    @integration
     Scenario: The rules are not on the page about the people they admit
       When "ana" opens the directory page
       Then the who-may-join policy is not on it
@@ -775,7 +775,7 @@ Feature: The people and access settings, as one cluster
       Then the setting saves
       And the plan was never consulted
 
-    @integration @unimplemented
+    @integration
     Scenario: The two ways a domain matters are told apart
       When "ana" reads the who-can-join policy
       Then it says a verified domain is what lets colleagues join automatically

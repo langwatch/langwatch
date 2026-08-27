@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the /settings/authentication page — verifying that
+ * Integration tests for the /settings/security page — verifying that
  * the Change Password entry point is gated correctly and that opening it
  * surfaces the dialog with the right shape (Current Password field shown
  * for email/credential mode, hidden for Auth0 mode).
@@ -14,24 +14,23 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockChangePassword,
-  mockSetPassword,
   mockUnlinkAccount,
   mockToasterCreate,
   publicEnvRef,
   linkedAccountsRef,
 } = vi.hoisted(() => ({
   mockChangePassword: vi.fn(),
-  mockSetPassword: vi.fn(),
   mockUnlinkAccount: vi.fn(),
   mockToasterCreate: vi.fn(),
   publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "auth0" as string | undefined },
+    current: { NEXTAUTH_PROVIDER: "auth0" } as Record<string, unknown>,
   },
   linkedAccountsRef: {
     current: [
@@ -50,7 +49,56 @@ vi.mock("~/utils/api", () => ({
       user: {
         getLinkedAccounts: { invalidate: vi.fn().mockResolvedValue(undefined) },
       },
+      // The page also renders the email-addresses section, which invalidates
+      // both reads after every change it makes.
+      identity: {
+        myIdentifiers: { invalidate: vi.fn().mockResolvedValue(undefined) },
+      },
+      auth: {
+        myAddressConfirmation: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
+        },
+      },
     }),
+    // The addresses section and the sign-in-methods list both read the
+    // account's identifiers: one to draw them, the other to know whether the
+    // detach guard would refuse an unlink. Empty here — this file is about the
+    // password dialog, and those two have their own tests.
+    identity: {
+      myIdentifiers: { useQuery: () => ({ data: [], isPending: false }) },
+      // When each method last got somebody in. Answered empty here: this file
+      // is about the password dialog, and the addresses band has its own tests.
+      myMethodsLastUsed: {
+        useQuery: () => ({ data: undefined, isPending: false }),
+      },
+      addEmailIdentifier: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      resendIdentifierConfirmation: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      removeIdentifier: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      completeVerification: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+    auth: {
+      myAddressConfirmation: {
+        useQuery: () => ({
+          data: { email: "user@example.com", confirmed: true },
+          isPending: false,
+        }),
+      },
+      sendMyAddressConfirmation: {
+        useMutation: () => ({
+          mutateAsync: vi.fn(),
+          mutate: vi.fn(),
+          isPending: false,
+        }),
+      },
+    },
     user: {
       getLinkedAccounts: {
         useQuery: () => ({
@@ -63,11 +111,8 @@ vi.mock("~/utils/api", () => ({
           data: { pendingSsoSetup: false },
         }),
       },
-      // `SignInMethodsSection` reads this to decide whether to offer "Set a
-      // password". Answered `true` because that is the section's own
-      // no-flicker default, and this suite drives the linked-account rows.
       hasPassword: {
-        useQuery: () => ({ data: { hasPassword: true }, isLoading: false }),
+        useQuery: () => ({ data: { hasPassword: true }, isPending: false }),
       },
       changePassword: {
         useMutation: () => ({
@@ -75,11 +120,9 @@ vi.mock("~/utils/api", () => ({
           isPending: false,
         }),
       },
-      // ADR-119: the same dialog sets a first password for an account that
-      // arrived by passkey or SSO. Reached at render, not only on submit.
       setPassword: {
         useMutation: () => ({
-          mutateAsync: mockSetPassword,
+          mutateAsync: vi.fn().mockResolvedValue(undefined),
           isPending: false,
         }),
       },
@@ -88,6 +131,21 @@ vi.mock("~/utils/api", () => ({
           mutateAsync: mockUnlinkAccount,
           isLoading: false,
         }),
+      },
+    },
+    // The page also renders TwoFactorSection (D06). It gates itself on the
+    // public env, but its query is declared before that gate — hooks run in
+    // order — so the mock has to answer it however the flag is set.
+    twoStepVerification: {
+      account: {
+        useQuery: () => ({
+          data: undefined,
+          isPending: false,
+          refetch: vi.fn(),
+        }),
+      },
+      disable: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
   },
@@ -121,11 +179,17 @@ vi.mock("~/utils/auth-client", () => ({
     data: { user: { email: "user@example.com" } },
   }),
   linkAccount: vi.fn(),
-  // `PasskeysSection` calls `useListPasskeys` at the top of its body, above
-  // the `PASSKEYS_ENABLED` early return the hooks rule forces it to sit
-  // above, so the flag cannot keep this off the render path. Only the hook is
-  // named: `passkey.*` is reached from click handlers this suite never fires.
-  authClient: { useListPasskeys: () => ({ data: [], isPending: false }) },
+  // The passkey and two-step sections both reach the auth client, and both
+  // call it before their own flag gate — a hook cannot be conditional. So the
+  // double has to answer even on a deployment where neither is offered.
+  authClient: {
+    useListPasskeys: () => ({ data: [], isPending: false }),
+    twoFactor: {
+      enable: vi.fn(),
+      verifyTotp: vi.fn(),
+      generateBackupCodes: vi.fn(),
+    },
+  },
 }));
 
 vi.mock("~/components/SettingsLayout", () => ({
@@ -133,19 +197,18 @@ vi.mock("~/components/SettingsLayout", () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-import AuthenticationSettings from "../authentication";
+import SecuritySettings from "../security";
 
 function renderPage() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <AuthenticationSettings />
+      <SecuritySettings />
     </ChakraProvider>,
   );
 }
 
 beforeEach(() => {
   mockChangePassword.mockReset();
-  mockSetPassword.mockReset();
   mockUnlinkAccount.mockReset();
   mockToasterCreate.mockReset();
   publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
@@ -162,7 +225,142 @@ afterEach(() => {
   cleanup();
 });
 
-describe("<AuthenticationSettings/>", () => {
+describe("<SecuritySettings/>", () => {
+  describe("the page's own shape", () => {
+    it("names the page and says in one line what it governs", () => {
+      renderPage();
+
+      expect(screen.getByRole("heading", { name: "Security" })).toBeTruthy();
+      expect(screen.getByText(/if you lost one of them/i)).toBeTruthy();
+    });
+
+    /** @scenario The page is four sections, one per subject */
+    it("lays the bands out in the order the page argues for", () => {
+      // Everything mounted, so the order is the whole order rather than
+      // whatever this deployment happens to offer.
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+        MFA_ENROLLMENT_OPEN: true,
+      };
+      const { container } = renderPage();
+
+      const sections = Array.from(
+        container.querySelectorAll("[data-testid$='-settings-section']"),
+      ).map((section) => section.getAttribute("data-testid"));
+
+      expect(sections).toEqual([
+        "email-and-linked-accounts-settings-section",
+        "passkeys-settings-section",
+        "two-factor-settings-section",
+        "password-settings-section",
+      ]);
+    });
+
+    /** @scenario Email addresses and linked accounts sit under one heading */
+    it("keeps the addresses, the providers and one action row inside the one band", () => {
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      renderPage();
+
+      const band = screen.getByTestId(
+        "email-and-linked-accounts-settings-section",
+      );
+      expect(
+        within(band).getByTestId("email-identifiers-section"),
+      ).toBeTruthy();
+      expect(within(band).getByTestId("linked-accounts-section")).toBeTruthy();
+
+      // One action row: adding an address and connecting a provider are the
+      // same offer, so they share a line rather than stacking as two. Asserted
+      // on the row itself rather than on how many parents up it happens to be,
+      // which is a fact about the flexbox and not about the offer.
+      const row = within(band).getByTestId("identifier-action-row");
+      expect(within(row).getByTestId("add-address")).toBeTruthy();
+      expect(within(row).getByTestId("link-method-google")).toBeTruthy();
+    });
+
+    /**
+     * The layout pop this row was reported for: opening the field used to
+     * replace the button with a much wider input, and every Connect button
+     * slid sideways out from under the cursor that had just pressed it.
+     */
+    /** @scenario Email addresses and linked accounts sit under one heading */
+    it("leaves the connect buttons where they were when the address field opens", () => {
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      renderPage();
+
+      const band = screen.getByTestId(
+        "email-and-linked-accounts-settings-section",
+      );
+      const row = within(band).getByTestId("identifier-action-row");
+      const before = within(row)
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+
+      fireEvent.click(within(band).getByTestId("add-address"));
+
+      // The field opened somewhere, and it did not open in this row.
+      expect(within(band).getByTestId("new-address")).toBeTruthy();
+      expect(within(row).queryByTestId("new-address")).toBeNull();
+      expect(
+        within(row)
+          .getAllByRole("button")
+          .map((b) => b.textContent),
+      ).toEqual(before);
+    });
+  });
+
+  describe("when the account is down to one way in", () => {
+    /** @scenario An account with one way in is told so, where the remedy is */
+    it("says so inside the band whose halves are the remedy", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+        MFA_ENROLLMENT_OPEN: true,
+      };
+      // A password and nothing else: no passkey, no linked account.
+      linkedAccountsRef.current = [
+        {
+          id: "acc-password",
+          provider: "credential",
+          providerAccountId: "user@example.com",
+        },
+      ];
+      renderPage();
+
+      const band = screen.getByTestId("passkeys-settings-section");
+      const notice = within(band).getByTestId("last-way-in-notice");
+      expect(notice.textContent).toMatch(/only way into this account/i);
+      expect(
+        within(notice).getByText(/only way into this account/i).dataset.case,
+      ).toBe("only-password");
+    });
+
+    /** @scenario An account with more than one way in is told nothing */
+    it("says nothing at all once a second way in exists", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+        MFA_ENROLLMENT_OPEN: true,
+      };
+      linkedAccountsRef.current = [
+        {
+          id: "acc-password",
+          provider: "credential",
+          providerAccountId: "user@example.com",
+        },
+        {
+          id: "acc-google",
+          provider: "google",
+          providerAccountId: "google-id",
+        },
+      ];
+      renderPage();
+
+      expect(screen.queryByTestId("last-way-in-notice")).toBeNull();
+    });
+  });
+
   describe("when NEXTAUTH_PROVIDER is auth0 with an Email/Password (auth0 db) identity", () => {
     /** @scenario Auth0 user with a database identity sees the Change Password link in their linked sign-in row */
     it("does not render the form by default — only a Change Password button next to the linked identity", () => {

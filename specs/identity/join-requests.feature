@@ -217,7 +217,7 @@ Feature: Join requests - asking to join the organization your colleagues already
   # An empty panel is not the same as a panel that failed to load, and from
   # the browser they look identical. A tab somebody opened on purpose owes
   # them a sentence either way.
-  @integration @unimplemented
+  @integration
   Scenario: An empty request list says it is empty
     Given "acme" has nobody waiting to join
     When "ana" opens the members area
