@@ -172,16 +172,48 @@ func Exclude(criteria Criteria) Filter {
 // verb: a case-insensitive or word-boundary match also swallows ordinary user
 // span names such as "post-process" or "get-user-profile"
 // ((?i)^post\b matches them), silently dropping them from exports.
-var httpVerbRegex = regexp.MustCompile(`^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)(?: |$)`)
+var httpVerbRegex = regexp.MustCompile(`^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE)(?: |$)`)
+
+// httpInstrumentationScopes contains the scope names of the OpenTelemetry Go
+// HTTP instrumentations. Only fully qualified package scopes count: an
+// application is free to name its own instrumentation "http", and such spans
+// are user data.
+var httpInstrumentationScopes = map[string]struct{}{
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp": {},
+}
+
+// isHTTPRequestSpan reports whether the span is an HTTP instrumentation span.
+//
+// The exact signals come first: the emitting instrumentation scope, or the
+// semantic-convention method attribute ("http.request.method", or the legacy
+// "http.method"). Only when neither is present does the name heuristic apply,
+// and it matches only the shape OpenTelemetry's HTTP instrumentations
+// actually emit — an uppercase verb alone or followed by a space. User spans
+// like "post-publish-smoke" or "get-user-profile" never match it.
+func isHTTPRequestSpan(span sdktrace.ReadOnlySpan) bool {
+	if _, ok := httpInstrumentationScopes[span.InstrumentationScope().Name]; ok {
+		return true
+	}
+
+	for _, attr := range span.Attributes() {
+		if attr.Key == "http.request.method" || attr.Key == "http.method" {
+			return true
+		}
+	}
+
+	return httpVerbRegex.MatchString(span.Name())
+}
 
 // ExcludeHTTPRequests creates a filter that removes HTTP request spans.
-// This matches spans whose names are an uppercase HTTP verb, optionally
-// followed by a route ("GET", "POST /api/users").
+// Spans are identified as HTTP requests by the HTTP instrumentation scope
+// that emitted them, or by the "http.request.method" / "http.method"
+// attribute, falling back to an uppercase-verb span name — mirroring the
+// TypeScript SDK's preset so both SDKs behave the same way.
 func ExcludeHTTPRequests() Filter {
 	return FilterFunc(func(spans []sdktrace.ReadOnlySpan) []sdktrace.ReadOnlySpan {
 		result := make([]sdktrace.ReadOnlySpan, 0, len(spans))
 		for _, span := range spans {
-			if !httpVerbRegex.MatchString(span.Name()) {
+			if !isHTTPRequestSpan(span) {
 				result = append(result, span)
 			}
 		}

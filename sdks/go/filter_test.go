@@ -6,6 +6,7 @@ import (
 
 	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -205,6 +206,69 @@ func TestExcludeHTTPRequests_KeepsLowercaseVerbNames(t *testing.T) {
 	result := filter.Apply(spans)
 
 	assert.Len(t, result, 2)
+}
+
+func TestExcludeHTTPRequests_ExcludesByInstrumentationScope(t *testing.T) {
+	filter := ExcludeHTTPRequests()
+
+	spans := []sdktrace.ReadOnlySpan{
+		// Fully qualified otelhttp scope: excluded whatever its name says.
+		testutil.CreateMockSpan("totally-not-http", "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"),
+		// An application naming its own scope "http" is user data.
+		testutil.CreateMockSpan("fetch-user-profile", "http"),
+	}
+
+	result := filter.Apply(spans)
+
+	assert.Len(t, result, 1)
+	assert.Equal(t, "fetch-user-profile", result[0].Name())
+}
+
+func TestExcludeHTTPRequests_ExcludesByMethodAttribute(t *testing.T) {
+	filter := ExcludeHTTPRequests()
+
+	spans := []sdktrace.ReadOnlySpan{
+		testutil.CreateMockSpanWithAttributes("custom-name", "my-scope",
+			attribute.String("http.request.method", "POST")),
+		testutil.CreateMockSpanWithAttributes("custom-name", "my-scope",
+			attribute.String("http.method", "GET")),
+		testutil.CreateMockSpanWithAttributes("custom-name", "my-scope",
+			attribute.String("db.system", "postgresql")),
+	}
+
+	result := filter.Apply(spans)
+
+	assert.Len(t, result, 1)
+	assert.Equal(t, "custom-name", result[0].Name())
+}
+
+func TestExcludeHTTPRequests_NameFallbackMatchesOnlyUppercaseVerbShape(t *testing.T) {
+	filter := ExcludeHTTPRequests()
+
+	spans := []sdktrace.ReadOnlySpan{
+		// Emitted shapes: uppercase verb alone or followed by a space.
+		testutil.CreateMockSpan("POST", "my-scope"),
+		testutil.CreateMockSpan("POST /v1/traces", "my-scope"),
+		testutil.CreateMockSpan("TRACE /health", "my-scope"),
+		testutil.CreateMockSpan("CONNECT proxy.example:443", "my-scope"),
+		// Lookalikes the application chose: kept.
+		testutil.CreateMockSpan("post /v1/traces", "my-scope"),
+		testutil.CreateMockSpan("GETAWAY", "custom"),
+		testutil.CreateMockSpan("postgres-query", "db"),
+		testutil.CreateMockSpan("GETTING", "http"),
+	}
+
+	result := filter.Apply(spans)
+
+	assert.Len(t, result, 4)
+	names := make([]string, len(result))
+	for i, s := range result {
+		names[i] = s.Name()
+	}
+	assert.Contains(t, names, "post /v1/traces")
+	assert.Contains(t, names, "GETAWAY")
+	assert.Contains(t, names, "postgres-query")
+	assert.Contains(t, names, "GETTING")
 }
 
 func TestLangWatchOnly(t *testing.T) {
