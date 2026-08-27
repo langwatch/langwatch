@@ -16,29 +16,6 @@ export function newMfaEnrollmentId(): string {
   return generate("mfaenr").toString();
 }
 
-/** A live ceremony's command id: a setup, a confirmation, a disable. */
-function newMfaCommandId(): string {
-  return generate("mfacmd").toString();
-}
-
-/**
- * The command id an EXPIRY wake dispatches with.
- *
- * Derived from the enrollment and the deadline it was scheduled for, so a
- * wake redelivered by a lagged worker derives byte-identical idempotency keys
- * and the event store dedupes it. A wake that fires twice must cost one
- * event.
- */
-function expireMfaEnrollmentCommandId({
-  enrollmentId,
-  scheduledFor,
-}: {
-  enrollmentId: string;
-  scheduledFor: number;
-}): string {
-  return `mfa-expire:${enrollmentId}:${scheduledFor}`;
-}
-
 /**
  * The command id a CEREMONY dispatches with.
  *

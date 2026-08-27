@@ -115,7 +115,18 @@ export async function issuersForRequest(
   return only === null ? [] : [only];
 }
 
-/** One connection's issuer, cached with the rest. */
+/**
+ * One connection's issuer, read fresh.
+ *
+ * NOT cached with the rest, and the comment used to say it was. This is the
+ * common path — every `/sso/callback/:providerId` and SAML ACS names a
+ * connection — so it is the read that most looked like it was collapsed by
+ * the five-second window above and never was. Left uncached deliberately
+ * rather than fixed silently: a connection registered a moment ago has to be
+ * dialable immediately, and one row by unique key is a cheap query. The
+ * module docstring's claim about collapsing bursts is about
+ * `registeredIssuers()`, which fans out over every row.
+ */
 async function issuerForConnection(
   connectionId: string,
 ): Promise<string | null> {

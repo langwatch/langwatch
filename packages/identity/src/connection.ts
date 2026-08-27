@@ -1388,15 +1388,6 @@ export function lapsedDomains(state: SsoConnectionState): string[] {
     .map((entry) => entry.domain);
 }
 
-/** The domains whose evidence is missing and whose grace has not run out —
- *  the ones an administrator has been emailed about and can still fix at no
- *  cost at all. */
-function waveringDomains(state: SsoConnectionState): string[] {
-  return state.domainVerifications
-    .filter((entry) => entry.proofState === "WAVERING")
-    .map((entry) => entry.domain);
-}
-
 /**
  * Whether the ceremony in flight has passed its expiry. An expired record
  * proves nothing — the guard refuses to read it as a proof — and nothing

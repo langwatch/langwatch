@@ -7,11 +7,11 @@ import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
 
+const logger = createLogger("langwatch:identity:resolution");
+
 /** Only a proven address signs anyone in. An ATTACHED identifier is one the
  *  user has claimed and not yet verified, and D01's collision guard lets it
  *  block nobody — so it resolves nobody either. */
-const logger = createLogger("langwatch:identity:resolution");
-
 const RESOLVABLE_STATES = ["VERIFIED", "PRIMARY"] as const;
 
 interface ResolutionRow {

@@ -307,6 +307,15 @@ export type CompleteTeardownCommandData = z.infer<
   typeof completeTeardownCommandDataSchema
 >;
 
+/** Who this connection admits, restated (ADR-117 §3). One field, decided by
+ *  the organization and revisited without re-registering anything. */
+export const setArrivalPolicyCommandDataSchema = commandDataSchema({
+  policy: ssoArrivalPolicySchema,
+});
+export type SetArrivalPolicyCommandData = z.infer<
+  typeof setArrivalPolicyCommandDataSchema
+>;
+
 /**
  * What the legacy strings imply, as one command. The whole history —
  * registered, claimed, approved, verified, activated — is stated in a single
@@ -317,13 +326,6 @@ export type CompleteTeardownCommandData = z.infer<
  * `source` is fixed rather than defaulted here: nothing else may state a
  * grandfathered fact, and nothing grandfathered may be stated any other way.
  */
-export const setArrivalPolicyCommandDataSchema = commandDataSchema({
-  policy: ssoArrivalPolicySchema,
-});
-export type SetArrivalPolicyCommandData = z.infer<
-  typeof setArrivalPolicyCommandDataSchema
->;
-
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,

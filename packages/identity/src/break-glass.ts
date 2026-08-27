@@ -132,22 +132,3 @@ export function breakGlassWarningsDue({
   );
 }
 
-/**
- * When the sweep next has something to say about this binding, or null when
- * it has nothing left: every warning sent, or the binding already over.
- */
-function breakGlassNextWarningAtMs({
-  binding,
-  nowMs,
-}: {
-  binding: BreakGlassBinding;
-  nowMs: number;
-}): number | null {
-  if (!breakGlassIsLive({ binding, nowMs })) return null;
-  const sent = new Set(binding.warnedDays);
-  const upcoming = BREAK_GLASS_WARNING_DAYS.filter((day) => !sent.has(day)).map(
-    (day) => binding.expiresAtMs - day * DAY_MS,
-  );
-  if (upcoming.length === 0) return null;
-  return Math.max(nowMs, Math.min(...upcoming));
-}
