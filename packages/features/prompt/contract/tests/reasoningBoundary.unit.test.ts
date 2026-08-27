@@ -17,37 +17,6 @@ import {
   normalizeReasoningFromProviderFields,
 } from "@langwatch/prompt-contract";
 
-// Mock the model registry
-vi.mock("../../modelProviders/registry", () => ({
-  getModelById: vi.fn((modelId: string) => {
-    // Return mock model data based on modelId
-    // Note: Model registry still uses provider-specific names for UI clarity
-    // Translation to reasoning_effort happens in mapReasoningToProvider
-    const models: Record<string, { reasoningConfig?: { parameterName: string } }> = {
-      "openai/gpt-5": {
-        reasoningConfig: { parameterName: "reasoning_effort" },
-      },
-      "gemini/gemini-3-flash": {
-        reasoningConfig: { parameterName: "thinkingLevel" },
-      },
-      "anthropic/claude-opus-4": {
-        reasoningConfig: { parameterName: "effort" },
-      },
-      "gemini/gemini-2.5-pro": {
-        reasoningConfig: { parameterName: "thinkingLevel" },
-      },
-      "anthropic/claude-opus-4.5": {
-        reasoningConfig: { parameterName: "effort" },
-      },
-      "custom/model-with-custom-param": {
-        reasoningConfig: { parameterName: "custom_reasoning" },
-      },
-      "openai/gpt-4.1": {}, // No reasoning config
-    };
-    return models[modelId];
-  }),
-}));
-
 // Mock the provider helper - matches real behavior in modelProviderHelpers.ts
 vi.mock("../../../utils/modelProviderHelpers", () => ({
   getProviderFromModel: vi.fn((model: string) => {
