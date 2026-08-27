@@ -98,9 +98,8 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
-4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
-5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
+3. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
+4. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
 If you need an unwired adapter, file an issue tagged `governance/ingestion/adapter-roadmap` and we'll sequence accordingly.
 

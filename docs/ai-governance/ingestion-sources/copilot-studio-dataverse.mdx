@@ -6,10 +6,9 @@ sidebarTitle: Microsoft Copilot Studio
 
 <Info>**Replaces:** the retired `copilot_studio` source, which polled Microsoft's directory audit, a log that records directory changes and has never contained a conversation. See [the retired source](/ai-governance/ingestion-sources/copilot-studio) for context.</Info>
 
-`copilot_studio_dataverse` reads conversations directly from the transcript
-table that Copilot Studio agents write to in Dataverse. Each conversation
-becomes a trace with question/answer turns, tool calls, and attribution to
-the person who asked.
+The source type is `copilot_studio_dataverse`. It connects to one Power
+Platform environment and queries the `conversationtranscripts` table on a
+15-minute cadence. No Microsoft Graph or directory permission is involved.
 
 ## What it reads
 
@@ -20,7 +19,7 @@ The puller queries two Dataverse tables per run:
 | `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
 | `bots` | Agent names, so conversations show which agent answered |
 
-Conversations arrive as one trace per conversation, with:
+Each conversation produces one trace, with:
 - Each user question paired with the agent's answer as a turn
 - Tool calls the agent made, including unfinished ones
 - The person's directory account identifier on each question
@@ -77,7 +76,7 @@ skips or re-reads a row. Default cadence is every 15 minutes.
 
 ## What shows up
 
-Each conversation trace carries:
+Each conversation trace includes these attributes:
 
 - `copilot_studio.agent_name`: the agent that answered
 - `copilot_studio.agent_changed_since`: `true` when the agent was edited after the conversation

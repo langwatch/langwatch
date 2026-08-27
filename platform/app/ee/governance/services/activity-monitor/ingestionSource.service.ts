@@ -604,7 +604,10 @@ export class IngestionSourceService {
     // The @@unique([organizationId, name]) constraint spans all rows
     // including archived ones. If an archived source holds the name,
     // rename it so the new source can take it.
-    await this.freeArchivedName(input.organizationId, input.name);
+    await this.freeArchivedName({
+      organizationId: input.organizationId,
+      name: input.name,
+    });
 
     const source = await this.prisma.ingestionSource.create({
       data: {
@@ -639,8 +642,11 @@ export class IngestionSourceService {
     // lives out here because the guard only runs on the parserConfig path
     // while the write is shared by every path.
     let cursorMustNotMove = false;
-    if (input.name !== undefined) {
-      await this.freeArchivedName(input.organizationId, input.name);
+    if (input.name !== undefined && input.name !== existing.name) {
+      await this.freeArchivedName({
+        organizationId: input.organizationId,
+        name: input.name,
+      });
       data.name = input.name;
     }
     if (input.description !== undefined) data.description = input.description;
@@ -849,10 +855,13 @@ export class IngestionSourceService {
    * a new source to take the name. No-op when no collision exists or
    * the colliding source is still active.
    */
-  private async freeArchivedName(
-    organizationId: string,
-    name: string,
-  ): Promise<void> {
+  private async freeArchivedName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<void> {
     const collider = await this.prisma.ingestionSource.findUnique({
       where: {
         organizationId_name: { organizationId, name },

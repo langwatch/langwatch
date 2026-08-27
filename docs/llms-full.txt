@@ -16811,10 +16811,9 @@ sidebarTitle: Microsoft Copilot Studio
 
 <Info>**Replaces:** the retired `copilot_studio` source, which polled Microsoft's directory audit, a log that records directory changes and has never contained a conversation. See [the retired source](/ai-governance/ingestion-sources/copilot-studio) for context.</Info>
 
-`copilot_studio_dataverse` reads conversations directly from the transcript
-table that Copilot Studio agents write to in Dataverse. Each conversation
-becomes a trace with question/answer turns, tool calls, and attribution to
-the person who asked.
+The source type is `copilot_studio_dataverse`. It connects to one Power
+Platform environment and queries the `conversationtranscripts` table on a
+15-minute cadence. No Microsoft Graph or directory permission is involved.
 
 ## What it reads
 
@@ -16825,7 +16824,7 @@ The puller queries two Dataverse tables per run:
 | `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
 | `bots` | Agent names, so conversations show which agent answered |
 
-Conversations arrive as one trace per conversation, with:
+Each conversation produces one trace, with:
 - Each user question paired with the agent's answer as a turn
 - Tool calls the agent made, including unfinished ones
 - The person's directory account identifier on each question
@@ -16882,7 +16881,7 @@ skips or re-reads a row. Default cadence is every 15 minutes.
 
 ## What shows up
 
-Each conversation trace carries:
+Each conversation trace includes these attributes:
 
 - `copilot_studio.agent_name`: the agent that answered
 - `copilot_studio.agent_changed_since`: `true` when the agent was edited after the conversation
@@ -16928,7 +16927,7 @@ See [Microsoft Copilot Studio (Dataverse)](/ai-governance/ingestion-sources/copi
 
 The `copilot_studio` source type was created as a setup contract for a planned
 Purview Audit poller. The poller was never built because the underlying API
-(`graph.microsoft.com/v1.0/auditLogs/directoryAudits`) does not carry
+(`graph.microsoft.com/v1.0/auditLogs/directoryAudits`) does not contain
 conversation data, only directory-level changes like admin consent grants and
 app registrations.
 
@@ -17055,9 +17054,8 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
-4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
-5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
+3. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
+4. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
 If you need an unwired adapter, file an issue tagged `governance/ingestion/adapter-roadmap` and we'll sequence accordingly.
 
