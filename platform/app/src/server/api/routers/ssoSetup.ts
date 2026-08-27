@@ -51,13 +51,18 @@ async function audited({
   action,
   args,
 }: {
-  ctx: { session: { user: { id: string } } };
+  ctx: {
+    session: { user: { id: string; impersonator?: { id: string } | null } };
+  };
   action: string;
   args: Record<string, unknown>;
 }): Promise<{ userId: string }> {
   const userId = ctx.session.user.id;
   await auditLog({
     userId,
+    // Under an impersonation `user.id` is the customer whose access is being
+    // borrowed, so without this the operator's act is filed against them.
+    actorUserId: ctx.session.user.impersonator?.id ?? null,
     action: `ssoSetup.${action}`,
     args,
     targetKind: "ssoConnection",

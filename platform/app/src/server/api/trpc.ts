@@ -498,10 +498,12 @@ const auditLogTRPCErrors = t.middleware(
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
-        // impersonated user (correct for RBAC attribution). We stamp the
-        // real admin's identity in metadata so security forensics can
-        // filter on `metadata.impersonatorId` to find actions that were
-        // actually performed by an admin.
+        // impersonated user (correct for RBAC attribution) and this is the
+        // human who actually did it. A COLUMN rather than only metadata:
+        // "what did this operator do" is the question an incident asks, and
+        // answering it by scanning JSON is how it stops being asked.
+        // `metadata.impersonatorId` stays for readers written against it.
+        actorUserId: ctx.session.user.impersonator?.id ?? null,
         metadata: ctx.session.user.impersonator
           ? { impersonatorId: ctx.session.user.impersonator.id }
           : undefined,
@@ -749,9 +751,10 @@ const auditLogMutations = t.middleware(
       req: ctx.req,
       targetKind: target.targetKind,
       targetId: target.targetId,
-      // Stamp the real admin id when the action is happening during
-      // impersonation. `userId` above is the impersonated target (the
-      // RBAC actor); metadata.impersonatorId is the human performing it.
+      // The real admin when the action happens under an impersonation.
+      // `userId` above is the impersonated target (the RBAC actor); this is
+      // the human performing it, in a column an incident can filter on.
+      actorUserId: ctx.session.user.impersonator?.id ?? null,
       metadata: ctx.session.user.impersonator
         ? { impersonatorId: ctx.session.user.impersonator.id }
         : undefined,
