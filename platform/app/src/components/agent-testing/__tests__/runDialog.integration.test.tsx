@@ -25,8 +25,7 @@ import { RunDialog, type RunDialogSubject } from "../run/RunDialog";
 import { LOCKED_IN_ROWS_MESSAGE } from "../run/RunParametersSection";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
-const mockSuitesRun = vi.hoisted(() => vi.fn());
-const mockSuitesRunAll = vi.hoisted(() => vi.fn());
+const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
 const mockSuitesUpdate = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
@@ -35,6 +34,8 @@ const mockAgentsGetAll = vi.hoisted(() => vi.fn());
 const mockPromptsGetAll = vi.hoisted(() => vi.fn());
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockSuitesGetAll = vi.hoisted(() => vi.fn());
+const mockSuitesCreate = vi.hoisted(() => vi.fn());
 const mockHasProviders = vi.hoisted(() => ({ value: true }));
 
 const emptyQuery = vi.hoisted(() => () => ({
@@ -73,18 +74,23 @@ vi.mock("~/utils/api", () => ({
         archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
       getSummaries: { useQuery: emptyQuery },
+      getAll: { useQuery: mockSuitesGetAll },
+      getById: { useQuery: emptyQuery },
+      create: {
+        useMutation: () => ({
+          mutateAsync: mockSuitesCreate,
+          isPending: false,
+        }),
+      },
       update: {
         useMutation: () => ({
           mutateAsync: mockSuitesUpdate,
           isPending: false,
         }),
       },
-      run: {
-        useMutation: () => ({ mutateAsync: mockSuitesRun, isPending: false }),
-      },
-      runAll: {
+      runPlan: {
         useMutation: () => ({
-          mutateAsync: mockSuitesRunAll,
+          mutateAsync: mockSuitesRunPlan,
           isPending: false,
         }),
       },
@@ -252,10 +258,13 @@ describe("<RunDialog/>", () => {
       isLoading: false,
     });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
-    mockSuitesRun.mockResolvedValue({ batchRunId: "batch_new", jobCount: 1 });
-    mockSuitesRunAll.mockResolvedValue({
-      batchRunId: "batch_all",
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
       jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      created: true,
     });
     mockSuitesUpdate.mockResolvedValue({});
   });
@@ -329,7 +338,9 @@ describe("<RunDialog/>", () => {
   /** @scenario "A run with no target selected is refused" */
   it("keeps the dialog open and says a target is needed when the run is refused", async () => {
     const user = userEvent.setup();
-    mockSuitesRun.mockRejectedValue(handledRejection("suite_targets_required"));
+    mockSuitesRunPlan.mockRejectedValue(
+      handledRejection("suite_targets_required"),
+    );
     const { onClose } = renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("run-dialog-run"));
@@ -338,7 +349,7 @@ describe("<RunDialog/>", () => {
     expect(error).toHaveTextContent("Choose an agent to run against");
     expect(onClose).not.toHaveBeenCalled();
     // The refusal happened before anything was queued.
-    expect(mockSuitesRun).toHaveBeenCalledTimes(1);
+    expect(mockSuitesRunPlan).toHaveBeenCalledTimes(1);
     expect(mockRunScenario).not.toHaveBeenCalled();
   });
 
@@ -373,8 +384,10 @@ describe("<RunDialog/>", () => {
     expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({ note: undefined });
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+      note: undefined,
+    });
   });
 
   /** @scenario "The override parameters chip adds one input line for the values" */
@@ -438,8 +451,8 @@ describe("<RunDialog/>", () => {
     await user.type(line, "model=gpt-5, locale=de");
 
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5", locale: "de" },
     });
   });
@@ -560,15 +573,15 @@ describe("<RunDialog/>", () => {
     await user.type(screen.getByTestId("run-dialog-parameter-value-1"), "de");
 
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5", locale: "de" },
     });
 
     await user.click(screen.getByTestId("run-dialog-parameter-remove-1"));
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalledTimes(2));
-    expect(mockSuitesRun.mock.calls[1]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalledTimes(2));
+    expect(mockSuitesRunPlan.mock.calls[1]![0]).toMatchObject({
       parameters: { model: "gpt-5" },
     });
   });
@@ -603,8 +616,8 @@ describe("<RunDialog/>", () => {
     expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
 
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5", api_token: "tok-1" },
     });
   });
@@ -653,14 +666,14 @@ describe("<RunDialog/>", () => {
     expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
 
     await user.click(screen.getByTestId("run-dialog-run"));
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5-mini", api_token: "sk-live-1" },
     });
   });
 
-  /** @scenario "The prompt chip is the last chip of the row" */
-  it("offers the prompt chip last in the row", () => {
+  /** @scenario "The chips read in one fixed order" */
+  it("reads the chips in one fixed order", () => {
     mockPromptsGetAll.mockReturnValue({
       data: [{ id: "prompt_1", handle: "refund-prompt", version: 3 }],
     });
@@ -669,13 +682,17 @@ describe("<RunDialog/>", () => {
     );
     renderDialog(suiteSubject());
 
+    // Every chip carries a plus icon, so the label alone is what is read.
     const chips = within(screen.getByTestId("customize-run-chips"))
       .getAllByRole("button")
-      .map((chip) => chip.getAttribute("data-testid"));
+      .map((chip) => chip.textContent);
     expect(chips).toEqual([
-      "customize-chip-note",
-      "customize-chip-params",
-      "customize-chip-prompt",
+      "Add parameters",
+      "Compare agents",
+      "Add a note",
+      "Run against a prompt",
+      "Custom simulation models",
+      "Run multiple times",
     ]);
   });
 
@@ -729,32 +746,43 @@ describe("<RunDialog/>", () => {
 
   // --- Starting the run ---
 
-  /** @scenario "The dialog has Cancel, Save and Run, with no dropdown on Run" */
-  it("holds Cancel, Save and Run, and Run carries no dropdown", () => {
+  /** @scenario "The dialog has Cancel and Run, with no dropdown on Run" */
+  it("holds Cancel and Run, and Run carries no dropdown", () => {
     renderDialog(suiteSubject({ scenarioIds: ["case_1", "case_2"] }));
 
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    // Running is what writes the plan down, so there is nothing to save.
+    expect(
+      screen.queryByRole("button", { name: "Save" }),
+    ).not.toBeInTheDocument();
     const run = screen.getByTestId("run-dialog-run");
     expect(run).toHaveTextContent("Run 2 scenarios");
     expect(run).not.toHaveAttribute("aria-haspopup");
+    // The count reads on Run alone: the footer states it nowhere else.
+    expect(screen.getAllByText(/2 scenarios/)).toHaveLength(1);
   });
 
   /** @scenario "Confirming a run remembers the target for next time" */
-  /** @scenario "The target chosen for a folder run is offered again next time" */
-  it("writes the chosen target onto the suite so the next run preselects it", async () => {
+  /** @scenario "The run carries the name the dialog holds" */
+  it("sends the name and the whole configuration, and writes no test suite", async () => {
     const user = userEvent.setup();
     const { onRunStarted } = renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
     await user.click(screen.getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesUpdate).toHaveBeenCalledWith({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       projectId: "proj_1",
-      id: "suite_refunds",
-      targets: [{ type: "http", referenceId: "agent_1" }],
+      name: "Refunds prod-agent",
+      config: {
+        scope: { mode: "folders", folderIds: ["suite_refunds"] },
+        targets: [{ type: "http", referenceId: "agent_1" }],
+        repeatCount: 1,
+      },
     });
+    // A test suite is only a grouping: no run option is written onto it.
+    expect(mockSuitesUpdate).not.toHaveBeenCalled();
     expect(onRunStarted).toHaveBeenCalled();
   });
 
@@ -806,7 +834,7 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "The run options are remembered for the whole team" */
-  it("writes the target and the overrides onto the suite, where everyone reads them", async () => {
+  it("sends the target and the overrides with the run, where the plan keeps them", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue(
       casesDeclaring([{ name: "model", defaultValue: "gpt-5-mini" }]),
@@ -820,17 +848,17 @@ describe("<RunDialog/>", () => {
     await user.type(line, "model=gpt-5");
     await user.click(screen.getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesUpdate).toHaveBeenCalledWith({
-      projectId: "proj_1",
-      id: "suite_refunds",
-      targets: [
-        {
-          type: "http",
-          referenceId: "agent_1",
-          runParameters: { model: "gpt-5" },
-        },
-      ],
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+      config: {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { model: "gpt-5" },
+          },
+        ],
+      },
     });
   });
 
@@ -848,7 +876,7 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "A secret parameter value is never remembered" */
-  it("keeps the secret out of what the suite remembers", async () => {
+  it("keeps the secret out of what the plan remembers", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue(
       casesDeclaring([
@@ -866,21 +894,19 @@ describe("<RunDialog/>", () => {
     );
     await user.click(screen.getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    // The run carries the secret; the suite is only told the plain rows.
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    // The run carries the secret; the plan is only told the plain rows.
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { api_key: "sk-live-1" },
-    });
-    expect(mockSuitesUpdate).toHaveBeenCalledWith({
-      projectId: "proj_1",
-      id: "suite_refunds",
-      targets: [
-        {
-          type: "http",
-          referenceId: "agent_1",
-          runParameters: { model: "gpt-5-mini" },
-        },
-      ],
+      config: {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ],
+      },
     });
   });
 
@@ -907,22 +933,22 @@ describe("<RunDialog/>", () => {
     );
     await user.click(screen.getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesUpdate).toHaveBeenCalledWith({
-      projectId: "proj_1",
-      id: "suite_refunds",
-      targets: [
-        {
-          type: "http",
-          referenceId: "agent_1",
-          runParameters: { model: "gpt-5" },
-          runSecretParameterNames: ["api_token"],
-        },
-      ],
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+      config: {
+        targets: [
+          {
+            type: "http",
+            referenceId: "agent_1",
+            runParameters: { model: "gpt-5" },
+            runSecretParameterNames: ["api_token"],
+          },
+        ],
+      },
     });
-    expect(JSON.stringify(mockSuitesUpdate.mock.calls[0]![0])).not.toContain(
-      "tok-1",
-    );
+    expect(
+      JSON.stringify(mockSuitesRunPlan.mock.calls[0]![0]!.config),
+    ).not.toContain("tok-1");
   });
 
   /** @scenario "A secret row is remembered by its key alone" */
@@ -991,8 +1017,8 @@ describe("<RunDialog/>", () => {
     );
     await user.click(screen.getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       note: "switched judge to the stricter criterion",
     });
   });
@@ -1016,7 +1042,7 @@ describe("<RunDialog/>", () => {
     // brighten it, so a click cannot even reach the button. The disabled
     // attribute is the assertion the run cannot start; the never-called
     // mutation confirms it.
-    expect(mockSuitesRun).not.toHaveBeenCalled();
+    expect(mockSuitesRunPlan).not.toHaveBeenCalled();
   });
 
   // --- Failure paths ---
@@ -1024,7 +1050,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "A parameter value the cases do not declare is refused by name" */
   it("names the unknown parameter and the declared ones in the refusal", async () => {
     const user = userEvent.setup();
-    mockSuitesRun.mockRejectedValue(
+    mockSuitesRunPlan.mockRejectedValue(
       handledRejection("scenario_parameter_unknown", {
         unknownKeys: ["modle"],
         declaredNames: ["model"],
@@ -1047,7 +1073,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "A run refused because every case is archived says so in the dialog" */
   it("says there is nothing left to run when every case is archived", async () => {
     const user = userEvent.setup();
-    mockSuitesRun.mockRejectedValue(
+    mockSuitesRunPlan.mockRejectedValue(
       handledRejection("suite_all_scenarios_archived"),
     );
     const { onClose } = renderDialog(
@@ -1103,7 +1129,13 @@ describe("run entries on the Scenarios tab", () => {
       ],
       isLoading: false,
     });
-    mockSuitesRun.mockResolvedValue({ batchRunId: "batch_new", jobCount: 1 });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      created: true,
+    });
   });
 
   afterEach(cleanup);
@@ -1111,22 +1143,6 @@ describe("run entries on the Scenarios tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
-    // Loose so the row reads at the root of the All scenarios surface.
-    mockScenariosGetAll.mockReturnValue({
-      data: [
-        {
-          id: "case_1",
-          name: "Double charge",
-          labels: [],
-          folderId: null,
-          parameters: null,
-          createdAt: new Date("2026-07-06T12:00:00.000Z"),
-          lastUpdatedById: null,
-          version: 1,
-        },
-      ],
-      isLoading: false,
-    });
     render(<TestCasesTab />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
@@ -1152,7 +1168,7 @@ describe("run entries on the Scenarios tab", () => {
     await user.click(within(dialog).getByTestId("run-dialog-agent-agent_1"));
     await user.click(within(dialog).getByTestId("run-dialog-run"));
 
-    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
     // No navigation: the placeholder is what announces the run. The runs rail
     // renders it from this same store value (see the run plan detail tests).
     expect(mockRouterPush).not.toHaveBeenCalled();

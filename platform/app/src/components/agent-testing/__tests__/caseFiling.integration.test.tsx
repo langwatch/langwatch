@@ -29,7 +29,7 @@ const mockFoldersGetAll = vi.hoisted(() => vi.fn());
 const mockLastResults = vi.hoisted(() => vi.fn());
 const mockArchiveScenario = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
-const mockRunAll = vi.hoisted(() => vi.fn());
+const mockRunPlan = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockAgentsGetAll = vi.hoisted(() =>
   vi.fn(() => ({
@@ -88,7 +88,7 @@ vi.mock("~/utils/api", () => ({
       create: { useMutation: mutation(vi.fn()) },
       update: { useMutation: mutation(vi.fn()) },
       run: { useMutation: mutation(vi.fn()) },
-      runAll: { useMutation: mutation(mockRunAll) },
+      runPlan: { useMutation: mutation(mockRunPlan) },
     },
     organization: {
       getOrganizationWithMembersAndTheirTeams: { useQuery: emptyQuery },

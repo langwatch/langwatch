@@ -33,8 +33,11 @@ export type {
   RunStartedInfo,
 } from "./run-dialog-types";
 
-function subjectTitle(subject: RunDialogSubject): string {
-  return subject.kind === "all" ? "All scenarios" : subject.name;
+/** What the dialog is called, given what it was opened on. */
+function dialogTitle(subject: RunDialogSubject): string {
+  if (subject.kind === "plan") return "New run plan";
+  if (subject.kind === "all") return "Run · All scenarios";
+  return `Run · ${subject.name}`;
 }
 
 /**
@@ -53,6 +56,7 @@ function isRunBlocked({
 }): boolean {
   if (controller.isBusy) return true;
   if (isNoteTooLong(form.note) || form.hasMissingSecrets) return true;
+  if (form.runName.trim() === "") return true;
   if (form.caseCount === 0) return true;
   if (form.target) return false;
   return subject?.kind === "case" || !controller.hasAnyTarget;
@@ -72,6 +76,8 @@ function runBlockedReason({
   controller: RunDialogController;
 }): string | null {
   if (controller.isBusy) return null;
+  // The name is what a run plan is, so a run cannot go out without one.
+  if (form.runName.trim() === "") return "Give the run a name.";
   if (form.caseCount === 0) {
     if (subject?.kind === "suite") {
       return "This test suite holds no scenario to run.";
@@ -94,6 +100,13 @@ export function RunDialog({
   const controller = useRunDialogSubmit({
     subject,
     target: form.target,
+    runName: form.runName,
+    runTargets: form.runTargets,
+    scope: form.runScope,
+    scopedScenarioIds: form.scopedScenarioIds,
+    repeatCount: form.repeatCount,
+    simulatorModel: form.simulatorModel,
+    judgeModel: form.judgeModel,
     note: form.note,
     runParameters: form.runParameters,
     storableRunParameters: form.storableRunParameters,
@@ -129,7 +142,7 @@ export function RunDialog({
           display="block"
         >
           <Dialog.Title fontSize="14px" fontWeight="semibold">
-            Run · {subjectTitle(subject)}
+            {dialogTitle(subject)}
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
@@ -143,7 +156,6 @@ export function RunDialog({
         </Dialog.Body>
         <RunDialogFooter
           controller={controller}
-          hasTarget={!!form.target}
           isRunBlocked={isRunBlocked({ subject, form, controller })}
           blockedReason={runBlockedReason({ subject, form, controller })}
           caseCount={form.caseCount}

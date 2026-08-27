@@ -5,15 +5,14 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { useCallback, useEffect } from "react";
-import type { SimulationSuite } from "~/generated/prisma/client";
+import { useEffect } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpenLiveRun } from "./cases/useOpenLiveRun";
-import { PLAN_EDITOR_DRAWER } from "./plan/usePlanEditor";
+import { useOpenNewRunPlan } from "./run/RunPlanDialogHost";
 import type { AgentTestingSelection } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
@@ -49,23 +48,14 @@ export function useHydrateViewFromUrl(): void {
   }, [router.isReady, viewParam, hydrateFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-/** Opens the run plan editor, and lands on the plan it saved. */
-export function useNewRunPlanFlow(
-  selectPlan: (planSlug: string | null) => void,
-): () => void {
-  const { openDrawer, setFlowCallbacks } = useDrawer();
-
-  const handleSuiteSaved = useCallback(
-    (suite: SimulationSuite) => {
-      selectPlan(suite.slug);
-    },
-    [selectPlan],
-  );
-
-  return useCallback(() => {
-    setFlowCallbacks(PLAN_EDITOR_DRAWER, { onSaved: handleSuiteSaved });
-    openDrawer(PLAN_EDITOR_DRAWER);
-  }, [openDrawer, setFlowCallbacks, handleSuiteSaved]);
+/**
+ * New run plan opens the run dialog with the scope still to be chosen.
+ *
+ * A run plan is a name and a configuration, and the run dialog is the only
+ * place either is chosen, so there is no separate editor to open.
+ */
+export function useNewRunPlanFlow(): () => void {
+  return useOpenNewRunPlan();
 }
 
 /**

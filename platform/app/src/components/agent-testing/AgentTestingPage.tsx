@@ -18,6 +18,7 @@ import { AgentTestingHeader } from "./AgentTestingHeader";
 import { AgentTestingCaseEditor } from "./cases/AgentTestingCaseEditor";
 import { TestCasesTab } from "./cases/TestCasesTab";
 import { ResultsTab } from "./results/ResultsTab";
+import { RunPlanDialogHost } from "./run/RunPlanDialogHost";
 import { useAgentTestingLiveUpdates } from "./useAgentTestingLiveUpdates";
 import { useHydrateViewFromUrl } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
@@ -39,9 +40,8 @@ function useTabCounts(projectId: string) {
 
 export function AgentTestingPage() {
   const { project } = useOrganizationTeamProject();
-  // The rows open a run's detail and the Test Runs list opens the run plan
-  // editor, two separate downloads. Fetch them while the person reads the page.
-  usePreloadDrawer("scenarioRunDetail", "agentTestingPlanEditor");
+  // The rows open a run's detail; fetch it while the person reads the page.
+  usePreloadDrawer("scenarioRunDetail");
 
   const routing = useAgentTestingRouting();
   useHydrateViewFromUrl();
@@ -71,6 +71,7 @@ export function AgentTestingPage() {
         </VStack>
 
         <AgentTestingCaseEditor />
+        <RunPlanDialogHost />
       </DashboardLayout>
     </NowProvider>
   );

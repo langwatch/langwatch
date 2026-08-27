@@ -1,6 +1,9 @@
 /**
- * The four ways a run starts: a one-off case, a stored test suite, every case
- * at once, and the choice between them.
+ * How a run starts.
+ *
+ * A one-off case runs through the scenario runner, which watches it start. The
+ * other three entry points all queue the same way: a name and a configuration
+ * go to the server, which resolves the name onto a run plan.
  *
  * A refusal the server can name reads inside the dialog. Only failures with
  * nothing structured to say fall back to a toast.
@@ -20,6 +23,7 @@ import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { useAgentTestingStore } from "../useAgentTestingStore";
+import { toSuiteScope } from "./run-configuration";
 import type { RunDialogSubmitInput, SuiteTargets } from "./useRunDialogSubmit";
 
 type RunAttempt = {
@@ -60,7 +64,6 @@ export type BatchRunInput = RunDialogSubmitInput & {
   projectId: string;
   suiteTargets: SuiteTargets;
   noteInput: string | undefined;
-  persistTargetChoice: () => Promise<void>;
   surfaceError: (error: unknown) => void;
 };
 
@@ -139,18 +142,39 @@ function useCaseRun(input: BatchRunInput) {
   return { runCase, isCaseRunning };
 }
 
-/** Queues the run of a saved test suite, after its target is written down. */
-function useQueueSuiteRun(input: BatchRunInput) {
-  const runSuite = api.suites.run.useMutation();
-  const { projectId, noteInput, runParameters } = input;
-  const { onRunStarted, persistTargetChoice } = input;
+/**
+ * Queues a run under the name the dialog holds.
+ *
+ * This is the one path every entry point but the one-off case takes: the
+ * server resolves the name, joins the plan of that name or creates one, writes
+ * the configuration onto it and runs it. Nothing is read off a test suite row,
+ * which is what keeps a suite a pure grouping.
+ */
+function useQueuePlanRun(input: BatchRunInput) {
+  const runPlan = api.suites.runPlan.useMutation();
+  const { projectId, target, noteInput, runParameters, suiteTargets } = input;
+  const { onRunStarted, runName, scope, scopedScenarioIds } = input;
+  const { repeatCount, simulatorModel, judgeModel } = input;
+  const setLastRunTarget = useAgentTestingStore(
+    (state) => state.setLastRunTarget,
+  );
 
-  const queueSuiteRun = useCallback(
-    async (suiteId: string, attempt: RunAttempt) => {
-      await persistTargetChoice();
-      const result = await runSuite.mutateAsync({
+  const queuePlanRun = useCallback(
+    async (attempt: RunAttempt) => {
+      if (target) setLastRunTarget(target);
+      const result = await runPlan.mutateAsync({
         projectId,
-        id: suiteId,
+        name: runName.trim(),
+        config: {
+          scope: toSuiteScope(scope),
+          // Only a hand-picked scope names its scenarios; every other one
+          // resolves against the project at run time.
+          ...(scope.mode === "cases" ? { scenarioIds: scopedScenarioIds } : {}),
+          targets: suiteTargets ?? [],
+          repeatCount,
+          simulatorModel,
+          judgeModel,
+        },
         idempotencyKey: attempt.idempotencyKey,
         batchRunId: attempt.batchRunId,
         note: noteInput,
@@ -158,57 +182,28 @@ function useQueueSuiteRun(input: BatchRunInput) {
       });
       onRunStarted({
         batchRunId: result.batchRunId ?? attempt.batchRunId,
-        scenarioSetId: getSuiteSetId(suiteId),
+        scenarioSetId: getSuiteSetId(result.suiteId),
       });
-    },
-    [
-      projectId,
-      noteInput,
-      runParameters,
-      onRunStarted,
-      persistTargetChoice,
-      runSuite,
-    ],
-  );
-
-  return { queueSuiteRun, isSuitePending: runSuite.isPending };
-}
-
-/** Queues a run of every scenario, targets and all, in one request. */
-function useQueueAllRun(input: BatchRunInput) {
-  const runAll = api.suites.runAll.useMutation();
-  const { projectId, target, suiteTargets, noteInput, runParameters } = input;
-  const { onRunStarted } = input;
-  const setLastRunTarget = useAgentTestingStore(
-    (state) => state.setLastRunTarget,
-  );
-
-  const queueAllRun = useCallback(
-    async (attempt: RunAttempt) => {
-      if (target) setLastRunTarget(target);
-      const result = await runAll.mutateAsync({
-        projectId,
-        idempotencyKey: attempt.idempotencyKey,
-        batchRunId: attempt.batchRunId,
-        targets: suiteTargets,
-        note: noteInput,
-        parameters: runParameters,
-      });
-      onRunStarted({ batchRunId: result.batchRunId ?? attempt.batchRunId });
     },
     [
       projectId,
       target,
+      runName,
+      scope,
+      scopedScenarioIds,
       suiteTargets,
+      repeatCount,
+      simulatorModel,
+      judgeModel,
       noteInput,
       runParameters,
       onRunStarted,
       setLastRunTarget,
-      runAll,
+      runPlan,
     ],
   );
 
-  return { queueAllRun, isAllPending: runAll.isPending };
+  return { queuePlanRun, isPlanPending: runPlan.isPending };
 }
 
 /** Starts the run the subject asks for, and holds the attempt behind it. */
@@ -217,15 +212,19 @@ export function useBatchRun(input: BatchRunInput) {
   const { setInlineError, setMissingProvider } = input;
   const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
   const { runCase, isCaseRunning } = useCaseRun(input);
-  const { queueSuiteRun, isSuitePending } = useQueueSuiteRun(input);
-  const { queueAllRun, isAllPending } = useQueueAllRun(input);
+  const { queuePlanRun, isPlanPending } = useQueuePlanRun(input);
   // One identity per attempt, not per click. The dialog stays open when the
   // call fails, and a request that timed out may already be accepted, so a
   // retry has to carry the same key or the server queues a second batch.
   // Editing the note, the parameters or the targets starts a new attempt.
   const attemptKey = JSON.stringify([
     subject,
+    input.runName,
+    input.scope,
     input.suiteTargets,
+    input.repeatCount,
+    input.simulatorModel,
+    input.judgeModel,
     input.noteInput,
     input.runParameters,
   ]);
@@ -240,11 +239,7 @@ export function useBatchRun(input: BatchRunInput) {
     }
     const attempt = takeRunAttempt(attemptKey);
     try {
-      if (subject.kind === "suite") {
-        await queueSuiteRun(subject.suiteId, attempt);
-      } else {
-        await queueAllRun(attempt);
-      }
+      await queuePlanRun(attempt);
       clearRunAttempt();
       onClose();
     } catch (error) {
@@ -257,17 +252,18 @@ export function useBatchRun(input: BatchRunInput) {
     runCase,
     takeRunAttempt,
     clearRunAttempt,
-    queueSuiteRun,
-    queueAllRun,
+    queuePlanRun,
     onClose,
     setInlineError,
     setMissingProvider,
     surfaceError,
   ]);
 
+  const isPending = isPlanPending;
+
   return {
     run,
-    isPending: isSuitePending || isAllPending,
-    isRunning: isSuitePending || isAllPending || isCaseRunning,
+    isPending,
+    isRunning: isPending || isCaseRunning,
   };
 }

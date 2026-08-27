@@ -75,10 +75,11 @@ vi.mock("~/utils/api", () => ({
     },
     suites: {
       folders: { getAll: { useQuery: mockFoldersGetAll } },
+      getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      runAll: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },

@@ -1,9 +1,10 @@
 /**
- * The three actions of the run dialog: leave it, write the target down, or
- * queue the run.
+ * The two actions of the run dialog: leave it, or queue the run.
  *
  * Only the run is solid: it is the one thing the dialog is open for, and it
- * names how many scenarios it starts.
+ * names how many scenarios it starts. A run plan is a name and a
+ * configuration, and running is what writes both down, so there is nothing to
+ * save on its own.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
@@ -24,14 +25,12 @@ export function runButtonLabel(caseCount: number | null): string {
 
 export function RunDialogFooter({
   controller,
-  hasTarget,
   isRunBlocked,
   caseCount,
   blockedReason,
   onClose,
 }: {
   controller: RunDialogController;
-  hasTarget: boolean;
   isRunBlocked: boolean;
   /** How many scenarios the run covers, or nothing when it is not known. */
   caseCount: number | null;
@@ -87,13 +86,6 @@ export function RunDialogFooter({
       >
         Cancel
       </chakra.button>
-      <SmallButton
-        disabled={!hasTarget || controller.isBusy}
-        loading={controller.isSaving}
-        onClick={() => void controller.save()}
-      >
-        Save
-      </SmallButton>
       {isRunBlocked && blockedReason ? (
         <Tooltip content={blockedReason}>
           {/* A disabled button never dispatches pointer events, which would

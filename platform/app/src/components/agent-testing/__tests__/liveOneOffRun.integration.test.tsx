@@ -106,7 +106,7 @@ vi.mock("~/utils/api", () => ({
       run: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
-      runAll: {
+      runPlan: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
     },

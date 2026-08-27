@@ -8,8 +8,15 @@
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type { SuiteTarget } from "~/server/suites/types";
 
-/** What the dialog is about to run. */
+/**
+ * What the dialog is about to run.
+ *
+ * The first three arms fix the scope, so the dialog says nothing about what
+ * runs. "plan" is the New run plan entry point, the one place the scope is
+ * still being chosen.
+ */
 export type RunDialogSubject =
+  | { kind: "plan"; initialTarget: TargetValue }
   | { kind: "all"; initialTarget: TargetValue }
   | {
       kind: "suite";

@@ -73,11 +73,18 @@ vi.mock("~/utils/api", () => ({
     },
     agents: { getAll: { useQuery: vi.fn(() => ({ data: [] })) } },
     suites: {
+      // The run dialog offers the previous configurations of a scope, which
+      // it reads from the run plans and the test suites of the project.
+      getAll: { useQuery: () => ({ data: [] }) },
+      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      create: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
       getById: { useQuery: mockGetSuiteById },
       run: {
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
-      runAll: {
+      runPlan: {
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
       update: {
@@ -550,8 +557,23 @@ describe("<RunPlanDetail/>", () => {
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
     expect(
-      within(sidebar).getByRole("button", { name: /Run plans/ }),
+      within(sidebar).getByRole("button", { name: /Results/ }),
     ).toBeInTheDocument();
+  });
+
+  /** @scenario "The runs sidebar holds only the back link and the run list" */
+  it("holds only the back link and the runs, never the name of the plan", () => {
+    renderDetail();
+
+    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    expect(
+      within(sidebar).getByRole("button", { name: /Results/ }),
+    ).toBeInTheDocument();
+    expect(within(sidebar).getByText("Run #3")).toBeInTheDocument();
+
+    // The plan name is the page title while the plan is open, so repeating it
+    // in the rail would say the same thing twice on one screen.
+    expect(within(sidebar).queryByText("Checkout")).not.toBeInTheDocument();
   });
 
   /** @scenario "The results header holds the run and the actions on one line" */
