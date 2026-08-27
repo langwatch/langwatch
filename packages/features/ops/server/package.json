@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
@@ -33,6 +34,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/feature-flag-server": "workspace:*",
     "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

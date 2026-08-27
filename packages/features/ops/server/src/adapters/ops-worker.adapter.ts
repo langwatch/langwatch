@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type {
-  AnomalyFeatureFlagConfig,
-  AnomalyFeatureFlagsPort,
-} from "../ports/anomaly-feature-flags.port";
 import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port";
 import {
   OpsWorkerPort,
@@ -34,8 +31,7 @@ const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
 export interface OpsWorkerAdapterOptions {
   anomaly: {
     redis: IORedis | Cluster | undefined;
-    featureFlags: AnomalyFeatureFlagsPort;
-    featureFlagConfig: AnomalyFeatureFlagConfig;
+    featureFlags: FeatureFlagService;
     hardTierAlerts: AnomalyHardTierAlertPort;
   };
   usageStats: {
@@ -69,11 +65,9 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
       rateTracker: RedisTenantRateTrackerAdapter.create({
         redis,
         featureFlags: this.options.anomaly.featureFlags,
-        featureFlagConfig: this.options.anomaly.featureFlagConfig,
       }),
       anomalyState: RedisAnomalyStateRepository.create(redis),
       featureFlags: this.options.anomaly.featureFlags,
-      featureFlagConfig: this.options.anomaly.featureFlagConfig,
       hardTierAlerts: this.options.anomaly.hardTierAlerts,
     });
 

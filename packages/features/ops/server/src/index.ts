@@ -29,10 +29,6 @@ export {
 } from "./adapters/ops-worker.adapter";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
 export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
-export type {
-  AnomalyFeatureFlagConfig,
-  AnomalyFeatureFlagsPort,
-} from "./ports/anomaly-feature-flags.port";
 export {
   UsageStatsErrorReporter,
   UsageStatsClickHouseClient,

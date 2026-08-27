@@ -1,4 +1,6 @@
 import type { Anomaly } from "@langwatch/ops-contract";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AnomalyHardTierAlertPort } from "../src/ports/anomaly-hard-tier-alert.port";
 import { AnomalyRateTrackerPort } from "../src/ports/anomaly-rate-tracker.port";
@@ -10,7 +12,6 @@ import {
   SURFACE_TIER_SUSTAIN_MINUTES,
 } from "../src/services/anomaly-detector.service";
 import { percentile } from "../src/ops.anomaly-percentile";
-import { AnomalyFeatureFlagsPort } from "../src/ports/anomaly-feature-flags.port";
 
 class RateTrackerFake extends AnomalyRateTrackerPort {
   readonly baselines = new Map<string, number>();
@@ -53,22 +54,13 @@ class AnomalyStateFake extends AnomalyStatePort {
   ]);
 }
 
-class FeatureFlagsFake extends AnomalyFeatureFlagsPort {
-  readonly isEnabled = vi.fn<
-    (
-      key: string,
-      input: { distinctId: string; defaultValue: boolean; cacheTtlMs: number },
-    ) => Promise<boolean>
-  >(async () => false);
-}
-
 class HardTierAlertsFake extends AnomalyHardTierAlertPort {
   readonly notify = vi.fn<(anomaly: Anomaly) => Promise<void>>(async () => undefined);
 }
 
 function createDetector(
   options: {
-    flags?: FeatureFlagsFake | undefined;
+    flags?: FeatureFlagService | undefined;
     alerts?: HardTierAlertsFake | undefined;
   } = {},
 ) {
@@ -78,7 +70,6 @@ function createDetector(
     rateTracker,
     anomalyState,
     featureFlags: options.flags,
-    featureFlagConfig: { killSwitchCacheTtlMs: 60_000 },
     hardTierAlerts: options.alerts,
   });
   return { detector, rateTracker, anomalyState };
@@ -194,12 +185,13 @@ describe("AnomalyDetectorService", () => {
   /** @scenario "Kill-switch FF disables anomaly detection for one tenant without a redeploy" */
   /** @scenario "Kill-switch fails open when PostHog is unavailable" */
   it("skips a killed tenant and fails open when flags are unavailable", async () => {
-    const flags = new FeatureFlagsFake();
+    const flags = MemoryFeatureFlagService.create();
+    const isEnabled = vi.spyOn(flags, "isEnabled");
     const { detector, rateTracker, anomalyState } = createDetector({ flags });
     rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
     rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
     rateTracker.currentWindowCount.mockResolvedValue(500);
-    flags.isEnabled.mockImplementation(
+    isEnabled.mockImplementation(
       async (_key, input) => input.distinctId === "proj_killed",
     );
 
@@ -209,7 +201,7 @@ describe("AnomalyDetectorService", () => {
       expect.objectContaining({ tenantId: "proj_normal" }),
     );
 
-    flags.isEnabled.mockRejectedValue(new Error("PostHog unavailable"));
+    isEnabled.mockRejectedValue(new Error("feature flag service unavailable"));
     const retry = await detector.tick();
     expect(retry.skippedKillSwitch).toBe(0);
   });

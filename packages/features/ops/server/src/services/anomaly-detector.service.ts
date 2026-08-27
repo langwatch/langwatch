@@ -1,9 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
-import type {
-  AnomalyFeatureFlagConfig,
-  AnomalyFeatureFlagsPort,
-} from "../ports/anomaly-feature-flags.port";
 import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port";
 import type { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port";
 import type { AnomalyStatePort } from "../ports/anomaly-state.port";
@@ -24,23 +21,20 @@ export class AnomalyDetectorService {
   private constructor(
     private readonly rateTracker: AnomalyRateTrackerPort,
     private readonly anomalyState: AnomalyStatePort,
-    private readonly featureFlags: AnomalyFeatureFlagsPort | undefined,
-    private readonly featureFlagConfig: AnomalyFeatureFlagConfig,
+    private readonly featureFlags: FeatureFlagService | undefined,
     private readonly hardTierAlerts: AnomalyHardTierAlertPort | undefined,
   ) {}
 
   static create(options: {
     rateTracker: AnomalyRateTrackerPort;
     anomalyState: AnomalyStatePort;
-    featureFlags?: AnomalyFeatureFlagsPort | undefined;
-    featureFlagConfig: AnomalyFeatureFlagConfig;
+    featureFlags?: FeatureFlagService | undefined;
     hardTierAlerts?: AnomalyHardTierAlertPort | undefined;
   }): AnomalyDetectorService {
     return new AnomalyDetectorService(
       options.rateTracker,
       options.anomalyState,
       options.featureFlags,
-      options.featureFlagConfig,
       options.hardTierAlerts,
     );
   }
@@ -174,9 +168,7 @@ export class AnomalyDetectorService {
     }
     try {
       return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        distinctId: tenantId,
-        defaultValue: false,
-        cacheTtlMs: this.featureFlagConfig.killSwitchCacheTtlMs,
+        kind: "system",
       });
     } catch {
       return false;

@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type {
-  AnomalyFeatureFlagConfig,
-  AnomalyFeatureFlagsPort,
-} from "../ports/anomaly-feature-flags.port";
 import { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../services/anomaly.constants";
 
@@ -23,8 +20,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   private constructor(
     private readonly redis: IORedis | Cluster,
     private readonly now: () => number,
-    private readonly featureFlags: AnomalyFeatureFlagsPort | undefined,
-    private readonly featureFlagConfig: AnomalyFeatureFlagConfig,
+    private readonly featureFlags: FeatureFlagService | undefined,
   ) {
     super();
   }
@@ -32,14 +28,12 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   static create(options: {
     redis: IORedis | Cluster;
     now?: (() => number) | undefined;
-    featureFlags?: AnomalyFeatureFlagsPort | undefined;
-    featureFlagConfig: AnomalyFeatureFlagConfig;
+    featureFlags?: FeatureFlagService | undefined;
   }): RedisTenantRateTrackerAdapter {
     return new RedisTenantRateTrackerAdapter(
       options.redis,
       options.now ?? Date.now,
       options.featureFlags,
-      options.featureFlagConfig,
     );
   }
 
@@ -189,9 +183,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
 
     try {
       return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        distinctId: tenantId,
-        defaultValue: false,
-        cacheTtlMs: this.featureFlagConfig.killSwitchCacheTtlMs,
+        kind: "system",
       });
     } catch {
       return false;

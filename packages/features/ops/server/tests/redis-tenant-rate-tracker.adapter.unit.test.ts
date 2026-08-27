@@ -1,16 +1,7 @@
 import Redis from "ioredis";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisTenantRateTrackerAdapter } from "../src/adapters/redis-tenant-rate-tracker.adapter";
-import { AnomalyFeatureFlagsPort } from "../src/ports/anomaly-feature-flags.port";
-
-class FeatureFlagsFake extends AnomalyFeatureFlagsPort {
-  readonly isEnabled = vi.fn<
-    (
-      key: string,
-      input: { distinctId: string; defaultValue: boolean; cacheTtlMs: number },
-    ) => Promise<boolean>
-  >(async () => false);
-}
 
 function redisFake() {
   const redis = new Redis({ lazyConnect: true, enableOfflineQueue: false });
@@ -89,7 +80,6 @@ describe("RedisTenantRateTrackerAdapter", () => {
     const tracker = RedisTenantRateTrackerAdapter.create({
       redis,
       now: () => now,
-      featureFlagConfig: { killSwitchCacheTtlMs: 60_000 },
     });
 
     await tracker.record("proj_acme");
@@ -105,7 +95,6 @@ describe("RedisTenantRateTrackerAdapter", () => {
     const tracker = RedisTenantRateTrackerAdapter.create({
       redis,
       now: () => now,
-      featureFlagConfig: { killSwitchCacheTtlMs: 60_000 },
     });
     await tracker.record("proj_acme", 7);
     const staleMinute = String(Math.floor(now / 60_000));
@@ -119,14 +108,14 @@ describe("RedisTenantRateTrackerAdapter", () => {
   /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
   it("uses the feature flag as a fail-open hot-path kill switch", async () => {
     const { redis } = redisFake();
-    const flags = new FeatureFlagsFake();
+    const flags = MemoryFeatureFlagService.create();
+    const isEnabled = vi.spyOn(flags, "isEnabled");
     const tracker = RedisTenantRateTrackerAdapter.create({
       redis,
       now: () => now,
       featureFlags: flags,
-      featureFlagConfig: { killSwitchCacheTtlMs: 60_000 },
     });
-    flags.isEnabled.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("down"));
+    isEnabled.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("down"));
 
     await tracker.record("proj_killed");
     await tracker.record("proj_open");
@@ -139,7 +128,6 @@ describe("RedisTenantRateTrackerAdapter", () => {
     const tracker = RedisTenantRateTrackerAdapter.create({
       redis,
       now: () => now,
-      featureFlagConfig: { killSwitchCacheTtlMs: 60_000 },
     });
     vi.spyOn(redis, "get").mockRejectedValueOnce(new Error("down"));
 
