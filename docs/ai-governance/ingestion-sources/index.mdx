@@ -23,8 +23,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio-dataverse) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
-| ~~[`copilot_studio`](/ai-governance/ingestion-sources/copilot-studio)~~ | ~~Pull (Purview Audit)~~ | n/a | n/a | **Retired**: polled directory audit, never contained conversations. Replaced by `copilot_studio_dataverse` |
+| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
 | `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
 | `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |

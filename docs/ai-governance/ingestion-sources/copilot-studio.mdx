@@ -1,42 +1,110 @@
 ---
-title: "Microsoft Copilot Studio (Purview), Retired"
-description: This source type polled Microsoft's directory audit log, which records directory changes and has never contained a Copilot conversation. It is retired and replaced by the Dataverse source.
-sidebarTitle: Copilot Studio (Purview), Retired
+title: Microsoft Copilot Studio
+description: Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
+sidebarTitle: Microsoft Copilot Studio
 ---
 
-<Warning>
-**This source type is retired.** It polled Microsoft's directory audit, the log
-of who was made an administrator and which app was granted consent. That log
-records changes to the directory; it has never contained a Copilot conversation
-and no configuration would make it.
+The source type is `copilot_studio_dataverse`. It connects to one Power
+Platform environment and queries the `conversationtranscripts` table on a
+15-minute cadence.
 
-Copilot Studio conversations are read from Dataverse instead.
-See [Microsoft Copilot Studio (Dataverse)](/ai-governance/ingestion-sources/copilot-studio-dataverse).
-</Warning>
+## What it reads
 
-## What happened
+The puller queries two Dataverse tables per run:
 
-The `copilot_studio` source type was created as a setup contract for a planned
-Purview Audit poller. The poller was never built because the underlying API
-(`graph.microsoft.com/v1.0/auditLogs/directoryAudits`) does not contain
-conversation data, only directory-level changes like admin consent grants and
-app registrations.
+| Table | What it provides |
+|---|---|
+| `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
+| `bot` | Agent names, so conversations show which agent answered |
 
-The replacement, `copilot_studio_dataverse`, reads conversations directly from
-the Power Platform environment's Dataverse transcript table, which is where
-Copilot Studio agents actually store what was said.
+Each conversation produces one trace, with:
+- Each user question paired with the agent's answer as a turn
+- Tool calls the agent made, including unfinished ones
+- The person's directory account identifier on each question
+- A flag when the agent was edited after the conversation happened
+- A label when the conversation was a design-time test
 
-## For existing sources configured on this type
+## What the admin sets up
 
-Sources already configured as `copilot_studio` still appear in the inventory
-and still resolve their adapter on a scheduled run. They will not produce
-conversation data because the underlying API has none to offer.
+### In the Microsoft Entra admin centre
 
-To start reading conversations, create a new source of type
-`copilot_studio_dataverse` pointed at the same Power Platform environment.
-The old source can then be disabled.
+Done once for the whole organisation:
 
-## The old type is no longer offered
+1. **App registrations** → New registration. Give it a name (e.g. `langwatch-copilot-reader`), choose the single-tenant option.
+2. Copy the **Application (client) ID** and **Directory (tenant) ID** from the overview page.
+3. **Certificates & secrets** → New client secret. Copy the **Value** column immediately; Microsoft never shows it again.
+4. *(Optional)* **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
 
-The source picker no longer shows `copilot_studio` as an option for new sources.
-Only `copilot_studio_dataverse` is offered.
+### In the Power Platform admin centre
+
+Repeated for every environment that has agents:
+
+5. **Environments** → pick the environment → Settings → Users + permissions → Application users → New app user.
+6. Paste the Application ID, choose a business unit, and assign the **Service Reader** role.
+
+<Note>Service Reader is the tightest stock role that grants read access to both `bot` and `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer only reads records the account created itself, which for a service account is none. See the [security roles reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for details.</Note>
+
+### In LangWatch
+
+Create a source of type **Microsoft Copilot Studio** and fill in:
+
+| Field | Required | Description |
+|---|---|---|
+| Power Platform environment URL | yes | `https://org12345.crm.dynamics.com`, from the admin centre |
+| Microsoft Entra tenant ID | yes | The directory the app registration lives in |
+| App registration client ID | yes | From the app registration overview |
+| App registration client secret | yes | The secret value (shown once) |
+
+The environment URL must be an `https` address on a domain Microsoft serves
+Power Platform from (`.dynamics.com`, `.microsoftdynamics.us`,
+`.appsplatform.us`, `.dynamics.cn`). Environments on a custom domain need a
+support ticket.
+
+## How a run works
+
+1. The puller exchanges the application credentials for a short-lived token scoped to the environment.
+2. It reads the agent table once (for names).
+3. It pages through the transcript table from where the last run left off.
+4. Multi-row conversations are stitched back together by their shared name and start time.
+5. Activities are paired into turns and emitted as OTLP spans.
+
+The cursor is a `(createdon, conversationtranscriptid)` pair so it never
+skips or re-reads a row. Default cadence is every 15 minutes.
+
+## Security boundaries
+
+- **Credentials stay in the environment.** Every request goes to the configured
+  Power Platform address. A next-page link pointing elsewhere stops the walk.
+  Redirects are never followed.
+- **The environment URL is checked at save time.** An address outside Microsoft's
+  known Power Platform domains is refused before it is stored.
+- **Directory access is optional.** When `Directory.Read.All` is granted, the
+  puller resolves the person's directory identifier to a name and department.
+  Without it, conversations still arrive with the raw `aadObjectId` only.
+
+## What shows up
+
+Each conversation trace includes these attributes:
+
+- `copilot_studio.agent_name`: the agent that answered
+- `copilot_studio.agent_changed_since`: `true` when the agent was edited after the conversation
+- `copilot_studio.design_mode`: `true` for conversations held while building the agent
+- `copilot_studio.transcript_batches`: which pieces this conversation was built from
+- `copilot_studio.conversation_incomplete`: `true` when a piece is missing from the middle
+- `langwatch.user.id`: the person's directory account on each user turn
+
+The model attribute is `microsoft/copilot-studio`, a product label, not a
+priced model. The agent record in the environment does not expose which model
+the agent uses.
+
+## Limitations
+
+- Microsoft deletes transcripts roughly 30 days out, so the first run's lookback
+  is capped at 30 days.
+- Dataverse caps a single transcript row at roughly 1 MB. Long conversations are
+  stored across multiple rows; the puller stitches them, but a missing piece
+  (a row that was already deleted) marks the conversation incomplete.
+- Agent names require the credential to read the `bot` table. If it cannot, conversations
+  still arrive but without an agent name, and the log says why.
+- The transcript has no token counts and no cost figures. Those come from Azure
+  cost reports, which require a separate billing-plan setup.

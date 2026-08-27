@@ -787,7 +787,6 @@
               "ai-governance/ingestion-sources/workato",
               "ai-governance/ingestion-sources/s3-custom",
               "ai-governance/ingestion-sources/copilot-studio",
-              "ai-governance/ingestion-sources/copilot-studio-dataverse",
               "ai-governance/ingestion-sources/openai-compliance",
               "ai-governance/ingestion-sources/claude-compliance"
             ]

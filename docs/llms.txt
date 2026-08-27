@@ -533,8 +533,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Anthropic Claude (Cowork)](https://langwatch.ai/docs/ai-governance/ingestion-sources/claude-cowork.md): Receiver works on the Generic OTel path; Cowork-specific attribute extraction is pending.
 - [Workato](https://langwatch.ai/docs/ai-governance/ingestion-sources/workato.md): Webhook receiver works (envelope-only). Audit-shape parser is pending.
 - [Custom S3 audit log](https://langwatch.ai/docs/ai-governance/ingestion-sources/s3-custom.md): Webhook callback receiver works (envelope-only). S3 puller + DSL parser are pending.
-- [Microsoft Copilot Studio (Purview), Retired](https://langwatch.ai/docs/ai-governance/ingestion-sources/copilot-studio.md): This source type polled Microsoft's directory audit log, which records directory changes and has never contained a Copilot conversation. It is retired and replaced by the Dataverse source.
-- [Microsoft Copilot Studio](https://langwatch.ai/docs/ai-governance/ingestion-sources/copilot-studio-dataverse.md): Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
+- [Microsoft Copilot Studio](https://langwatch.ai/docs/ai-governance/ingestion-sources/copilot-studio.md): Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
 - [OpenAI Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/openai-compliance.md): Setup contract only, S3 bucket + cross-account role config captured; the JSONL puller is pending.
 - [Anthropic Claude Enterprise Compliance](https://langwatch.ai/docs/ai-governance/ingestion-sources/claude-compliance.md): Setup contract only, workspace API key captured; the compliance API poller is pending.
 

@@ -16801,7 +16801,7 @@ You should see Cowork events landing as `tool.invocation` and `api.call`. If eve
 
 ---
 
-# FILE: ./ai-governance/ingestion-sources/copilot-studio-dataverse.mdx
+# FILE: ./ai-governance/ingestion-sources/copilot-studio.mdx
 
 ---
 title: Microsoft Copilot Studio
@@ -16916,53 +16916,6 @@ the agent uses.
 
 ---
 
-# FILE: ./ai-governance/ingestion-sources/copilot-studio.mdx
-
----
-title: "Microsoft Copilot Studio (Purview), Retired"
-description: This source type polled Microsoft's directory audit log, which records directory changes and has never contained a Copilot conversation. It is retired and replaced by the Dataverse source.
-sidebarTitle: Copilot Studio (Purview), Retired
----
-
-<Warning>
-**This source type is retired.** It polled Microsoft's directory audit, the log
-of who was made an administrator and which app was granted consent. That log
-records changes to the directory; it has never contained a Copilot conversation
-and no configuration would make it.
-
-Copilot Studio conversations are read from Dataverse instead.
-See [Microsoft Copilot Studio (Dataverse)](/ai-governance/ingestion-sources/copilot-studio-dataverse).
-</Warning>
-
-## What happened
-
-The `copilot_studio` source type was created as a setup contract for a planned
-Purview Audit poller. The poller was never built because the underlying API
-(`graph.microsoft.com/v1.0/auditLogs/directoryAudits`) does not contain
-conversation data, only directory-level changes like admin consent grants and
-app registrations.
-
-The replacement, `copilot_studio_dataverse`, reads conversations directly from
-the Power Platform environment's Dataverse transcript table, which is where
-Copilot Studio agents actually store what was said.
-
-## For existing sources configured on this type
-
-Sources already configured as `copilot_studio` still appear in the inventory
-and still resolve their adapter on a scheduled run. They will not produce
-conversation data because the underlying API has none to offer.
-
-To start reading conversations, create a new source of type
-`copilot_studio_dataverse` pointed at the same Power Platform environment.
-The old source can then be disabled.
-
-## The old type is no longer offered
-
-The source picker no longer shows `copilot_studio` as an option for new sources.
-Only `copilot_studio_dataverse` is offered.
-
----
-
 # FILE: ./ai-governance/ingestion-sources/index.mdx
 
 ---
@@ -16990,8 +16943,7 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio-dataverse) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
-| ~~[`copilot_studio`](/ai-governance/ingestion-sources/copilot-studio)~~ | ~~Pull (Purview Audit)~~ | n/a | n/a | **Retired**: polled directory audit, never contained conversations. Replaced by `copilot_studio_dataverse` |
+| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
 | `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
 | `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
