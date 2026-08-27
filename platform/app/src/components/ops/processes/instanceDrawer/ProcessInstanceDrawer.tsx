@@ -5,7 +5,7 @@ import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
+import { useShikiAdapter } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
