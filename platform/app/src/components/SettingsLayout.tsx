@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Collapsible,
   Container,
@@ -11,7 +10,6 @@ import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
-import { usePendingJoinRequestCount } from "~/components/members/useJoinRequests";
 import { useNavigationV2ShellActive } from "~/features/navigation/useNavigationV2ShellActive";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
@@ -152,17 +150,6 @@ export default function SettingsLayout({
           gap={2}
           display={isSubscription ? "none" : "flex"}
         >
-          {/* The reader's own two pages come first, and carry no gate: a
-              member with no authority over the organization still has a name,
-              a photo and a password. */}
-          <NavSection
-            label="You"
-            paths={["/settings/profile", "/settings/security"]}
-          >
-            <MenuLink href="/settings/profile">Profile</MenuLink>
-            <MenuLink href="/settings/security">Security</MenuLink>
-          </NavSection>
-
           <MenuLink href="/settings">General Settings</MenuLink>
           {!isLiteMember && (
             <MenuLink href="/settings/api-keys">API Keys</MenuLink>
@@ -185,15 +172,8 @@ export default function SettingsLayout({
             )}
           </NavSection>
 
-          {/* FOUR ENTRIES, NOT SEVEN. Members, Teams & Projects and Access
-              were three of them, and they answered one question in three
-              vocabularies: a list of people, a list of the containers those
-              people sit in, and the rules by which somebody becomes one. All
-              three are the Directory now, as tabs, and their old addresses
-              forward onto the tab each became. Groups and Role Bindings had
-              already gone the same way. */}
           <NavSection
-            label="People & access"
+            label="Teams & Access"
             paths={[
               "/settings/teams",
               "/settings/members",
@@ -202,44 +182,26 @@ export default function SettingsLayout({
               "/settings/role-bindings",
               "/settings/authentication",
               "/settings/scim",
-              "/settings/directory",
-              "/settings/access",
               "/settings/audit-log",
             ]}
           >
-            {/* WHO IS WAITING, from wherever in settings the reader is. A
-                join request is the one thing in here that is waiting on a
-                person rather than sitting there, and it was only visible to
-                somebody who had already opened the page it lives on.
-                Unlike the tab's count, this is hidden at zero: a badge in a
-                menu means "something needs you", and one that is always
-                present means nothing at all.
-
-                Never behind the enterprise nav: Directory is where the
-                members are, and every organization has those. Its
-                provisioning tab carries its own permission. */}
-            <MenuLink
-              href="/settings/directory"
-              includePath="directory"
-              menuEnd={<PendingJoinRequestsBadge />}
-            >
-              Directory
+            <MenuLink href="/settings/members" includePath="members">
+              Members
             </MenuLink>
+            <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
             {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/roles">Roles</MenuLink>
+              <MenuLink href="/settings/groups">Groups</MenuLink>
             )}
-            {/* How the ORGANIZATION signs in; how the reader does is
-                Security, under You. Offered only to somebody who may at
-                least SEE single sign-on (D05). An administrator without the
-                permission is not shown the entry, and the page refuses the
-                address as well — the menu is a courtesy, not the gate. */}
-            {showEnterpriseNav &&
-              !isLiteMember &&
-              hasPermission("sso:view") && (
-                <MenuLink href="/settings/authentication">
-                  Authentication
-                </MenuLink>
-              )}
+            {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+            )}
+            <MenuLink href="/settings/authentication">Authentication</MenuLink>
+            {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
+            )}
+            {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
+            )}
             {showEnterpriseNav &&
               !isLiteMember &&
               hasPermission("auditLog:view") && (
@@ -364,41 +326,5 @@ export default function SettingsLayout({
         </Container>
       </HStack>
     </DashboardLayout>
-  );
-}
-
-/**
- * How many people are waiting to join, beside the menu entry that answers
- * them.
- *
- * Its own component so the query lives with the one thing that reads it: the
- * layout renders on every settings page and must not take a dependency on a
- * count most of those pages have nothing to do with.
- *
- * Draws nothing at zero, and nothing for somebody who could not answer a
- * request anyway. A menu badge is a claim on the reader's attention, and one
- * that is always there stops being read.
- */
-function PendingJoinRequestsBadge() {
-  const { organization, hasPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-  const waiting = usePendingJoinRequestCount({
-    organizationId: organization?.id,
-    canManage: hasPermission("organization:manage"),
-  });
-
-  if (!waiting) return null;
-
-  return (
-    <Badge
-      size="sm"
-      variant="solid"
-      colorPalette="orange"
-      fontVariantNumeric="tabular-nums"
-      aria-label={`${waiting} waiting to join`}
-    >
-      {waiting}
-    </Badge>
   );
 }
