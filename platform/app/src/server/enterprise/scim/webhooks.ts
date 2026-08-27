@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Thin Auth0 webhook mount; parsing and provisioning live in Enterprise SCIM. */
-import { AppScimWebhookAdapter } from "~/runtime/app/scim/scim-transport.adapter";
+import { ScimWebhookApi } from "@langwatch/enterprise-scim-server";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 
 const secured = createServiceApp({ basePath: "/api/webhooks" });
-const scimWebhookApi = AppScimWebhookAdapter.create();
+const scimWebhookApi = ScimWebhookApi.create();
 
 secured
   .access(
@@ -23,7 +23,10 @@ secured
     } catch {
       return c.json({ error: "Invalid JSON" }, { status: 400 });
     }
-    await scimWebhookApi.handle(c.app.scim, Array.isArray(body) ? body : [body]);
+    await scimWebhookApi.handle({
+      service: c.app.scim,
+      events: Array.isArray(body) ? body : [body],
+    });
     return c.json({ received: true });
   });
 
