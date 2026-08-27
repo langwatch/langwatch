@@ -172,16 +172,12 @@ interface ClickHouseWriteRecord {
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
-function toBranchSessionRow(
-  record: Record<string, unknown>,
-): CodingAgentBranchSessionRow {
+function toBranchSessionRow(record: Record<string, unknown>): CodingAgentBranchSessionRow {
   return {
     sessionId: String(record.SessionId ?? ""),
     tenantId: String(record.TenantId ?? ""),
     startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
-    lastEventOccurredAtMs: parseClickHouseDateTimeMs(
-      String(record.LastEventOccurredAt ?? ""),
-    ),
+    lastEventOccurredAtMs: parseClickHouseDateTimeMs(String(record.LastEventOccurredAt ?? "")),
     inputTokens: asNumber(record.InputTokens),
     outputTokens: asNumber(record.OutputTokens),
     cacheReadTokens: asNumber(record.CacheReadTokens),
@@ -335,12 +331,26 @@ function toRecord({
 }
 
 export class CodingAgentSessionClickHouseRepository implements SessionRepository {
-  constructor(
+  private constructor(
     private readonly clickHouse: CodingAgentClickHousePort,
     private readonly defaultTraceRetentionDays: number,
     private readonly metrics: CodingAgentReadMetricsPort,
     private readonly clock: CodingAgentClockPort,
   ) {}
+
+  static create(deps: {
+    clickHouse: CodingAgentClickHousePort;
+    defaultTraceRetentionDays: number;
+    metrics: CodingAgentReadMetricsPort;
+    clock: CodingAgentClockPort;
+  }): CodingAgentSessionClickHouseRepository {
+    return new CodingAgentSessionClickHouseRepository(
+      deps.clickHouse,
+      deps.defaultTraceRetentionDays,
+      deps.metrics,
+      deps.clock,
+    );
+  }
 
   /**
    * Monotonic floor for the RMT version stamp this writer issues. The
@@ -357,11 +367,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   private lastVersionStampMs = 0;
 
   private nextVersionStamp(priorUpdatedAtMs: number): number {
-    const stamp = Math.max(
-      this.clock.nowMs(),
-      priorUpdatedAtMs + 1,
-      this.lastVersionStampMs + 1,
-    );
+    const stamp = Math.max(this.clock.nowMs(), priorUpdatedAtMs + 1, this.lastVersionStampMs + 1);
     this.lastVersionStampMs = stamp;
     return stamp;
   }
@@ -584,42 +590,16 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * The sessions that ran on one repository's branches, across several
-   * projects of ONE organization: the read behind pull-request usage.
+   * Reads pull-request usage across one organization's project tenants.
    *
-   * `TenantId IN (...)` comes first, as every read of this table does. Several
-   * tenants share one query here because a pull request's cost spans the
-   * projects of the organization that owns it, and ClickHouse routing is
-   * per-ORGANIZATION, so those all resolve to one endpoint and one query. A
-   * list that did span organizations fans out per endpoint and the answers
-   * merge, so the read stays whole either way.
+   * `TenantId IN (...)` preserves the table's tenant-first read shape. The
+   * required `startedAtFromMs` bounds the partition scan; there is no upper
+   * bound because an open pull request continues accruing usage.
    *
-   * `startedAtFromMs` is required. `StartedAt` is the partition key, and this
-   * read is not anchored on a session id, so without a lower bound it opens
-   * every partition the retention holds, cold storage included. The caller
-   * passes a bound wide enough to cover a pull request's whole life; there is
-   * no upper bound, because a pull request open today is still accruing.
-   *
-   * The dedup is the table's own IN-tuple pattern, unwindowed for the reason
-   * `findManyRecent` documents at length: `StartedAt` moves, so bounding the
-   * dedup scope can resolve a session to a superseded version.
-   *
-   * A session matches on the branch it ENDED on or on any branch it drove
-   * (`GitBranches`, migration 00077). Matching the scalar alone would charge a
-   * session that landed one change and moved on entirely to its last pull
-   * request, leaving the one it opened first reading as free. The set is
-   * selected as well as matched on, because attribution runs the tenure rule
-   * over it again on the way out: a row fetched on a branch it no longer sits
-   * on is only useful if the caller can still see which branch that was.
-   *
-   * Only the columns the rollup adds up are selected, plus the session's title
-   * and the scalar keys the shared tie-break ranks on. The two array-length
-   * keys it also knows about
-   * are deliberately absent, because they would mean reading `MetricSeries` and
-   * `AppliedEventIds` for every session of a busy repository to break a tie
-   * that `nextVersionStamp` already makes unreachable. `preferredOf` treats an
-   * absent column as "no progress", so the ranking degrades to its scalar keys
-   * rather than to arbitrary.
+   * Dedup remains unwindowed because `StartedAt` can move between versions.
+   * Branch matching uses both the final scalar and bounded history, while the
+   * select carries only rollup fields and scalar tie-break keys; absent array
+   * tie-break fields rank as no progress in `preferredOf`.
    */
   async listByRepositoryBranch({
     tenantIds,
@@ -769,10 +749,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     if (!first) return;
 
     const tenantId = first.row.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
-      "CodingAgentSessionClickHouseRepository.upsertBatch",
-    );
+    EventUtils.validateTenantId({ tenantId }, "CodingAgentSessionClickHouseRepository.upsertBatch");
     // A batch insert resolves ONE client, so a row from another tenant would be
     // written into this tenant's ClickHouse. Refuse rather than cross the line.
     for (const { row } of entries) {
@@ -882,17 +859,12 @@ const asNumberMap = (value: unknown): Record<string, number> => {
  * Insertion order is not relied on — the caller re-sorts — so this only has to
  * pick the right version, not preserve a position.
  */
-export function dedupToLatestPerSession(
-  records: Record<string, unknown>[],
-): Record<string, unknown>[] {
+function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();
   for (const record of records) {
     const sessionId = String(record.SessionId ?? "");
     const incumbent = bySession.get(sessionId);
-    bySession.set(
-      sessionId,
-      incumbent === undefined ? record : preferredOf(incumbent, record),
-    );
+    bySession.set(sessionId, incumbent === undefined ? record : preferredOf(incumbent, record));
   }
   return [...bySession.values()];
 }
@@ -917,8 +889,7 @@ function preferredOf(
   };
   const progressOf = (record: Record<string, unknown>) => ({
     watermark: msOf(record.LastEventOccurredAt),
-    signals:
-      asNumber(record.ModelCalls) + asNumber(record.ToolCalls) + asNumber(record.Prompts),
+    signals: asNumber(record.ModelCalls) + asNumber(record.ToolCalls) + asNumber(record.Prompts),
     units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
     applied: Array.isArray(record.AppliedEventIds) ? record.AppliedEventIds.length : 0,
     startedAt: msOf(record.StartedAt),
@@ -948,7 +919,7 @@ function preferredOf(
  * them without a zone suffix ("2026-07-24 12:00:00.123") and V8 reads a bare
  * datetime as LOCAL time, so `new Date(str)` skews each one by the host's UTC
  * offset. `LastEventOccurredAt` makes that load-bearing rather than cosmetic —
- * `CodingAgentSessionStore` reads it as the "was this row written after
+ * `EventingCodingAgentSessionStoreAdapter` reads it as the "was this row written after
  * migration 00053" discriminator, and a pre-00053 row's `1970-01-01
  * 00:00:00.000` decodes POSITIVE anywhere west of UTC, which would let the
  * store decode exactly the rows its gate exists to reject.
@@ -988,11 +959,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     responseChars: asNumber(record.ResponseChars),
     steps: steps.map((s) => {
       const tuple = s as [string, unknown, unknown];
-      return [String(tuple[0]), asNumber(tuple[1]), Boolean(tuple[2])] as [
-        string,
-        number,
-        boolean,
-      ];
+      return [String(tuple[0]), asNumber(tuple[1]), Boolean(tuple[2])] as [string, number, boolean];
     }),
 
     toolCounts: asNumberMap(record.ToolCounts),
@@ -1068,8 +1035,6 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     metricSeries: asMetricSeriesRows(record.MetricSeries),
     createdAt: parseClickHouseDateTimeMs(String(record.CreatedAt ?? "")),
     updatedAt: parseClickHouseDateTimeMs(String(record.UpdatedAt ?? "")),
-    lastEventOccurredAt: parseClickHouseDateTimeMs(
-      String(record.LastEventOccurredAt ?? ""),
-    ),
+    lastEventOccurredAt: parseClickHouseDateTimeMs(String(record.LastEventOccurredAt ?? "")),
   };
 }

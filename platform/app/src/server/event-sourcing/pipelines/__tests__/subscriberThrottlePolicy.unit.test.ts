@@ -1,5 +1,7 @@
 import { type SubscriberDispatchDefinition, throttledWindow } from "@langwatch/eventing";
+import { createPullRequestMappingSubscriber } from "@langwatch/coding-agent-server";
 import { describe, expect, it, vi } from "vitest";
+import { TestGithubService } from "~/test-utils/test-github.service";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -16,11 +18,6 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import { AppGovernanceSubscriberAdapter } from "~/runtime/app/features/governance/governance-subscriber.adapter";
 import { createBillingMeterDispatchSubscriber } from "../../registration/global/billingMeterDispatch.subscriber";
-import {
-  type CodingAgentProcessingPipelineDeps,
-  createCodingAgentProcessingPipeline,
-} from "../coding-agent-processing/pipeline";
-import { createPullRequestMappingHandler } from "../coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { buildTraceDeps } from "../trace-processing/__tests__/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "../trace-processing/pipeline";
 
@@ -62,19 +59,37 @@ const tracePipeline = createTraceProcessingPipeline(
   }),
 );
 
-const codingAgentStore = {} as never;
-const codingAgentPipeline = createCodingAgentProcessingPipeline({
-  codingAgentSessionStore: codingAgentStore,
-  codingAgentTraceSessionAppendStore: codingAgentStore,
-  sessionMetricSeriesAppendStore: codingAgentStore,
-  codingAgentSessionEventsAppendStore: codingAgentStore,
-  pullRequestMappingHandler: createPullRequestMappingHandler({
-    requestBranchMapping: async () => {},
-  }),
-} as unknown as CodingAgentProcessingPipelineDeps);
+const pullRequestMapping = createPullRequestMappingSubscriber(TestGithubService.create());
 
 function traceRegistration(name: string): AnySubscriber {
   return tracePipeline.foldSubscribers.get(name)!.definition as AnySubscriber;
+}
+
+function registeredPolicy(subscriber: AnySubscriber) {
+  return {
+    delay: subscriber.options?.delay,
+    ttlMs: subscriber.options?.deduplication?.ttlMs,
+    extend: subscriber.options?.deduplication?.extend,
+    makeJobId: subscriber.options?.makeJobId,
+    dedupId: subscriber.options?.deduplication?.makeId,
+    shouldSurviveDispatch: subscriber.options?.deduplication?.shouldSurviveDispatch,
+  };
+}
+
+function pullRequestMappingPolicy() {
+  const deduplication = pullRequestMapping.dedup;
+  if (deduplication === undefined || deduplication === "aggregate") {
+    throw new Error("Pull-request mapping must declare its throttle window");
+  }
+
+  return {
+    delay: pullRequestMapping.delay,
+    ttlMs: deduplication.ttlMs,
+    extend: deduplication.extend,
+    makeJobId: deduplication.makeId,
+    dedupId: deduplication.makeId,
+    shouldSurviveDispatch: deduplication.shouldSurviveDispatch,
+  };
 }
 
 /**
@@ -103,7 +118,7 @@ const windowed = [
     // Level-triggered: it tells a connected client the trace moved, so
     // swallowing the last event leaves that client on the previous state.
     survivesDispatch: false,
-    subscriber: traceRegistration("traceUpdateBroadcast"),
+    policy: registeredPolicy(traceRegistration("traceUpdateBroadcast")),
   },
   {
     name: "projectMetadata",
@@ -113,7 +128,7 @@ const windowed = [
     // Rebuilt from the fold's running state, so the final event is the one
     // that decides the row.
     survivesDispatch: false,
-    subscriber: traceRegistration("projectMetadata"),
+    policy: registeredPolicy(traceRegistration("projectMetadata")),
   },
   {
     name: "governanceKpisSync",
@@ -122,7 +137,7 @@ const windowed = [
     dedupTtlMs: 30_000,
     // Same: the last contribution to an hour bucket is what makes it correct.
     survivesDispatch: false,
-    subscriber: traceRegistration("governanceKpisSync"),
+    policy: registeredPolicy(traceRegistration("governanceKpisSync")),
   },
   {
     name: "governanceOcsfEventsSync",
@@ -132,7 +147,7 @@ const windowed = [
     // The sync writes what the fold currently holds, so a dropped last event
     // is a row that never ships.
     survivesDispatch: false,
-    subscriber: traceRegistration("governanceOcsfEventsSync"),
+    policy: registeredPolicy(traceRegistration("governanceOcsfEventsSync")),
   },
   {
     name: "pullRequestMapping",
@@ -149,42 +164,38 @@ const windowed = [
     // the identical question inside thirty seconds, which the mapping
     // service's own bookkeeping would have refused one layer down.
     survivesDispatch: true,
-    subscriber: codingAgentPipeline.foldSubscribers.get("pullRequestMapping")!
-      .definition as AnySubscriber,
+    policy: pullRequestMappingPolicy(),
   },
 ] as const satisfies readonly {
   name: string;
   windowMs: number;
   dedupTtlMs: number;
   survivesDispatch: boolean;
-  subscriber: AnySubscriber;
+  policy: ReturnType<typeof registeredPolicy>;
 }[];
 
 describe("subscriber throttle policy", () => {
   describe.each(windowed)(
     "given the $name subscriber",
-    ({ subscriber, windowMs, dedupTtlMs }) => {
+    ({ policy, windowMs, dedupTtlMs }) => {
       it("holds events for exactly the window the policy assigns it", () => {
-        expect(subscriber.options?.delay).toBe(windowMs);
+        expect(policy.delay).toBe(windowMs);
       });
 
       it("pins the window's deadline so a continuous stream cannot defer it forever", () => {
-        expect(subscriber.options?.deduplication?.extend).toBe(false);
+        expect(policy.extend).toBe(false);
       });
 
       it("keeps its dedup key alive for exactly the suppression the policy assigns it", () => {
-        expect(subscriber.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
+        expect(policy.ttlMs).toBe(dedupTtlMs);
       });
 
       it("never lets the key expire before the job it is holding dispatches", () => {
-        const { delay, deduplication } = subscriber.options!;
-        expect(deduplication?.ttlMs).toBeGreaterThanOrEqual(delay!);
+        expect(policy.ttlMs).toBeGreaterThanOrEqual(policy.delay ?? 0);
       });
 
       it("collapses on the same job id the router collapses on", () => {
-        expect(subscriber.options?.makeJobId).toBe(
-          subscriber.options?.deduplication?.makeId,
-        );
+        expect(policy.makeJobId).toBe(policy.dedupId);
       });
     },
   );
@@ -196,10 +207,8 @@ describe("subscriber throttle policy", () => {
     // write as the final answer. The table says which is which, and why.
     it.each(windowed)(
       "holds $name to the post-dispatch suppression the policy allows it",
-      ({ subscriber, survivesDispatch }) => {
-        expect(subscriber.options?.deduplication?.shouldSurviveDispatch).toBe(
-          survivesDispatch,
-        );
+      ({ policy, survivesDispatch }) => {
+        expect(policy.shouldSurviveDispatch).toBe(survivesDispatch);
       },
     );
 

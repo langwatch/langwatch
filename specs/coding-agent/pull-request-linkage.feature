@@ -5,7 +5,7 @@
 #   packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
 #   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
 #   packages/features/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
+#   packages/features/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
 #   packages/features/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
 #   packages/features/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
 #   packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)

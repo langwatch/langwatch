@@ -34,7 +34,7 @@ TTL IF(_retention_days > 0, toDateTime(StartedAt) + toIntervalDay(_retention_day
 `StartedAt` is not stable. The fold takes the **minimum** business time it has ever seen for the session:
 
 ```ts
-// codingAgentSession.foldProjection.ts:262-267
+// packages/features/coding-agent/server/src/projections/coding-agent-session.projection.ts
 // The session starts when its earliest signal does. Spans refine this
 // below with their own start time, which can predate arrival order.
 startedAtMs:
@@ -146,7 +146,7 @@ The obvious reaction to this ADR is that `coding_agent_sessions` picked an idios
 
 | Table                                   | Anchor (partition + sort key + TTL) | How it is derived                                                                                                                                                                                                         | Direction it moves                        |
 | --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `coding_agent_sessions` (00051:192-195) | `StartedAt`                         | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:262-267`                                                                                                                                     | backwards                                 |
+| `coding_agent_sessions` (00051:192-195) | `StartedAt`                         | `min(state.startedAtMs, occurredAt)` — `coding-agent-session.projection.ts`                                                                                                                                              | backwards                                 |
 | `trace_analytics` (00039:189-192)       | `OccurredAt`                        | was `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`; **since the amendment above** it is `storageAnchorMs`, first-observed and frozen, projected at `traceAnalytics.foldProjection.ts:593` | **frozen per row** — see the caveat below |
 | `evaluation_analytics` (00041:135-138)  | `OccurredAt`                        | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:252`                                                                 | forwards                                  |
 

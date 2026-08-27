@@ -276,23 +276,6 @@ import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
-import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
-import { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
-import { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
-import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
-import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
-import {
-  CodingAgentSessionEventsClickHouseRepository,
-  NullCodingAgentSessionEventsRepository,
-} from "./coding-agent/repositories/coding-agent-session-events.repository";
-import {
-  CodingAgentTraceSessionClickHouseRepository,
-  NullCodingAgentTraceSessionRepository,
-} from "./coding-agent/repositories/coding-agent-trace-session.repository";
-import {
-  NullSessionMetricSeriesRepository,
-  SessionMetricSeriesClickHouseRepository,
-} from "./coding-agent/repositories/session-metric-series.repository";
 import {
   type AppConfig,
   createAppConfigFromEnv,
@@ -309,8 +292,16 @@ import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/ev
 import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
-import { GithubCompositionAdapter } from "@langwatch/github-server";
-import type { GithubService } from "@langwatch/github-contract";
+import { GithubPrismaInstaller } from "@langwatch/github-server";
+import {
+  CodingAgentProjectionPersistenceAdapter,
+  CodingAgentRuntime,
+} from "@langwatch/coding-agent-server";
+import {
+  AppCodingAgentBillingPolicy,
+  AppCodingAgentClickHousePort,
+  AppCodingAgentReadMetricsPort,
+} from "~/runtime/app/features/coding-agent";
 import { AppDatasetRuntime } from "~/runtime/app/features/dataset";
 import { AppAutomationTestFireAdapter } from "~/runtime/app/features/automation-test-fire.adapter";
 import { AppPromptRuntime } from "~/runtime/app/features/prompt";
@@ -1064,6 +1055,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     messages: langyPersistence.trustedMessages,
   });
 
+  const codingAgentProjections = CodingAgentProjectionPersistenceAdapter.create({
+    clickHouse: clickhouseEnabled
+      ? AppCodingAgentClickHousePort.create(resolveClickHouseClient)
+      : null,
+    retention: {
+      defaultTraceRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    },
+    readMetrics: AppCodingAgentReadMetricsPort.create(),
+  });
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     simulationRunState: clickhouseEnabled
@@ -1094,18 +1095,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
-    codingAgentSession: clickhouseEnabled
-      ? new CodingAgentSessionClickHouseRepository(resolveClickHouseClient)
-      : new NullCodingAgentSessionRepository(),
-    codingAgentTraceSession: clickhouseEnabled
-      ? new CodingAgentTraceSessionClickHouseRepository(resolveClickHouseClient)
-      : new NullCodingAgentTraceSessionRepository(),
-    sessionMetricSeries: clickhouseEnabled
-      ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
-      : new NullSessionMetricSeriesRepository(),
-    codingAgentSessionEvents: clickhouseEnabled
-      ? new CodingAgentSessionEventsClickHouseRepository(resolveClickHouseClient)
-      : new NullCodingAgentSessionEventsRepository(),
+    codingAgentProjections,
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -1503,21 +1493,20 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       });
   }
 
-  // The coding-agent pipeline's pull-request mapping subscriber fires against a
-  // service composed further down (it needs the GitHub connection, which needs
-  // Redis and Prisma), so the registry is handed the callable proxy now and the
-  // real implementation is wired once it exists.
-  const requestBranchMapping = new Deferred<GithubService["requestBranchMapping"]>(
-    "requestBranchMapping",
-  );
-
-  // The fleet-wide linkage maintenance the scheduled process manager drives.
-  // Late-bound for the same reason: both need the mapping service and its
-  // repository, which are composed further down.
-  const recheckDueBranches = new Deferred<() => Promise<number>>("recheckDueBranches");
-  const pruneStaleBranchLinkage = new Deferred<() => Promise<{ branchChecks: number }>>(
-    "pruneStaleBranchLinkage",
-  );
+  const githubService = GithubPrismaInstaller.create({
+    database: prisma,
+    config: {
+      appId: env.GITHUB_LANGY_APP_ID ?? "",
+      privateKey: env.GITHUB_LANGY_PRIVATE_KEY ?? "",
+      appSlug: env.GITHUB_LANGY_APP_SLUG ?? "",
+      webhookSecret: env.GITHUB_LANGY_WEBHOOK_SECRET ?? "",
+      signingKey: env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET ?? "",
+    },
+    redis,
+    hostConfig: { host: env.GITHUB_LANGY_HOST },
+    organization: organizations,
+    project: projects,
+  });
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
@@ -1527,18 +1516,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       connect: (authzCommands) => authzFeature.connect(authzCommands as never),
     },
     repositories,
+    modelProviders,
     suiteRunState: suiteEventing.suiteRunState,
     redis: redis!,
     broadcast,
-    codingAgent: {
-      pullRequestMapping: {
-        requestBranchMapping: (params) => requestBranchMapping.fn(params),
-      },
-    },
-    github: {
-      recheckDueBranches: () => recheckDueBranches.fn(),
-      pruneStaleBranchLinkage: () => pruneStaleBranchLinkage.fn(),
-    },
+    codingAgent: { github: githubService },
+    github: githubService,
     langy: {
       buffer: langyTokenBuffer,
       handoffStore: langyHandoffStore,
@@ -1663,14 +1646,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // reports `configured=false` and every read short-circuits to "GitHub
   // unavailable" without touching GitHub. The App private key is the only
   // credential and it lives here in the control plane, never near a worker.
-  let github: GithubService | null = null;
   const langyCredentialComposition = createAppLangyCredentialComposition({
     prisma,
     apiKeys,
-    github: () => {
-      if (!github) throw new Error("GitHub service has not been composed");
-      return github;
-    },
+    github: () => githubService,
     workerCallbackUrl:
       env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL,
     workerGatewayBaseUrl:
@@ -1833,59 +1812,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "MetricRequestCollectionService",
   );
 
-  // Hoisted out of the `codingAgents` bag below: the Sessions lens rollup
-  // enriches session rows with these pre-folded counters, so both reads
-  // share the one service instance.
-  const codingAgentSessions = traced(
-    new CodingAgentSessionService({
-      sessions: repositories.codingAgentSession,
-      traceSessions: repositories.codingAgentTraceSession,
-      metricSeries: repositories.sessionMetricSeries,
-      sessionEvents: repositories.codingAgentSessionEvents,
-    }),
-    "CodingAgentSessionService",
-  );
-
-  const githubService = GithubCompositionAdapter.create({
-    database: prisma,
-    config: {
-      appId: env.GITHUB_LANGY_APP_ID ?? "",
-      privateKey: env.GITHUB_LANGY_PRIVATE_KEY ?? "",
-    },
-    redis: (redis ?? null) as never,
-    hostConfig: { host: env.GITHUB_LANGY_HOST },
-    organization: organizations,
-    project: projects,
-    codingAgent: codingAgentSessions,
-  });
-  github = githubService;
-  requestBranchMapping.resolve((params) => githubService.requestBranchMapping(params));
-  recheckDueBranches.resolve(() => githubService.recheckDueBranches());
-  pruneStaleBranchLinkage.resolve(() => githubService.pruneStaleBranchLinkage());
-
-  const pullRequestUsage = new PullRequestUsageService({
-    pullRequests: githubService,
-    sessions: repositories.codingAgentSession,
-    personalSessions: codingAgentSessions,
-    sessionEvents: repositories.codingAgentSessionEvents,
-    installations: githubService,
-    resolveOrganizationId,
-    // The one place the bundled-plan policy is reached: the service takes the
-    // answer as a dep so the read stays free of the enterprise module, and the
-    // receiver and this rollup resolve bundled-ness the same way.
-    isSourceNonBillable: (input) => governanceRuntime.resolveSourceNonBillable(input),
-  });
-
-  // The Sessions screen's read: the same session service, plus the mapping
-  // lookup the sessions lens joins with, so both surfaces answer "which pull
-  // request" from one place.
-  const codingAgentSessionsList = traced(
-    new CodingAgentSessionsListService({
-      sessions: codingAgentSessions,
-      pullRequests: githubService,
-      resolveOrganizationId,
-    }),
-    "CodingAgentSessionsListService",
+  const codingAgents = traced(
+    CodingAgentRuntime.create({
+      projections: codingAgentProjections,
+      github: githubService,
+      projects,
+      billing: AppCodingAgentBillingPolicy.create(governance),
+    }).service,
+    "CodingAgentService",
   );
 
   const sessionGroups = traced(
@@ -1893,7 +1827,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       repository: clickhouseEnabled
         ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
         : new NullSessionGroupsRepository(),
-      codingAgentSessions,
+      codingAgentSessions: codingAgents,
       pullRequests: githubService,
       resolveOrganizationId,
     }),
@@ -2070,11 +2004,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     governance,
     billableEvents: billableEventsRepository ?? undefined,
     billingQueries,
-    codingAgents: {
-      sessions: codingAgentSessions,
-      sessionsList: codingAgentSessionsList,
-      pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
-    },
+    codingAgents,
     github: githubService,
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(getAllClickHouseInstances),
@@ -2313,39 +2243,31 @@ export function createTestApp(
     governance: testGovernance,
   });
   const testBroadcast = new BroadcastService(null);
-  const testCodingAgentSessions = new CodingAgentSessionService({
-    sessions: new NullCodingAgentSessionRepository(),
-    traceSessions: new NullCodingAgentTraceSessionRepository(),
-    metricSeries: new NullSessionMetricSeriesRepository(),
-    sessionEvents: new NullCodingAgentSessionEventsRepository(),
-  });
   // Pull-request linkage against an unconfigured App and null stores: every
   // read answers empty, every write is a no-op, and no test can accidentally
   // reach github.com.
-  const testGithub = GithubCompositionAdapter.create({
+  const testGithub = GithubPrismaInstaller.create({
     database: testPrisma,
-    config: { appId: "", privateKey: "" },
+    config: {
+      appId: "",
+      privateKey: "",
+      appSlug: "",
+      webhookSecret: "",
+      signingKey: "",
+    },
     redis: null,
     organization: nullOrganizations,
     project: testProjects,
-    codingAgent: testCodingAgentSessions,
   });
-  const testPullRequestUsage = new PullRequestUsageService({
-    pullRequests: testGithub,
-    sessions: new NullCodingAgentSessionRepository(),
-    personalSessions: testCodingAgentSessions,
-    sessionEvents: new NullCodingAgentSessionEventsRepository(),
-    installations: testGithub,
-    resolveOrganizationId: async () => undefined,
-    // No enterprise policy in the test app: everything reads as billed, the
-    // conservative answer for a cost.
-    isSourceNonBillable: async () => false,
-  });
-  const testCodingAgentSessionsList = new CodingAgentSessionsListService({
-    sessions: testCodingAgentSessions,
-    pullRequests: testGithub,
-    resolveOrganizationId: async () => undefined,
-  });
+  const testCodingAgents = CodingAgentRuntime.create({
+    projections: CodingAgentProjectionPersistenceAdapter.create({
+      clickHouse: null,
+      retention: { defaultTraceRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS },
+    }),
+    github: testGithub,
+    projects: testProjects,
+    billing: AppCodingAgentBillingPolicy.create(testGovernance),
+  }).service;
   const testDataset = AppDatasetRuntime.create({
     database: testPrisma,
   }).build();
@@ -2487,7 +2409,7 @@ export function createTestApp(
         sessionGroups: traced(
           new SessionGroupsService({
             repository: new NullSessionGroupsRepository(),
-            codingAgentSessions: testCodingAgentSessions,
+            codingAgentSessions: testCodingAgents,
           }),
           "SessionGroupsService",
         ),
@@ -2597,11 +2519,7 @@ export function createTestApp(
     governance: testGovernance,
     billableEvents: undefined,
     billingQueries: BillableEventsQueryService.create(null),
-    codingAgents: {
-      sessions: testCodingAgentSessions,
-      sessionsList: testCodingAgentSessionsList,
-      pullRequestUsage: testPullRequestUsage,
-    },
+    codingAgents: testCodingAgents,
     github: testGithub,
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(async () => []),

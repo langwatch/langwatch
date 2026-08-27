@@ -49,6 +49,8 @@ import {
   throttledWindow,
 } from "@langwatch/eventing";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { GithubService } from "@langwatch/github-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { BlobSweeper } from "@langwatch/group-queue/operational";
 import type {
   LangyConversationStateData,
@@ -76,10 +78,16 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
-import type { CodingAgentSessionRepository } from "../../app-layer/coding-agent/repositories/coding-agent-session.repository";
-import type { CodingAgentSessionEventsRepository } from "../../app-layer/coding-agent/repositories/coding-agent-session-events.repository";
-import type { CodingAgentTraceSessionRepository } from "../../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
-import type { SessionMetricSeriesRepository } from "../../app-layer/coding-agent/repositories/session-metric-series.repository";
+import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import {
+  EventingCodingAgentProcessingAdapter,
+  PrometheusCodingAgentCostMetricsAdapter,
+  SystemCodingAgentClock,
+  createCodingAgentLogFactsDispatchSubscriber,
+  createCodingAgentMetricFactsDispatchSubscriber,
+  createCodingAgentSpanFactsDispatchSubscriber,
+} from "@langwatch/coding-agent-server";
+import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../../app-layer/evaluations/evaluation-cost.recorder";
 import { offloadInputsIfOversized } from "../../app-layer/evaluations/evaluation-inputs-offload";
@@ -113,6 +121,7 @@ import { TraceReadDerivationService } from "../../app-layer/traces/trace-read-de
 import type { TraceSummaryService } from "../../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { publishCancellation } from "../../scenarios/cancellation-channel";
 import type { ScenarioExecutionPool } from "../../scenarios/execution/execution-pool";
 import {
@@ -127,22 +136,6 @@ import {
   createBillingReportingPipeline,
 } from "../pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "../pipelines/blob-maintenance/pipeline";
-import { createCodingAgentProcessingPipeline } from "../pipelines/coding-agent-processing/pipeline";
-import type { CodingAgentSessionState } from "../pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CodingAgentSessionStore } from "../pipelines/coding-agent-processing/projections/codingAgentSession.store";
-import { createCodingAgentSessionSeenTouch } from "../pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
-import {
-  CodingAgentSessionEventsAppendStore,
-  CodingAgentTraceSessionAppendStore,
-  SessionMetricSeriesAppendStore,
-} from "../pipelines/coding-agent-processing/projections/stores";
-import { createCodingAgentLogFactsDispatchSubscriber } from "../pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
-import { createCodingAgentMetricFactsDispatchSubscriber } from "../pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "../pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
-import {
-  createPullRequestMappingHandler,
-  type PullRequestMappingSubscriberDeps,
-} from "../pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { ExecuteEvaluationCommand } from "../pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -166,7 +159,7 @@ import { GatewaySpendStore } from "../pipelines/gateway-spend-processing/project
 import type { OpenAdmission } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { getOpenAdmissionFindersByInstance } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "../pipelines/gateway-spend-processing/schemas/constants";
-import { createGithubMaintenancePipeline } from "../pipelines/github-maintenance/pipeline";
+import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
 import { createLangyConversationProcessingPipeline } from "@langwatch/langy-server";
 import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type { LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-server";
@@ -359,13 +352,8 @@ export interface PipelineRepositories {
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
-  /** ADR-056: the session-aggregate row + the (trace → session) map. */
-  codingAgentSession: CodingAgentSessionRepository;
-  codingAgentTraceSession: CodingAgentTraceSessionRepository;
-  /** ADR-056 §5: converged per-series metric totals per session. */
-  sessionMetricSeries: SessionMetricSeriesRepository;
-  /** The per-call fact table: one row per session event (migration 00073). */
-  codingAgentSessionEvents: CodingAgentSessionEventsRepository;
+  /** Coding Agent owns the persistence behind its durable projections. */
+  codingAgentProjections: CodingAgentProjectionPersistence;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
@@ -429,6 +417,7 @@ export interface PipelineRegistryDeps {
   enterprisePipelines: AppGovernanceEventingRuntime;
   projects: ProjectService;
   monitors: MonitorService;
+  modelProviders: ModelProviderService;
   automation: AutomationService;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;
@@ -459,13 +448,7 @@ export interface PipelineRegistryDeps {
   governanceOcsfEventsSync?: AppGovernanceOcsfSubscriberDependencies;
   retentionPolicyResolver?: RetentionPolicyResolver;
   codingAgent?: {
-    /**
-     * Maps a folded session's branch to its pull requests. Late-bound: the
-     * mapping service is composed after the registry (it needs the GitHub
-     * connection), so presets passes a `Deferred`'s callable proxy here.
-     * Omitted where there is no GitHub connection to ask.
-     */
-    pullRequestMapping: PullRequestMappingSubscriberDeps;
+    github: GithubService;
   };
   /**
    * The fleet-wide GitHub linkage maintenance the scheduled process manager
@@ -474,12 +457,7 @@ export interface PipelineRegistryDeps {
    * passes `Deferred` callable proxies. Omitted where there is no GitHub
    * connection, in which case the pipeline is not registered at all.
    */
-  github?: {
-    /** One recheck pass; returns how many branches were re-asked about. */
-    recheckDueBranches: () => Promise<number>;
-    /** One retention pass over the branch bookkeeping. */
-    pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
-  };
+  github?: GithubService;
 }
 
 /** The one Automation-backed trigger catalogue used by Governance trace alerts. */
@@ -619,16 +597,11 @@ export class PipelineRegistry {
     // `setTimeout` chain on every replica with no lock, so the fleet ran the
     // same cross-tenant scan N times every ten minutes.
     if (this.deps.github) {
-      const github = this.deps.github;
       this.deps.eventSourcing.register(
-        createGithubMaintenancePipeline({
-          branchRecheck: {
-            recheck: () => github.recheckDueBranches(),
-            prune: () => github.pruneStaleBranchLinkage(),
-            deleteDispatchedBefore: (params) =>
-              this.deps.repositories.processStore.deleteDispatchedBefore(params),
-          },
-        }),
+        EventingGithubMaintenanceAdapter.create({
+          github: this.deps.github,
+          processStore: this.deps.repositories.processStore,
+        }).build(),
       );
     }
 
@@ -695,8 +668,10 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          traceCanonicalisation: this.deps.traceCanonicalisation,
-          getNormalizedSpanById: (params) => this.deps.traces.spans.getNormalizedSpanById(params),
+          traces: AppCodingAgentTraceProcessingAdapter.create({
+            traceCanonicalisation: this.deps.traceCanonicalisation,
+            spans: this.deps.traces.spans,
+          }),
         }),
       ],
     });
@@ -1053,40 +1028,17 @@ export class PipelineRegistry {
 
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
-      createCodingAgentProcessingPipeline({
+      EventingCodingAgentProcessingAdapter.create({
         traceCanonicalisation: this.deps.traceCanonicalisation,
-        // Read-through store (ADR-066): Redis is the warm read tier; on a miss
-        // the store reads its own last committed state back from
-        // coding_agent_sessions (store.get() → findBySessionId → decode row).
-        // The delivery path never reads event_log. Same wiring as trace_summaries.
-        codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession, {
-            // The Sessions-destination stamp, inline at the commit seam with
-            // its own per-process window — a read-model write, not a subscriber.
-            onSessionsStored: createCodingAgentSessionSeenTouch({
-              touchCodingAgentSessionSeen: (params) =>
-                this.deps.projects.touchCodingAgentSessionSeen(params),
-            }),
-          }),
-          "coding_agent_sessions",
-        ),
-        codingAgentTraceSessionAppendStore: new CodingAgentTraceSessionAppendStore(
-          this.deps.repositories.codingAgentTraceSession,
-        ),
-        sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
-          this.deps.repositories.sessionMetricSeries,
-        ),
-        codingAgentSessionEventsAppendStore: new CodingAgentSessionEventsAppendStore(
-          this.deps.repositories.codingAgentSessionEvents,
-        ),
-        ...(this.deps.codingAgent
-          ? {
-              pullRequestMappingHandler: createPullRequestMappingHandler(
-                this.deps.codingAgent.pullRequestMapping,
-              ),
-            }
-          : {}),
-      }),
+        modelProviders: this.deps.modelProviders,
+        costMetrics: PrometheusCodingAgentCostMetricsAdapter.create(),
+        projections: this.deps.repositories.codingAgentProjections,
+        projects: this.deps.projects,
+        clock: SystemCodingAgentClock.create(),
+        redis: this.deps.redis,
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        ...(this.deps.codingAgent ? { github: this.deps.codingAgent.github } : {}),
+      }).build(),
     );
   }
 

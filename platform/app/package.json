@@ -109,6 +109,7 @@
     "@langwatch/automation-web": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/coding-agent-server": "workspace:*",
     "@langwatch/coding-agent-web": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dashboard-server": "workspace:*",

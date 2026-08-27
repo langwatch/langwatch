@@ -49,10 +49,7 @@ const projectionRepositories = new WeakMap<
   CodingAgentProjectionPersistence,
   CodingAgentRepositories
 >();
-const projectionClocks = new WeakMap<
-  CodingAgentProjectionPersistence,
-  CodingAgentClockPort
->();
+const projectionClocks = new WeakMap<CodingAgentProjectionPersistence, CodingAgentClockPort>();
 
 /**
  * The process-owned persistence adapter installed into Coding Agent's event
@@ -86,11 +83,7 @@ export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjecti
     retentionDays: number;
     appliedEventIds: readonly string[];
   }): Promise<void> {
-    return this.repositories.sessions.upsert(
-      input.row,
-      input.retentionDays,
-      input.appliedEventIds,
-    );
+    return this.repositories.sessions.upsert(input.row, input.retentionDays, input.appliedEventIds);
   }
 
   storeSessionBatch(
@@ -173,10 +166,7 @@ export class CodingAgentRuntime {
     return new CodingAgentRuntime(service, options.projections);
   }
 
-  private constructor(
-    service: CodingAgentService,
-    projections: CodingAgentProjectionPersistence,
-  ) {
+  private constructor(service: CodingAgentService, projections: CodingAgentProjectionPersistence) {
     this.service = service;
     this.projections = projections;
   }
@@ -195,12 +185,12 @@ function createRepositories(
   }
   const metrics = options.readMetrics ?? NoopCodingAgentReadMetricsPort.create();
   return {
-    sessions: new CodingAgentSessionClickHouseRepository(
-      options.clickHouse,
-      options.retention.defaultTraceRetentionDays,
+    sessions: CodingAgentSessionClickHouseRepository.create({
+      clickHouse: options.clickHouse,
+      defaultTraceRetentionDays: options.retention.defaultTraceRetentionDays,
       metrics,
-      options.clock,
-    ),
+      clock: options.clock,
+    }),
     traceSessions: new CodingAgentTraceSessionClickHouseRepository(
       options.clickHouse,
       options.retention.defaultTraceRetentionDays,

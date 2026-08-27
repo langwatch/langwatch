@@ -1714,16 +1714,46 @@ importers:
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../github/contract
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../../log/contract
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../../metric/contract
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+      ioredis:
+        specifier: ^5.9.3
+        version: 5.10.1
+      prom-client:
+        specifier: ^15.1.3
+        version: 15.1.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../../group-queue
+      '@langwatch/metric-server':
+        specifier: workspace:*
+        version: link:../../metric/server
+      '@langwatch/trace-server':
+        specifier: workspace:*
+        version: link:../../trace/server
+      '@testcontainers/redis':
+        specifier: ^12.0.4
+        version: 12.0.4
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2495,6 +2525,9 @@ importers:
 
   packages/features/github/server:
     dependencies:
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4459,6 +4492,9 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../packages/features/coding-agent/contract
+      '@langwatch/coding-agent-server':
+        specifier: workspace:*
+        version: link:../../packages/features/coding-agent/server
       '@langwatch/coding-agent-web':
         specifier: workspace:*
         version: link:../../packages/features/coding-agent/web

@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetricsPort } from "../src/adapters/coding-agent-read-metrics.adapter";
-import {
-  TestClickHouseEndpoint,
-  TestClock,
-  session,
-} from "./fixtures/coding-agent.fixture";
+import { TestClickHouseEndpoint, TestClock, session } from "./fixtures/coding-agent.fixture";
 import { CodingAgentSessionClickHouseRepository } from "../src/repositories/coding-agent-session/clickhouse.repository";
 
 const endpoints: TestClickHouseEndpoint[] = [];
@@ -18,12 +14,12 @@ async function createRepository() {
   endpoints.push(endpoint);
   return {
     endpoint,
-    repository: new CodingAgentSessionClickHouseRepository(
-      endpoint,
-      30,
-      NoopCodingAgentReadMetricsPort.create(),
-      new TestClock(),
-    ),
+    repository: CodingAgentSessionClickHouseRepository.create({
+      clickHouse: endpoint,
+      defaultTraceRetentionDays: 30,
+      metrics: NoopCodingAgentReadMetricsPort.create(),
+      clock: new TestClock(),
+    }),
   };
 }
 
@@ -46,9 +42,7 @@ describe("Coding Agent session ClickHouse repository", () => {
     expect(endpoint.requests[0]?.url).toContain("coding_agent_sessions");
     expect(endpoint.requests[0]?.body).toContain('"SessionId":"session-a"');
     expect(endpoint.requests[0]?.body).toContain('"InputTokens":"123"');
-    expect(endpoint.requests[0]?.body).toContain(
-      '"AppliedEventIds":["event-a","event-b"]',
-    );
+    expect(endpoint.requests[0]?.body).toContain('"AppliedEventIds":["event-a","event-b"]');
     expect(endpoint.requests[0]?.body).toContain('"_retention_days":14');
   });
 
@@ -67,9 +61,7 @@ describe("Coding Agent session ClickHouse repository", () => {
     const secondUpdated = /"UpdatedAt":"([^"]+)"/.exec(second?.body)?.[1];
     expect(firstUpdated).toBeDefined();
     expect(secondUpdated).toBeDefined();
-    expect(Date.parse(secondUpdated ?? "")).toBeGreaterThan(
-      Date.parse(firstUpdated ?? ""),
-    );
+    expect(Date.parse(secondUpdated ?? "")).toBeGreaterThan(Date.parse(firstUpdated ?? ""));
   });
 
   it("decodes ClickHouse DateTime64 values as UTC and preserves the zero checkpoint", async () => {
@@ -112,8 +104,7 @@ describe("Coding Agent session ClickHouse repository", () => {
     expect(request?.body).toContain("StartedAt BETWEEN");
     expect(request?.body).toContain("UserId =");
     expect(request?.body).toContain("SELECT TenantId, SessionId, max(UpdatedAt)");
-    const dedup =
-      request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
     expect(dedup).not.toContain("StartedAt BETWEEN");
     expect(dedup).not.toContain("UserId =");
   });

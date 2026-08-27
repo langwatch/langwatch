@@ -9,12 +9,12 @@ import type {
   OtlpInstrumentationScope,
   OtlpResource,
   OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "@langwatch/trace-contract";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
   NormalizedSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "@langwatch/trace-contract";
 import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 

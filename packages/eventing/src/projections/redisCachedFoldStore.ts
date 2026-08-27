@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
-import type { Redis } from "ioredis";
+import type { Cluster, Redis } from "ioredis";
 import {
   incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
@@ -114,7 +114,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
-    private readonly redis: Redis,
+    private readonly redis: Redis | Cluster,
     options: RedisCachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;

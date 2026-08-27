@@ -72,9 +72,7 @@ import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { AutomationService } from "@langwatch/automation-contract";
 import type { BroadcastService } from "./broadcast/broadcast.service";
-import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
-import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
-import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
+import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { AppConfig } from "./config";
 import type { GithubService } from "@langwatch/github-contract";
 import type { LangyService } from "@langwatch/langy-contract";
@@ -308,14 +306,8 @@ export interface AppDependencies {
    *  `billableEventsQuery.ts`'s exported query functions. */
   billableEvents: BillingEventsReadRepository | undefined;
   billingQueries: BillableEventsQueryService;
-  /** ADR-056: read side of the coding-agent session aggregate. */
-  codingAgents: {
-    sessions: CodingAgentSessionService;
-    /** The Sessions screen's list, joined to the pull requests each drove. */
-    sessionsList: CodingAgentSessionsListService;
-    /** What a pull request cost in assistant usage, RBAC-scoped. */
-    pullRequestUsage: PullRequestUsageService;
-  };
+  /** ADR-056: the canonical coding-agent session aggregate. */
+  codingAgents: CodingAgentService;
   /**
    * The organization's GitHub connection, consumed by Langy for writes and by
    * pull-request linkage for reads.

@@ -1,6 +1,8 @@
 import type { TraceLogRecordDto } from "~/server/api/routers/tracesV2";
-import type { CodingAgentEvent } from "~/server/event-sourcing/pipelines/coding-agent-processing/agents/_types";
-import { normalizeEventName } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
+import {
+  type CodingAgentEvent,
+  normalizeEventName,
+} from "@langwatch/coding-agent-contract";
 
 /**
  * A one-line, human summary for a log record whose `event.name` is one of the

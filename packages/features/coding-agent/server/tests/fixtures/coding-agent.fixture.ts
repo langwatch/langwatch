@@ -183,12 +183,16 @@ export function sessionEventRecord(
 }
 
 export class TestClock extends CodingAgentClockPort {
-  constructor(private readonly value = TEST_NOW_MS) {
+  constructor(private value = TEST_NOW_MS) {
     super();
   }
 
   nowMs(): number {
     return this.value;
+  }
+
+  set(value: number): void {
+    this.value = value;
   }
 }
 
@@ -427,6 +431,10 @@ export class TestGithubService extends GithubService {
   coveredRepositories = true;
   mappingError: Error | null = null;
 
+  static create(): TestGithubService {
+    return new TestGithubService();
+  }
+
   getAppConfig(): never {
     throw new Error("not used by Coding Agent tests");
   }
@@ -561,6 +569,8 @@ export class TestGithubService extends GithubService {
 
 export class TestProjectService extends ProjectService {
   projects: Array<{ id: string }> = [];
+  sessionActivity: Array<{ projectId: string; at: Date }> = [];
+  sessionActivityError: Error | null = null;
   organizationId = "organization-1";
   teamProject: ProjectWithTeam | null = projectWithTeamSchema.parse({
     id: "project-1",
@@ -677,8 +687,15 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async touchCodingAgentSessionSeen(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
+  async touchCodingAgentSessionSeen(input: {
+    projectId: string;
+    at: Date;
+  }): Promise<void> {
+    if (this.sessionActivityError) {
+      throw this.sessionActivityError;
+    }
+
+    this.sessionActivity.push(input);
   }
 
   async touchCodingAgentPullRequestSeen(): Promise<never> {

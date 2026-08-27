@@ -1156,9 +1156,7 @@
         "~/server/app-layer/traces/coding-agent-transcript.derivation"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/logSummary.ts": [
-        "~/server/api/routers/tracesV2",
-        "~/server/event-sourcing/pipelines/coding-agent-processing/agents/_types",
-        "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization"
+        "~/server/api/routers/tracesV2"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/SpanAccordions.tsx": [
         "~/server/api/routers/tracesV2.schemas"
