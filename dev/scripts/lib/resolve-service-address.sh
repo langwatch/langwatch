@@ -21,14 +21,21 @@
 
 # Reads one variable out of one env file the way dotenv would: last assignment
 # wins, an optional `export` prefix, single or double quotes, and an inline
-# comment after an unquoted value. Prints the value, or fails when the file has
-# no usable one.
+# comment after an unquoted value.
+#
+# Prints the value and returns 0. Returns 1 when the file assigns the variable
+# nowhere, and 2 when it assigns it an empty value, which is a different answer:
+# dotenv gives the app an empty string there, so the file has cleared whatever a
+# lower-precedence file said rather than saying nothing about it.
 _service_address_from_env_file() {
   local var="$1"
   local file="$2"
   [ -f "$file" ] || return 1
 
-  local raw
+  local assigned raw
+  assigned=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=.*\$/y/p" "$file" | tail -n 1)
+  [ -n "$assigned" ] || return 1
+
   raw=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=[[:space:]]*(.*)\$/\\2/p" "$file" | tail -n 1)
   raw="${raw%$'\r'}"
 
@@ -47,7 +54,7 @@ _service_address_from_env_file() {
       ;;
   esac
 
-  [ -n "$raw" ] || return 1
+  [ -n "$raw" ] || return 2
   printf '%s' "$raw"
 }
 
@@ -57,12 +64,23 @@ resolve_service_address() {
   local var="$1"
   local app_dir="${2:-.}"
   local label="${3:-$1}"
-  local file value
+  local file value status
 
   for file in "$app_dir/.env.portless" "$app_dir/.env"; do
-    if value=$(_service_address_from_env_file "$var" "$file"); then
+    # `|| status=$?` keeps this out of `set -e`'s reach: a bare assignment from
+    # a failing command substitution ends the caller's script.
+    status=0
+    value=$(_service_address_from_env_file "$var" "$file") || status=$?
+    if [ "$status" -eq 0 ]; then
       export "$var=$value"
       echo "  ✓ ${label}: ${var}=${value} (from $(basename "$file"))"
+      return 0
+    fi
+    # An empty assignment is this file's answer, not a gap to look past. The app
+    # would read an empty string here, so the launcher derives its own address
+    # rather than exporting the value a lower-precedence file still holds.
+    if [ "$status" -eq 2 ]; then
+      echo "  ✓ ${label}: ${var} cleared by $(basename "$file")"
       return 0
     fi
   done

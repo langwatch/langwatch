@@ -64,6 +64,14 @@ Feature: `pnpm dev` starts the Langy agent manager
       Then it leaves the address unset for the launcher to derive from the port
 
     @unit
+    Scenario: An overlay that clears the agent address is not read past
+      Given platform/app/.env pins the agent URL
+      And the haven overlay assigns it an empty value
+      When the launcher resolves the agent address
+      Then it derives the port slot, because the app reads the empty overlay too
+      And it does not fall back to the address in the plain env file
+
+    @unit
     Scenario: A commented-out pin is not an agent address
       Given platform/app/.env has its agent URL commented out
       When the launcher resolves the agent address
@@ -111,6 +119,17 @@ Feature: `pnpm dev` starts the Langy agent manager
       When the launcher plans the langy lane
       Then the lane is skipped
       And the reason names the missing setting
+
+    @unit
+    Scenario: A setting only the haven overlay carries does not count as present
+      Given the Langy secret is only in the haven overlay, not in the app's env file
+      When the launcher plans the langy lane
+      Then the lane is skipped
+      And the reason names the missing setting
+      # The manager reads its settings from the app's env file alone, so a value
+      # that lives only in the overlay would start a lane that cannot boot. The
+      # agent address is resolved from the overlay on purpose, because the app
+      # reads the overlay to decide where to dial.
 
     @unit
     Scenario: No Go toolchain skips the lane with the manual command
@@ -161,6 +180,26 @@ Feature: `pnpm dev` starts the Langy agent manager
       When the launcher plans the langy lane
       Then the lane still starts, because the manager answers health checks
       And the startup line says which build command a chat needs first
+
+  Rule: The worker finds the command names its model expects
+
+    # The worker's model reaches for `python` on its own. macOS ships `python3`
+    # only, so the first call fails and the model spends another turn and
+    # another tool call finding that out. The name it expects goes on the
+    # worker's PATH so the first call works.
+
+    @unit
+    Scenario: A machine with only python3 gets a python that runs it
+      Given the machine has python3 and no python
+      When the launcher plans the langy lane
+      Then the lane puts a python on the worker's PATH
+      And that python runs the python3 already installed
+
+    @unit
+    Scenario: A machine that has its own python is left alone
+      Given the machine already has a python
+      When the launcher plans the langy lane
+      Then the lane adds nothing to the worker's PATH
 
   Rule: A local manager is capped to a local worker pool
 

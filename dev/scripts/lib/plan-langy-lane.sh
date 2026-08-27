@@ -30,25 +30,52 @@ LANGY_LOCAL_REAPER_INTERVAL_MS=2000
 # free. It is also what the standalone server package defaults to.
 LANGY_PORT_OFFSET=4
 
-# Overridable so the lane can be planned in a test without a Go toolchain or a
-# live listener.
+# Overridable so the lane can be planned in a test without a Go toolchain, a
+# live listener, or a particular python on PATH.
 _langy_have_go() { command -v go >/dev/null 2>&1; }
 _langy_port_listening() { lsof -i ":$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
-# True when the setting has a value in the shell or in either env file, which
-# is what the manager will see: `make service` sources .env into its process.
+# True when the manager will have a value for the setting.
+#
+# This reads fewer files than the address does, and the difference is the point.
+# The address is resolved the way the APP reads it, because the app decides
+# where to dial, and the app loads the haven overlay. These settings are read by
+# the MANAGER, and `make service` sources .env alone. A value that lives only in
+# .env.portless would count as present here, start the lane, and the manager
+# would still exit for a missing setting, on every restart.
 _langy_setting_present() {
-  local var="$1" app_dir="$2" file
-  [ -n "${!var}" ] && return 0
-  for file in "$app_dir/.env.portless" "$app_dir/.env"; do
-    _service_address_from_env_file "$var" "$file" >/dev/null && return 0
-  done
-  return 1
+  local var="$1" app_dir="$2"
+  [ -n "${!var:-}" ] && return 0
+  _service_address_from_env_file "$var" "$app_dir/.env" >/dev/null
 }
 
 _langy_skip() {
   LANGY_LANE_DECISION="skip"
   LANGY_LANE_REASON="$1"
+}
+
+# A directory holding a `python` that runs `python3`, or nothing.
+#
+# The worker's model reaches for `python` on its own. macOS ships `python3`
+# only, so that first call fails, and the model spends another turn and another
+# tool call finding out. Putting the name it expects on the worker's PATH makes
+# the first call work. Nothing is shadowed: the shim is built only when the
+# machine has no `python` of its own, and it points at the `python3` already
+# installed.
+_langy_have_python() { command -v python >/dev/null 2>&1; }
+_langy_python3_path() { command -v python3 2>/dev/null; }
+
+_langy_python_shim_dir() {
+  local repo="$1" dir target
+  _langy_have_python && return 1
+  target=$(_langy_python3_path) || return 1
+  [ -n "$target" ] || return 1
+  dir="$repo/node_modules/.cache/langy-shims/bin"
+  mkdir -p "$dir" 2>/dev/null || return 1
+  # Relinked every time rather than only when absent, so a shim left over from
+  # an interpreter that has since moved does not outlive it.
+  ln -sfn "$target" "$dir/python" 2>/dev/null || return 1
+  printf '%s' "$dir"
 }
 
 plan_langy_lane() {
@@ -59,7 +86,7 @@ plan_langy_lane() {
   LANGY_LANE_REASON=""
   LANGY_LANE_PORT=""
 
-  if [ "$LANGWATCH_SKIP_LANGY" = "1" ]; then
+  if [ "${LANGWATCH_SKIP_LANGY:-}" = "1" ]; then
     _langy_skip "skipped (LANGWATCH_SKIP_LANGY=1)"
     return 0
   fi
@@ -67,10 +94,10 @@ plan_langy_lane() {
   resolve_service_address OPENCODE_AGENT_URL "$app_dir" langy
 
   local port=""
-  if [ -z "$OPENCODE_AGENT_URL" ]; then
+  if [ -z "${OPENCODE_AGENT_URL:-}" ]; then
     port=$((app_port + LANGY_PORT_OFFSET))
     export OPENCODE_AGENT_URL="http://localhost:${port}"
-  elif [[ "$OPENCODE_AGENT_URL" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
+  elif [[ "${OPENCODE_AGENT_URL:-}" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
     port="${BASH_REMATCH[2]}"
   else
     _langy_skip "external OPENCODE_AGENT_URL=${OPENCODE_AGENT_URL}, not starting a local one"
@@ -108,10 +135,14 @@ plan_langy_lane() {
   # boots, accepts the dispatch and fails the turn with `exec: "langy-worker"`,
   # which reaches the reader as "Langy stopped mid-reply" and says nothing
   # about a missing build. Name the repo's copy and say when it is not there.
-  LANGY_LANE_WORKER_BINARY="$(cd "$app_dir/../.." 2>/dev/null && pwd)/services/langyworker/out/langy-worker"
+  local repo
+  repo="$(cd "$app_dir/../.." 2>/dev/null && pwd)"
+  LANGY_LANE_WORKER_BINARY="${repo}/services/langyworker/out/langy-worker"
   if [ ! -x "$LANGY_LANE_WORKER_BINARY" ]; then
     LANGY_LANE_REASON="${LANGY_LANE_REASON}, chats need \`pnpm --filter @langwatch/langyworker build:binary\` first"
   fi
+
+  LANGY_LANE_PYTHON_SHIM="$(_langy_python_shim_dir "$repo" || true)"
   return 0
 }
 
@@ -120,7 +151,11 @@ plan_langy_lane() {
 langy_lane_command() {
   local repo_from_app="$1"
   local port="$2"
-  printf '%s' "PORT=\"${port}\" \
+  local path_prefix=""
+  if [ -n "${LANGY_LANE_PYTHON_SHIM:-}" ]; then
+    path_prefix="PATH=\"${LANGY_LANE_PYTHON_SHIM}:\$PATH\" "
+  fi
+  printf '%s' "${path_prefix}PORT=\"${port}\" \
 LANGY_PI_WORKER_BINARY_PATH=\"\${LANGY_PI_WORKER_BINARY_PATH:-${LANGY_LANE_WORKER_BINARY}}\" \
 LANGY_MAX_WORKERS=\"\${LANGY_MAX_WORKERS:-${LANGY_LOCAL_MAX_WORKERS}}\" \
 LANGY_WORKER_IDLE_MS=\"\${LANGY_WORKER_IDLE_MS:-${LANGY_LOCAL_WORKER_IDLE_MS}}\" \

@@ -47,18 +47,46 @@ afterEach(() => {
   }
 });
 
+/**
+ * Expands the lane command the way the shell that runs it would, so a test can
+ * see which value the manager ends up with.
+ *
+ * The command goes through an unquoted heredoc: bash expands `${VAR:-default}`
+ * there and leaves every quote literal, so the command needs no escaping on the
+ * way in. Interpolating it into a `bash -c '...'` string would need escaping for
+ * both quotes and backslashes, and getting that half right is its own bug.
+ */
+function expandLaneCommand({
+  command,
+  env,
+}: {
+  command: string;
+  env: Record<string, string>;
+}): string {
+  return execSync("bash -s", {
+    encoding: "utf8",
+    input: `cat <<EOF\n${command}\nEOF\n`,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { PATH: process.env.PATH ?? "", ...env },
+  });
+}
+
 function plan({
   appDir,
   appPort = "5560",
   env = {},
   hasGo = true,
   listening = false,
+  hasPython = false,
+  python3 = "/usr/bin/python3",
 }: {
   appDir: string;
   appPort?: string;
   env?: Record<string, string | undefined>;
   hasGo?: boolean;
   listening?: boolean;
+  hasPython?: boolean;
+  python3?: string;
 }): {
   stdout: string;
   decision: string;
@@ -81,6 +109,8 @@ ${exports}
 . "${PLANNER}"
 _langy_have_go() { return ${hasGo ? 0 : 1}; }
 _langy_port_listening() { return ${listening ? 0 : 1}; }
+_langy_have_python() { return ${hasPython ? 0 : 1}; }
+_langy_python3_path() { printf '%s' "${python3}"; }
 plan_langy_lane "${appDir}" "${appPort}"
 echo "__DECISION=\${LANGY_LANE_DECISION:-}"
 echo "__REASON=\${LANGY_LANE_REASON:-}"
@@ -107,6 +137,7 @@ echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}"
   }
   const read = (key: string) =>
     stdout.match(new RegExp(`__${key}=(.*)`))?.[1] ?? "";
+
   return {
     stdout,
     decision: read("DECISION"),
@@ -195,6 +226,19 @@ describe("plan-langy-lane.sh", () => {
       expect(r.agentUrl).toBe("http://127.0.0.1:41234");
       expect(r.port).toBe("41234");
     });
+
+    /** @scenario "An overlay that clears the agent address is not read past" */
+    it("derives the port when the overlay clears the address", () => {
+      const appDir = appDirWith({
+        ".env": `OPENCODE_AGENT_URL="http://localhost:8080"\n${FULL_ENV}`,
+        ".env.portless": "OPENCODE_AGENT_URL=\n",
+      });
+
+      const r = plan({ appDir, appPort: "5570" });
+
+      expect(r.port).toBe("5574");
+      expect(r.agentUrl).toBe("http://localhost:5574");
+    });
   });
 
   describe("given nothing pins an agent address", () => {
@@ -255,6 +299,19 @@ describe("plan-langy-lane.sh", () => {
       const r = plan({ appDir, env: { LANGY_INTERNAL_SECRET: "from-shell" } });
 
       expect(r.decision).toBe("start");
+    });
+
+    /** @scenario "A setting only the haven overlay carries does not count as present" */
+    it("does not count a secret that only the haven overlay carries", () => {
+      const appDir = appDirWith({
+        ".env": 'SESSIONS_ROOT="/tmp/s"\nLANGY_WORKSPACE_ROOT="/tmp/w"\n',
+        ".env.portless": 'LANGY_INTERNAL_SECRET="from-overlay"\n',
+      });
+
+      const r = plan({ appDir });
+
+      expect(r.decision).toBe("skip");
+      expect(r.reason).toMatch(/LANGY_INTERNAL_SECRET/);
     });
 
     /** @scenario "No Go toolchain skips the lane with the manual command" */
@@ -333,10 +390,10 @@ describe("plan-langy-lane.sh", () => {
       const appDir = appDirWith({ ".env": FULL_ENV });
 
       const r = plan({ appDir });
-      const expanded = execSync(
-        `bash -c 'export LANGY_PI_WORKER_BINARY_PATH=/opt/mine; echo "${r.command.replace(/"/g, '\\"')}"'`,
-        { encoding: "utf8", env: { PATH: process.env.PATH ?? "" } },
-      );
+      const expanded = expandLaneCommand({
+        command: r.command,
+        env: { LANGY_PI_WORKER_BINARY_PATH: "/opt/mine" },
+      });
 
       expect(expanded).toMatch(/LANGY_PI_WORKER_BINARY_PATH="\/opt\/mine"/);
     });
@@ -354,43 +411,85 @@ describe("plan-langy-lane.sh", () => {
     });
   });
 
-  describe("when the lane is started", () => {
-    /** @scenario "The lane caps the pool and reaps idle workers quickly" */
-    it("caps the worker pool to the local size", () => {
+  describe("given the command names the worker's model reaches for", () => {
+    /** @scenario "A machine with only python3 gets a python that runs it" */
+    it("puts a python on the worker's PATH when the machine has only python3", () => {
       const appDir = appDirWith({ ".env": FULL_ENV });
 
-      const r = plan({ appDir });
+      const r = plan({ appDir, hasPython: false });
 
-      expect(r.command).toMatch(
-        /LANGY_MAX_WORKERS="\$\{LANGY_MAX_WORKERS:-2\}"/,
-      );
+      expect(r.command).toMatch(/^PATH="[^"]*langy-shims\/bin:\$PATH" /);
     });
 
-    /** @scenario "The lane caps the pool and reaps idle workers quickly" */
-    it("reaps an idle worker in minutes rather than the production wait", () => {
+    /** @scenario "A machine with only python3 gets a python that runs it" */
+    it("points that python at the python3 already installed", () => {
       const appDir = appDirWith({ ".env": FULL_ENV });
 
-      const r = plan({ appDir });
+      const r = plan({
+        appDir,
+        hasPython: false,
+        python3: "/opt/homebrew/bin/python3",
+      });
+      const shimDir = r.command.match(/^PATH="([^:]*)/)?.[1] ?? "";
+      const target = execSync(`readlink ${shimDir}/python`, {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH ?? "" },
+      }).trim();
 
-      expect(r.command).toMatch(
-        /LANGY_WORKER_IDLE_MS="\$\{LANGY_WORKER_IDLE_MS:-120000\}"/,
-      );
-      expect(r.command).toMatch(/svc=langyagent/);
+      expect(target).toBe("/opt/homebrew/bin/python3");
     });
 
-    /** @scenario "The lane caps the pool and reaps idle workers quickly" */
-    it("lets a cap set in the environment win over the local default", () => {
+    /** @scenario "A machine that has its own python is left alone" */
+    it("adds nothing to the PATH when the machine already has a python", () => {
       const appDir = appDirWith({ ".env": FULL_ENV });
 
-      const r = plan({ appDir, env: { LANGY_MAX_WORKERS: "8" } });
+      const r = plan({ appDir, hasPython: true });
 
-      // The lane expands the override where it runs, so the local number is
-      // only a fallback and the developer's value survives.
-      const expanded = execSync(
-        `bash -c 'export LANGY_MAX_WORKERS=8; echo "${r.command.replace(/"/g, '\\"')}"'`,
-        { encoding: "utf8", env: { PATH: process.env.PATH ?? "" } },
-      );
-      expect(expanded).toMatch(/LANGY_MAX_WORKERS="8"/);
+      expect(r.command).not.toMatch(/^PATH=/);
+      expect(r.command).toMatch(/^PORT=/);
+    });
+  });
+
+  describe("given a lane that will start", () => {
+    describe("when the lane is started", () => {
+      /** @scenario "The lane caps the pool and reaps idle workers quickly" */
+      it("caps the worker pool to the local size", () => {
+        const appDir = appDirWith({ ".env": FULL_ENV });
+
+        const r = plan({ appDir });
+
+        expect(r.command).toMatch(
+          /LANGY_MAX_WORKERS="\$\{LANGY_MAX_WORKERS:-2\}"/,
+        );
+      });
+
+      /** @scenario "The lane caps the pool and reaps idle workers quickly" */
+      it("reaps an idle worker in minutes rather than the production wait", () => {
+        const appDir = appDirWith({ ".env": FULL_ENV });
+
+        const r = plan({ appDir });
+
+        expect(r.command).toMatch(
+          /LANGY_WORKER_IDLE_MS="\$\{LANGY_WORKER_IDLE_MS:-120000\}"/,
+        );
+        expect(r.command).toMatch(/svc=langyagent/);
+      });
+
+      /** @scenario "The lane caps the pool and reaps idle workers quickly" */
+      it("lets a cap set in the environment win over the local default", () => {
+        const appDir = appDirWith({ ".env": FULL_ENV });
+
+        const r = plan({ appDir, env: { LANGY_MAX_WORKERS: "8" } });
+
+        // The lane expands the override where it runs, so the local number is
+        // only a fallback and the developer's value survives.
+        const expanded = expandLaneCommand({
+          command: r.command,
+          env: { LANGY_MAX_WORKERS: "8" },
+        });
+
+        expect(expanded).toMatch(/LANGY_MAX_WORKERS="8"/);
+      });
     });
   });
 });

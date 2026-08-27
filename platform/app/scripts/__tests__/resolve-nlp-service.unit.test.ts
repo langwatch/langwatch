@@ -159,6 +159,18 @@ describe("resolve-nlp-service.sh", () => {
 
       expect(r.nlpService).toBe("http://nlp.plum.langwatch.localhost");
     });
+
+    /** @scenario "An overlay that clears the address is not read past" */
+    it("treats an empty overlay assignment as the answer, not as a gap", () => {
+      const appDir = appDirWith({
+        ".env": 'LANGWATCH_NLP_SERVICE="http://localhost:5571"\n',
+        ".env.portless": "LANGWATCH_NLP_SERVICE=\n",
+      });
+
+      const r = runHelper({ appDir });
+
+      expect(r.nlpService).toBe("");
+    });
   });
 
   describe("given nothing pins an address", () => {
