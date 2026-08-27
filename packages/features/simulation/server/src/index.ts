@@ -7,6 +7,7 @@ export {
   type SimulationWindowedReadInput,
 } from "./ports/simulation-windowed-read.port";
 export { SimulationService } from "./services/simulation.service";
+export { NullSimulationRepository } from "./repositories/simulation.repository";
 export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process";
 export * from "./adapters/simulation-processing-commands.adapter";
 export type { QueueRunCommandData } from "./adapters/simulation-run.adapter";
