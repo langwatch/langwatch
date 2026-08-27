@@ -1,5 +1,6 @@
 export * from "./code-evaluator";
 export * from "./evaluator";
+export * from "./evaluator-execution";
 export * from "./evaluator.service";
 export * from "./evaluator.errors";
 export * from "./evaluators";

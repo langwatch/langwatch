@@ -2,6 +2,7 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import {
   evaluatorConfigSchema,
   evaluatorSchema,
+  EvaluatorNotFoundError,
   type Evaluator,
   type EvaluatorConfig,
   type EvaluatorCopy,
@@ -74,16 +75,24 @@ export class PrismaEvaluatorRepository extends EvaluatorRepository {
     });
     return row ? mapRow(row as unknown as EvaluatorRow) : null;
   }
+  async findById(input: { id: string; projectId: string }): Promise<Evaluator> {
+    const row = await this.database.evaluator.findFirst({
+      where: { id: input.id, projectId: input.projectId, archivedAt: null },
+    });
+
+    if (!row) {
+      throw new EvaluatorNotFoundError(input.id);
+    }
+
+    return mapRow(row as unknown as EvaluatorRow);
+  }
   async tryFindByIdOnly(id: string): Promise<Evaluator | null> {
     const row = await this.database.evaluator.findFirst({
       where: { id, archivedAt: null },
     });
     return row ? mapRow(row as unknown as EvaluatorRow) : null;
   }
-  async tryFindBySlug(input: {
-    slug: string;
-    projectId: string;
-  }): Promise<Evaluator | null> {
+  async tryFindBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
     const row = await this.database.evaluator.findFirst({
       where: { slug: input.slug, projectId: input.projectId, archivedAt: null },
     });
@@ -101,6 +110,21 @@ export class PrismaEvaluatorRepository extends EvaluatorRepository {
       },
     });
     return row ? mapRow(row as unknown as EvaluatorRow) : null;
+  }
+  async findByIdOrSlug(input: { idOrSlug: string; projectId: string }): Promise<Evaluator> {
+    const row = await this.database.evaluator.findFirst({
+      where: {
+        projectId: input.projectId,
+        OR: [{ slug: input.idOrSlug }, { id: input.idOrSlug }],
+        archivedAt: null,
+      },
+    });
+
+    if (!row) {
+      throw new EvaluatorNotFoundError(input.idOrSlug);
+    }
+
+    return mapRow(row as unknown as EvaluatorRow);
   }
   async findAll(input: { projectId: string }): Promise<Evaluator[]> {
     const rows = await this.database.evaluator.findMany({

@@ -81,6 +81,9 @@ class FakeRepository extends MonitorRepository {
 }
 
 class FakeEvaluatorService extends EvaluatorService {
+  async resolveForExecution(): Promise<never> {
+    throw new Error("unused");
+  }
   async executeCode(): Promise<never> {
     throw new Error("unused");
   }

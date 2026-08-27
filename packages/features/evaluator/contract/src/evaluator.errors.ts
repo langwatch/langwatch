@@ -59,15 +59,37 @@ export class EvaluatorSourceNotFoundError extends NotFoundError {
 export class EvaluatorCopySelectionError extends HandledError {
   declare readonly code: "evaluator_copy_selection_invalid";
   constructor(evaluatorId: string) {
-    super(
-      "evaluator_copy_selection_invalid",
-      "No valid evaluator copies were selected.",
-      {
-        httpStatus: 400,
-        meta: { evaluatorId },
-        fault: "customer",
-      },
-    );
+    super("evaluator_copy_selection_invalid", "No valid evaluator copies were selected.", {
+      httpStatus: 400,
+      meta: { evaluatorId },
+      fault: "customer",
+    });
     this.name = "EvaluatorCopySelectionError";
+  }
+}
+
+export class EvaluatorWorkflowNotFoundError extends HandledError {
+  declare readonly code: "evaluator_workflow_not_found";
+
+  constructor(idOrSlug: string, workflowId: string) {
+    super("evaluator_workflow_not_found", `Workflow not found for evaluator: ${idOrSlug}`, {
+      httpStatus: 404,
+      meta: { idOrSlug, workflowId },
+      fault: "customer",
+    });
+    this.name = "EvaluatorWorkflowNotFoundError";
+  }
+}
+
+export class EvaluatorInvalidConfigError extends HandledError {
+  declare readonly code: "evaluator_config_invalid";
+
+  constructor(idOrSlug: string) {
+    super("evaluator_config_invalid", `Code evaluator has an invalid config: ${idOrSlug}`, {
+      httpStatus: 400,
+      meta: { idOrSlug },
+      fault: "customer",
+    });
+    this.name = "EvaluatorInvalidConfigError";
   }
 }

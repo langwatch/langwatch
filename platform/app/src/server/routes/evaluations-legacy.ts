@@ -26,9 +26,7 @@ import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
 import type { Project } from "~/generated/prisma/client";
 import { CostReferenceType, CostType, ExperimentType } from "~/generated/prisma/client";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
-import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
@@ -44,9 +42,13 @@ import { prisma } from "~/server/db";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
+  coerceEvaluatorScalar,
   type EvaluationResult,
+  EvaluatorInvalidConfigError,
   type EvaluatorDefinition,
+  EvaluatorNotFoundError,
   type EvaluatorTypes,
+  EvaluatorWorkflowNotFoundError,
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
@@ -60,10 +62,7 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import {
-  CODE_EVALUATOR_CHECK_PREFIX,
-  codeEvaluatorConfigSchema,
-} from "@langwatch/evaluator-contract";
+import { CODE_EVALUATOR_CHECK_PREFIX } from "@langwatch/evaluator-contract";
 import {
   type ESBatchEvaluation,
   type ESBatchEvaluationRESTParams,
@@ -82,7 +81,6 @@ import {
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
-import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL, KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -1066,53 +1064,30 @@ async function handleEvaluatorCall(c: Context, evaluatorSlug: string, as_guardra
 
   if (evaluatorSlug.startsWith("evaluators/")) {
     const slugOrId = evaluatorSlug.replace("evaluators/", "");
-    const savedEvaluator = await prisma.evaluator.findFirst({
-      where: {
+    try {
+      const resolved = await c.app.evaluators.resolveForExecution({
+        idOrSlug: slugOrId,
         projectId: project.id,
-        OR: [{ slug: slugOrId }, { id: slugOrId }],
-        archivedAt: null,
-      },
-    });
-
-    if (savedEvaluator) {
-      const config = savedEvaluator.config as {
-        evaluatorType?: string;
-        settings?: Record<string, unknown>;
-      } | null;
-
-      if (savedEvaluator.type === "workflow" && savedEvaluator.workflowId) {
-        checkType = `custom/${savedEvaluator.workflowId}`;
-        const workflow = await prisma.workflow.findUnique({
-          where: { id: savedEvaluator.workflowId },
-          include: { currentVersion: true },
-        });
-        if (!workflow) {
-          return c.json({ error: `Workflow not found for evaluator: ${slugOrId}` }, 404);
-        }
-        const dsl = workflow.currentVersion?.dsl as unknown as StudioWorkflow | undefined;
-        const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
-        workflowEvaluatorDef = {
-          name: savedEvaluator.name,
-          requiredFields: entryOutputs.map((o) => o.identifier),
-        };
-      } else if (savedEvaluator.type === "code") {
-        checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
-        const parsedConfig = codeEvaluatorConfigSchema.safeParse(savedEvaluator.config);
-        if (!parsedConfig.success) {
-          return c.json({ error: `Code evaluator has an invalid config: ${slugOrId}` }, 400);
-        }
-        workflowEvaluatorDef = {
-          name: savedEvaluator.name,
-          requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
-        };
-      } else {
-        checkType = config?.evaluatorType ?? evaluatorSlug;
+      });
+      checkType = resolved.checkType;
+      evaluatorSettings = resolved.settings;
+      evaluatorName = resolved.name;
+      savedEvaluatorId = resolved.evaluatorId;
+      workflowEvaluatorDef = resolved.requiredFields
+        ? { name: resolved.name, requiredFields: resolved.requiredFields }
+        : void 0;
+    } catch (error) {
+      if (error instanceof EvaluatorNotFoundError) {
+        return c.json({ error: `Evaluator not found with slug or id: ${slugOrId}` }, 404);
       }
-      evaluatorSettings = config?.settings;
-      evaluatorName = savedEvaluator.name;
-      savedEvaluatorId = savedEvaluator.id;
-    } else {
-      return c.json({ error: `Evaluator not found with slug or id: ${slugOrId}` }, 404);
+      if (error instanceof EvaluatorWorkflowNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof EvaluatorInvalidConfigError) {
+        return c.json({ error: error.message }, 400);
+      }
+
+      throw error;
     }
   } else {
     const monitor = await prisma.monitor.findUnique({

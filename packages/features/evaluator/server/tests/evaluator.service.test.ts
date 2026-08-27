@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
   EvaluatorWorkflowAlreadyAssignedError,
   standardEvaluatorOutputFields,
@@ -29,11 +30,25 @@ function evaluator(overrides: Partial<Evaluator> = {}): Evaluator {
 }
 
 function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepository {
+  const tryFindById = overrides.tryFindById ?? vi.fn().mockResolvedValue(baseEvaluator);
+  const findById =
+    overrides.findById ??
+    vi.fn(async (input: { id: string; projectId: string }) => {
+      const found = await tryFindById(input);
+      if (!found) {
+        throw new EvaluatorNotFoundError(input.id);
+      }
+
+      return found;
+    });
+
   return {
-    tryFindById: vi.fn().mockResolvedValue(baseEvaluator),
+    tryFindById,
+    findById,
     tryFindByIdOnly: vi.fn().mockResolvedValue(baseEvaluator),
     tryFindBySlug: vi.fn().mockResolvedValue(baseEvaluator),
     tryFindByWorkflow: vi.fn().mockResolvedValue(baseEvaluator),
+    findByIdOrSlug: vi.fn().mockResolvedValue(baseEvaluator),
     findAll: vi.fn().mockResolvedValue([baseEvaluator]),
     create: vi.fn().mockResolvedValue(baseEvaluator),
     update: vi.fn().mockResolvedValue(baseEvaluator),
@@ -67,15 +82,17 @@ function service(
   return EvaluatorService.create({
     repository: options.repository ?? repository(),
     workflows: options.workflows ?? workflows(),
-    codeExecution: options.codeExecution ?? new (class extends EvaluatorCodeExecutionPort {
-      async execute() {
-        return {
-          ok: true,
-          statusText: "OK",
-          body: { status: "success", result: {} },
-        };
-      }
-    })(),
+    codeExecution:
+      options.codeExecution ??
+      new (class extends EvaluatorCodeExecutionPort {
+        async execute() {
+          return {
+            ok: true,
+            statusText: "OK",
+            body: { status: "success", result: {} },
+          };
+        }
+      })(),
     generateId: () => "test",
   });
 }
@@ -165,12 +182,120 @@ describe("EvaluatorService", () => {
     });
     const evaluators = service({ repository: missing });
 
+    await expect(evaluators.tryGetById({ id: "missing", projectId: "p1" })).resolves.toBeNull();
+    await expect(evaluators.getById({ id: "missing", projectId: "p1" })).rejects.toBeInstanceOf(
+      EvaluatorNotFoundError,
+    );
+  });
+
+  it("resolves a saved evaluator for the legacy execution transport", async () => {
+    const evaluators = service({
+      repository: repository({
+        findByIdOrSlug: vi.fn().mockResolvedValue(
+          evaluator({
+            config: {
+              evaluatorType: "langevals/exact_match",
+              settings: { case_sensitive: true },
+            },
+          }),
+        ),
+      }),
+    });
+
     await expect(
-      evaluators.tryGetById({ id: "missing", projectId: "p1" }),
-    ).resolves.toBeNull();
+      evaluators.resolveForExecution({ idOrSlug: "exact", projectId: "p1" }),
+    ).resolves.toEqual({
+      evaluatorId: "e1",
+      name: "Exact",
+      checkType: "langevals/exact_match",
+      settings: { case_sensitive: true },
+    });
+  });
+
+  it("rejects an invalid code evaluator before dispatch", async () => {
+    const evaluators = service({
+      repository: repository({
+        findByIdOrSlug: vi
+          .fn()
+          .mockResolvedValue(evaluator({ type: "code", config: { code: "" } })),
+      }),
+    });
+
     await expect(
-      evaluators.getById({ id: "missing", projectId: "p1" }),
-    ).rejects.toBeInstanceOf(EvaluatorNotFoundError);
+      evaluators.resolveForExecution({ idOrSlug: "broken", projectId: "p1" }),
+    ).rejects.toBeInstanceOf(EvaluatorInvalidConfigError);
+  });
+
+  it("derives workflow execution inputs from the current saved version", async () => {
+    const getById = vi.fn().mockResolvedValue({
+      id: "w1",
+      projectId: "p1",
+      name: "Workflow",
+      icon: null,
+      description: null,
+      latestVersionId: "v1",
+      currentVersionId: "v1",
+      publishedId: null,
+      publishedById: null,
+      copiedFromWorkflowId: null,
+      isEvaluator: true,
+      isComponent: false,
+      archivedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      currentVersion: {
+        id: "v1",
+        workflowId: "w1",
+        projectId: "p1",
+        version: "1",
+        autoSaved: false,
+        commitMessage: "initial",
+        authorId: null,
+        parentId: null,
+        dsl: {
+          spec_version: "1.4",
+          version: "1",
+          name: "Workflow",
+          icon: "",
+          description: "",
+          nodes: [
+            {
+              id: "entry",
+              type: "entry",
+              position: { x: 0, y: 0 },
+              data: {
+                name: "Entry",
+                outputs: [{ identifier: "input", type: "str" }],
+              },
+            },
+          ],
+          edges: [],
+          state: {},
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    const evaluators = service({
+      repository: repository({
+        findByIdOrSlug: vi
+          .fn()
+          .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
+      }),
+      workflows: workflows({ getById }),
+    });
+
+    await expect(
+      evaluators.resolveForExecution({ idOrSlug: "workflow", projectId: "p1" }),
+    ).resolves.toMatchObject({
+      checkType: "custom/w1",
+      requiredFields: ["input"],
+    });
+    expect(getById).toHaveBeenCalledWith({
+      id: "w1",
+      projectId: "p1",
+      includeVersion: true,
+    });
   });
 
   it("keeps one workflow owned by one evaluator", async () => {
@@ -178,9 +303,7 @@ describe("EvaluatorService", () => {
       repository: repository({
         tryFindByWorkflow: vi
           .fn()
-          .mockResolvedValue(
-            evaluator({ id: "existing", workflowId: "w1", type: "workflow" }),
-          ),
+          .mockResolvedValue(evaluator({ id: "existing", workflowId: "w1", type: "workflow" })),
       }),
     });
 
@@ -227,8 +350,8 @@ describe("EvaluatorService", () => {
     {
       evaluatorType: "langevals/exact_match",
       fields: [
-        { identifier: "output", type: "str", optional: true },
-        { identifier: "expected_output", type: "str", optional: true },
+        { identifier: "output", type: "str" },
+        { identifier: "expected_output", type: "str" },
       ],
       outputFields: [{ identifier: "passed", type: "bool" }],
     },
@@ -265,9 +388,7 @@ describe("EvaluatorService", () => {
     async ({ evaluatorType, fields, outputFields }) => {
       const evaluators = service({
         repository: repository({
-          tryFindById: vi
-            .fn()
-            .mockResolvedValue(evaluator({ config: { evaluatorType } })),
+          tryFindById: vi.fn().mockResolvedValue(evaluator({ config: { evaluatorType } })),
         }),
       });
 
@@ -289,9 +410,7 @@ describe("EvaluatorService", () => {
       repository: repository({
         tryFindById: vi
           .fn()
-          .mockResolvedValue(
-            evaluator({ config: { evaluatorType: "unknown/evaluator" } }),
-          ),
+          .mockResolvedValue(evaluator({ config: { evaluatorType: "unknown/evaluator" } })),
       }),
     });
 
@@ -339,9 +458,7 @@ describe("EvaluatorService", () => {
     });
     const evaluators = service({
       repository: repository({
-        tryFindById: vi
-          .fn()
-          .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
+        tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
       workflows: workflows({ getFields }),
     });
@@ -364,9 +481,7 @@ describe("EvaluatorService", () => {
   it("falls back to standard outputs when a workflow declares none", async () => {
     const evaluators = service({
       repository: repository({
-        tryFindById: vi
-          .fn()
-          .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
+        tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
     });
 

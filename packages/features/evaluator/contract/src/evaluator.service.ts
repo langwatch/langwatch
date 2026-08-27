@@ -1,11 +1,7 @@
-import type {
-  Evaluator,
-  EvaluatorConfig,
-  EvaluatorField,
-  EvaluatorWithFields,
-} from "./evaluator";
+import type { Evaluator, EvaluatorConfig, EvaluatorField, EvaluatorWithFields } from "./evaluator";
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator";
 import type { SingleEvaluationResult } from "./evaluators.generated";
+import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution";
 
 export type EvaluatorCreateInput = {
   id: string;
@@ -61,16 +57,9 @@ export type EvaluatorResultAugmentationInput = {
 
 export abstract class EvaluatorService {
   abstract executeCode(input: CodeEvaluatorExecutionInput): Promise<SingleEvaluationResult>;
-  abstract executeNative(
-    input: NativeEvaluatorExecutionInput,
-  ): Promise<SingleEvaluationResult>;
-  abstract augmentResult(
-    input: EvaluatorResultAugmentationInput,
-  ): SingleEvaluationResult;
-  abstract tryGetById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Evaluator | null>;
+  abstract executeNative(input: NativeEvaluatorExecutionInput): Promise<SingleEvaluationResult>;
+  abstract augmentResult(input: EvaluatorResultAugmentationInput): SingleEvaluationResult;
+  abstract tryGetById(input: { id: string; projectId: string }): Promise<Evaluator | null>;
   abstract getById(input: { id: string; projectId: string }): Promise<Evaluator>;
   abstract tryGetByIdWithFields(input: {
     id: string;
@@ -80,10 +69,8 @@ export abstract class EvaluatorService {
     id: string;
     projectId: string;
   }): Promise<EvaluatorWithFields>;
-  abstract tryGetBySlug(input: {
-    slug: string;
-    projectId: string;
-  }): Promise<Evaluator | null>;
+  abstract resolveForExecution(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution>;
+  abstract tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null>;
   abstract tryGetByWorkflow(input: {
     workflowId: string;
     projectId: string;
@@ -104,20 +91,14 @@ export abstract class EvaluatorService {
     fields: EvaluatorField[];
     outputFields: EvaluatorField[];
   }>;
-  abstract getCopies(input: {
-    evaluatorId: string;
-    projectId: string;
-  }): Promise<EvaluatorCopy[]>;
+  abstract getCopies(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorCopy[]>;
   abstract pushToCopies(input: {
     projectId: string;
     evaluatorId: string;
     copyIds?: string[];
     allowedProjectIds?: string[];
   }): Promise<{ pushedTo: number; selectedCopies: number }>;
-  abstract syncFromSource(input: {
-    projectId: string;
-    evaluatorId: string;
-  }): Promise<{ ok: true }>;
+  abstract syncFromSource(input: { projectId: string; evaluatorId: string }): Promise<{ ok: true }>;
   abstract getCopySource(input: {
     projectId: string;
     evaluatorId: string;

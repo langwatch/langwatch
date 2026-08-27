@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EvaluatorCodeService } from "../src/services/evaluator-code.service";
 
-const dsl = EvaluatorCodeService.create().buildDsl({
+const dsl = EvaluatorCodeService.buildDsl({
   name: "My Evaluator",
   workflowId: "code_evaluator_test",
   config: {
