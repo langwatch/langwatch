@@ -70,6 +70,26 @@ function withScenarioVersion(
 }
 
 /**
+ * The simulation models the plan was configured with, or nothing at all.
+ *
+ * A plan that names no model runs on the project default, and records no
+ * model rather than the default's name: a configuration is what a person
+ * chose, so the same choice has to key the same way after a project default
+ * changes.
+ *
+ * @see specs/scenarios/run-configuration-on-runs.feature
+ */
+function withSimulationModels(models: {
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+}): { simulatorModel?: string; judgeModel?: string } {
+  return {
+    ...(models.simulatorModel ? { simulatorModel: models.simulatorModel } : {}),
+    ...(models.judgeModel ? { judgeModel: models.judgeModel } : {}),
+  };
+}
+
+/**
  * The names of the secrets a run used, for the run's metadata.
  *
  * Names only. They are what lets a person see which credentials a run needed;
@@ -168,6 +188,13 @@ export class SuiteRunService {
      * of the batch, so a run carries its note from its first moment.
      */
     note?: string;
+    /**
+     * The simulation models the plan was configured with. Stamped onto every
+     * run so the run dialog can read a configuration back off the runs and
+     * not only off the plan row.
+     */
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -183,6 +210,7 @@ export class SuiteRunService {
       secretParametersByScenarioId,
       note,
     } = params;
+    const simulationModels = withSimulationModels(params);
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(suiteId);
@@ -254,6 +282,7 @@ export class SuiteRunService {
               targetReferenceId: item.target.referenceId,
               targetType: item.target.type,
               ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
+              ...simulationModels,
             },
             ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),

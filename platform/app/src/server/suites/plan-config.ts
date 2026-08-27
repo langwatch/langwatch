@@ -15,6 +15,7 @@
  */
 
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { type SuiteScope, suiteScopeSchema } from "./scope";
 import type { SuiteTarget } from "./types";
 
@@ -84,7 +85,7 @@ export function scopeKey(params: {
 export function configurationKey(params: {
   config: PlanConfig;
   scenarioIds?: string[];
-  parameters?: Record<string, string>;
+  parameters?: RunParameterValues;
 }): string {
   const { config } = params;
   return [
@@ -97,9 +98,15 @@ export function configurationKey(params: {
   ].join("|");
 }
 
-/** The parameter overrides a run was started with, as `k=v` pairs. */
+/**
+ * The parameter overrides a run was started with, as `k=v` pairs.
+ *
+ * A parameter value is a string, a number or a boolean, so the key states the
+ * value the way JavaScript prints it. A number and the string of that number
+ * therefore take one key, which is correct here: both name the same run.
+ */
 export function parametersKey(
-  parameters: Record<string, string> | undefined,
+  parameters: RunParameterValues | undefined,
 ): string {
   return Object.entries(parameters ?? {})
     .map(([name, value]) => `${name}=${value}`)

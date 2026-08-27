@@ -78,6 +78,8 @@ async function queuedCommandFor(params: {
   scenarioId: string;
   parameters?: Record<string, string | number | boolean>;
   secretParameters?: Record<string, string>;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
 }): Promise<QueueRunCommandData> {
   const queued: QueueRunCommandData[] = [];
   const service = new SuiteRunService(
@@ -98,6 +100,8 @@ async function queuedCommandFor(params: {
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${nanoid()}`,
+    simulatorModel: params.simulatorModel ?? null,
+    judgeModel: params.judgeModel ?? null,
     ...(params.parameters && {
       parametersByScenarioId: new Map([[params.scenarioId, params.parameters]]),
     }),
@@ -283,6 +287,81 @@ describe("Feature: recording a run's resolved parameters", () => {
           scenarioVersion: 1,
         },
       });
+    });
+  });
+});
+
+describe("Feature: recording the simulation models a run was configured with", () => {
+  describe("given a run plan that names both models", () => {
+    /** @scenario "A run records the simulation models its plan was configured with" */
+    it("reads both back off the run", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+        simulatorModel: "openai/gpt-5-mini",
+        judgeModel: "openai/gpt-5",
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      expect(run!.metadata).toMatchObject({
+        langwatch: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
+      });
+    });
+  });
+
+  describe("given a run plan that names neither model", () => {
+    // A plan naming no model runs on the project default and records no
+    // model, so it keys the same as a run recorded before models were
+    // stamped at all.
+    /** @scenario "A run plan that names no model records no model" */
+    it("records neither key", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const langwatch = (
+        run!.metadata as { langwatch: Record<string, unknown> }
+      ).langwatch;
+      expect(langwatch).not.toHaveProperty("simulatorModel");
+      expect(langwatch).not.toHaveProperty("judgeModel");
+    });
+  });
+
+  describe("given a run plan that names only the judge model", () => {
+    /** @scenario "A plan that names only one of the two models records only that one" */
+    it("records that one and not the other", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+        judgeModel: "openai/gpt-5",
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const langwatch = (
+        run!.metadata as { langwatch: Record<string, unknown> }
+      ).langwatch;
+      expect(langwatch.judgeModel).toBe("openai/gpt-5");
+      expect(langwatch).not.toHaveProperty("simulatorModel");
     });
   });
 });

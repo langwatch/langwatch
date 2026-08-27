@@ -640,6 +640,8 @@ export class SuiteService {
           parametersByScenarioId,
           secretParametersByScenarioId,
           note: params.note,
+          simulatorModel: suite.simulatorModel,
+          judgeModel: suite.judgeModel,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);

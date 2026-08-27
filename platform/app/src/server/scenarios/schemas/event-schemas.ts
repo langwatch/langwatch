@@ -73,6 +73,19 @@ export const langwatchMetadataSchema = z.object({
    * @see specs/scenarios/scenario-version-on-runs.feature
    */
   scenarioVersion: z.number().int().optional(),
+  /**
+   * The simulation models the run plan was CONFIGURED with, stamped at queue
+   * time. Absent when the plan names none and the project default is used,
+   * and absent on runs recorded before this was stamped. Both read back as
+   * "this configuration named no model", which is what a person chose.
+   *
+   * Not the model the run resolved to: the same choice has to key the same
+   * way after a project default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
 });
 
 /**

@@ -112,6 +112,32 @@ describe("sortSuiteTargets", () => {
   });
 });
 
+describe("configurationKey", () => {
+  describe("when one configuration leaves a model empty and another omits it", () => {
+    /** @scenario "A configuration naming no model keys the same whether the model is empty or absent" */
+    it("keys them the same, so both mean the project default", () => {
+      const shared = {
+        scope: { mode: "all" } as const,
+        targets: [{ type: "http", referenceId: "prod-agent" } as SuiteTarget],
+        repeatCount: 1,
+      };
+
+      const empty = configurationKey({
+        config: { ...shared, simulatorModel: null, judgeModel: null },
+      });
+      const absent = configurationKey({
+        config: {
+          ...shared,
+          simulatorModel: undefined as unknown as null,
+          judgeModel: undefined as unknown as null,
+        },
+      });
+
+      expect(empty).toBe(absent);
+    });
+  });
+});
+
 describe("scopeKey", () => {
   describe("when two hand-picked scopes cover different scenarios", () => {
     it("tells them apart, which the scope shape alone cannot", () => {
