@@ -14,6 +14,7 @@ import { lintPrismaBoundaries } from "./prisma-boundaries";
 import { lintStrictPortModules } from "./port-modules";
 import { lintServiceResultContracts } from "./service-results";
 import { lintServiceQuality } from "./service-quality";
+import { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 import { lintTestQuality } from "./test-quality";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
 import { discoverClassifiedPackages } from "./workspace";
@@ -43,10 +44,7 @@ export {
   collectLegacyApplicationBoundaryEdges,
   formatLegacyApplicationBoundaryBaseline,
 } from "./application-boundaries";
-export type {
-  LegacyFeatureFragment,
-  LegacyFeatureFragmentKind,
-} from "./legacy-feature-fragments";
+export type { LegacyFeatureFragment, LegacyFeatureFragmentKind } from "./legacy-feature-fragments";
 export {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
@@ -59,6 +57,7 @@ export { readServiceQualityBaselineFile } from "./service-quality";
 export { lintServiceQualityBaseline } from "./service-quality";
 export { lintServiceQuality } from "./service-quality";
 export { lintServiceQualityFile } from "./service-quality";
+export { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 export { lintStrictContractBuildConfigs } from "./contract-build-config";
 export { lintTestQuality } from "./test-quality";
 export type { TestQualityLintOptions } from "./test-quality";
@@ -85,8 +84,7 @@ export function lintWorkspace(
 ): ArchitectureViolation[] {
   const root = resolve(options.root);
   const changedFiles = options.changedFiles ?? changedSourceFiles(root);
-  const resolvedCommentBlocks =
-    commentBlocks ?? lintCommentBlocks(root, { files: changedFiles });
+  const resolvedCommentBlocks = commentBlocks ?? lintCommentBlocks(root, { files: changedFiles });
   const discovery = discoverClassifiedPackages(root);
   const violations = [
     ...discovery.violations,
@@ -105,11 +103,8 @@ export function lintWorkspace(
     }),
     ...lintPrismaBoundaries(discovery.packages),
     ...lintServiceResultContracts(discovery.packages),
-    ...lintServiceQuality(
-      root,
-      discovery.packages,
-      options.serviceQualityBaselineReference,
-    ),
+    ...lintServiceProjectionBoundaries(discovery.packages),
+    ...lintServiceQuality(root, discovery.packages, options.serviceQualityBaselineReference),
     ...lintCycles(discovery.packages),
     ...resolvedCommentBlocks.violations,
     ...lintTestQuality(root, { files: changedFiles }),
@@ -121,9 +116,7 @@ export function lintWorkspace(
       file: relative(root, violation.file) || violation.file,
     }))
     .sort((a, b) =>
-      `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(
-        `${b.file}:${b.line ?? 0}:${b.policy}`,
-      ),
+      `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(`${b.file}:${b.line ?? 0}:${b.policy}`),
     );
 }
 
