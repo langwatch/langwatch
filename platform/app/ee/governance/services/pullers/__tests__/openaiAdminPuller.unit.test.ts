@@ -534,6 +534,9 @@ describe("given an OpenAI Admin cost source", () => {
       const cursor1 = JSON.parse(run1.cursor!);
       expect(cursor1.hasKeyGrouping).toBe(true);
       expect(cursor1.keyGroupingUpgrade).toBe(true);
+      // One day past the watermark — not at it — so the keyed window never
+      // re-reads the last user-only bucket with a different identity.
+      expect(cursor1.startingAt).toBe("2026-08-02T00:00:00.000Z");
 
       // Run 2: API now accepts key grouping (window advanced past the floor).
       fetchMock.mockResolvedValue(jsonResponse(page()));
@@ -543,9 +546,9 @@ describe("given an OpenAI Admin cost source", () => {
         CONFIG,
       );
 
-      // The request must start at the stored watermark, NOT three days before.
-      // Three days before would re-read buckets that were emitted with user-only
-      // dimensions, producing different source_event_ids and doubling spend.
+      // The request must start one day AFTER the watermark, not at it or three
+      // days before. Starting at the watermark would re-read that bucket with
+      // keyed dimensions, producing a different source_event_id and doubling it.
       const run2Start = Number(
         requestedUrl(2).searchParams.get("start_time"),
       );

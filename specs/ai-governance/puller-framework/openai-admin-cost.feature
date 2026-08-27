@@ -127,9 +127,10 @@ Feature: OpenAI Admin cost puller
     Scenario: Spend is not doubled when the grouping dimension changes across a drain
       Given a window that drained with user-only grouping
       When the next run tries key grouping
-      Then the lookback is skipped so no bucket appears under two identities
-      # apiKeyId is part of source_event_id, so re-reading the same day with
-      # and without it produces two records instead of restating one.
+      Then the keyed window starts one day after the watermark and the lookback is skipped
+      # The watermark day was already emitted with user-only dimensions.
+      # Re-reading it with keyed dimensions produces a different source_event_id,
+      # so both the lookback and the watermark bucket itself must be excluded.
 
     @unit
     Scenario: A refusal about anything else is not mistaken for the cutoff

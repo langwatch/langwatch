@@ -532,25 +532,24 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       watermark = laterOf(watermark, read.watermark);
 
       if (read.nextPage === null) {
-        // Drained. The next run resumes from the newest bucket read, moved
-        // back by the look-back when it starts.
+        // The stored start never moves backwards: a retracted window whose
+        // newest bucket predates the stored start must not rewind the source.
+        const drainStart =
+          laterOf(watermark, cursor.storedStart) ?? cursor.storedStart;
         return {
           events,
           cursor: encodeCursor({
-            // The stored start never moves backwards: a retracted window
-            // whose newest bucket predates the stored start must not rewind
-            // the source. laterOf picks the later of the two.
-            startingAt:
-              laterOf(watermark, cursor.storedStart) ?? cursor.storedStart,
+            // When upgrading from user-only to keyed grouping, advance one
+            // bucket past the watermark: that day was already emitted with
+            // user-only dimensions, and re-reading it with keyed dimensions
+            // would produce a different source_event_id, doubling that day.
+            startingAt: !hasKeyGrouping
+              ? new Date(Date.parse(drainStart) + MS_PER_DAY).toISOString()
+              : drainStart,
             page: null,
             query,
             watermark: null,
             hasKeyGrouping: true,
-            // When this window was read without key grouping, the next run
-            // must try key grouping again — but without the restatement
-            // lookback. Overlapping a keyed window with a user-only window
-            // produces different source_event_ids for the same buckets, which
-            // doubles the reported spend instead of restating it.
             keyGroupingUpgrade: !hasKeyGrouping,
           }),
           errorCount: 0,
