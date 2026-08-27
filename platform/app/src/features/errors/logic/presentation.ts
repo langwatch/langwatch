@@ -2040,9 +2040,18 @@ const presentations = {
   identity_passkey_not_recognized: {
     // Same answer whether the credential belongs to somebody else or to
     // nobody: this endpoint does not tell callers which passkeys exist.
-    title: "We couldn't use that passkey",
+    //
+    // Naming both ORDINARY reasons is not a leak and is the whole use of this
+    // sentence. The old copy said "check which passkeys are on your account",
+    // which assumes an account — and this is a SIGNED-OUT screen, where the
+    // two likely readers are somebody whose password manager offered a
+    // credential saved for a different site, and somebody who has not signed
+    // up yet. Neither could act on the old sentence. Saying "it may be" of
+    // both confirms nothing about the address in the field, so it is still no
+    // oracle.
+    title: "That passkey isn't one we recognize",
     describe: () =>
-      "Try again, or sign in another way and check which passkeys are on your account.",
+      "It may have been saved for another site, or belong to an account that doesn't exist here yet. Sign in with your email address instead, or create an account.",
   },
   cannot_impersonate_without_second_factor: {
     title: "Set up two-step verification first",
