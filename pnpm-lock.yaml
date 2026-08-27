@@ -2351,6 +2351,15 @@ importers:
 
   packages/features/experiment/server:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../eventing
@@ -2369,6 +2378,12 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -4084,6 +4099,9 @@ importers:
 
   packages/features/trace/contract:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       liqe:
         specifier: ^3.8.7
         version: 3.8.7

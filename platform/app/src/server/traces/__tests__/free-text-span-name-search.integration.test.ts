@@ -22,7 +22,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { translateFilterToClickHouse } from "@langwatch/trace-server";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {

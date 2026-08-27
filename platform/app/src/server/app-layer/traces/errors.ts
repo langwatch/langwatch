@@ -97,35 +97,6 @@ export class QueryScanLimitExceededError extends HandledError {
   }
 }
 
-export class FilterParseError extends HandledError {
-  declare readonly code: "filter_parse_error";
-
-  constructor(message: string, position?: number) {
-    super("filter_parse_error", message, {
-      httpStatus: 422,
-      meta: {
-        ...(position !== undefined ? { position } : {}),
-        expected: message,
-      },
-      ...remediation("filter_parse_error"),
-    });
-    this.name = "FilterParseError";
-  }
-}
-
-export class FilterFieldUnknownError extends HandledError {
-  declare readonly code: "filter_field_unknown";
-
-  constructor(field: string, knownFields: string[]) {
-    super("filter_field_unknown", `Unknown field: @${field}`, {
-      httpStatus: 422,
-      meta: { field, knownFields },
-      ...remediation("filter_field_unknown"),
-    });
-    this.name = "FilterFieldUnknownError";
-  }
-}
-
 export class TimeRangeTooWideError extends HandledError {
   declare readonly code: "time_range_too_wide";
 

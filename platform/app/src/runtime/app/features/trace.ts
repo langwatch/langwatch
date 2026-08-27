@@ -17,7 +17,7 @@ import {
   TraceIngressCommandPort,
   TraceIngressPayloadPort,
   TraceListClickHouseRepository,
-  TraceQueryClassificationPort,
+  TraceQueryClassificationAdapter,
   TraceSpanDedupPort,
   TraceSummaryReaderPort,
   TraceEventDerivationPort,
@@ -25,7 +25,6 @@ import {
   type TraceQueryFieldValuesPort,
   type TraceClickHouseResolver,
 } from "@langwatch/trace-server";
-import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
@@ -113,25 +112,6 @@ export class AppTraceSummaryReaderAdapter extends TraceSummaryReaderPort {
       aggregateId: input.traceId,
       tenantId: createTenantId(input.tenantId),
     });
-  }
-}
-
-export class AppTraceQueryClassificationAdapter extends TraceQueryClassificationPort {
-  private constructor() {
-    super();
-  }
-
-  static create(): AppTraceQueryClassificationAdapter {
-    return new AppTraceQueryClassificationAdapter();
-  }
-
-  classify(query: string) {
-    const needs = queryNeeds(query);
-    return {
-      evaluations: needs.has("evaluations"),
-      events: needs.has("events"),
-      spans: needs.has("spans"),
-    };
   }
 }
 
@@ -248,7 +228,7 @@ export class AppTraceRuntime {
   build(): TraceService {
     return ClickHouseTraceAdapter.create({
       ...this.options,
-      queryClassification: AppTraceQueryClassificationAdapter.create(),
+      queryClassification: TraceQueryClassificationAdapter.create(),
       summaryReader: AppTraceSummaryReaderAdapter.create(this.options.traceSummaryStore),
       records: AppTraceRecordAdapter.create(this.options.database, this.options.records),
       eventDerivation: AppTraceEventDerivationAdapter.create(this.options.spans),

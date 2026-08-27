@@ -33,7 +33,7 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
   translateFilterToClickHouse,
-} from "~/server/app-layer/traces/filter-to-clickhouse";
+} from "@langwatch/trace-server";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,

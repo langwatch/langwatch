@@ -9,6 +9,7 @@ import { TraceRecordPort } from "./ports/trace-record.port";
 import { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
+export { boundedSubquery } from "./adapters/trace-query-subquery.clickhouse.adapter";
 
 export class MissingTraceRecordPort extends TraceRecordPort {
   async getById(input: TraceByIdInput): Promise<never> {

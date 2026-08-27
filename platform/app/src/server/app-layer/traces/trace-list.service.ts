@@ -32,8 +32,8 @@ import type {
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
-} from "./facet-registry";
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
+} from "@langwatch/trace-server";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { teaserOf } from "./visibility-window.service";
 

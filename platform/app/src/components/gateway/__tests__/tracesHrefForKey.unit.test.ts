@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseFragment } from "@langwatch/trace-web";
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse/ast";
+import { translateFilterToClickHouse } from "@langwatch/trace-server";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../tracesHrefForKey";
 
 /**

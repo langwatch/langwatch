@@ -29,6 +29,19 @@ import {
   serialize as liqeRawSerialize,
 } from "liqe";
 
+export type {
+  LiqeQuery,
+  LogicalExpressionToken,
+  ParenthesizedExpressionToken,
+  TagToken,
+  UnaryOperatorToken,
+} from "liqe";
+
+/** Parse already-normalised query syntax without applying browser editor affordances. */
+export function parseTraceQuerySyntax(query: string): LiqeQuery {
+  return liqeParse(query);
+}
+
 /**
  * `liqe`'s serializer occasionally emits queries that its own parser then
  * rejects — most reliably the range form: `cost:[0.01 TO 1]AND foo:bar` (no

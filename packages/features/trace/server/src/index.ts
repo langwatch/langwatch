@@ -41,6 +41,40 @@ export { TraceRecordPort } from "./ports/trace-record.port";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";
 export { TraceQueryClassificationPort } from "./ports/trace-query-classification.port";
+export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter";
+export {
+  extractFreeTextTerms,
+  normalizeQuery,
+  translateFilterToClickHouse,
+} from "./adapters/trace-query.clickhouse.adapter";
+export {
+  FIELD_DEFS,
+  KNOWN_FIELDS,
+  type KnownField,
+} from "./adapters/trace-query-fields.clickhouse.adapter";
+export {
+  FACET_REGISTRY,
+  TABLE_TIME_COLUMNS,
+  type CategoricalFacetDef,
+  type DynamicKeysDef,
+  type ExpressionCategoricalDef,
+  type FacetDefinition,
+  type FacetGroup,
+  type FacetQuery,
+  type FacetQueryContext,
+  type FacetTable,
+  type QueryBuilderCategoricalDef,
+  type RangeFacetDef,
+} from "./adapters/trace-facet-registry.clickhouse.adapter";
+export { buildSpanAttributeKeysFacetQuery } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
+export { evaluateQueryInMemory, queryNeeds } from "./services/trace-query-evaluation.service";
+export type {
+  DerivedSpanRow,
+  FieldDef,
+  FieldNeeds,
+  InMemoryTrace,
+  TraceQueryEvaluationRun,
+} from "./adapters/trace-query-evaluation.adapter";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 export {
   TraceSummaryProjectionPort,

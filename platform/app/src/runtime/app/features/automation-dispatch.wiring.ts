@@ -17,10 +17,10 @@ import type {
   TraceCanonicalisationService,
   TraceService,
 } from "@langwatch/trace-contract";
+import { evaluateQueryInMemory } from "@langwatch/trace-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { AppAutomationPersistActionAdapter } from "./automation-adapters/automation-persist-action.adapter";
-import { evaluateQueryInMemory } from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   buildPreconditionTraceDataFromFoldState,
   matchesEvaluationFilters,

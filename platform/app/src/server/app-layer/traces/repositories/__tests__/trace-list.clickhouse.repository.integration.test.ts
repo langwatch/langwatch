@@ -20,9 +20,8 @@ import {
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { TraceListQuery, TraceListReadPort } from "@langwatch/trace-contract";
 import { AppTraceRuntime } from "~/runtime/app/features/trace";
-import { FACET_REGISTRY } from "../../facet-registry";
-import { translateFilterToClickHouse } from "../../filter-to-clickhouse";
-import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
+import { FACET_REGISTRY, translateFilterToClickHouse } from "@langwatch/trace-server";
+import { boundedSubquery } from "@langwatch/trace-server/testing";
 
 const tenantId = `test-trace-list-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;

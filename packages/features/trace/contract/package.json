@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "liqe": "^3.8.7",
     "ts-pattern": "^5.7.1",
     "zod": "^4.4.3"

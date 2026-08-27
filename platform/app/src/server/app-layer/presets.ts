@@ -388,7 +388,7 @@ import {
 import { AppTopicRuntime, createAppTopicClusteringRunnerDeps } from "~/runtime/app/features/topic";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
-import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
+import { translateFilterToClickHouse } from "@langwatch/trace-server";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";

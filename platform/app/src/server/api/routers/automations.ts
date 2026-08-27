@@ -38,7 +38,7 @@ import {
   redactActionParamsFor,
 } from "~/runtime/app/features/automation-adapters/providers/registry";
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { translateFilterToClickHouse } from "@langwatch/trace-server";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { KSUID_RESOURCES } from "~/utils/constants";
