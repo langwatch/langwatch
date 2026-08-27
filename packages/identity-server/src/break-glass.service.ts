@@ -1,9 +1,12 @@
 import {
   type BreakGlassBinding,
+  BREAK_GLASS_MAX_WINDOW_DAYS,
   BREAK_GLASS_WARNING_DAYS,
   breakGlassDaysRemaining,
+  breakGlassExpiryIsAllowed,
   breakGlassIsLive,
   breakGlassWarningsDue,
+  SsoBreakGlassExpiryOutOfRangeError,
   SsoBreakGlassLastWayInError,
   SsoBreakGlassHolderIneligibleError,
 } from "@langwatch/identity";
@@ -93,6 +96,7 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     grantedByUserId: string;
     expiresAtMs: number;
   }): Promise<BreakGlassBinding> {
+    this.requireExpiryInRange({ expiresAtMs });
     await this.requireEligibleHolder({ organizationId, userId });
     const binding: BreakGlassBinding = {
       bindingId: this.deps.newBindingId(),
@@ -141,7 +145,9 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     // A renewal is a fresh decision of the same weight, and the holder may
     // have stopped being an administrator since the original grant. Extending
     // a door that no longer opens is the same empty precondition a bad grant
-    // is.
+    // is — and so is extending one past the window, which is how a renewal
+    // would otherwise have bought the permanence the grant was refused.
+    this.requireExpiryInRange({ expiresAtMs });
     await this.requireEligibleHolder({
       organizationId,
       userId: replaced.userId,
@@ -164,6 +170,25 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       supersededAtMs: now,
     });
     return { renewed, replaced };
+  }
+
+  /**
+   * Refuses an expiry that is in the past, or further out than a way in may
+   * be granted for.
+   *
+   * NEVER OPEN-ENDED is what this file already claims, and until now nothing
+   * enforced it: the router accepted any positive integer, so a grant could
+   * be dated to the year 9999 — live forever, and silent, because the warning
+   * sweep only looks fourteen days ahead.
+   */
+  private requireExpiryInRange({ expiresAtMs }: { expiresAtMs: number }): void {
+    if (
+      !breakGlassExpiryIsAllowed({ expiresAtMs, nowMs: this.now() })
+    ) {
+      throw new SsoBreakGlassExpiryOutOfRangeError(
+        BREAK_GLASS_MAX_WINDOW_DAYS,
+      );
+    }
   }
 
   /** Refuses a holder who could not use the way in they are being given. */

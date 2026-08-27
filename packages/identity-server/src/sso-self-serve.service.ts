@@ -492,13 +492,17 @@ export class SsoSelfServeService {
       // customer's own record unless another organization already holds the
       // domain, and telling somebody we are reviewing it when the next move
       // is theirs is how a customer waits for nothing.
+      // A withdrawn claim is a tombstone the rate limit reads, not a domain
+      // this connection has. It never reaches a screen.
       claims: await Promise.all(
-        (state?.domainClaims ?? []).map(async (claim) => ({
+        (state?.domainClaims ?? [])
+          .filter((claim) => claim.state !== "WITHDRAWN")
+          .map(async (claim) => ({
           ...toClaimView(claim),
           waitsForReview:
             claim.state === "WAITING" &&
             (await this.isDisputed({ organizationId, domain: claim.domain })),
-        })),
+          })),
       ),
       record:
         state?.pendingVerification &&

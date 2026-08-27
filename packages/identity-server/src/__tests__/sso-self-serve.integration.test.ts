@@ -1334,12 +1334,63 @@ describe("taking a domain back out", () => {
     expect(state?.claimedDomains).toEqual([]);
     expect(state?.approvedDomains).toEqual([]);
     expect(state?.verifiedDomains).toEqual([]);
-    expect(state?.domainClaims).toEqual([]);
+    // The claim row stays as a TOMBSTONE, and only as one: the domain is gone
+    // from every list above, and what the row is still good for is the rate
+    // limit, which counts claims inside the window. Deleting it put the
+    // budget back, so "five an hour" cost two requests per probe — and what
+    // that budget stands in front of is walking a list of other customers'
+    // domains to find out which are taken.
+    expect(state?.domainClaims.map((claim) => claim.state)).toEqual([
+      "WITHDRAWN",
+    ]);
     // Nothing else was in flight, so the journey is back at the start.
     expect(state?.state).toBe("DRAFT");
     // The history keeps every step: the claim and the withdrawal are both
     // facts, and neither erased the other.
     expect(commanded()).toContain("withdraw_domain");
+  });
+
+  it("does not hand the claim budget back", async () => {
+    // WITHDRAWING IS NOT A REFUND. The throttle counts claims inside the
+    // window, so deleting the row on withdrawal made the limit cost two
+    // requests per probe instead of one — and an unbounded probe is exactly
+    // what it stands in front of, because each claim answers whether another
+    // customer already holds the domain.
+    await register();
+    const spent: string[] = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const domain = `probe-${attempt}.test`;
+      await selfServe.claimDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain,
+        actor: ANA,
+      });
+      await selfServe.removeDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain,
+        actor: ANA,
+      });
+      spent.push(domain);
+    }
+    expect(spent).toHaveLength(5);
+
+    const refusal = await selfServe
+      .claimDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: "one-too-many.test",
+        actor: ANA,
+      })
+      .then(
+        () => {
+          throw new Error("the sixth claim was expected to be throttled");
+        },
+        (error: { code: string }) => error,
+      );
+
+    expect(refusal.code).toBe("sso_domain_claim_throttled");
   });
 
   /** @scenario "A verified domain cannot be removed from a connection that decides sign-in" */

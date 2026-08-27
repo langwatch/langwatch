@@ -170,6 +170,56 @@ describe("given an address a public email provider issued", () => {
       // through would be the same mistake as matching one.
       expect(isPublicEmailDomain("mail.gmail.com")).toBe(false);
     });
+
+    it("covers the country variants of every provider it lists", () => {
+      // A HAND-TYPED LIST DRIFTS, and each gap is a directory of who works
+      // where: an address on a missed variant is treated as a work address,
+      // so a stranger who verifies one is told an organization's real name
+      // and roughly how many people are in it. `gmx.de` was listed and
+      // `web.de` was not; `hotmail.fr` was and `hotmail.de` was not.
+      //
+      // Pinned by brand rather than by counting, so adding a provider means
+      // adding its variants and nothing silently half-lands.
+      const variantsOf: Record<string, string[]> = {
+        hotmail: ["com", "co.uk", "fr", "de", "it", "es", "nl", "be"],
+        live: ["com", "co.uk", "de", "fr", "it", "nl", "be"],
+        outlook: ["com", "de", "fr", "es", "it"],
+        yahoo: [
+          "com",
+          "co.uk",
+          "co.jp",
+          "de",
+          "fr",
+          "it",
+          "es",
+          "ca",
+          "com.au",
+          "com.br",
+        ],
+        gmx: ["com", "de", "net", "at", "ch"],
+      };
+
+      const missing: string[] = [];
+      for (const [brand, suffixes] of Object.entries(variantsOf)) {
+        for (const suffix of suffixes) {
+          const domain = `${brand}.${suffix}`;
+          if (!isPublicEmailDomain(domain)) missing.push(domain);
+        }
+      }
+      expect(missing).toEqual([]);
+    });
+
+    it("lists no domain twice and no domain that cannot be one", () => {
+      // `prontonmail.com` sat three lines above `protonmail.com` and matched
+      // nothing at all — the tell that the list was typed rather than
+      // checked.
+      expect(new Set(PUBLIC_EMAIL_DOMAINS).size).toBe(
+        PUBLIC_EMAIL_DOMAINS.length,
+      );
+      for (const domain of PUBLIC_EMAIL_DOMAINS) {
+        expect(domain).toMatch(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/);
+      }
+    });
   });
 });
 

@@ -558,7 +558,9 @@ export class SsoConnectionGuards {
       state.approvedDomains.includes(domain) ||
       state.verifiedDomains.includes(domain) ||
       state.pendingVerification?.domain === domain ||
-      state.domainClaims.some((claim) => claim.domain === domain);
+      state.domainClaims.some(
+        (claim) => claim.domain === domain && claim.state !== "WITHDRAWN",
+      );
     if (!known) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: domain ${domain} is not on this connection`,

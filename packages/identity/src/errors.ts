@@ -320,6 +320,30 @@ export class SsoBreakGlassHolderIneligibleError extends SsoConnectionCommandRefu
 }
 
 /**
+ * The expiry asked for is not one a grant may carry: in the past, or further
+ * out than the window allows.
+ *
+ * The expiry is the whole of what stops a break-glass grant from becoming a
+ * permanent second door past an organization's own identity provider, and
+ * nothing bounded it — a date in the year 9999 was accepted, never expired,
+ * and never warned, because the sweep only looks fourteen days ahead.
+ */
+export class SsoBreakGlassExpiryOutOfRangeError extends SsoConnectionCommandRefusedError {
+  constructor(maxWindowDays: number) {
+    super(
+      "sso_break_glass_expiry_out_of_range",
+      "sso_break_glass_expiry_out_of_range",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxWindowDays },
+      },
+    );
+    this.name = "SsoBreakGlassExpiryOutOfRangeError";
+  }
+}
+
+/**
  * Revoking this grant would leave a live connection with no way back in.
  * The one lever that exists for the identity provider failing must not be
  * removable while the identity provider is what decides sign-in — grant

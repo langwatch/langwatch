@@ -234,11 +234,19 @@ export const ssoDomainProofStateSchema = z.enum(SSO_DOMAIN_PROOF_STATES);
 export type SsoDomainProofState = z.infer<typeof ssoDomainProofStateSchema>;
 
 /** Where a domain claim stands. `WAITING` is the only state the tier-3 queue
- *  lists, and `REJECTED` is not terminal — the domain may be claimed again. */
+ *  lists, and `REJECTED` is not terminal — the domain may be claimed again.
+ *
+ *  `WITHDRAWN` is a TOMBSTONE rather than a step. The domain leaves every
+ *  list the connection derives; the row stays so the claim rate limit can
+ *  still see that the attempt happened. Deleting it put the budget back,
+ *  which made "five an hour" cost two requests per probe — and what that
+ *  budget stands in front of is walking a list of other customers' domains
+ *  to find out which are taken. */
 export const SSO_DOMAIN_CLAIM_STATES = [
   "WAITING",
   "APPROVED",
   "REJECTED",
+  "WITHDRAWN",
 ] as const;
 export const ssoDomainClaimStateSchema = z.enum(SSO_DOMAIN_CLAIM_STATES);
 export type SsoDomainClaimState = z.infer<typeof ssoDomainClaimStateSchema>;
@@ -1058,8 +1066,13 @@ export function reduceSsoConnection({
         claimedDomains: without(state.claimedDomains, domain),
         approvedDomains: without(state.approvedDomains, domain),
         verifiedDomains: without(state.verifiedDomains, domain),
-        domainClaims: state.domainClaims.filter(
-          (claim) => claim.domain !== domain,
+        // A tombstone rather than a deletion: the throttle counts claims
+        // inside the window, and a row the customer can remove is a budget
+        // the customer can reset. Every other reader ignores it.
+        domainClaims: state.domainClaims.map((claim) =>
+          claim.domain === domain
+            ? { ...claim, state: "WITHDRAWN" as const }
+            : claim,
         ),
         domainVerifications: state.domainVerifications.filter(
           (verification) => verification.domain !== domain,

@@ -26,6 +26,38 @@ export type BreakGlassWarningDay = (typeof BREAK_GLASS_WARNING_DAYS)[number];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * The longest a way in may be granted for, in days.
+ *
+ * A break-glass grant is a named person who can still sign in WITHOUT the
+ * identity provider an organization has otherwise made mandatory. The expiry
+ * is the whole of what stops that from quietly becoming a permanent second
+ * door — and nothing bounded it, so `expiresAtMs: 253402300799000` was a
+ * grant that outlived everybody and fired no warning, because the sweep only
+ * looks fourteen days ahead.
+ *
+ * Ninety days: long enough to cover a migration or a contested rollout, short
+ * enough that somebody has to look at it again within a quarter.
+ */
+export const BREAK_GLASS_MAX_WINDOW_DAYS = 90;
+export const BREAK_GLASS_MAX_WINDOW_MS = BREAK_GLASS_MAX_WINDOW_DAYS * DAY_MS;
+
+/**
+ * Whether this expiry is one a grant may carry: in the future, and inside the
+ * window. Pure, so the guard and the surface can ask the same question.
+ */
+export function breakGlassExpiryIsAllowed({
+  expiresAtMs,
+  nowMs,
+  maxWindowMs = BREAK_GLASS_MAX_WINDOW_MS,
+}: {
+  expiresAtMs: number;
+  nowMs: number;
+  maxWindowMs?: number;
+}): boolean {
+  return expiresAtMs > nowMs && expiresAtMs <= nowMs + maxWindowMs;
+}
+
+/**
  * One binding as everything that reads them sees it. Immutable: a renewal
  * writes a NEW binding naming the one it replaced, so the date a way in
  * previously ended is still readable afterwards.

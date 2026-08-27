@@ -114,10 +114,13 @@ export {
   waitingDomainClaims,
 } from "./connection";
 export {
+  BREAK_GLASS_MAX_WINDOW_DAYS,
+  BREAK_GLASS_MAX_WINDOW_MS,
   BREAK_GLASS_WARNING_DAYS,
   type BreakGlassBinding,
   type BreakGlassWarningDay,
   breakGlassDaysRemaining,
+  breakGlassExpiryIsAllowed,
   breakGlassIsLive,
   breakGlassWarningsDue,
 } from "./break-glass";
@@ -237,6 +240,7 @@ export {
   SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
   SsoBreakGlassHolderIneligibleError,
+  SsoBreakGlassExpiryOutOfRangeError,
   SsoBreakGlassLastWayInError,
   SsoActivationDomainUnprovedError,
   SsoActivationPreconditionError,
