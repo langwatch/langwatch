@@ -17,7 +17,6 @@ import { z } from "zod";
 import {
   AuthShell,
   IdentifierFirstSignIn,
-  useIdentityAuthScreens,
 } from "~/features/auth";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
@@ -39,101 +38,18 @@ import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
  * which one it is, because guessing would flash the wrong door on every load.
  */
 export default function SignIn() {
-  const auth = useIdentityAuthScreens();
-
-  if (!auth.isResolved) return null;
-  if (auth.enabled) {
-    return (
-      // The same room as sign-up, same seats: words on the left, card on the
-      // right. The panel greets rather than pitches, because somebody logging
-      // in already made the decision the sign-up headline argues for.
-      <AuthShell
-        headline={"Let's see what your agents\nhave been up to."}
-        headlineAccent="up to"
-        tagline="Log in and pick up where you left off."
-      >
-        <IdentifierFirstSignIn />
-      </AuthShell>
-    );
-  }
-
-  return <LegacySignIn />;
-}
-
-function LegacySignIn() {
-  const { data: session } = useSession();
-  const query = useSearchParams();
-  const rawError = query?.get("error");
-  // Normalize BetterAuth error codes so the auto-redirect gate works.
-  // e.g. "account_already_linked_to_different_user" → "OAuthAccountNotLinked"
-  const error = normalizeErrorCode(rawError);
-
-  const publicEnv = usePublicEnv();
-  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const callbackUrl = query?.get("callbackUrl") ?? undefined;
-
-  const isSocialProvider = isAuthProvider && isAuthProvider !== "email";
-
-  useEffect(() => {
-    if (!publicEnv.data) return;
-
-    // Already-signed-in users hitting /auth/signin should bounce to their
-    // callback (or dashboard) instead of staring at a 'Redirecting to Sign
-    // in...' splash forever (ariana dogfood finding #2).
-    if (session) {
-      replaceLocation(safeRedirectTarget(callbackUrl));
-      return;
-    }
-
-    let signInTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    // Don't auto-redirect back to the identity provider on a stable failure
-    // (wrong method / account collision): the IdP still holds a live session
-    // for the failing identity, so re-initiating sign-in silently re-auths it
-    // and traps the user in a loop. Those errors render SignInError with a
-    // federated-logout recovery instead.
-    if (!isStableAuthError(error) && isSocialProvider) {
-      signInTimeout = setTimeout(
-        () => {
-          void signIn(isAuthProvider, { callbackUrl });
-        },
-        error ? 2000 : 0,
-      );
-    }
-
-    return () => {
-      if (signInTimeout) clearTimeout(signInTimeout);
-    };
-  }, [
-    publicEnv.data,
-    session,
-    callbackUrl,
-    isAuthProvider,
-    isSocialProvider,
-    error,
-  ]);
-
-  if (error) {
-    return <SignInError error={error} />;
-  }
-
-  if (!publicEnv.data) {
-    return null;
-  }
-
-  // Show a friendlier message if the user is already signed in (the
-  // useEffect above triggers the redirect — this is the transient splash
-  // for ~1 paint frame). Distinguishes the two very different states that
-  // used to render the same "Redirecting to Sign in..." string.
-  if (session) {
-    return <Box padding="12px">Already signed in — redirecting…</Box>;
-  }
-
-  if (isSocialProvider) {
-    return <Box padding="12px">Redirecting to Sign in...</Box>;
-  }
-
-  return <SignInForm />;
+  return (
+    // The same room as sign-up, same seats: words on the left, card on the
+    // right. The panel greets rather than pitches, because somebody logging
+    // in already made the decision the sign-up headline argues for.
+    <AuthShell
+      headline={"Let's see what your agents\nhave been up to."}
+      headlineAccent="up to"
+      tagline="Log in and pick up where you left off."
+    >
+      <IdentifierFirstSignIn />
+    </AuthShell>
+  );
 }
 
 // Auth redirect is now handled client-side via useSession() + useEffect in the component

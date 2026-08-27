@@ -240,7 +240,6 @@ describe("<SecuritySettings/>", () => {
       // whatever this deployment happens to offer.
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
-        PASSKEYS_ENABLED: true,
         MFA_ENROLLMENT_OPEN: true,
       };
       const { container } = renderPage();
@@ -315,7 +314,6 @@ describe("<SecuritySettings/>", () => {
     it("says so inside the band whose halves are the remedy", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
-        PASSKEYS_ENABLED: true,
         MFA_ENROLLMENT_OPEN: true,
       };
       // A password and nothing else: no passkey, no linked account.
@@ -340,7 +338,6 @@ describe("<SecuritySettings/>", () => {
     it("says nothing at all once a second way in exists", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
-        PASSKEYS_ENABLED: true,
         MFA_ENROLLMENT_OPEN: true,
       };
       linkedAccountsRef.current = [

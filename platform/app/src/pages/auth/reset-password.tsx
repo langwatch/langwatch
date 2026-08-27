@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
-import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
+import { AuthShell } from "~/features/auth";
 import { SHAPE } from "~/features/auth/authTheme";
 import { AuthField } from "~/features/auth/components/AuthField";
 import {
@@ -17,7 +17,6 @@ import {
   useAuthAnalytics,
   usePublishAuthStep,
 } from "~/features/auth/hooks/useAuthAnalytics";
-import { useSignsInWithPasskeys } from "~/features/auth/hooks/useSignsInWithPasskeys";
 import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { HandledErrorAlert } from "~/features/errors";
@@ -120,15 +119,10 @@ function readResetRefusal(error: {
 export default function ResetPassword() {
   const query = useSearchParams();
   const token = query?.get("token") ?? null;
-  const auth = useIdentityAuthScreens();
 
   const screen = token ? <ResetPasswordForm token={token} /> : <DeadLinkCard />;
 
-  // The shell is the auth screens' ground, so it appears where the auth screens
-  // does and not before — the same condition `signin.tsx` composes on. The
-  // CARD is the same either way: the grammar is not the flag's to decide.
-  if (!auth.isResolved) return null;
-  return auth.enabled ? <AuthShell>{screen}</AuthShell> : screen;
+  return <AuthShell>{screen}</AuthShell>;
 }
 
 /** The link carried no token at all: there is nothing here to spend. */
@@ -302,9 +296,8 @@ function ResetPasswordForm({ token }: { token: string }) {
  * card exactly as it would have been.
  */
 function PasswordUpdatedCard() {
-  const passkeys = useSignsInWithPasskeys();
   const [offerDismissed, setOfferDismissed] = useState(false);
-  const offerPasskey = passkeys.enabled && !offerDismissed;
+  const offerPasskey = !offerDismissed;
 
   return (
     <AuthCard

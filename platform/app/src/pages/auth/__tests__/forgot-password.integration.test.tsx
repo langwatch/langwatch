@@ -182,10 +182,14 @@ describe("ForgotPassword page", () => {
     });
   });
 
-  describe("when the deployment uses an SSO identity provider", () => {
+  describe("when a hosted organization signs in through an identity provider", () => {
+    // Reset follows the IDENTIFIER, not the deployment: a self-hosted install
+    // keeps this door open however it federates, so the refusal is the hosted
+    // rule and names itself as one.
     it("explains the password is managed by the provider instead of a form", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "auth0",
+        IS_SAAS: true,
         HAS_EMAIL_PROVIDER_KEY: true,
       };
       renderPage();

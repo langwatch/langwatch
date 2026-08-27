@@ -15,7 +15,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   AuthShell,
-  useIdentityAuthScreens,
   VerificationFirstSignUp,
 } from "~/features/auth";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
@@ -53,61 +52,27 @@ const RECOVERY_FALLBACK =
  * below is untouched and answers whenever the auth screens is not enforced.
  */
 export default function SignUp() {
-  const auth = useIdentityAuthScreens();
-
-  if (!auth.isResolved) return null;
-  if (auth.enabled) {
-    return (
-      // The pitch is the hosted product's, and it lives OUTSIDE the card: the
-      // card itself is the same on every installation.
-      //
-      // Nothing sits under the tagline. `trustStrip` stayed empty because the
-      // one thing that belongs there is a customer — a quote or a logo row —
-      // and both are somebody else's decision to be named. A row of INTEGRATION
-      // marks was tried in that slot and is the wrong module for this page: it
-      // argues we are compatible, when the question a stranger is asking is
-      // whether anybody else trusts us. Leave it empty until there is a cleared
-      // name to put in it; an empty slot beats furniture.
-      <AuthShell
-        headline={"See what your agents\nare actually doing."}
-        headlineAccent="actually"
-        // Names the thing they are seconds away from, rather than listing what
-        // the product has. "Traces, evaluations and monitoring" was a feature
-        // list read by somebody who has not agreed to want any of them yet.
-        tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
-      >
-        <VerificationFirstSignUp />
-      </AuthShell>
-    );
-  }
-
-  return <LegacySignUp />;
-}
-
-function LegacySignUp() {
-  const { data: session } = useSession();
-  const publicEnv = usePublicEnv();
-  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
-
-  useEffect(() => {
-    if (!publicEnv.data) {
-      return;
-    }
-
-    if (!session && isAuthProvider && isAuthProvider !== "email") {
-      void signIn(isAuthProvider, { callbackUrl });
-    }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider]);
-
-  if (!publicEnv.data) {
-    return null;
-  }
-
-  return isAuthProvider && isAuthProvider !== "email" ? (
-    <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
-  ) : (
-    <SignUpForm />
+  return (
+    // The pitch is the hosted product's, and it lives OUTSIDE the card: the
+    // card itself is the same on every installation.
+    //
+    // Nothing sits under the tagline. `trustStrip` stayed empty because the
+    // one thing that belongs there is a customer — a quote or a logo row —
+    // and both are somebody else's decision to be named. A row of INTEGRATION
+    // marks was tried in that slot and is the wrong module for this page: it
+    // argues we are compatible, when the question a stranger is asking is
+    // whether anybody else trusts us. Leave it empty until there is a cleared
+    // name to put in it; an empty slot beats furniture.
+    <AuthShell
+      headline={"See what your agents\nare actually doing."}
+      headlineAccent="actually"
+      // Names the thing they are seconds away from, rather than listing what
+      // the product has. "Traces, evaluations and monitoring" was a feature
+      // list read by somebody who has not agreed to want any of them yet.
+      tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
+    >
+      <VerificationFirstSignUp />
+    </AuthShell>
   );
 }
 

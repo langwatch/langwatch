@@ -52,27 +52,6 @@ export const PASSKEY_METHOD: SignInMethod = {
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
 
 /**
- * Whether this deployment mounted the passkey plugin at boot. The server half
- * is registered off the same value, so the set can never name a method the
- * endpoint behind it does not have.
- */
-export function deploymentOffersPasskeys(): boolean {
-  return env.PASSKEYS_ENABLED === "on";
-}
-
-/**
- * Whether a passkey minted today is a way IN today. The plugin can be mounted
- * (`deploymentOffersPasskeys`) while the legacy sign-in screens are still the
- * auth screens — and those screens accept no passkey, only the identifier-first
- * ones do (D13, `IDENTITY_ROUTER_V2=enforce`). Anything that OFFERS to mint a
- * credential — the nudge above all — gates on this, so nobody is walked into
- * creating one the sign-in screen then has no button for.
- */
-export function deploymentSignsInWithPasskeys(): boolean {
-  return deploymentOffersPasskeys() && env.IDENTITY_ROUTER_V2 === "enforce";
-}
-
-/**
  * Whether this deployment offers two-step verification at all (D06). The
  * same derived read `deploymentOffersPasskeys` is, for the same reason: the
  * two-factor plugin's server half is registered off this value, so a screen
@@ -118,7 +97,7 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // Offered alongside whatever else answers, never instead of it: somebody
   // without a passkey on THIS device must still find the way they used last
   // time. It is appended, so the order the screen renders does not move.
-  const passkeys = deploymentOffersPasskeys() ? [PASSKEY_METHOD] : [];
+  const passkeys = [PASSKEY_METHOD];
   return {
     defaultMethods: [
       ...(federated ? [federated] : LOCAL_METHOD_SET),

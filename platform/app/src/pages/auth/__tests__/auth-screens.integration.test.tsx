@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * One flag covers the router and the screens (ADR-117 §7). These tests hold
- * both sides of it: enforced, the first-party screens answer and no journey
- * through them reaches an identity provider's hosted pages; not enforced, the
- * legacy screens answer exactly as they did before, which is what makes the
- * rollback a flag rather than a deploy.
+ * The identifier-first screens are the screens (ADR-117 §7). What these hold
+ * is what that means for somebody arriving: reset follows the identifier
+ * rather than the deployment's provider, it is still refused where the
+ * installation holds no passwords to reset, and no journey through them
+ * reaches an identity provider's hosted pages.
  *
  * Spec: specs/identity/signin-signup-screens.feature
  */
@@ -29,7 +29,6 @@ const {
   publicEnvRef: {
     current: {
       NEXTAUTH_PROVIDER: "email",
-      IDENTITY_FRONT_DOOR: false,
       HAS_EMAIL_PROVIDER_KEY: true,
     } as Record<string, unknown>,
   },
@@ -142,77 +141,12 @@ const federatedPicker: RoutingDecision = {
 const renderPage = (page: ReactNode) =>
   render(<ChakraProvider value={defaultSystem}>{page}</ChakraProvider>);
 
-describe("given the identifier-first auth screens is not enforced", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    searchParamsRef.current = new URLSearchParams("");
-    publicEnvRef.current = {
-      NEXTAUTH_PROVIDER: "email",
-      IDENTITY_FRONT_DOOR: false,
-      HAS_EMAIL_PROVIDER_KEY: true,
-    };
-    routeMock.mockResolvedValue(federatedPicker);
-  });
-
-  afterEach(() => cleanup());
-
-  describe("when the sign-in page is requested", () => {
-    /** @scenario The legacy screens return untouched when the flag is off */
-    it("answers with the legacy screen and asks the router nothing", async () => {
-      const { container } = renderPage(<SignIn />);
-
-      // The legacy credential screen: one form carrying both fields, which is
-      // exactly what it rendered before any of this existed.
-      expect(container.querySelector('input[type="email"]')).not.toBeNull();
-      expect(container.querySelector('input[type="password"]')).not.toBeNull();
-      expect(
-        screen.getByRole("link", { name: /forgot password/i }),
-      ).toBeTruthy();
-      expect(screen.queryByTestId("method-picker")).toBeNull();
-      expect(routeMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the sign-up page is requested", () => {
-    /** @scenario The legacy screens return untouched when the flag is off */
-    it("answers with the legacy screen, which asks for a password up front", () => {
-      const { container } = renderPage(<SignUp />);
-
-      expect(container.querySelectorAll('input[type="password"]').length).toBe(
-        2,
-      );
-      expect(screen.getByRole("button", { name: /sign up/i })).toBeTruthy();
-      expect(requestVerificationMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the deployment signs in through an identity provider", () => {
-    /** @scenario The legacy screens return untouched when the flag is off */
-    /** @scenario Password reset stays a credential-mode concept before the flip */
-    it("keeps refusing password reset, as it did before", () => {
-      publicEnvRef.current = {
-        NEXTAUTH_PROVIDER: "auth0",
-        IDENTITY_FRONT_DOOR: false,
-        HAS_EMAIL_PROVIDER_KEY: true,
-      };
-
-      const { container } = renderPage(<ForgotPassword />);
-
-      expect(
-        screen.getByText(/password is managed by your identity provider/i),
-      ).toBeTruthy();
-      expect(container.querySelector('input[type="email"]')).toBeNull();
-    });
-  });
-});
-
-describe("given the identifier-first auth screens is enforced", () => {
+describe("given the identifier-first auth screens", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = {
       NEXTAUTH_PROVIDER: "auth0",
-      IDENTITY_FRONT_DOOR: true,
       HAS_EMAIL_PROVIDER_KEY: true,
     };
     routeMock.mockResolvedValue(federatedPicker);
@@ -223,7 +157,6 @@ describe("given the identifier-first auth screens is enforced", () => {
 
   describe("when somebody who holds a password asks to reset it", () => {
     /** @scenario Reset follows the identifier, not the deployment mode */
-    /** @scenario Password reset follows the identifier once the auth screens is enforced */
     it("offers the reset on a deployment that signs in through a provider", async () => {
       publicEnvRef.current = {
         ...publicEnvRef.current,

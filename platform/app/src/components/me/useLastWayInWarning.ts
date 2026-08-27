@@ -80,17 +80,16 @@ export function useLastWayInWarning(): LastWayInWarning | null {
   const passwordStatus = api.user.hasPassword.useQuery({});
 
   const provider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const offersPasskeys = publicEnv.data?.PASSKEYS_ENABLED === true;
 
   // Nothing is claimed until both halves of the count are in hand.
   if (!accounts.data) return null;
-  if (offersPasskeys && passkeys.isPending) return null;
+  if (passkeys.isPending) return null;
   if (provider === "email" && !passwordStatus.data) return null;
 
   const linked = accounts.data.filter(
     (account) => !isCredentialAccount(account),
   );
-  const heldPasskeys = offersPasskeys ? (passkeys.data ?? []).length : 0;
+  const heldPasskeys = (passkeys.data ?? []).length;
   const hasPassword =
     provider === "email"
       ? passwordStatus.data?.hasPassword === true

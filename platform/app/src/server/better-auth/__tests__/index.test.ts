@@ -85,22 +85,15 @@ describe("better-auth config", () => {
     });
 
     /** @scenario "With the flag off nothing about two-step verification exists" */
-    /** @scenario "With the flag off, passkeys do not exist" */
-    it("registers a factor plugin only when its flag is on", async () => {
-      // Both flags default off, so re-importing the module under each
-      // setting is what makes this a real check rather than one that
-      // happens to pass because nothing was ever turned on.
-      const pluginIdsUnder = async (flags: {
-        MFA_ENROLLMENT_OPEN: string;
-        PASSKEYS_ENABLED: string;
-      }): Promise<string[]> => {
+    it("registers the two-factor plugin only when its flag is on", async () => {
+      // The flag defaults off, so re-importing the module under each setting
+      // is what makes this a real check rather than one that happens to pass
+      // because nothing was ever turned on.
+      const pluginIdsUnder = async (mfa: string): Promise<string[]> => {
         vi.resetModules();
         const { env } = await import("~/env.mjs");
         vi.spyOn(env, "MFA_ENROLLMENT_OPEN", "get").mockReturnValue(
-          flags.MFA_ENROLLMENT_OPEN as never,
-        );
-        vi.spyOn(env, "PASSKEYS_ENABLED", "get").mockReturnValue(
-          flags.PASSKEYS_ENABLED as never,
+          mfa as never,
         );
         const { auth } = await import("../index");
         return ((auth as any).options?.plugins ?? []).map(
@@ -111,18 +104,16 @@ describe("better-auth config", () => {
       // Not registered means the routes are not mounted, so nothing about
       // the feature is reachable — the flag governs the surface, not just
       // whether a screen renders.
-      const off = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "off",
-        PASSKEYS_ENABLED: "off",
-      });
+      const off = await pluginIdsUnder("off");
       expect(off).not.toContain("two-factor");
-      expect(off).not.toContain("passkey");
 
-      const on = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "on",
-        PASSKEYS_ENABLED: "on",
-      });
+      const on = await pluginIdsUnder("on");
       expect(on).toContain("two-factor");
+
+      // Passkeys are not a flag any more. They are mounted either way, which
+      // is the whole point of removing the setting: a deployment cannot be
+      // in a state where the button exists and the endpoint does not.
+      expect(off).toContain("passkey");
       expect(on).toContain("passkey");
 
       vi.restoreAllMocks();

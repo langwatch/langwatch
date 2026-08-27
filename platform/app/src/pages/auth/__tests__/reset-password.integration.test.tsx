@@ -25,8 +25,6 @@ const { mockResetPassword, searchParamsRef, publicEnvRef } = vi.hoisted(() => ({
   publicEnvRef: {
     current: {
       NEXTAUTH_PROVIDER: "email",
-      IDENTITY_FRONT_DOOR: false,
-      PASSKEYS_ENABLED: false,
     } as Record<string, unknown>,
   },
 }));
@@ -113,8 +111,6 @@ describe("ResetPassword page", () => {
     setToken("tok_valid");
     publicEnvRef.current = {
       NEXTAUTH_PROVIDER: "email",
-      IDENTITY_FRONT_DOOR: false,
-      PASSKEYS_ENABLED: false,
     };
   });
 
@@ -272,8 +268,6 @@ describe("ResetPassword page", () => {
     beforeEach(() => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
-        IDENTITY_FRONT_DOOR: true,
-        PASSKEYS_ENABLED: true,
       };
     });
 
@@ -313,26 +307,6 @@ describe("ResetPassword page", () => {
         expect(
           screen.getByRole("heading", { name: /password updated/i }),
         ).toBeTruthy();
-        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
-      });
-    });
-  });
-
-  describe("given a deployment that does not sign people in with passkeys", () => {
-    describe("when the reset completes", () => {
-      /** @scenario No passkey is offered where the auth screens cannot take one */
-      it("shows the confirmation it always was", async () => {
-        publicEnvRef.current = {
-          NEXTAUTH_PROVIDER: "email",
-          // The plugin is mounted, but the legacy screens are still the way in
-          // and they take no passkey — so minting one would be a credential
-          // for a door with no button on it.
-          IDENTITY_FRONT_DOOR: false,
-          PASSKEYS_ENABLED: true,
-        };
-        await resetSuccessfully();
-
-        expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
         expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
       });
     });

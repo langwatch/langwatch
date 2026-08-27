@@ -56,7 +56,6 @@ import { passkeySignUpRegistration } from "./passkey-signup";
 import { issuersForRequest } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
-import { runSignInRouterShadow } from "./signInRouterShadow";
 import { resolveTrustedOrigins } from "./trustedOrigins";
 import {
   runTwoStepCeremony,
@@ -113,7 +112,6 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(env);
  * screen. Feature flags are read per project, and neither caller has one yet.
  */
 const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
-const passkeysEnabled = env.PASSKEYS_ENABLED === "on";
 
 const plugins = [
   ...(genericOAuthConfigs.length > 0
@@ -156,8 +154,7 @@ const plugins = [
         }),
       ]
     : []),
-  ...(passkeysEnabled
-    ? [
+  ...[
         passkey({
           rpName: "LangWatch",
           // The relying party is the app's own origin. Left to the plugin's
@@ -171,8 +168,7 @@ const plugins = [
           // account must be refused there.
           registration: passkeySignUpRegistration,
         }),
-      ]
-    : []),
+      ],
   /**
    * Per-organization single sign-on (D09 — see
    * specs/identity/sso-idp-termination.feature).
@@ -893,13 +889,6 @@ export const auth = betterAuth({
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
-
-      // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
-      // the email-mode early return on purpose — an email-mode deployment is a
-      // routing decision the router has to agree with too, and it is the
-      // commonest one in the fleet. With the flag off it returns having read
-      // nothing, computed nothing and logged nothing.
-      await runSignInRouterShadow({ pathname, url, body: ctx.body });
 
       // ADR-119, on the two removals that reach no ceremony: the passkey
       // plugin owns its own table so `account.delete.before` never sees a
