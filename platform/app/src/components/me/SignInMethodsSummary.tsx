@@ -56,7 +56,6 @@ export function SignInMethodsSummary() {
   const twoStep = api.twoStepVerification.account.useQuery({});
   const passkeys = authClient.useListPasskeys();
 
-  const offersPasskeys = publicEnv.data?.PASSKEYS_ENABLED === true;
 
   return (
     <SettingsSection
@@ -102,7 +101,6 @@ export function SignInMethodsSummary() {
           {methodRows({
             identifiers: identifiers.data ?? [],
             accountAddress: confirmation.data ?? null,
-            offersPasskeys,
             passkeyCount: passkeys.data?.length ?? 0,
             hasPassword: password.data?.hasPassword === true,
             twoStep: twoStep.data ?? null,
@@ -182,7 +180,6 @@ interface MethodRowProps {
 function methodRows({
   identifiers,
   accountAddress,
-  offersPasskeys,
   passkeyCount,
   hasPassword,
   twoStep,
@@ -199,7 +196,6 @@ function methodRows({
   /** The address on the account itself, for the accounts whose identifier
    *  projection holds nothing — see the section's docblock. */
   accountAddress: { email: string | null; confirmed: boolean } | null;
-  offersPasskeys: boolean;
   passkeyCount: number;
   hasPassword: boolean;
   twoStep: { offered: boolean; enabled: boolean } | null;
@@ -233,17 +229,13 @@ function methodRows({
       chip: null,
       testId: "method-row-federated",
     })),
-    ...(offersPasskeys
-      ? [
-          {
-            key: "passkeys",
-            label: "Passkeys",
-            detail: passkeyDetail(passkeyCount),
-            chip: null,
-            testId: "method-row-passkeys",
-          },
-        ]
-      : []),
+    {
+      key: "passkeys",
+      label: "Passkeys",
+      detail: passkeyDetail(passkeyCount),
+      chip: null,
+      testId: "method-row-passkeys",
+    },
     {
       key: "password",
       label: "Password",
