@@ -25,6 +25,8 @@ import { Readable } from "node:stream";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { PullResult } from "../pullerAdapter";
+
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
 const ocsfInsert = vi.fn();
@@ -308,32 +310,64 @@ describe("a pull run that reported errors", () => {
     });
   });
 
+  /**
+   * Driven through a registered stub rather than a real adapter, deliberately.
+   *
+   * No shipped adapter returns errors together with a null cursor: s3_polling
+   * sets its cursor on every key it touches including one it failed to read,
+   * and http_polling, anthropic_admin and databricks_genie all hand back the
+   * cursor they were given. So this rule cannot be reached from production
+   * code today, and a mutation that deletes it survives every test written
+   * against a real adapter.
+   *
+   * It is worth stating anyway, and worth a test that says so, because it is
+   * the difference between a stalled source and a source that silently
+   * re-ingests its entire history. The next adapter is what makes it
+   * reachable, and it will not come with this reasoning attached.
+   */
   describe("given the adapter reported errors and handed back a null cursor", () => {
+    const nullCursorAdapter = {
+      id: "test_null_cursor",
+      validateConfig: (config: unknown) => config,
+      runOnce: (): Promise<PullResult> =>
+        Promise.resolve({ events: [], cursor: null, errorCount: 1 }),
+    };
+
+    const advancingAdapter = {
+      id: "test_advancing",
+      validateConfig: (config: unknown) => config,
+      runOnce: (): Promise<PullResult> =>
+        Promise.resolve({ events: [], cursor: "cursor-B", errorCount: 1 }),
+    };
+
+    async function runWith(adapter: { id: string }, sourceId: string) {
+      sourceFindUnique.mockResolvedValueOnce({
+        id: sourceId,
+        organizationId: "org-1",
+        sourceType: adapter.id,
+        status: "active",
+        parserConfig: { adapter: adapter.id },
+        pollerCursor: "cursor-A",
+      });
+      const { pullerAdapterRegistry } = await import("../pullerAdapter");
+      pullerAdapterRegistry.register(adapter as never);
+      const { runIngestionPull } = await import("../pullerWorker");
+      return runIngestionPull({ sourceId, cursor: "cursor-A" });
+    }
+
     describe("when the worker runs it", () => {
-      /**
-       * `null` is the "no cursor yet / drained" sentinel, not an advance.
-       * Persisting it against a non-null incoming cursor would rewind the
-       * source to the beginning of the prefix and re-ingest everything, which
-       * is a worse outcome than the stall this replaces.
-       */
-      it("treats null as no progress rather than as an advance", async () => {
-        const sourceId = "src-null-1";
-        stubObjects = [];
-        sourceFindUnique.mockResolvedValueOnce(
-          s3Source(sourceId, `${PREFIX}b.ndjson`),
-        );
-        fetchStub.mockRejectedValue(new Error("unused"));
+      it("fails the run rather than rewinding the source to the beginning", async () => {
+        await expect(
+          runWith(nullCursorAdapter, "src-null-1"),
+        ).rejects.toThrow(/reported 1 error/);
+      });
+    });
 
-        const { runIngestionPull } = await import("../pullerWorker");
-        const outcome = await runIngestionPull({
-          sourceId,
-          cursor: `${PREFIX}b.ndjson`,
-        });
-
-        // An empty listing is a clean drained run, so it does not throw; what
-        // matters is that it did not rewind the source to the start.
-        expect(outcome.errorCount).toBe(0);
-        expect(outcome.nextCursor).not.toBe(null);
+    describe("when the same adapter hands back a real cursor instead", () => {
+      it("accepts it as progress, so the rule is about null and not about errors", async () => {
+        const outcome = await runWith(advancingAdapter, "src-advance-1");
+        expect(outcome.nextCursor).toBe("cursor-B");
+        expect(outcome.errorCount).toBe(1);
       });
     });
   });
