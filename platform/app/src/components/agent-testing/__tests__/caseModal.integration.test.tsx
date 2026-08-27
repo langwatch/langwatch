@@ -62,6 +62,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: emptyQuery },
       getById: { useQuery: mockGetById },
       getLastResultSummaries: { useQuery: emptyQuery },

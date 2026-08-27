@@ -85,7 +85,14 @@ function folderScopeLabel({
   return `${names.length} test suites`;
 }
 
-/** One hand-picked scenario reads by name; several read as a count. */
+/**
+ * One hand-picked scenario reads by its own name; several read as a count.
+ *
+ * A run of one scenario is named after that scenario, always. A count in its
+ * place says how many ran and never which, so "1 scenario dev-agent" names
+ * every single-scenario run of that agent the same thing and they all resolve
+ * onto one run plan.
+ */
 function caseScopeLabel({
   scope,
   scenarios,
@@ -96,7 +103,8 @@ function caseScopeLabel({
   if (scope.caseIds.length === 0) return "All scenarios";
   if (scope.caseIds.length === 1) {
     const only = scenarios.find((entry) => entry.id === scope.caseIds[0]);
-    if (only) return only.name;
+    // The scenario list is still on its way, or holds no scenario of that id.
+    return only?.name ?? "Selected scenario";
   }
   return `${scope.caseIds.length} scenarios`;
 }

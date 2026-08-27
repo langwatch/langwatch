@@ -64,11 +64,19 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       getAll: { useQuery: mockSuitesGetAll },
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       // The results list names the scenario and the labels of every run it
       // lists, so the tab reads the scenarios of the project too.
       getAll: { useQuery: () => ({ data: [] }) },

@@ -57,6 +57,18 @@ vi.mock("~/stores/upgradeModalStore", () => ({
 // Mock tRPC - no create mutation needed since modal no longer creates
 vi.mock("~/utils/api", () => ({
   api: {
+    suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+    scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
     modelProvider: {
       getAllForProject: {
         useQuery: () => ({

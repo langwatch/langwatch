@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestCasesTab } from "../cases/TestCasesTab";
 import { RunDialog, type RunDialogSubject } from "../run/RunDialog";
 import { LOCKED_IN_ROWS_MESSAGE } from "../run/RunParametersSection";
+import { configurationKeyOf } from "../run/run-configuration";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
@@ -35,6 +36,7 @@ const mockPromptsGetAll = vi.hoisted(() => vi.fn());
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
 const mockSuitesGetAll = vi.hoisted(() => vi.fn());
+const mockRunConfigurations = vi.hoisted(() => vi.fn());
 const mockSuitesCreate = vi.hoisted(() => vi.fn());
 const mockHasProviders = vi.hoisted(() => ({ value: true }));
 
@@ -60,6 +62,7 @@ vi.mock("~/utils/api", () => ({
       getExternalSetSummaries: { useQuery: emptyQuery },
       getLastResultSummaries: { useQuery: emptyQuery },
       getScenarioSetRunData: { useQuery: emptyQuery },
+      getRunConfigurations: { useQuery: mockRunConfigurations },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       moveToFolder: {
@@ -263,6 +266,7 @@ describe("<RunDialog/>", () => {
     });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
       batchRunId: "batch_new",
       jobCount: 1,
@@ -1182,20 +1186,44 @@ describe("run entries on the Scenarios tab", () => {
   });
 });
 
-/** A stored run plan, in the shape the plans read returns it. */
-function planRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "plan_1",
-    name: "Refunds prod-agent",
-    kind: "custom",
-    scope: { mode: "folders", folderIds: ["suite_refunds"] },
-    scenarioIds: [],
-    targets: [{ type: "http", referenceId: "agent_1" }],
-    repeatCount: 1,
+/** One configuration, in the shape the run configurations read returns it. */
+function configurationEntry(
+  overrides: {
+    planId?: string;
+    planName?: string;
+    targets?: { type: string; referenceId: string }[];
+    repeatCount?: number;
+    runParameters?: Record<string, string>;
+    lastRunAt?: Date;
+    scope?: unknown;
+    usesNote?: boolean;
+  } = {},
+) {
+  const configuration = {
+    scope: overrides.scope ?? {
+      mode: "folders",
+      folderIds: ["suite_refunds"],
+    },
+    targets: overrides.targets ?? [{ type: "http", referenceId: "agent_1" }],
+    repeatCount: overrides.repeatCount ?? 1,
     simulatorModel: null,
     judgeModel: null,
-    updatedAt: new Date("2026-08-01T10:00:00.000Z"),
-    ...overrides,
+  };
+  const runParameters = overrides.runParameters ?? {};
+  return {
+    // The key is the configuration's identity, taken the way the server takes
+    // it, so two entries of one plan that differ in parameters or repeat count
+    // are two rows.
+    key: configurationKeyOf({
+      configuration: configuration as never,
+      runParameters,
+    }),
+    planId: overrides.planId ?? "plan_1",
+    planName: overrides.planName ?? "Refunds prod-agent",
+    configuration,
+    runParameters,
+    usesNote: overrides.usesNote ?? false,
+    lastRunAt: overrides.lastRunAt ?? new Date("2026-08-01T10:00:00.000Z"),
   };
 }
 
@@ -1224,6 +1252,7 @@ describe("the run name", () => {
     });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
       batchRunId: "batch_new",
       jobCount: 1,
@@ -1301,18 +1330,18 @@ describe("the run name", () => {
   it("lists the configurations of this scope newest first, each saying what it ran with", async () => {
     const user = userEvent.setup();
     // Fed oldest first, so an order that is merely preserved fails here.
-    mockSuitesGetAll.mockReturnValue({
+    mockRunConfigurations.mockReturnValue({
       data: [
-        planRow({
-          id: "plan_old",
-          name: "Refunds prod-agent",
-          updatedAt: new Date("2026-08-01T10:00:00.000Z"),
+        configurationEntry({
+          planId: "plan_old",
+          planName: "Refunds prod-agent",
+          lastRunAt: new Date("2026-08-01T10:00:00.000Z"),
         }),
-        planRow({
-          id: "plan_new",
-          name: "Nightly refunds",
+        configurationEntry({
+          planId: "plan_new",
+          planName: "Nightly refunds",
           targets: [{ type: "http", referenceId: "agent_2" }],
-          updatedAt: new Date("2026-08-20T10:00:00.000Z"),
+          lastRunAt: new Date("2026-08-20T10:00:00.000Z"),
         }),
       ],
       isLoading: false,
@@ -1343,14 +1372,19 @@ describe("the run name", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "The note is never part of a configuration" */
-  it("never lists a note and never brings one back", async () => {
+  /** @scenario "The note text is never carried over" */
+  /** @scenario "A run plan that takes a note opens the note field ready" */
+  it("opens the note block ready and empty, and carries no note text", async () => {
     const user = userEvent.setup();
-    mockSuitesGetAll.mockReturnValue({
+    mockRunConfigurations.mockReturnValue({
       data: [
-        // The stored plan carries the note of its last run; it is not part of
-        // the configuration and must reach neither the list nor the dialog.
-        planRow({ note: "checking the stricter criterion" }),
+        // The read carries the fact, never the text. The text below stands in
+        // for a note leaking onto an entry: it must reach neither the list nor
+        // the field.
+        {
+          ...configurationEntry({ usesNote: true }),
+          note: "checking the stricter criterion",
+        },
       ],
       isLoading: false,
     });
@@ -1361,6 +1395,30 @@ describe("the run name", () => {
     expect(list).not.toHaveTextContent("stricter criterion");
 
     await user.click(within(list).getAllByRole("button")[0]!);
+
+    // The plan takes a note, so the block is ready for one.
+    const note = screen.getByTestId("run-note-field");
+    expect(within(note).getByRole("textbox")).toHaveValue("");
+    expect(note).not.toHaveTextContent("stricter criterion");
+    expect(screen.queryByTestId("customize-chip-note")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A field added by a chip can be removed again" */
+  it("leaves the note block folded away for a plan that never took one", async () => {
+    const user = userEvent.setup();
+    mockRunConfigurations.mockReturnValue({
+      data: [configurationEntry({ usesNote: false })],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    await user.click(
+      within(screen.getByTestId("run-dialog-name-options")).getAllByRole(
+        "button",
+      )[0]!,
+    );
+
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
     expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
   });
@@ -1371,19 +1429,16 @@ describe("the run name", () => {
     mockScenariosGetAll.mockReturnValue(
       casesDeclaring([{ name: "locale", defaultValue: "en" }]),
     );
-    mockSuitesGetAll.mockReturnValue({
+    mockRunConfigurations.mockReturnValue({
       data: [
-        planRow({
-          name: "Nightly refunds",
+        configurationEntry({
+          planName: "Nightly refunds",
           repeatCount: 3,
           targets: [
-            {
-              type: "http",
-              referenceId: "agent_1",
-              runParameters: { locale: "de" },
-            },
+            { type: "http", referenceId: "agent_1" },
             { type: "http", referenceId: "agent_2" },
           ],
+          runParameters: { locale: "de" },
         }),
       ],
       isLoading: false,
@@ -1419,17 +1474,20 @@ describe("the run name", () => {
   /** @scenario "Typing filters the list and opens it" */
   it("narrows the list to what is typed, and offers none for a new name", async () => {
     const user = userEvent.setup();
-    mockSuitesGetAll.mockReturnValue({
+    mockRunConfigurations.mockReturnValue({
       data: [
-        planRow({ id: "plan_a", name: "Refunds prod-agent" }),
-        planRow({
-          id: "plan_b",
-          name: "Nightly refunds",
+        configurationEntry({
+          planId: "plan_a",
+          planName: "Refunds prod-agent",
+        }),
+        configurationEntry({
+          planId: "plan_b",
+          planName: "Nightly refunds",
           targets: [{ type: "http", referenceId: "agent_2" }],
         }),
-        planRow({
-          id: "plan_c",
-          name: "Weekly refunds",
+        configurationEntry({
+          planId: "plan_c",
+          planName: "Weekly refunds",
           repeatCount: 2,
         }),
       ],
@@ -1457,18 +1515,18 @@ describe("the run name", () => {
   /** @scenario "The arrow keys move and Enter takes the highlighted entry" */
   it("moves down the list and takes the highlighted entry on Enter", async () => {
     const user = userEvent.setup();
-    mockSuitesGetAll.mockReturnValue({
+    mockRunConfigurations.mockReturnValue({
       data: [
-        planRow({
-          id: "plan_new",
-          name: "Nightly refunds",
+        configurationEntry({
+          planId: "plan_new",
+          planName: "Nightly refunds",
           targets: [{ type: "http", referenceId: "agent_2" }],
-          updatedAt: new Date("2026-08-20T10:00:00.000Z"),
+          lastRunAt: new Date("2026-08-20T10:00:00.000Z"),
         }),
-        planRow({
-          id: "plan_old",
-          name: "Refunds prod-agent",
-          updatedAt: new Date("2026-08-01T10:00:00.000Z"),
+        configurationEntry({
+          planId: "plan_old",
+          planName: "Refunds prod-agent",
+          lastRunAt: new Date("2026-08-01T10:00:00.000Z"),
         }),
       ],
       isLoading: false,
@@ -1487,8 +1545,8 @@ describe("the run name", () => {
   /** @scenario "Escape closes the list and leaves the dialog open" */
   it("closes the list on Escape and asks for no dialog close", async () => {
     const user = userEvent.setup();
-    mockSuitesGetAll.mockReturnValue({
-      data: [planRow()],
+    mockRunConfigurations.mockReturnValue({
+      data: [configurationEntry()],
       isLoading: false,
     });
     const { onClose } = renderDialog(suiteSubject());
@@ -1539,6 +1597,7 @@ describe("what the run covers", () => {
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
     mockPromptsGetAll.mockReturnValue({ data: [] });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockFoldersGetAll.mockReturnValue({
       data: [
         { id: "suite_refunds", name: "Refunds", slug: "refunds" },
@@ -1677,6 +1736,53 @@ describe("what the run covers", () => {
     ]);
   });
 
+  /** @scenario "Running a stored run plan again keeps the scope it holds" */
+  it("runs a stored plan on the scope it holds, not on its own id", async () => {
+    const user = userEvent.setup();
+    // The Results tab opens a stored plan as a subject that carries the plan's
+    // own rule. Derived from its id instead, the rule would name a folder that
+    // holds nothing and would overwrite the plan's real scope.
+    renderDialog({
+      kind: "suite",
+      suiteId: "plan_nightly",
+      name: "Nightly refunds",
+      scenarioIds: ["case_1", "case_2"],
+      scope: { mode: "cases", caseIds: ["case_1", "case_2"] },
+      initialTarget: { type: "http", id: "agent_1" },
+    });
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const sent = mockSuitesRunPlan.mock.calls[0]![0] as {
+      config: { scope: { mode: string }; scenarioIds?: string[] };
+    };
+    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
+      "case_1",
+      "case_2",
+    ]);
+  });
+
+  /** @scenario "A run of one scenario is named after that scenario" */
+  it("names a run of one scenario after that scenario, never after a count", async () => {
+    const user = userEvent.setup();
+    renderDialog(planSubject());
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+
+    await user.click(screen.getByTestId("run-scope-cases"));
+    await user.click(screen.getByTestId("run-scope-case-case_2"));
+
+    const name = screen.getByTestId("run-dialog-name");
+    expect(name).toHaveValue("Late invoice prod-agent");
+    // A count names every single-scenario run of that agent the same thing.
+    expect(name).not.toHaveValue(expect.stringContaining("1 scenario"));
+
+    // Two of them do read as a count, which says what it means there.
+    await user.click(screen.getByTestId("run-scope-case-case_1"));
+    expect(name).toHaveValue("2 scenarios prod-agent");
+  });
+
   /** @scenario "The derived name follows the scope while it is being picked" */
   it("names the test suite that was ticked, beside the agent", async () => {
     const user = userEvent.setup();
@@ -1721,6 +1827,7 @@ describe("the chips that add a run option", () => {
     });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
       batchRunId: "batch_new",
       jobCount: 1,

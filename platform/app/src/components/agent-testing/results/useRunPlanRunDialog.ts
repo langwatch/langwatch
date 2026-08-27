@@ -17,6 +17,7 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { useRunStartedHandler } from "../cases/useCaseRunActions";
+import { scopeOfStoredPlan } from "../run/plan-scope";
 import type { RunDialogSubject } from "../run/RunDialog";
 import type { RunPlan } from "./run-plans";
 
@@ -56,6 +57,8 @@ export function useRunPlanRunDialog({
       suiteId: suite.id,
       name: suite.name,
       scenarioIds: suite.scenarioIds,
+      // The plan's own rule, never a folder rule built from its id.
+      scope: scopeOfStoredPlan(suite),
       initialTarget: persisted
         ? { type: persisted.type, id: persisted.referenceId }
         : null,

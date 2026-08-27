@@ -61,6 +61,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getRunState: { useQuery: mockGetRunState },
       getById: { useQuery: mockGetScenario },
       getByIdIncludingArchived: { useQuery: mockGetScenario },
@@ -74,6 +78,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       folders: { getAll: { useQuery: emptyQuery } },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },

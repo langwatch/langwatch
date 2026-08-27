@@ -16,7 +16,11 @@ import type { RunPlanFields } from "./useRunPlanFields";
  * Puts a configuration back into the dialog, opening the blocks it used and
  * folding away the ones it did not.
  *
- * The note is left alone: it belongs to one run, not to a configuration.
+ * The note text is left alone: it belongs to one run, not to a configuration.
+ * A configuration that took a note before opens the note block ready and
+ * empty, because the run plan takes a note every run and its words change
+ * every run. The block only ever opens this way: a note somebody is already
+ * writing is never taken away.
  */
 export function applyConfigurationTo({
   entry,
@@ -64,4 +68,6 @@ export function applyConfigurationTo({
   planFields.setShowModels(
     !!configuration.simulatorModel || !!configuration.judgeModel,
   );
+
+  if (entry.usesNote) fields.setShowNote(true);
 }

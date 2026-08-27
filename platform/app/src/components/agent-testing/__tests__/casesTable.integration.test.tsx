@@ -33,6 +33,12 @@ const batchRunCountQuery = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     scenarios: {

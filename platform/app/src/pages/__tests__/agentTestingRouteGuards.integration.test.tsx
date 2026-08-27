@@ -82,6 +82,12 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      // The run dialog host reads the plan a stored run plan opens on.
+      getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       // Left unread, so the tab strip carries no count and the guard is the
       // only thing this file is checking.
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
@@ -103,6 +109,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },

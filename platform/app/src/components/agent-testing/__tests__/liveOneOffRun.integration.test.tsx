@@ -58,10 +58,6 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
-        // The run dialog reads the configurations its scope already ran with.
-        getRunConfigurations: {
-          useQuery: () => ({ data: [], isLoading: false }),
-        },
         getAll: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
@@ -72,6 +68,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: mockScenariosGetAll },
       getRunState: { useQuery: mockGetRunState },
       getById: { useQuery: mockGetScenario },

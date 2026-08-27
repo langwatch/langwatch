@@ -77,6 +77,13 @@ export type RunConfigurationEntry = {
   configuration: RunConfiguration;
   /** The parameter overrides this configuration was run with. */
   runParameters: RunParameterValues;
+  /**
+   * Whether a run of this configuration carried a note.
+   *
+   * The fact, never the note. A run plan that takes a note takes one every
+   * run, and the text changes every run.
+   */
+  usesNote?: boolean;
   /** Newest-first ordering, and the age the row reads. */
   lastRunAt: Date | null;
 };

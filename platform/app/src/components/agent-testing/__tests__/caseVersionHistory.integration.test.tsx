@@ -42,6 +42,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       create: {
         useMutation: () => ({
           mutateAsync: mocks.mockCreateMutateAsync,
@@ -90,7 +94,13 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    suites: { folders: { getAll: { useQuery: () => ({ data: [] }) } } },
+    suites: {
+      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: {
       getAllPromptsForProject: {

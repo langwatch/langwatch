@@ -66,11 +66,19 @@ Feature: The run dialog
     And each names the repeat count that tells it from the other
 
   @integration
-  Scenario: The note is never part of a configuration
+  Scenario: The note text is never carried over
     Given a previous run of this scope that carried a note
     When its configuration is picked from the list
-    Then the note is not shown and not carried over
-    And no note is listed as part of the configuration
+    Then the note field is empty
+    And no note text is listed as part of the configuration
+
+  @integration
+  Scenario: A run plan that takes a note opens the note field ready
+    Given a previous run of this scope that carried a note
+    When its configuration is picked from the list
+    Then the note block is open
+    And the note field is empty
+    And the note chip is no longer offered
 
   @integration
   Scenario: Picking a configuration refills the dialog and opens what it used
@@ -318,6 +326,20 @@ Feature: The run dialog
     When "Specific scenarios" is chosen
     Then the scenarios read under the name of the test suite they are filed in
     And the count follows the cases that are ticked
+
+  @integration
+  Scenario: A run of one scenario is named after that scenario
+    Given the run dialog opened from New run plan with an agent chosen
+    When one scenario is hand-picked
+    Then the run name reads that scenario name and the agent
+    And it never reads a count in place of the name
+
+  @integration
+  Scenario: Running a stored run plan again keeps the scope it holds
+    Given a stored run plan over a hand-picked list of scenarios
+    When it is opened from the Results tab and run again
+    Then the run covers the list the plan holds
+    And the plan is not rewritten to cover the scenarios filed under its own id
 
   @integration
   Scenario: The derived name follows the scope while it is being picked

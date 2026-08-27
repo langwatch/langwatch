@@ -17,7 +17,9 @@ import type { RunDialogSubject } from "./run-dialog-types";
 export function initialScopeOf(subject: RunDialogSubject | null): RunScope {
   if (!subject) return { mode: "all" };
   if (subject.kind === "suite") {
-    return { mode: "folders", folderIds: [subject.suiteId] };
+    // A stored run plan hands its own rule in. A test suite hands none,
+    // because it covers the scenarios filed in it.
+    return subject.scope ?? { mode: "folders", folderIds: [subject.suiteId] };
   }
   if (subject.kind === "case") {
     return { mode: "cases", caseIds: [subject.scenarioId] };

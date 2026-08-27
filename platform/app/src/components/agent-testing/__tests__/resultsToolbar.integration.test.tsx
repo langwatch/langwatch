@@ -61,21 +61,25 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
-        // The run dialog reads the configurations its scope already ran with.
-        getRunConfigurations: {
-          useQuery: () => ({ data: [], isLoading: false }),
-        },
         getSuiteRunData: { invalidate: vi.fn() },
         getScenarioSetBatchHistory: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
       getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined }) },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: {
         useQuery: () => ({
           data: [
