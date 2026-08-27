@@ -1,6 +1,6 @@
 # Platform application exit ledger
 
-**Updated:** 2026-08-27
+**Updated:** 2026-08-28
 
 **Committed application baseline:** `903fb2e4c5`
 
@@ -14,6 +14,49 @@ dependency-closed deletion batches. Feature ownership remains defined by
 [ADR-112](../adr/112-singular-feature-ownership.md).
 Non-blocking structural improvements discovered during extraction are recorded
 in [the follow-up ledger](core-application-feature-extraction-future-work.md).
+
+## Active UI/web lane hand-off
+
+The frontend lane owns `apps/ui`, the Prompt web-package export pilot,
+frontend architecture lint, and `packages/design-system` Storybook. The backend
+lane concurrently owns API, Secret, Agent server/composition, and backend
+transport lint changes. Each lane must commit before integration; reconcile the
+shared `pnpm-lock.yaml` and this ledger after both checkpoints exist.
+
+Integration note for the concurrent Agent UI work: browser RPC ports and
+adapters belong under `apps/ui/src/platform/agent`, not directly under
+`apps/ui/src`. Update their exports and tests during reconciliation; the new
+source-root rule intentionally rejects root-level feature and transport files.
+
+Completed and under final review:
+
+- `apps/ui` uses independent user-facing `features`, not a mirror of backend
+  features. Its linted roots are `app`, `platform`, `features`, and `testing`.
+- Frontend lint has 14 passing fixtures covering catalogue ownership,
+  dependency direction and cycles, owner-only screens, exact narrow surfaces,
+  recursive browser-safe closure, and dynamic module loads.
+- Prompt is the first export-boundary pilot: its package exposes the owner-only
+  `screens/prompt-studio` entry and three narrow `surfaces` entries. This does
+  not claim that the full Prompt Studio page or its transport hooks have moved.
+- The UI runtime owns the existing Design System provider seam and exact
+  `Suspense(fallback={null})`/`RouterProvider` shell shape. The legacy adapter
+  still supplies the live outer providers and router, preserving the current
+  `platform/app` UI rather than introducing a replacement shell.
+- `packages/design-system` has package-local Storybook 10.5.10 using the real
+  provider, accessibility/docs addons, and a Foundations, Primitives,
+  Components, and Patterns catalogue. Typecheck, 38 tests, and the static
+  Storybook build pass.
+
+Next hand-off:
+
+- Keep `LegacyUiShellAdapter` until outer-provider and route closure can move
+  without app/server imports. Then move real routes incrementally.
+- Complete the Prompt screen only when its real page, hooks, and narrow
+  platform transport ports compose in `apps/ui`.
+- Add route declarations, overlay intents, composition-hub rationale, and graph
+  metrics to frontend lint before those capabilities spread.
+- Promote the first genuine app-independent Design System Pattern, then add
+  Storybook Vitest/browser interaction coverage for interactive stories.
 
 ## Progress
 

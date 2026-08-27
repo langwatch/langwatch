@@ -132,6 +132,8 @@
     }
   },
   "scripts": {
+    "storybook": "storybook dev --port 6006",
+    "build:storybook": "storybook build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
@@ -144,13 +146,18 @@
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
+    "@storybook/addon-a11y": "^10.5.10",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/react-vite": "^10.5.10",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "storybook": "^10.5.10",
     "typescript": "^7.0.2",
+    "vite": "^8.1.2",
     "vitest": "^4.1.9"
   },
   "peerDependencies": {
