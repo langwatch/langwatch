@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Hand-off checkpoint:** `8f2986764e`
+**Hand-off checkpoint:** `6d86932ce9`
 
 **Frontend integration baseline:** `13a0805bf3`
 
@@ -17,7 +17,9 @@ feature catalogue, accepted ADRs, feature ADRs/specs, or the main
 
 1. the nearest `AGENTS.md`;
 2. `packages/features/catalogue.json`;
-3. ADRs 101, 111 and 112 linked from the main ledger;
+3. ADRs 101, 111, 112 and
+   [128](../adr/128-public-rest-and-internal-trpc.md) linked from the main
+   ledger;
 4. the owning feature ADR/spec and current source; and
 5. `.agents/skills/feature-migration/SKILL.md` and
    `.agents/skills/feature-migration-review/SKILL.md` for a migration batch.
@@ -41,6 +43,9 @@ The following work is committed and must not be rebuilt in the application:
   callbacks.
 - `13a0805bf3` integrates the Prompt frontend boundary, exact `apps/ui` shell,
   frontend architecture lint and Design System Storybook.
+- `6d86932ce9` makes modern public REST and internal tRPC separate thin
+  transports over one feature service graph. It records ownership, validation,
+  authorisation, limits, error and compatibility rules in ADR-128.
 
 The frontend merge is authoritative. Do not restore the former Prompt paths
 from the working-tree backup.
@@ -132,7 +137,7 @@ infrastructure-error sanitisation coverage before approval.
 
 Commit Secret separately from the tRPC pilot and Agent UI.
 
-## tRPC ownership hand-off
+## Active backend batch: internal tRPC pilot
 
 The working tree contains a non-production Secret tRPC pilot:
 
@@ -147,10 +152,10 @@ root still mounts `platform/app/src/server/api/routers/secrets.ts`, while the ne
 `ApiApplication` is not composed by a running process. Global auth, audit,
 trace and error middleware parity has not been proved.
 
-Another agent with broader tRPC context owns this work. Do not modify, complete
-or commit the tRPC pilot from this hand-off. In particular, do not import a
-feature server router or the whole `AppRouter` into a web package and do not
-describe the current pilot as a production cutover.
+No agent currently owns this batch. Review it against ADR-128 before changing
+or committing it. In particular, do not import a feature server router or the
+whole `AppRouter` into a web package and do not describe the current pilot as a
+production cutover. Keep this commit separate from Secret REST and Agent UI.
 
 ## Active frontend batch: Agent
 
@@ -186,10 +191,9 @@ incomplete:
 - post-push refresh, Langy composition, dialog parity and the remaining adapter
   mappings lack coverage.
 
-The user has assigned tRPC work to another agent. Leave
-`apps/ui/src/platform/agent`, its root exports and its adapter test to that
-owner. Complete only the controlled Agent presentation and app composition
-repairs unless ownership is explicitly returned.
+No other agent currently owns `apps/ui/src/platform/agent`, its root exports or
+its adapter test. Treat them as part of this Agent batch, not the Secret tRPC
+pilot.
 
 Keep the one `platform/app/src/runtime/ui/features/agent-ui-host.adapter.tsx`
 host only while it is required for composition. Do not move reusable Agent
@@ -215,16 +219,15 @@ copying their detailed enforcement and package rules.
 
 ## Current verification
 
-After the successful frozen offline install:
+After the successful frozen offline install, the checks rerun at this hand-off
+still report:
 
 - Design System typecheck passes;
 - Prompt web typecheck passes;
 - all 14 frontend-boundary lint fixtures pass;
 - Secret contract and Secret server typechecks pass;
-- `apps/ui` typecheck fails only because the Agent adapter test imports the two
-  deleted root paths;
 - Agent web typecheck fails because `agent-management-page.test.tsx` still uses
-  the old prop shape; and
+  the old prop shape;
 - `apps/api` typecheck fails in `packages/api/src/capabilities.ts` because one
   callback does not return on every path and `BodyInit` is absent from that
   app's TypeScript library surface.
@@ -234,13 +237,14 @@ not unrelated diagnostics and not green proof.
 
 ## Immediate sequence
 
-1. Let the designated tRPC owner reconcile the `apps/api` pilot and Agent
-   browser adapter; do not edit those files concurrently.
-2. Decide Secret URL compatibility, migrate or protect every live SDK/MCP
+1. Decide Secret URL compatibility, migrate or protect every live SDK/MCP
    caller, regenerate OpenAPI/docs, remove stale maps/baselines, add real auth
    coverage, then rerun and commit the Secret REST cut separately.
-3. Complete the Agent controlled-port host, restore Langy card composition and
+2. Complete the Agent controlled-port host, restore Langy card composition and
    parity coverage, then rerun and commit the Agent UI vertical separately.
+3. Reconcile the non-production `apps/api` tRPC pilot with ADR-128, prove the
+   real app middleware boundary and commit it separately. Do not call this a
+   production cutover until the running root is rewired.
 4. Update the main exit ledger with the real commit hashes and committed
    `platform/app` file counts.
 5. Continue with the next dependency-closed vertical from that ledger. Do not
@@ -254,3 +258,7 @@ honestly rather than calling the batch green.
 
 Do not touch or fold work into PR 7531. This branch belongs to the application
 extraction work and was previously published as draft PR 7536.
+
+At this hand-off the branch is 461 commits ahead of and three commits behind
+`origin/main`. Rebase only at the planned batch boundary, after the current
+working-tree buckets are safely committed.
