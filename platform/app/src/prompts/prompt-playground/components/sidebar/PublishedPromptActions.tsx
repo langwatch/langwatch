@@ -1,13 +1,7 @@
 import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
-import {
-  LuClock,
-  LuCopyPlus,
-  LuEllipsisVertical,
-  LuPencil,
-  LuTrash2,
-} from "react-icons/lu";
+import { LuClock, LuCopyPlus, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -19,7 +13,7 @@ import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { useRenamePromptHandle } from "~/prompts/hooks/useRenamePromptHandle";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import { getDisplayHandle } from "@langwatch/prompt-web";
+import { getDisplayHandle } from "@langwatch/prompt-web/surfaces/prompt-reference";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -76,9 +70,7 @@ export function PublishedPromptActions({
       await utils.prompts.getAllPromptsForProject.invalidate();
       toaster.create({
         title: "Prompt updated",
-        description: `Prompt "${getDisplayHandle(
-          promptHandle,
-        )}" has been updated from source.`,
+        description: `Prompt "${getDisplayHandle(promptHandle)}" has been updated from source.`,
         type: "success",
       });
     } catch (error) {
@@ -156,11 +148,7 @@ export function PublishedPromptActions({
       >
         <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
           <Menu.Trigger asChild>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <Button variant="ghost" size="xs" onClick={(event) => event.stopPropagation()}>
               <LuEllipsisVertical size={14} />
             </Button>
           </Menu.Trigger>

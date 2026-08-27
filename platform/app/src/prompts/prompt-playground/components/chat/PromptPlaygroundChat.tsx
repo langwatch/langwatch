@@ -1,5 +1,5 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { AssistantMessage, CopilotChat, UserMessage } from "@copilotkit/react-ui";
 import clsx from "clsx";
@@ -46,45 +46,44 @@ export interface PromptPlaygroundChatRef {
   focusInput: () => void;
 }
 
-const PromptPlaygroundChat = forwardRef<
-  PromptPlaygroundChatRef,
-  PromptPlaygroundChatProps
->(function PromptPlaygroundChat(props, ref) {
-  const { formValues, variables, ...boxProps } = props;
-  const { project } = useOrganizationTeamProject();
-  const additionalParams = useMemo(() => {
-    return JSON.stringify({
-      formValues,
-      variables,
-    });
-  }, [formValues, variables]);
+const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroundChatProps>(
+  function PromptPlaygroundChat(props, ref) {
+    const { formValues, variables, ...boxProps } = props;
+    const { project } = useOrganizationTeamProject();
+    const additionalParams = useMemo(() => {
+      return JSON.stringify({
+        formValues,
+        variables,
+      });
+    }, [formValues, variables]);
 
-  return (
-    <Box
-      width="full"
-      height="full"
-      {...boxProps}
-      className={clsx("prompt-studio-chat", boxProps.className)}
-    >
-      <CopilotKit
-        runtimeUrl="/api/copilotkit"
-        headers={{
-          "X-Auth-Token": project?.apiKey ?? "",
-        }}
-        forwardedParameters={{
-          // @ts-expect-error - Total hack to pass additional params to the service adapter
-          model: additionalParams,
-        }}
-        onError={(error: unknown) => {
-          console.error("CopilotKit error:", error);
-        }}
-        disableSystemMessage
+    return (
+      <Box
+        width="full"
+        height="full"
+        {...boxProps}
+        className={clsx("prompt-studio-chat", boxProps.className)}
       >
-        <PromptPlaygroundChatInner ref={ref} />
-      </CopilotKit>
-    </Box>
-  );
-});
+        <CopilotKit
+          runtimeUrl="/api/copilotkit"
+          headers={{
+            "X-Auth-Token": project?.apiKey ?? "",
+          }}
+          forwardedParameters={{
+            // @ts-expect-error - Total hack to pass additional params to the service adapter
+            model: additionalParams,
+          }}
+          onError={(error: unknown) => {
+            console.error("CopilotKit error:", error);
+          }}
+          disableSystemMessage
+        >
+          <PromptPlaygroundChatInner ref={ref} />
+        </CopilotKit>
+      </Box>
+    );
+  },
+);
 
 const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
   function PromptPlaygroundChatInner(_props, ref) {
@@ -110,9 +109,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     }));
 
     const deleteMessage = (messageId: string) => {
-      const updatedMessages = visibleMessages.filter(
-        (message) => message.id !== messageId,
-      );
+      const updatedMessages = visibleMessages.filter((message) => message.id !== messageId);
 
       setMessages(updatedMessages);
     };
@@ -121,9 +118,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
       const tab = getTabById(tabId);
       const initialMessagesFromSpanData = tab?.chat?.initialMessagesFromSpanData;
       if (initialMessagesFromSpanData?.length) {
-        void setMessages(
-          convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData),
-        );
+        void setMessages(convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData));
       }
     }, [setMessages, tabId, getTabById]);
 

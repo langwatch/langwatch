@@ -16,13 +16,9 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  horizontalListSortingStrategy,
-  SortableContext,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TabIdProvider } from "@langwatch/prompt-web";
+import { TabIdProvider } from "@langwatch/prompt-web/screens/prompt-studio";
 import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
 
@@ -205,10 +201,7 @@ function DragOverlayContent({
  *
  * Single Responsibility: Manages one split-pane window of tabs with shared state and drop zone
  */
-interface DraggableTabsWindowProps extends Omit<
-  TabsRootProps,
-  "onClick" | "defaultValue"
-> {
+interface DraggableTabsWindowProps extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
   windowId: string;
   activeTabId?: string;
   onTabChange?: (params: { windowId: string; tabId: string }) => void;

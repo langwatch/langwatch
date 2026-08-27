@@ -1,5 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   createContext,
@@ -25,7 +25,7 @@ import { PromptTabbedSection } from "./PromptTabbedSection";
 const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
-export { useTabId } from "@langwatch/prompt-web";
+export { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -101,15 +101,10 @@ function PromptBrowserWindowInner(props: {
     updateTabData,
   }));
 
-  const updateTabDataDebounced = useMemo(
-    () => debounce(updateTabData, 500),
-    [updateTabData],
-  );
+  const updateTabDataDebounced = useMemo(() => debounce(updateTabData, 500), [updateTabData]);
 
   // Track version to cancel debounced updates when external upgrade happens
-  const lastVersionRef = useRef(
-    props.initialConfigValues?.versionMetadata?.versionNumber,
-  );
+  const lastVersionRef = useRef(props.initialConfigValues?.versionMetadata?.versionNumber);
 
   useEffect(() => {
     const newVersion = props.initialConfigValues?.versionMetadata?.versionNumber;
@@ -175,8 +170,7 @@ function PromptBrowserWindowInner(props: {
   // Handle drag with direct DOM manipulation (no React state updates during drag)
   const handlePositionChange = useCallback(
     (clientY: number) => {
-      if (!containerRef.current || !headerRef.current || !messagesWrapperRef.current)
-        return;
+      if (!containerRef.current || !headerRef.current || !messagesWrapperRef.current) return;
 
       const containerRect = containerRef.current.getBoundingClientRect();
       const headerHeight = headerRef.current.clientHeight;
@@ -282,13 +276,7 @@ function PromptBrowserWindowInner(props: {
             </Box>
 
             {/* Right panel: Tabbed section (conversation/variables) */}
-            <Box
-              flex={1}
-              display="flex"
-              flexDirection="column"
-              overflow="hidden"
-              paddingTop={2}
-            >
+            <Box flex={1} display="flex" flexDirection="column" overflow="hidden" paddingTop={2}>
               <PromptTabbedSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
@@ -328,21 +316,13 @@ function PromptBrowserWindowInner(props: {
           {/* Prompt messages area - collapsible, auto-grows with content */}
           <Box
             ref={messagesWrapperRef}
-            maxHeight={
-              isCollapsed ? 0 : messagesMaxHeight ? `${messagesMaxHeight}px` : undefined
-            }
+            maxHeight={isCollapsed ? 0 : messagesMaxHeight ? `${messagesMaxHeight}px` : undefined}
             overflow="hidden"
             position="relative"
             flexShrink={0}
             transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
           >
-            <Box
-              paddingBottom={2}
-              width="full"
-              maxWidth="768px"
-              margin="0 auto"
-              paddingX={3}
-            >
+            <Box paddingBottom={2} width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
               <PromptMessagesEditor />
             </Box>
 

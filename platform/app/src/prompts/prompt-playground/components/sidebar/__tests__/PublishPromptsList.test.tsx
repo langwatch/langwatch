@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayHandle } from "@langwatch/prompt-web";
+import { getDisplayHandle } from "@langwatch/prompt-web/surfaces/prompt-reference";
 
 describe("getDisplayHandle", () => {
   describe("when handle is missing or nullish", () => {

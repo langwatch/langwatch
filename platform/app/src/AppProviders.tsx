@@ -1,4 +1,4 @@
-import { ChakraProvider } from "@chakra-ui/react";
+import { UiDesignSystemShell } from "@langwatch/ui";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ReactNode } from "react";
@@ -8,7 +8,6 @@ import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { EnterpriseSaasFooter } from "./components/enterprise/EnterpriseSaasFooter";
 import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
-import { ColorModeProvider } from "@langwatch/design-system/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useNavigationV2Tracking } from "./features/navigation/useNavigationV2Tracking";
@@ -33,11 +32,9 @@ export function OuterProviders({ children }: { children: ReactNode }) {
   return (
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>
-        <ChakraProvider value={system}>
-          <ColorModeProvider>
-            <GraphicsQualityProvider>{children}</GraphicsQualityProvider>
-          </ColorModeProvider>
-        </ChakraProvider>
+        <UiDesignSystemShell system={system}>
+          <GraphicsQualityProvider>{children}</GraphicsQualityProvider>
+        </UiDesignSystemShell>
       </TRPCProvider>
     </SessionProvider>
   );

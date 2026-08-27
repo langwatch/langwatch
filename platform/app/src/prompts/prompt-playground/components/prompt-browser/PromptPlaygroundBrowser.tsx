@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { TabIdProvider } from "@langwatch/prompt-web";
+import { TabIdProvider } from "@langwatch/prompt-web/screens/prompt-studio";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -17,14 +17,7 @@ import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 export function PromptPlaygroundBrowser() {
   const { windows, splitTab, moveTab, setActiveTab, activeWindowId, setActiveWindow } =
     useDraggableTabsBrowserStore(
-      ({
-        windows,
-        splitTab,
-        moveTab,
-        setActiveTab,
-        activeWindowId,
-        setActiveWindow,
-      }) => ({
+      ({ windows, splitTab, moveTab, setActiveTab, activeWindowId, setActiveWindow }) => ({
         windows,
         splitTab,
         moveTab,
@@ -63,9 +56,7 @@ export function PromptPlaygroundBrowser() {
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
           onWindowClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
-          maxWidth={
-            windows.length > 1 ? `calc((100vw - 340px) / ${windows.length})` : "auto"
-          }
+          maxWidth={windows.length > 1 ? `calc((100vw - 340px) / ${windows.length})` : "auto"}
           paddingTop={0}
         >
           <DraggableTabsBrowser.TabBar tabIds={tabbedWindow.tabs.map((tab) => tab.id)}>
@@ -76,9 +67,7 @@ export function PromptPlaygroundBrowser() {
               tabs={tabbedWindow.tabs}
               activeTabId={tabbedWindow.activeTabId ?? undefined}
               isActiveWindow={tabbedWindow.id === activeWindowId}
-              onSelectTab={(tabId) =>
-                handleTabChange({ windowId: tabbedWindow.id, tabId })
-              }
+              onSelectTab={(tabId) => handleTabChange({ windowId: tabbedWindow.id, tabId })}
             />
             {tabbedWindow.id === activeWindowId && (
               <>

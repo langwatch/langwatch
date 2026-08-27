@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
@@ -31,8 +31,7 @@ export function PromptBrowserHeader() {
    * @param params - The versioned prompt data to restore
    */
   const handleOnRestore = async (params: VersionedPrompt) => {
-    const newFormValues =
-      versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
+    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
     formMethods.reset(newFormValues);
   };
 

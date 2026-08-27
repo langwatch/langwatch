@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
@@ -63,15 +63,13 @@ export function PromptTabbedSection({
   const demonstrations = form.watch("version.configData.demonstrations");
 
   // Get variable values from persisted store
-  const { storedVariableValues, updateTabData } = useDraggableTabsBrowserStore(
-    (state) => {
-      const tabData = state.getByTabId(tabId);
-      return {
-        storedVariableValues: tabData?.variableValues ?? {},
-        updateTabData: state.updateTabData,
-      };
-    },
-  );
+  const { storedVariableValues, updateTabData } = useDraggableTabsBrowserStore((state) => {
+    const tabData = state.getByTabId(tabId);
+    return {
+      storedVariableValues: tabData?.variableValues ?? {},
+      updateTabData: state.updateTabData,
+    };
+  });
 
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
@@ -87,18 +85,15 @@ export function PromptTabbedSection({
     useState<Record<string, string>>(storedVariableValues);
 
   // Debounced persistence to store (300ms delay)
-  const debouncedPersistToStore = useDebounceCallback(
-    (values: Record<string, string>) => {
-      updateTabData({
-        tabId,
-        updater: (data) => ({
-          ...data,
-          variableValues: values,
-        }),
-      });
-    },
-    300,
-  );
+  const debouncedPersistToStore = useDebounceCallback((values: Record<string, string>) => {
+    updateTabData({
+      tabId,
+      updater: (data) => ({
+        ...data,
+        variableValues: values,
+      }),
+    });
+  }, 300);
 
   // Flush any pending variable-value write before unmount. useDebounceCallback
   // cancels on unmount, so without this a value typed just before switching
@@ -184,9 +179,7 @@ export function PromptTabbedSection({
           paddingX={3}
         >
           <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
-          {hasInputs && (
-            <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
-          )}
+          {hasInputs && <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>}
           {hasDemonstrations && (
             <Tabs.Trigger value={PromptTab.Demonstrations}>Demonstrations</Tabs.Trigger>
           )}
@@ -240,14 +233,7 @@ export function PromptTabbedSection({
           display="flex"
           position="relative"
         >
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            width="full"
-            height="full"
-            maxHeight="full"
-          >
+          <Box position="absolute" bottom={0} left={0} width="full" height="full" maxHeight="full">
             <PromptPlaygroundChat
               ref={chatRef}
               formValues={formValues}
@@ -276,12 +262,7 @@ export function PromptTabbedSection({
           </Box>
         </Tabs.Content>
         {activeTab === PromptTab.Demonstrations && (
-          <Tabs.Content
-            value={PromptTab.Demonstrations}
-            flex={1}
-            width="full"
-            height="full"
-          >
+          <Tabs.Content value={PromptTab.Demonstrations} flex={1} width="full" height="full">
             <Box
               height="full"
               width="full"
@@ -295,8 +276,8 @@ export function PromptTabbedSection({
         <Tabs.Content value={PromptTab.Parameters} height="full">
           <Box height="full" width="full" maxWidth="768px" margin="0 auto" padding={3}>
             <Text fontSize="xs" color="fg.subtle" marginBottom={3}>
-              Parameters are arbitrary configurations returned with the prompt, for use
-              outside the prompt itself (e.g. RAG settings, pipeline config).
+              Parameters are arbitrary configurations returned with the prompt, for use outside the
+              prompt itself (e.g. RAG settings, pipeline config).
             </Text>
             <RuntimeParametersField />
           </Box>

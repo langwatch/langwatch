@@ -1,13 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  type AnnotationService,
-  annotationSuggestedOutput,
-} from "@langwatch/annotation-contract";
+import { type AnnotationService, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { parsePromptTraceReference } from "@langwatch/prompt-contract";
-import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
+import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -247,9 +243,7 @@ export function remapScoreOptionsToNames(
 ): Record<string, unknown> {
   if (!scoreOptions || typeof scoreOptions !== "object") return {};
   const remapped: Record<string, unknown> = {};
-  for (const [scoreId, value] of Object.entries(
-    scoreOptions as Record<string, unknown>,
-  )) {
+  for (const [scoreId, value] of Object.entries(scoreOptions as Record<string, unknown>)) {
     const name = scoreNameById.get(scoreId) ?? scoreId;
     if (FORBIDDEN_SCORE_KEYS.has(name)) continue;
     // AnnotationScore names are not unique. On a collision the first entry
@@ -756,10 +750,7 @@ export class ClickHouseTraceService {
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
 
-        this.logger.debug(
-          { projectId, threadId },
-          "Fetching traces by thread ID from ClickHouse",
-        );
+        this.logger.debug({ projectId, threadId }, "Fetching traces by thread ID from ClickHouse");
 
         try {
           // Query trace_summaries for traces with matching thread_id
@@ -800,9 +791,7 @@ export class ClickHouseTraceService {
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
-          traces.sort(
-            (a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
-          );
+          traces.sort((a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0));
           return traces;
         } catch (error) {
           // See getTracesWithSpans: a resolver-contract violation is a code bug,
@@ -902,9 +891,7 @@ export class ClickHouseTraceService {
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
-          traces.sort(
-            (a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
-          );
+          traces.sort((a, b) => (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0));
           return traces;
         } catch (error) {
           // Third flattening catch on this class, and it sits ABOVE
@@ -970,14 +957,9 @@ export class ClickHouseTraceService {
           // Parse cursor from scrollId if present (matches ES service contract)
           let cursor: ClickHouseScrollCursor | null = null;
           if (options.scrollId) {
-            this.logger.debug(
-              { scrollId: options.scrollId },
-              "Parsing scrollId from request",
-            );
+            this.logger.debug({ scrollId: options.scrollId }, "Parsing scrollId from request");
             try {
-              cursor = JSON.parse(
-                Buffer.from(options.scrollId, "base64").toString("utf-8"),
-              );
+              cursor = JSON.parse(Buffer.from(options.scrollId, "base64").toString("utf-8"));
 
               // Validate that cursor parameters match current request
               if (cursor && cursor.sortDirection !== sortDirection) {
@@ -1150,9 +1132,7 @@ export class ClickHouseTraceService {
             // A summary caller keeps the recomputed trace-level IO but not the
             // spans it never asked for — the payload shape stays exactly as it
             // was before this branch could run for them.
-            traces = wantsSpans
-              ? enriched
-              : enriched.map((trace) => ({ ...trace, spans: [] }));
+            traces = wantsSpans ? enriched : enriched.map((trace) => ({ ...trace, spans: [] }));
           }
 
           // Generate new scrollId from last trace. The cursor seeks on the
@@ -1353,9 +1333,10 @@ export class ClickHouseTraceService {
               key,
               count,
             })),
-            subtopicCounts: Array.from(subtopicCountsMap.entries()).map(
-              ([key, count]) => ({ key, count }),
-            ),
+            subtopicCounts: Array.from(subtopicCountsMap.entries()).map(([key, count]) => ({
+              key,
+              count,
+            })),
           };
         } catch (error) {
           this.logger.warn(
@@ -1378,9 +1359,7 @@ export class ClickHouseTraceService {
    * @returns CustomersAndLabelsResult
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getCustomersAndLabels(
-    input: AggregationFiltersInput,
-  ): Promise<CustomersAndLabelsResult> {
+  async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
@@ -1587,8 +1566,7 @@ export class ClickHouseTraceService {
               const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
               if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
               const promptVersion = r.SpanAttributes["langwatch.prompt.version.number"];
-              if (promptVersion)
-                attributes["langwatch.prompt.version.number"] = promptVersion;
+              if (promptVersion) attributes["langwatch.prompt.version.number"] = promptVersion;
               return {
                 spanId: r.SpanId,
                 parentSpanId: r.ParentSpanId ?? null,
@@ -1687,9 +1665,7 @@ export class ClickHouseTraceService {
 
     // Extract metrics
     const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as
-      | number
-      | undefined;
+    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as number | undefined;
 
     // Build error if present
     let error: Span["error"] | null = null;
@@ -1915,9 +1891,7 @@ export class ClickHouseTraceService {
 
         // Explicit trace ID filter — when callers provide specific trace IDs
         const traceIdFilter =
-          traceIds && traceIds.length > 0
-            ? " AND ts.TraceId IN ({traceIds:Array(String)})"
-            : "";
+          traceIds && traceIds.length > 0 ? " AND ts.TraceId IN ({traceIds:Array(String)})" : "";
 
         // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
         const effectiveQuery = query && query.length >= 3 ? query : undefined;
@@ -2143,12 +2117,7 @@ export class ClickHouseTraceService {
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace(
-            summary,
-            [],
-            projectId,
-            this.traceCanonicalisation,
-          );
+          const trace = mapTraceSummaryToTrace(summary, [], projectId, this.traceCanonicalisation);
           return applyTraceProtections(trace, protections);
         });
 
@@ -2302,11 +2271,7 @@ export class ClickHouseTraceService {
       );
 
       const allRows: TraceSummaryRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
+      for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
         const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
@@ -2435,9 +2400,7 @@ export class ClickHouseTraceService {
     for (const trace of traces) {
       const rawEvents = byTrace.get(trace.trace_id) ?? [];
       const redactions = new Set<string>([
-        ...(!protections.canSeeCapturedInput
-          ? extractRedactionsForObject(trace.input?.value)
-          : []),
+        ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(trace.input?.value) : []),
         ...(!protections.canSeeCapturedOutput
           ? extractRedactionsForObject(trace.output?.value)
           : []),
@@ -2555,11 +2518,7 @@ export class ClickHouseTraceService {
       );
 
       const allRows: ClickHouseEvaluationRunRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
+      for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
         const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
@@ -2813,12 +2772,7 @@ export class ClickHouseTraceService {
       : null;
 
     const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
-    let trace = mapTraceSummaryToTrace(
-      summary,
-      mappedSpans,
-      projectId,
-      this.traceCanonicalisation,
-    );
+    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId, this.traceCanonicalisation);
 
     // When blobs were resolved, patch trace.input / trace.output with
     // the recomputed full values (overwriting the preview from trace_summaries).
@@ -2826,9 +2780,7 @@ export class ClickHouseTraceService {
       trace = {
         ...trace,
         ...(recomputedInput !== null ? { input: { value: recomputedInput.text } } : {}),
-        ...(recomputedOutput !== null
-          ? { output: { value: recomputedOutput.text } }
-          : {}),
+        ...(recomputedOutput !== null ? { output: { value: recomputedOutput.text } } : {}),
       };
     }
 
@@ -2861,11 +2813,7 @@ export class ClickHouseTraceService {
       startedAts.length > 0
         ? { from: Math.min(...startedAts), to: Math.max(...startedAts) }
         : undefined;
-    const tracesWithSpans = await this.fetchTracesWithSpansJoined(
-      projectId,
-      traceIds,
-      occurredAt,
-    );
+    const tracesWithSpans = await this.fetchTracesWithSpansJoined(projectId, traceIds, occurredAt);
 
     // Collect the traces that actually have spans, resolve+merge them as one
     // bounded batch (#4991 AC6), then splice the results back in order. Traces
@@ -3037,9 +2985,7 @@ export class ClickHouseTraceService {
            * query means the rows never cross the socket.
            */
           maxSpanRows?: number;
-        }): Promise<
-          Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
-        > => {
+        }): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> => {
           // When the caller knows the traces' approximate time, bound the
           // summary read to those weekly partitions. trace_summaries is
           // partitioned on OccurredAt, so a TraceId-only filter cannot prune
@@ -3065,8 +3011,7 @@ export class ClickHouseTraceService {
             ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
             : null;
           const summaryWindowMs = hasSummaryWindow
-            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
-              DEFAULT_PARTITION_WINDOW_MS
+            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
           // Summaries first (light, one row per trace): they carry OccurredAt,
@@ -3370,20 +3315,10 @@ export class ClickHouseTraceService {
             `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
           );
 
-          const merged = new Map<
-            string,
-            { summary: TraceSummaryData; spans: NormalizedSpan[] }
-          >();
+          const merged = new Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>();
           let mergedSpanCount = 0;
-          for (
-            let i = 0;
-            i < traceIds.length;
-            i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-          ) {
-            const batch = traceIds.slice(
-              i,
-              i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-            );
+          for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
+            const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
 
             // Batching caps ClickHouse's peak memory, not ours — the merge
             // rebuilds the whole result set here. Stop before the heap does,
@@ -3392,10 +3327,7 @@ export class ClickHouseTraceService {
             // ClickHouse instead of arriving in this process first.
             // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
             const remainingSpanBudget = MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
-            let batchMap: Map<
-              string,
-              { summary: TraceSummaryData; spans: NormalizedSpan[] }
-            >;
+            let batchMap: Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>;
             try {
               batchMap = await runBatch({
                 batchTraceIds: batch,
@@ -3728,12 +3660,8 @@ export function isClickHouseMemoryLimitError(error: unknown): boolean {
  *   3. First llm in the trace by start time as a last resort.
  * Returns null when the trace genuinely has no llm spans.
  */
-function findNearestLlm<T extends PromptStudioCandidateRow>(
-  rows: T[],
-  requested: T,
-): T | null {
-  const isLlm = (r: T) =>
-    (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
+function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested: T): T | null {
+  const isLlm = (r: T) => (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
 
   const llmRows = rows.filter(isLlm);
   if (llmRows.length === 0) return null;

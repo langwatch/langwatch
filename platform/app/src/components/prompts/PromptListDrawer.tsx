@@ -17,7 +17,7 @@ import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import { getDisplayHandle } from "@langwatch/prompt-web";
+import { getDisplayHandle } from "@langwatch/prompt-web/surfaces/prompt-reference";
 
 export type PromptListDrawerProps = {
   open?: boolean;
@@ -241,11 +241,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
           Create your first prompt to get started
         </Text>
       </VStack>
-      <Button
-        colorPalette="blue"
-        onClick={onCreateNew}
-        data-testid="create-first-prompt-button"
-      >
+      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-prompt-button">
         <Plus size={16} />
         Create your first prompt
       </Button>
@@ -295,10 +291,7 @@ function PromptFolder({ folder, prompts, onSelect }: PromptFolderProps) {
           data-testid={`folder-${folder}`}
         >
           <HStack gap={2} width="full">
-            <Box
-              transform={isOpen ? "rotate(90deg)" : "rotate(0deg)"}
-              transition="transform 0.2s"
-            >
+            <Box transform={isOpen ? "rotate(90deg)" : "rotate(0deg)"} transition="transform 0.2s">
               <ChevronRight size={16} />
             </Box>
             <FolderOpen size={16} />
@@ -314,11 +307,7 @@ function PromptFolder({ folder, prompts, onSelect }: PromptFolderProps) {
       <Collapsible.Content>
         <VStack gap={1} align="stretch" paddingLeft={6} paddingY={1}>
           {prompts.map((prompt) => (
-            <PromptCard
-              key={prompt.id}
-              prompt={prompt}
-              onClick={() => onSelect(prompt)}
-            />
+            <PromptCard key={prompt.id} prompt={prompt} onClick={() => onSelect(prompt)} />
           ))}
         </VStack>
       </Collapsible.Content>

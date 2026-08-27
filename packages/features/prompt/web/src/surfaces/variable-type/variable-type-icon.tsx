@@ -1,13 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { Braces, Hash, Image, List, MessageSquare, ToggleLeft, Type } from "lucide-react";
 
-export const VariableTypeIcon = ({
-  type,
-  size = 16,
-}: {
-  type: string;
-  size?: number;
-}) => {
+export const VariableTypeIcon = ({ type, size = 16 }: { type: string; size?: number }) => {
   const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };
   switch (type) {
     case "str":
@@ -61,13 +55,7 @@ export const TYPE_LABELS: Record<string, string> = {
 
 export const getTypeLabel = (type: string): string => TYPE_LABELS[type] ?? type;
 
-export const VariableTypeBadge = ({
-  type,
-  size = "sm",
-}: {
-  type: string;
-  size?: "xs" | "sm";
-}) => (
+export const VariableTypeBadge = ({ type, size = "sm" }: { type: string; size?: "xs" | "sm" }) => (
   <Box
     as="span"
     fontSize={size === "xs" ? "10px" : "11px"}

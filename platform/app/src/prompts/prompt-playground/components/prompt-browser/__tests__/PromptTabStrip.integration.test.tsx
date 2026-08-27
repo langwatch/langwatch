@@ -12,7 +12,11 @@
  * render for real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TabIdProvider, useIsOverflowing, useTabId } from "@langwatch/prompt-web";
+import {
+  TabIdProvider,
+  useIsOverflowing,
+  useTabId,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Tab } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -20,10 +24,10 @@ import { PromptTabStrip } from "../PromptTabStrip";
 import { usePromptBrowserTabController } from "../tab/usePromptBrowserTabController";
 import { DraggableTabsBrowser } from "../ui/DraggableTabsBrowser";
 
-vi.mock("@langwatch/prompt-web", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/prompt-web")>(
-    "@langwatch/prompt-web",
-  );
+vi.mock("@langwatch/prompt-web/screens/prompt-studio", async () => {
+  const actual = await vi.importActual<
+    typeof import("@langwatch/prompt-web/screens/prompt-studio")
+  >("@langwatch/prompt-web/screens/prompt-studio");
   return { ...actual, useIsOverflowing: vi.fn() };
 });
 
@@ -65,8 +69,7 @@ function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   );
 }
 
-const closeActionFor = (name: string) =>
-  screen.queryByRole("button", { name: `Close ${name}` });
+const closeActionFor = (name: string) => screen.queryByRole("button", { name: `Close ${name}` });
 
 beforeEach(() => {
   // Each tab names itself after its own id, so the close labels tell them apart.

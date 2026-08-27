@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Circle,
-  HStack,
-  Icon,
-  IconButton,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Circle, HStack, Icon, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -31,7 +22,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
-import { VersionBadge } from "@langwatch/prompt-web";
+import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 
@@ -62,13 +53,7 @@ const pulseAnimation = keyframes`
 type TargetHeaderProps = {
   target: TargetConfig;
   /** Hands the prompt to Langy for the improvement loop. Prompt targets only. */
-  onOptimize?: ({
-    target,
-    name,
-  }: {
-    target: TargetConfig;
-    name: string;
-  }) => void;
+  onOptimize?: ({ target, name }: { target: TargetConfig; name: string }) => void;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
   onSwitch?: (target: TargetConfig) => void;
@@ -114,13 +99,8 @@ export const TargetHeader = memo(function TargetHeader({
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
     const currentTarget = state.targets.find((r) => r.id === target.id);
     if (!currentTarget) return false;
-    if (currentTarget.type === "prompt" && !!currentTarget.localPromptConfig)
-      return true;
-    if (
-      currentTarget.type === "evaluator" &&
-      !!currentTarget.localEvaluatorConfig
-    )
-      return true;
+    if (currentTarget.type === "prompt" && !!currentTarget.localPromptConfig) return true;
+    if (currentTarget.type === "evaluator" && !!currentTarget.localEvaluatorConfig) return true;
     return false;
   });
 
@@ -128,9 +108,7 @@ export const TargetHeader = memo(function TargetHeader({
   const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
 
   // Check if there are missing mappings for the active dataset
-  const activeDatasetId = useEvaluationsV3Store(
-    (state) => state.activeDatasetId,
-  );
+  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
   const promptTemplateFields = usePromptTemplateFields();
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId, {
     promptTemplateFields,
@@ -173,9 +151,7 @@ export const TargetHeader = memo(function TargetHeader({
   const variantDisplayNames = useMemo(
     () =>
       disambiguateNames(
-        variantNames.map(
-          (name, i) => name || variantIds?.[i] || `Variant ${i + 1}`,
-        ),
+        variantNames.map((name, i) => name || variantIds?.[i] || `Variant ${i + 1}`),
       ),
     [variantNames, variantIds],
   );
@@ -197,24 +173,19 @@ export const TargetHeader = memo(function TargetHeader({
   }, [allTargets, allTargetNames, target.id, targetName]);
 
   // Get results, evaluators, and dataset for computing aggregates
-  const { results, evaluators, activeDataset } = useEvaluationsV3Store(
-    (state) => ({
-      results: state.results,
-      evaluators: state.evaluators,
-      activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
-    }),
-  );
+  const { results, evaluators, activeDataset } = useEvaluationsV3Store((state) => ({
+    results: state.results,
+    evaluators: state.evaluators,
+    activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
+  }));
 
   // Count non-empty rows (empty rows are skipped during execution)
   // Handles both inline and saved datasets, with fallback to persisted results
   const nonEmptyRowCount = useMemo(() => {
     // For inline datasets, count non-empty rows
     if (activeDataset?.type === "inline" && activeDataset.inline?.records) {
-      const rows = transposeColumnsFirstToRowsFirstWithId(
-        activeDataset.inline.records,
-      );
-      return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row))
-        .length;
+      const rows = transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records);
+      return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row)).length;
     }
 
     // For saved datasets, use savedRecords count when available
@@ -244,11 +215,7 @@ export const TargetHeader = memo(function TargetHeader({
     if (results.executingCells && isRunning) {
       // Count cells being executed for this specific target
       const maxRowIndex = nonEmptyRowCount; // Max possible row index
-      const cellCount = countCellsForTarget(
-        results.executingCells,
-        target.id,
-        maxRowIndex,
-      );
+      const cellCount = countCellsForTarget(results.executingCells, target.id, maxRowIndex);
       // Only use cell count if this target actually has cells executing
       if (cellCount > 0) {
         return cellCount;
@@ -274,12 +241,7 @@ export const TargetHeader = memo(function TargetHeader({
             results,
             effectiveRowCount,
           )
-        : computeTargetAggregates(
-            target.id,
-            results,
-            evaluators,
-            effectiveRowCount,
-          ),
+        : computeTargetAggregates(target.id, results, evaluators, effectiveRowCount),
     [target, results, evaluators, effectiveRowCount],
   );
 
@@ -298,8 +260,7 @@ export const TargetHeader = memo(function TargetHeader({
   // Get the latest version for this prompt (to determine if target is at "latest")
   const { latestVersion } = useLatestPromptVersion({
     configId: target.type === "prompt" ? target.promptId : undefined,
-    currentVersion:
-      target.type === "prompt" ? target.promptVersionNumber : undefined,
+    currentVersion: target.type === "prompt" ? target.promptVersionNumber : undefined,
     // One instance per target column, all always mounted — same N-mounted
     // storm shape as the prompt tab labels (#5585).
     isLiveRefetchEnabled: false,
@@ -309,8 +270,7 @@ export const TargetHeader = memo(function TargetHeader({
   // (either has no pinned version, or pinned version matches latest)
   const isAtLatestVersion =
     target.type === "prompt" &&
-    (target.promptVersionNumber === undefined ||
-      target.promptVersionNumber === latestVersion);
+    (target.promptVersionNumber === undefined || target.promptVersionNumber === latestVersion);
 
   // Show version badge if:
   // - Has version number defined AND is NOT at latest version
@@ -319,9 +279,7 @@ export const TargetHeader = memo(function TargetHeader({
   // Note: We intentionally don't show drift/upgrade on the table. Users pin old versions
   // for comparison. Drift detection is handled in the drawer.
   const showVersionBadge =
-    target.type === "prompt" &&
-    target.promptVersionNumber !== undefined &&
-    !isAtLatestVersion;
+    target.type === "prompt" && target.promptVersionNumber !== undefined && !isAtLatestVersion;
 
   // Controlled menu state to prevent closing on re-renders
   const [menuOpen, setMenuOpen] = useState(false);
@@ -432,9 +390,7 @@ export const TargetHeader = memo(function TargetHeader({
       // Glow lives on the <th> itself (EvaluationsV3Table.tsx) so the whole
       // column reads as highlighted, not just this inner content row. Keep
       // the marker attribute only, for tests.
-      data-testid={
-        isHighlightedVariant ? "target-header-highlighted" : undefined
-      }
+      data-testid={isHighlightedVariant ? "target-header-highlighted" : undefined}
     >
       <Menu.Root
         positioning={{ placement: "bottom-start" }}
@@ -608,19 +564,11 @@ export const TargetHeader = memo(function TargetHeader({
             variantDisplayNames={variantDisplayNames}
           />
           {hasAggregates && (
-            <TargetSummary
-              aggregates={aggregates}
-              evaluators={evaluators}
-              isRunning={isRunning}
-            />
+            <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
           )}
         </HStack>
       ) : hasAggregates ? (
-        <TargetSummary
-          aggregates={aggregates}
-          evaluators={evaluators}
-          isRunning={isRunning}
-        />
+        <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
       ) : null}
 
       {/* Play/Stop button on far right */}
@@ -636,9 +584,7 @@ export const TargetHeader = memo(function TargetHeader({
         openDelay={200}
       >
         <IconButton
-          aria-label={
-            isRunning ? "Stop evaluation" : "Run evaluation for this target"
-          }
+          aria-label={isRunning ? "Stop evaluation" : "Run evaluation for this target"}
           size="xs"
           variant="outline"
           onClick={(e) => {

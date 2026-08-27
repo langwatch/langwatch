@@ -1,0 +1,5 @@
+{
+  "version": 0,
+  "governedWebPackages": ["@langwatch/prompt-web"],
+  "features": []
+}

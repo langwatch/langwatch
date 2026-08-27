@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
+import { LLM_PARAMETER_MAP } from "@langwatch/prompt-contract";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
@@ -130,8 +130,7 @@ export function coerceToNumber(value: unknown): number | undefined {
 export function coerceToString(value: unknown): string | undefined {
   if (value == null) return undefined;
   if (typeof value === "string") return value === "" ? undefined : value;
-  if (typeof value === "number")
-    return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : undefined;
   if (typeof value === "boolean") return String(value);
   return undefined;
 }
@@ -152,10 +151,7 @@ export function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
 ): PromptConfigFormValues {
   if (!spanData.llmConfig?.model) {
-    logger.warn(
-      { spanData },
-      "Model is not available for span data. This is not expected.",
-    );
+    logger.warn({ spanData }, "Model is not available for span data. This is not expected.");
   }
 
   const systemPrompt = spanData.llmConfig?.systemPrompt
@@ -175,8 +171,7 @@ export function createDefaultPromptFormValues(
 
   for (const param of LLM_PARAMETER_MAP) {
     const raw = (spanData.llmConfig as Record<string, unknown>)[param.formField];
-    const coerced =
-      param.coercion === "number" ? coerceToNumber(raw) : coerceToString(raw);
+    const coerced = param.coercion === "number" ? coerceToNumber(raw) : coerceToString(raw);
     if (coerced !== undefined) {
       llm[param.formField] = coerced;
     }
@@ -385,11 +380,7 @@ export function useLoadSpanIntoPromptPlayground() {
           action ?? (hasPromptReference ? "open-existing" : "create-new");
 
         // When action is "open-existing" and span references a managed prompt
-        if (
-          effectiveAction === "open-existing" &&
-          spanData.promptHandle &&
-          hasPromptReference
-        ) {
+        if (effectiveAction === "open-existing" && spanData.promptHandle && hasPromptReference) {
           const existingPrompt = await tryOpenExistingPromptTab({
             promptHandle: spanData.promptHandle,
             promptVersionNumber: spanData.promptVersionNumber,

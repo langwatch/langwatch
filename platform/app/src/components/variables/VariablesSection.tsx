@@ -3,8 +3,11 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FieldTypeSelect } from "@langwatch/prompt-web";
-import { TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-web";
+import {
+  FieldTypeSelect,
+  TYPE_LABELS,
+  VariableTypeIcon,
+} from "@langwatch/prompt-web/surfaces/variable-type";
 import { generateUniqueIdentifier, normalizeIdentifier } from "~/utils/identifierUtils";
 import {
   type AvailableSource,
@@ -138,9 +141,7 @@ export const VariablesSection = ({
 
       onChange(
         variables.map((v) =>
-          v.identifier === oldIdentifier
-            ? { ...v, ...updates, identifier: newIdentifier }
-            : v,
+          v.identifier === oldIdentifier ? { ...v, ...updates, identifier: newIdentifier } : v,
         ),
       );
 
@@ -228,9 +229,7 @@ export const VariablesSection = ({
                 }
                 defaultValue={values[variable.identifier]}
                 onDefaultValueChange={
-                  onValueChange
-                    ? (value) => onValueChange(variable.identifier, value)
-                    : undefined
+                  onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
                 }
                 infoTooltip={infoTooltip}
                 isMappingDisabled={isMappingDisabled_internal}

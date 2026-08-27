@@ -17,24 +17,16 @@ import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappi
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { getFieldsUsedByPromptTemplate } from "~/experiments-v3/utils/mappingValidation";
 import { showErrorToast } from "~/features/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web";
 import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
-import { VersionBadge } from "@langwatch/prompt-web";
+import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import {
-  type SaveDialogFormValues,
-  SaveVersionDialog,
-} from "~/prompts/forms/SaveVersionDialog";
+import { type SaveDialogFormValues, SaveVersionDialog } from "~/prompts/forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
@@ -198,8 +190,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.onSave ??
     flowCallbacks?.onSave ??
     (complexProps.onSave as PromptEditorDrawerProps["onSave"]);
-  const onLocalConfigChange =
-    props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+  const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
   const onVersionChange =
     props.onVersionChange ??
     (flowCallbacks?.onVersionChange as PromptEditorDrawerProps["onVersionChange"]);
@@ -240,9 +231,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     (complexProps.onInputMappingsChange as PromptEditorDrawerProps["onInputMappingsChange"]);
 
   // THE source of truth for mappings inside this drawer
-  const [inputMappings, setInputMappings] = useState<
-    Record<string, FieldMapping> | undefined
-  >(_mappingsFromProps);
+  const [inputMappings, setInputMappings] = useState<Record<string, FieldMapping> | undefined>(
+    _mappingsFromProps,
+  );
 
   // Sync from external when props change (e.g., drawer reopened, dataset changed)
   useEffect(() => {
@@ -269,9 +260,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   );
 
   const promptId =
-    props.promptId ??
-    drawerParams.promptId ??
-    (complexProps.promptId as string | undefined);
+    props.promptId ?? drawerParams.promptId ?? (complexProps.promptId as string | undefined);
   // Get the specific version ID if provided (for editing pinned versions)
   const promptVersionId =
     props.promptVersionId ??
@@ -405,10 +394,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           }
         });
       }
-    } else if (
-      (!promptId || (!promptQuery.data && !promptQuery.isLoading)) &&
-      modelMetadata
-    ) {
+    } else if ((!promptId || (!promptQuery.data && !promptQuery.isLoading)) && modelMetadata) {
       // New prompt OR prompt referenced by ID but not found in DB (e.g. after
       // importing a workflow from another project). Use defaults with model's
       // max tokens, merging initialLocalConfig if available.
@@ -524,8 +510,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // brand-new/not-found prompts only, and only while the model field is
   // still the unresolved empty placeholder, so it can never clobber a
   // real user edit or server value.
-  const isNewOrNotFoundPrompt =
-    !promptId || (!promptQuery.data && !promptQuery.isLoading);
+  const isNewOrNotFoundPrompt = !promptId || (!promptQuery.data && !promptQuery.isLoading);
   useEffect(() => {
     if (!isFormInitialized) return;
     if (!isNewOrNotFoundPrompt) return;
@@ -548,13 +533,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         shouldDirty: false,
       });
     }
-  }, [
-    isFormInitialized,
-    isNewOrNotFoundPrompt,
-    resolvedDefaultModel,
-    modelMetadata,
-    methods,
-  ]);
+  }, [isFormInitialized, isNewOrNotFoundPrompt, resolvedDefaultModel, modelMetadata, methods]);
 
   // Reset when drawer closes
   useEffect(() => {
@@ -630,9 +609,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         targetIdRef.current === initializedTargetIdRef.current
       ) {
         if (isUnsaved) {
-          debouncedUpdateLocalConfig(
-            extractLocalConfig(formValues as PromptConfigFormValues),
-          );
+          debouncedUpdateLocalConfig(extractLocalConfig(formValues as PromptConfigFormValues));
         } else {
           // Clear local config when back to saved state
           debouncedUpdateLocalConfig.cancel();
@@ -695,8 +672,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const updateMutation = api.prompts.update.useMutation({
     onSuccess: (prompt) => {
       // Build fresh form values from server response
-      const freshFormValues =
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+      const freshFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
 
       // Update configValues state - this is THE key fix!
       // This ensures the forward sync in usePromptConfigForm sees form matches configValues
@@ -758,8 +734,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         type: "success",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't rename prompt" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't rename prompt" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -783,9 +758,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
   // State for change handle dialog (for renaming existing prompts)
   const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
-  const pendingSaveDataRef = useRef<ReturnType<
-    typeof formValuesToTriggerSaveVersionParams
-  > | null>(null);
+  const pendingSaveDataRef = useRef<ReturnType<typeof formValuesToTriggerSaveVersionParams> | null>(
+    null,
+  );
 
   // Validate and prepare save data, returns true if ready to save
   const validateAndPrepare = useCallback(async () => {
@@ -938,8 +913,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       outputs: prompt.outputs,
     });
 
-    const newFormValues =
-      versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
     // Update savedFormValuesRef to the restored version's values
     // This ensures hasUnsavedChanges is false after restore
     savedFormValuesRef.current = newFormValues;
@@ -970,8 +944,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
       if (!latestPrompt) return;
 
-      const newFormValues =
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt);
+      const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt);
       // Update savedFormValuesRef to the latest version's values
       // This ensures hasUnsavedChanges is false after upgrade
       savedFormValuesRef.current = newFormValues;
@@ -1041,12 +1014,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Get available fields for message editor (with type information)
   const watchedInputs = methods.watch("version.configData.inputs");
-  const availableFields = (Array.isArray(watchedInputs) ? watchedInputs : []).map(
-    (input) => ({
-      identifier: input.identifier,
-      type: input.type,
-    }),
-  );
+  const availableFields = (Array.isArray(watchedInputs) ? watchedInputs : []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
 
   // Watch messages to calculate which variables are used
   const watchedMessages = methods.watch("version.configData.messages");
@@ -1284,11 +1255,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                     openDelay={0}
                     showArrow
                   >
-                    <Circle
-                      size="10px"
-                      bg="orange.400"
-                      data-testid="unsaved-changes-indicator"
-                    />
+                    <Circle size="10px" bg="orange.400" data-testid="unsaved-changes-indicator" />
                   </Tooltip>
                 )}
               </>
@@ -1302,12 +1269,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         </Drawer.Body>
 
         {/* Footer with History, API, Save, and optionally Apply buttons */}
-        <Drawer.Footer
-          borderTopWidth="1px"
-          borderColor="border"
-          paddingX={4}
-          paddingY={3}
-        >
+        <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
           {footerElement}
         </Drawer.Footer>
       </Drawer.Content>

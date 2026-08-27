@@ -6,7 +6,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompts";
 import { TypeSelector } from "~/prompts/components/ui/TypeSelector";
-import { generateUniqueIdentifier } from "@langwatch/prompt-web";
+import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
 
 /**
  * ConfigFieldGroup
@@ -218,12 +218,7 @@ function FieldRow({
               padding="6px 0px 6px 12px"
             />
           ) : (
-            <Text
-              fontFamily="monospace"
-              fontSize="13px"
-              width="full"
-              padding="8px 0px 8px 12px"
-            >
+            <Text fontFamily="monospace" fontSize="13px" width="full" padding="8px 0px 8px 12px">
               {currentIdentifier}
             </Text>
           )}

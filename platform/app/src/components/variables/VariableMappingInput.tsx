@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 import { ComponentIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
-import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web";
+import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web/surfaces/variable-type";
 
 // ============================================================================
 // Types
@@ -140,10 +140,7 @@ const isFieldComplete = (field: NestedField): boolean => {
 /**
  * Find a field by name in a list of fields
  */
-const findFieldByName = (
-  fields: NestedField[],
-  name: string,
-): NestedField | undefined => {
+const findFieldByName = (fields: NestedField[], name: string): NestedField | undefined => {
   return fields.find((f) => f.name === name);
 };
 
@@ -154,9 +151,7 @@ const findFieldByName = (
 const SourceTypeIconComponent = ({ type }: { type: SourceType }) => {
   // Dataset is not a ComponentType, so handle it separately
   if (type === "dataset") {
-    return (
-      <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />
-    );
+    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
   }
 
   // Use ComponentIcon for all DSL component types
@@ -283,9 +278,7 @@ export const VariableMappingInput = ({
     // If we're in nested selection mode, filter the nested fields
     if (currentDropdownContext.fields && currentDropdownContext.source) {
       const filtered = currentDropdownContext.fields.filter((field) =>
-        (field.label ?? field.name ?? "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()),
+        (field.label ?? field.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()),
       );
       return [
         {
@@ -369,13 +362,7 @@ export const VariableMappingInput = ({
     } else {
       handleClearMapping();
     }
-  }, [
-    inProgressPath,
-    isSourceMapping,
-    localMapping,
-    onMappingChange,
-    handleClearMapping,
-  ]);
+  }, [inProgressPath, isSourceMapping, localMapping, onMappingChange, handleClearMapping]);
 
   // Handle input change - updates search query
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -567,8 +554,7 @@ export const VariableMappingInput = ({
 
     if (shouldFlipToTop) {
       // Position above the input - measure actual dropdown height
-      const actualDropdownHeight =
-        dropdownRef.current?.offsetHeight ?? DROPDOWN_MAX_HEIGHT;
+      const actualDropdownHeight = dropdownRef.current?.offsetHeight ?? DROPDOWN_MAX_HEIGHT;
       const dropdownHeight = Math.min(actualDropdownHeight, spaceAbove);
       setDropdownPosition({
         top: rect.top - dropdownHeight - DROPDOWN_GAP,
@@ -678,9 +664,7 @@ export const VariableMappingInput = ({
                   variant="subtle"
                   data-testid={`path-segment-tag-${index}`}
                 >
-                  {index === 0 && source && (
-                    <SourceTypeIconComponent type={source.type} />
-                  )}
+                  {index === 0 && source && <SourceTypeIconComponent type={source.type} />}
                   <Tag.Label fontFamily="mono" fontSize="12px">
                     {segment}
                   </Tag.Label>
@@ -893,10 +877,7 @@ export const VariableMappingInput = ({
                             })()}
                           </Text>
                           {fieldHasChildren ? (
-                            <ChevronRight
-                              size={14}
-                              color="var(--chakra-colors-fg-muted)"
-                            />
+                            <ChevronRight size={14} color="var(--chakra-colors-fg-muted)" />
                           ) : (
                             <VariableTypeBadge type={field.type} size="xs" />
                           )}
@@ -919,9 +900,7 @@ export const VariableMappingInput = ({
                       cursor="pointer"
                       borderRadius="4px"
                       background={
-                        highlightedIndex === allOptions.length - 1
-                          ? "blue.subtle"
-                          : "transparent"
+                        highlightedIndex === allOptions.length - 1 ? "blue.subtle" : "transparent"
                       }
                       onMouseMove={() => {
                         const valueOptionIdx = allOptions.length - 1;

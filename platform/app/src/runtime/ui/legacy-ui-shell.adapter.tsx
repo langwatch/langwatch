@@ -1,6 +1,5 @@
-import { UiShellPort } from "@langwatch/ui";
-import { Suspense, type ReactNode } from "react";
-import { RouterProvider } from "react-router/dom";
+import { UiApplicationShell, UiShellPort } from "@langwatch/ui";
+import type { ReactNode } from "react";
 import { OuterProviders } from "../../AppProviders";
 import { router } from "../../routes";
 import { registerChunkReloadListener } from "../../utils/chunkReload";
@@ -21,12 +20,6 @@ export class LegacyUiShellAdapter extends UiShellPort {
   }
 
   render(): ReactNode {
-    return (
-      <OuterProviders>
-        <Suspense fallback={null}>
-          <RouterProvider router={router} />
-        </Suspense>
-      </OuterProviders>
-    );
+    return <UiApplicationShell outerProvider={OuterProviders} router={router} />;
   }
 }

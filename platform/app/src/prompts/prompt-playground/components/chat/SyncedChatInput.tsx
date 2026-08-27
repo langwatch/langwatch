@@ -1,5 +1,5 @@
 import { Box, HStack } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web";
+import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
@@ -25,14 +25,8 @@ export function SyncedChatInput({
   isVisible = true,
   onStop: _onStop,
 }: InputProps) {
-  const {
-    syncedInput,
-    setSyncedInput,
-    isSynced,
-    setIsSynced,
-    submitTrigger,
-    triggerSubmit,
-  } = usePromptPlaygroundChatSync();
+  const { syncedInput, setSyncedInput, isSynced, setIsSynced, submitTrigger, triggerSubmit } =
+    usePromptPlaygroundChatSync();
   const tabId = useTabId();
   const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
   const [localInput, setLocalInput] = useState("");

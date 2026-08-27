@@ -8,6 +8,7 @@ import { lintStrictContractBuildConfigs } from "./contract-build-config";
 import { lintDeclarations } from "./declarations";
 import { lintEventingRoles } from "./eventing-roles";
 import { lintFeatureLayouts } from "./feature-layout";
+import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
 import { lintGlobalAppAccess } from "./global-app-access";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
 import { lintManifests } from "./manifests";
@@ -61,6 +62,7 @@ export { lintServiceQuality } from "./service-quality";
 export { lintServiceQualityFile } from "./service-quality";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 export { lintStrictContractBuildConfigs } from "./contract-build-config";
+export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
 export { lintTestQuality } from "./test-quality";
 export type { TestQualityLintOptions } from "./test-quality";
 export {
@@ -91,6 +93,7 @@ export function lintWorkspace(
   const violations = [
     ...discovery.violations,
     ...lintFeatureLayouts(discovery.packages, discovery.catalogue),
+    ...lintFrontendUiBoundaries(root, discovery.packages),
     ...lintGlobalAppAccess(root),
     ...(options.legacyFeatureFragments === false
       ? []
