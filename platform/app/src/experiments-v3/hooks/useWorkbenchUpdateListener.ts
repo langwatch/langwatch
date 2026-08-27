@@ -74,19 +74,6 @@ const rememberMissedVersion = ({
 };
 
 /**
- * Takes a version this page's own run wrote, and carries on saving.
- *
- * A run writes its cells into the saved state, which advances the counter. The
- * page already holds every cell that run produced, because it streamed them, so
- * there is nothing to reload and nothing to warn about. What there IS is the
- * reader's other edits, still inside the autosave debounce: treating this bump
- * as somebody else's write stands autosave down and loses them.
- *
- * Taking the version is the part that matters. A page that only skipped the
- * warning would keep sending the version it had, and the next save would be
- * refused for exactly the same reason one save later.
- */
-/**
  * What the page does about a version somebody else announced.
  *
  * `ignore` covers two different reasons to do nothing: the version is not
@@ -158,6 +145,19 @@ const isOwnRunVersion = (runId: string | undefined): boolean =>
     runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId),
   );
 
+/**
+ * Takes a version this page's own run wrote, and carries on saving.
+ *
+ * A run writes its cells into the saved state, which advances the counter. The
+ * page already holds every cell that run produced, because it streamed them, so
+ * there is nothing to reload and nothing to warn about. What there IS is the
+ * reader's other edits, still inside the autosave debounce: treating this bump
+ * as somebody else's write stands autosave down and loses them.
+ *
+ * Taking the version is the part that matters. A page that only skipped the
+ * warning would keep sending the version it had, and the next save would be
+ * refused for exactly the same reason one save later.
+ */
 const adoptOwnRunVersion = (serverVersion: number): void => {
   const store = useEvaluationsV3Store.getState();
   store.setWorkbenchVersion(serverVersion);

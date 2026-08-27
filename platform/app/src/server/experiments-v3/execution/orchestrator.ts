@@ -2539,27 +2539,6 @@ export const buildEvaluatorResultDispatch = ({
 };
 
 /**
- * The stored rows for the board cells a run carries rather than produces.
- *
- * A run holds a snapshot of the whole board, so opening it shows what the
- * person was looking at instead of the one column they clicked. The cells
- * outside the execution scope are copied in at run start; the cells inside it
- * fill in as they execute.
- *
- * Built through the same two dispatch builders a live cell goes through, so a
- * carried cell and a produced cell are the same row in every respect but one:
- * `carriedOver`. That flag is what keeps the run's cost, duration and progress
- * about the run's own work. Money and time belong to this run; verdicts and
- * scores belong to the board.
- *
- * A cell with neither an output nor a failure gets no target row. Writing one
- * would say the column produced nothing, which reads as a result rather than
- * as an empty cell. A verdict whose status is not one the store knows is
- * dropped for the same reason.
- *
- * Exported for unit testing.
- */
-/**
  * The optional halves of a carried cell, each present only when the board
  * holds it. An absent cost is not a zero cost, and an absent trace is not a
  * missing one.
@@ -2569,9 +2548,7 @@ const carriedCellFields = (cell: CarriedOverCell) => ({
   ...(cell.duration !== undefined ? { duration: cell.duration } : {}),
   ...(cell.traceId !== undefined ? { traceId: cell.traceId } : {}),
   ...(cell.error !== undefined ? { error: cell.error } : {}),
-  ...(cell.domainError !== undefined
-    ? { domainError: cell.domainError }
-    : {}),
+  ...(cell.domainError !== undefined ? { domainError: cell.domainError } : {}),
 });
 
 /** The statuses the store knows. A verdict with any other is dropped. */
@@ -2665,6 +2642,27 @@ const carriedEvaluatorResults = ({
     ];
   });
 
+/**
+ * The stored rows for the board cells a run carries rather than produces.
+ *
+ * A run holds a snapshot of the whole board, so opening it shows what the
+ * person was looking at instead of the one column they clicked. The cells
+ * outside the execution scope are copied in at run start; the cells inside it
+ * fill in as they execute.
+ *
+ * Built through the same two dispatch builders a live cell goes through, so a
+ * carried cell and a produced cell are the same row in every respect but one:
+ * `carriedOver`. That flag is what keeps the run's cost, duration and progress
+ * about the run's own work. Money and time belong to this run; verdicts and
+ * scores belong to the board.
+ *
+ * A cell with neither an output nor a failure gets no target row. Writing one
+ * would say the column produced nothing, which reads as a result rather than
+ * as an empty cell. A verdict whose status is not one the store knows is
+ * dropped for the same reason.
+ *
+ * Exported for unit testing.
+ */
 export const buildCarriedOverDispatches = ({
   tenantId,
   runId,
