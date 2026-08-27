@@ -956,8 +956,7 @@ function conversationSpans(params: {
     const parentEntry =
       [...turnIdentities]
         .reverse()
-        .find(({ turn }) => turn.startMs <= call.startMs) ??
-      turnIdentities[0]!;
+        .find(({ turn }) => turn.startMs <= call.startMs) ?? turnIdentities[0]!;
     spans.push(
       toolSpan({
         origin,

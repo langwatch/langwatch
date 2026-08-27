@@ -23,13 +23,13 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   # --- What gets read, and from where ---
 
   @integration
-  Scenario: A conversation becomes one trace carrying what was said
+  Scenario: Each turn in a conversation becomes its own trace, all sharing a thread
     Given a Copilot agent conversation with two questions and two answers
     When the puller runs
-    Then one trace is recorded for that conversation
-    And the trace carries each question as the person typed it
-    And the trace carries each answer as the agent gave it
-    And the trace names the agent that answered
+    Then one trace is recorded per turn, all sharing the same thread
+    And each turn carries the question as the person typed it
+    And each turn carries the answer as the agent gave it
+    And every turn names the agent that answered
 
   @integration
   Scenario: Bookkeeping activities do not become turns
@@ -65,7 +65,7 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   Scenario: A conversation stored across several rows is still one conversation
     Given a conversation long enough that Microsoft stored it as two rows
     When the puller runs
-    Then one trace is recorded, not two
+    Then every turn shares the same thread regardless of which row it came from
     And the turns appear in the order they were spoken
     # No real capture of a chopped conversation exists. This is built by hand
     # on purpose, and that fact belongs in the pull request description.
@@ -105,7 +105,7 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   Scenario: Identity survives Microsoft renumbering the underlying rows
     Given two stored rows describing the same conversation with different row identifiers
     When the puller records them
-    Then both produce the same trace
+    Then both produce the same set of traces sharing the same thread
     # The row identifier names a storage chunk, not a conversation, so it is
     # never part of what identifies a conversation.
 
