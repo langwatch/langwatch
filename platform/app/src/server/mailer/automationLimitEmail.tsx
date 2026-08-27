@@ -1,14 +1,15 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  Button,
-  Container,
-  Heading,
-  Html,
-  Section,
-  Text,
-} from "@react-email/components";
 import { render } from "@react-email/render";
+import {
+  EmailAction,
+  EmailCallout,
+  EmailFinePrint,
+  EmailParagraph,
+  EmailShell,
+  emailLinkStyle,
+} from "./emailLayout";
 import { sendEmail } from "./emailSender";
+import { EMAIL_COLOR } from "./emailTheme";
 
 const logger = createLogger("langwatch:mailer:automationLimitEmail");
 
@@ -25,17 +26,13 @@ interface AutomationLimitEmailProps {
   actionUrl: string;
 }
 
-const BODY_FONT =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
-
 /** The two sentences that differ between a throttle and a pause. */
 function LimitBody({
   paused,
-  automationName,
   projectName,
   dailyCeiling,
   skippedToday,
-}: Omit<AutomationLimitEmailProps, "kind" | "actionUrl"> & {
+}: Omit<AutomationLimitEmailProps, "kind" | "actionUrl" | "automationName"> & {
   paused: boolean;
 }) {
   const lead = paused
@@ -44,101 +41,52 @@ function LimitBody({
   const advice = paused
     ? "Narrow its condition so it selects the traces you actually want, then switch it back on."
     : "If this is the volume you expect, narrow the condition so it selects fewer traces, or talk to us about a higher limit on your plan.";
-  const paragraph = {
-    fontSize: "16px",
-    color: "#4b5563",
-    lineHeight: 1.5,
-    margin: "0 0 16px 0",
-  } as const;
 
   return (
-    <Section style={{ marginBottom: "24px" }}>
-      <Heading
-        as="h1"
-        style={{
-          fontSize: "22px",
-          fontWeight: 600,
-          color: "#1f2937",
-          margin: "0 0 16px 0",
-        }}
-      >
-        {paused
-          ? `We paused "${automationName}"`
-          : `"${automationName}" reached its daily limit`}
-      </Heading>
-      <Text style={paragraph}>{lead}</Text>
-      <Text style={paragraph}>
-        {skippedToday.toLocaleString()} matches were skipped today.
-      </Text>
-      <Text style={{ ...paragraph, margin: 0 }}>{advice}</Text>
-    </Section>
+    <>
+      <EmailParagraph>{lead}</EmailParagraph>
+      <EmailCallout>
+        <EmailParagraph
+          style={{ margin: 0, color: EMAIL_COLOR.accentText, fontWeight: 500 }}
+        >
+          {skippedToday.toLocaleString()} matches were skipped today.
+        </EmailParagraph>
+      </EmailCallout>
+      <EmailParagraph>{advice}</EmailParagraph>
+    </>
   );
 }
 
-/** Deep link plus the standard support footer. */
-function LimitFooter({ actionUrl }: { actionUrl: string }) {
+/** The standard support footer, in the quietest voice on the card. */
+function LimitFooter() {
   return (
-    <>
-      <Section style={{ marginBottom: "32px" }}>
-        <Button
-          href={actionUrl}
-          style={{
-            backgroundColor: "#ED8926",
-            color: "white",
-            padding: "12px 24px",
-            textDecoration: "none",
-            borderRadius: "6px",
-            display: "inline-block",
-            fontWeight: 500,
-            fontSize: "14px",
-          }}
-        >
-          Open the automation
-        </Button>
-      </Section>
-
-      <Section style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px" }}>
-        <Text
-          style={{
-            fontSize: "14px",
-            color: "#6b7280",
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
-          Questions? Visit the{" "}
-          <a
-            href="https://docs.langwatch.ai"
-            style={{ color: "#ED8926", textDecoration: "none" }}
-          >
-            Help Center
-          </a>{" "}
-          or reach out to us. Our support engineers are here to help.
-        </Text>
-      </Section>
-    </>
+    <EmailFinePrint>
+      Questions? Visit the{" "}
+      <a href="https://docs.langwatch.ai" style={emailLinkStyle}>
+        Help Center
+      </a>{" "}
+      or reach out to us. Our support engineers are here to help.
+    </EmailFinePrint>
   );
 }
 
 const AutomationLimitEmailTemplate = ({
   kind,
   actionUrl,
+  automationName,
   ...body
 }: AutomationLimitEmailProps) => (
-  <Html lang="en" dir="ltr">
-    <Container
-      style={{
-        fontFamily: BODY_FONT,
-        maxWidth: "600px",
-        margin: "0 auto",
-        backgroundColor: "#ffffff",
-        padding: "40px 20px",
-      }}
-    >
-      <LimitBody paused={kind === "paused"} {...body} />
-      <LimitFooter actionUrl={actionUrl} />
-    </Container>
-  </Html>
+  <EmailShell
+    title={
+      kind === "paused"
+        ? `We paused "${automationName}"`
+        : `"${automationName}" reached its daily limit`
+    }
+    footer={<LimitFooter />}
+  >
+    <LimitBody paused={kind === "paused"} {...body} />
+    <EmailAction href={actionUrl} label="Open the automation" />
+  </EmailShell>
 );
 
 export const renderAutomationLimitEmail = (props: AutomationLimitEmailProps) =>

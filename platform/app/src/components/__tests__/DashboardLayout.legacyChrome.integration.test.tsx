@@ -137,6 +137,36 @@ vi.mock("~/utils/api", () => ({
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+      // The chrome mounts `SecureAccountNudge`, which asks whether to offer
+      // a passkey or a second step. Not offered here: this suite is about the
+      // navigation, and a modal over it would be answering a different
+      // question in every scenario.
+      secureAccountNudge: { useQuery: () => ({ data: { offer: false } }) },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    // The chrome also offers to join a team somebody's domain admits them to.
+    // Nothing on offer here, for the same reason: this suite is about the
+    // navigation, not about what interrupts it.
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    // The chrome asks whether this organization requires a second step before
+    // it lets anybody past. Undefined standing is "we do not know yet", which
+    // the gate treats as no interruption — the right answer for a suite about
+    // navigation.
+    twoStepVerification: {
+      standing: {
+        useQuery: () => ({ data: undefined, refetch: vi.fn() }),
+      },
     },
     ops: {
       getScope: { useQuery: () => ({ data: undefined, isLoading: false }) },
@@ -151,7 +181,22 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined }),
       },
     },
+    // The notices above invalidate their own reads after answering.
+    useUtils: () => ({
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
+    }),
   },
+}));
+
+// Stubbed like MainMenu above: it routes on its own (`useNavigate`), and this
+// suite renders no Router because the chrome it is about does not need one.
+// What the nudge decides is its own suite's claim.
+vi.mock("../me/SecureAccountNudge", () => ({
+  SecureAccountNudge: () => null,
 }));
 
 vi.mock("../MainMenu", () => ({
@@ -196,7 +241,6 @@ vi.mock("../CurrentDrawer", () => ({ CurrentDrawer: () => null }));
 vi.mock("../AnnouncementBanner", () => ({ AnnouncementBanner: () => null }));
 vi.mock("../UpgradeModal", () => ({ GlobalUpgradeModal: () => null }));
 vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
-vi.mock("../me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
 vi.mock("../governance/AdminViewingAsBanner", () => ({
   AdminViewingAsBanner: () => null,
 }));

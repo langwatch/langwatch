@@ -131,7 +131,7 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
   Scenario: Signing out from the mismatch returns to the same invitation
     Given "sam" is signed in as the wrong account and sees the mismatch
     When "sam" takes the offered way out
-    Then "sam" arrives at the front door with the invitation still in hand
+    Then "sam" arrives at the auth screens with the invitation still in hand
     And accepting as the invited account makes "sam" a member
 
   # ── Asking again ───────────────────────────────────────────────────────
@@ -170,3 +170,19 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     Given the production case: an invite expiring while an account-linking loop was being debugged
     When the inviter resends in one click and the invitee accepts via any verified method
     Then they become a member without an ops action
+
+  # ── Two addresses, one person ──────────────────────────────────────────
+  #
+  # Somebody invites their own work address to the organization their
+  # personal account founded, or the other way round. The two addresses are
+  # one person the moment both are proven, so an invitation is matched
+  # against every proven identifier the account holds rather than against
+  # the one column a User row happens to carry. Nobody merges two accounts:
+  # there was only ever one.
+
+  @unit
+  Scenario: An invitation reaches the person, not the address
+    Given somebody holds more than one proven address
+    When an invitation is sent to any one of them
+    Then it matches that person
+    And accepting it needs no second account and no merge

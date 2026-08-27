@@ -9,12 +9,15 @@
  * requests where procedure names are comma-separated in the path.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { getServerAuthSession } from "~/server/auth";
+
+const logger = createLogger("langwatch:trpc");
 
 /**
  * JSON-RPC 2.0 internal-error code. tRPC maps the `INTERNAL_SERVER_ERROR`
@@ -145,6 +148,16 @@ const handler = async (c: Context) => {
           permissionChecked: false,
           publiclyShared: false,
         });
+      },
+      // The wire deliberately says nothing about an unknown failure (ADR-045),
+      // which makes this log line the ONLY place the real exception exists —
+      // without it a 500 ships a trace id that correlates to nothing.
+      onError: ({ error, path, type }) => {
+        if (error.code !== "INTERNAL_SERVER_ERROR") return;
+        logger.error(
+          { path, type, error: error.cause ?? error },
+          "unhandled error at the tRPC boundary",
+        );
       },
     });
   } catch (error) {

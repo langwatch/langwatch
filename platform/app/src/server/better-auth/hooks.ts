@@ -1,6 +1,7 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { normalizeDomain, type SsoArrivalPolicy } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -15,6 +16,10 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import {
+  joinRequestsService,
+  looksLikeSsoConnectionId,
+} from "~/server/app-layer/identity/runtime";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -241,6 +246,297 @@ const joinSsoOrganization = async ({
     userId: user.id,
   });
   announceSsoAutoJoin({ user, org, inviteId: null });
+};
+
+/**
+ * What happens to somebody a connection has never seen (ADR-117 §3).
+ *
+ * THE ANSWER EXISTED AND NOTHING ASKED IT. `arrivalPolicy` is written by the
+ * setup journey, folded onto the connection and rendered back on two screens,
+ * and no code on any sign-in path read it. better-auth's `sso()` plugin
+ * creates the user and the account — its own comment says whether they then
+ * land in the organization is "the connection's arrival policy and the join
+ * policy's business, not this plugin's" — and nobody did that business.
+ * `afterUserCreate` below is the only live auto-join and it matches the
+ * LEGACY `Organization.ssoDomain` column, which a self-serve connection never
+ * writes, so it returned early and every arrival was dropped in silence: an
+ * account, no membership, no request, and nothing for an administrator to
+ * answer.
+ *
+ * This is that business, at the seam where the account has just been linked
+ * and the connection it arrived through is known — better-auth stores the
+ * connection id as the account's provider, which is what makes an SSO arrival
+ * distinguishable from every other OAuth account that passes through here.
+ *
+ * WHICH DOMAINS COUNT. Only the ones this connection PROVED, and not one
+ * whose published record has lapsed: ADR-123's rule is that a lapsed domain
+ * still ROUTES, so people who already work there keep signing in, and stops
+ * PROVISIONING, so it admits nobody new.
+ *
+ * BEST EFFORT, LOUDLY. The sign-in has succeeded and the account is already
+ * committed. Throwing would surface as "unable to create user" on a sign-in
+ * that worked, so a failure is logged and swallowed — logged with the
+ * connection and the domain, because an administrator asking "why is nobody
+ * in my queue" needs this line to exist.
+ */
+/**
+ * The answer this connection gives about somebody arriving on this domain, or
+ * null when it gives none — which is most callers, because every provider the
+ * deployment mounts passes through the same seam.
+ *
+ * WHICH DOMAINS COUNT. Only the ones this connection PROVED, and not one
+ * whose published record has lapsed: ADR-123's rule is that a lapsed domain
+ * still ROUTES, so people who already work there keep signing in, and stops
+ * PROVISIONING, so it admits nobody new.
+ */
+/**
+ * Whether an assertion from a customer's identity provider may become a
+ * session at all — asked BEFORE better-auth links it to anybody.
+ *
+ * This is the only place that asks. `admitSsoArrival` below compares the
+ * asserted domain against the connection's proved domains too, but it runs in
+ * `account.create.after`, which is after the link has already happened, and it
+ * decides organization membership rather than identity. That ordering was an
+ * account takeover: `trustEmailVerified` makes `emailVerified` the CUSTOMER'S
+ * OWN identity provider's word, better-auth links a verified address onto an
+ * existing user, and a connection is dialable from DRAFT — so anybody who
+ * could register a connection could point it at a server they control, assert
+ * `someone-else@their-company.com` with `email_verified: true`, and be handed
+ * that person's session.
+ *
+ * Two questions, and the second is why this is not simply "is the domain
+ * proved":
+ *
+ *   - A LIVE connection may only assert addresses on domains it has proved.
+ *     Nothing else is defensible; the proof is the entire basis for trusting
+ *     the flag.
+ *
+ *   - A connection that is NOT live may only assert ONE address: the one
+ *     belonging to the administrator who registered it. This is the setup
+ *     journey and nothing wider: activation refuses without a real sign-in
+ *     through the connection (`SsoActivationTestSignInMissingError`), so the
+ *     administrator doing the setup has to be able to sign in before the
+ *     domain is proved — and proving the round trip works takes exactly one
+ *     person, the one doing it.
+ *
+ *     ANY MEMBER IS NOT THE RULE, and reading it that way was an account
+ *     takeover of a colleague. An administrator holding `sso:manage` can
+ *     point a DRAFT connection at a server they control; if the gate admits
+ *     every address in their organization, they assert a co-worker's address
+ *     with `email_verified: true` and are handed that co-worker's session —
+ *     including the co-worker's access to every OTHER organization and
+ *     project they belong to, which the administrator never had. The threat
+ *     the setup exemption has to survive is a colleague, not a stranger.
+ *
+ * The refusal is deliberately one code for every cause. Which of the two
+ * questions failed is not something an unauthenticated caller gets to learn.
+ */
+export const ssoAssertionDecision = async ({
+  prisma,
+  providerId,
+  email,
+}: {
+  prisma: PrismaClient;
+  providerId: string;
+  email: string | null | undefined;
+}): Promise<{ action: "continue" } | { action: "reject"; code: string }> => {
+  // A code the client registry already has words for; the words are the
+  // ones a person who was refused at a customer's identity provider needs.
+  const refuse = {
+    action: "reject",
+    code: "identity_sign_in_refused",
+  } as const;
+  const carryOn = { action: "continue" } as const;
+
+  // Not a connection at all: the deployment's own brokered provider and the
+  // generic OAuth path do not come through this plugin, and an id that is not
+  // a connection's reaching it is not something to wave past.
+  if (!looksLikeSsoConnectionId(providerId)) return refuse;
+
+  const raw = extractEmailDomain(email);
+  if (!raw) return refuse;
+  // Folded the way a claimed domain is folded, or a trailing dot and a
+  // unicode homograph both compare unequal to the domain they impersonate.
+  const domain = normalizeDomain(raw);
+
+  const connection = await prisma.ssoConnection.findUnique({
+    where: { id: providerId },
+    select: {
+      organizationId: true,
+      state: true,
+      verifiedDomains: true,
+      createdBy: true,
+    },
+  });
+  if (!connection) return refuse;
+
+  if (connection.state === "ACTIVE") {
+    return connection.verifiedDomains.includes(domain) ? carryOn : refuse;
+  }
+
+  // A connection nobody is recorded as having registered has no setup
+  // administrator to make an exception for. Grandfathered connections end
+  // ACTIVE and never reach here, so this is a row that should not exist
+  // rather than a shape to wave through.
+  if (!connection.createdBy) return refuse;
+
+  const setupAdministrator = await registrantAtAddress({
+    prisma,
+    organizationId: connection.organizationId,
+    userId: connection.createdBy,
+    email: email ?? "",
+  });
+  return setupAdministrator ? carryOn : refuse;
+};
+
+/**
+ * Whether this address belongs to the one person the setup exemption is for:
+ * the administrator who registered this connection, who is still a member of
+ * the organization it belongs to.
+ *
+ * BOTH HALVES ARE LOAD-BEARING. The address must resolve to `userId` — that
+ * is what keeps a colleague's address out of a connection under setup — and
+ * `userId` must still be a member here, so a registrant whose membership was
+ * revoked stops being able to dial the connection they left behind.
+ *
+ * Both places an address can live are asked, because the identity work moved
+ * the truth to `Identifier` while `User.email` remains a copy for accounts the
+ * backfill has not finalized (ADR-101 §5). Asking only one of them would make
+ * the setup sign-in work for some administrators and not others.
+ */
+const registrantAtAddress = async ({
+  prisma,
+  organizationId,
+  userId,
+  email,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+  email: string;
+}): Promise<boolean> => {
+  const address = email.trim().toLowerCase();
+  if (!address) return false;
+  const membership = await prisma.organizationUser.findFirst({
+    where: {
+      organizationId,
+      userId,
+      OR: [
+        { user: { email: { equals: address, mode: "insensitive" } } },
+        {
+          user: {
+            identifiers: {
+              some: { value: address, verifiedAt: { not: null } },
+            },
+          },
+        },
+      ],
+    },
+    select: { userId: true },
+  });
+  return membership !== null;
+};
+
+const arrivalDecisionFor = async ({
+  prisma,
+  connectionId,
+  domain,
+}: {
+  prisma: PrismaClient;
+  connectionId: string;
+  domain: string;
+}): Promise<{ policy: "admit" | "request"; organizationId: string } | null> => {
+  // Cheap first: most accounts through this seam are not connections at all.
+  if (!looksLikeSsoConnectionId(connectionId)) return null;
+  const connection = await prisma.ssoConnection.findUnique({
+    where: { id: connectionId },
+    select: {
+      organizationId: true,
+      state: true,
+      arrivalPolicy: true,
+      verifiedDomains: true,
+      lapsedDomains: true,
+    },
+  });
+  if (!connection) return null;
+  if (connection.state !== "ACTIVE") return null;
+  if (!connection.verifiedDomains.includes(domain)) return null;
+  if (connection.lapsedDomains.includes(domain)) return null;
+
+  // Read off the connection rather than re-derived here. There is one field
+  // and one answer, which is the point of there being one field: this is the
+  // only reader for which the answer is an authorization decision, and it is
+  // the last one that should be keeping a copy.
+  const policy = connection.arrivalPolicy as SsoArrivalPolicy;
+  if (policy !== "admit" && policy !== "request") return null;
+  return { policy, organizationId: connection.organizationId };
+};
+
+export const admitSsoArrival = async ({
+  prisma,
+  writer,
+  user,
+  connectionId,
+  domain,
+}: {
+  prisma: PrismaClient;
+  writer: GrantsLedgerWriter;
+  user: { id: string; email: string; name: string };
+  connectionId: string;
+  domain: string;
+}): Promise<void> => {
+  try {
+    const decision = await arrivalDecisionFor({ prisma, connectionId, domain });
+    if (!decision) return;
+    const { organizationId } = decision;
+
+    // Already one of them, which is every administrator testing their own
+    // connection. Nothing to admit and nothing to ask about.
+    const member = await prisma.organizationUser.findFirst({
+      where: { userId: user.id, organizationId },
+      select: { userId: true },
+    });
+    if (member) return;
+
+    if (decision.policy === "request") {
+      await joinRequestsService().requestFromSsoArrival({
+        userId: user.id,
+        organizationId,
+        domain,
+      });
+      return;
+    }
+
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+    if (org) await joinSsoOrganization({ prisma, writer, user, org });
+  } catch (err) {
+    // ORDINARY OUTCOMES ARE NOT INCIDENTS. A person who already has a request
+    // in the queue, or whose domain the join rules will not match, is a
+    // sentence about the world rather than something that went wrong — and a
+    // fresh account row for somebody already waiting is routine (a provider
+    // rotation, an unlink, the reconcile below). Logging those at `error`
+    // buried the line an administrator is actually told to grep for when
+    // their queue is empty.
+    const expected = new Set([
+      "join_request_already_pending",
+      "join_not_available",
+    ]);
+    const code = (err as { code?: unknown } | null)?.code;
+    if (typeof code === "string" && expected.has(code)) {
+      logger.info(
+        { code, userId: user.id, connectionId, domain },
+        "an arrival through a single sign-on connection was not queued",
+      );
+      return;
+    }
+    logger.error(
+      { err, userId: user.id, connectionId, domain },
+      "an arrival through a single sign-on connection was not admitted (the sign-in still succeeded)",
+    );
+  }
 };
 
 /**
@@ -475,21 +771,36 @@ export const beforeAccountCreate = async ({
 export const afterAccountCreate = async ({
   prisma,
   account,
+  writer = grantsLedgerWriter(),
 }: {
   prisma: PrismaClient;
   account: { userId: string; providerId: string; accountId: string };
+  /** Injectable so a test can watch the seam without a module mock. */
+  writer?: GrantsLedgerWriter;
 }): Promise<void> => {
   try {
     if (account.providerId === "credential") return;
 
     const user = await prisma.user.findUnique({
       where: { id: account.userId },
-      select: { id: true, email: true },
+      select: { id: true, email: true, name: true },
     });
     if (!user?.email) return;
 
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
+
+    // THE CONNECTION'S OWN DOOR, asked before the legacy columns below and
+    // independently of them. The two answer for different populations and a
+    // self-serve connection never writes `ssoDomain`, so an arrival that
+    // reaches this line has to be decided here or not at all.
+    await admitSsoArrival({
+      prisma,
+      writer,
+      user: { id: user.id, email: user.email, name: user.name ?? "" },
+      connectionId: account.providerId,
+      domain,
+    });
 
     const org = await prisma.organization.findUnique({
       where: { ssoDomain: domain },
@@ -545,12 +856,40 @@ export const afterAccountUpdate = async ({
   try {
     const user = await prisma.user.findUnique({
       where: { id: account.userId },
-      select: { id: true, email: true, pendingSsoSetup: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        pendingSsoSetup: true,
+      },
     });
-    if (!user?.email || !user.pendingSsoSetup) return;
+    if (!user?.email) return;
 
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
+
+    // ASKED ON EVERY SIGN-IN, not only the first.
+    //
+    // The arrival decision refuses a connection that is not yet ACTIVE, and
+    // this hook is the only one that runs on a RETURNING sign-in — the
+    // account row already exists, so `account.create.after` never fires
+    // again. Deciding arrivals only there meant everybody who signed in
+    // during setup was decided once, while the answer was still "not live",
+    // and never again: an account, no membership, no request, and an empty
+    // queue on the administrator's screen. That includes the administrator
+    // who performed the test sign-in activation refuses to go without.
+    //
+    // Idempotent, so asking every time costs a read: it returns early on an
+    // existing membership, and the join guard refuses a duplicate request.
+    await admitSsoArrival({
+      prisma,
+      writer: grantsLedgerWriter(),
+      user: { id: user.id, email: user.email, name: user.name ?? "" },
+      connectionId: account.providerId,
+      domain,
+    });
+
+    if (!user.pendingSsoSetup) return;
 
     const org = await prisma.organization.findUnique({
       where: { ssoDomain: domain },
@@ -613,9 +952,12 @@ export const beforeSessionCreate = async ({
  * invariant holds immediately for subsequent requests on the same session.
  * Ported from the NextAuth session callback.
  *
- * Skipped entirely when the session is an admin-impersonation session
- * (detected via the `impersonating` JSON field on the new Session row) — we
+ * Skipped entirely when the session is an admin-impersonation session — we
  * don't want an admin's activity to ghost-write the target user's lastLoginAt.
+ * In practice no impersonation reaches here at all: starting one writes the
+ * `{actor, subject}` claims onto the operator's EXISTING session rather than
+ * minting a new one (D06), so this hook only ever sees real sign-ins. The
+ * parameter survives for callers that mint a session on somebody's behalf.
  */
 export const afterSessionCreate = async ({
   prisma,

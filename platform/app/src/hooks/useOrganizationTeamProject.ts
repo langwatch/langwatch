@@ -43,7 +43,12 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // (rbac.ts ADMIN defaults); resolving them against team roles denies
     // org admins client-side while the server correctly allows them.
     permission.startsWith("webhookEndpoints:") ||
-    permission.startsWith("gatewaySpend:")
+    permission.startsWith("gatewaySpend:") ||
+    // Single sign-on, and the directory sync it gates, are org-tier by
+    // declaration (registry scopes: ["organization"]); resolving them
+    // against team roles denies org admins client-side while the server
+    // allows them.
+    permission.startsWith("sso:")
   );
 }
 

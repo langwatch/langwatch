@@ -173,3 +173,51 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     And ben's 2 credentials are NOT listed
     # The devices tab is per-user; admin oversight is at /governance per the
     # admin-bird-eye scenario. Cross-user leakage would be a P0.
+
+  # ---------------------------------------------------------------------------
+  # What a web session signed in WITH (D06 amendment)
+  # ---------------------------------------------------------------------------
+  #
+  # Additive: every scenario above is untouched. A web session now records
+  # which of the person's sign-in methods minted it and what that sign-in
+  # PROVED, so the inventory can say how each one got in rather than only
+  # that it exists.
+  #
+  # No interplay with `maxSessionDurationDays` to settle. That policy ends
+  # sessions by AGE; an organization's two-step requirement is a membership
+  # condition and ends none, ever - so the two never contend over the same
+  # session. Per-identifier revocation below is narrower than either: it ends
+  # the sessions one sign-in method minted and nothing else.
+  #
+  # Spec: specs/identity/mfa-and-session-shape.feature (D06).
+
+  @integration @sessions-and-devices @inventory @sign-in-method
+  Scenario: Each web session says how it signed in
+    Given jane signed in on one device with her password and on another with a passkey
+    When jane opens the devices tab on "/me/configure"
+    Then each web session names the method it signed in with
+    And each one says whether a second factor was proven at sign-in
+    And nothing on the card shows the wire vocabulary a method reference uses
+
+  @integration @sessions-and-devices @inventory @sign-in-method
+  Scenario: A session that recorded nothing reads as an ordinary sign-in
+    Given jane holds a web session minted before sessions recorded what they proved
+    When jane opens the devices tab on "/me/configure"
+    Then the session is listed like any other
+    And it reads as a normal sign-in rather than as a warning
+    And nothing offers to end it on those grounds
+
+  @unit @sessions-and-devices @revoke-single @per-identifier
+  Scenario: Ending the sessions one sign-in method minted leaves the others alone
+    Given jane holds web sessions minted by her password and by her identity provider
+    When the sessions minted by one of those methods are ended
+    Then only those sessions end
+    And the sessions minted by the other method keep working
+    And no CLI device session and no ingestion key is touched
+
+  @unit @sessions-and-devices @revoke-single @per-identifier
+  Scenario: Ending sessions for a sign-in method that is not yours ends nothing
+    Given jane asks to end the sessions of a sign-in method belonging to somebody else
+    When the request is handled
+    Then no session ends
+    And jane is told nothing about whose method it was

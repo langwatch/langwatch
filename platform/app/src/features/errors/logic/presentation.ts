@@ -1328,13 +1328,22 @@ const presentations = {
     describe: () =>
       "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
   },
+  join_policy_not_licensed: {
+    // Read by an administrator opening the door, so it says what they can
+    // still do today as well as what the plan adds. Closing the door is
+    // never refused for this reason, so the copy never suggests they are
+    // stuck with a policy they cannot turn off.
+    title: "Choosing who can join needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. You can still invite people by email, and you can stop colleagues joining at any time. Talk to your account team about upgrading.",
+  },
   // Company domains only, and the copy stops there. Listing what counts as a
   // consumer mail provider would turn the refusal into a way to enumerate
   // the deny-list.
   join_auto_domain_unproven: {
-    title: "That domain is not proven yet",
+    title: "That domain is not verified yet",
     describe: () =>
-      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+      "Automatic joining works once you have verified the domain is yours — publish the record or serve the file from the Authentication page, then try again. Personal email domains are never eligible.",
   },
   join_auto_connection_admits: {
     title: "Your identity provider already admits that domain",
@@ -1421,6 +1430,32 @@ const presentations = {
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
   },
+  // ---- the sign-in and sign-up screens ----
+  auth_rate_limited: {
+    title: "Too many attempts",
+    // The countdown when the limit named one, the vague version when it did
+    // not. "A few minutes" is the honest floor rather than a guess dressed up
+    // as a number.
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Wait a few minutes, then try again.";
+      const minutes = Math.ceil(seconds / 60);
+      return minutes <= 1
+        ? "Wait a minute, then try again."
+        : `Wait ${minutes} minutes, then try again.`;
+    },
+  },
+  auth_no_address_to_confirm: {
+    title: "This account has no email address",
+    describe: () =>
+      "Add an email address in your account settings, then confirm it.",
+  },
+  auth_direct_registration_unavailable: {
+    title: "Accounts here are created by your identity provider",
+    describe: () =>
+      "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+  },
+
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -1463,12 +1498,44 @@ const presentations = {
     describe: () =>
       "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
   },
+  scim_token_too_short: {
+    title: "That token is too short",
+    // The number is written here rather than read off the error: `meta` is a
+    // client contract of named fields, and adding one that only this sentence
+    // reads would be a field with no consumer. The service and this string
+    // are two lines apart in review, which is what keeps them in step.
+    describe: () =>
+      "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
+  },
+  scim_token_unavailable: {
+    title: "Choose a different token value",
+    // Says nothing about why it cannot be used. "Somebody else has it" would
+    // confirm to one customer that another customer holds a particular secret,
+    // which is a probe rather than an explanation.
+    describe: () =>
+      "That value cannot be used. Pick a different one, or let us generate a token for you.",
+  },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to
     // somebody else, on purpose: the copy must not confirm the second.
     title: "Connection not found",
     describe: () =>
       "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_apply_not_retired: {
+    // Read only by a platform operator on the oversight surface, so it may
+    // name the mechanism: they are the person who decides whether to wait.
+    title: "That operation is still being retried",
+    describe: () =>
+      "Only an operation that has stopped being retried can be sent through again. Wait for it to be retired, then re-drive it.",
+  },
+  scim_apply_not_redrivable: {
+    // The history keeps ids and reason codes, never the directory's payload
+    // (the D01 rule), so an addition or a group mapping cannot be
+    // reconstructed from it. Say what does put it right instead.
+    title: "That operation cannot be sent through again",
+    describe: () =>
+      "Only a removal can be re-driven. For anything the directory adds or maps, its next push re-asserts what it still believes.",
   },
   scim_write_outside_connection: {
     // The identity provider is pointed at the wrong connection. Nothing about
@@ -1786,6 +1853,14 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  session_is_current: {
+    // fault: customer. Signing out of the browser you are reading this in is
+    // a different act with a different control, so the refusal points at it
+    // rather than just saying no.
+    title: "This is the browser you're using",
+    describe: () =>
+      "Signing out here would end this visit. Use the sign-out control instead.",
+  },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator
     // can have created and only an operator can resolve. Nothing was charged,
@@ -1885,10 +1960,30 @@ const presentations = {
     describe: () =>
       "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
   },
+  identity_mfa_password_invalid: {
+    // Named where the code refusal is not, and deliberately so: this says
+    // nothing the sign-in screen does not already say, and somebody who
+    // mistyped a password has to be sent to the right field.
+    title: "That password didn't match",
+    describe: () =>
+      "Enter the password you sign in to LangWatch with, then try again.",
+  },
   identity_mfa_required_by_organization: {
     title: "An organization you belong to requires two-step verification",
+    // The two honest ways out, and nothing else. An administrator's reset
+    // starts a fresh setup — it does not lift the requirement — so it is
+    // named as what it is.
     describe: () =>
-      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+      "You can't turn it off while you're a member. Leave that organization, or ask an administrator to reset two-step verification for you, which starts a fresh setup.",
+  },
+  identity_mfa_requirement_not_licensed: {
+    // Read by an administrator who is turning a security control on, so it
+    // says what they can still do today as well as what the plan adds.
+    // Turning the requirement OFF is never refused for this reason, so the
+    // copy never suggests they are stuck with it.
+    title: "Requiring two-step verification needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. Members can still set two-step verification up on their own accounts. Talk to your account team about upgrading to require it of everybody.",
   },
   identity_mfa_enrollment_required: {
     // Not an authentication failure: nobody is signed out and every other
@@ -1903,12 +1998,60 @@ const presentations = {
     describe: () =>
       "It may have been cancelled or timed out. Try again, or use another way to sign in.",
   },
+  identity_passkey_already_registered: {
+    title: "That passkey is already on your account",
+    describe: () =>
+      "You can sign in with it now. To add a different one, use another device or security key.",
+  },
+  identity_password_rejected: {
+    // The policy is one module's (`passwordProblem`), and this says the same
+    // thing the field-level rejection says, for the case where the server was
+    // the first to see it.
+    title: "That password wasn't accepted",
+    describe: () =>
+      "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_reset_link_invalid: {
+    // Expired, already spent and never issued collapse to one answer on
+    // purpose: the remedy is the same for all three, and telling them apart
+    // would say whether a link had been used, which is not our news to give.
+    title: "That password reset link no longer works",
+    describe: () =>
+      "It may have expired or already been used. Request a new one and open the newest email.",
+  },
+  identity_sign_in_refused: {
+    // Says nothing about which half was wrong, and nothing about whether the
+    // address has an account. The two are indistinguishable by design
+    // (specs/auth/sign-in-failure-messages.feature), and this copy is what
+    // keeps them that way once the wire carries a stable code.
+    title: "That email or password is wrong",
+    describe: () =>
+      "Check both and try again. If you have forgotten the password, reset it from the sign-in screen.",
+  },
+  identity_identifier_already_held: {
+    // Only ever raised for an address already on the CALLER'S OWN account, so
+    // it can say so plainly. An address somebody else holds is not refused
+    // here at all — that check belongs at verification, where it is not an
+    // existence oracle (`identity_email_in_use`).
+    title: "That address is already on your account",
+    describe: () =>
+      "You can already sign in with it. To add another way in, use a different address.",
+  },
   identity_passkey_not_recognized: {
     // Same answer whether the credential belongs to somebody else or to
     // nobody: this endpoint does not tell callers which passkeys exist.
-    title: "We couldn't use that passkey",
+    //
+    // Naming both ORDINARY reasons is not a leak and is the whole use of this
+    // sentence. The old copy said "check which passkeys are on your account",
+    // which assumes an account — and this is a SIGNED-OUT screen, where the
+    // two likely readers are somebody whose password manager offered a
+    // credential saved for a different site, and somebody who has not signed
+    // up yet. Neither could act on the old sentence. Saying "it may be" of
+    // both confirms nothing about the address in the field, so it is still no
+    // oracle.
+    title: "That passkey isn't one we recognize",
     describe: () =>
-      "Try again, or sign in another way and check which passkeys are on your account.",
+      "It may have been saved for another site, or belong to an account that doesn't exist here yet. Sign in with your email address instead, or create an account.",
   },
   cannot_impersonate_without_second_factor: {
     title: "Set up two-step verification first",
@@ -1919,6 +2062,11 @@ const presentations = {
     title: "This single sign-on connection has moved on",
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
+  },
+  sso_connection_not_found: {
+    title: "That single sign-on connection is not here any more",
+    describe: () =>
+      "It may have been removed while this page was open. Refresh to see what your organization has now.",
   },
   sso_connection_domain_taken: {
     // Says the domain is spoken for and stops there: which organization holds
@@ -1932,6 +2080,47 @@ const presentations = {
     title: "This connection isn't ready to go live",
     describe: () =>
       "Turning it on needs a verified domain, a successful test sign-in, and a way for someone to get in without the identity provider.",
+  },
+  // The same three preconditions as above, one code each. The one above is
+  // what the aggregate refuses with and it is right for an operator who
+  // commanded an activation directly; these are what somebody looking at
+  // their own setup screen gets, and each says which step to go back to.
+  sso_activation_domain_unproved: {
+    title: "Prove a domain first",
+    describe: () =>
+      "Nobody can be sent to your identity provider until a domain is proved to be yours. Claim the domain and publish the record we give you.",
+  },
+  sso_activation_test_sign_in_missing: {
+    title: "Sign in through it once first",
+    describe: () =>
+      "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
+  },
+  sso_break_glass_expiry_out_of_range: {
+    title: "Choose a date inside the allowed window",
+    describe: (error) => {
+      const days = num(error, "maxWindowDays", 90);
+      return `A way back in is temporary on purpose, so it can be granted for up to ${days} days at a time. Pick a date in the future and inside that window, and renew it if you still need it.`;
+    },
+  },
+  sso_break_glass_holder_ineligible: {
+    title: "Choose an administrator for the way back in",
+    describe: () =>
+      "The way back in has to belong to somebody who could actually use it, so it can only be granted to an administrator of this organization.",
+  },
+  sso_break_glass_last_way_in: {
+    title: "That grant is the only way back in",
+    describe: () =>
+      "While single sign-on decides who gets in, someone has to be able to sign in without it. Grant another person a way in first, or remove the connection itself.",
+  },
+  sso_activation_break_glass_missing: {
+    title: "Name someone who can still get in",
+    describe: () =>
+      "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
+  },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
   },
   sso_connection_string_edit_retired: {
     title: "Single sign-on is configured on the connection now",
@@ -1953,10 +2142,133 @@ const presentations = {
     describe: () =>
       "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
   },
-  sso_saml_not_self_serve: {
-    title: "SAML connections are set up with us",
+  sso_connection_already_registered: {
+    // Says there is one and what to do with it. Never says "rate limit": the
+    // bound is a rate limit in effect, but to the administrator reading this
+    // it is simply that they already did this.
+    title: "This organization already has an identity provider",
     describe: () =>
-      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+      "Only one can be set up at a time. Remove the one that is there before registering another, or add the domains you need to it.",
+  },
+  sso_credentials_required: {
+    // Names the two shapes rather than the field that was empty, because the
+    // form is what says which box is blank and the reader is looking at it.
+    title: "Some of the identity provider's details are missing",
+    describe: () =>
+      "For OpenID Connect we need the issuer address, the client id and the client secret. For SAML we need the sign-in address, and either your identity provider's metadata or its entity id and signing certificate.",
+  },
+  sso_issuer_unreachable: {
+    // Says the address did not answer and nothing about our side of the call.
+    // A timeout, a refused connection and a 404 are one thing to the person
+    // reading: the address is not the one to use.
+    title: "That address did not answer as an identity provider",
+    describe: () =>
+      "Check the issuer address with whoever administers your identity provider — it is usually the one its OpenID Connect settings call the issuer or the domain. Then try again.",
+  },
+  sso_saml_metadata_invalid: {
+    title: "That is not identity provider metadata",
+    describe: () =>
+      "Paste the metadata your identity provider publishes for itself. A file describing LangWatch, or an application's own settings, will not work here.",
+  },
+  sso_certificate_invalid: {
+    title: "The signing certificate could not be read",
+    describe: () =>
+      "Copy the whole certificate from your identity provider, including the BEGIN and END lines, and paste it again.",
+  },
+  sso_license_required: {
+    // Names activating a licence and nothing else. An environment variable,
+    // a hostname or a service name would be useless to whoever is reading
+    // and an internals leak on a screen an administrator opens.
+    title: "Single sign-on needs an active licence",
+    describe: () =>
+      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  sso_domain_claim_pending: {
+    // Reached by one claim only now: one on a domain somebody else already
+    // proved. Says the claim is being looked at and nothing about who is
+    // looking or who holds the domain — neither is the reader's to know.
+    title: "We're still reviewing this domain",
+    describe: () =>
+      "You can prove the domain as soon as the review is done. We'll let you know, and nothing else about your setup is waiting on it.",
+  },
+  sso_domain_not_eligible: {
+    // Names the shape of domain that works and lists nothing: printing the
+    // deny-list would turn the refusal into a way to read it back.
+    title: "That domain can't be used for single sign-on",
+    describe: () =>
+      "Use a domain your company owns, like the one in your work email addresses. Shared mail providers and domain endings can't be claimed by one company.",
+  },
+  sso_domain_claim_throttled: {
+    title: "You've claimed a lot of domains just now",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const unaffected = "The domains you've already claimed are unaffected.";
+      if (seconds <= 0) return `Try that again shortly. ${unaffected}`;
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}. ${unaffected}`;
+    },
+  },
+  sso_domain_proof_not_found: {
+    title: "We couldn't find that record yet",
+    describe: () =>
+      "Publish the record shown here on your domain, then check again. Changes to DNS can take a while to reach us.",
+  },
+  sso_domain_file_not_found: {
+    title: "We couldn't find that file yet",
+    describe: () =>
+      "Serve the value shown here as a plain-text file at the well-known address, then check again.",
+  },
+  sso_domain_fetch_failed: {
+    // Deliberately not the words above: we did not look and find nothing —
+    // we could not read the file at all. The domain may be mid-deploy or
+    // refusing us, so the only true instruction is to try again.
+    title: "We couldn't reach that file just now",
+    describe: () =>
+      "Fetching the file from your domain didn't work this time. Nothing about your setup changed — check the address is served over https and try again in a few minutes.",
+  },
+  sso_domain_lookup_failed: {
+    // Deliberately NOT the words above. We did not look and find nothing —
+    // we could not look, so "publish it and check again" would send an
+    // administrator to change a record that is already correct. The words
+    // say to try again and name no resolver, nameserver or timeout.
+    title: "We couldn't check your domain just now",
+    describe: () =>
+      "Looking your domain's records up didn't work this time. Nothing about your setup changed — try again in a few minutes, and tell us if it keeps happening.",
+  },
+  sso_domain_proof_expired: {
+    title: "That record has expired",
+    describe: () =>
+      "Ask for a fresh one and publish it — your approved domain is unaffected, and you don't start over.",
+  },
+  sso_self_serve_unavailable: {
+    // Offers a conversation and names no flag: a customer cannot act on a
+    // flag name, and printing one turns a rollback lever into something
+    // support has to explain away.
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    describe: () =>
+      "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+  identity_link_proposal_not_found: {
+    title: "That waiting sign-in is no longer there",
+    describe: () =>
+      "It was decided or withdrawn since this page was loaded. Reload the person and look at what is waiting now.",
+  },
+  identity_link_proposal_resolved: {
+    title: "Somebody already decided this sign-in",
+    // Names the decision and the hand that made it, because the way this
+    // refusal actually happens is two operators on the same support case —
+    // and "already decided" on its own sends the second one hunting for a
+    // bug instead of talking to the first.
+    describe: (error) => {
+      const outcome =
+        str(error, "decidedOutcome", "decided") === "confirmed"
+          ? "confirmed"
+          : "rejected";
+      const by = str(error, "decidedByActorId", "");
+      return by
+        ? `It was ${outcome} by ${by}. Reload the person to see what changed, and talk to them before deciding anything else here.`
+        : `It was ${outcome} already. Reload the person to see what changed.`;
+    },
   },
   identity_link_proposed: {
     title: "An administrator needs to confirm this sign-in",

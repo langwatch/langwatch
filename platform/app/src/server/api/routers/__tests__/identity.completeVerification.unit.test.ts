@@ -89,10 +89,30 @@ vi.mock(
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
     resolveSignInMethodPolicy: async () => ({}),
+    // Re-stated by the runtime because it is better-auth's one identity door.
+    // Nothing in this suite asks it; the Record above is exhaustive.
+    looksLikeSsoConnectionId: () => false,
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
     signUpVerification: () => ({}),
     ssoConnections: () => ({}),
+    // Wave 3's additions. Stubbed rather than omitted because the annotation
+    // above is exhaustive on purpose: a new runtime export has to be looked
+    // at here, and this suite reaches none of them.
+    BACKUP_CODE_COUNT: 0,
+    accountIdentifiers: () => ({}),
+    memberProvenance: () => ({}),
+    mfaCeremonies: () => ({}),
+    mfaEnrollments: () => ({}),
+    organizationMfa: () => ({}),
+    sessionClaims: () => ({}),
+    sessionInventory: () => ({}),
+    signUpHealth: () => ({}),
+    ssoBreakGlass: () => ({}),
+    ssoDomainClaimQueue: () => ({}),
+    ssoDomainReproof: () => ({}),
+    ssoEngineProviderDerivation: () => ({}),
+    ssoSelfServe: () => ({}),
   }),
 );
 

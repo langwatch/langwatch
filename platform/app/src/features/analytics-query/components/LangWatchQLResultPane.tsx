@@ -250,7 +250,7 @@ function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
   );
 }
 
-/** Nothing has run yet. The workbench's front door, not an error. */
+/** Nothing has run yet. The workbench's auth screens, not an error. */
 function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
   return (
     <VStack

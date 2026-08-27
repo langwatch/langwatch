@@ -97,29 +97,61 @@ model AccountCredential {
 }
 
 model Session {
-  id            String   @id @default(nanoid())
-  sessionToken  String   @unique
-  userId        String
-  expires       DateTime
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  impersonating Json?
-  ipAddress     String?
-  userAgent     String?  @db.Text
+  id                     String    @id @default(nanoid())
+  sessionToken           String    @unique
+  userId                 String
+  expires                DateTime
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress              String?
+  userAgent              String?   @db.Text
   /// Which of the user's sign-in methods minted this session (D06). NULL on
   /// every session that predates the column and on any mint we could not
   /// attribute - an ordinary value, not an error. Nothing reads it to decide
   /// whether the session is valid, so no session was ended to add it.
-  identifierId  String?
+  identifierId           String?
   /// What the sign-in that minted this session PROVED, as RFC 8176 method
   /// references (D06). Empty on every session minted before the column, and
   /// on any ordinary password sign-in. An organization that requires a second
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
-  amr           String[] @default([])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  amr                    String[]  @default([])
+  /// The legacy impersonation payload. NOTHING READS OR WRITES IT any more -
+  /// the {actor, subject} columns below replaced it, and the migration beside
+  /// them ended every session that still carried a value.
+  ///
+  /// It stays for ONE release, and that is the whole reason it is still here.
+  /// `prisma migrate deploy` runs at container start, so the first pod of a
+  /// new release drops a column while the previous release's pods are still
+  /// serving - and those pods select this column on EVERY authenticated
+  /// request and fail closed when the row does not come back. Dropping it in
+  /// the same release that stops reading it signs everybody out for the length
+  /// of the rollout. Expand now, contract next release.
+  impersonating          Json?
+  /// The impersonation claims (D06), aligned with the authz Principal
+  /// {actor, subject}. The actor is the operator who really made the request
+  /// and the subject is the person whose access they are borrowing; both are
+  /// recorded on every authorization decision, so the audit trail can answer
+  /// who really did it. These replace the legacy `impersonating` JSON blob,
+  /// which is dropped in the release AFTER this one.
+  ///
+  /// NULL on every ordinary session, which is all of them: an impersonation
+  /// is a handful of rows at a time and nothing else reads these columns.
+  actorUserId            String?
+  subjectUserId          String?
+  /// Why the operator started it. Required to start one
+  /// (specs/features/backoffice-user-impersonation-reason.feature) and kept
+  /// beside both people rather than only in the audit log, so a request under
+  /// impersonation carries its own justification.
+  impersonationReason    String?   @db.Text
+  /// When the borrowed access lapses. A session outlives its impersonation
+  /// window: past this the claims are ignored and the operator is themselves
+  /// again, with nothing ended.
+  impersonationExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @default(now()) @updatedAt
 
   @@index([userId])
+  @@index([identifierId])
 }
 
 model User {
@@ -164,6 +196,12 @@ model User {
   /// where the offer should be MORE eager, and an interval nobody can enforce
   /// is not an interval. NULL means never asked.
   passkeyNudgeDismissedAt       DateTime?
+  /// The domains this person has said "no thanks" to being offered their
+  /// colleagues on (D12). Per domain rather than one flag: somebody who
+  /// changes jobs and verifies a second address should be offered their new
+  /// employer's organization, not silenced forever by a decision they made
+  /// about the old one. Empty means never dismissed anything.
+  joinOfferDismissedDomains     String[]                 @default([])
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -250,6 +288,20 @@ model Identifier {
   verifiedAt        DateTime?
   attachedAt        DateTime
   detachedAt        DateTime?
+  // When this identifier last ANSWERED a sign-in resolution — the address or
+  // provider subject someone presented matched this row and it named the
+  // account. Row-truth, never an event: a sign-in happens on every visit, and
+  // one event per visit would bloat the log for a fact no decision folds.
+  // Written fire-and-forget the way `ApiKey.lastUsedAt` is, so a failed touch
+  // costs a timestamp rather than a sign-in.
+  //
+  // Deliberately NOT "last successfully signed in with". Resolution runs
+  // BEFORE the password, passkey or IdP answer is checked, so this moves on a
+  // wrong password too. It is here to answer "is this method still in use?"
+  // for stale-credential sweeps and for showing somebody their own sign-in
+  // methods — never to prove an authentication happened. `User.lastLoginAt`
+  // is the fact that means a session was minted.
+  lastUsedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
@@ -455,22 +507,67 @@ model SsoConnection {
   /// TEARDOWN_PENDING | TORN_DOWN
   state               String
   claimedDomains      String[]
+  /// [{ domain, state, claimedAtMs, claimedByActorId, decidedAtMs,
+  /// decidedByActorId, authority, waitedMs, note }] - every claim this
+  /// connection has made and how long each waited to be decided. The tier-3
+  /// approval queue is a read of this column, and the epic's Open Q2 wants
+  /// that latency measured from the day the queue exists.
+  domainClaims        Json      @default("[]")
   approvedDomains     String[]
   /// The only domains that ever route, and only while state is ACTIVE.
   verifiedDomains     String[]
-  /// [{ domain, method, actorId, verifiedAtMs }] - what proved each verified
-  /// domain, and who. Kept on the row rather than only in the log so that an
-  /// operator-attested domain can never be read as one the customer proved.
+  /// The subset of `verifiedDomains` whose published record stayed missing
+  /// through its grace window (ADR-123). They still ROUTE - everyone already
+  /// here signs in unchanged - and they stop vouching for anybody NEW: no
+  /// provisioning on first sign-in, no walking in by domain. A column rather
+  /// than a read of the JSON below, because both questions are asked on a
+  /// sign-in path and have to be one indexed predicate.
+  lapsedDomains       String[]
+  /// [{ domain, method, actorId, verifiedAtMs, proofState, firstAbsentAtMs,
+  /// graceEndsAtMs }] - what proved each verified domain, who, and whether
+  /// that evidence is still there. Kept on the row rather than only in the
+  /// log so that an operator-attested domain can never be read as one the
+  /// customer proved, and a wavering one never as one nothing is doubting.
   domainVerifications Json      @default("[]")
   /// { domain, method, tokenHash } while a ceremony is in flight.
   pendingVerification Json?
   idpMetadata         Json
+  /// admit | request | refuse - what this connection does with somebody who
+  /// signs in through it and is not a member yet (ADR-117 3). Stated at
+  /// registration and changed by the setup journey, so it is never absent
+  /// and no reader has to decide what absence means. This was two fields
+  /// for a while - a boolean `allowsJit` beside it, kept in step by the
+  /// fold - and they disagreed about the middle answer.
+  arrivalPolicy       String    @default("refuse")
+  /// DEAD, AND STAYING FOR ONE RELEASE. Nothing reads or writes this; the
+  /// routing repository derives the same answer from `arrivalPolicy`. It is
+  /// declared so the schema still describes the table, and left in place so
+  /// the PREVIOUS release's pods — which select it by name on every
+  /// connection read — keep working through the rollout. Dropping it in the
+  /// release that stopped reading it would stop single sign-on routing and
+  /// the connection projection for the length of the deploy. Dropped by
+  /// `20260827120000_drop_sso_connection_allows_jit` in the next one.
   allowsJit           Boolean   @default(false)
+  /// When somebody CHOSE the policy above, and null while the registration
+  /// default stands. A different fact from the policy rather than a second
+  /// copy of it: a connection always has a behaviour, and separately
+  /// somebody has or has not decided on it. Going live waits for the
+  /// deciding - "turn everybody away" is a decision too.
+  arrivalPolicyDecidedAt DateTime?
   /// self-serve | legacy-grandfathered
   source              String
   testLoginAccountId  String?
   /// { domain, note } - the last ops rejection, read back on a re-claim.
   rejection           Json?
+  /// When the re-proof sweep last LOOKED at this connection, whatever it
+  /// found (ADR-123). A column of its own because the sweep cannot order by
+  /// `updatedAt`: a healthy re-read writes no facts, so `updatedAt` never
+  /// moves — while a domain that starts WAVERING does bump it, which sorted
+  /// the one domain mid-grace to the back of the queue and out of the batch.
+  /// The domain that most needed re-checking was the one that stopped being
+  /// re-checked, so it never lapsed. Null until first swept, which sorts
+  /// first, so a new connection is looked at soonest.
+  lastReproofAt       DateTime?
   createdBy           String?
   /// While TEARDOWN_PENDING: when the process manager's wake completes it.
   tearDownAfter       DateTime?
@@ -487,6 +584,152 @@ model SsoConnection {
   @@index([organizationId])
   @@index([state])
   @@index([verifiedDomains], type: Gin)
+  @@index([lapsedDomains], type: Gin)
+}
+
+/// The values an `SsoConnection`'s credential references point AT (D09 - see
+/// specs/identity/sso-idp-termination.feature).
+///
+/// The aggregate has always carried `clientIdRef` / `secretRef` / `certRefs`
+/// rather than values, because a fact may not carry a secret (ADR-101 §4).
+/// Until D09 there was nothing behind the references and every writer passed
+/// null. This is the thing behind them.
+///
+/// `ciphertext` is AES-256-GCM under the deployment's `CREDENTIALS_SECRET`,
+/// the same key every other credential in the product is kept under. Nothing
+/// reads a row except the projection that builds the engine's dialing
+/// configuration; no surface renders one back.
+///
+/// Written by the command path rather than the fold, and that split is
+/// deliberate: the VALUE is not event truth and cannot be, so the log records
+/// WHEN a credential changed (a new reference in a new fact) and never what
+/// it was. A replay rebuilds every reference from the log and finds the value
+/// still here.
+model SsoCredential {
+  id             String   @id
+  organizationId String
+  /// The connection whose registration minted this. Not a relation, matching
+  /// `SsoConnection` itself: a projection rebuilt from events must not depend
+  /// on relational state the log does not carry.
+  connectionId   String
+  /// oidc-client-id | oidc-client-secret | saml-idp-config
+  kind           String
+  ciphertext     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, connectionId])
+}
+
+/// better-auth's single sign-on plugin's provider table (D09), and a
+/// PROJECTION of the connection log rather than a second source of truth.
+///
+/// The plugin owns the columns and the reads: it is the only thing that
+/// speaks OpenID Connect discovery or reads a SAML assertion, and it dials
+/// what it finds here. What it never does is decide that a row should exist —
+/// that is folded from `SsoConnection`'s events by the same projection that
+/// writes the connection head, in the same transaction, so a replay rebuilds
+/// both together and a row can never outlive the connection that justified
+/// it. Nothing else writes here.
+///
+/// `providerId` is the CONNECTION ID rather than the name the customer typed.
+/// The plugin's column is globally unique, and two organizations both calling
+/// their provider `okta` must both be able to.
+///
+/// `oidcConfig` and `samlConfig` are the plugin's own JSON documents, rebuilt
+/// on every fold from `SsoCredential` — the vault is where the material
+/// lives, and this row is a derived copy the engine can read synchronously.
+///
+/// SEALED AT REST, under the same key the vault uses. The document carries
+/// the client secret the derivation reads OUT of the vault, so a plaintext
+/// copy here would hand every customer's live identity-provider credential
+/// to anybody holding a database dump — the exact threat `SsoCredential`
+/// exists to defeat, reopened one table over. A stored value announces its
+/// form (`enc:v1:`), so a row written before the seal existed still opens;
+/// the one reader is the identity storage adapter, on the path that dials.
+/// The reader tolerates both forms, so this needs no backfill — but a pod
+/// without it cannot read a sealed row, so it must not be rolled back past.
+/// WHO OWNS A PROVED DOMAIN, as a row the database can refuse twice.
+///
+/// "First verifier owns" was enforced by reading `findDomainOwner` and then
+/// writing the fact — two different aggregates, so the per-connection queue
+/// never ordered them against each other, and `SsoConnection.verifiedDomains`
+/// is a `String[]` with only a GIN index behind it, which enforces nothing.
+/// Two organizations proving `acme.com` at the same moment both read "nobody
+/// owns it" and both committed; the sign-in router then picked between two
+/// live connections by planner order, so a member of one company could be
+/// handed to another company's identity provider — and with `arrivalPolicy`
+/// on `admit`, provisioned into it.
+///
+/// The legacy single-domain model had this: `Organization.ssoDomain` is
+/// `@unique`. The multi-domain rewrite dropped the guarantee, and self-serve
+/// proof is what made the race reachable by customers rather than by two
+/// operators working at once.
+///
+/// `domain` is the primary key, so the second writer loses on the constraint
+/// rather than on a check it raced. Written in the same transaction as the
+/// connection head, so the row and the array can never disagree.
+model SsoVerifiedDomain {
+  domain         String @id
+  connectionId   String
+  organizationId String
+
+  @@index([connectionId])
+  @@index([organizationId])
+}
+
+model SsoProvider {
+  id             String  @id
+  issuer         String
+  oidcConfig     String?
+  samlConfig     String?
+  userId         String?
+  providerId     String  @unique
+  organizationId String?
+  domain         String
+
+  @@index([organizationId])
+  @@index([domain])
+}
+
+/// A way back in (D05 - see specs/identity/sso-onboarding-tiers.feature).
+///
+/// One named person who may still sign in without the identity provider
+/// while their organization's sign-in belongs to one, and the date on which
+/// that stops. Activation asks whether such a person exists, because the
+/// failure it prevents is the only one that cannot be recovered from inside
+/// the product: a misconfigured connection goes live, every member is handed
+/// to an identity provider that will not authenticate them, and nobody is
+/// left who can turn it off.
+///
+/// Rows are immutable except for `supersededAt` and `warnedDays`. A renewal
+/// writes a NEW row naming the one it replaced, so the date a way in
+/// previously ended is still readable in the history - which is what makes a
+/// renewal auditable rather than a column somebody moved.
+///
+/// No relation to Organization or User, matching the identity heads above:
+/// the binding is the record of who could get in, and a cascade would erase
+/// exactly the history a lockout post-mortem reads.
+model SsoBreakGlassBinding {
+  id              String    @id
+  organizationId  String
+  /// Who holds the way in.
+  userId          String
+  /// Who granted it. A way back in is never self-served.
+  grantedByUserId String
+  grantedAt       DateTime
+  expiresAt       DateTime
+  /// Set when a renewal replaced this row; the row itself is never edited.
+  supersededAt    DateTime?
+  /// The binding this one renewed, so the previous end date stays readable.
+  renewedFromId   String?
+  /// Which of the fourteen, seven and one day warnings have been sent, so a
+  /// sweep that runs twice in a day never says the same thing twice.
+  warnedDays      Int[]
+  createdAt       DateTime  @default(now())
+
+  @@index([organizationId, expiresAt])
+  @@index([userId])
 }
 
 /// The join-request pipeline's projection (ADR-117, D12 - see
@@ -751,6 +994,7 @@ model Organization {
   notifications          Notification[]
   subscriptions          Subscription[]
   scimTokens             ScimToken[]
+  scimRequestLog         ScimRequestLog[]
   promptTags             PromptTag[]
   groups                 Group[]
   roleBindings           RoleBinding[]
@@ -773,6 +1017,51 @@ model Organization {
   @@index([ssoProvider])
 }
 
+/// Every SCIM request we could attribute, and what we answered (ADR-126).
+///
+/// EVIDENCE, NOT TRUTH. A request authors nothing — an HTTP round trip that
+/// was refused decided nothing — so this is a table and not an event: nothing
+/// downstream derives from it, rebuilding the world from the log must not
+/// depend on how often a provider retried a GET, and rows age out of a
+/// retention window an event log would never have.
+///
+/// NO ROW FOR A REQUEST WE CANNOT ATTRIBUTE. A token that does not verify is
+/// answered 401 and recorded nowhere: we do not know whose organization to
+/// file it under, and a table unauthenticated traffic can write is a table
+/// anybody on the internet can fill. What answers that case instead is
+/// `ScimToken.lastUsedAt` being null. The 403 IS recorded — a lapsed plan is
+/// a credential we recognize.
+///
+/// THE PAYLOAD RULE HOLDS. A method, a resource name, a status, a reason slug
+/// and our own sentence. Never a token, never a header, never a provider's
+/// raw message — the same reason `scim_apply_failed` carries a code and not a
+/// message.
+model ScimRequestLog {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Null when the refusal resolved an organization and stopped before the
+  /// connection — a lapsed plan is answered off the token alone.
+  connectionId   String?
+  method         String
+  /// The SCIM resource asked for ("Users", "Users/:id", "Groups"), never the
+  /// raw path: a path carries ids and query strings, and this is read by
+  /// people rather than matched by machines.
+  resource       String
+  status         Int
+  /// A stable slug, only on a refusal, so a reader branches on this and never
+  /// on the sentence beside it.
+  reason         String?
+  /// Our own short sentence, customer-safe.
+  detail         String?
+  occurredAt     DateTime     @default(now())
+
+  @@index([organizationId, occurredAt])
+  @@index([connectionId, occurredAt])
+  /// The retention sweep's own predicate.
+  @@index([occurredAt])
+}
+
 model ScimToken {
   id             String       @id @default(nanoid())
   organizationId String
@@ -788,13 +1077,30 @@ model ScimToken {
   /// each at its organization's first connection where there is one. Minting
   /// a NEW token without a connection is refused (`scim_connection_required`).
   connectionId   String?
-  hashedToken    String
+  /// UNIQUE, and that is a tenancy boundary rather than tidiness.
+  ///
+  /// The lookup that turns a bearer token into an organization is keyed on
+  /// this column alone — it has to be, since the token is the only thing the
+  /// caller presents. While every token was 32 random bytes a collision was
+  /// impossible and the missing constraint cost nothing. An administrator may
+  /// now supply a value they already hold, so two organizations CAN choose the
+  /// same string, and without this the lookup would answer with whichever row
+  /// the planner reached first: one customer's directory provisioning and
+  /// deleting another customer's people.
+  hashedToken    String       @unique
+  /// How `hashedToken` was derived, so the two schemes can coexist while
+  /// tokens minted under the old one are still in use.
+  ///
+  /// `sha256` is a bare digest, which is correct for 32 random bytes and wrong
+  /// for a value a person chose — a database dump of those is a wordlist away
+  /// from live credentials. `hmac-sha256` is keyed on the deployment's own
+  /// secret, so a dump on its own is inert. Every new row is the latter.
+  hashScheme     String       @default("sha256")
   description    String?
   createdAt      DateTime     @default(now())
   lastUsedAt     DateTime?
 
   @@index([organizationId])
-  @@index([hashedToken])
   @@index([connectionId])
 }
 
@@ -2605,6 +2911,18 @@ model AuditLog {
   userAgent      String?
   metadata       Json?
 
+  /// WHO REALLY DID IT, when that is not `userId`.
+  ///
+  /// Under an impersonation the session's `user.id` is the SUBJECT — the
+  /// customer whose access an operator is borrowing — so a row naming only
+  /// `userId` filed the operator's act against the customer. An operator
+  /// granting a permanent way into somebody's organization appeared, in the
+  /// only durable record of it, to be that somebody.
+  ///
+  /// Null on an ordinary request, where the two would be the same person and
+  /// saying so twice adds nothing. ADR-118 / D06: every decision names both.
+  actorUserId    String?
+
   // Gateway-shape governance fields (see model docstring above).
   targetKind String?
   targetId   String?
@@ -2613,6 +2931,7 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([actorUserId])
   @@index([projectId])
   @@index([action])
   @@index([ipAddress])

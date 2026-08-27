@@ -356,6 +356,13 @@
 			// driving it, and the seam would be drawn to satisfy a line count
 			// rather than to name a part anybody reuses.
 			//
+			// The front door moved from src/features/auth-front-door to
+			// src/features/auth, and FrontDoorGround became AuthGround, when the
+			// flagged and unflagged screens stopped being two products (#7531).
+			// The globs below name the files at their new path: a directory
+			// rename is not a rewrite, and the tolerance above was granted to
+			// these screens rather than to the folder they used to sit in.
+			//
 			// REMOVE THIS BLOCK when IDENTITY_ROUTER_V2 retires and the legacy
 			// screens go: the surviving components stop carrying both the
 			// flagged and unflagged paths, and should come back under the
@@ -365,11 +372,75 @@
 				"src/components/me/PasskeysSection.tsx",
 				"src/components/me/SignInMethodsSection.tsx",
 				"src/components/settings/ChangePasswordDialog.tsx",
-				"src/features/auth-front-door/components/CredentialSignInForm.tsx",
-				"src/features/auth-front-door/components/FrontDoorGround.tsx",
-				"src/features/auth-front-door/components/IdentifierFirstSignIn.tsx",
-				"src/features/auth-front-door/components/SignUpCredentialForm.tsx",
-				"src/features/auth-front-door/components/VerificationFirstSignUp.tsx"
+				"src/features/auth/components/AuthGround.tsx",
+				"src/features/auth/components/CredentialSignInForm.tsx",
+				"src/features/auth/components/IdentifierFirstSignIn.tsx",
+				"src/features/auth/components/SignUpCredentialForm.tsx",
+				"src/features/auth/components/VerificationFirstSignUp.tsx"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
+			// The organization access cluster and the account screens beside it
+			// (ADR-117 wave 3): the directory's four tabs, the authentication
+			// page's cards, single sign-on setup, and the account sections the
+			// same work rewrote. Every finding below sits on a component or on
+			// a row renderer inside one -- the flagged sites were read one by
+			// one, and the four that were NOT markup were split instead of
+			// being listed here: `handleSave` in MemberAccessEditor, the two
+			// passkey ceremony `run` handlers, and `onSubmit` on the reset
+			// screen. What is left is the shape React gives a screen that
+			// answers in more than one state.
+			//
+			// Cognitive complexity counts those states: a card that says one
+			// thing while it loads, another when the plan does not carry the
+			// feature, another when the read failed, another when nothing has
+			// arrived yet and a fourth when something has, scores a point per
+			// answer even though no two of them interact. DirectoryCard is the
+			// clearest case at 27 -- seven states, each a few lines of markup
+			// under a named condition, and every one of them a thing a
+			// customer can actually see.
+			//
+			// The length findings are the same fact from the other side. A
+			// list section holds its empty state, its skeleton, its rows and
+			// its dialogs, and splitting on the line count moves markup away
+			// from the hook state that drives it, leaving a child that takes
+			// nine props and is rendered once.
+			//
+			// REMOVE THIS BLOCK a screen at a time, whenever one of these
+			// grows a part something else renders too. That is a seam the
+			// product drew; a line count is not.
+			"includes": [
+				"src/components/JoinYourTeamTakeover.tsx",
+				"src/components/access/GroupsSection.tsx",
+				"src/components/access/IdentityRow.tsx",
+				"src/components/access/JoinPolicyCard.tsx",
+				"src/components/access/MemberAccessEditor.tsx",
+				"src/components/access/PeopleSection.tsx",
+				"src/components/access/PersonDrawer.tsx",
+				"src/components/access/RoleAssignmentsPanel.tsx",
+				"src/components/access/RoleDialog.tsx",
+				"src/components/access/RolesPanel.tsx",
+				"src/components/access/TeamsAndProjectsSection.tsx",
+				"src/components/me/PasswordSection.tsx",
+				"src/components/me/TwoFactorSection.tsx",
+				"src/components/settings/SingleSignOnSetup.tsx",
+				"src/components/settings/authentication/ConnectorsSection.tsx",
+				"src/components/settings/authentication/DirectoryCard.tsx",
+				"src/components/settings/authentication/SingleSignOnCard.tsx",
+				"src/components/settings/singleSignOn/DomainsSection.tsx",
+				"src/components/settings/singleSignOn/TestSignInSection.tsx",
+				"src/features/account-identifiers/components/EmailIdentifiersSection.tsx",
+				"src/features/auth/components/PasskeyCeremonyPanel.tsx",
+				"src/pages/auth/reset-password.tsx",
+				"src/pages/settings/directory.tsx"
 			],
 			"linter": {
 				"rules": {

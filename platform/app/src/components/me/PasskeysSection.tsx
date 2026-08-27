@@ -1,23 +1,41 @@
 import {
   Box,
   Button,
-  Card,
   Field,
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
+import { QuietNotice } from "~/components/settings/QuietNotice";
+import { SettingsEmptyState } from "~/components/settings/SettingsEmptyState";
+import {
+  SettingsSection,
+  SettingsSectionRow,
+} from "~/components/settings/SettingsSection";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import {
+  PasskeyCeremonyPanel,
+  passkeyCeremonyTitle,
+} from "~/features/auth/components/PasskeyCeremonyPanel";
+import {
+  cancelPasskeyCeremony,
+  endPasskeyCeremony,
+  startPasskeyCeremony,
+  usePasskeyCeremony,
+} from "~/features/auth/logic/passkeyCeremony";
+import { showErrorToast } from "~/features/errors";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
+import { passkeyLabel as labelFor } from "./passkeyAuthenticators";
+import { useLastWayInWarning } from "./useLastWayInWarning";
 
 /** What the plugin stores per credential, of the parts this screen reads. */
 interface HeldPasskey {
@@ -25,6 +43,8 @@ interface HeldPasskey {
   name?: string | null;
   createdAt: string | Date;
   transports?: string | null;
+  /** The authenticator MODEL, never a device or a person. Names the row. */
+  aaguid?: string | null;
 }
 
 /**
@@ -52,12 +72,20 @@ function isSecurityKey(passkey: HeldPasskey): boolean {
  * What to call one in a list of them.
  *
  * A passkey registered from the sign-up screen is labelled with the address it
- * was created for; one added from settings carries whatever the browser chose,
- * which is often nothing. "Passkey" is the honest fallback — better than an
- * id, and it is exactly why renaming exists.
+ * was created for — the only string that ceremony had — so somebody holding
+ * three of them reads three copies of their own email and cannot tell the work
+ * laptop from the phone they no longer own. Renaming has always been here;
+ * nobody used it, because the list gave them nothing to rename FROM.
+ *
+ * The authenticator's own name is that starting point, and it is derived
+ * rather than stored: nothing is written at registration, so a lookup that
+ * learns a new authenticator improves every row that already exists.
  */
-function passkeyLabel(passkey: HeldPasskey): string {
-  return passkey.name?.trim() || "Passkey";
+function passkeyLabel(
+  passkey: HeldPasskey,
+  accountAddress?: string | null,
+): string {
+  return labelFor(passkey, { accountAddress });
 }
 
 /**
@@ -238,57 +266,75 @@ function PasskeyGroup({
         {heading}
       </Text>
       {passkeys.map((passkey) => (
-        <Card.Root key={passkey.id} width="full" data-testid="passkey-card">
-          <Card.Body paddingY={3}>
-            <HStack>
-              <Box color="fg.muted" display="flex">
-                {isSecurityKey(passkey) ? (
-                  <Usb size={16} />
-                ) : (
-                  <Fingerprint size={16} />
-                )}
-              </Box>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight={500}>
-                  {passkeyLabel(passkey)}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Added {new Date(passkey.createdAt).toLocaleDateString()}
-                </Text>
-              </VStack>
-              <Spacer />
-              {/* One trigger per row, per row-actions-overflow-menu.md: two
-                  icon buttons in a row is the pattern that doc exists to
-                  stop, and it puts a destructive action one stray click from
-                  a credential. */}
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    aria-label={`Actions for ${passkeyLabel(passkey)}`}
-                  >
-                    <MoreVertical size={14} />
-                  </Button>
-                </Menu.Trigger>
-                <Menu.Content>
-                  <Menu.Item value="rename" onClick={() => onRename(passkey)}>
-                    Rename
-                  </Menu.Item>
-                  <Menu.Item
-                    value="remove"
-                    color="red.500"
-                    onClick={() => onRemove(passkey)}
-                  >
-                    Remove
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Root>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+        <SettingsSectionRow key={passkey.id} testId="passkey-card">
+          <Box color="fg.muted" display="flex">
+            {isSecurityKey(passkey) ? (
+              <Usb size={16} />
+            ) : (
+              <Fingerprint size={16} />
+            )}
+          </Box>
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" fontWeight={500}>
+              {passkeyLabel(passkey)}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Added {new Date(passkey.createdAt).toLocaleDateString()}
+            </Text>
+          </VStack>
+          <Spacer />
+          {/* One trigger per row, per row-actions-overflow-menu.md: two icon
+              buttons in a row is the pattern that doc exists to stop, and it
+              puts a destructive action one stray click from a credential. */}
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                size="xs"
+                variant="ghost"
+                aria-label={`Actions for ${passkeyLabel(passkey)}`}
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="rename" onClick={() => onRename(passkey)}>
+                Rename
+              </Menu.Item>
+              <Menu.Item
+                value="remove"
+                color="red.500"
+                onClick={() => onRemove(passkey)}
+              >
+                Remove
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        </SettingsSectionRow>
       ))}
     </VStack>
+  );
+}
+
+/**
+ * One way in and no other, said where the remedy is.
+ *
+ * Quiet on purpose: it is a fact about the account rather than a failure, and
+ * the moment it looks like an error is the moment people learn to scroll past
+ * it. It names the real risk — losing the passkey PROVIDER, not misplacing a
+ * phone — because the opposite framing is the misconception the guidance
+ * (passkeycentral.org) says people already hold, and repeating it here would
+ * teach it.
+ */
+function LastWayInNotice() {
+  const warning = useLastWayInWarning();
+  if (!warning) return null;
+
+  return (
+    <QuietNotice testId="last-way-in-notice">
+      <Text fontSize="sm" lineHeight="1.55" data-case={warning.id}>
+        {warning.message}
+      </Text>
+    </QuietNotice>
   );
 }
 
@@ -297,10 +343,11 @@ function PasskeyGroup({
  * looking for them (Passkey Central, "Create, view and manage passkeys in
  * account settings").
  *
- * It sits ABOVE the password section on purpose. The order of a settings page
- * is an argument about what the account should be secured with, and putting
- * the thing we would rather people used underneath the thing we would rather
- * they stopped using makes the opposite one.
+ * One HALF of a band it shares with two-step verification, and above the
+ * password on purpose. The order of a settings page is an argument about what
+ * the account should be secured with, and putting the thing we would rather
+ * people used underneath the thing we would rather they stopped using makes
+ * the opposite one.
  *
  * With nothing enrolled it is a hero rather than an empty list: an empty list
  * says "you have none of these" to somebody who does not know what they are,
@@ -318,6 +365,12 @@ export function PasskeysSection() {
   // identical-looking cards is not a question anybody can answer.
   const [renaming, setRenaming] = useState<HeldPasskey | null>(null);
   const [removing, setRemoving] = useState<HeldPasskey | null>(null);
+  // The ceremony this page started, if it is the one in flight. Read before
+  // any early return: a hook cannot be called conditionally, and the flag
+  // check below is a return.
+  const ceremony = usePasskeyCeremony();
+  const registering = ceremony?.purpose === "register" ? ceremony : null;
+  const abandoned = useRef<{ abandoned: boolean } | null>(null);
 
   // A deployment that never mounted the plugin has no endpoint behind any of
   // this. Rendering the hero there would be an offer we cannot honour.
@@ -325,31 +378,53 @@ export function PasskeysSection() {
 
   const held = passkeys.data ?? [];
 
-  const create = async () => {
+  const create = () => {
     setIsCreating(true);
+    const current = { abandoned: false };
+    abandoned.current = current;
+    // The ceremony is the browser's and the wait can be long — a phone across
+    // the room, a security key in a bag. The dialog that opens on this says
+    // whose prompt it is and how to stop waiting; a spinner on the button
+    // would say neither.
+    startPasskeyCeremony({
+      purpose: "register",
+      cancel: () => {
+        current.abandoned = true;
+        setIsCreating(false);
+      },
+      retry: create,
+    });
+    void runCreate(current);
+  };
+
+  const runCreate = async (current: { abandoned: boolean }) => {
     try {
       const result = await authClient.passkey.addPasskey({});
+      if (current.abandoned) return;
       // A cancelled prompt is not a failure. Somebody opened the OS dialog,
       // looked at it and closed it; saying "something went wrong" about a
       // decision would be telling them off for deciding.
       if (result?.error) {
         if (result.error.status !== 0) {
-          toaster.error({
-            title: "That passkey wasn't created",
-            description:
-              "The attempt didn't finish. Try again, or use another way to sign in.",
+          // Words from the code-keyed registry, never the endpoint's own
+          // sentence: the wire message for a handled refusal IS the code.
+          showErrorToast({
+            error: result.error,
+            fallbackTitle: "That passkey wasn't created",
           });
         }
         return;
       }
       toaster.success({ title: "Passkey created" });
-    } catch {
-      toaster.error({
-        title: "That passkey wasn't created",
-        description: "This device could not complete the attempt.",
-      });
+    } catch (error) {
+      if (!current.abandoned) {
+        showErrorToast({ error, fallbackTitle: "That passkey wasn't created" });
+      }
     } finally {
-      setIsCreating(false);
+      if (!current.abandoned) {
+        setIsCreating(false);
+        endPasskeyCeremony();
+      }
     }
   };
 
@@ -357,18 +432,23 @@ export function PasskeysSection() {
     try {
       const result = await authClient.passkey.deletePasskey({ id });
       if (result?.error) {
-        toaster.error({
-          title: "That passkey wasn't removed",
-          description: "Try again in a moment.",
+        // Refused BEFORE the plugin deletes anything, by the last-way-in
+        // guard in `server/better-auth/last-way-in.ts`. It is not the detach
+        // guard: a passkey lives in the plugin's own table, so
+        // `account.delete.before` never sees one going — which is how
+        // removing the only passkey on an account used to succeed and lock
+        // the person out. The refusal carries its own sentence and the
+        // remedy, because a flat "try again in a moment" about something that
+        // will never change on a retry is the worst of both.
+        showErrorToast({
+          error: result.error,
+          fallbackTitle: "That passkey wasn't removed",
         });
         return;
       }
       toaster.success({ title: "Passkey removed" });
-    } catch {
-      toaster.error({
-        title: "That passkey wasn't removed",
-        description: "Try again in a moment.",
-      });
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "That passkey wasn't removed" });
     }
   };
 
@@ -392,84 +472,103 @@ export function PasskeysSection() {
   };
 
   return (
-    <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Fingerprint size={18} />
-          <Text fontWeight={600}>Passkeys</Text>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          Passkeys can be created and saved on your devices, like your phone or
-          laptop, or on security keys. With passkeys on your devices, you don't
-          need to remember complex passwords.
-        </Text>
-      </VStack>
+    <SettingsSection
+      anchorId="passkeys"
+      icon={<Fingerprint size={18} />}
+      title="Passkeys"
+      description="Sign in with the fingerprint, face or screen lock you already use. There is nothing to remember and nothing to phish."
+      testId="passkeys-settings-section"
+    >
+      <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
+        <LastWayInNotice />
+        {passkeys.isPending ? <SettingsRowsSkeleton rows={2} /> : null}
 
-      {passkeys.isPending ? <Spinner size="sm" /> : null}
-
-      {!passkeys.isPending && held.length === 0 ? (
-        <Card.Root width="full" data-testid="passkeys-empty">
-          <Card.Body>
-            <VStack align="start" gap={3}>
-              {/* Said in terms of what somebody already does with their
-                  device, because "public key credential" is not a thing
-                  anybody has ever wanted. */}
-              <Text fontSize="sm">
-                Passkeys are encrypted digital keys you create using your
-                fingerprint, face, or screen lock. They are saved in your
-                credential manager, so you can sign in on other devices.
-              </Text>
+        {!passkeys.isPending && held.length === 0 ? (
+          // Said in terms of what somebody already does with their device,
+          // because "public key credential" is not a thing anybody has wanted.
+          <SettingsEmptyState
+            icon={<Fingerprint size={20} />}
+            title="No passkeys yet"
+            description="A passkey is an encrypted key you create with your fingerprint, face or screen lock. It is kept by your passkey provider, so it works on your other devices too."
+            testId="passkeys-empty"
+            action={
               <Button
-                colorPalette="orange"
+                variant="outline"
                 loading={isCreating}
                 onClick={() => void create()}
                 data-testid="create-passkey"
               >
                 Create a passkey
               </Button>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      ) : null}
-
-      {held.length > 0 ? (
-        <VStack width="full" align="stretch" gap={5}>
-          <PasskeyGroup
-            heading="Passkeys on your devices"
-            passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
-            onRename={setRenaming}
-            onRemove={setRemoving}
+            }
           />
-          <PasskeyGroup
-            heading="Passkeys on security keys"
-            passkeys={held.filter(isSecurityKey)}
-            onRename={setRenaming}
-            onRemove={setRemoving}
-          />
-          <Box>
-            <Button
-              variant="outline"
-              size="sm"
-              loading={isCreating}
-              onClick={() => void create()}
-              data-testid="create-passkey"
-            >
-              Create a passkey
-            </Button>
-          </Box>
-        </VStack>
-      ) : null}
+        ) : null}
 
-      <RenamePasskeyDialog
-        passkey={renaming}
-        onClose={() => setRenaming(null)}
-        onRename={rename}
-      />
-      <RemovePasskeyDialog
-        passkey={removing}
-        onClose={() => setRemoving(null)}
-        onRemove={remove}
-      />
-    </VStack>
+        {held.length > 0 ? (
+          <VStack width="full" align="stretch" gap={5}>
+            <PasskeyGroup
+              heading="Passkeys on your devices"
+              passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <PasskeyGroup
+              heading="Passkeys on security keys"
+              passkeys={held.filter(isSecurityKey)}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <Box>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={isCreating}
+                onClick={() => void create()}
+                data-testid="create-passkey"
+              >
+                Create a passkey
+              </Button>
+            </Box>
+          </VStack>
+        ) : null}
+
+        {/* The waiting state, as a dialog: the ceremony has to sit over the
+            list it was started from. Same panel, same words, same still glyph
+            under reduced motion as the auth screens'. */}
+        <Dialog.Root
+          open={registering !== null}
+          onOpenChange={(details) => {
+            if (!details.open) cancelPasskeyCeremony();
+          }}
+          placement="center"
+        >
+          <Dialog.Content bg="bg" data-testid="passkey-ceremony-dialog">
+            <Dialog.Header>
+              <Dialog.Title fontSize="md" fontWeight="500">
+                {registering
+                  ? passkeyCeremonyTitle(registering)
+                  : "Use your passkey"}
+              </Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body paddingBottom={6}>
+              {registering ? (
+                <PasskeyCeremonyPanel ceremony={registering} />
+              ) : null}
+            </Dialog.Body>
+          </Dialog.Content>
+        </Dialog.Root>
+
+        <RenamePasskeyDialog
+          passkey={renaming}
+          onClose={() => setRenaming(null)}
+          onRename={rename}
+        />
+        <RemovePasskeyDialog
+          passkey={removing}
+          onClose={() => setRemoving(null)}
+          onRemove={remove}
+        />
+      </VStack>
+    </SettingsSection>
   );
 }

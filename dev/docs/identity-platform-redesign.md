@@ -16,7 +16,7 @@ This program makes identity first-class and self-service:
 - An **identifiers** model: one user, many attach/detach-able verified identifiers (email, password, OAuth, OIDC/SAML, passkey), tombstoned forever. Storage = a **new pure event-truth Postgres `Identifier` projection**, born clean and backfilled grants-style; `Account` stays a 100% row-truth protocol table (see D01, ADR-101 rev. 2026-08-20).
 - A first-class, event-sourced **SsoConnection** per organization with a guarded lifecycle, domain verification, and org-admin self-service onboarding. Self-hosted priority: single-SSO deployments auto-redirect straight to the IdP.
 - **Domain join-requests** (ask-to-join with org-admin approval, or domain auto-join where the org opts in) and **resilient invitations** (identifier-aware acceptance, inviter one-click resend) — the fixes for the invitation dead-end support load and for the orphaned organizations sign-up keeps minting.
-- A **first-party sign-in & sign-up UI** (D13): Auth0 owned the front-door screens; every unauthenticated screen is rebuilt in-product, and sign-up offers join-your-team **before** create-a-workspace.
+- A **first-party sign-in & sign-up UI** (D13): Auth0 owned the auth-screen screens; every unauthenticated screen is rebuilt in-product, and sign-up offers join-your-team **before** create-a-workspace.
 - **MFA (TOTP + backup codes, never SMS)** and **passkeys**, using better-auth plugins for protocol while our domain model remains the record.
 - SCIM scoped per connection, producing commands/events, writing membership exclusively through `grants.*`.
 - **Two separate identity surfaces**: a platform-ops identity lookup (cross-org support tooling) and an org-admin surface inside org settings.
@@ -73,7 +73,7 @@ Requirements are stated here at domain level; the normative, implementable versi
 
 ## Domain: Authorization consumption (not construction)
 
-- New permissions `sso:view`, `sso:manage`, `scim:view`, `scim:manage` are registered directly in `packages/authz/src/registry.ts` (org-scope only) — the shared registry package, not app code (`server/authz/registry.ts` does not exist; app-side authorization lives at `server/app-layer/authz`). IT-admin custom role = `CustomRole` row holding only those permissions.
+- New permissions `sso:view`, `sso:manage` are registered directly in `packages/authz/src/registry.ts` (org-scope only), and gate directory sync as well — the directory provisions against a connection, so one pair covers both — the shared registry package, not app code (`server/authz/registry.ts` does not exist; app-side authorization lives at `server/app-layer/authz`). IT-admin custom role = `CustomRole` row holding only those permissions.
 - All identity writes with authorization consequences go through `grants.*`. All UI gating uses `useCan`/`RequireCan`; all tRPC gating uses `.permission()`/`authz.require`.
 - PATs need nothing from this program: they are already edge-resolved principals with owner-ceiling intersection.
 
@@ -201,10 +201,10 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 | `ScimToken` per-org, direct writes | Per-connection tokens; SCIM = command producer; `grants.*` only writer | D08 |
 | Invites: 2-day, method-sensitive, ops-only resend | Identifier-aware, 14-day, one-click resend, explicit states | D11 |
 | (no join path without invite) | Domain join-requests: admin approval or opt-in auto-join | D12 |
-| Auth0-hosted front-door screens | Complete first-party sign-in/sign-up/reset/verification UI | D13 |
+| Auth0-hosted auth-screen screens | Complete first-party sign-in/sign-up/reset/verification UI | D13 |
 | Sign-up always mints a fresh org (orphans) | Join-before-create interstitial; org creation is an explicit choice | D12, D13 |
 | (no support visibility) | Platform-ops lookup + org-admin surface | D05 |
-| super-admin hand-sets `ssoDomain` | Org-admin self-service + ops approval; `sso:manage`/`scim:manage` in registry | D05 |
+| super-admin hand-sets `ssoDomain` | Org-admin self-service + ops approval; `sso:manage` in registry | D05 |
 | Auth0 broker + password service + webhook | Direct OIDC per customer; then deletion | D09, D10 |
 
 ## Final state — system overview

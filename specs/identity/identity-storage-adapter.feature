@@ -52,6 +52,62 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no identity event is appended
     And no AccountCredential row is written
 
+  # better-auth 1.7 keys an account by (issuer, accountId) and sends the
+  # issuer — synthesised from the provider id for providers that declare
+  # none — in its account queries and writes. The legacy Account table has
+  # no issuer column, so the clause reached Prisma as an unknown argument
+  # and every issuer-keyed operation on an unlatched user threw. The one
+  # customers met first was /two-factor/enable, which read as "two-step
+  # verification wouldn't start".
+
+  @unit
+  Scenario: An issuer-keyed account read on the legacy branch drops the synthetic issuer
+    Given a user "olga" whose identifier backfill has not finalized
+    When better-auth reads "olga"'s credential account keyed by user, provider, issuer and subject
+    Then the legacy engine is queried without the issuer column
+    And the credential account row is returned
+
+  @unit
+  Scenario: An issuer the legacy table cannot answer returns no rows instead of throwing
+    Given a user "olga" whose identifier backfill has not finalized
+    When better-auth reads an account by an issuer that contradicts the provider beside it
+    Then the read answers no rows
+    And the legacy engine is never queried with the issuer column
+
+  # A CONNECTION'S ISSUER IS NOT A CONTRADICTION. Refusing every issuer we
+  # did not mint refused the ordinary shape of single sign-on, where the
+  # issuer is the identity provider's real URL and decodes to no provider id
+  # because nothing ever encoded one into it. So the first sign-in on a
+  # connection created its account row, the next one could not find it, and
+  # better-auth created it again — into the unique constraint on the provider
+  # and its subject, which reached the person as a generic "something went
+  # wrong". Every RETURNING person on a connection hit it.
+  #
+  # The lookup carries the ISSUER AND THE SUBJECT and no provider id at all,
+  # so nothing in the clause can be decoded: the mapping has to be read from
+  # the connection's own registration. An issuer nobody registered is still
+  # unanswerable, which is what keeps one provider's subject from resolving
+  # another's user.
+  #
+  # Both directions matter. Finding the row is not enough on its own — the
+  # row is handed back to a library that compares the issuer on it against
+  # the issuer the ceremony is running for, so a synthetic one fails just as
+  # surely as a missing row.
+  @unit
+  Scenario: A connection is found by its own issuer, not refused for it
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" has signed in once through a single sign-on connection
+    When better-auth looks that account up by the issuer and the subject alone
+    Then the account row is returned
+    And it carries the issuer the connection registered, not a synthesized one
+    And the legacy engine is never queried with the issuer column
+
+  @unit
+  Scenario: A legacy account write never carries the issuer column
+    Given a user "olga" whose identifier backfill has not finalized
+    When better-auth signs "olga" up and links a provider account
+    Then every account row lands through the legacy engine without an issuer column
+
   @unit
   Scenario: A latched user's account create states the fact instead of owning the row
     Given a user "sam" whose identifier backfill is finalized

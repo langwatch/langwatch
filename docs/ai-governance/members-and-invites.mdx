@@ -1,10 +1,10 @@
 ---
 title: Members & invites
-description: Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
+description: Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/security.
 sidebarTitle: Members & invites
 ---
 
-The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
+The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/security`, under the You section of Settings.
 
 <Info>**Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role change, and removal records a row).</Info>
 
@@ -92,9 +92,9 @@ Caveats:
 
 Overflow menu → **Remove from org**. The user loses every team membership, every role binding, and every Personal Virtual Key they minted (revoked on the gateway via the same RBAC chain). Their existing audit log rows stay, removal doesn't rewrite history.
 
-## Per-user sign-in methods at `/settings/authentication`
+## Per-user sign-in methods at `/settings/security`
 
-What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
+What the user controls about their own account lives at `/settings/security`, under the You section of Settings. The page renders one of three shapes depending on how your org is configured:
 
 - **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
 - **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
@@ -102,11 +102,11 @@ What the user controls about their own account lives at `/settings/authenticatio
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/directory` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
 
 ## Where to next
 
-- **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
+- **Self-service for me**: [/settings/security](#per-user-sign-in-methods-at-settingssecurity) (this page) and [Devices](/ai-governance/personal-portal/sessions).
+- **Org SSO + SCIM auto-provisioning**: `/settings/directory` (admin-only).
 - **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Audit who did what when**: [Audit log](/ai-governance/audit-log).

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { signUpHealth } from "~/server/app-layer/identity/runtime";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
 import {
   type DashboardData,
@@ -116,6 +117,30 @@ export const opsRouter = createTRPCRouter({
     }
     return { scope: ctx.opsScope };
   }),
+
+  /**
+   * Sign-up health: the orphaned-organization rate join-before-create exists
+   * to reduce (D12).
+   *
+   * Derived from `Organization` and `OrganizationUser` rather than counted
+   * live, which is what makes it readable for the period BEFORE the flag was
+   * turned on. A counter could only start counting when somebody added it,
+   * and "was this better or worse before" is the whole question.
+   */
+  getSignUpHealth: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        fromMs: z.number().int().nonnegative(),
+        toMs: z.number().int().nonnegative(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return signUpHealth().getOrphanedOrganizationRate({
+        fromMs: input.fromMs,
+        toMs: input.toMs,
+      });
+    }),
 
   getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;

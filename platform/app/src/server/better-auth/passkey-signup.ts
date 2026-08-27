@@ -6,7 +6,11 @@ import { APIError } from "better-auth/api";
 import { env } from "~/env.mjs";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
-import { createPasskeyUser } from "~/server/users/credential-user";
+import {
+  belongsToSomebody,
+  createPasskeyUser,
+  PasskeySignUpAddressTakenError,
+} from "~/server/users/credential-user";
 
 const logger = createLogger("langwatch:better-auth:passkey-signup");
 
@@ -89,15 +93,83 @@ function requireEmail(context: string | null | undefined): string {
   return email;
 }
 
+/**
+ * Whether this address already has an account somebody can sign into.
+ *
+ * NOT "is there a User row", and the difference is the dead end this closes.
+ * A passkey sign-up is TWO calls a network round trip apart — `resolveUser`
+ * before the ceremony, `afterVerification` after it — and the account is
+ * written between them, in a transaction of its own that nothing spanning the
+ * ceremony can roll back. A failure after that write leaves a User row whose
+ * only credential is the null-password placeholder, with no passkey beside
+ * it: an account with no way in, that nobody has ever signed into. Reading
+ * "a row exists" as "registered" turned that residue into a permanent
+ * refusal — sign-up said the address was taken while the sign-in screen told
+ * the same person no account existed. Neither answer was wrong. They were
+ * answering different questions, and only one of them is the question the
+ * caller can act on.
+ *
+ * So this asks that one: is there a CREDENTIAL here. Both branches are read,
+ * because a user whose backfill has finalized keeps theirs in
+ * `AccountCredential` rather than `Account`, and a check that saw only one
+ * would refuse half the population for the wrong reason.
+ *
+ * ## Why this does not widen the takeover surface
+ *
+ * The guard above exists to stop a stranger attaching their passkey to
+ * somebody else's account by naming its address. It still does. Every account
+ * anybody can reach holds a credential by definition, so every account worth
+ * stealing is still refused; what became adoptable is only an account that
+ * has never been signed into and never could be.
+ *
+ * That set is exactly this file's own residue, which is what makes the
+ * relaxation safe rather than merely convenient. Nothing else in the product
+ * makes a credential-less user: `createCredentialUser` always writes a
+ * password, a social sign-up always writes its provider's account, an
+ * invitation creates no User row at all (`OrganizationInvite` is keyed by
+ * address and redeemed after sign-in), and removing somebody's last way in is
+ * refused before it happens — by the detach guard on `account.delete.before`,
+ * and by `last-way-in.ts` for the passkey and second-factor doors those hooks
+ * never saw (ADR-119).
+ *
+ * MEMBERSHIP IS CHECKED ANYWAY, and the reason is worth stating: everything
+ * in the paragraph above is an argument about OTHER code, and this predicate
+ * is the security boundary. An account that belongs to an organization is
+ * somebody's whatever its credential rows say, so it is refused on that
+ * ground alone — which keeps the boundary true even if some later
+ * provisioning path starts pre-creating members. It costs no genuine
+ * recovery: residue from a ceremony that never finished has no membership,
+ * because joining one takes a sign-in and this account has never had a way
+ * to sign in.
+ */
 async function refuseIfRegistered(email: string): Promise<void> {
   // Case-insensitive for the same reason `user.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
   const existing = await prisma.user.findFirst({
     where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
+    select: {
+      id: true,
+      accounts: { select: { provider: true, password: true } },
+      accountCredentials: { select: { provider: true, password: true } },
+      // One of each is enough: the question is only whether any exists.
+      passkeys: { select: { id: true }, take: 1 },
+      orgMemberships: { select: { organizationId: true }, take: 1 },
+    },
   });
   if (!existing) return;
+
+  if (!belongsToSomebody(existing)) {
+    // The recovery, and the one line that says it happened. Without it a
+    // resumed sign-up is indistinguishable from a first one in the logs,
+    // which is the difference between knowing this path is exercised and
+    // guessing at it from a support ticket.
+    logger.info(
+      { userId: existing.id },
+      "an address whose account holds no credential is being resumed rather than refused; an earlier ceremony did not finish",
+    );
+    return;
+  }
 
   throw new APIError("BAD_REQUEST", {
     code: PASSKEY_SIGNUP_EMAIL_TAKEN,
@@ -155,11 +227,28 @@ async function afterVerification({
 }): Promise<{ userId: string; name: string }> {
   const email = requireEmail(context);
   // Again, because the check in `resolveUser` was one network round trip ago
-  // and an account can be created in that window. The unique index on the
-  // address is the real backstop; this is the one that answers in words.
+  // and an account can be created in that window. This is the one that
+  // answers in WORDS; the decision that actually holds is taken inside the
+  // write's own transaction, which is the only place a read of the account
+  // and the write that depends on it cannot be separated.
   await refuseIfRegistered(email);
 
-  const user = await createPasskeyUser({ prisma, email });
+  const user = await createPasskeyUser({ prisma, email }).catch((error) => {
+    // The transaction found what the guard above could not: the address
+    // became somebody's in between. Same refusal, same code, so the screen
+    // cannot tell the two moments apart and does not have to.
+    if (error instanceof PasskeySignUpAddressTakenError) {
+      logger.warn(
+        { path: "/passkey/verify-registration" },
+        "an address was claimed between the sign-up guard and the write; the ceremony is refused",
+      );
+      throw new APIError("BAD_REQUEST", {
+        code: PASSKEY_SIGNUP_EMAIL_TAKEN,
+        message: "That email already has an account. Log in with it instead.",
+      });
+    }
+    throw error;
+  });
 
   // The address confirmation follows them in, exactly as it does on the
   // password path (ADR-117 §6, revised). Sent from HERE rather than from the

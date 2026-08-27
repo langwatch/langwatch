@@ -154,6 +154,50 @@ export class SsoConnectionDomainTakenError extends SsoConnectionCommandRefusedEr
   }
 }
 
+/**
+ * A domain nobody may claim on any tier: a consumer mail provider, a
+ * registry suffix, or a bare top-level domain.
+ *
+ * Refused at the CLAIM rather than at the proof, because a published record
+ * on such a domain would be genuine evidence of exactly the wrong thing —
+ * that somebody controls a registry, or a mailbox at a provider whose
+ * customers are everybody. The check moved from a reviewer's eye to the
+ * guard when the published record became the decision, so it has to hold for
+ * every caller rather than for whoever a person happened to read.
+ *
+ * The copy says to claim the company's own domain and lists nothing:
+ * printing the deny-list turns a refusal into a way to enumerate it.
+ */
+export class SsoDomainNotEligibleError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_not_eligible", "sso_domain_not_eligible", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainNotEligibleError";
+  }
+}
+
+/**
+ * More domains claimed in the window than the connection is allowed.
+ *
+ * The rail that replaces a reviewer noticing volume. `retryAfterSeconds`
+ * rides in `meta` rather than only in the words, so the screen counts down
+ * from the guard's own answer instead of guessing — the same shape the join
+ * throttle uses, for the same reason.
+ */
+export class SsoDomainClaimThrottledError extends SsoConnectionCommandRefusedError {
+  constructor(retryAfterSeconds: number) {
+    super("sso_domain_claim_throttled", "sso_domain_claim_throttled", {
+      httpStatus: 429,
+      fault: "customer",
+      meta: { retryAfterSeconds },
+    });
+    this.name = "SsoDomainClaimThrottledError";
+  }
+}
+
 /** Activation's preconditions are unmet: no verified domain, no live
  *  break-glass binding, or no recorded test login. */
 export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRefusedError {
@@ -164,6 +208,178 @@ export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRef
       { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
     );
     this.name = "SsoConnectionActivationBlockedError";
+  }
+}
+
+/**
+ * Activation's preconditions, refused ONE AT A TIME (wave 3).
+ *
+ * `sso_connection_activation_blocked` above stays exactly as it is: it is the
+ * guard's, it is what every caller of the aggregate gets, and it is the right
+ * answer for an operator who commanded an activation directly. What it is not
+ * is an instruction — "this needs a verified domain, a test sign-in and a way
+ * back in" tells a customer looking at their own setup screen nothing about
+ * which of the three they are missing.
+ *
+ * So the self-serve surface checks the same three first and refuses by name,
+ * and the guard refuses again underneath. Two refusals for one rule is
+ * deliberate here in a way it usually is not: the surface's exists to be
+ * ACTED on, the guard's exists to be true for every caller, and deleting
+ * either would cost one of those.
+ */
+export abstract class SsoActivationPreconditionError extends SsoConnectionCommandRefusedError {}
+
+/** No domain of this organization's has been proved, so nothing routes. */
+export class SsoActivationDomainUnprovedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_domain_unproved", "sso_activation_domain_unproved", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationDomainUnprovedError";
+  }
+}
+
+/**
+ * Nobody has signed in through the connection yet.
+ *
+ * The evidence is an account the engine wrote when the identity provider
+ * handed a person back, so this refusal cannot be cleared by clicking
+ * anything — it is cleared by signing in, which is the point.
+ */
+export class SsoActivationTestSignInMissingError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super(
+      "sso_activation_test_sign_in_missing",
+      "sso_activation_test_sign_in_missing",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoActivationTestSignInMissingError";
+  }
+}
+
+/**
+ * Nobody can get in without the identity provider.
+ *
+ * The one refusal here that is about US rather than about the connection: it
+ * is what stops an organization turning single sign-on on and discovering,
+ * from outside, that a misconfigured provider is now the only door.
+ */
+export class SsoActivationBreakGlassMissingError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super(
+      "sso_activation_break_glass_missing",
+      "sso_activation_break_glass_missing",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoActivationBreakGlassMissingError";
+  }
+}
+
+/**
+ * Nobody has said what this connection does with somebody it has never seen.
+ *
+ * A precondition rather than a default, because the default that shipped —
+ * turn them away, and hand them a workspace of their own — is the one nobody
+ * would pick, and it got picked by never being asked.
+ */
+export class SsoActivationArrivalsUndecidedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super(
+      "sso_activation_arrivals_undecided",
+      "sso_activation_arrivals_undecided",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoActivationArrivalsUndecidedError";
+  }
+}
+
+/**
+ * The person named could not use the way in they are being given.
+ *
+ * Break-glass exists so somebody can still get in when the identity provider
+ * fails, and activation refuses without a live binding on the strength of
+ * that. A binding naming somebody who is not an administrator of this
+ * organization satisfies the check and opens no door — the precondition
+ * passes and the thing it promised does not exist.
+ */
+export class SsoBreakGlassHolderIneligibleError extends SsoConnectionCommandRefusedError {
+  constructor(userId: string) {
+    super(
+      "sso_break_glass_holder_ineligible",
+      "sso_break_glass_holder_ineligible",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { userId },
+      },
+    );
+    this.name = "SsoBreakGlassHolderIneligibleError";
+  }
+}
+
+/**
+ * The connection named does not exist, or is not this organization's.
+ *
+ * ONE SENTENCE FOR BOTH, deliberately: telling somebody a connection exists
+ * but is not theirs is a probe for other customers' connection ids. What
+ * changes is only that it is now its OWN sentence — every one of these used
+ * to be answered with `sso_domain_proof_not_found`, whose customer copy reads
+ * "We couldn't find that record yet — publish the record shown here on your
+ * domain, then check again." Two administrators with the page open, one of
+ * whom discards the connection, sent the other to argue with their DNS team
+ * about a record that was already published and a connection that was gone.
+ */
+export class SsoConnectionNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_connection_not_found", "sso_connection_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoConnectionNotFoundError";
+  }
+}
+
+/**
+ * The expiry asked for is not one a grant may carry: in the past, or further
+ * out than the window allows.
+ *
+ * The expiry is the whole of what stops a break-glass grant from becoming a
+ * permanent second door past an organization's own identity provider, and
+ * nothing bounded it — a date in the year 9999 was accepted, never expired,
+ * and never warned, because the sweep only looks fourteen days ahead.
+ */
+export class SsoBreakGlassExpiryOutOfRangeError extends SsoConnectionCommandRefusedError {
+  constructor(maxWindowDays: number) {
+    super(
+      "sso_break_glass_expiry_out_of_range",
+      "sso_break_glass_expiry_out_of_range",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxWindowDays },
+      },
+    );
+    this.name = "SsoBreakGlassExpiryOutOfRangeError";
+  }
+}
+
+/**
+ * Revoking this grant would leave a live connection with no way back in.
+ * The one lever that exists for the identity provider failing must not be
+ * removable while the identity provider is what decides sign-in — grant
+ * somebody else the way in first, or remove the connection itself.
+ */
+export class SsoBreakGlassLastWayInError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_break_glass_last_way_in", "sso_break_glass_last_way_in", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoBreakGlassLastWayInError";
   }
 }
 
@@ -212,14 +428,97 @@ export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandR
  * decision D09 makes against a named customer's connection. The words say to
  * talk to LangWatch and name no engine, library or release.
  */
-export class SsoSamlNotSelfServeError extends SsoConnectionCommandRefusedError {
+/**
+ * A second connection, registered through a surface that holds exactly one
+ * (D09).
+ *
+ * The bound is what stops connection registration being the way around the
+ * per-connection claim limit: five domains an hour is a rate limit only while
+ * an organization has one connection to spend them from, and an unbounded
+ * register would make it five an hour PER registration. One connection is
+ * also what the self-serve journey has always meant — offering to register a
+ * second before the first routes anything is offering a way to lock yourself
+ * out twice.
+ *
+ * A torn-down or discarded connection is not one: it is a tombstone, and a
+ * customer whose connection was removed is setting up from nothing again.
+ */
+export class SsoConnectionAlreadyRegisteredError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super("sso_saml_not_self_serve", "sso_saml_not_self_serve", {
+    super(
+      "sso_connection_already_registered",
+      "sso_connection_already_registered",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionAlreadyRegisteredError";
+  }
+}
+
+/**
+ * A registration that named a protocol but not the things needed to speak it
+ * (D09): an OpenID Connect provider with no client id or no client secret, a
+ * SAML provider with neither metadata nor an entity id and certificate.
+ *
+ * Refused before anything is written, and refused as ONE code rather than one
+ * per missing field: the reader is filling a form in, and the form is what
+ * says which box is empty. What the code has to carry is that the connection
+ * was not registered.
+ */
+export class SsoCredentialsRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_credentials_required", "sso_credentials_required", {
       httpStatus: 422,
       fault: "customer",
       reasons: [new Error(detail)],
     });
-    this.name = "SsoSamlNotSelfServeError";
+    this.name = "SsoCredentialsRequiredError";
+  }
+}
+
+/**
+ * The address given as the OpenID Connect issuer did not answer with a
+ * discovery document (D09).
+ *
+ * `fault` is the customer's, and deliberately so even though the failure was
+ * a network call OF OURS: what failed is the address they typed, and the
+ * action that fixes it is theirs. The detail names what went wrong for the
+ * log; the message says nothing about our side of the call.
+ */
+export class SsoIssuerUnreachableError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_issuer_unreachable", "sso_issuer_unreachable", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoIssuerUnreachableError";
+  }
+}
+
+/** What was pasted as identity provider metadata is not a SAML descriptor
+ *  (D09). Refused before anything is written. */
+export class SsoSamlMetadataInvalidError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_saml_metadata_invalid", "sso_saml_metadata_invalid", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSamlMetadataInvalidError";
+  }
+}
+
+/** The signing certificate could not be read (D09). Separate from metadata
+ *  because they are two fields on the form and two different things to go
+ *  and fetch again. */
+export class SsoCertificateInvalidError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_certificate_invalid", "sso_certificate_invalid", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoCertificateInvalidError";
   }
 }
 
@@ -237,6 +536,159 @@ export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRef
       { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
     );
     this.name = "SsoConnectionStringEditRetiredError";
+  }
+}
+
+/**
+ * Single sign-on setup on an installation that has never held a genuine
+ * licence (D05 tier 2). The licence is what authorizes a self-hosted
+ * customer's domain, so without one there is no path to offer at all.
+ *
+ * The words name activating a licence and nothing else: an environment
+ * variable, a hostname or an internal service in a customer-facing message
+ * would be both useless to the reader and an internals leak on a surface
+ * that is not always read by an operator.
+ */
+export class SsoLicenseRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_license_required", "sso_license_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoLicenseRequiredError";
+  }
+}
+
+/**
+ * A domain whose claim is still waiting for LangWatch cannot be proved yet
+ * (D05 tier 3). Refused before the customer publishes anything, because
+ * refusing afterwards would mean telling them the record they just asked
+ * their DNS team for is worthless.
+ *
+ * The copy says the claim is being looked at and nothing about who is
+ * looking: queue staffing is ours, and a customer told a named person has
+ * their claim is a customer who will chase that person.
+ */
+export class SsoDomainClaimPendingError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_claim_pending", "sso_domain_claim_pending", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainClaimPendingError";
+  }
+}
+
+/** The record we asked for is not published on the domain yet (D05 tier 3).
+ *  A refusal rather than a retry loop, so the customer is told plainly and
+ *  the record they were given stays on screen, unchanged. */
+export class SsoDomainProofNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_not_found", "sso_domain_proof_not_found", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofNotFoundError";
+  }
+}
+
+/**
+ * We could not READ the domain's records at all (D05 tier 3) — a resolver
+ * that timed out, refused, or answered SERVFAIL.
+ *
+ * Distinct from `sso_domain_proof_not_found` on purpose, and the distinction
+ * is the whole point of having this code: "we looked and it is not there" is
+ * a customer's next step (publish it, wait for propagation), and "we could
+ * not look" is not their next step at all. Collapsing the two sends an
+ * administrator to argue with a DNS team about a record they already
+ * published correctly.
+ *
+ * The fault is the provider's rather than the customer's, and it is stated
+ * rather than left to default: a 5xx that logs as routine customer noise is
+ * an incident nobody sees. The detail names what the resolver said; the copy
+ * says to try again, because that is the only true instruction.
+ */
+export class SsoDomainLookupFailedError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_lookup_failed", "sso_domain_lookup_failed", {
+      httpStatus: 503,
+      fault: "provider",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainLookupFailedError";
+  }
+}
+
+/** The verification file is not being served at the well-known path yet —
+ *  the domain answered, and what it answered was not the token. Its own code
+ *  rather than the record's, because the remedy is different words: put the
+ *  file at the path, not publish a record and wait for DNS. */
+export class SsoDomainFileNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_file_not_found", "sso_domain_file_not_found", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainFileNotFoundError";
+  }
+}
+
+/**
+ * We could not FETCH the file at all — the domain did not answer, refused
+ * the connection, or answered with a server error. The same distinction the
+ * DNS pair draws, for the same reason: "we looked and it is not there" and
+ * "we could not look" have different next steps, and only the first one is
+ * the customer's. Stated as the customer's server being unreachable rather
+ * than as our failure, but with the try-again copy, because a deploy mid-
+ * flight and a hiccup of ours read identically from here.
+ */
+export class SsoDomainFetchFailedError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_fetch_failed", "sso_domain_fetch_failed", {
+      httpStatus: 503,
+      fault: "provider",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainFetchFailedError";
+  }
+}
+
+/**
+ * The record was found and has passed its expiry, so it proves nothing. The
+ * way forward costs no progress: asking again issues a fresh record against
+ * the same approved claim, and the approval is untouched.
+ */
+export class SsoDomainProofExpiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_expired", "sso_domain_proof_expired", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofExpiredError";
+  }
+}
+
+/**
+ * The organization has not been opted in to setting single sign-on up itself
+ * (D05 tier 3, the `SELF_SERVE_SSO` flag).
+ *
+ * The words offer talking to LangWatch and name no flag: a customer cannot
+ * act on a flag name, and printing one turns a rollback lever into something
+ * support has to explain.
+ */
+export class SsoSelfServeUnavailableError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_self_serve_unavailable", "sso_self_serve_unavailable", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSelfServeUnavailableError";
   }
 }
 
@@ -378,6 +830,34 @@ export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
 }
 
 /**
+ * Opening the door at all — to people who ask, or to a domain that walks
+ * straight in — is a paid capability of the organization's plan, and an
+ * organization whose plan does not carry it is refused HERE rather than by
+ * the screen. A greyed control is a courtesy to whoever is reading; this is
+ * the boundary, and it holds for anything that reaches the command: another
+ * tab, a stale page, a script.
+ *
+ * CLOSING the door is never refused for this reason. An organization that
+ * leaves the plan with a policy already on must be able to shut it, or a
+ * lapsed plan would be a door it cannot close — the same reasoning that keeps
+ * turning the two-step requirement OFF ungated.
+ *
+ * Distinct from `JoinAutoNotLicensedError`, which asks a different question:
+ * whether the DEPLOYMENT holds a genuine license to federate at all. Both can
+ * refuse automatic joining, and they refuse it for different reasons.
+ */
+export class JoinPolicyNotLicensedError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_policy_not_licensed", "join_policy_not_licensed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinPolicyNotLicensedError";
+  }
+}
+
+/**
  * A two-step verification refusal (D06). Handled for the usual reason: each
  * names a cause the person can act on, and the words they read live in the
  * app's presentation registry keyed by code.
@@ -466,6 +946,50 @@ export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedErr
 }
 
 /**
+ * Requiring a second factor of every member is a paid capability, and an
+ * organization whose plan does not carry it is refused HERE rather than by
+ * the screen. A control that is greyed out is a courtesy to whoever is
+ * reading; this is the boundary, and it holds for anything that reaches the
+ * command — another tab, a stale page, a script.
+ *
+ * Turning the requirement OFF is never refused for this reason. An
+ * organization that leaves the plan with the requirement already on has
+ * members standing at an enrollment gate, and an administrator who could not
+ * release them would have bought a lockout.
+ */
+export class IdentityMfaRequirementNotLicensedError extends MfaCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_mfa_requirement_not_licensed",
+      "identity_mfa_requirement_not_licensed",
+      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityMfaRequirementNotLicensedError";
+  }
+}
+
+/**
+ * The password re-proof turning it off asks for did not match.
+ *
+ * Named, unlike the code refusal, and for the opposite reason: this reveals
+ * nothing an attacker could not already learn from the sign-in screen, and a
+ * person who mistyped their password while turning two-step verification off
+ * has to be told which of the two fields to look at. Collapsing it into the
+ * code refusal would send them back to their authenticator for a password
+ * mistake.
+ */
+export class IdentityMfaPasswordInvalidError extends MfaCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_mfa_password_invalid", "identity_mfa_password_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityMfaPasswordInvalidError";
+  }
+}
+
+/**
  * The enrollment gate: this organization requires a second factor and this
  * person cannot yet prove one. NOT an authentication failure — the session
  * is untouched and every other organization stays reachable — so it is 403
@@ -506,6 +1030,24 @@ export class IdentityPasskeyCeremonyFailedError extends PasskeyCommandRefusedErr
   }
 }
 
+/**
+ * The authenticator offered a credential this account already holds. Named
+ * rather than left to the ceremony refusal because the action is different:
+ * there is nothing to retry — the passkey is already there and already works
+ * — and a person told "that attempt didn't finish" would sit trying the same
+ * device again.
+ */
+export class IdentityPasskeyAlreadyRegisteredError extends PasskeyCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_passkey_already_registered",
+      "identity_passkey_already_registered",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityPasskeyAlreadyRegisteredError";
+  }
+}
+
 /** The credential presented is not one we hold — or is not one we hold for
  *  anybody. Deliberately the same answer either way. */
 export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedError {
@@ -533,6 +1075,132 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
       reasons: [new Error(detail)],
     });
     this.name = "IdentityDetachStrandsUserError";
+  }
+}
+
+/**
+ * The address being attached is already live somewhere — on this account, or
+ * on somebody else's.
+ *
+ * ONE error for both readings, which is the whole point of it. Telling them
+ * apart would answer "does an account exist for this address" to anybody
+ * signed in anywhere, and the person who actually hits this is nearly always
+ * adding their own address a second time — for whom "it is already yours" and
+ * "use a different one" are the same instruction.
+ */
+export class IdentityIdentifierAlreadyHeldError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_identifier_already_held",
+      "identity_identifier_already_held",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityIdentifierAlreadyHeldError";
+  }
+}
+
+/**
+ * A password the policy will not take (`passwordProblem`). The refusal is
+ * about the value that was typed, so it is the customer's and it is
+ * actionable: type a different one.
+ */
+export class IdentityPasswordRejectedError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_password_rejected", "identity_password_rejected", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityPasswordRejectedError";
+  }
+}
+
+/**
+ * A password-reset link that will not spend: expired, already used, or never
+ * issued.
+ *
+ * The three collapse to one for the same reason the two invalid-code variants
+ * do: answering differently would say whether a link had ever existed and
+ * whether it had been opened, and the way forward — request a new one — is
+ * identical for all three.
+ */
+export class IdentityResetLinkInvalidError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_reset_link_invalid", "identity_reset_link_invalid", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityResetLinkInvalidError";
+  }
+}
+
+/**
+ * A credential sign-in that did not check out.
+ *
+ * The one load-bearing property is what it does NOT distinguish: a wrong
+ * password for an account that exists and any password for an address nobody
+ * holds are the same refusal, with the same code, the same status and the same
+ * words (`specs/auth/sign-in-failure-messages.feature`,
+ * `specs/auth/signup-does-not-strand-an-account.feature`). better-auth already
+ * answers both with `INVALID_EMAIL_OR_PASSWORD`; this keeps that true once the
+ * wire carries a code of ours instead.
+ */
+export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_sign_in_refused", "identity_sign_in_refused", {
+      httpStatus: 401,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentitySignInRefusedError";
+  }
+}
+
+/**
+ * The proposal named is not one this person has. Either it never existed, or
+ * the operator is holding a stale page — the surface lists what is waiting,
+ * so a proposal that is gone from the list is gone from here too.
+ */
+export class IdentityLinkProposalNotFoundError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_link_proposal_not_found",
+      "identity_link_proposal_not_found",
+      { httpStatus: 404, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentityLinkProposalNotFoundError";
+  }
+}
+
+/**
+ * Somebody already decided this proposal, so nobody may decide it again.
+ *
+ * The decision is carried in `meta` rather than only in the detail, because
+ * the words an operator reads have to name what was decided and by whom —
+ * two operators working the same support case is exactly how this refusal
+ * happens, and "already decided" without the other half sends the second one
+ * looking for a bug.
+ */
+export class IdentityLinkProposalResolvedError extends IdentityCommandRefusedError {
+  constructor(
+    detail: string,
+    decision: { outcome: "confirmed" | "rejected"; byActorId: string | null },
+  ) {
+    super(
+      "identity_link_proposal_resolved",
+      "identity_link_proposal_resolved",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: {
+          decidedOutcome: decision.outcome,
+          decidedByActorId: decision.byActorId,
+        },
+        reasons: [new Error(detail)],
+      },
+    );
+    this.name = "IdentityLinkProposalResolvedError";
   }
 }
 

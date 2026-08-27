@@ -1,9 +1,12 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 
+import { AuthCard } from "~/components/auth/AuthCard";
 import {
+  AuthShell,
   InviteLanding,
-  useIdentityFrontDoor,
-} from "~/features/auth-front-door";
+  useIdentityAuthScreens,
+} from "~/features/auth";
+import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { HandledErrorAlert } from "~/features/errors";
 import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -24,22 +27,54 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
  */
 export default function Accept() {
   const router = useRouter();
-  const frontDoor = useIdentityFrontDoor();
+  const auth = useIdentityAuthScreens();
   const inviteCode = router.query.inviteCode;
 
-  if (!frontDoor.isResolved) return <LoadingScreen />;
+  if (!auth.isResolved) return <LoadingScreen />;
 
-  if (frontDoor.enabled) {
-    return typeof inviteCode === "string" && inviteCode.length > 0 ? (
-      <InviteLanding inviteCode={inviteCode} />
-    ) : (
-      <SetupLayout>
-        <Text>This invitation link is incomplete. Ask for a new one.</Text>
-      </SetupLayout>
+  if (auth.enabled) {
+    // The auth screens's ground under the auth screens' card, the way every other
+    // enforced screen composes it. The landing was rendering its card on blank
+    // paper, which made an invitation the one arrival that did not look like
+    // the sign-in it leads to.
+    return (
+      <AuthShell>
+        {typeof inviteCode === "string" && inviteCode.length > 0 ? (
+          <InviteLanding inviteCode={inviteCode} />
+        ) : (
+          <IncompleteInviteLink />
+        )}
+      </AuthShell>
     );
   }
 
   return <LegacyAccept />;
+}
+
+/**
+ * The link arrived with no code in it — cut in half by a mail client, or
+ * typed short. It names no organization because there is none to name: nothing
+ * was looked up, so nothing was found, and a dead end that describes what it
+ * did not find is a way to learn which organizations exist.
+ */
+function IncompleteInviteLink() {
+  usePublishAuthStage({ door: "signin", depth: "entry" });
+
+  return (
+    <AuthCard
+      title="This invitation link is incomplete"
+      intro="Some email clients cut long links in half. Open the one in your inbox again, or ask whoever invited you for a fresh link."
+    >
+      <Text
+        fontSize="13.5px"
+        lineHeight="1.65"
+        color="fg.muted"
+        data-testid="invite-incomplete"
+      >
+        Nothing has been accepted, and nothing expires while you sort it out.
+      </Text>
+    </AuthCard>
+  );
 }
 
 function LegacyAccept() {

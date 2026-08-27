@@ -1,5 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { IncomingHttpHeaders } from "http";
+import {
+  ownPrincipal,
+  type SessionPrincipal,
+} from "~/server/app-layer/authz/principal";
+import { resolveSessionPrincipal } from "~/server/app-layer/identity/impersonation-claims";
 import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
@@ -42,6 +47,22 @@ export interface Session {
   /** ISO-8601 expiration timestamp. */
   expires: string;
   /**
+   * Who really made the request and whose access it exercises (D06). Equal
+   * halves on every ordinary session; they come apart under impersonation,
+   * and every authorization decision records both.
+   *
+   * Optional for the same reason `sessionId` is: many test fixtures build a
+   * Session by hand. Production always populates it via `getServerAuthSession`,
+   * and a caller without one falls back to the session user acting as
+   * themselves — never to an impersonation.
+   */
+  principal?: SessionPrincipal;
+  /**
+   * Why the operator started the impersonation, when one is running. Recorded
+   * beside both people; absent on every ordinary session.
+   */
+  impersonationReason?: string;
+  /**
    * The BetterAuth session row id (Session.id in Postgres). Exposed so
    * server-side mutations like `changePassword` can call
    * `revokeOtherSessionsForUser({keepSessionId})` without re-fetching the
@@ -78,8 +99,9 @@ const toHeaders = (
  *
  * Preserves the old NextAuth-shaped Session so consumer code does not
  * need to know the underlying auth provider changed. Also handles admin
- * impersonation by inspecting the `Session.impersonating` JSON column and
- * rewriting `session.user` to the impersonated identity.
+ * impersonation by reading the session's `{actor, subject}` claims and
+ * rewriting `session.user` to the subject's identity, while `principal`
+ * keeps naming both people for every authorization decision that follows.
  *
  * Accepts either `{ req, res }` (Pages Router / getServerSideProps) or
  * `{ req }` (App Router — pass a NextRequest).
@@ -118,14 +140,22 @@ export const getServerAuthSession = async (ctx: {
           ? result.session.expiresAt.toISOString()
           : new Date(result.session.expiresAt).toISOString(),
       sessionId: result.session.id,
+      principal: ownPrincipal({ userId: result.user.id }),
     };
 
-    // Admin impersonation compat: read Session.impersonating JSON directly.
-    // We keep this legacy column (added in migration 20260406120000) so the
-    // existing impersonate endpoint + UI banner keep working unchanged.
+    // The session's own impersonation claims (D06). `{actor, subject}` on the
+    // row, which is the shape the authz principal speaks — it replaced a JSON
+    // payload that carried a stale copy of the impersonated user's name and
+    // e-mail and named the operator nowhere at all.
     const dbSession = await prisma.session.findUnique({
       where: { id: result.session.id },
-      select: { impersonating: true },
+      select: {
+        userId: true,
+        actorUserId: true,
+        subjectUserId: true,
+        impersonationReason: true,
+        impersonationExpiresAt: true,
+      },
     });
 
     // Fail closed when BetterAuth returns a cached session but the DB row
@@ -143,49 +173,46 @@ export const getServerAuthSession = async (ctx: {
       return null;
     }
 
-    const impersonating = dbSession.impersonating as
-      | {
-          id?: string;
-          name?: string | null;
-          email?: string | null;
-          image?: string | null;
-          expires?: string | Date;
-        }
-      | null
-      | undefined;
+    const principal = resolveSessionPrincipal({
+      claims: {
+        sessionUserId: dbSession.userId,
+        actorUserId: dbSession.actorUserId,
+        subjectUserId: dbSession.subjectUserId,
+        impersonationExpiresAt: dbSession.impersonationExpiresAt,
+      },
+    });
 
-    if (
-      impersonating &&
-      typeof impersonating === "object" &&
-      impersonating.id &&
-      impersonating.expires &&
-      new Date(impersonating.expires) > new Date()
-    ) {
-      // Verify the impersonation target still exists and isn't deactivated.
-      // If the target was deleted or deactivated AFTER impersonation started,
-      // fall through to the real admin session rather than acting on behalf
-      // of a stale / banned user. The cost is a single findUnique per
-      // impersonated request — acceptable for a flow used only by admins.
-      const targetStillValid = await prisma.user.findUnique({
-        where: { id: impersonating.id },
-        select: { id: true, deactivatedAt: true },
+    if (principal.subject.userId !== principal.actor.userId) {
+      // The subject is read fresh on every request rather than copied onto
+      // the session at start: a person deleted or deactivated AFTER the
+      // impersonation began must not still be acted for, and their name and
+      // e-mail must not be a stale snapshot from an hour ago.
+      const subject = await prisma.user.findUnique({
+        where: { id: principal.subject.userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          deactivatedAt: true,
+        },
       });
-      const isTargetActive =
-        targetStillValid && !targetStillValid.deactivatedAt;
 
-      if (isTargetActive) {
+      if (subject && !subject.deactivatedAt) {
         // The impersonated user takes the same fork as anyone else; the
         // impersonator's own email rides in already resolved.
-        const impersonatedEmail = await identityEmail().resolveEmail({
-          userId: impersonating.id,
+        const subjectEmail = await identityEmail().resolveEmail({
+          userId: subject.id,
         });
         return {
           ...baseSession,
+          principal,
+          impersonationReason: dbSession.impersonationReason ?? undefined,
           user: {
-            id: impersonating.id,
-            name: impersonating.name ?? null,
-            email: impersonatedEmail ?? impersonating.email ?? null,
-            image: impersonating.image ?? null,
+            id: subject.id,
+            name: subject.name ?? null,
+            email: subjectEmail ?? subject.email ?? null,
+            image: subject.image ?? null,
             impersonator: {
               id: baseSession.user.id,
               name: baseSession.user.name ?? null,
@@ -197,10 +224,10 @@ export const getServerAuthSession = async (ctx: {
       }
       logger.warn(
         {
-          adminId: baseSession.user.id,
-          impersonatedUserId: impersonating.id,
+          actorUserId: principal.actor.userId,
+          subjectUserId: principal.subject.userId,
         },
-        "Impersonation target is deleted or deactivated — falling back to admin session",
+        "Impersonation subject is deleted or deactivated — falling back to the operator's own session",
       );
     }
 

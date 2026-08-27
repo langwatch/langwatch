@@ -4,7 +4,7 @@ Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 �
 
 # Overview
 
-Auth0 owned the front-door visuals; retiring it means every screen an unauthenticated person can touch must be rebuilt first-party. This deliverable is that screen set: sign-in, sign-up, method picker, password reset, email verification, and every deny/guidance state — designed as one experience, shipped behind the router flag, with the hook points D06/D07/D12 later fill. It also moves the join-your-team decision to **before** workspace creation, which is where orphaned organizations stop being minted.
+Auth0 owned the auth-screen visuals; retiring it means every screen an unauthenticated person can touch must be rebuilt first-party. This deliverable is that screen set: sign-in, sign-up, method picker, password reset, email verification, and every deny/guidance state — designed as one experience, shipped behind the router flag, with the hook points D06/D07/D12 later fill. It also moves the join-your-team decision to **before** workspace creation, which is where orphaned organizations stop being minted.
 
 # Requirements
 

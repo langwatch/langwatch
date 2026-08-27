@@ -110,6 +110,9 @@ describe("identity pipeline", () => {
           // exercises the identifier half, so its store is never reached.
           mfaProjectionStore: new InMemoryStateStore() as never,
           mfaGuards: null as never,
+          // Deciding a waiting sign-in rides this pipeline too (D05); this
+          // test attaches an identifier, so the proposal log is never read.
+          linkProposalGuards: null as never,
         }),
       );
       try {

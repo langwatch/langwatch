@@ -224,12 +224,16 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
-import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import {
+  LocalDoorBreakGlassBinding,
+  RequiresLocalDoorAndBinding,
+} from "./identity/break-glass-binding";
 import {
   EmailJoinRequestNotifier,
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
 import { AdminEmailPlatformOperators } from "./identity/platform-operators";
+import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
@@ -244,7 +248,9 @@ import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "./identity/repositories/sso-connection-reads.prisma.repository";
+import { ssoBreakGlass, ssoEngineProviderDerivation } from "./identity/runtime";
 import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+import { LicenseDomainClaimAuthority } from "./identity/sso-self-serve-adapters";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -924,15 +930,33 @@ export function initializeDefaultApp(options?: {
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
     identityUsers: new PrismaIdentityUsersRepository(prisma),
     identityReservations,
+    // The proposal log, not a table: reads the identity events back through
+    // the App's own event store, resolved lazily for the same reason the
+    // ledger writer resolves it lazily — this composes before an App exists.
+    identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    // The engine's provider table is folded from the same events in the same
+    // apply (D09), so the STAGED command re-run projects exactly what the
+    // calling path projects — a fold that maintained it on one route and not
+    // the other would be two answers to "what is registered".
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
       prisma,
+      ssoEngineProviderDerivation,
     ),
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
-    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    // Activation's way-back-in precondition, as of D05: a named person who
+    // holds a live binding AND a local door for it to be a way in through.
+    // Composed here so the STAGED command re-run asks exactly what the
+    // calling path asks — a guard that answered differently on the queue
+    // would let a re-run activate what the live command refused.
+    ssoBreakGlassBindings: new RequiresLocalDoorAndBinding({
+      localDoor: new LocalDoorBreakGlassBinding(),
+      bindings: ssoBreakGlass(),
+    }),
     ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would

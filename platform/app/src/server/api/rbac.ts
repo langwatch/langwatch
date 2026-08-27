@@ -92,6 +92,8 @@ const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
   Resources.AI_TOOLS,
   Resources.WEBHOOK_ENDPOINTS,
   Resources.GATEWAY_SPEND,
+  Resources.SSO,
+  Resources.SCIM,
 ]);
 
 /**
@@ -428,6 +430,12 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // envelopes to one endpoint.
     "gatewaySpend:view",
     "gatewaySpend:manage",
+    // Single sign-on and directory sync (D05/D08): the org admin is the IT
+    // administrator, mirroring ORG_ADMIN in @langwatch/authz roles.ts —
+    // this legacy bag is what the client's hasPermission resolves against,
+    // so omitting them here hides the surfaces the server would allow.
+    "sso:view",
+    "sso:manage",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

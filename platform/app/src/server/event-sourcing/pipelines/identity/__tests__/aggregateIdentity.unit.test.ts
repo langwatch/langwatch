@@ -186,6 +186,7 @@ describe("identity event aggregate type", () => {
         identityGuards: {} as never,
         mfaProjectionStore: {} as never,
         mfaGuards: {} as never,
+        linkProposalGuards: {} as never,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The export's front door: the button that offers it, the dialog that asks how
+ * The export's auth screens: the button that offers it, the dialog that asks how
  * deep, and what the header shows while a file is streaming.
  *
  * Rendered rather than asserted on props, because every one of these is a claim

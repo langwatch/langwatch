@@ -82,8 +82,10 @@ function seedBridgeRow(stack: Stack, accountId: string): void {
     id: accountId,
     userId: userIdOf(stack),
     providerId: "credential",
-    issuer: CREDENTIAL_ISSUER,
     accountId: userIdOf(stack),
+    // 1.7 keys the local credential account by this issuer; the real bridge
+    // rows carry it in their non-nullable `issuer` column.
+    issuer: CREDENTIAL_ISSUER,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
