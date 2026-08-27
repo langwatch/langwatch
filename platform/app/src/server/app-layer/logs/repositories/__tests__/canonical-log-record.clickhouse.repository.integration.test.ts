@@ -22,18 +22,18 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  type LogRedactionService,
+  ClickHouseCanonicalLogRecordRepository,
+  type LogRedactionPort,
   prepareCanonicalLogRecords,
-} from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
-import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+} from "@langwatch/log-server/testing";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
 let ch: ClickHouseClient;
-let repo: CanonicalLogRecordClickHouseRepository;
+let repo: ClickHouseCanonicalLogRecordRepository;
 
 const tag = nanoid();
 const tenantId = `${tag}-project`;
@@ -47,7 +47,7 @@ const spanA = "1111aaaa2222bbbb";
 const spanB = "3333cccc4444dddd";
 const spanC = "5555eeee6666ffff";
 
-const noRedaction: LogRedactionService = {
+const noRedaction: LogRedactionPort = {
   redactLog: async () => undefined,
 };
 
@@ -69,9 +69,7 @@ function otlpLogRecord({
     severityNumber: 9,
     severityText: "INFO",
     body: { stringValue: body },
-    attributes: eventName
-      ? [{ key: "event.name", value: { stringValue: eventName } }]
-      : [],
+    attributes: eventName ? [{ key: "event.name", value: { stringValue: eventName } }] : [],
   };
 }
 
@@ -134,7 +132,11 @@ async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new CanonicalLogRecordClickHouseRepository(async () => ch);
+  repo = ClickHouseCanonicalLogRecordRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+    defaultReadLimit: 1_000,
+  });
 }, 60_000);
 
 afterAll(async () => {
@@ -211,9 +213,7 @@ describe("given canonical log records ensured for one trace", () => {
       // The metering deviation: _size_bytes is the canonical payload's
       // original UTF-8 byte count, verbatim from the record.
       expect(Number(rows[0]!._size_bytes)).toBe(marked.canonicalSizeBytes);
-      expect(marked.canonicalSizeBytes).toBe(
-        Buffer.byteLength(marked.canonicalPayload, "utf8"),
-      );
+      expect(marked.canonicalSizeBytes).toBe(Buffer.byteLength(marked.canonicalPayload, "utf8"));
     });
 
     it("writes a usage-estimate ledger row per accepted record", async () => {

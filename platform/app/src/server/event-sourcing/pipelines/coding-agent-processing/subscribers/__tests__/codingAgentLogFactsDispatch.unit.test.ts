@@ -8,9 +8,11 @@
 
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { AppTraceRuntime } from "~/runtime/app/features/trace";
-import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../../log-processing/schemas/constants";
-import type { LogProcessingEvent } from "../../../log-processing/schemas/events";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import {
+  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+  type LogProcessingEvent,
+} from "@langwatch/log-contract";
 import type { ContributeLogFactsCommandData } from "../../schemas/commands";
 import {
   SESSION_TITLE_FACT_KEY,
@@ -19,7 +21,7 @@ import {
 import { createCodingAgentLogFactsDispatchSubscriber } from "../codingAgentLogFactsDispatch.subscriber";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
-const traceCanonicalisation = AppTraceRuntime.createCanonicalisation();
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function canonicalLogEvent({
   attributes,
@@ -142,13 +144,9 @@ describe("codingAgentLogFactsDispatch", () => {
       expect(contribution!.sessionId).toBe("cw-sess-1");
       expect(contribution!.sessionKeySource).toBe("provider");
       expect(contribution!.traceId).toBeNull();
-      expect(contribution!.facts["prompt.id"]).toBe(
-        "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
-      );
+      expect(contribution!.facts["prompt.id"]).toBe("0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c");
       expect(contribution!.facts["event.sequence"]).toBe(7);
-      expect(contribution!.facts["organization.id"]).toBe(
-        "b3d7a45e-1189-4e0f-8b7a-2c3d4e5f6a7b",
-      );
+      expect(contribution!.facts["organization.id"]).toBe("b3d7a45e-1189-4e0f-8b7a-2c3d4e5f6a7b");
       expect(contribution!.facts["terminal.type"]).toBe("non-interactive");
       expect(contribution!.facts["service.version"]).toBe("1.1.4173");
     });
@@ -371,13 +369,7 @@ describe("codingAgentLogFactsDispatch", () => {
         content: [{ type: "text", text: JSON.stringify({ title }) }],
       });
 
-    const responseBodyEvent = ({
-      querySource,
-      body,
-    }: {
-      querySource: string;
-      body: string;
-    }) =>
+    const responseBodyEvent = ({ querySource, body }: { querySource: string; body: string }) =>
       canonicalLogEvent({
         attributes: {
           "event.name": "api_response_body",
@@ -400,9 +392,7 @@ describe("codingAgentLogFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(1);
-      expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBe(
-        "Fix the flaky session fold test",
-      );
+      expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBe("Fix the flaky session fold test");
 
       const { subscriber: capped, dispatched: cappedOut } = makeSubscriber();
       await capped.handle(
@@ -483,10 +473,7 @@ describe("codingAgentLogFactsDispatch", () => {
     it("stamps nothing for a machine-injected turn", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 
-      await subscriber.handle(
-        promptEvent("<task-notification>\n<task-id>abc</task-id>"),
-        context,
-      );
+      await subscriber.handle(promptEvent("<task-notification>\n<task-id>abc</task-id>"), context);
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();

@@ -1,8 +1,10 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
-import type { LogProcessingEvent } from "../../log-processing/schemas/events";
+import {
+  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+  type LogProcessingEvent,
+} from "@langwatch/log-contract";
 import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS } from "@langwatch/coding-agent-contract";
 import type { ContributeLogFactsCommandData } from "../schemas/commands";
 import {
@@ -47,8 +49,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
     eventTypes: [CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE],
     options: {
       deduplication: {
-        makeId: (event) =>
-          `coding-agent-log-facts:${event.tenantId}:${String(event.aggregateId)}`,
+        makeId: (event) => `coding-agent-log-facts:${event.tenantId}:${String(event.aggregateId)}`,
         ttlMs: 60_000,
       },
     },
@@ -77,9 +78,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       const resourceAttributes = parseFlatAttributes(record.resourceAttributesFlatJson);
       const rawServiceName = resourceAttributes?.["service.name"];
       const serviceName =
-        typeof rawServiceName === "string" && rawServiceName.length > 0
-          ? rawServiceName
-          : null;
+        typeof rawServiceName === "string" && rawServiceName.length > 0 ? rawServiceName : null;
 
       const serviceVersion = resourceAttributes?.["service.version"];
       if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
@@ -101,8 +100,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (agent === null) return;
 
-      const sessionKey =
-        resolveConversationKey(attributes) ?? (record.providerSessionId || null);
+      const sessionKey = resolveConversationKey(attributes) ?? (record.providerSessionId || null);
       const correlationTraceId =
         record.correlationSource !== "none" && record.correlationTraceId
           ? record.correlationTraceId

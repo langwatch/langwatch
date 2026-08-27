@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type {
-  CanonicalLogRecord,
-  LogTraceContribution,
-} from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
+import { CanonicalLogAdapter, LogService } from "@langwatch/log-server/testing";
+import type { LogTraceContribution } from "@langwatch/trace-contract";
+import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
 import { IO_PREVIEW_BYTES } from "../lean-for-projection";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service";
+import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -31,11 +31,16 @@ function makeService(args?: { storageFails?: boolean; contributionFails?: boolea
     if (args?.contributionFails) throw new Error("trace unavailable");
     contributions.push(...batch);
   });
+  const logs = LogService.create({
+    preparation: CanonicalLogAdapter.create({
+      redaction: new OtlpSpanPiiRedactionService(),
+    }),
+  });
   const service = new LogRequestCollectionService({
+    logs,
     traceCanonicalisation: TraceCanonicalisationService.create(),
     recordLogRecords,
     recordLogContributions,
-    piiRedactionService: { redactLog: async () => undefined },
   });
   return {
     service,
@@ -115,9 +120,7 @@ describe("LogRequestCollectionService", () => {
       nonBillable: true,
       occurredAt: records[0]!.acceptedAt,
     });
-    expect(JSON.stringify(contributions[0]).length).toBeLessThan(
-      records[0]!.canonicalSizeBytes,
-    );
+    expect(JSON.stringify(contributions[0]).length).toBeLessThan(records[0]!.canonicalSizeBytes);
   });
 
   it("keeps a correlated log accepted when its trace contribution cannot be queued", async () => {
@@ -151,9 +154,7 @@ describe("LogRequestCollectionService", () => {
     expect(Buffer.byteLength(contributions[0]!.input!, "utf8")).toBeLessThanOrEqual(
       IO_PREVIEW_BYTES + 3,
     );
-    expect(
-      contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"],
-    ).toBe(true);
+    expect(contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"]).toBe(true);
   });
 
   describe("when the canonical batch cannot be persisted", () => {

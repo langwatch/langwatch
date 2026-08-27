@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
+import type { LogService } from "@langwatch/log-contract";
 import { LogRecordStorageService } from "../log-record-storage.service";
 import type {
   LogRecordStorageRepository,
@@ -29,18 +29,20 @@ const canonicalRow: StoredLogRecordRow = {
   attributes: { "event.name": "user_prompt", prompt: "hi" },
 };
 
-function makeService({
-  legacyRows = [row],
-  canonicalRows = [] as StoredLogRecordRow[],
-} = {}) {
+function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecordRow[] } = {}) {
   const getLogsByTraceId = vi.fn().mockResolvedValue(legacyRows);
   const repository = {
     getLogsByTraceId,
   } as unknown as LogRecordStorageRepository;
   const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
-  const canonical = {
+  const canonical: LogService = {
+    prepareCanonicalLogRecords: async () => ({
+      accepted: [],
+      rejectedLogRecords: 0,
+      errors: [],
+    }),
     getLogsByTraceId: canonicalGetLogsByTraceId,
-  } as unknown as CanonicalLogRecordRepository;
+  };
   return {
     service: new LogRecordStorageService({ repository, canonical }),
     getLogsByTraceId,

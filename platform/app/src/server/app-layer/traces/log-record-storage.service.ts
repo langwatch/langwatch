@@ -1,4 +1,4 @@
-import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
+import type { LogService } from "@langwatch/log-contract";
 import {
   type LogRecordStorageRepository,
   mergeStoredLogRows,
@@ -17,20 +17,20 @@ import {
  */
 export class LogRecordStorageService {
   readonly repository: LogRecordStorageRepository;
-  private readonly canonical: CanonicalLogRecordRepository;
+  private readonly canonical: LogService;
 
   /**
    * `canonical` is REQUIRED: canonical `log_records` is the only table still
    * receiving writes, so a service built without it reads legacy-only and
    * silently returns nothing for every trace ingested after the cutover.
-   * Deployments without ClickHouse pass NullCanonicalLogRecordRepository.
+   * Deployments without ClickHouse receive the unavailable Log service adapter.
    */
   constructor({
     repository,
     canonical,
   }: {
     repository: LogRecordStorageRepository;
-    canonical: CanonicalLogRecordRepository;
+    canonical: LogService;
   }) {
     this.repository = repository;
     this.canonical = canonical;

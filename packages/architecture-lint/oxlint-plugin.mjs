@@ -154,9 +154,16 @@ function isFeatureServerCompositionRoot(workspacePath) {
       workspacePath,
     ) ||
     /^platform\/app\/src\/runtime\/(app|worker)\//.test(workspacePath) ||
-    workspacePath ===
-      "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts"
+    workspacePath === "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts"
   );
+}
+
+function isRecognizedTestSource(workspacePath) {
+  const namedTest = /\.(?:test|unit|integration|e2e)\.[cm]?[jt]sx?$/.test(workspacePath);
+  const testDirectory = /(?:^|\/)(?:__tests__|tests)(?:\/|$)/.test(workspacePath);
+  const runtimeDirectory = /(?:^|\/)(?:prisma|scripts?|seeds?)(?:\/|$)/.test(workspacePath);
+
+  return namedTest && testDirectory && !runtimeDirectory;
 }
 
 function importedPackage(specifier, workspace) {
@@ -272,13 +279,20 @@ const boundaryRule = {
 
       if (target) {
         const subpath = packageSubpath(specifier, target.name);
+        const testSupportImport =
+          target.pkg.role === "server" &&
+          subpath === "./testing" &&
+          target.pkg.exports.has(subpath) &&
+          (classification.role === "other" || classification.role === "server") &&
+          isRecognizedTestSource(classification.workspacePath);
         if (!target.pkg.exports.has(subpath)) {
           context.report({ node, messageId: "sealedExports" });
         }
         if (
           classification.feature &&
           target.pkg.feature !== classification.feature &&
-          target.pkg.role !== "contract"
+          target.pkg.role !== "contract" &&
+          !testSupportImport
         ) {
           context.report({ node, messageId: "crossFeature" });
         }
@@ -301,7 +315,8 @@ const boundaryRule = {
         if (
           classification.role === "other" &&
           target.pkg.role === "server" &&
-          !isFeatureServerCompositionRoot(classification.workspacePath)
+          !isFeatureServerCompositionRoot(classification.workspacePath) &&
+          !testSupportImport
         ) {
           context.report({ node, messageId: "compositionRoot" });
         }

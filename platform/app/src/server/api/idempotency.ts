@@ -85,17 +85,10 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import {
-  type IdempotencyReceipt,
-  Prisma,
-  type PrismaClient,
-} from "~/generated/prisma/client";
+import { type IdempotencyReceipt, Prisma } from "~/generated/prisma/client";
 
-import {
-  sha256,
-  stableStringify,
-} from "~/server/event-sourcing/pipelines/metric-processing/canonical/serialization";
 import { decrypt, encrypt } from "~/utils/encryption";
+import { fingerprintJson, sha256 } from "~/utils/idempotency-fingerprint";
 
 import { RequestValidationError } from "./validation";
 
@@ -220,7 +213,7 @@ export function fingerprintRequestBody({
   operation: string;
   body: unknown;
 }): string {
-  return sha256(stableStringify({ operation, body }));
+  return sha256(fingerprintJson({ operation, body }));
 }
 
 /** What a handler hands back: the status and body it wants answered with. */

@@ -10,10 +10,7 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../repositories/session-groups.repository";
-import {
-  decodeSessionGroupsCursor,
-  encodeSessionGroupsCursor,
-} from "../session-groups.cursor";
+import { decodeSessionGroupsCursor, encodeSessionGroupsCursor } from "../session-groups.cursor";
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { SessionGroupsService } from "../session-groups.service";
@@ -111,20 +108,14 @@ describe("session groups cursor codec", () => {
         conversationId: "s-1",
         ...CURSOR_SORT,
       };
-      expect(decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor))).toEqual(
-        cursor,
-      );
+      expect(decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor))).toEqual(cursor);
     });
 
     it("rejects malformed cursors", () => {
-      expect(() => decodeSessionGroupsCursor("not base64 json")).toThrow(
-        "Invalid sessions cursor",
-      );
+      expect(() => decodeSessionGroupsCursor("not base64 json")).toThrow("Invalid sessions cursor");
       expect(() =>
         decodeSessionGroupsCursor(
-          Buffer.from(JSON.stringify({ sortValue: "high" }), "utf8").toString(
-            "base64url",
-          ),
+          Buffer.from(JSON.stringify({ sortValue: "high" }), "utf8").toString("base64url"),
         ),
       ).toThrow("Invalid sessions cursor");
     });
@@ -132,10 +123,9 @@ describe("session groups cursor codec", () => {
     it("rejects a cursor missing the sort it was minted under", () => {
       expect(() =>
         decodeSessionGroupsCursor(
-          Buffer.from(
-            JSON.stringify({ sortValue: 1, conversationId: "s-1" }),
-            "utf8",
-          ).toString("base64url"),
+          Buffer.from(JSON.stringify({ sortValue: 1, conversationId: "s-1" }), "utf8").toString(
+            "base64url",
+          ),
         ),
       ).toThrow("Invalid sessions cursor");
     });
@@ -155,10 +145,7 @@ describe("SessionGroupsService", () => {
         }),
       });
       const service = new SessionGroupsService({
-        repository: new FakeRepository(
-          [makeRow(), makeRow({ conversationId: "session-b" })],
-          2,
-        ),
+        repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
         codingAgentSessions: codingAgents,
       });
 
@@ -168,9 +155,10 @@ describe("SessionGroupsService", () => {
         pageSize: 10,
       });
 
-      expect(
-        codingAgents.sessionLookupInputs.map((input) => input.sessionId).sort(),
-      ).toEqual(["session-a", "session-b"]);
+      expect(codingAgents.sessionLookupInputs.map((input) => input.sessionId).sort()).toEqual([
+        "session-a",
+        "session-b",
+      ]);
       expect(result.sessions[0]?.codingAgent).toEqual({
         modelCalls: 41,
         compactions: 2,
@@ -184,10 +172,7 @@ describe("SessionGroupsService", () => {
     /** @scenario Coding agent enrichment carries repository, branch, worktree and title */
     it("carries the repository, branch, worktree and title, empty where unreported", async () => {
       const service = new SessionGroupsService({
-        repository: new FakeRepository(
-          [makeRow(), makeRow({ conversationId: "session-b" })],
-          2,
-        ),
+        repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
         codingAgentSessions: lookupReturning({
           "session-a": codingAgentRow({
             repositoryHost: "github.com",
@@ -517,9 +502,7 @@ describe("SessionGroupsService", () => {
       });
 
       const session = result.sessions[0]!;
-      expect(session.input).not.toBe(
-        "a very long captured prompt that must not leak in full",
-      );
+      expect(session.input).not.toBe("a very long captured prompt that must not leak in full");
       expect(session.totalTokens).toBe(4200);
       expect(session.traceCount).toBe(3);
     });

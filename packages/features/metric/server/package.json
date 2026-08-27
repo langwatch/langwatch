@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/metric-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Metric ingestion service, event pipeline, and ClickHouse persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@opentelemetry/core": "2.10.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

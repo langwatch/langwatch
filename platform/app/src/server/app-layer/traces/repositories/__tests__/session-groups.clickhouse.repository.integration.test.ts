@@ -13,14 +13,14 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  type LogRedactionService,
+  ClickHouseCanonicalLogRecordRepository,
+  type LogRedactionPort,
   prepareCanonicalLogRecords,
-} from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
+} from "@langwatch/log-server/testing";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { CanonicalLogRecordClickHouseRepository } from "../../../logs/repositories/canonical-log-record.clickhouse.repository";
 import { SessionGroupsClickHouseRepository } from "../session-groups.clickhouse.repository";
 import type { SessionGroupsQuery } from "../session-groups.repository";
 
@@ -136,7 +136,7 @@ async function insertTraceSummaries(rows: Record<string, unknown>[]) {
   });
 }
 
-const noRedaction: LogRedactionService = {
+const noRedaction: LogRedactionPort = {
   redactLog: async () => undefined,
 };
 
@@ -192,11 +192,13 @@ async function insertSessionLog({
     },
   });
   if (result.errors.length > 0) {
-    throw new Error(
-      `Canonicalising the fixture log failed: ${JSON.stringify(result.errors)}`,
-    );
+    throw new Error(`Canonicalising the fixture log failed: ${JSON.stringify(result.errors)}`);
   }
-  const logRepo = new CanonicalLogRecordClickHouseRepository(async () => ch);
+  const logRepo = ClickHouseCanonicalLogRecordRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+    defaultReadLimit: 1_000,
+  });
   await logRepo.ensureLogRecords(result.accepted.map((prepared) => prepared.record));
 }
 

@@ -99,8 +99,8 @@ import {
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
 } from "@langwatch/langy-server";
-import type { CanonicalLogRecordRepository } from "../../app-layer/logs/repositories/canonical-log-record.repository";
-import type { MetricDataPointRepository } from "../../app-layer/metrics/repositories/metric-data-point.repository";
+import type { LogRuntimeAdapter } from "@langwatch/log-server";
+import type { MetricRuntimeAdapter } from "@langwatch/metric-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "../../app-layer/organizations/organization.service";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -169,16 +169,9 @@ import { createLangyConversationProcessingPipeline } from "@langwatch/langy-serv
 import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type { LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-server";
 import { createLangyMaintenancePipeline } from "../pipelines/langy-maintenance/pipeline";
-import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "../pipelines/log-processing/canonicalLog";
-import { createLogProcessingPipeline } from "../pipelines/log-processing/pipeline";
-import { CanonicalLogAppendStore } from "../pipelines/log-processing/projections/stores";
-import { resolveMetricCommandShardCount } from "../pipelines/metric-processing/canonical/shards";
-import { createMetricProcessingPipeline } from "../pipelines/metric-processing/pipeline";
-import {
-  MetricDataPointAppendStore,
-  MetricSeriesCatalogAppendStore,
-  MetricTimeRollupAppendStore,
-} from "../pipelines/metric-processing/projections/stores";
+import { type EventSubscriberDefinition } from "@langwatch/eventing";
+import type { LogProcessingEvent } from "@langwatch/log-contract";
+import type { MetricProcessingEvent } from "@langwatch/metric-contract";
 import { createProcessManagerMaintenancePipeline } from "../pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
@@ -364,7 +357,6 @@ export interface PipelineRepositories {
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
-  canonicalLogStorage: CanonicalLogRecordRepository;
   /** ADR-056: the session-aggregate row + the (trace → session) map. */
   codingAgentSession: CodingAgentSessionRepository;
   codingAgentTraceSession: CodingAgentTraceSessionRepository;
@@ -372,7 +364,6 @@ export interface PipelineRepositories {
   sessionMetricSeries: SessionMetricSeriesRepository;
   /** The per-call fact table: one row per session event (migration 00073). */
   codingAgentSessionEvents: CodingAgentSessionEventsRepository;
-  metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
@@ -411,6 +402,8 @@ export interface PipelineRepositories {
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   traceCanonicalisation: TraceCanonicalisationService;
+  logProcessing: LogRuntimeAdapter;
+  metricProcessing: MetricRuntimeAdapter;
   /** Package-owned AuthZ definition; this registry only installs and binds it. */
   authz: {
     pipeline: StaticPipelineDefinition<any, any, any>;
@@ -961,17 +954,10 @@ export class PipelineRegistry {
   private registerMetricPipeline({
     subscribers,
   }: {
-    subscribers: Parameters<typeof createMetricProcessingPipeline>[0]["subscribers"];
+    subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
   }) {
-    const repository = this.deps.repositories.metricDataPointStorage;
     return this.deps.eventSourcing.register(
-      createMetricProcessingPipeline({
-        metricDataPointAppendStore: new MetricDataPointAppendStore(repository),
-        metricSeriesCatalogAppendStore: new MetricSeriesCatalogAppendStore(repository),
-        metricTimeRollupAppendStore: new MetricTimeRollupAppendStore(repository),
-        metricCommandShardCount: resolveMetricCommandShardCount(
-          process.env.METRIC_PROCESSING_SHARDS,
-        ),
+      this.deps.metricProcessing.buildProcessing({
         subscribers,
       }),
     );
@@ -1123,16 +1109,10 @@ export class PipelineRegistry {
   private registerLogPipeline({
     subscribers,
   }: {
-    subscribers: Parameters<typeof createLogProcessingPipeline>[0]["subscribers"];
+    subscribers?: EventSubscriberDefinition<LogProcessingEvent>[];
   }) {
     return this.deps.eventSourcing.register(
-      createLogProcessingPipeline({
-        canonicalLogAppendStore: new CanonicalLogAppendStore(
-          this.deps.repositories.canonicalLogStorage,
-        ),
-        logCommandShardCount: resolveCanonicalLogCommandShardCount(
-          process.env.LOG_PROCESSING_SHARDS,
-        ),
+      this.deps.logProcessing.buildProcessing({
         subscribers,
       }),
     );

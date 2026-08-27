@@ -2630,6 +2630,91 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/features/log/contract:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/log/server:
+    dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/metric/contract:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/metric/server:
+    dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@opentelemetry/core':
+        specifier: 2.10.0
+        version: 2.10.0(@opentelemetry/api@1.9.1)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/features/model-provider/contract:
     dependencies:
       safe-regex2:
@@ -4491,9 +4576,21 @@ importers:
       '@langwatch/langy-web':
         specifier: workspace:*
         version: link:../../packages/features/langy/web
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/log/contract
+      '@langwatch/log-server':
+        specifier: workspace:*
+        version: link:../../packages/features/log/server
       '@langwatch/mcp-server':
         specifier: workspace:*
         version: link:../../mcp/typescript
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/metric/contract
+      '@langwatch/metric-server':
+        specifier: workspace:*
+        version: link:../../packages/features/metric/server
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../packages/features/model-provider/contract

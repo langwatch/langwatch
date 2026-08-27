@@ -9,10 +9,11 @@
 
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { canonicalAttributes } from "../../../metric-processing/canonical/attributes";
-import { stableStringify } from "../../../metric-processing/canonical/serialization";
-import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../../metric-processing/schemas/constants";
-import type { MetricProcessingEvent } from "../../../metric-processing/schemas/events";
+import { canonicalAttributes, stableStringify } from "@langwatch/metric-server/testing";
+import {
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+  type MetricProcessingEvent,
+} from "@langwatch/metric-contract";
 import type { ContributeMetricFactsCommandData } from "../../schemas/commands";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "../codingAgentMetricFactsDispatch.subscriber";
 
@@ -20,7 +21,7 @@ const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);
 
 /**
- * Encode attributes exactly the way buildPoint does — through
+ * Encode attributes exactly the way build-point does — through
  * canonicalAttributes + stableStringify — so this suite drives the dispatcher
  * with the canonical KeyValue-array shape the pipeline actually stores, not a
  * hand-rolled flat object.

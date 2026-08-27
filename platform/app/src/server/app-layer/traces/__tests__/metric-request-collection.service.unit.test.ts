@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { CanonicalMetricAdapter, MetricService } from "@langwatch/metric-server/testing";
+import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service";
+import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -17,22 +19,22 @@ function expectCollected(
 }
 
 function makeService(
-  recordDataPointsImpl: (
-    data: CanonicalMetricDataPoint[],
-  ) => Promise<void> = async () => {},
+  recordDataPointsImpl: (data: CanonicalMetricDataPoint[]) => Promise<void> = async () => {},
 ) {
   const recordDataPoints =
     vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(recordDataPointsImpl);
   const recordMetricCorrelations = vi.fn<
     (data: RecordMetricCorrelationCommandData[]) => Promise<void>
   >(async () => {});
-  const piiRedactionService = {
-    redactMetricAttributes: async () => {},
-  };
+  const metrics = MetricService.create({
+    preparation: CanonicalMetricAdapter.create({
+      redaction: new OtlpSpanPiiRedactionService(),
+    }),
+  });
   const service = new MetricRequestCollectionService({
+    metrics,
     recordDataPoints,
     recordMetricCorrelations,
-    piiRedactionService,
   });
   return { service, recordDataPoints, recordMetricCorrelations };
 }

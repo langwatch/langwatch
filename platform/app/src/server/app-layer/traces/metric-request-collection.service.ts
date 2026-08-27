@@ -1,23 +1,22 @@
 import { createLogger } from "@langwatch/observability";
+import type {
+  CanonicalMetricDataPoint,
+  MetricDataPointPreparation,
+  MetricService,
+} from "@langwatch/metric-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type { DeepPartial } from "~/utils/types";
 import {
-  type MetricPreparationResult,
-  prepareMetricDataPoints,
-} from "../../event-sourcing/pipelines/metric-processing/canonicalMetric";
-import type { CanonicalMetricDataPoint } from "../../event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import {
   piiRedactionLevelSchema,
   type RecordMetricCorrelationCommandData,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
+} from "@langwatch/trace-contract";
 
 export interface MetricRequestCollectionDeps {
+  metrics: MetricService;
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
   recordMetricCorrelations: (data: RecordMetricCorrelationCommandData[]) => Promise<void>;
-  piiRedactionService?: Pick<OtlpSpanPiiRedactionService, "redactMetricAttributes">;
 }
 
 /**
@@ -58,19 +57,9 @@ const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
  * success without losing the accepted points.
  */
 export class MetricRequestCollectionService {
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.metric-processing.metric-ingestion",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.metric-processing.metric-ingestion");
   private readonly logger = createLogger("langwatch:metric-processing:metric-ingestion");
-  private readonly piiRedactionService: Pick<
-    OtlpSpanPiiRedactionService,
-    "redactMetricAttributes"
-  >;
-
-  constructor(private readonly deps: MetricRequestCollectionDeps) {
-    this.piiRedactionService =
-      deps.piiRedactionService ?? new OtlpSpanPiiRedactionService();
-  }
+  constructor(private readonly deps: MetricRequestCollectionDeps) {}
 
   async handleOtlpMetricRequest({
     tenantId,
@@ -100,14 +89,14 @@ export class MetricRequestCollectionService {
       },
       async (span): Promise<MetricRequestCollectionResult> => {
         const acceptedAt = Date.now();
-        const preparation: MetricPreparationResult = await prepareMetricDataPoints({
-          tenantId,
-          organizationId,
-          request: metricRequest,
-          piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
-          redactionService: this.piiRedactionService,
-          acceptedAt,
-        });
+        const preparation: MetricDataPointPreparation =
+          await this.deps.metrics.prepareMetricDataPoints({
+            tenantId,
+            organizationId,
+            request: metricRequest,
+            piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+            acceptedAt,
+          });
 
         const acceptedDataPoints = preparation.accepted.length;
         const rejectedDataPoints = preparation.rejectedDataPoints;
@@ -123,10 +112,7 @@ export class MetricRequestCollectionService {
             // safe to return. A persistence failure is ours: its message can
             // name internal hosts, tables and queries, so the sender gets a
             // stable string and the detail goes to the log only.
-            span.setAttribute(
-              "metrics.ingestion.unavailable",
-              preparation.accepted.length,
-            );
+            span.setAttribute("metrics.ingestion.unavailable", preparation.accepted.length);
             this.logger.error(
               {
                 error,
@@ -149,9 +135,7 @@ export class MetricRequestCollectionService {
           // Correlation is deliberately best-effort and separate from metric
           // acceptance. A valid metric remains accepted if a trace fold is
           // temporarily unavailable.
-          const correlations = preparation.accepted.flatMap(
-            ({ correlations }) => correlations,
-          );
+          const correlations = preparation.accepted.flatMap(({ correlations }) => correlations);
           if (correlations.length > 0) {
             try {
               await this.deps.recordMetricCorrelations(correlations);

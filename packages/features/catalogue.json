@@ -128,6 +128,18 @@
       "subjects": ["conversation", "credential", "langy", "message", "relay", "turn"]
     },
     {
+      "id": "log",
+      "root": "packages/features/log",
+      "classification": "core",
+      "subjects": ["log", "log-ingestion"]
+    },
+    {
+      "id": "metric",
+      "root": "packages/features/metric",
+      "classification": "core",
+      "subjects": ["metric", "metric-ingestion"]
+    },
+    {
       "id": "model-provider",
       "root": "packages/features/model-provider",
       "classification": "core",
@@ -226,12 +238,6 @@
       "subjects": ["suite"]
     },
     {
-      "id": "telemetry",
-      "root": "packages/features/telemetry",
-      "classification": "core",
-      "subjects": ["telemetry"]
-    },
-    {
       "id": "topic",
       "root": "packages/features/topic",
       "classification": "core",
@@ -241,7 +247,7 @@
       "id": "trace",
       "root": "packages/features/trace",
       "classification": "core",
-      "subjects": ["trace"]
+      "subjects": ["trace", "trace-ingestion"]
     },
     {
       "id": "user",

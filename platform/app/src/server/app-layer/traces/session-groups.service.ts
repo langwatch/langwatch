@@ -186,9 +186,7 @@ export class SessionGroupsService {
    * needs the owning organization. Returns undefined for an orphan project,
    * which simply leaves every row unlinked.
    */
-  private readonly resolveOrganizationId: (
-    projectId: string,
-  ) => Promise<string | undefined>;
+  private readonly resolveOrganizationId: (projectId: string) => Promise<string | undefined>;
 
   constructor({
     repository,
@@ -205,8 +203,7 @@ export class SessionGroupsService {
   }
 
   async getSessionGroups(params: SessionGroupsParams): Promise<SessionGroupsResult> {
-    const sortColumn =
-      SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
+    const sortColumn = SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
     const page = await this.repository.findSessionGroups({
       tenantId: params.tenantId,
@@ -242,9 +239,7 @@ export class SessionGroupsService {
         row,
         codingAgent: enrichments[index] ?? null,
       });
-      return cutoffMs !== null && row.lastActivityMs < cutoffMs
-        ? teasedSession(dto)
-        : dto;
+      return cutoffMs !== null && row.lastActivityMs < cutoffMs ? teasedSession(dto) : dto;
     });
 
     const lastRow = visibleRows[visibleRows.length - 1];

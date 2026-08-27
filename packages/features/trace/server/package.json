@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -21,9 +25,15 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/otlp-transformer": "0.55.0",
+    "langwatch": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -34,7 +34,7 @@ import type { App } from "~/server/app-layer/app";
 import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
 import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import type { GovernancePolicyService } from "@langwatch/enterprise-governance-contract";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import {
   OTLP_CORRECTED_PATH_HEADER,
   readCorrectedPath,

@@ -39,6 +39,14 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       filename: "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
+    {
+      filename: "platform/app/src/server/example/__tests__/agent.integration.test.ts",
+      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
+    },
+    {
+      filename: "packages/features/project/server/tests/agent.integration.test.ts",
+      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
+    },
   ],
   invalid: [
     {
@@ -54,6 +62,26 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
     {
       filename: "platform/app/src/server/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+    {
+      filename: "platform/app/src/server/example.ts",
+      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+    {
+      filename: "platform/app/src/server/example/__tests__/agent.integration.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+    {
+      filename: "platform/app/scripts/__tests__/agent.integration.test.ts",
+      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+    {
+      filename: "platform/app/prisma/__tests__/agent.integration.test.ts",
+      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
       errors: [{ messageId: "compositionRoot" }],
     },
     {

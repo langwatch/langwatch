@@ -1,8 +1,10 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
-import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../metric-processing/schemas/constants";
-import type { MetricProcessingEvent } from "../../metric-processing/schemas/events";
+import {
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+  scalarsFromCanonicalAttributes,
+  type MetricProcessingEvent,
+} from "@langwatch/metric-contract";
 import type { ContributeMetricFactsCommandData } from "../schemas/commands";
 import {
   detectCodingAgent,
@@ -37,8 +39,7 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
     eventTypes: [METRIC_DATA_POINT_RECEIVED_EVENT_TYPE],
     options: {
       deduplication: {
-        makeId: (event) =>
-          `coding-agent-metric-facts:${event.tenantId}:${event.data.pointId}`,
+        makeId: (event) => `coding-agent-metric-facts:${event.tenantId}:${event.data.pointId}`,
         ttlMs: 60_000,
       },
     },
@@ -104,13 +105,11 @@ function liftScalarAttributes(
 }
 
 /**
- * `pointAttributesJson` stores the canonical KeyValue array buildPoint
+ * `pointAttributesJson` stores the canonical KeyValue array build-point
  * writes (`[{key, value: {type, value}}]`), so parsing means flattening the
  * typed wrappers back to scalars — never treating the JSON as a flat object.
  */
-function parsePointAttributes(
-  json: string,
-): Record<string, string | number | boolean> | null {
+function parsePointAttributes(json: string): Record<string, string | number | boolean> | null {
   if (!json) return null;
   try {
     return scalarsFromCanonicalAttributes(JSON.parse(json));

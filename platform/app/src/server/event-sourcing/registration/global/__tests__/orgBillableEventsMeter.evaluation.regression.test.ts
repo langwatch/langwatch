@@ -23,8 +23,8 @@ import {
   TEST_CONSTANTS,
 } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
-import { EVALUATION_EVENT_TYPES } from "../../../pipelines/evaluation-processing/schemas/constants";
-import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../../pipelines/metric-processing/schemas/constants";
+import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
+import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "@langwatch/metric-contract";
 import { orgBillableEventsMeterProjection } from "../orgBillableEventsMeter.mapProjection";
 import type { BillableEventRecord } from "../orgBillableEventsMeter.store";
 

@@ -29,14 +29,19 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { point } from "~/server/event-sourcing/pipelines/metric-processing/__tests__/fixtures/metric-point.fixtures";
-import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+import {
+  MetricDataPointClickHouseRepository,
+  type MetricClickHouseClient,
+  point,
+} from "@langwatch/metric-server/testing";
+import {
+  METRIC_ROLLUP_INTERVAL_MS,
+  type CanonicalMetricDataPoint,
+} from "@langwatch/metric-contract";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
 let ch: ClickHouseClient;
 let repo: MetricDataPointClickHouseRepository;
@@ -52,8 +57,7 @@ const cumulativeSeriesId = "c".repeat(64);
 // Recent, bucket-aligned base so retention TTLs never GC the rows and the
 // bucket boundaries are exact multiples of the 30s rollup interval.
 const bucket0 =
-  Math.floor((Date.now() - 5 * 60_000) / METRIC_ROLLUP_INTERVAL_MS) *
-  METRIC_ROLLUP_INTERVAL_MS;
+  Math.floor((Date.now() - 5 * 60_000) / METRIC_ROLLUP_INTERVAL_MS) * METRIC_ROLLUP_INTERVAL_MS;
 const bucket1 = bucket0 + METRIC_ROLLUP_INTERVAL_MS;
 
 function gaugePoint({
@@ -132,19 +136,16 @@ async function readRollups(seriesId: string) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new MetricDataPointClickHouseRepository({
+  repo = MetricDataPointClickHouseRepository.create({
     resolveClient: async () => ch,
     resolveOrganizationClient: async () => ch,
+    defaultRetentionDays: 30,
   });
 }, 60_000);
 
 afterAll(async () => {
   if (ch) {
-    for (const table of [
-      "metric_data_points",
-      "metric_usage_estimates",
-      "metric_time_rollups",
-    ]) {
+    for (const table of ["metric_data_points", "metric_usage_estimates", "metric_time_rollups"]) {
       await ch.exec({
         query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId },
@@ -327,9 +328,7 @@ describe("given a cumulative series long enough to span several rollup buckets",
     it("counts every sample exactly once across the buckets", async () => {
       const chunked = await readRollups(chunkSeriesId);
 
-      expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
-        values.length,
-      );
+      expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(values.length);
     });
   });
 
@@ -339,18 +338,18 @@ describe("given a cumulative series long enough to span several rollup buckets",
 
     beforeAll(async () => {
       reads = 0;
-      const counting = {
-        query: async (args: Parameters<ClickHouseClient["query"]>[0]) => {
+      const counting: MetricClickHouseClient = {
+        query: async (args) => {
           reads += 1;
           return await ch.query(args);
         },
-        insert: async (args: Parameters<ClickHouseClient["insert"]>[0]) =>
-          await ch.insert(args),
-      } as unknown as ClickHouseClient;
+        insert: async (args) => await ch.insert(args),
+      };
 
-      await new MetricDataPointClickHouseRepository({
+      await MetricDataPointClickHouseRepository.create({
         resolveClient: async () => counting,
         resolveOrganizationClient: async () => counting,
+        defaultRetentionDays: 30,
       }).recomputeAffectedRollupsMany({ points: samples(countedSeriesId) });
     }, 60_000);
 
@@ -446,9 +445,7 @@ describe("given a series whose chunk points have stored points between them", ()
   it("counts every sample exactly once across the buckets", async () => {
     const chunked = await readRollups(foldedSeriesId);
 
-    expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
-      values.length,
-    );
+    expect(chunked.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(values.length);
   });
 });
 
@@ -568,9 +565,7 @@ describe("given one chunk carrying two series staggered in time", () => {
     for (const seriesId of [earlySeriesId, lateSeriesId]) {
       const folded = await readRollups(seriesId);
 
-      expect(folded.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(
-        values.length,
-      );
+      expect(folded.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(values.length);
     }
   });
 });
