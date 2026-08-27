@@ -50,6 +50,71 @@ export interface RunResultsPersistence {
   actor: WorkbenchActor;
 }
 
+/** What one attempt at the write needs to know. */
+interface WriteAttempt {
+  persistence: RunResultsPersistence;
+  projectId: string;
+  experimentId: string;
+  runId: string;
+  scope: ExecutionScope;
+  draft: RunResultsDraft;
+}
+
+/** Folds the run's cells into the saved state and takes the next version. */
+const writeCells = async ({
+  persistence,
+  projectId,
+  experimentId,
+  runId,
+  scope,
+  draft,
+}: WriteAttempt): Promise<void> => {
+  const plan = planRunMerge(scope);
+  const saved = await persistence.experiments.applyWorkbenchTransform({
+    projectId,
+    id: experimentId,
+    // The run names itself on the write. A page that started this run then
+    // reads the version bump as its own and adopts it, rather than standing
+    // down and asking the reader to reload over their unsaved edits.
+    actor: { ...persistence.actor, runId },
+    commitMessage: `Results from run ${runId}`,
+    transform: (state) => ({
+      ...state,
+      results: mergeRunResults({ existing: state.results, draft, plan }),
+    }),
+  });
+  logger.info(
+    {
+      runId,
+      experimentId,
+      version: saved.version,
+      targets: Object.keys(draft.targetOutputs).length,
+    },
+    "Wrote the run results into the workbench state",
+  );
+};
+
+/** Where a write that could not be retried stops, without failing the run. */
+const reportWriteFailure = ({
+  error,
+  projectId,
+  experimentId,
+  runId,
+}: {
+  error: unknown;
+  projectId: string;
+  experimentId: string;
+  runId: string;
+}): void => {
+  logger.error(
+    { error, runId, experimentId, projectId },
+    "Failed to write the run results into the workbench state",
+  );
+  captureException(toError(error), {
+    extra: { runId, experimentId, projectId },
+  });
+};
+
 /**
  * Writes a completed run's cells into the saved workbench state.
  *
@@ -58,23 +123,11 @@ export interface RunResultsPersistence {
  * concurrent write (a person typing in the same experiment), which is the same
  * answer the assistant's backend edits give a stale read.
  */
-export const persistRunResults = async ({
-  persistence,
-  projectId,
-  experimentId,
-  runId,
-  scope,
-  draft,
-  isRetry = false,
-}: {
-  persistence: RunResultsPersistence;
-  projectId: string;
-  experimentId: string;
-  runId: string;
-  scope: ExecutionScope;
-  draft: RunResultsDraft;
-  isRetry?: boolean;
-}): Promise<void> => {
+export const persistRunResults = async (
+  attempt: WriteAttempt & { isRetry?: boolean },
+): Promise<void> => {
+  const { draft, runId, experimentId, projectId, isRetry = false } = attempt;
+
   if (runResultsAreEmpty(draft)) {
     logger.info(
       { runId, experimentId },
@@ -83,56 +136,18 @@ export const persistRunResults = async ({
     return;
   }
 
-  const plan = planRunMerge(scope);
-
   try {
-    const saved = await persistence.experiments.applyWorkbenchTransform({
-      projectId,
-      id: experimentId,
-      // The run names itself on the write. A page that started this run then
-      // reads the version bump as its own and adopts it, rather than standing
-      // down and asking the reader to reload over their unsaved edits.
-      actor: { ...persistence.actor, runId },
-      commitMessage: `Results from run ${runId}`,
-      transform: (state) => ({
-        ...state,
-        results: mergeRunResults({ existing: state.results, draft, plan }),
-      }),
-    });
-    logger.info(
-      {
-        runId,
-        experimentId,
-        version: saved.version,
-        targets: Object.keys(draft.targetOutputs).length,
-      },
-      "Wrote the run results into the workbench state",
-    );
+    await writeCells(attempt);
   } catch (error) {
     if (error instanceof StaleWorkbenchStateError && !isRetry) {
       logger.info(
         { runId, experimentId },
         "Workbench moved while the run was writing its results, retrying once",
       );
-      await persistRunResults({
-        persistence,
-        projectId,
-        experimentId,
-        runId,
-        scope,
-        draft,
-        isRetry: true,
-      });
+      await persistRunResults({ ...attempt, isRetry: true });
       return;
     }
-
-    logger.error(
-      { error, runId, experimentId, projectId },
-      "Failed to write the run results into the workbench state",
-    );
-    captureException(toError(error), {
-      extra: { runId, experimentId, projectId },
-    });
+    reportWriteFailure({ error, projectId, experimentId, runId });
   }
 };
 
