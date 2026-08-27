@@ -79,6 +79,10 @@ export default defineConfig({
     // ever flakes a shard, drop this line first.
     isolate: false,
     testTimeout: 30000, // 30s default to handle slower CI runners
+    // Hooks get the same budget. vitest defaults hookTimeout to 10s, so a
+    // beforeEach that imports a module under a loaded shard failed while a
+    // test body doing the same work had 30s.
+    hookTimeout: 30000,
     // Global setup runs once before all tests. Unit needs no containers; this
     // only carries a CI-gated hard-floor that mirrors the integration
     // globalSetup, releasing the vitest finalize wedge on unit shards (which
