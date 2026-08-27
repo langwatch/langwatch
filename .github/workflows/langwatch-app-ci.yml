@@ -432,6 +432,42 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/langyworker run typecheck
 
+      # The share feature (ADR-057 / share ADR-001) owns trace-link minting,
+      # token resolution, audience and expiry, the view budget and the
+      # share-safe payload cache. Its suites live under packages/, so the app's
+      # vitest root cannot see them and nothing here named them: the whole
+      # feature's own coverage ran nowhere, while the scenarios it binds in
+      # packages/features/share/specs/share.feature still counted as bound by
+      # check-feature-parity.ts. Same raw-TypeScript, shard-1 arrangement as
+      # the packages above.
+      - name: Run @langwatch/share-contract unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-contract run test
+
+      - name: Typecheck @langwatch/share-contract
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-contract run typecheck
+
+      # The Postgres-backed suite here self-skips without DATABASE_URL, so this
+      # step runs the unit coverage and stays green on a runner with no
+      # database — it does not silently drop the integration file, which runs
+      # wherever a database is present.
+      - name: Run @langwatch/share-server unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-server run test
+
+      - name: Typecheck @langwatch/share-server
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-server run typecheck
+
+      - name: Run @langwatch/share-web unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-web run test
+
+      - name: Typecheck @langwatch/share-web
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/share-web run typecheck
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app
