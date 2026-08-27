@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getLatestOpenAIChatFlagship } from "~/server/modelProviders/getLatestFlagship";
-import { getModelById } from "~/server/modelProviders/registry";
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import { getModelById } from "@langwatch/model-provider-contract";
 import { DEFAULT_MODEL } from "../constants";
 
 /**

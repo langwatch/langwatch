@@ -18,7 +18,7 @@
  *
  * Kept free of any catalog import: this is what the browser bundle uses, and
  * the model catalog is 441 KB. Ranked suggestions per tier live server-side in
- * `server/modelProviders/suggestTierTargets.ts`.
+ * `@langwatch/model-provider-server`'s tier-target adapter.
  */
 
 /**

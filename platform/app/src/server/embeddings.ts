@@ -1,7 +1,6 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "./api/routers/modelProviders.utils";
 import { prisma } from "./db";
-import { resolveModelForFeature } from "./modelProviders/resolveModelForFeature";
 
 export const getProjectEmbeddingsModel = async (
   modelProvidersService: ModelProviderService,
@@ -17,9 +16,9 @@ export const getProjectEmbeddingsModel = async (
   // ModelNotConfiguredError if no scope has it set; the caller surfaces
   // that as a sticky toast prompting the user to add an
   // embedding-capable provider.
-  const resolved = await resolveModelForFeature("analytics.topic_clustering_embeddings", {
-    prisma,
+  const resolved = await modelProvidersService.resolveModelForFeature({
     projectId,
+    featureKey: "analytics.topic_clustering_embeddings",
   });
   const embeddingsModel = resolved.model;
   const provider = embeddingsModel.split("/")[0];

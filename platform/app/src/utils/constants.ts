@@ -1,4 +1,4 @@
-import { getLatestOpenAIChatFlagship } from "../server/modelProviders/getLatestFlagship";
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 
 // Auto-derived from the LLM model registry (llmModels.json) — always the
 // newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only

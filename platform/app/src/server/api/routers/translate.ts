@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
-import { featureByKey } from "../../modelProviders/featureRegistry";
+import { featureByKey } from "@langwatch/model-provider-contract";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const TRANSLATE_FEATURE_KEY = "translate.text";

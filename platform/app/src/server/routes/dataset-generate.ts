@@ -89,6 +89,8 @@ ${dataset}`,
     const model = await getVercelAIModel({
       projectId,
       featureKey: "datasets.generator",
+      modelProviders: c.app.modelProviders,
+      managedProviders: c.app.managedProviders,
     });
     const result = streamText({
       model,

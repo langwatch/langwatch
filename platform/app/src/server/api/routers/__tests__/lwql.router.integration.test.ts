@@ -10,24 +10,19 @@
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 
-const { mockFeatureFlagIsEnabled, mockDescribeSchema, mockExecute, deployment } =
-  vi.hoisted(() => ({
-    mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
-    mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
-    mockExecute: vi.fn().mockResolvedValue({
-      columns: [],
-      rows: [],
-      statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-      truncated: false,
-      diagnostics: [],
-    }),
-    /** Whether this deployment has a LangWatchQL identity to run queries as. */
-    deployment: { provisioned: true },
-  }));
-
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
+const { mockDescribeSchema, mockExecute, deployment } = vi.hoisted(() => ({
+  mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
+  mockExecute: vi.fn().mockResolvedValue({
+    columns: [],
+    rows: [],
+    statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+    truncated: false,
+    diagnostics: [],
+  }),
+  /** Whether this deployment has a LangWatchQL identity to run queries as. */
+  deployment: { provisioned: true },
 }));
 
 // The audit log reaches for the module-level Prisma singleton rather than the
@@ -68,10 +63,11 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { createTestApp } from "~/server/app-layer/presets";
 import { lwqlRouter } from "../analytics/lwql";
 
-wireDefaultTestApp();
+const featureFlags = MemoryFeatureFlagService.create();
+const testApp = createTestApp({ featureFlags });
 
 const mockPrismaClient = {
   project: {
@@ -89,6 +85,7 @@ function createTestCaller() {
     req: undefined,
     res: undefined,
     prisma: mockPrismaClient,
+    app: testApp,
     permissionChecked: false,
     publiclyShared: false,
     organizationRole: undefined,
@@ -113,7 +110,8 @@ describe("the LangWatchQL router's feature switch", () => {
   let caller: ReturnType<typeof createTestCaller>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    featureFlags.setFlag("release_lwql_workbench", true);
     deployment.provisioned = true;
     mockPrismaClient.project.findUnique.mockResolvedValue({
       id: "proj_test_123",
@@ -125,7 +123,7 @@ describe("the LangWatchQL router's feature switch", () => {
 
   describe("given the switch is on for the project", () => {
     beforeEach(() => {
-      mockFeatureFlagIsEnabled.mockResolvedValue(true);
+      featureFlags.setFlag("release_lwql_workbench", true);
     });
 
     it("answers available and serves the schema and the query", async () => {
@@ -143,7 +141,7 @@ describe("the LangWatchQL router's feature switch", () => {
 
   describe("given the switch is off for the project", () => {
     beforeEach(() => {
-      mockFeatureFlagIsEnabled.mockResolvedValue(false);
+      featureFlags.setFlag("release_lwql_workbench", false);
     });
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
@@ -187,7 +185,7 @@ describe("the LangWatchQL router's feature switch", () => {
       // A fake of the rule itself rather than an assertion about the call: it
       // answers true only for this flag and that organization, so the surface
       // can only come on if the router resolved and passed the right one.
-      mockFeatureFlagIsEnabled.mockImplementation(
+      vi.spyOn(featureFlags, "isEnabled").mockImplementation(
         async (flag: string, context: { organizationId?: string }) =>
           flag === "release_lwql_workbench" && context.organizationId === "org_test_123",
       );
@@ -204,15 +202,16 @@ describe("the LangWatchQL router's feature switch", () => {
         team: { organizationId: "org_other_456" },
       });
 
-      await expect(caller.availability({ projectId: "proj_other_456" })).resolves.toEqual(
-        { available: false, reason: "disabled" },
-      );
+      await expect(caller.availability({ projectId: "proj_other_456" })).resolves.toEqual({
+        available: false,
+        reason: "disabled",
+      });
     });
   });
 
   describe("given the switch is on but the deployment is not provisioned", () => {
     beforeEach(() => {
-      mockFeatureFlagIsEnabled.mockResolvedValue(true);
+      featureFlags.setFlag("release_lwql_workbench", true);
       deployment.provisioned = false;
     });
 

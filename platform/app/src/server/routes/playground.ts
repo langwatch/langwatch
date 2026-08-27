@@ -9,10 +9,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { env } from "~/env.mjs";
-import {
-  getProjectModelProviders,
-  prepareLitellmParams,
-} from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
@@ -67,7 +64,10 @@ secured
     // legacy `{provider}/{model}`. For mp-id values we look up the MP by
     // id; for legacy values we resolve to the single accessible MP for
     // that provider (today always narrowest-wins) exactly as before.
-    const modelProviders = await getProjectModelProviders(c.app.modelProviders, projectId);
+    const modelProviders = await getProjectModelProviders(
+      c.app.modelProviders,
+      projectId,
+    );
     const providerKey = model.split("/")[0] ?? "";
     const modelProvider = providerKey.startsWith("mp_")
       ? Object.values(modelProviders).find((provider) => provider.id === providerKey)
@@ -94,15 +94,10 @@ secured
       return c.json(previousError, { status: 401 });
     }
 
-    const litellmParams = await prepareLitellmParams(
-      c.app.modelProviders,
-      c.app.managedProviders,
-      {
-        model,
-        modelProvider,
-        projectId,
-      },
-    );
+    const litellmParams = await c.app.modelProviders.prepareExecution({
+      model,
+      projectId,
+    });
     const headers = Object.fromEntries(
       Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
     );

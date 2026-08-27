@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { getModelById } from "../server/modelProviders/registry";
+import { getModelById } from "@langwatch/model-provider-contract";
 
 const logger = createLogger("modelLimits");
 

@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  *
- * End-to-end TS integration: spins up a real `nlpgo` Go subprocess,
- * mocks the feature flag to ON, and exercises the same `nlpgoFetch`
- * helper that `runWorkflow.ts` calls in production. The signature
+ * End-to-end TS integration: spins up a real `nlpgo` Go subprocess and
+ * exercises the same `nlpgoFetch` helper that `runWorkflow.ts` calls in
+ * production. The signature
  * node hits a live OpenAI endpoint via the in-process dispatcher.
  *
  * Why this test exists:
@@ -31,14 +31,6 @@ import {
   NlpLambdaRuntime,
   resolveNlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda";
-
-// Mock the feature flag service BEFORE importing the helper so the
-// FF check returns true regardless of PostHog state.
-vi.mock("../../featureFlag/featureFlag.service", () => ({
-  featureFlagService: {
-    isEnabled: vi.fn().mockResolvedValue(true),
-  },
-}));
 
 // Mock lambdaFetch so it routes through plain fetch instead of trying
 // to invoke an AWS Lambda. The Go subprocess is reachable on
