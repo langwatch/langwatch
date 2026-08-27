@@ -532,26 +532,16 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       watermark = laterOf(watermark, read.watermark);
 
       if (read.nextPage === null) {
-        // The stored start never moves backwards: a retracted window whose
-        // newest bucket predates the stored start must not rewind the source.
-        const drainStart =
-          laterOf(watermark, cursor.storedStart) ?? cursor.storedStart;
         return {
           events,
-          cursor: encodeCursor({
-            // When upgrading from user-only to keyed grouping, advance one
-            // bucket past the watermark: that day was already emitted with
-            // user-only dimensions, and re-reading it with keyed dimensions
-            // would produce a different source_event_id, doubling that day.
-            startingAt: !hasKeyGrouping
-              ? new Date(Date.parse(drainStart) + MS_PER_DAY).toISOString()
-              : drainStart,
-            page: null,
-            query,
-            watermark: null,
-            hasKeyGrouping: true,
-            keyGroupingUpgrade: !hasKeyGrouping,
-          }),
+          cursor: encodeCursor(
+            drainCursor({
+              watermark,
+              storedStart: cursor.storedStart,
+              hasKeyGrouping,
+              query,
+            }),
+          ),
           errorCount: 0,
         };
       }
@@ -873,6 +863,37 @@ function encodeCursor({
     hasKeyGrouping,
     keyGroupingUpgrade,
   });
+}
+
+/** Cursor emitted when a window drains (no more pages). */
+function drainCursor({
+  watermark,
+  storedStart,
+  hasKeyGrouping,
+  query,
+}: {
+  watermark: string | null;
+  storedStart: string;
+  hasKeyGrouping: boolean;
+  query: string;
+}): Parameters<typeof encodeCursor>[0] {
+  // The stored start never moves backwards: a retracted window whose newest
+  // bucket predates the stored start must not rewind the source.
+  const start = laterOf(watermark, storedStart) ?? storedStart;
+  return {
+    // When upgrading from user-only to keyed grouping, advance one bucket past
+    // the watermark: that day was already emitted with user-only dimensions,
+    // and re-reading it with keyed dimensions would produce a different
+    // source_event_id, doubling that day.
+    startingAt: !hasKeyGrouping
+      ? new Date(Date.parse(start) + MS_PER_DAY).toISOString()
+      : start,
+    page: null,
+    query,
+    watermark: null,
+    hasKeyGrouping: true,
+    keyGroupingUpgrade: !hasKeyGrouping,
+  };
 }
 
 /** The later of two ISO instants, tolerating nulls and unparseable input. */
