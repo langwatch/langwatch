@@ -1,5 +1,6 @@
+import { z } from "zod";
 import type { FeatureFlagKey } from "./feature-flag";
-import type { FeatureFlagRules } from "./feature-flag-rules";
+import { featureFlagRulesSchema, type FeatureFlagRules } from "./feature-flag-rules";
 import type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
@@ -9,7 +10,6 @@ import type {
 } from "./feature-flag-experiment";
 import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags";
 import type { FrontendFeatureFlag } from "./frontend-feature-flags";
-import type { FeatureFlagScope } from "./feature-flag";
 import type { FeatureFlagTarget } from "./feature-flag-target";
 
 /** One operator-written row, as the operator surfaces read it back. */
@@ -29,32 +29,42 @@ export interface FeatureFlagWrite {
   lastEditedBy: string | null;
 }
 
-export interface OperatorFeatureFlag {
-  key: string;
-  scope: FeatureFlagScope;
-  defaultValue: boolean;
-  description: string;
-  family: string | null;
-  storedValue: boolean | null;
-  rules: FeatureFlagRules;
-  envOverride: boolean | null;
-  effective: boolean;
-  lastEditedBy: string | null;
-  updatedAt: Date | null;
-}
+export const operatorFeatureFlagSchema = z
+  .object({
+    key: z.string(),
+    scope: z.enum(["SYSTEM", "PRODUCT"]),
+    defaultValue: z.boolean(),
+    description: z.string(),
+    family: z.string().nullable(),
+    storedValue: z.boolean().nullable(),
+    rules: featureFlagRulesSchema,
+    envOverride: z.boolean().nullable(),
+    effective: z.boolean(),
+    lastEditedBy: z.string().nullable(),
+    updatedAt: z.date().nullable(),
+  })
+  .strict();
 
-export interface OperatorFeatureFlagFamily {
-  family: string;
-  keyPrefix: string;
-  scope: FeatureFlagScope;
-  defaultValue: boolean;
-  description: string;
-}
+export const operatorFeatureFlagFamilySchema = z
+  .object({
+    family: z.string(),
+    keyPrefix: z.string(),
+    scope: z.enum(["SYSTEM", "PRODUCT"]),
+    defaultValue: z.boolean(),
+    description: z.string(),
+  })
+  .strict();
 
-export interface OperatorFeatureFlagCatalogue {
-  flags: OperatorFeatureFlag[];
-  families: OperatorFeatureFlagFamily[];
-}
+export const operatorFeatureFlagCatalogueSchema = z
+  .object({
+    flags: z.array(operatorFeatureFlagSchema),
+    families: z.array(operatorFeatureFlagFamilySchema),
+  })
+  .strict();
+
+export type OperatorFeatureFlag = z.infer<typeof operatorFeatureFlagSchema>;
+export type OperatorFeatureFlagFamily = z.infer<typeof operatorFeatureFlagFamilySchema>;
+export type OperatorFeatureFlagCatalogue = z.infer<typeof operatorFeatureFlagCatalogueSchema>;
 
 /**
  * The one canonical feature flag capability.

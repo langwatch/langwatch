@@ -15,16 +15,10 @@ import {
   getProjectionMetadata,
 } from "~/server/event-sourcing/registration/pipelineRegistry";
 import {
-  getFeatureFlagStore,
-  listFeatureFlagFamilies,
-  listFeatureFlags,
-  resolveFlagDefinition,
-} from "~/server/featureFlag";
-import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
-import {
   featureFlagRulesSchema,
-  resolveEffectiveForListing,
-} from "~/server/featureFlag/rules";
+  listFeatureFlags,
+  operatorFeatureFlagCatalogueSchema,
+} from "@langwatch/feature-flag-contract";
 import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
@@ -39,6 +33,7 @@ const opsViewProbe = checkOpsPermission({
 });
 
 const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
+const okOutputSchema = z.object({ ok: z.literal(true) }).strict();
 
 /**
  * The extra gate on an ops write whose damage nobody will notice in time.
@@ -1126,77 +1121,10 @@ export const opsRouter = createTRPCRouter({
    * Read-only: no PostHog calls happen on this path either, so opening
    * the page does not cost a flag call.
    */
-  listFeatureFlags: protectedProcedure.use(opsViewPermission).query(async () => {
-    const store = getFeatureFlagStore();
-    const stored = await store.listAll();
-    const explicit = listFeatureFlags();
-    const families = listFeatureFlagFamilies();
-    const explicitKeys = new Set(explicit.map((e) => e.key));
-
-    const explicitRows = explicit.map((def) => {
-      const row = stored.find((s) => s.key === def.key);
-      const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
-      const effective = resolveEffectiveForListing({
-        envOverride: envOverride ?? null,
-        rules: row?.rules ?? [],
-        rowEnabled: row?.enabled ?? null,
-        registryDefault: def.defaultValue,
-      });
-      return {
-        key: def.key,
-        scope: def.scope,
-        defaultValue: def.defaultValue,
-        description: def.description,
-        family: def.family ?? null,
-        storedValue: row?.enabled ?? null,
-        rules: row?.rules ?? [],
-        envOverride: envOverride ?? null,
-        effective,
-        lastEditedBy: row?.lastEditedBy ?? null,
-        updatedAt: row?.updatedAt ?? null,
-      };
-    });
-
-    // Stored postgres rows without an explicit registry entry remain visible
-    // so operators can clean them up.
-    const orphanRows = stored
-      .filter((s) => !explicitKeys.has(s.key))
-      .map((s) => {
-        const def = resolveFlagDefinition(s.key);
-        const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
-        const effective = resolveEffectiveForListing({
-          envOverride: envOverride ?? null,
-          rules: s.rules,
-          rowEnabled: s.enabled,
-          registryDefault: def?.defaultValue ?? false,
-        });
-        return {
-          key: s.key,
-          scope: def?.scope ?? "SYSTEM",
-          defaultValue: def?.defaultValue ?? false,
-          description:
-            def?.description ?? "Orphaned postgres flag row (no longer registered).",
-          family: def?.family ?? null,
-          storedValue: s.enabled,
-          rules: s.rules,
-          envOverride: envOverride ?? null,
-          effective,
-          lastEditedBy: s.lastEditedBy,
-          updatedAt: s.updatedAt,
-        };
-      });
-
-    return {
-      flags: [...explicitRows, ...orphanRows],
-      families: families.map((f) => ({
-        family: f.family,
-        keyPrefix: f.keyPrefix,
-        scope: f.scope,
-        defaultValue: f.defaultValue,
-        description: f.description,
-      })),
-    };
-  }),
+  listFeatureFlags: protectedProcedure
+    .use(opsViewPermission)
+    .output(operatorFeatureFlagCatalogueSchema)
+    .query(async ({ ctx }) => ctx.app.featureFlags.listOperatorCatalogue()),
 
   setFeatureFlag: protectedProcedure
     .use(opsManagePermission)
@@ -1206,6 +1134,7 @@ export const opsRouter = createTRPCRouter({
         enabled: z.boolean(),
       }),
     )
+    .output(okOutputSchema)
     .mutation(async ({ ctx, input }) => {
       const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
       if (!isExplicitKey) {
@@ -1214,7 +1143,11 @@ export const opsRouter = createTRPCRouter({
           message: `Unknown feature flag key: ${input.key}`,
         });
       }
-      await getFeatureFlagStore().set(input.key, input.enabled, ctx.session.user.id);
+      await ctx.app.featureFlags.setEnabled({
+        key: input.key,
+        enabled: input.enabled,
+        lastEditedBy: ctx.session.user.id,
+      });
       return { ok: true };
     }),
 
@@ -1244,6 +1177,7 @@ export const opsRouter = createTRPCRouter({
           ),
       }),
     )
+    .output(okOutputSchema)
     .mutation(async ({ ctx, input }) => {
       const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
       if (!isExplicitKey) {
@@ -1252,19 +1186,27 @@ export const opsRouter = createTRPCRouter({
           message: `Unknown feature flag key: ${input.key}`,
         });
       }
-      await getFeatureFlagStore().setRules(input.key, input.rules, ctx.session.user.id);
+      await ctx.app.featureFlags.setRules({
+        key: input.key,
+        rules: input.rules,
+        lastEditedBy: ctx.session.user.id,
+      });
       return { ok: true };
     }),
 
   clearFeatureFlag: protectedProcedure
     .use(opsManagePermission)
     .input(z.object({ key: z.string().min(1).max(200) }))
+    .output(okOutputSchema)
     .mutation(async ({ ctx, input }) => {
       // Deliberately permissive: listFeatureFlags surfaces orphan rows
       // (DB keys that no longer match the registry or pipeline graph)
       // so operators can delete them. Validating the key here would
       // break that cleanup path.
-      await getFeatureFlagStore().clear(input.key, ctx.session.user.id);
+      await ctx.app.featureFlags.clearStoredFlag({
+        key: input.key,
+        lastEditedBy: ctx.session.user.id,
+      });
       return { ok: true };
     }),
 

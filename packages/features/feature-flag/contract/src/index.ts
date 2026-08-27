@@ -87,7 +87,12 @@ export type {
   OperatorFeatureFlagFamily,
   StoredFeatureFlag,
 } from "./feature-flag.service";
-export { FeatureFlagService } from "./feature-flag.service";
+export {
+  FeatureFlagService,
+  operatorFeatureFlagCatalogueSchema,
+  operatorFeatureFlagFamilySchema,
+  operatorFeatureFlagSchema,
+} from "./feature-flag.service";
 export type { FrontendFeatureFlag } from "./frontend-feature-flags";
 export { frontendFeatureFlagMapSchema, frontendFeatureFlagSchema } from "./frontend-feature-flags";
 export type {

@@ -183,6 +183,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayCacheRules:update",
     "gatewayCacheRules:delete",
     "gatewayCacheRules:manage",
+    "featureFlags:manageExperiments",
   ],
   [TeamUserRole.MEMBER]: [
     // Projects
@@ -384,6 +385,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<OrganizationUserRole, Permission[]> 
     // envelopes to one endpoint.
     "gatewaySpend:view",
     "gatewaySpend:manage",
+    "featureFlags:manageExperiments",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.
