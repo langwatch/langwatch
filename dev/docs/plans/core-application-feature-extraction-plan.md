@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `1f0ee01ec9`
+**Committed baseline:** `fa00f3d7ec`
 
 **Goal:** delete `platform/app`.
 
@@ -24,8 +24,8 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `1f0ee01ec9`             | 5,894 files | Authoritative current progress        |
-| Current physical tree from `rg --files platform/app` | 5,896 files | Working tree includes new adapters    |
+| Committed `platform/app` at `fa00f3d7ec`             | 5,850 files | Authoritative current progress        |
+| Current physical tree from `rg --files platform/app` | 5,828 files | Unreviewed work; not counted          |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
 | Trace processing cut                                 |    45 fewer | Committed                             |
@@ -38,6 +38,7 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Gateway persistence and policy cut                   |    47 fewer | Committed                             |
 | Trace projection-persistence cut                      |     8 fewer | Committed                             |
 | Topic clustering application cut                     |    39 fewer | Committed                             |
+| Simulation and Suite eventing cut                    |    44 fewer | Partial checkpoint committed          |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
@@ -62,6 +63,7 @@ cutovers remain explicit ledger work.
 | Topic         | Package ownership is committed at `ee3c64f882`; the 56-file app cut is committed at `1f0ee01ec9`, deleting both old roots and 39 net application files. Topic typechecks and 157 tests pass. Docker integration was unavailable.                                              | Clear the strict-layout and relocated task/test import findings without restoring app business logic; rerun Testcontainers integration where Docker exists. |
 | API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
 | Feature Flag  | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services. |
+| Evaluation wave | Evaluator duplicate vocabulary, native implementations and code-evaluator ownership are being removed; Experiment, Simulation and Suite old eventing roots are physically empty. Simulation and Suite have a 44-file committed partial checkpoint at `fa00f3d7ec`. | Finish the seven distinct feature cuts through transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature. |
 
 Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
