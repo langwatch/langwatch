@@ -14,9 +14,7 @@ vi.mock("~/server/users/credential-user", async (importOriginal) => ({
   // The predicate and the error class are REAL: they are the contract the
   // guard and the write share, and mocking them would leave the two halves of
   // it unasserted against each other.
-  ...(await importOriginal<
-    typeof import("~/server/users/credential-user")
-  >()),
+  ...(await importOriginal<typeof import("~/server/users/credential-user")>()),
   createPasskeyUser: (...args: unknown[]) => createPasskeyUser(...args),
 }));
 

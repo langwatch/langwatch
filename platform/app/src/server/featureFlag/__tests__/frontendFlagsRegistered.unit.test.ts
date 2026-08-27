@@ -55,22 +55,13 @@ import { resolveFlagDefinition } from "../registry";
  *   - `ops_ui_ops_menu_pinned` — a per-browser convenience for somebody who
  *     already has ops access. It widens nothing: the sidebar still gates on
  *     access, so forcing it On shows a non-ops user nothing.
- *   - `release_ui_identity_front_door_enabled` — every screen it governs is
- *     reached SIGNED OUT, and `featureFlag.isEnabled` is a protected procedure
- *     that answers 401 rather than false to a visitor with no session
- *     (`useIdentityAuthScreens` never calls it). The fleet-wide lever for this
- *     one is the deployment's `IDENTITY_ROUTER_V2`, which is what a registry
- *     row would have to disagree with to matter.
  *
  * Exact contents, not a count: pinning the members means swapping a key —
  * or adding one — shows up as a changed literal in review. It does not
  * prevent a future author from widening the list, it only makes widening
  * a deliberate, visible edit.
  */
-const UNREGISTERED_BY_DESIGN = [
-  "ops_ui_ops_menu_pinned",
-  "release_ui_identity_front_door_enabled",
-];
+const UNREGISTERED_BY_DESIGN = ["ops_ui_ops_menu_pinned"];
 
 /**
  * Frontend flags that CANNOT resolve to a registry definition, because the
@@ -86,8 +77,13 @@ const UNREGISTERED_BY_DESIGN = [
  * Separate from {@link UNREGISTERED_BY_DESIGN} on purpose: that list is
  * history nobody has cleaned up, this one is a design constraint. A flag
  * belongs here only if its surface genuinely has no session to check.
+ *
+ * Empty today. It held `release_ui_identity_front_door_enabled` while the new
+ * front door was reached through a flag; the front door is the only one now,
+ * so nothing gates it and there is nothing to exempt. The constraint outlives
+ * its one member, so the list stays for the next signed-out surface.
  */
-const SIGNED_OUT_FLAGS = ["release_ui_identity_front_door_enabled"];
+const SIGNED_OUT_FLAGS: readonly string[] = [];
 
 /**
  * Frontend-exposed flags that are SYSTEM on purpose: internal levers

@@ -865,7 +865,7 @@ describe("given the identifier-first sign-in screen", () => {
 
     /** @scenario The sign-up door never offers to use a passkey that already exists */
     it("offers creating a passkey, never using one that already exists", async () => {
-      publicEnvRef.current = { IS_SAAS: true, PASSKEYS_ENABLED: true };
+      publicEnvRef.current = { IS_SAAS: true };
       routeMock.mockResolvedValue(unknownIdentifier);
 
       renderScreen();

@@ -121,10 +121,9 @@ vi.mock("~/utils/auth-client", () => ({
     data: { user: { email: "user@example.com" } },
   }),
   linkAccount: vi.fn(),
-  // `PasskeysSection` calls `useListPasskeys` at the top of its body, above
-  // the `PASSKEYS_ENABLED` early return the hooks rule forces it to sit
-  // above, so the flag cannot keep this off the render path. Only the hook is
-  // named: `passkey.*` is reached from click handlers this suite never fires.
+  // `PasskeysSection` calls `useListPasskeys` at the top of its body, so it is
+  // always on the render path. Only the hook is named: `passkey.*` is reached
+  // from click handlers this suite never fires.
   authClient: { useListPasskeys: () => ({ data: [], isPending: false }) },
 }));
 

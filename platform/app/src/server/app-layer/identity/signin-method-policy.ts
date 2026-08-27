@@ -53,9 +53,10 @@ export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
 
 /**
  * Whether this deployment offers two-step verification at all (D06). The
- * same derived read `deploymentOffersPasskeys` is, for the same reason: the
  * two-factor plugin's server half is registered off this value, so a screen
- * that offers a setup can never call an endpoint nobody mounted.
+ * that offers a setup can never call an endpoint nobody mounted. Passkeys
+ * used to have a matching read; they no longer do, because they are no longer
+ * a setting — the plugin is mounted everywhere.
  *
  * It is NOT part of any method set. Two-step verification is a second factor
  * answered after a first one, never a way in on its own, so nothing about it

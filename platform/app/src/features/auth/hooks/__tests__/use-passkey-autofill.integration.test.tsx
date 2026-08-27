@@ -24,6 +24,9 @@ vi.mock("~/utils/auth-client", () => ({
   safeRedirectTarget: (url?: string) => url ?? "/",
 }));
 
+import { UNKNOWN_ERROR_PRESENTATION } from "~/features/errors/logic/presentation";
+import { resolveErrorCopy } from "~/features/errors/logic/resolveErrorCopy";
+
 import { usePasskeyAutofill } from "../usePasskeyAutofill";
 
 function Door({
@@ -176,52 +179,75 @@ describe("given a deployment that offers passkeys", () => {
    * nothing at all, so the click read as broken.
    */
   describe("when somebody picks a passkey the server refuses", () => {
+    /**
+     * Asserted through `resolveErrorCopy`, which is the one implementation of
+     * "what does this error say to a customer" — the same call the card's
+     * alert makes. Asserting that `onError` received the plugin's own object
+     * was the bug wearing a test: the raw `{ code, status }` is not a shape
+     * `readHandledError` can read, so a refusal the server had named
+     * correctly reached the screen as the generic "We've been notified", and
+     * a test that checked only the object's identity could never see it. The
+     * scenario says the refusal SAYS SO, so that is what is asserted.
+     */
     /** @scenario A passkey I picked that cannot be used says so */
-    it("tells the screen, so the refusal is not silent", async () => {
-      const refusal = { code: "identity_passkey_not_recognized" };
+    it("says which passkey problem it was, in words", async () => {
       passkeyMock.mockImplementationOnce(
-        async () => ({ error: refusal }) as never,
+        async () =>
+          ({
+            error: { code: "ERROR_CREDENTIAL_NOT_FOUND", status: 401 },
+          }) as never,
       );
       const onError = vi.fn();
       const { getByLabelText } = render(<Door enabled onError={onError} />);
 
       fireEvent.pointerDown(getByLabelText("Email"));
 
-      await waitFor(() => expect(onError).toHaveBeenCalledWith(refusal));
+      await waitFor(() => expect(onError).toHaveBeenCalled());
+      const copy = resolveErrorCopy({
+        error: onError.mock.calls[0]?.[0],
+        fallbackTitle: "Could not use a passkey",
+      });
+      expect(copy.title).toBe("That passkey isn't one we recognize");
+      expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
       expect(navigateMock).not.toHaveBeenCalled();
     });
 
     /** @scenario A passkey I picked that cannot be used says so */
-    it("reports a ceremony that threw rather than answered", async () => {
-      const thrown = new Error("the authenticator gave up");
+    it("says a ceremony that threw did not finish, rather than apologising", async () => {
       passkeyMock.mockImplementationOnce(async () => {
-        throw thrown;
+        throw new Error("the authenticator gave up");
       });
       const onError = vi.fn();
       const { getByLabelText } = render(<Door enabled onError={onError} />);
 
       fireEvent.pointerDown(getByLabelText("Email"));
 
-      await waitFor(() => expect(onError).toHaveBeenCalledWith(thrown));
+      await waitFor(() => expect(onError).toHaveBeenCalled());
+      const copy = resolveErrorCopy({
+        error: onError.mock.calls[0]?.[0],
+        fallbackTitle: "Could not use a passkey",
+      });
+      expect(copy.title).toBe("That passkey attempt didn't finish");
+      expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
     });
   });
 
   describe("when somebody dismisses the sheet instead", () => {
     /** @scenario Dismissing the passkey sheet is not a failure */
-    it.each([["NotAllowedError"], ["AbortError"]])(
-      "stays silent for %s, because nobody finished anything",
-      async (name) => {
-        passkeyMock.mockImplementationOnce(async () => {
-          throw new DOMException("declined", name);
-        });
-        const onError = vi.fn();
-        const { getByLabelText } = render(<Door enabled onError={onError} />);
+    it.each([
+      ["NotAllowedError"],
+      ["AbortError"],
+    ])("stays silent for %s, because nobody finished anything", async (name) => {
+      passkeyMock.mockImplementationOnce(async () => {
+        throw new DOMException("declined", name);
+      });
+      const onError = vi.fn();
+      const { getByLabelText } = render(<Door enabled onError={onError} />);
 
-        fireEvent.pointerDown(getByLabelText("Email"));
-        await flush();
+      fireEvent.pointerDown(getByLabelText("Email"));
+      await flush();
 
-        expect(onError).not.toHaveBeenCalled();
-      },
-    );
+      expect(onError).not.toHaveBeenCalled();
+    });
   });
 });

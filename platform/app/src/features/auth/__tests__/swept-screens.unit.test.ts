@@ -50,25 +50,22 @@ const SWEPT_SCREENS: readonly string[] = [
 ];
 
 /**
- * The three screens that still carry their pre-flip twin.
+ * The screens that still carry their pre-flip twin: none, now.
  *
- * `IDENTITY_ROUTER_V2` is a live flag with a bake behind it, and rollback is
- * the flag off — so until the bake ends these files hold BOTH doors, and the
- * legacy half is still the app's own furniture on purpose
- * (`signin-signup-screens.feature`: "The legacy screens return untouched when
- * the flag is off"). The strict assertions below are therefore scoped away
- * from them, exactly as the spec scopes its own sweep to the enforced
- * journeys. They are still held to composing the shell, which is the enforced
- * half of each of them.
+ * It held sign-in, sign-up and accept while `IDENTITY_ROUTER_V2` was live and
+ * rollback was the flag off, because until the bake ended those files held
+ * BOTH doors and the legacy half was the app's own furniture on purpose. The
+ * strict assertions below were scoped away from them for exactly that long.
  *
- * This list shrinks to nothing when the legacy path is deleted at bake end,
- * and the assertions tighten by themselves when it does.
+ * The bake ended, the flag and the legacy halves are deleted, and the list is
+ * empty — which is what its own instruction said to do, and what tightens the
+ * assertions onto the three screens they most needed to cover. Left populated
+ * it would go on excusing the very files the flip rewrote.
+ *
+ * Keep it empty. A screen that needs excusing from these rules is a screen
+ * that has left the auth surface without saying so.
  */
-const STILL_CARRY_A_LEGACY_TWIN: readonly string[] = [
-  "pages/auth/signin.tsx",
-  "pages/auth/signup.tsx",
-  "pages/invite/accept.tsx",
-];
+const STILL_CARRY_A_LEGACY_TWIN: readonly string[] = [];
 
 /** The cards those screens draw, including the ones swept in this pass. */
 const SWEPT_CARDS: readonly string[] = [

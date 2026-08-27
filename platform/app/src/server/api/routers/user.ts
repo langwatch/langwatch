@@ -17,9 +17,7 @@ import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
-import {
-  deploymentOffersTwoStepVerification,
-} from "~/server/app-layer/identity/signin-method-policy";
+import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   AuthRateLimitedError,

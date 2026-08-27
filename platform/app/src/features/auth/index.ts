@@ -4,7 +4,8 @@
  * logic of their own — see `logic/routingReasonCopy.ts` for the one place a
  * reason code becomes words.
  *
- * before rendering any of this, and the legacy screens answer until the flip.
+ * These are the only screens. There is no second set behind a setting any
+ * more, and nothing here is asked whether it may render.
  */
 export { AuthShell } from "./components/AuthShell";
 export { AuthValuePanel } from "./components/AuthValuePanel";

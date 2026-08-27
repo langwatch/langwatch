@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { authClient, navigate, safeRedirectTarget } from "~/utils/auth-client";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
+import { passkeyFailure, passkeyFailureFrom } from "../logic/passkeyFailure";
 
 /**
  * A ceremony nobody completed: the sheet was dismissed, the screen went away,
@@ -45,7 +46,13 @@ async function offerPasskeyFromAutofill({
     // passkey the server no longer holds (`identity_passkey_not_recognized`)
     // was refused correctly, and the screen said nothing.
     if (result.error) {
-      onError(result.error);
+      // Mapped to a code the registry has words for, exactly as the button on
+      // the rail maps its own. Handed on raw, the plugin's `{ code, status }`
+      // is not a shape `readHandledError` can read, so a refusal it had named
+      // correctly reached the card as "Something went wrong. We've been
+      // notified." — which is the generic line for a failure nobody
+      // anticipated, and this one we anticipated and wrote copy for.
+      onError(passkeyFailureFrom(result.error));
       return;
     }
 
@@ -54,7 +61,9 @@ async function offerPasskeyFromAutofill({
   } catch (error) {
     // Still silent for the ones nobody finished, and only those.
     if (!isLive() || wasDeclined(error)) return;
-    onError(error);
+    // A throw never reached the server, so there is no status to read and
+    // nothing to tell apart — the ceremony simply did not finish.
+    onError(passkeyFailure(void 0));
   }
 }
 

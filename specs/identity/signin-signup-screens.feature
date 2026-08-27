@@ -139,11 +139,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   # is indistinguishable from a dead control. Reported from a live stack: a
   # passkey the server no longer held was refused exactly as it should be, and
   # the screen said nothing at all.
+  #
+  # Saying SOMETHING is not enough, which is the second half of this and the
+  # half that regressed: the ceremony's failures arrive from the browser in a
+  # shape our error vocabulary cannot read, so passed along as they are they
+  # resolve to the generic "Something went wrong. We've been notified." That
+  # line is for failures nobody anticipated. These two were anticipated and
+  # have had registered copy all along, and an apology in their place tells
+  # the reader we broke rather than that their passkey did not match.
   @integration
   Scenario: A passkey I picked that cannot be used says so
     Given a passkey is being offered from the address field itself
     When I pick one and it cannot be used
     Then the card says so in the same place its other passkey refusals appear
+    And it names which of the two passkey problems it was
+    And it does not apologize for a fault of ours
     And I am not sent anywhere
 
   # A decline is not a failure, and the browser reports it the same way it

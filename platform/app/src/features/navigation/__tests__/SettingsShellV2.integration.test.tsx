@@ -16,10 +16,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { MemoryRouter } from "react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/settings";
@@ -223,7 +223,9 @@ vi.mock("~/utils/api", () => ({
     joinRequests: {
       offer: { useQuery: () => ({ data: undefined }) },
       mine: { useQuery: () => ({ data: undefined }) },
-      dismissOffer: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
       request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
   },
@@ -274,9 +276,9 @@ function renderSettings() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <MemoryRouter>
-      <SettingsLayout>
-        <div data-testid="settings-page-content" />
-      </SettingsLayout>
+        <SettingsLayout>
+          <div data-testid="settings-page-content" />
+        </SettingsLayout>
       </MemoryRouter>
     </ChakraProvider>,
   );
@@ -288,9 +290,9 @@ function renderOpsPage(pathname: string) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <MemoryRouter>
-      <DashboardLayout>
-        <div data-testid="ops-page-content" />
-      </DashboardLayout>
+        <DashboardLayout>
+          <div data-testid="ops-page-content" />
+        </DashboardLayout>
       </MemoryRouter>
     </ChakraProvider>,
   );

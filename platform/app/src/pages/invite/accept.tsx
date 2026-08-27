@@ -1,20 +1,18 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell, InviteLanding } from "~/features/auth";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
-import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
-import { SetupLayout } from "../../components/SetupLayout";
 
 /**
  * The invitation link's landing (ADR-117 §6, D13).
  *
- * Enforced, it is a screen: it says who is asking before anything happens,
- * takes a signed-out visitor through sign-in or sign-up with the invitation
- * still in hand, and asks a signed-in one to confirm. Until the flip it stays
- * what it was — a page that accepts on arrival and requires a session to
- * reach at all.
+ * It is a screen: it says who is asking before anything happens, takes a
+ * signed-out visitor through sign-in or sign-up with the invitation still in
+ * hand, and asks a signed-in one to confirm. It used to be a page that
+ * accepted on arrival and needed a session to reach at all; that half is
+ * deleted, along with the setting that chose between them.
  */
 export default function Accept() {
   const router = useRouter();
@@ -60,4 +58,3 @@ function IncompleteInviteLink() {
     </AuthCard>
   );
 }
-
