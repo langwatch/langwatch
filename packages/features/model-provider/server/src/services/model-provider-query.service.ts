@@ -31,18 +31,16 @@ export class ModelProviderQueryService {
 
   async listForProject(input: { projectId: string }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListProjectInputSchema.parse(input);
-    const projectScopes = await this.options.scopes.tryGetProjectScopes(parsed.projectId);
-    const [saved, system] = await Promise.all([
-      projectScopes
-        ? this.options.repository.listForProject(projectScopes)
-        : Promise.resolve([]),
-      this.options.catalog.systemProviders(parsed),
-    ]);
+    const { saved, system } = await this.getProjectCandidates(parsed.projectId);
     const savedProviders = new Set(saved.map((provider) => provider.provider));
 
     return [
-      ...saved.map((provider) => this.toSummary(provider)),
-      ...system.filter((provider) => !savedProviders.has(provider.provider)),
+      ...saved
+        .filter((provider) => this.shouldKeep(provider, system))
+        .map((provider) => this.toSummary(provider)),
+      ...system.filter(
+        (provider) => provider.enabled && !savedProviders.has(provider.provider),
+      ),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
 
@@ -50,15 +48,25 @@ export class ModelProviderQueryService {
     organizationId: string;
   }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListOrganizationInputSchema.parse(input);
-    const [saved, system] = await Promise.all([
+    const [saved, referenceCreatedAt] = await Promise.all([
       this.options.repository.listForOrganization(parsed.organizationId),
-      this.options.catalog.systemProviders(parsed),
+      this.options.scopes.tryGetOrganizationSystemReference(parsed.organizationId),
     ]);
+    const system = referenceCreatedAt
+      ? await this.options.catalog.systemProviders({
+          ...parsed,
+          referenceCreatedAt,
+        })
+      : [];
     const savedProviders = new Set(saved.map((provider) => provider.provider));
 
     return [
-      ...saved.map((provider) => this.toSummary(provider)),
-      ...system.filter((provider) => !savedProviders.has(provider.provider)),
+      ...saved
+        .filter((provider) => this.shouldKeep(provider, system))
+        .map((provider) => this.toSummary(provider)),
+      ...system.filter(
+        (provider) => provider.enabled && !savedProviders.has(provider.provider),
+      ),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
 
@@ -66,8 +74,13 @@ export class ModelProviderQueryService {
     projectId: string;
     provider?: string;
   }): Promise<Record<string, ModelProviderSummary>> {
-    const providers = await this.listForProject(input);
-    const chain = await this.getProjectScopeChain(input.projectId);
+    const { chain, saved, system } = await this.getProjectCandidates(input.projectId);
+    const stored = saved.filter((provider) => this.shouldKeep(provider, system));
+    const storedProviders = new Set(stored.map((provider) => provider.provider));
+    const providers = [
+      ...stored.map((provider) => this.toSummary(provider)),
+      ...system.filter((provider) => !storedProviders.has(provider.provider)),
+    ];
     const selected = this.selectProjectProviders(providers, chain, input.provider);
 
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
@@ -133,18 +146,13 @@ export class ModelProviderQueryService {
     projectId: string;
   }): Promise<Record<string, ModelProviderExecution>> {
     const parsed = modelProviderListProjectInputSchema.parse(input);
-    const chain = await this.getProjectScopeChain(parsed.projectId);
-    const [saved, system] = await Promise.all([
-      this.options.repository.listForProject(chain),
-      this.options.catalog.systemProviders(parsed),
-    ]);
+    const { chain, saved, system } = await this.getProjectCandidates(parsed.projectId);
+    const stored = saved.filter((provider) => this.shouldKeep(provider, system));
+    const storedProviders = new Set(stored.map((provider) => provider.provider));
     const candidates: ModelProviderExecution[] = [
-      ...saved.map((provider) => this.toExecutionProvider(provider)),
+      ...stored.map((provider) => this.toExecutionProvider(provider)),
       ...system
-        .filter(
-          (provider) =>
-            !saved.some((savedProvider) => savedProvider.provider === provider.provider),
-        )
+        .filter((provider) => !storedProviders.has(provider.provider))
         .map((provider) => modelProviderExecutionSchema.parse(provider)),
     ];
     const selected = new Map<string, ModelProviderExecution>();
@@ -156,6 +164,38 @@ export class ModelProviderQueryService {
     }
 
     return Object.fromEntries(selected.entries());
+  }
+
+  private async getProjectCandidates(projectId: string): Promise<{
+    chain: ModelDefaultScope[];
+    saved: ModelProvider[];
+    system: ModelProviderSummary[];
+  }> {
+    const context = await this.options.scopes.getProjectSystemContext(projectId);
+    const [saved, system] = await Promise.all([
+      this.options.repository.listForProject(context.scopes),
+      this.options.catalog.systemProviders({
+        projectId,
+        referenceCreatedAt: context.referenceCreatedAt,
+      }),
+    ]);
+
+    return { chain: context.scopes, saved, system };
+  }
+
+  private shouldKeep(provider: ModelProvider, system: ModelProviderSummary[]): boolean {
+    if (provider.customKeys) {
+      return true;
+    }
+
+    const defaultProvider = system.find(
+      (candidate) => candidate.provider === provider.provider,
+    );
+    if (provider.enabled !== defaultProvider?.enabled) {
+      return true;
+    }
+
+    return provider.customModels.length > 0 || provider.customEmbeddingsModels.length > 0;
   }
 
   private toSummary(provider: ModelProvider): ModelProviderSummary {

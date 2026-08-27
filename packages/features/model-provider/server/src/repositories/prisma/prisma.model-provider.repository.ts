@@ -308,8 +308,13 @@ function toModelProvider(
     rateLimitTpm: row.rateLimitTpm ?? null,
     rateLimitRpd: row.rateLimitRpd ?? null,
     fallbackPriorityGlobal: row.fallbackPriorityGlobal ?? null,
+    rotationPolicy: row.rotationPolicy,
     providerConfig: asRecord(row.providerConfig),
     deploymentMapping: asStringRecord(row.deploymentMapping),
+    healthStatus: row.healthStatus,
+    circuitOpenedAt: row.circuitOpenedAt ?? null,
+    lastHealthCheckAt: row.lastHealthCheckAt ?? null,
+    disabledAt: row.disabledAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });

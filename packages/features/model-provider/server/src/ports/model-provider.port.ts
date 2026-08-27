@@ -26,8 +26,6 @@ import {
   type ModelDefaultFeature,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-
 export type ModelProviderRecord = ModelProvider;
 export type ModelDefaultConfigSaveInput = {
   id: string;
@@ -148,6 +146,7 @@ export abstract class ModelProviderCatalog {
   abstract systemProviders(input: {
     projectId?: string;
     organizationId?: string;
+    referenceCreatedAt: Date;
   }): Promise<ModelProviderSummary[]>;
   abstract validateApiKey(
     provider: string,

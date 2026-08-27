@@ -56,10 +56,7 @@ class Providers extends ModelProviderRepository {
   deleted: string[] = [];
   storedCredentialIds = new Set<string>();
   updates: ModelProvider[] = [];
-  tryFindById(input: {
-    id: string;
-    organizationId?: string;
-  }): Promise<ModelProvider | null> {
+  tryFindById(input: { id: string; organizationId?: string }): Promise<ModelProvider | null> {
     return Promise.resolve(
       this.rows.find(
         (row) =>
@@ -68,12 +65,8 @@ class Providers extends ModelProviderRepository {
       ) ?? null,
     );
   }
-  tryFindByProviderForProject(input: {
-    provider: string;
-  }): Promise<ModelProvider | null> {
-    return Promise.resolve(
-      this.rows.find((row) => row.provider === input.provider) ?? null,
-    );
+  tryFindByProviderForProject(input: { provider: string }): Promise<ModelProvider | null> {
+    return Promise.resolve(this.rows.find((row) => row.provider === input.provider) ?? null);
   }
   listForProject(): Promise<ModelProvider[]> {
     return Promise.resolve(this.rows);
@@ -107,9 +100,7 @@ class Providers extends ModelProviderRepository {
 class CodexRefresher extends CodexTokenRefresher {
   calls = 0;
   failure: Error | null = null;
-  result:
-    | { status: "refreshed"; tokens: CodexTokenKeys }
-    | { status: "session_expired" } = {
+  result: { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" } = {
     status: "session_expired",
   };
 
@@ -242,6 +233,22 @@ class Authorization extends AuthzService {
   }
 
   listUserCreatedRoles(): Promise<never> {
+    return this.notUsed();
+  }
+
+  wouldFirstBindingDisableLegacyAccess(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listManagedBindingsForUser(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listManagedBindingsForOrganization(): Promise<never> {
+    return this.notUsed();
+  }
+
+  getAccessBreakdown(): Promise<never> {
     return this.notUsed();
   }
 
@@ -561,9 +568,7 @@ class Defaults extends ModelDefaultRepository {
   tryGetById(id: string): Promise<ModelDefaultConfig | null> {
     return Promise.resolve(this.configs.find((config) => config.id === id) ?? null);
   }
-  tryFindByScope(
-    scope: ModelDefaultConfig["scopes"][number],
-  ): Promise<ModelDefaultConfig | null> {
+  tryFindByScope(scope: ModelDefaultConfig["scopes"][number]): Promise<ModelDefaultConfig | null> {
     return Promise.resolve(
       this.configs.find((config) =>
         config.scopes.some(
@@ -793,6 +798,7 @@ function service(
   authorization: AuthzService = new Authorization(),
   connectionRateLimiter = new ConnectionRateLimiter(),
   credentialPolicy: ModelProviderCredentialPolicy = new CredentialPolicy(),
+  defaults = new Defaults(),
 ) {
   return ModelProviderService.create({
     repository: providers,
@@ -801,7 +807,7 @@ function service(
     credentialPolicy,
     codexTokenRefresher,
     connectionRateLimiter,
-    defaults: new Defaults(),
+    defaults,
     costs: new Costs(),
     catalog,
     authorization,
@@ -811,6 +817,38 @@ function service(
 }
 
 describe("ModelProviderService", () => {
+  it("resolves the newest feature default through the project scope chain", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "team-default",
+        config: { DEFAULT: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "TEAM", scopeId: "team_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      service(
+        new Providers(),
+        new Catalog(),
+        new CodexRefresher(),
+        new Authorization(),
+        new ConnectionRateLimiter(),
+        new CredentialPolicy(),
+        defaults,
+      ).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({
+      model: "openai/gpt-5-mini",
+      source: "role_default",
+      scope: "team",
+    });
+  });
+
   it("masks credentials in frontend summaries", async () => {
     const result = await service().listForProject({ projectId: "project_1" });
     expect(result[0]?.customKeys).toEqual({ apiKey: "••••" });
@@ -1251,9 +1289,7 @@ describe("ModelProviderService", () => {
       }),
     ];
 
-    await expect(
-      service(providers).getCodexStatus({ projectId: "project_1" }),
-    ).resolves.toEqual({
+    await expect(service(providers).getCodexStatus({ projectId: "project_1" })).resolves.toEqual({
       connected: true,
       providerId: "mp_1",
       plan: "plus",
@@ -1572,9 +1608,7 @@ describe("ModelProviderService", () => {
       { actorId: "user_1", scopeType: "ORGANIZATION", scopeId: "org_1" },
       { actorId: "user_1", scopeType: "PROJECT", scopeId: "project_1" },
     ]);
-    expect(providers.rows[0]?.scopes).toEqual([
-      { scopeType: "PROJECT", scopeId: "project_1" },
-    ]);
+    expect(providers.rows[0]?.scopes).toEqual([{ scopeType: "PROJECT", scopeId: "project_1" }]);
   });
 
   it("does not turn a missing id into a new provider row", async () => {
@@ -1668,13 +1702,11 @@ describe("ModelProviderService", () => {
     const catalog = new Catalog();
     const authorization = new Authorization();
 
-    await service(providers, catalog, new CodexRefresher(), authorization).testConnection(
-      {
-        modelProviderId: "mp_1",
-        organizationId: "org_1",
-        actorId: "user_1",
-      },
-    );
+    await service(providers, catalog, new CodexRefresher(), authorization).testConnection({
+      modelProviderId: "mp_1",
+      organizationId: "org_1",
+      actorId: "user_1",
+    });
 
     expect(catalog.connectionChecks).toEqual([
       { provider: "openai", customKeys: { apiKey: "stored-secret" } },

@@ -1,7 +1,7 @@
 export {
   PostgresModelProviderAdapter,
   type PostgresModelProviderAdapterOptions,
-} from "./adapters/postgres-model-provider.adapter";
+} from "./adapters/postgres.model-provider.adapter";
 export {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
@@ -12,3 +12,12 @@ export {
   ModelProviderIdService,
 } from "./ports/model-provider.port";
 export { ModelProviderKeysService } from "./services/model-provider-keys.service";
+export { resolveMaxTokensCeiling } from "./adapters/resolve-max-tokens-ceiling.adapter";
+export {
+  isKnownModelId,
+  isRankableByPrice,
+  partitionTierAliases,
+  suggestTierTargets,
+  type SuggestTierTargetsInput,
+  type TierTargetSuggestion,
+} from "./adapters/suggest-tier-targets.adapter";

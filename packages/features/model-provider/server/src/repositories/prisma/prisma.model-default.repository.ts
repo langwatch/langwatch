@@ -7,7 +7,6 @@ import {
   modelDefaultConfigSchema,
   type ModelDefaultConfig,
   type ModelDefaultScope,
-  type ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
 import {
   ModelDefaultRepository,

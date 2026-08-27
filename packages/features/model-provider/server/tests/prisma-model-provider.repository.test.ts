@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { ModelProviderCredentialCodec } from "../src/ports/model-provider.port";
-import { PrismaModelProviderRepository } from "../src/repositories/prisma/prisma-model-provider.repository";
+import { PrismaModelProviderRepository } from "../src/repositories/prisma/prisma.model-provider.repository";
 
 class Credentials extends ModelProviderCredentialCodec {
   encode(value: Record<string, unknown> | null): unknown {

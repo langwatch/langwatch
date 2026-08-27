@@ -23,6 +23,8 @@ import {
   type ModelProviderCodexStatusInput,
   type ModelProviderDeleteInput,
   type ModelProviderExecution,
+  type ModelProviderAlternateResolution,
+  type ModelProviderResolution,
   type ModelProviderExecutionParameters,
   type ModelProviderExecutionPrepareInput,
   ModelProviderService as ModelProviderServiceContract,
@@ -57,6 +59,7 @@ import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboard
 import { ModelProviderQueryService } from "./model-provider-query.service";
 import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service";
 import { ModelProviderScopeService } from "./model-provider-scope.service";
+import { ModelProviderResolutionService } from "./model-provider-resolution.service";
 
 export interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;
@@ -85,6 +88,7 @@ export class ModelProviderService extends ModelProviderServiceContract {
   private readonly defaultWrites: ModelProviderDefaultsWriteService;
   private readonly execution: ModelProviderExecutionService;
   private readonly query: ModelProviderQueryService;
+  private readonly resolution: ModelProviderResolutionService;
 
   private constructor(private readonly options: ModelProviderServiceOptions) {
     super();
@@ -96,6 +100,11 @@ export class ModelProviderService extends ModelProviderServiceContract {
     const scopes = ModelProviderScopeService.create({
       projects: options.projects,
       organizations: options.organizations,
+    });
+    this.resolution = ModelProviderResolutionService.create({
+      defaults: options.defaults,
+      catalog: options.catalog,
+      scopes,
     });
     this.commands = ModelProviderCommandService.create({
       repository: options.repository,
@@ -254,6 +263,20 @@ export class ModelProviderService extends ModelProviderServiceContract {
     input: ModelDefaultResolveInput,
   ): Promise<ModelDefaultEffective | null> {
     return this.defaults.tryGetResolved(input);
+  }
+
+  resolveModelForFeature(
+    input: ModelDefaultResolveInput,
+  ): Promise<ModelProviderResolution> {
+    return this.resolution.resolve(input);
+  }
+
+  tryFindAlternateModel(input: {
+    projectId: string;
+    featureKey: string;
+    skipFromScope: ModelProviderResolution["scope"];
+  }): Promise<ModelProviderAlternateResolution | null> {
+    return this.resolution.tryFindAlternate(input);
   }
 
   setDefault(input: ModelDefaultAssignmentInput): Promise<void> {

@@ -10,9 +10,9 @@ import {
   ModelTranslationPort,
   type ModelProviderIdService,
 } from "../ports/model-provider.port";
-import { PrismaModelCostRepository } from "../repositories/prisma/prisma-model-cost.repository";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma-model-default.repository";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma-model-provider.repository";
+import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository";
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
 import { ModelProviderService } from "../services/model-provider.service";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service";
 

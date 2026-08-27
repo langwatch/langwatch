@@ -17,6 +17,7 @@ import type {
   ModelProviderRepository,
 } from "../ports/model-provider.port";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
+import { modelProviderScopeNames } from "./model-provider-defaults-scopes.service";
 import type { ModelProviderScopeService } from "./model-provider-scope.service";
 
 type DefaultScope = { id: string; name: string };
@@ -60,7 +61,7 @@ export class ModelProviderDefaultsService {
       }),
     });
     const writable = await this.writableScopes(available, parsed.actorId);
-    const names = scopeNames(available);
+    const names = modelProviderScopeNames(available);
 
     return modelDefaultSnapshotSchema.parse({
       projectId: parsed.projectId,
@@ -125,7 +126,10 @@ export class ModelProviderDefaultsService {
   async tryGetResolved(
     input: ModelDefaultResolveInput,
   ): Promise<ModelDefaultEffective | null> {
-    const parsed = modelDefaultResolveInputSchema.parse(input);
+    const parsed = modelDefaultResolveInputSchema.parse({
+      projectId: input.projectId,
+      featureKey: input.featureKey,
+    });
     const snapshot = await this.getSnapshot({ projectId: parsed.projectId });
     const direct = snapshot.effective[parsed.featureKey];
     if (direct) {
@@ -486,14 +490,4 @@ async function filterScopes<T>(
   );
 
   return results.filter(({ keep }) => keep).map(({ scope }) => scope);
-}
-
-function scopeNames(available: DefaultAvailableScopes): Map<string, string> {
-  return new Map([
-    ...(available.organization
-      ? [[available.organization.id, available.organization.name] as const]
-      : []),
-    ...available.teams.map((scope) => [scope.id, scope.name] as const),
-    ...available.projects.map((scope) => [scope.id, scope.name] as const),
-  ]);
 }

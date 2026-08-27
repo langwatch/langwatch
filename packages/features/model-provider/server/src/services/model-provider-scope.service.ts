@@ -21,6 +21,11 @@ export type ModelProviderAvailableScopes = {
   projects: Array<ScopeReference & { teamId: string }>;
 };
 
+export type ModelProviderProjectSystemContext = {
+  scopes: ModelDefaultScope[];
+  referenceCreatedAt: Date;
+};
+
 export class ModelProviderScopeService {
   private constructor(
     private readonly projects: ProjectService,
@@ -52,6 +57,38 @@ export class ModelProviderScopeService {
   async getProjectScopes(projectId: string): Promise<ModelDefaultScope[]> {
     const project = await this.projects.getWithTeam(projectId);
     return projectScopes(project.id, project.teamId, project.team.organizationId);
+  }
+
+  async getProjectSystemContext(
+    projectId: string,
+  ): Promise<ModelProviderProjectSystemContext> {
+    const project = await this.projects.getWithTeam(projectId);
+
+    return {
+      scopes: projectScopes(project.id, project.teamId, project.team.organizationId),
+      referenceCreatedAt: project.createdAt,
+    };
+  }
+
+  async tryGetOrganizationSystemReference(organizationId: string): Promise<Date | null> {
+    const firstPage = await this.projects.listByOrganization({
+      organizationId,
+      page: 1,
+      limit: 1,
+    });
+    if (firstPage.pagination.total === 0) {
+      return null;
+    }
+    if (firstPage.pagination.total === 1) {
+      return firstPage.data[0]?.createdAt ?? null;
+    }
+
+    const lastPage = await this.projects.listByOrganization({
+      organizationId,
+      page: firstPage.pagination.total,
+      limit: 1,
+    });
+    return lastPage.data[0]?.createdAt ?? null;
   }
 
   async tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
