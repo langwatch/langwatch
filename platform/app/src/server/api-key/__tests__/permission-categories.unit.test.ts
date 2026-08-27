@@ -11,7 +11,7 @@ import {
 } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 import { hasPermissionWithHierarchy } from "../../api/rbac";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const CustomRolePermissionsSchema = z.array(apiKeyPermissionFormatSchema);
 

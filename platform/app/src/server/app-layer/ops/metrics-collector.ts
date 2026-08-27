@@ -281,7 +281,7 @@ export function buildPipelineTree({
  *
  * The pending-counter reconcile is deliberately NOT lease-gated. It already has
  * its own cross-instance single-flight marker
- * (`specs/ops/pending-counter-reconcile.feature`), and stacking the snapshot
+ * (`packages/features/ops/specs/pending-counter-reconcile.feature`), and stacking the snapshot
  * lease on top would make several of that spec's scenarios unreachable.
  */
 export class OpsMetricsCollector {

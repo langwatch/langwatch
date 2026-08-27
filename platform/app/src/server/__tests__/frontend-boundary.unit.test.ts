@@ -309,9 +309,8 @@ const bannedPackage = (spec: string): string | null =>
  * with the guard still green — precisely the leaf class the leak this guard
  * exists to prevent travelled through.
  *
- * The extension alone is not the signal: `server/modelProviders/llmModelCost.tsx`
- * and `features/onboarding/.../registry.tsx` are `.tsx` files with no JSX in
- * them, so nothing is emitted and flagging them would be a false positive. Every
+ * The extension alone is not the signal: the onboarding `registry.tsx` files
+ * contain no JSX, so nothing is emitted and flagging them would be a false positive. Every
  * real JSX element has to close, either `</tag>` or `/>`, so requiring one of
  * those keeps the rule to files that genuinely render. A `</` inside a string or
  * comment could over-report; none does today, and the failure direction of a
@@ -544,7 +543,10 @@ describe("browser-only UI never reaches the backend", () => {
     });
 
     it("leaves a .tsx that renders nothing alone, so the rule is not the extension", () => {
-      const noJsx = path.join(SRC, "server/modelProviders/llmModelCost.tsx");
+      const noJsx = path.join(
+        SRC,
+        "features/onboarding/regions/model-providers/registry.tsx",
+      );
       expect(fs.existsSync(noJsx)).toBe(true);
 
       expect(chainToBrowserUi(noJsx)).toBeNull();

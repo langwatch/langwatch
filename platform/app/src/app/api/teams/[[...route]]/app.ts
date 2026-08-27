@@ -1,6 +1,6 @@
 import { describeRoute } from "hono-openapi";
 import { organizationTeamRoleSchema } from "@langwatch/organization-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

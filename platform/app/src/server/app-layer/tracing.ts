@@ -8,8 +8,8 @@ import { getLangWatchTracer } from "langwatch";
  * Apply once at factory time so individual service methods stay clean:
  *
  * ```ts
- * static create(prisma: PrismaClient): TraceService {
- *   const service = new TraceService(...);
+ * static create(options): TraceService {
+ *   const service = TraceService.create(options);
  *   return traced(service, "TraceService");
  * }
  * ```

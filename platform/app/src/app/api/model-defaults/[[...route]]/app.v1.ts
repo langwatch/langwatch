@@ -91,7 +91,7 @@ export function registerModelDefaultsRoutes(
   );
 
   // POST /api/model-defaults — create a new config. Authorization is
-  // data-dependent: assertCanWriteScope gates every target scope in-handler
+  // data-dependent: the canonical service gates every target scope
   // (the Hono analogue of tRPC's authorizeInResolver), so the route policy is
   // "any authenticated caller" and the real check happens below.
   secured.access(anyAuthenticated()).post(

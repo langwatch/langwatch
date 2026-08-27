@@ -9,7 +9,7 @@ import {
   UploadValidationError,
 } from "@langwatch/dataset-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createProjectApp, handlerManagedAuth, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";

@@ -126,18 +126,19 @@ export const opsRouter = createTRPCRouter({
     },
   ),
 
-  dashboardStream: protectedProcedure
-    .use(opsViewPermission)
-    .subscription(async function* ({ signal, ctx }) {
-      const snapshots = ctx.app.ops.snapshots;
-      if (!snapshots) {
-        return;
-      }
+  dashboardStream: protectedProcedure.use(opsViewPermission).subscription(async function* ({
+    signal,
+    ctx,
+  }) {
+    const snapshots = ctx.app.ops.snapshots;
+    if (!snapshots) {
+      return;
+    }
 
-      for await (const data of snapshots.streamDashboard({ signal })) {
-        yield data;
-      }
-    }),
+    for await (const data of snapshots.streamDashboard({ signal })) {
+      yield data;
+    }
+  }),
 
   /**
    * One parked tenant's groups, read live rather than from the snapshot.
@@ -692,8 +693,7 @@ export const opsRouter = createTRPCRouter({
           confirm: z.literal("DISCARD ALL").optional(),
         })
         .refine((input) => !!input.processName || input.confirm !== undefined, {
-          message:
-            "Discarding every process's dead letters requires an explicit confirmation",
+          message: "Discarding every process's dead letters requires an explicit confirmation",
           path: ["confirm"],
         }),
     )
@@ -777,8 +777,7 @@ export const opsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       return {
         status: "coming_soon" as const,
-        message:
-          "Dry run is not yet implemented. Full replay will process all aggregates.",
+        message: "Dry run is not yet implemented. Full replay will process all aggregates.",
         projectionNames: input.projectionNames,
         sampleSize: input.sampleSize,
       };
@@ -1171,8 +1170,7 @@ export const opsRouter = createTRPCRouter({
                 ),
               ),
             {
-              message:
-                "A targeting rule's project/organization id must not be blank or padded",
+              message: "A targeting rule's project/organization id must not be blank or padded",
             },
           ),
       }),
@@ -1305,9 +1303,7 @@ export const opsRouter = createTRPCRouter({
   searchMigrationOrganizations: protectedProcedure
     .use(opsViewPermission)
     .input(z.object({ query: z.string().max(200) }))
-    .query(({ input }) =>
-      systemMigrationsService.searchOrganizations({ query: input.query }),
-    ),
+    .query(({ input }) => systemMigrationsService.searchOrganizations({ query: input.query })),
 
   /**
    * Enroll one organization for one registered migration. Takes effect on

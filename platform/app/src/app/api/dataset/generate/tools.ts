@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import Parse from "papaparse";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const tools = (dataset: string) => {
   const parsedDataset = Parse.parse(dataset, { header: true });

@@ -69,7 +69,7 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(ssoConfiguration);
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and
 // it would override admin impersonation with its own mechanism. We use our
-// own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
+// own `isAdmin` check (the Ops service) and the legacy
 // Session.impersonating JSON column handled in src/server/auth.ts.
 const plugins =
   genericOAuthConfigs.length > 0 ? [genericOAuth({ config: genericOAuthConfigs })] : [];
@@ -507,34 +507,14 @@ export const auth = betterAuth({
   },
 
   /**
-   * Global before-hook that blocks credential-management endpoints in
-   * cloud/SSO mode. BetterAuth mounts these endpoints unconditionally
-   * (only `/sign-in/email` and `/sign-up/email` check the
-   * `emailAndPassword.enabled` flag). In cloud mode we don't want a
-   * user with a legacy credential Account row (e.g. from a prior
-   * on-prem deployment) to be able to bypass our tRPC `changePassword`
-   * mutation — which gates on `env.NEXTAUTH_PROVIDER === "email"` AND
-   * calls `revokeOtherSessionsForUser` (iter 26) — by POSTing directly
-   * to BetterAuth's endpoint. In pure cloud deployments this has zero
-   * user impact (no credential accounts exist), but in mixed/migration
-   * scenarios it prevents a subtle side-channel around the tRPC gate.
+   * BetterAuth mounts credential endpoints even when email/password is off.
+   * Block them here so a legacy credential row cannot bypass the application
+   * password change and session-revocation flow.
    *
-   * Also blocks `/set-password` (BetterAuth's flow for first-time
-   * password setup on a social-signup user — not something we want
-   * available in cloud mode where SSO is the only path).
-   *
-   * ADR-027 extends this SAME hook (one memoized gate value, branched both
-   * ways — no truth table, Decision 4) for SSO-capable deployments
-   * (`NEXTAUTH_PROVIDER !== "email"`):
-   *   - gate ALLOW: also 403 `/sign-in/email`, `/sign-up/email`, and the
-   *     password-reset pair — preserves `main`'s guarantee that a licensed
-   *     Auth0/Okta install can't mint a password account (v5 BLOCKER fix).
-   *   - gate DENY: 403 the SSO-initiation and callback paths (Constants
-   *     table in the ADR) instead — the deployment runs as if the SSO env
-   *     vars were unset. The password-reset pair is intentionally left OUT
-   *     of the deny branch (v6): every existing user on a denied install is
-   *     OAuth-born with no password, so reset is the inbox-proof
-   *     self-recovery door (Decision 4 exception).
+   * In SSO mode, ADR-027 uses this same memoized gate: allow blocks email
+   * sign-in, sign-up and reset; deny blocks SSO initiation/callback instead.
+   * Reset remains available when SSO is denied because OAuth-only users need
+   * an account-recovery path.
    */
   hooks: {
     before: async (ctx) => {
