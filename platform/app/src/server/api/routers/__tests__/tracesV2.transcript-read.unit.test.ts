@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 
 const { mockGetSpansByTraceId, mockGetLogsByTraceId } = vi.hoisted(() => ({
   mockGetSpansByTraceId: vi.fn(),
@@ -34,6 +35,7 @@ import { readCodingAgentTranscriptWithProtections } from "../tracesV2";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
+const codingAgents = TestCodingAgentService.create();
 
 function claudeLogRow(attributes: Record<string, string>, timeUnixMs: number) {
   return {
@@ -79,6 +81,7 @@ describe("readCodingAgentTranscriptWithProtections", () => {
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
+        codingAgents,
       });
 
       expect(transcript.agent).toBe("claude_code");
@@ -110,6 +113,7 @@ describe("readCodingAgentTranscriptWithProtections", () => {
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
+        codingAgents,
       });
 
       expect(transcript.entries).toEqual([]);

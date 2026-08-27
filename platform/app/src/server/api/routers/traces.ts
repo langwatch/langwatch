@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
+import { evaluatorsSchema } from "@langwatch/evaluator-contract";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,

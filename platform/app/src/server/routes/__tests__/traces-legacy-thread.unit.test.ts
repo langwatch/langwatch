@@ -3,8 +3,8 @@
  *
  * GET /api/thread/:id returns a conversation's traces; the consumer reads the
  * messages, so it must resolve FULL IO, not the 64 KB preview. Proves the
- * handler constructs TraceService WITH blob-resolution deps and calls
- * getTracesByThreadId with { full: true }. Mirrors the merged
+ * handler uses the process-owned TraceService and calls getTracesByThreadId
+ * with { full: true }. Mirrors the merged
  * traces-legacy-get-trace.unit.test.ts harness.
  */
 import { Hono } from "hono";
@@ -15,24 +15,6 @@ import { z } from "zod";
 import type { Trace } from "~/server/tracer/types";
 
 const mockGetTracesByThreadId = vi.fn();
-const mockCreate = vi.fn();
-
-vi.mock("~/server/traces/trace.service", async () => {
-  class AmbiguousTraceIdPrefixError extends Error {}
-  return {
-    AmbiguousTraceIdPrefixError,
-    TraceService: { create: mockCreate },
-  };
-});
-
-const mockBuildTraceBlobResolutionDeps = vi.fn(() => ({
-  blobStore: { tag: "blobStore" },
-  ioExtractionService: { tag: "ioExtractionService" },
-}));
-
-vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
-  buildTraceBlobResolutionDeps: mockBuildTraceBlobResolutionDeps,
-}));
 
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
@@ -75,6 +57,9 @@ vi.mock("~/server/app-layer/app", () => ({
       markUsed: mockMarkUsed,
     },
     share: { createShare: vi.fn(), unshare: vi.fn() },
+    traces: {
+      read: { getTracesByThreadId: mockGetTracesByThreadId },
+    },
   })),
 }));
 
@@ -123,22 +108,13 @@ describe("legacy GET /api/thread/:id — #4991 AC2", () => {
       type: "legacyProjectKey",
       project: fakeProject,
     });
-    mockCreate.mockReturnValue({
-      getTracesByThreadId: mockGetTracesByThreadId,
-    });
     mockGetTracesByThreadId.mockResolvedValue([sampleThreadTrace]);
   });
 
   describe("when fetching a thread by id", () => {
-    it("constructs TraceService with blob-resolution deps", async () => {
+    it("uses the process-owned trace reader", async () => {
       await makeThreadRequest("thread-1");
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          blobStore: expect.anything(),
-          ioExtractionService: expect.anything(),
-        }),
-      );
+      expect(mockGetTracesByThreadId).toHaveBeenCalledTimes(1);
     });
 
     it("calls getTracesByThreadId with full:true (resolves offloaded IO)", async () => {

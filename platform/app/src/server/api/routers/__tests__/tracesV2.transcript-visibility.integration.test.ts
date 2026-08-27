@@ -25,6 +25,7 @@ import type { DataPrivacyConfig } from "../../../data-privacy/dataPrivacy.types"
 import { getDataPrivacyPolicyService } from "../../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../../db";
 import { getProtectionsForProject } from "../../utils";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const NAMESPACE = "transcript-visibility";
@@ -33,6 +34,7 @@ const USER_PROMPT_SECRET = "acme merger memo, do not disclose";
 const ASSISTANT_REPLY_SECRET = "the board vote is 7 to 2 against";
 const TOOL_ARGS_SECRET = "SELECT * FROM salaries WHERE level > 8";
 const TOOL_OUTPUT_SECRET = "cfo total compensation 1.4 million";
+const codingAgents = TestCodingAgentService.create();
 
 const { mockGetSpansByTraceId, mockGetLogsByTraceId } = vi.hoisted(() => ({
   mockGetSpansByTraceId: vi.fn(),
@@ -153,6 +155,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       traceId: TRACE_ID,
       occurredAtMs: NOW,
       protections,
+      codingAgents,
     });
   }
 

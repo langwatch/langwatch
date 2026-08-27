@@ -18,14 +18,6 @@ vi.mock("../../utils", () => ({
   }),
 }));
 
-vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    evaluatorsSchema: { keyof: () => ({ or: () => ({}) }) },
-  };
-});
-
 vi.mock("~/server/evaluations/preconditions", () => ({
   evaluatePreconditions: vi.fn(),
   buildPreconditionTraceDataFromTrace: vi.fn(),

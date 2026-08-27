@@ -408,6 +408,7 @@ export function registerTracesRoutes(
         traceId: trace.trace_id,
         occurredAtMs: trace.timestamps.started_at,
         protections,
+        codingAgents: c.app.codingAgents,
       });
 
       return c.json(transcript);

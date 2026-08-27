@@ -5,42 +5,9 @@ import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
 import type { Trace } from "~/server/tracer/types";
 
-// ─── TraceService spy ─────────────────────────────────────────────────────────
 // Capture at module scope so assertions can reach them from every it() block.
 const mockGetById = vi.fn();
 const mockGetEvaluationsMultiple = vi.fn();
-const mockCreate = vi.fn();
-
-vi.mock("~/server/traces/trace.service", async () => {
-  class AmbiguousTraceIdPrefixError extends Error {
-    constructor(
-      public readonly prefix: string,
-      public readonly candidateTraceIds: string[],
-    ) {
-      super(
-        `Trace ID prefix "${prefix}" is ambiguous — matches: ${candidateTraceIds.join(", ")}`,
-      );
-      this.name = "AmbiguousTraceIdPrefixError";
-    }
-  }
-  return {
-    AmbiguousTraceIdPrefixError,
-    TraceService: {
-      create: mockCreate,
-    },
-  };
-});
-
-// ─── Blob-resolution deps spy ─────────────────────────────────────────────────
-// Captured so we can assert create() received the return value of this function.
-const mockBuildTraceBlobResolutionDeps = vi.fn(() => ({
-  blobStore: { tag: "blobStore" },
-  ioExtractionService: { tag: "ioExtractionService" },
-}));
-
-vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
-  buildTraceBlobResolutionDeps: mockBuildTraceBlobResolutionDeps,
-}));
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
 // The legacy route resolves credentials through the process App service.
@@ -83,7 +50,7 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
   formatSpansDigest: vi.fn().mockReturnValue("formatted trace"),
 }));
 
-// Stub the app-layer (used by share/unshare routes only; not needed for GET).
+// Stub the process App used by both the handler-managed auth and trace reader.
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
@@ -97,6 +64,12 @@ vi.mock("~/server/app-layer/app", () => ({
       unshare: vi.fn(),
     },
     evaluations: {},
+    traces: {
+      read: {
+        getById: mockGetById,
+        getEvaluationsMultiple: mockGetEvaluationsMultiple,
+      },
+    },
   })),
 }));
 
@@ -170,12 +143,6 @@ describe("legacy GET /api/trace/:id (singular)", () => {
       project: fakeProject,
     });
 
-    // Wire TraceService.create to return the service mock.
-    mockCreate.mockReturnValue({
-      getById: mockGetById,
-      getEvaluationsMultiple: mockGetEvaluationsMultiple,
-    });
-
     mockGetById.mockResolvedValue(sampleTrace);
     mockGetEvaluationsMultiple.mockResolvedValue({
       "trace-abc": [],
@@ -183,21 +150,10 @@ describe("legacy GET /api/trace/:id (singular)", () => {
   });
 
   describe("when fetching a trace by id", () => {
-    it("constructs TraceService with blob-resolution deps (mirrors the plural reference handler)", async () => {
-      // PRE-FIX: FAILS — current code calls TraceService.create(prisma) with ONE arg,
-      // not two. The fix must pass buildTraceBlobResolutionDeps() as the second arg.
+    it("uses the process-owned trace reader", async () => {
       await makeRequest({ traceId: "trace-abc", query: { format: "json" } });
 
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          blobStore: expect.anything(),
-          ioExtractionService: expect.anything(),
-        }),
-        undefined,
-        expect.anything(),
-      );
+      expect(mockGetById).toHaveBeenCalledTimes(1);
     });
 
     it("calls getById with full:true so >64 KB offloaded IO resolves (#4888)", async () => {

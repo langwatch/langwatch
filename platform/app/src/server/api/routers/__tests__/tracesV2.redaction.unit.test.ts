@@ -1,16 +1,45 @@
 import { describe, expect, it } from "vitest";
 import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 import {
   buildContentPrivacy,
   contentSearchTermsForViewer,
-  gateTraceLogVisibility,
-  redactTraceLogContent,
+  gateTraceLogVisibility as gateTraceLogVisibilityWithService,
+  redactTraceLogContent as redactTraceLogContentWithService,
   redactV2Content,
   type TraceLogRecordDto,
 } from "../tracesV2";
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
+const codingAgents = TestCodingAgentService.create();
+
+type LogProtections = {
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+};
+
+function redactTraceLogContent(
+  row: TraceLogRecordDto,
+  protections: LogProtections,
+): TraceLogRecordDto {
+  return redactTraceLogContentWithService(row, protections, codingAgents);
+}
+
+function gateTraceLogVisibility(
+  row: TraceLogRecordDto,
+  protections: LogProtections,
+  visibilityCutoffMs: number | null,
+): TraceLogRecordDto {
+  return gateTraceLogVisibilityWithService(
+    row,
+    protections,
+    visibilityCutoffMs,
+    codingAgents,
+  );
+}
 
 /** A full per-category visibility map, all visible unless overridden. */
 function cats(
