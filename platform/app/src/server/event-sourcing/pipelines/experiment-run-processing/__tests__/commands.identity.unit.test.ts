@@ -11,6 +11,8 @@
  * and its cost but no score at all.
  */
 import { describe, expect, it } from "vitest";
+import type { CommandHandlerResult } from "../../../commands/command";
+import type { Event } from "../../../domain/types";
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
@@ -43,11 +45,21 @@ const verdict = ({
   },
 });
 
-/** The identity the store orders on, for one recorded verdict. */
-const identityOf = (payload: ReturnType<typeof verdict>): string => {
-  const [event] = new RecordEvaluatorResultCommand().handle(payload as never);
+/**
+ * The identity the store orders on, for one recorded event.
+ *
+ * `handle` is declared as `Promise<Event[]> | Event[]` for handlers that need
+ * to read state first. These two build their event from the payload alone and
+ * answer at once, so the array is taken directly.
+ */
+const identityOfEvent = (result: CommandHandlerResult<Event>): string => {
+  const [event] = result as Event[];
   return (event as { idempotencyKey: string }).idempotencyKey;
 };
+
+/** The identity the store orders on, for one recorded verdict. */
+const identityOf = (payload: ReturnType<typeof verdict>): string =>
+  identityOfEvent(new RecordEvaluatorResultCommand().handle(payload as never));
 
 describe("given a run whose two columns share one evaluator", () => {
   describe("when both columns produce a verdict for the same row", () => {
@@ -114,20 +126,20 @@ describe("given a recorded target output", () => {
   describe("when two columns produce an output for the same row", () => {
     /** @scenario "Two columns keep their own score for the same evaluator and row" */
     it("separates them by target, the way the verdicts now do", () => {
-      const outputFor = (targetId: string): string => {
-        const [event] = new RecordTargetResultCommand().handle({
-          tenantId: TENANT,
-          data: {
+      const outputFor = (targetId: string): string =>
+        identityOfEvent(
+          new RecordTargetResultCommand().handle({
             tenantId: TENANT,
-            occurredAt: 1_700_000_000_000,
-            runId: "bold-jolly-bee",
-            experimentId: "experiment_1",
-            index: 0,
-            targetId,
-          },
-        } as never);
-        return (event as { idempotencyKey: string }).idempotencyKey;
-      };
+            data: {
+              tenantId: TENANT,
+              occurredAt: 1_700_000_000_000,
+              runId: "bold-jolly-bee",
+              experimentId: "experiment_1",
+              index: 0,
+              targetId,
+            },
+          } as never),
+        );
 
       expect(outputFor("target-eyMC-VVJ")).not.toBe(
         outputFor("target-YyznMusS"),
