@@ -22067,6 +22067,11 @@ export interface operations {
                             targetType: "prompt" | "http" | "code" | "workflow";
                             simulationSuiteId?: string;
                             scenarioVersion?: number;
+                            simulatorModel?: string;
+                            judgeModel?: string;
+                            actorId?: string;
+                            /** @enum {string} */
+                            actorLabel?: "user" | "api" | "cli";
                         };
                     } & {
                         [key: string]: unknown;
