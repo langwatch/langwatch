@@ -84,15 +84,14 @@ const customClientCache = new Map<string, ClickHouseClient>();
 const tenantOrgCache = new Map<string, string>();
 
 /**
- * Tenants known to be users, whose events route to the shared instance.
- * Cached apart from `tenantOrgCache` because a user resolves to no
- * organization at all — that is the whole point of them — so there is
- * nothing to key there.
+ * Tenants already known to name a user. Kept separately from
+ * `tenantOrgCache` because a user has no organization to key there — the
+ * answer is the shared instance, not an org id.
  *
- * No TTL, for the same reason `tenantOrgCache` needs none: what it remembers
- * cannot change. "This id names a user" is immutable, and a user's instance
- * does not depend on anything they might later join, so an answer cached once
- * stays right for the life of the process.
+ * Grows with the number of DISTINCT users a process resolves, which unlike
+ * projects and organizations is not bounded by how many exist: a backfill
+ * walks the whole user table. Acceptable because the entries are ids, and
+ * because the lookups it saves are on the hot path of every identity append.
  */
 const userTenantCache = new Set<string>();
 
@@ -144,6 +143,18 @@ const userTenantCache = new Set<string>();
  * every pass. Nothing was corrupted — the guard refused rather than writing
  * somewhere wrong — but nothing could ever finish either.
  *
+ * ── The order below ────────────────────────────────────────────────────
+ *
+ * The user is asked for FIRST and asked for DIRECTLY: one lookup that says
+ * user or not, rather than reaching the answer by elimination. Deriving it —
+ * "no project and no organization, so it must be a person" — makes the most
+ * important routing decision in this file the one nothing states, and every
+ * future tenant kind silently joins that same branch.
+ *
+ * Both caches are consulted before either query, so asking about the user
+ * first costs a project tenant one extra lookup on its first resolution and
+ * nothing afterwards.
+ *
  * An id that names none of the three kinds is still an error rather than the
  * shared client: a tenant we cannot place is exactly the one whose data must
  * not land on somebody else's instance.
@@ -153,31 +164,29 @@ export async function getClickHouseClientForTenant(
 ): Promise<ClickHouseClient | null> {
   if (userTenantCache.has(tenantId)) return sharedClickHouseClientOrThrow();
 
-  const cached = tenantOrgCache.get(tenantId);
-  if (cached) return getClickHouseClientForOrganization(cached);
+  const cachedOrgId = tenantOrgCache.get(tenantId);
+  if (cachedOrgId) return getClickHouseClientForOrganization(cachedOrgId);
 
-  const orgId = await organizationIdForTenant(tenantId);
-  if (orgId === null) {
+  if (await tenantIsUser(tenantId)) {
     userTenantCache.add(tenantId);
     return sharedClickHouseClientOrThrow();
   }
 
+  const orgId = await organizationIdForTenant(tenantId);
   tenantOrgCache.set(tenantId, orgId);
   return getClickHouseClientForOrganization(orgId);
 }
 
 /**
- * Which organization's instance a tenant belongs to, or `null` when the
- * tenant is a user whose history belongs on the shared instance.
+ * Which organization's instance this tenant routes to. Called only once the
+ * tenant is known not to be a user, so it answers for the two kinds that
+ * resolve per-organization: a project names its owner, an organization names
+ * itself.
  *
- * The three kinds are asked for in the order they are cheap: a project names
- * its organization in one join, an organization names itself, and only an id
- * that is neither costs the user lookup. An id that names none of them
- * throws rather than resolving.
+ * An id that is none of the three throws rather than resolving — by the time
+ * this runs, every kind we support has been asked for.
  */
-async function organizationIdForTenant(
-  tenantId: string,
-): Promise<string | null> {
+async function organizationIdForTenant(tenantId: string): Promise<string> {
   const project = await prisma.project.findUnique({
     where: { id: tenantId },
     select: { team: { select: { organizationId: true } } },
@@ -189,8 +198,6 @@ async function organizationIdForTenant(
     select: { id: true },
   });
   if (organization) return organization.id;
-
-  if (await tenantIsUser(tenantId)) return null;
 
   throw new Error(
     `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project, an organization, nor a user. Refusing to fall back to shared client to prevent data leakage.`,
