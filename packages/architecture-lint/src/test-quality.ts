@@ -110,10 +110,7 @@ function isAssertionCall(node: ts.CallExpression): boolean {
   );
 }
 
-function containsAssertion(
-  callback: TestCallback,
-  assertionHelpers: ReadonlySet<string>,
-): boolean {
+function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet<string>): boolean {
   let assertion = false;
   const visit = (node: ts.Node): void => {
     if (assertion) return;
@@ -223,6 +220,33 @@ function isTautologicalAssertion(node: ts.CallExpression): boolean {
   return expected !== void 0 && literalKey(expected) === actualKey;
 }
 
+function isSchemaLiteralEchoAssertion(node: ts.CallExpression): boolean {
+  const assertion = matcherCall(node);
+  if (!assertion || !["toBe", "toEqual", "toStrictEqual"].includes(assertion.matcher)) {
+    return false;
+  }
+
+  const actual = assertion.expect.arguments[0];
+  const expected = node.arguments[0];
+  if (!actual || !expected || !ts.isCallExpression(actual)) {
+    return false;
+  }
+
+  const callee = actual.expression;
+  if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== "parse") {
+    return false;
+  }
+
+  const schema = callee.expression;
+  const input = actual.arguments[0];
+  if (!ts.isIdentifier(schema) || !/schema$/i.test(schema.text) || !input) {
+    return false;
+  }
+
+  const inputKey = literalKey(input);
+  return inputKey !== void 0 && literalKey(expected) === inputKey;
+}
+
 function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
   const assertion = matcherCall(node);
   if (!assertion || !SNAPSHOT_MATCHERS.has(assertion.matcher)) return false;
@@ -241,10 +265,7 @@ function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
 function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
   const bindings: ImportBinding[] = [];
   for (const statement of source.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
     }
     const clause = statement.importClause;
@@ -252,8 +273,7 @@ function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
     const module = statement.moduleSpecifier.text;
     if (clause.name) bindings.push({ name: clause.name.text, module });
     const named = clause.namedBindings;
-    if (named && ts.isNamespaceImport(named))
-      bindings.push({ name: named.name.text, module });
+    if (named && ts.isNamespaceImport(named)) bindings.push({ name: named.name.text, module });
     if (named && ts.isNamedImports(named)) {
       for (const element of named.elements) {
         if (!element.isTypeOnly) bindings.push({ name: element.name.text, module });
@@ -384,6 +404,15 @@ function lintTestFile(file: string): ArchitectureViolation[] {
         line: lineOf(source, node),
         message: "Assertion compares a static literal with the same known result.",
         allowed: "Assert a value derived from the behaviour under test.",
+      });
+    }
+    if (isSchemaLiteralEchoAssertion(node)) {
+      violations.push({
+        policy: "test-quality",
+        file,
+        line: lineOf(source, node),
+        message: "Assertion only echoes a static literal through a schema parser.",
+        allowed: "Assert a refinement, default, transform, error, or observable caller behaviour.",
       });
     }
     if (isEmptySnapshotAssertion(node)) {

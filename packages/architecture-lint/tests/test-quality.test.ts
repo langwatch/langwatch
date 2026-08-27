@@ -118,10 +118,26 @@ describe("test quality", () => {
       ].join("\n"),
     );
 
-    expect(policies(root, file)).toEqual([
-      "test-quality",
-      "test-quality",
-      "test-quality",
+    expect(policies(root, file)).toEqual(["test-quality", "test-quality", "test-quality"]);
+  });
+
+  it("rejects a static literal echoed through a schema parser", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-schema-echo-"));
+    const file = writeFixture(
+      root,
+      "src/suite.kind.unit.test.ts",
+      [
+        'import { suiteKindSchema } from "./suite.kind";',
+        'it("accepts custom", () => { expect(suiteKindSchema.parse("custom")).toBe("custom"); });',
+      ].join("\n"),
+    );
+
+    const violations = lintTestQuality(root, { files: [file] });
+    expect(violations).toMatchObject([
+      {
+        policy: "test-quality",
+        message: "Assertion only echoes a static literal through a schema parser.",
+      },
     ]);
   });
 
@@ -213,11 +229,7 @@ describe("test quality", () => {
       ].join("\n"),
     );
 
-    expect(policies(root, file)).toEqual([
-      "test-quality",
-      "test-quality",
-      "test-quality",
-    ]);
+    expect(policies(root, file)).toEqual(["test-quality", "test-quality", "test-quality"]);
   });
 
   it("only flags literal toBeDefined assertions that must pass", () => {
@@ -236,11 +248,7 @@ describe("test quality", () => {
 
   it("only lints test files", () => {
     const root = mkdtempSync(join(tmpdir(), "test-quality-files-"));
-    const file = writeFixture(
-      root,
-      "src/example.ts",
-      'it("does nothing", () => { doWork(); });',
-    );
+    const file = writeFixture(root, "src/example.ts", 'it("does nothing", () => { doWork(); });');
 
     expect(policies(root, file)).toEqual([]);
   });
