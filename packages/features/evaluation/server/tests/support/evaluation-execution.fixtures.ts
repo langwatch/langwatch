@@ -16,7 +16,9 @@ import {
   type ExecuteEvaluationCommand as ExecuteEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import type {
+  EnabledGuardrailMonitor,
   MonitorCreateInput,
+  MonitorEnabledGuardrailInput,
   Monitor,
   MonitorIdInput,
   MonitorSummary,
@@ -126,6 +128,12 @@ export class TestMonitorService extends MonitorService {
   }
 
   async getEnabledOnMessageMonitors(_projectId: string): Promise<MonitorSummary[]> {
+    return [];
+  }
+
+  async listEnabledGuardrailMonitors(
+    _input: MonitorEnabledGuardrailInput,
+  ): Promise<EnabledGuardrailMonitor[]> {
     return [];
   }
 
