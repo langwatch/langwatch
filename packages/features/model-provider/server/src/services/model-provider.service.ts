@@ -93,9 +93,7 @@ export class ModelProviderService extends ModelProviderServiceContract {
   private constructor(private readonly options: ModelProviderServiceOptions) {
     super();
 
-    const writeAuthorization = ModelProviderWriteAuthorizationService.create(
-      options.authorization,
-    );
+    const writeAuthorization = ModelProviderWriteAuthorizationService.create(options.authorization);
     const authorization = ModelProviderAuthorizationService.create(options.authorization);
     const scopes = ModelProviderScopeService.create({
       projects: options.projects,
@@ -171,9 +169,7 @@ export class ModelProviderService extends ModelProviderServiceContract {
     return this.query.listForProject(input);
   }
 
-  listForOrganization(input: {
-    organizationId: string;
-  }): Promise<ModelProviderSummary[]> {
+  listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     return this.query.listForOrganization(input);
   }
 
@@ -225,15 +221,11 @@ export class ModelProviderService extends ModelProviderServiceContract {
     return this.commands.validateApiKey(input);
   }
 
-  testConnection(
-    input: ModelProviderTestConnectionInput,
-  ): Promise<{ connected: boolean }> {
+  testConnection(input: ModelProviderTestConnectionInput): Promise<{ connected: boolean }> {
     return this.commands.testConnection(input);
   }
 
-  getCodexStatus(
-    input: ModelProviderCodexStatusInput,
-  ): Promise<ModelProviderCodexStatus> {
+  getCodexStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus> {
     return this.codex.getStatus(input);
   }
 
@@ -259,24 +251,20 @@ export class ModelProviderService extends ModelProviderServiceContract {
     return this.defaults.getInheritedValues(input);
   }
 
-  tryGetResolvedDefault(
-    input: ModelDefaultResolveInput,
-  ): Promise<ModelDefaultEffective | null> {
+  tryGetResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
     return this.defaults.tryGetResolved(input);
   }
 
-  resolveModelForFeature(
-    input: ModelDefaultResolveInput,
-  ): Promise<ModelProviderResolution> {
+  resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
     return this.resolution.resolve(input);
   }
 
-  tryFindAlternateModel(input: {
+  findAlternateModel(input: {
     projectId: string;
     featureKey: string;
     skipFromScope: ModelProviderResolution["scope"];
-  }): Promise<ModelProviderAlternateResolution | null> {
-    return this.resolution.tryFindAlternate(input);
+  }): Promise<ModelProviderAlternateResolution> {
+    return this.resolution.findAlternate(input);
   }
 
   setDefault(input: ModelDefaultAssignmentInput): Promise<void> {

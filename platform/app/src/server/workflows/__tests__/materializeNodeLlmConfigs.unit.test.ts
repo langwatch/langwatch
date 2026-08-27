@@ -10,16 +10,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../modelProviders/resolveModelForFeature", () => ({
-  resolveModelForFeature: vi.fn(),
-}));
-
+import {
+  ModelNotConfiguredError,
+  type ModelProviderResolution,
+} from "@langwatch/model-provider-contract";
+import { TestModelProviderService } from "../../modelProviders/__tests__/model-provider-services.test-support";
 import { DEFAULT_MODEL } from "../../../utils/constants";
-import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
-import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { materializeNodeLlmConfigs } from "../materializeNodeLlmConfigs";
-
-const prisma = {} as never;
 
 const dslWith = (llmValue: unknown, extra?: Record<string, unknown>) => ({
   ...extra,
@@ -35,30 +32,43 @@ const dslWith = (llmValue: unknown, extra?: Record<string, unknown>) => ({
   ],
 });
 
+const workflowResolution: ModelProviderResolution = {
+  model: "anthropic/claude-haiku-4-5-20251001",
+  source: "role_default",
+  scope: "project",
+  feature: {
+    key: "workflows.create_default",
+    role: "DEFAULT",
+    displayName: "New workflow model",
+    description: "Starts new workflows with a ready-to-use model.",
+  },
+};
+
 describe("materializeNodeLlmConfigs", () => {
+  const modelProviders = new TestModelProviderService();
+  const resolveModel = vi.spyOn(modelProviders, "resolveModelForFeature");
+
   beforeEach(() => {
-    vi.mocked(resolveModelForFeature).mockReset();
+    resolveModel.mockReset();
   });
 
   it("fills a modelless llm parameter from the cascade-resolved default", async () => {
-    vi.mocked(resolveModelForFeature).mockResolvedValue({
-      model: "anthropic/claude-haiku-4-5-20251001",
-    } as never);
+    resolveModel.mockResolvedValue(workflowResolution);
     const dsl = dslWith(undefined);
 
-    await materializeNodeLlmConfigs({ prisma, projectId: "p1", dsl });
+    await materializeNodeLlmConfigs({ projectId: "p1", dsl, modelProviders });
 
-    expect(resolveModelForFeature).toHaveBeenCalledWith(
-      "workflows.create_default",
-      expect.objectContaining({ projectId: "p1" }),
-    );
+    expect(resolveModel).toHaveBeenCalledWith({
+      projectId: "p1",
+      featureKey: "workflows.create_default",
+    });
     expect(dsl.nodes[0]!.data.parameters[0]!.value).toEqual({
       model: "anthropic/claude-haiku-4-5-20251001",
     });
   });
 
   it("falls back to DEFAULT_MODEL when nothing is configured at any scope", async () => {
-    vi.mocked(resolveModelForFeature).mockRejectedValue(
+    resolveModel.mockRejectedValue(
       new ModelNotConfiguredError(
         "workflows.create_default",
         "DEFAULT",
@@ -68,7 +78,7 @@ describe("materializeNodeLlmConfigs", () => {
     );
     const dsl = dslWith({ model: "", temperature: 0.2 });
 
-    await materializeNodeLlmConfigs({ prisma, projectId: "p1", dsl });
+    await materializeNodeLlmConfigs({ projectId: "p1", dsl, modelProviders });
 
     expect(dsl.nodes[0]!.data.parameters[0]!.value).toEqual({
       model: DEFAULT_MODEL,
@@ -77,11 +87,11 @@ describe("materializeNodeLlmConfigs", () => {
   });
 
   it("propagates unexpected resolver failures instead of pinning a model", async () => {
-    vi.mocked(resolveModelForFeature).mockRejectedValue(new Error("database is down"));
+    resolveModel.mockRejectedValue(new Error("database is down"));
     const dsl = dslWith(undefined);
 
     await expect(
-      materializeNodeLlmConfigs({ prisma, projectId: "p1", dsl }),
+      materializeNodeLlmConfigs({ projectId: "p1", dsl, modelProviders }),
     ).rejects.toThrow("database is down");
     expect(dsl.nodes[0]!.data.parameters[0]!.value).toBeUndefined();
   });
@@ -91,9 +101,9 @@ describe("materializeNodeLlmConfigs", () => {
       default_llm: { model: "openai/gpt-5-mini", max_tokens: 256 },
     });
 
-    await materializeNodeLlmConfigs({ prisma, projectId: "p1", dsl });
+    await materializeNodeLlmConfigs({ projectId: "p1", dsl, modelProviders });
 
-    expect(resolveModelForFeature).not.toHaveBeenCalled();
+    expect(resolveModel).not.toHaveBeenCalled();
     expect(dsl.nodes[0]!.data.parameters[0]!.value).toEqual({
       model: "openai/gpt-5-mini",
       max_tokens: 256,
@@ -107,9 +117,9 @@ describe("materializeNodeLlmConfigs", () => {
       { default_llm: { model: "openai/gpt-5-mini" } },
     );
 
-    await materializeNodeLlmConfigs({ prisma, projectId: "p1", dsl });
+    await materializeNodeLlmConfigs({ projectId: "p1", dsl, modelProviders });
 
-    expect(resolveModelForFeature).not.toHaveBeenCalled();
+    expect(resolveModel).not.toHaveBeenCalled();
     expect(dsl.nodes[0]!.data.parameters[0]!.value).toEqual({
       model: "gemini/gemini-2.5-flash",
     });

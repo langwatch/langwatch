@@ -38,10 +38,7 @@ import {
   recursiveAlphabeticallySortedKeys,
 } from "@langwatch/workflow-contract";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
-import {
-  featureByKey,
-  type ModelProviderService,
-} from "@langwatch/model-provider-contract";
+import { featureByKey, type ModelProviderService } from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
@@ -79,7 +76,6 @@ export const workflowRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const workflowId = `workflow_${nanoid()}`;
       const dsl = await prepareWorkflowDsl({
-        prisma: ctx.prisma,
         projectId: input.projectId,
         modelProviders: ctx.app.modelProviders,
         dsl: { ...input.dsl, workflow_id: workflowId },
@@ -228,9 +224,8 @@ export const workflowRouter = createTRPCRouter({
           copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
           copiedFrom: canSeeSource ? workflow.copiedFrom : null,
           _count: {
-            copiedWorkflows: copiedWorkflows.filter((copy) =>
-              visibleProjects.get(copy.projectId),
-            ).length,
+            copiedWorkflows: copiedWorkflows.filter((copy) => visibleProjects.get(copy.projectId))
+              .length,
           },
         };
       });
@@ -262,11 +257,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Verify the user has view permission on the workflow's project
-      const hasPermission = await probeProjectPermission(
-        ctx,
-        workflow.projectId,
-        "workflows:view",
-      );
+      const hasPermission = await probeProjectPermission(ctx, workflow.projectId, "workflows:view");
 
       if (!hasPermission) {
         throw new TRPCError({
@@ -587,9 +578,7 @@ export const workflowRouter = createTRPCRouter({
       const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
       // Deep clone DSL to ensure mutability
-      const dsl = parseStudioWorkflow(
-        JSON.parse(JSON.stringify(sourceWorkflow.latestVersion.dsl)),
-      );
+      const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(sourceWorkflow.latestVersion.dsl)));
 
       // Update the workflow_id to match the copied workflow
       dsl.workflow_id = workflow.id;
@@ -676,9 +665,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Deep clone DSL to ensure mutability
-      const dsl = parseStudioWorkflow(
-        JSON.parse(JSON.stringify(workflow.latestVersion.dsl)),
-      );
+      const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(workflow.latestVersion.dsl)));
 
       const results = [];
 
@@ -1082,11 +1069,7 @@ export const copyWorkflowWithDatasets = async ({
       // Check parameters for Demonstrations
       if (node.data && "parameters" in node.data && node.data.parameters) {
         for (const param of node.data.parameters) {
-          if (
-            param.type === "dataset" &&
-            param.value != null &&
-            isDatasetRef(param.value)
-          ) {
+          if (param.type === "dataset" && param.value != null && isDatasetRef(param.value)) {
             await processDatasetRef(param.value);
           }
         }
@@ -1139,7 +1122,6 @@ export const saveOrCommitWorkflowVersion = async ({
   setAsLatestVersion?: boolean;
 }): Promise<WorkflowVersion> => {
   const dslWithMergedConfigs = await prepareWorkflowDsl({
-    prisma: ctx.prisma,
     projectId: input.projectId,
     modelProviders: ctx.app.modelProviders,
     dsl: input.dsl,
@@ -1174,15 +1156,13 @@ export const saveOrCommitWorkflowVersion = async ({
 
 /** Application-owned preparation for legacy Studio node configuration. */
 async function prepareWorkflowDsl({
-  prisma,
   projectId,
   dsl,
   modelProviders,
 }: {
-  prisma: PrismaClient;
   projectId: string;
   dsl: z.infer<typeof studioWorkflowSchema>;
-  modelProviders?: ModelProviderService;
+  modelProviders: ModelProviderService;
 }): Promise<z.infer<typeof studioWorkflowSchema>> {
   // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
   // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
@@ -1194,7 +1174,6 @@ async function prepareWorkflowDsl({
     state: {},
   };
   await materializeNodeLlmConfigs({
-    prisma,
     projectId,
     dsl: dslWithMergedConfigs,
     modelProviders,

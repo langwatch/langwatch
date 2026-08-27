@@ -1,6 +1,6 @@
 /**
  * Model id tier grammar and version ranking, shared by the server-side
- * latest-alias resolver (`server/modelProviders/latestAliases.ts`) and
+ * latest-alias resolver (`catalog/latest-aliases.ts`) and
  * the client-side provider-drawer picker (`utils/pickFlagshipModel.ts`)
  * so the model the drawer pre-fills is the model the org seed writes.
  *

@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
@@ -7,7 +6,7 @@ import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
@@ -30,8 +29,7 @@ const logger = createLogger("langwatch:api:evaluators");
 
 patchZodOpenapi();
 
-export type EvaluatorAppVariables = AuthMiddlewareVariables &
-  OrganizationMiddlewareVariables;
+export type EvaluatorAppVariables = AuthMiddlewareVariables & OrganizationMiddlewareVariables;
 
 export function registerEvaluatorRoutes(
   secured: SecuredApp<{ Variables: EvaluatorAppVariables }>,
@@ -177,25 +175,28 @@ export function registerEvaluatorRoutes(
 
       logger.info({ projectId: project.id, name: data.name }, "Creating evaluator");
 
+      const resolveEmbedding = async () => {
+        try {
+          return await c.app.modelProviders.resolveModelForFeature({
+            projectId: project.id,
+            featureKey: "analytics.topic_clustering_embeddings",
+          });
+        } catch (error) {
+          if (error instanceof ModelNotConfiguredError) {
+            return null;
+          }
+
+          throw error;
+        }
+      };
+
       const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-        c.app.modelProviders.tryGetResolvedDefault({
+        c.app.modelProviders.resolveModelForFeature({
           projectId: project.id,
           featureKey: "evaluator.create_default",
         }),
-        c.app.modelProviders.tryGetResolvedDefault({
-          projectId: project.id,
-          featureKey: "analytics.topic_clustering_embeddings",
-        }),
+        resolveEmbedding(),
       ]);
-
-      if (!resolvedDefault) {
-        throw new ModelNotConfiguredError(
-          "evaluator.create_default",
-          "DEFAULT",
-          "Evaluator",
-          project.id,
-        );
-      }
 
       const evaluator = await service.createWithDefaults({
         id: `evaluator_${nanoid()}`,
@@ -384,10 +385,7 @@ export function registerEvaluatorRoutes(
         projectId: project.id,
       });
 
-      logger.info(
-        { projectId: project.id, evaluatorId: id },
-        "Successfully archived evaluator",
-      );
+      logger.info({ projectId: project.id, evaluatorId: id }, "Successfully archived evaluator");
 
       return c.json({ success: true });
     },

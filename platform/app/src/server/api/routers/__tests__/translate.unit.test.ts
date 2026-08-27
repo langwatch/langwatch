@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderDisabledError } from "../../../modelProviders/modelProviderDisabledError";
 import { createInnerTRPCContext, errorFormatter } from "../../trpc";
 import { translateRouter } from "../translate";
@@ -117,9 +117,7 @@ describe("translateRouter.translate()", () => {
 
   describe("when the model call fails", () => {
     it("re-raises as BAD_REQUEST and serialises a typed AI_CALL_FAILED cause the toast can read", async () => {
-      mockGenerateText.mockRejectedValue(
-        new Error("Invalid API key: FAKE_KEY_FOR_TESTING"),
-      );
+      mockGenerateText.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
 
       const error = await caller
         .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
@@ -148,9 +146,7 @@ describe("translateRouter.translate()", () => {
       // — and when the call used a LangWatch-managed provider that key is
       // ours, not the customer's. An earlier version of this test asserted the
       // opposite, which is how the leak survived review.
-      mockGenerateText.mockRejectedValue(
-        new Error("Invalid API key: FAKE_KEY_FOR_TESTING"),
-      );
+      mockGenerateText.mockRejectedValue(new Error("Invalid API key: FAKE_KEY_FOR_TESTING"));
 
       const error = await caller
         .translate({ projectId: "project_abc123", textToTranslate: "Hola" })

@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
+import { testModelProviders } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 
 const mockRunEvaluation = vi.fn();
 vi.mock("~/server/evaluations/runEvaluation", () => ({
@@ -21,8 +22,7 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
 
 const mockResolve = vi.fn();
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: vi.fn(() => ({
@@ -46,10 +46,6 @@ vi.mock("~/server/api/routers/evaluations", () => ({
   getCustomEvaluators: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("~/server/modelProviders/modelDefaults.read", () => ({
-  getResolvedDefaultForFeature: vi.fn().mockResolvedValue(null),
-}));
-
 const mockReportEvaluation = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", async () => {
   // The app-context middleware reads tryGetApp, and the credential
@@ -61,6 +57,7 @@ vi.mock("~/server/app-layer/app", async () => {
     apiKeys: { tryResolveToken: mockResolve, markUsed: vi.fn() },
     permissions: appPermissionsService(dbForPermissions),
     evaluations: { reportEvaluation: mockReportEvaluation },
+    modelProviders: testModelProviders,
   });
   return { getApp: vi.fn(fakeApp), tryGetApp: vi.fn(fakeApp) };
 });

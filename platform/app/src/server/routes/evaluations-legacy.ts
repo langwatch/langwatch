@@ -32,11 +32,7 @@ import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
-import {
-  createServiceApp,
-  handlerManagedAuth,
-  publicEndpoint,
-} from "~/server/api/security";
+import { createServiceApp, handlerManagedAuth, publicEndpoint } from "~/server/api/security";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -58,10 +54,7 @@ import {
   type CustomEvaluatorDefinition,
   getEvaluatorDefaultSettings,
 } from "@langwatch/evaluator-contract";
-import {
-  type DataForEvaluation,
-  runEvaluation,
-} from "~/server/evaluations/runEvaluation";
+import { type DataForEvaluation, runEvaluation } from "~/server/evaluations/runEvaluation";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
@@ -82,20 +75,15 @@ import {
   mapLegacyExperimentTargets,
 } from "@langwatch/experiment-contract";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
-  getResolvedDefaultForFeature,
-  type ReadCtx,
-} from "~/server/modelProviders/modelDefaults.read";
+  ModelNotConfiguredError,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  KSUID_RESOURCES,
-} from "~/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL, KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
@@ -358,20 +346,13 @@ secured.access(legacyEvaluationAuth).post(
         { runId: params.run_id },
         "log_results missing experiment_id and experiment_slug",
       );
-      return c.json(
-        { error: "Either experiment_id or experiment_slug is required" },
-        400,
-      );
+      return c.json({ error: "Either experiment_id or experiment_slug is required" }, 400);
     }
 
-    if (
-      params.timestamps?.created_at &&
-      params.timestamps.created_at.toString().length === 10
-    ) {
+    if (params.timestamps?.created_at && params.timestamps.created_at.toString().length === 10) {
       return c.json(
         {
-          error:
-            "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+          error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
         },
         400,
       );
@@ -395,10 +376,7 @@ secured.access(legacyEvaluationAuth).post(
           { code: error.code, meta: error.meta, projectId: project.id },
           "handled error processing batch evaluation",
         );
-        return c.json(
-          { error: error.code, message: error.message },
-          error.httpStatus as 400,
-        );
+        return c.json({ error: error.code, message: error.message }, error.httpStatus as 400);
       } else {
         logger.error(
           { error, runId: params.run_id, projectId: project.id },
@@ -648,10 +626,7 @@ secured.access(legacyEvaluationAuth).post(
     try {
       params = batchEvaluationInputSchema.parse(body);
     } catch (error) {
-      logger.error(
-        { error, projectId: project.id },
-        "invalid evaluation params received",
-      );
+      logger.error({ error, projectId: project.id }, "invalid evaluation params received");
       captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
@@ -674,10 +649,7 @@ secured.access(legacyEvaluationAuth).post(
       checkType = evaluation;
     }
 
-    const evaluator = await getEvaluatorIncludingCustom(
-      project.id,
-      checkType as EvaluatorTypes,
-    );
+    const evaluator = await getEvaluatorIncludingCustom(project.id, checkType as EvaluatorTypes);
     if (!evaluator) {
       return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
     }
@@ -695,10 +667,7 @@ secured.access(legacyEvaluationAuth).post(
         );
       }
     } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid evaluation data received",
-      );
+      logger.error({ error, body, projectId: project.id }, "invalid evaluation data received");
       captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
@@ -798,10 +767,7 @@ const batchEvaluationInputSchema = z.object({
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
-const coercedString = z.preprocess(
-  coerceEvaluatorScalar,
-  z.string().optional().nullable(),
-);
+const coercedString = z.preprocess(coerceEvaluatorScalar, z.string().optional().nullable());
 
 const defaultEvaluatorInputSchema = z.object({
   input: coercedString,
@@ -839,10 +805,7 @@ export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
 ): DataForEvaluation => {
-  if (
-    checkType.startsWith("custom/") ||
-    checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)
-  ) {
+  if (checkType.startsWith("custom/") || checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)) {
     return { type: "custom", data: params };
   }
 
@@ -977,9 +940,7 @@ export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
 ): Promise<
-  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
-  | CustomEvaluatorDefinition
-  | undefined
+  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | CustomEvaluatorDefinition | undefined
 > => {
   const availableCustomEvaluators = await getCustomEvaluators({
     projectId,
@@ -1001,10 +962,7 @@ export const getEvaluatorIncludingCustom = async (
     const requiredFields = inputs
       .map((input) => input.identifier)
       .filter((id): id is string => typeof id === "string");
-    customEntries.push([
-      `custom/${evaluator.id}`,
-      { name: evaluator.name, requiredFields },
-    ]);
+    customEntries.push([`custom/${evaluator.id}`, { name: evaluator.name, requiredFields }]);
   }
 
   const availableEvaluators = {
@@ -1034,42 +992,31 @@ export const getEvaluatorIncludingCustom = async (
  */
 export const resolveEvaluatorSettingsDefaults = async (
   projectId: string,
-  modelProviders?: ModelProviderService,
+  modelProviders: ModelProviderService,
 ): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {
-  const ctx: ReadCtx = { prisma, session: null };
-  const [resolvedDefault, resolvedEmbeddings] = await Promise.all([
-    modelProviders
-      ? getResolvedDefaultForFeature(
-          ctx,
-          {
-            projectId,
-            featureKey: "evaluator.create_default",
-          },
-          modelProviders,
-        )
-      : getResolvedDefaultForFeature(ctx, {
-          projectId,
-          featureKey: "evaluator.create_default",
-        }),
-    modelProviders
-      ? getResolvedDefaultForFeature(
-          ctx,
-          {
-            projectId,
-            featureKey: "analytics.topic_clustering_embeddings",
-          },
-          modelProviders,
-        )
-      : getResolvedDefaultForFeature(ctx, {
-          projectId,
-          featureKey: "analytics.topic_clustering_embeddings",
-        }),
+  const resolveConfiguredModel = async (featureKey: string): Promise<string | null> => {
+    try {
+      const resolution = await modelProviders.resolveModelForFeature({
+        projectId,
+        featureKey,
+      });
+
+      return resolution.model;
+    } catch (error) {
+      if (error instanceof ModelNotConfiguredError) {
+        return null;
+      }
+
+      throw error;
+    }
+  };
+
+  const [defaultModel, embeddingsModel] = await Promise.all([
+    resolveConfiguredModel("evaluator.create_default"),
+    resolveConfiguredModel("analytics.topic_clustering_embeddings"),
   ]);
 
-  return {
-    defaultModel: resolvedDefault?.model ?? null,
-    embeddingsModel: resolvedEmbeddings?.model ?? null,
-  };
+  return { defaultModel, embeddingsModel };
 };
 
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
@@ -1097,11 +1044,7 @@ function gatedVerdictFields(result: {
   };
 }
 
-async function handleEvaluatorCall(
-  c: Context,
-  evaluatorSlug: string,
-  as_guardrail: boolean,
-) {
+async function handleEvaluatorCall(c: Context, evaluatorSlug: string, as_guardrail: boolean) {
   const auth = await authenticateRequest(c, "evaluations:manage");
   if ("error" in auth) {
     return c.json(auth.body, auth.status);
@@ -1156,10 +1099,7 @@ async function handleEvaluatorCall(
         checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
         const parsedConfig = codeEvaluatorConfigSchema.safeParse(savedEvaluator.config);
         if (!parsedConfig.success) {
-          return c.json(
-            { error: `Code evaluator has an invalid config: ${slugOrId}` },
-            400,
-          );
+          return c.json({ error: `Code evaluator has an invalid config: ${slugOrId}` }, 400);
         }
         workflowEvaluatorDef = {
           name: savedEvaluator.name,
@@ -1366,10 +1306,7 @@ async function handleEvaluatorCall(
 
   for (const requiredField of evaluatorDefinition.requiredFields) {
     if (data.data[requiredField] === undefined || data.data[requiredField] === null) {
-      const handledError = new EvaluatorMissingFieldError(
-        requiredField,
-        evaluatorDefinition.name,
-      );
+      const handledError = new EvaluatorMissingFieldError(requiredField, evaluatorDefinition.name);
       logger.warn(
         {
           code: handledError.code,
@@ -1399,8 +1336,7 @@ async function handleEvaluatorCall(
   let result: SingleEvaluationResult;
   let costId: string | undefined;
 
-  const evaluationId =
-    params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
+  const evaluationId = params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
   const evaluatorId =
     savedEvaluatorId ??
     monitor?.id ??
@@ -1678,8 +1614,7 @@ const dispatchToClickHouse = async (
           details: evaluation.details ?? undefined,
           cost: evaluation.cost ?? undefined,
           inputs: evaluation.inputs ?? undefined,
-          duration:
-            typeof evaluation.duration === "number" ? evaluation.duration : undefined,
+          duration: typeof evaluation.duration === "number" ? evaluation.duration : undefined,
           occurredAt: Date.now(),
         })
         .catch((err) => {

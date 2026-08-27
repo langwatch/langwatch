@@ -1,7 +1,7 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 
 type LangyTrustedMessageReader = {

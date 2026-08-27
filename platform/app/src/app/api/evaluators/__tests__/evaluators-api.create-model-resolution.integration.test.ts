@@ -14,9 +14,9 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { expandLatestAlias } from "@langwatch/model-provider-contract";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { expandLatestAlias } from "~/server/modelProviders/latestAliases";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
@@ -106,9 +106,7 @@ describe("given an organization whose default models carry DEFAULT and FAST but 
       // expands it to the catalog's current flagship on the way out, so the
       // expectation is the expansion rather than a pinned model id that a
       // catalog release would break.
-      expect(body.config.settings.model).toBe(
-        expandLatestAlias("anthropic/latest"),
-      );
+      expect(body.config.settings.model).toBe(expandLatestAlias("anthropic/latest"));
       expect(body.config.settings).not.toHaveProperty("embeddings_model");
     });
   });

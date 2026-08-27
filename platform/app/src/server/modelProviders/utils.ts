@@ -3,6 +3,7 @@ import type { ManagedProviderService } from "@langwatch/enterprise-managed-provi
 import {
   ModelNotConfiguredError,
   ModelProviderDisabledError,
+  type ModelProviderAlternateResolution,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { env } from "@langwatch/trace-server";
@@ -36,12 +37,7 @@ type VercelModelInput = {
 };
 
 export const getVercelAIModel = async (input: VercelModelInput) => {
-  const {
-    projectId,
-    model,
-    featureKey = "prompt.create_default",
-    managedProviders,
-  } = input;
+  const { projectId, model, featureKey = "prompt.create_default", managedProviders } = input;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -83,15 +79,11 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
     return getCodexVercelAIModel({ projectId, model: model_, featureKey });
   }
 
-  const litellmParams = await prepareLitellmParams(
-    input.modelProviders,
-    managedProviders,
-    {
-      model: model_,
-      modelProvider,
-      projectId,
-    },
-  );
+  const litellmParams = await prepareLitellmParams(input.modelProviders, managedProviders, {
+    model: model_,
+    modelProvider,
+    projectId,
+  });
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
   );
@@ -155,11 +147,18 @@ async function resolveModel({
     if (resolved.scope === null) {
       throw new Error("resolveModelForFeature returned a null scope");
     }
-    const alternate = await modelProviderService.tryFindAlternateModel({
-      projectId,
-      featureKey,
-      skipFromScope: resolved.scope,
-    });
+    let alternate: ModelProviderAlternateResolution | null = null;
+    try {
+      alternate = await modelProviderService.findAlternateModel({
+        projectId,
+        featureKey,
+        skipFromScope: resolved.scope,
+      });
+    } catch (error) {
+      if (!(error instanceof ModelNotConfiguredError)) {
+        throw error;
+      }
+    }
     const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
     throw new ModelProviderDisabledError(
       featureKey,

@@ -157,7 +157,7 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Coding Agent tests.");
   }
 
-  tryFindAlternateModel(): Promise<never> {
+  findAlternateModel(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }
 

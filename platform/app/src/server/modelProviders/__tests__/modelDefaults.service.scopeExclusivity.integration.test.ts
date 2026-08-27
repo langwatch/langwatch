@@ -18,7 +18,6 @@ import { getApp } from "~/server/app-layer";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
-import { resolveModelForFeature } from "../resolveModelForFeature";
 
 wireDefaultTestApp();
 
@@ -33,10 +32,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
 
   const defaults = () => getApp().modelProviders;
 
-  const attachmentsAt = (
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-    scopeId: string,
-  ) =>
+  const attachmentsAt = (scopeType: "ORGANIZATION" | "TEAM" | "PROJECT", scopeId: string) =>
     prisma.modelDefaultConfigScope.findMany({
       where: { scopeType, scopeId },
       select: { configId: true },
@@ -133,9 +129,9 @@ describe("given default-model configs with scope attachments (real DB)", () => {
       // The part a customer actually sees. Asserting only the rows would
       // stay green if the claim detached the attachment but the resolver
       // still read the config that lost it.
-      const resolved = await resolveModelForFeature("prompt.create_default", {
-        prisma,
+      const resolved = await defaults().resolveModelForFeature({
         projectId: webProjectId,
+        featureKey: "prompt.create_default",
       });
       expect(resolved.model).toBe("gemini/gemini-2.5-pro");
     });
@@ -260,9 +256,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
       });
 
       expect(await attachmentsAt("ORGANIZATION", organizationId)).toEqual([]);
-      expect(await prisma.modelDefaultConfig.count({ where: { organizationId } })).toBe(
-        0,
-      );
+      expect(await prisma.modelDefaultConfig.count({ where: { organizationId } })).toBe(0);
     });
   });
 });

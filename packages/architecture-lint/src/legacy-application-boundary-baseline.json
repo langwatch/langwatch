@@ -784,7 +784,6 @@
         "~/server/api/routers/langy.schemas"
       ],
       "platform/app/src/features/langy/logic/langyMakeDefaultOffer.ts": [
-        "~/server/modelProviders/modelDefaults.read",
         "~/server/scopes/scope.types"
       ],
       "platform/app/src/features/langy/logic/langyToolFailure.ts": [

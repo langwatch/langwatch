@@ -2308,16 +2308,6 @@
     },
     {
       "feature": "model-provider",
-      "file": "platform/app/src/server/modelProviders/modelDefaults.read.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "model-provider",
-      "file": "platform/app/src/server/modelProviders/modelNotConfiguredError.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "model-provider",
       "file": "platform/app/src/server/modelProviders/modelProvider.authz.ts",
       "kind": "legacy-implementation"
     },
@@ -2328,22 +2318,12 @@
     },
     {
       "feature": "model-provider",
-      "file": "platform/app/src/server/modelProviders/modelRestrictedForFeatureError.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "model-provider",
       "file": "platform/app/src/server/modelProviders/providerValidation.ts",
       "kind": "legacy-implementation"
     },
     {
       "feature": "model-provider",
       "file": "platform/app/src/server/modelProviders/resolveMaxTokensCeiling.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "model-provider",
-      "file": "platform/app/src/server/modelProviders/resolveModelForFeature.ts",
       "kind": "legacy-implementation"
     },
     {

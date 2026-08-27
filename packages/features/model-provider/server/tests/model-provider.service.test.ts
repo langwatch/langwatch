@@ -5,7 +5,9 @@ import {
   type ModelProvider,
   type ModelProviderApiKeyValidation,
   type CodexTokenKeys,
+  CODEX_DEFAULT_MODEL,
   DEFAULT_AZURE_API_VERSION,
+  expandLatestAlias,
   ModelProviderCredentialsUnreadableError,
 } from "@langwatch/model-provider-contract";
 import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
@@ -816,6 +818,18 @@ function service(
   });
 }
 
+function serviceWithDefaults(defaults: Defaults): ModelProviderService {
+  return service(
+    new Providers(),
+    new Catalog(),
+    new CodexRefresher(),
+    new Authorization(),
+    new ConnectionRateLimiter(),
+    new CredentialPolicy(),
+    defaults,
+  );
+}
+
 describe("ModelProviderService", () => {
   it("resolves the newest feature default through the project scope chain", async () => {
     const defaults = new Defaults();
@@ -846,6 +860,222 @@ describe("ModelProviderService", () => {
       model: "openai/gpt-5-mini",
       source: "role_default",
       scope: "team",
+    });
+  });
+
+  it("prefers the narrowest scope and a feature override within that scope", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "organization-default",
+        config: { FAST: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        authorId: null,
+        createdAt: new Date(2),
+      },
+      {
+        id: "project-default",
+        config: {
+          FAST: "openai/gpt-5-mini",
+          "traces.ai_search": "anthropic/claude-sonnet-4-6",
+        },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "traces.ai_search",
+      }),
+    ).resolves.toMatchObject({
+      model: "anthropic/claude-sonnet-4-6",
+      source: "feature_override",
+      scope: "project",
+    });
+  });
+
+  it("uses the newest config when duplicate rows exist at one scope", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "old",
+        config: { DEFAULT: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+      {
+        id: "new",
+        config: { DEFAULT: "openai/gpt-5.5" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(2),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5.5", scope: "project" });
+  });
+
+  it("skips restricted defaults and reports restricted-only exhaustion", async () => {
+    const defaults = new Defaults();
+    const restricted = {
+      id: "restricted-project",
+      config: { DEFAULT: CODEX_DEFAULT_MODEL },
+      scopes: [{ scopeType: "PROJECT" as const, scopeId: "project_1" }],
+      authorId: null,
+      createdAt: new Date(2),
+    };
+    defaults.configs = [
+      restricted,
+      {
+        id: "organization-default",
+        config: { DEFAULT: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5-mini", scope: "organization" });
+
+    defaults.configs = [restricted];
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).rejects.toMatchObject({
+      code: "model_restricted_for_feature",
+      meta: { restrictedModels: [CODEX_DEFAULT_MODEL] },
+    });
+  });
+
+  it("distinguishes unknown features from an empty configured cascade", async () => {
+    const modelProviders = service();
+
+    await expect(
+      modelProviders.resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "not-a-feature",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_invalid" });
+    await expect(
+      modelProviders.resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).rejects.toMatchObject({ code: "model_not_configured" });
+  });
+
+  it("expands latest aliases before returning a resolution", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "alias",
+        config: { DEFAULT: "openai/latest" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({ model: expandLatestAlias("openai/latest") });
+  });
+
+  it("falls back from Langy to the prompt default", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "prompt-default",
+        config: { DEFAULT: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "langy.chat",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5-mini", source: "role_default" });
+  });
+
+  it("finds the next wider configured scope below a resolved project default", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "project-default",
+        config: { DEFAULT: "openai/gpt-5.5" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(2),
+      },
+      {
+        id: "organization-default",
+        config: { DEFAULT: "anthropic/claude-sonnet-4-6" },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).findAlternateModel({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+        skipFromScope: "project",
+      }),
+    ).resolves.toMatchObject({
+      model: "anthropic/claude-sonnet-4-6",
+      scope: "organization",
+    });
+  });
+
+  it("throws the handled missing-model error when no wider alternate exists", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "project-default",
+        config: { DEFAULT: "openai/gpt-5.5" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).findAlternateModel({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+        skipFromScope: "project",
+      }),
+    ).rejects.toMatchObject({
+      code: "model_not_configured",
+      meta: {
+        featureKey: "prompt.create_default",
+        role: "DEFAULT",
+        projectId: "project_1",
+      },
     });
   });
 

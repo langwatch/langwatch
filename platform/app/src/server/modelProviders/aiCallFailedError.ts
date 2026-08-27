@@ -1,8 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { ModelRole } from "@langwatch/model-provider-contract";
-import { ModelNotConfiguredError } from "./modelNotConfiguredError";
+import { ModelNotConfiguredError, type ModelRole } from "@langwatch/model-provider-contract";
 
 const logger = createLogger("langwatch:modelProviders:aiCall");
 
@@ -108,11 +107,6 @@ export async function wrapAiCall<T>(
     // `data.cause` sidecar until that block is retired, and a stack-laden
     // provider error should not be dragged along wholesale.
     const firstLine = message.split("\n")[0]!.slice(0, 200);
-    throw new AiCallFailedError(
-      feature.key,
-      feature.role,
-      feature.displayName,
-      firstLine,
-    );
+    throw new AiCallFailedError(feature.key, feature.role, feature.displayName, firstLine);
   }
 }

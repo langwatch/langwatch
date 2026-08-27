@@ -5,6 +5,7 @@ import {
   ModelDefaultNotFoundError,
   ModelDefaultScopeForbiddenError,
   ModelDefaultValidationError,
+  ModelNotConfiguredError,
   ModelProviderAnchorRequiredError,
   ModelProviderCredentialsUnreadableError,
   ModelProviderCredentialsWouldBeDroppedError,
@@ -16,6 +17,7 @@ import {
   ModelProviderScopeForbiddenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
+  ModelRestrictedForFeatureError,
 } from "../src/model-provider.errors";
 
 function expectHandledWire(
@@ -151,5 +153,47 @@ describe("model provider handled errors", () => {
       message: "Model cost not found",
       httpStatus: 404,
     });
+    expectHandledWire(
+      new ModelNotConfiguredError(
+        "analytics.topic_clustering_embeddings",
+        "EMBEDDINGS",
+        "Topic clustering embeddings",
+        "project_abc",
+      ),
+      {
+        code: "model_not_configured",
+        message:
+          'No model configured for "analytics.topic_clustering_embeddings" (role: EMBEDDINGS, project: project_abc).',
+        httpStatus: 400,
+        meta: {
+          featureKey: "analytics.topic_clustering_embeddings",
+          role: "EMBEDDINGS",
+          featureDisplayName: "Topic clustering embeddings",
+          projectId: "project_abc",
+        },
+      },
+    );
+    expectHandledWire(
+      new ModelRestrictedForFeatureError({
+        featureKey: "prompt.create_default",
+        role: "DEFAULT",
+        featureDisplayName: "New prompt model",
+        projectId: "project_abc",
+        restrictedModels: ["openai_codex/gpt-5.6-terra"],
+      }),
+      {
+        code: "model_restricted_for_feature",
+        message:
+          '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot be the model for "prompt.create_default".',
+        httpStatus: 400,
+        meta: {
+          featureKey: "prompt.create_default",
+          role: "DEFAULT",
+          featureDisplayName: "New prompt model",
+          projectId: "project_abc",
+          restrictedModels: ["openai_codex/gpt-5.6-terra"],
+        },
+      },
+    );
   });
 });

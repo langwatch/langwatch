@@ -44,7 +44,7 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Workflow tests.");
   }
 
-  tryFindAlternateModel(): Promise<never> {
+  findAlternateModel(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
   }
 

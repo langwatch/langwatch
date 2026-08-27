@@ -15,10 +15,7 @@ import {
   type ModelProviderAlternateResolution,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
-import type {
-  ModelDefaultRepository,
-  ModelProviderCatalog,
-} from "../ports/model-provider.port";
+import type { ModelDefaultRepository, ModelProviderCatalog } from "../ports/model-provider.port";
 import type { ModelProviderScopeService } from "./model-provider-scope.service";
 
 type ResolutionOptions = {
@@ -51,15 +48,18 @@ export class ModelProviderResolutionService {
     const chain = this.chain(parsed.projectId, context.teamId, context.organizationId);
     const restrictedModels = new Set<string>();
     const resolution = this.findResolution(configs, chain, feature, restrictedModels);
+
     if (resolution) {
       return modelProviderResolutionSchema.parse({ ...resolution, feature });
     }
+
     if (parsed.featureKey === LANGY_CHAT_FEATURE_KEY) {
       return this.resolve({
         projectId: parsed.projectId,
         featureKey: "prompt.create_default",
       });
     }
+
     if (restrictedModels.size > 0) {
       throw new ModelRestrictedForFeatureError({
         featureKey: feature.key,
@@ -69,6 +69,7 @@ export class ModelProviderResolutionService {
         restrictedModels: [...restrictedModels],
       });
     }
+
     throw new ModelNotConfiguredError(
       feature.key,
       feature.role,
@@ -77,33 +78,44 @@ export class ModelProviderResolutionService {
     );
   }
 
-  async tryFindAlternate(input: {
+  async findAlternate(input: {
     projectId: string;
     featureKey: string;
     skipFromScope: ModelProviderResolution["scope"];
-  }): Promise<ModelProviderAlternateResolution | null> {
+  }): Promise<ModelProviderAlternateResolution> {
     const parsed = modelDefaultResolveInputSchema.parse({
       projectId: input.projectId,
       featureKey: input.featureKey,
     });
-    const feature = this.options.catalog
-      .defaultFeatures()
-      .find((candidate) => candidate.key === parsed.featureKey);
-    if (!feature) return null;
+    const feature = this.feature(parsed.featureKey);
     const context = await this.options.scopes.getProjectContext(parsed.projectId);
     const configs = await this.configs(parsed.projectId, context.organizationId);
     const chain = this.chain(parsed.projectId, context.teamId, context.organizationId);
     const skipIndex = TIERS.findIndex((tier) => tier.label === input.skipFromScope);
-    if (skipIndex < 0) return null;
+
+    if (skipIndex < 0) {
+      throw new ModelProviderInvalidError(
+        `Unknown model resolution scope: "${input.skipFromScope}".`,
+      );
+    }
 
     for (const tier of TIERS.slice(skipIndex + 1)) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
+
       for (const key of [feature.key, feature.role]) {
         for (const config of tierConfigs) {
           const value = readConfiguredModel(config.config[key]);
-          if (!value) continue;
+
+          if (!value) {
+            continue;
+          }
+
           const model = expandLatestAlias(value);
-          if (isLatestAlias(value) && model === value) continue;
+
+          if (isLatestAlias(value) && model === value) {
+            continue;
+          }
+
           return modelProviderResolutionSchema.parse({
             model,
             source: key === feature.key ? "feature_override" : "role_default",
@@ -113,22 +125,37 @@ export class ModelProviderResolutionService {
         }
       }
     }
-    return null;
+
+    throw new ModelNotConfiguredError(
+      feature.key,
+      feature.role,
+      feature.displayName,
+      parsed.projectId,
+    );
   }
 
   private feature(featureKey: string): ModelDefaultFeature {
     const feature = this.options.catalog
       .defaultFeatures()
       .find((candidate) => candidate.key === featureKey);
+
     if (!feature) {
       throw new ModelProviderInvalidError(`Unknown feature key: "${featureKey}".`);
     }
+
     return feature;
   }
 
-  private async configs(projectId: string, organizationId: string | null) {
-    if (organizationId) return this.options.defaults.listForOrganization(organizationId);
+  private async configs(
+    projectId: string,
+    organizationId: string | null,
+  ): Promise<ModelDefaultConfig[]> {
+    if (organizationId) {
+      return this.options.defaults.listForOrganization(organizationId);
+    }
+
     const scopes = await this.options.scopes.getProjectScopes(projectId);
+
     return this.options.defaults.listForProject(scopes);
   }
 
@@ -140,9 +167,7 @@ export class ModelProviderResolutionService {
     return [
       { scopeType: "PROJECT", scopeId: projectId },
       ...(teamId ? [{ scopeType: "TEAM" as const, scopeId: teamId }] : []),
-      ...(organizationId
-        ? [{ scopeType: "ORGANIZATION" as const, scopeId: organizationId }]
-        : []),
+      ...(organizationId ? [{ scopeType: "ORGANIZATION" as const, scopeId: organizationId }] : []),
     ];
   }
 
@@ -154,16 +179,27 @@ export class ModelProviderResolutionService {
   ): Omit<ModelProviderResolution, "feature"> | null {
     for (const tier of TIERS) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
+
       for (const key of [feature.key, feature.role]) {
         for (const config of tierConfigs) {
           const value = readConfiguredModel(config.config[key]);
-          if (!value) continue;
-          const model = expandLatestAlias(value);
-          if (isLatestAlias(value) && model === value) continue;
-          if (!isModelAllowedForFeature({ modelId: model, featureKey: feature.key })) {
-            restrictedModels.add(model);
+
+          if (!value) {
             continue;
           }
+
+          const model = expandLatestAlias(value);
+
+          if (isLatestAlias(value) && model === value) {
+            continue;
+          }
+
+          if (!isModelAllowedForFeature({ modelId: model, featureKey: feature.key })) {
+            restrictedModels.add(model);
+
+            continue;
+          }
+
           return {
             model,
             source: key === feature.key ? "feature_override" : "role_default",
@@ -172,6 +208,7 @@ export class ModelProviderResolutionService {
         }
       }
     }
+
     return null;
   }
 
@@ -187,8 +224,7 @@ export class ModelProviderResolutionService {
             scope.scopeType === tier.type &&
             chain.some(
               (candidate) =>
-                candidate.scopeType === scope.scopeType &&
-                candidate.scopeId === scope.scopeId,
+                candidate.scopeType === scope.scopeType && candidate.scopeId === scope.scopeId,
             ),
         ),
       )

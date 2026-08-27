@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { InternalServerError } from "../../shared/errors";
 import { handleError, handledErrorResponseBody } from "../error-handler";
 
@@ -44,10 +44,7 @@ describe("handleError()", () => {
 
   // Mirrors what the tracer middleware does: stash the request's trace/span ids
   // on the context before the handler runs, so handleError can read them.
-  function createTracedTestApp(
-    errorToThrow: Error,
-    ids: { traceId?: string; spanId?: string },
-  ) {
+  function createTracedTestApp(errorToThrow: Error, ids: { traceId?: string; spanId?: string }) {
     const app = new Hono<{ Variables: { traceId: string; spanId: string } }>();
     app.onError(handleError);
     app.use("*", async (c, next) => {
@@ -187,13 +184,10 @@ describe("handleError()", () => {
 
   describe("when error is a Prisma P2002 unique-constraint violation", () => {
     it("returns 409 conflict with the constrained field in the message", async () => {
-      const error = Object.assign(
-        new Error("Unique constraint failed on the fields: (`handle`)"),
-        {
-          code: "P2002",
-          meta: { target: ["handle"] },
-        },
-      );
+      const error = Object.assign(new Error("Unique constraint failed on the fields: (`handle`)"), {
+        code: "P2002",
+        meta: { target: ["handle"] },
+      });
       const app = createTestApp(error);
 
       const res = await app.request("/");
@@ -258,9 +252,7 @@ describe("handleError()", () => {
     });
 
     it("sanitizes explicit 500 HttpErrors too", async () => {
-      const app = createTestApp(
-        new InternalServerError("Prisma connection pool exhausted"),
-      );
+      const app = createTestApp(new InternalServerError("Prisma connection pool exhausted"));
 
       const res = await app.request("/");
       const body = await res.json();

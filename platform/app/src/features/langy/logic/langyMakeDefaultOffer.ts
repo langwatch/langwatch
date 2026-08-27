@@ -1,4 +1,4 @@
-import type { DefaultModelEffective } from "~/server/modelProviders/modelDefaults.read";
+import type { ModelDefaultEffective } from "@langwatch/model-provider-contract";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 
 /**
@@ -38,7 +38,7 @@ const SCOPE_TIER_BY_LABEL = {
 } as const satisfies Record<MakeDefaultWritePlan["scopeLabel"], ScopeTier>;
 
 function isOfferableScope(
-  scope: NonNullable<DefaultModelEffective["scope"]>,
+  scope: NonNullable<ModelDefaultEffective["scope"]>,
 ): scope is MakeDefaultWritePlan["scopeLabel"] {
   return scope in SCOPE_TIER_BY_LABEL;
 }
@@ -56,7 +56,7 @@ export function makeDefaultOffer({
    * resolver's own type: a renamed source or scope slug fails here at compile
    * time rather than turning the offer into a silent no-op.
    */
-  resolvedDefault: DefaultModelEffective | null;
+  resolvedDefault: ModelDefaultEffective | null;
   /** The caller's manage rights, one per scope the default could live at. */
   canManage: { organization: boolean; team: boolean; project: boolean };
   scopeIds: {
@@ -76,8 +76,7 @@ export function makeDefaultOffer({
   if (!scopeId) return null;
 
   return {
-    kind:
-      resolvedDefault.source === "feature_override" ? "feature-override" : "role-default",
+    kind: resolvedDefault.source === "feature_override" ? "feature-override" : "role-default",
     scopeType: SCOPE_TIER_BY_LABEL[scopeLabel],
     scopeId,
     scopeLabel,

@@ -15,8 +15,7 @@
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */
 
-export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE =
-  "serves the coding-assistant surfaces only";
+export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE = "serves the coding-assistant surfaces only";
 
 export const ScenarioInfraErrorCode = {
   /** The runner couldn't establish TLS because the certificate isn't trusted. */
@@ -210,9 +209,7 @@ function findMeaningfulLine(text: string): string | undefined {
   // that open an object, so a balanced block's innards can't surface — rather
   // than lose a genuine sentence sitting under the truncation.
   if (!endedInsideBlock) return undefined;
-  return lines.find(
-    (line) => line.length > 0 && !line.startsWith("{") && !isNoiseLine(line),
-  );
+  return lines.find((line) => line.length > 0 && !line.startsWith("{") && !isNoiseLine(line));
 }
 
 /**
@@ -234,9 +231,7 @@ const HTML_DOCUMENT_MARKER = /<!doctype\s+html|<html[\s>]/i;
  * a generic sentence instead of surfacing a stack frame.
  */
 function summarize(raw: string): string | undefined {
-  const withoutWrapper = raw
-    .replace(/^Child process exited with code \d+:\s*/i, "")
-    .trim();
+  const withoutWrapper = raw.replace(/^Child process exited with code \d+:\s*/i, "").trim();
   const meaningful = findMeaningfulLine(withoutWrapper);
   if (!meaningful || exposesInternals(meaningful)) return undefined;
   let collapsed = meaningful.replace(/\s+/g, " ").trim();
@@ -307,11 +302,7 @@ interface ClassificationRule {
 }
 
 /** Markers that only an uncaught Node crash prints. */
-const NODE_CRASH_MARKERS = [
-  "node:internal/modules",
-  "Require stack:",
-  "at Module._",
-] as const;
+const NODE_CRASH_MARKERS = ["node:internal/modules", "Require stack:", "at Module._"] as const;
 
 /**
  * The wrapper `scenario.processor.ts` puts on a child that exited non-zero
@@ -336,8 +327,7 @@ const CHILD_EXIT_WRAPPER = /Child process exited with code \d+/i;
  */
 function isOurRunnerCrash(text: string): boolean {
   return (
-    CHILD_EXIT_WRAPPER.test(text) &&
-    NODE_CRASH_MARKERS.some((marker) => contains(text, marker))
+    CHILD_EXIT_WRAPPER.test(text) && NODE_CRASH_MARKERS.some((marker) => contains(text, marker))
   );
 }
 
@@ -379,9 +369,9 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     // A terms-restricted model (codex) ran outside the coding-assistant
     // surfaces its plan licenses — the resolver only lets a saved value
-    // reach execution when it predates the restriction (see
-    // resolveModelForFeature.ts's restricted-model skip). Kept ahead of the
-    // generic model-provider rule below since this is the more specific,
+    // reach execution when it predates the restriction (see the canonical
+    // Model Provider resolution service's restricted-model skip). Kept ahead
+    // of the generic model-provider rule below since this is the more specific,
     // more actionable failure.
     needles: [CODING_ASSISTANT_SURFACES_ONLY_NEEDLE],
     build: () => ({
@@ -476,9 +466,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
  * Falls back to a trimmed generic message so we never lose information, but
  * never surface a raw dump.
  */
-export function classifyScenarioInfraError(
-  raw: string | undefined,
-): ScenarioErrorEnvelope {
+export function classifyScenarioInfraError(raw: string | undefined): ScenarioErrorEnvelope {
   const text = (raw ?? "").trim();
 
   if (text.length === 0) {
@@ -511,9 +499,7 @@ export function encodeScenarioError(envelope: ScenarioErrorEnvelope): string {
  * legacy plain-string errors (or anything that isn't one of our envelopes) so
  * callers can fall back to rendering the raw string.
  */
-export function decodeScenarioError(
-  raw: string | undefined | null,
-): ScenarioErrorEnvelope | null {
+export function decodeScenarioError(raw: string | undefined | null): ScenarioErrorEnvelope | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
@@ -528,9 +514,7 @@ export function decodeScenarioError(
   if (typeof candidate.code !== "string" || typeof candidate.message !== "string") {
     return null;
   }
-  const knownCode = (Object.values(ScenarioInfraErrorCode) as string[]).includes(
-    candidate.code,
-  );
+  const knownCode = (Object.values(ScenarioInfraErrorCode) as string[]).includes(candidate.code);
   if (!knownCode) return null;
   return {
     code: candidate.code as ScenarioInfraErrorCode,
@@ -578,9 +562,7 @@ export function extractScenarioErrorText(raw: string): string {
  * plain string — reads as one clean, actionable handled error.
  */
 export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
-  return (
-    decodeScenarioError(raw) ?? classifyScenarioInfraError(extractScenarioErrorText(raw))
-  );
+  return decodeScenarioError(raw) ?? classifyScenarioInfraError(extractScenarioErrorText(raw));
 }
 
 /** Short human title for an envelope code, for the drawer's error heading. */

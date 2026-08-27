@@ -36,9 +36,7 @@ import type {
 } from "./model-provider";
 
 export abstract class ModelProviderService {
-  abstract listForProject(
-    input: ModelProviderListProjectInput,
-  ): Promise<ModelProviderSummary[]>;
+  abstract listForProject(input: ModelProviderListProjectInput): Promise<ModelProviderSummary[]>;
   abstract listForOrganization(
     input: ModelProviderListOrganizationInput,
   ): Promise<ModelProviderSummary[]>;
@@ -65,22 +63,13 @@ export abstract class ModelProviderService {
   abstract validateApiKey(
     input: ModelProviderApiKeyValidationInput,
   ): Promise<ModelProviderApiKeyValidation>;
-  abstract testConnection(
-    input: ModelProviderTestConnectionInput,
-  ): Promise<{ connected: boolean }>;
-  abstract getCodexStatus(
-    input: ModelProviderCodexStatusInput,
-  ): Promise<ModelProviderCodexStatus>;
+  abstract testConnection(input: ModelProviderTestConnectionInput): Promise<{ connected: boolean }>;
+  abstract getCodexStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus>;
   abstract refreshCodexForGateway(
     input: ModelProviderCodexGatewayRefreshInput,
   ): Promise<ModelProviderCodexGatewayRefresh>;
-  abstract isManagedProvider(input: {
-    organizationId: string;
-    provider: string;
-  }): boolean;
-  abstract getDefaultSnapshot(
-    input: ModelDefaultSnapshotInput,
-  ): Promise<ModelDefaultSnapshot>;
+  abstract isManagedProvider(input: { organizationId: string; provider: string }): boolean;
+  abstract getDefaultSnapshot(input: ModelDefaultSnapshotInput): Promise<ModelDefaultSnapshot>;
   abstract getInheritedValues(input: {
     projectId: string;
     scopes: ModelDefaultScope[];
@@ -92,15 +81,13 @@ export abstract class ModelProviderService {
   abstract resolveModelForFeature(
     input: ModelDefaultResolveInput,
   ): Promise<ModelProviderResolution>;
-  abstract tryFindAlternateModel(input: {
+  abstract findAlternateModel(input: {
     projectId: string;
     featureKey: string;
     skipFromScope: ModelProviderResolution["scope"];
-  }): Promise<ModelProviderAlternateResolution | null>;
+  }): Promise<ModelProviderAlternateResolution>;
   abstract setDefault(input: ModelDefaultAssignmentInput): Promise<void>;
-  abstract saveDefaultConfig(
-    input: ModelDefaultConfigWriteInput,
-  ): Promise<ModelDefaultConfig>;
+  abstract saveDefaultConfig(input: ModelDefaultConfigWriteInput): Promise<ModelDefaultConfig>;
   abstract tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
   abstract deleteDefaultConfig(input: ModelDefaultDeleteInput): Promise<void>;
   abstract listCosts(input: ModelCostListInput): Promise<ModelCost[]>;

@@ -59,7 +59,7 @@ import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";

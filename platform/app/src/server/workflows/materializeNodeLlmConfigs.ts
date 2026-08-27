@@ -1,10 +1,9 @@
-import type { PrismaClient } from "~/generated/prisma/client";
-
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { DEFAULT_MODEL } from "../../utils/constants";
-import { ModelNotConfiguredError } from "../modelProviders/modelNotConfiguredError";
-import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";
 
 type LlmParamLike = {
   identifier?: string;
@@ -52,18 +51,15 @@ const hasModel = (value: unknown): boolean => {
  * Mutates `dsl` in place and only touches the database when a gap exists.
  */
 export const materializeNodeLlmConfigs = async ({
-  prisma,
   projectId,
   dsl,
   modelProviders,
 }: {
-  prisma: PrismaClient;
   projectId: string;
   dsl: DslLike;
-  modelProviders?: ModelProviderService;
+  modelProviders: ModelProviderService;
 }): Promise<void> => {
-  const legacyDefault =
-    dsl.default_llm && hasModel(dsl.default_llm) ? dsl.default_llm : undefined;
+  const legacyDefault = dsl.default_llm && hasModel(dsl.default_llm) ? dsl.default_llm : undefined;
   delete dsl.default_llm;
 
   const modellessParams = (dsl.nodes ?? [])
@@ -77,15 +73,10 @@ export const materializeNodeLlmConfigs = async ({
   if (!fallback) {
     let resolvedModel: string | undefined;
     try {
-      const resolved = modelProviders
-        ? await modelProviders.resolveModelForFeature({
-            projectId,
-            featureKey: "workflows.create_default",
-          })
-        : await resolveModelForFeature("workflows.create_default", {
-            prisma,
-            projectId,
-          });
+      const resolved = await modelProviders.resolveModelForFeature({
+        projectId,
+        featureKey: "workflows.create_default",
+      });
       resolvedModel = resolved.model;
     } catch (error) {
       // Only "nothing configured at any scope" falls back to the registry
