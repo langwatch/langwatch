@@ -221,7 +221,9 @@ export const experimentResultsCommand = async ({
            * different runs. A caller comparing a before against an after has
            * to pin the run, and cannot know to unless it is told.
            */
-          runSelection: options.runId ? "explicit" : "latest-at-call-time",
+          runSelection: options.runId?.trim()
+            ? "explicit"
+            : "latest-at-call-time",
           filter,
           evaluator: evaluatorFilter ?? null,
         },

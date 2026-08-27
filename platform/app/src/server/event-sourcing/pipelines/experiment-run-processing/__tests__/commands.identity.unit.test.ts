@@ -11,14 +11,23 @@
  * and its cost but no score at all.
  */
 import { describe, expect, it } from "vitest";
-import type { CommandHandlerResult } from "../../../commands/command";
+import type { Command, CommandHandlerResult } from "../../../commands/command";
+import type { CommandEnvelope } from "../../../commands/commandEnvelope";
+import { createTenantId } from "../../../domain/tenantId";
 import type { Event } from "../../../domain/types";
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
 } from "../commands";
+import type {
+  EvaluatorResultEventData,
+  TargetResultEventData,
+} from "../schemas/events";
 
-const TENANT = "project_test";
+const TENANT = createTenantId("project_test");
+const RUN = "bold-jolly-bee";
+const EXPERIMENT = "experiment_1";
+const OCCURRED_AT = 1_700_000_000_000;
 
 const verdict = ({
   targetId,
@@ -30,18 +39,37 @@ const verdict = ({
   evaluatorId?: string;
   index?: number;
   passed?: boolean;
-}) => ({
+}): Command<EvaluatorResultEventData & CommandEnvelope> => ({
   tenantId: TENANT,
+  aggregateId: `${EXPERIMENT}:${RUN}`,
+  type: "lw.experiment_run.record_evaluator_result",
   data: {
     tenantId: TENANT,
-    occurredAt: 1_700_000_000_000,
-    runId: "bold-jolly-bee",
-    experimentId: "experiment_1",
+    occurredAt: OCCURRED_AT,
+    runId: RUN,
+    experimentId: EXPERIMENT,
     index,
     targetId,
     evaluatorId,
-    status: "processed" as const,
+    status: "processed",
     passed,
+  },
+});
+
+const output = (
+  targetId: string,
+): Command<TargetResultEventData & CommandEnvelope> => ({
+  tenantId: TENANT,
+  aggregateId: `${EXPERIMENT}:${RUN}`,
+  type: "lw.experiment_run.record_target_result",
+  data: {
+    tenantId: TENANT,
+    occurredAt: OCCURRED_AT,
+    runId: RUN,
+    experimentId: EXPERIMENT,
+    index: 0,
+    targetId,
+    entry: { question: "what is the capital of France?" },
   },
 });
 
@@ -58,8 +86,8 @@ const identityOfEvent = (result: CommandHandlerResult<Event>): string => {
 };
 
 /** The identity the store orders on, for one recorded verdict. */
-const identityOf = (payload: ReturnType<typeof verdict>): string =>
-  identityOfEvent(new RecordEvaluatorResultCommand().handle(payload as never));
+const identityOf = (command: ReturnType<typeof verdict>): string =>
+  identityOfEvent(new RecordEvaluatorResultCommand().handle(command));
 
 describe("given a run whose two columns share one evaluator", () => {
   describe("when both columns produce a verdict for the same row", () => {
@@ -83,11 +111,8 @@ describe("given a run whose two columns share one evaluator", () => {
 
     /** @scenario "Two columns keep their own score for the same evaluator and row" */
     it("keeps the queue job separate too, so one job cannot drop the other", () => {
-      const makeJobId = (
-        RecordEvaluatorResultCommand as unknown as {
-          makeJobId: (payload: unknown) => string;
-        }
-      ).makeJobId;
+      const makeJobId = RecordEvaluatorResultCommand.makeJobId;
+      if (!makeJobId) throw new Error("the command declares no job id");
 
       expect(makeJobId(verdict({ targetId: "target-eyMC-VVJ" }).data)).not.toBe(
         makeJobId(verdict({ targetId: "target-YyznMusS" }).data),
@@ -128,17 +153,7 @@ describe("given a recorded target output", () => {
     it("separates them by target, the way the verdicts now do", () => {
       const outputFor = (targetId: string): string =>
         identityOfEvent(
-          new RecordTargetResultCommand().handle({
-            tenantId: TENANT,
-            data: {
-              tenantId: TENANT,
-              occurredAt: 1_700_000_000_000,
-              runId: "bold-jolly-bee",
-              experimentId: "experiment_1",
-              index: 0,
-              targetId,
-            },
-          } as never),
+          new RecordTargetResultCommand().handle(output(targetId)),
         );
 
       expect(outputFor("target-eyMC-VVJ")).not.toBe(

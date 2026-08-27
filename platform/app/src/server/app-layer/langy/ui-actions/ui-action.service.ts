@@ -47,10 +47,14 @@ export const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
  * "the action may still have applied" warning, which is written for exactly
  * that case.
  *
+ * The ceiling is the WHOLE server wait, claim window included: the dispatch
+ * waits the claim window first, then the rest of the budget, so a 15s ceiling
+ * is 3s of claim plus at most 12s of execute.
+ *
  * The order that has to hold is: this ceiling (15s) < the CLI's own request
  * deadline (20s, sdks/typescript/src/cli/commands/ui/call.ts) < the harness
- * stop (30s). Each step gets 5 seconds, so the failure is always reported by
- * the layer that owns it. This still clears the ingress idle timeout.
+ * stop (30s), so the failure is always reported by the layer that owns it.
+ * This still clears the ingress idle timeout.
  */
 export const UI_ACTION_MAX_BUDGET_MS = 15_000;
 /** Pending records outlive the longest possible dispatch, then self-clean. */

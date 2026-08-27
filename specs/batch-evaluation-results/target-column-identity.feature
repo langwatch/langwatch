@@ -47,6 +47,14 @@ Feature: Target column identity on the results page
     Then one target column header reads "category_classifier (1)"
     And the other target column header reads "category_classifier (2)"
 
+  @unit
+  Scenario: A same-named target keeps one label across the runs it is compared in
+    Given two targets both stored under the name "classifier"
+    And one run holds rows for both targets
+    And another run holds rows for the second target only
+    When the results table renders for each run
+    Then the second target reads "classifier (2)" in both runs
+
   # ============================================================================
   # Chart axis labels
   # ============================================================================

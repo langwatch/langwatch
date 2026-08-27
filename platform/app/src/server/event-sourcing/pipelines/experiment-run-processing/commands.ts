@@ -31,6 +31,30 @@ export const StartExperimentRunCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.runId}:start`,
 });
 
+/**
+ * The identity of one cell result, used both to order the event and to name
+ * its queue job.
+ *
+ * The store deduplicates on the idempotency key and the queue deduplicates on
+ * the job id, so the two must always describe the same cell. One builder for
+ * both keeps them that way.
+ */
+const targetResultIdentity = (d: {
+  tenantId: string;
+  runId: string;
+  targetId: string;
+  index: number;
+}) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`;
+
+const evaluatorResultIdentity = (d: {
+  tenantId: string;
+  runId: string;
+  targetId: string;
+  evaluatorId: string;
+  index: number;
+}) =>
+  `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`;
+
 export const RecordTargetResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_target_result",
   eventType: "lw.experiment_run.target_result",
@@ -39,15 +63,14 @@ export const RecordTargetResultCommand = defineCommand({
   schema: targetResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
   groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
+  idempotencyKey: targetResultIdentity,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
     "payload.target.id": d.targetId,
     "payload.index": d.index,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
+  makeJobId: targetResultIdentity,
 });
 
 /**
@@ -66,8 +89,7 @@ export const RecordEvaluatorResultCommand = defineCommand({
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
   groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`,
+  idempotencyKey: evaluatorResultIdentity,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
@@ -75,8 +97,7 @@ export const RecordEvaluatorResultCommand = defineCommand({
     "payload.evaluator.id": d.evaluatorId,
     "payload.index": d.index,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`,
+  makeJobId: evaluatorResultIdentity,
 });
 
 export const ComputeExperimentRunMetricsCommand = defineCommand({

@@ -316,12 +316,23 @@ export const transformBatchEvaluationData = (
     );
     const runTargets = withData.length > 0 ? withData : targets;
 
-    const displayNames = disambiguateNames(runTargets.map((t) => t.name));
+    // Number the whole declared board, not only the targets this run holds
+    // rows for. Compare mode merges columns by target id across runs, so a
+    // label worked out from one run's subset would move: the same target reads
+    // `classifier (2)` beside a sibling and plain `classifier` in a run that
+    // covers it alone.
+    const boardNames = disambiguateNames(targets.map((t) => t.name));
+    const displayNameById = new Map(
+      targets.map((target, index) => [
+        target.id,
+        boardNames[index] ?? target.name,
+      ]),
+    );
 
-    targetColumns = runTargets.map((target, index) => ({
+    targetColumns = runTargets.map((target) => ({
       id: target.id,
       name: target.name,
-      displayName: displayNames[index] ?? target.name,
+      displayName: displayNameById.get(target.id) ?? target.name,
       type:
         target.type === "custom"
           ? "custom"

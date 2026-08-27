@@ -410,16 +410,16 @@ describe("experimentResultsCommand()", () => {
         // only its verdict should be described.
         mockGetRunResults.mockResolvedValue({
           ...comparisonResults,
-          evaluations: comparisonResults.evaluations.map((evaluation) =>
-            evaluation.evaluator === "quality" && evaluation.index === 0
-              ? evaluation
-              : evaluation.evaluator === "quality"
-                ? { ...evaluation, passed: false }
-                : evaluation,
-          ),
-          dataset: [
-            ...comparisonResults.dataset,
-            { index: 1, targetId: "target_a", entry: { input: "q2" } },
+          evaluations: [
+            ...comparisonResults.evaluations,
+            {
+              evaluator: "quality",
+              targetId: "target_a",
+              index: 1,
+              status: "processed",
+              score: 0.1,
+              passed: false,
+            },
           ],
         });
 
@@ -432,7 +432,7 @@ describe("experimentResultsCommand()", () => {
         const verdicts = evaluations.filter(
           (e: any) => e.evaluator === "target_comparison",
         );
-        expect(verdicts.every((v: any) => v.index === 1)).toBe(true);
+        expect(verdicts.map((v: any) => v.index)).toEqual([1]);
       });
     });
 

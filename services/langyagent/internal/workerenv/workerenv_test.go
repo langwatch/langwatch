@@ -22,14 +22,14 @@ func TestBaseEnv_CarriesCrashReportOptOutToTheWorker(t *testing.T) {
 
 	env := workerenv.BaseEnv()
 
-	found := false
+	hasCrashReportOptOut := false
 	for _, kv := range env {
 		if kv == "DO_NOT_TRACK=1" {
-			found = true
+			hasCrashReportOptOut = true
 			break
 		}
 	}
-	if !found {
+	if !hasCrashReportOptOut {
 		t.Fatalf("worker env does not carry DO_NOT_TRACK=1, got %v", env)
 	}
 }

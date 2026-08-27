@@ -8,7 +8,7 @@ import type { CommandResult } from "../../utils/output";
  * Bound the request so a wedged control plane cannot hold the whole turn.
  *
  * This call blocks by design: the server keeps it open for the claim window
- * (3s) plus the action's execute budget, which the platform caps at 15s
+ * plus the action's execute budget, and caps the two together at 15s
  * (UI_ACTION_MAX_BUDGET_MS). It also runs inside an agent worker whose harness
  * stops any command at 30 seconds. At 60s this deadline could never fire
  * there: the harness always killed the command first, so the MAY_HAVE_APPLIED

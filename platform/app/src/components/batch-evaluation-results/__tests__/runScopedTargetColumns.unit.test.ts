@@ -103,6 +103,29 @@ describe("given a run whose Targets snapshot lists the whole board", () => {
     });
   });
 
+  describe("when two declared targets share one name", () => {
+    /** @scenario "A same-named target keeps one label across the runs it is compared in" */
+    it("labels the second target the same way whichever run holds its rows", () => {
+      const sameNamedBoard = [
+        { id: "target-a", name: "classifier", type: "prompt" },
+        { id: "target-b", name: "classifier", type: "prompt" },
+      ];
+
+      const labelFor = (targetIds: string[]): string | undefined => {
+        const run = runWithRowsFor(targetIds);
+        run.targets = sameNamedBoard;
+        return transformBatchEvaluationData(run).targetColumns.find(
+          (column) => column.id === "target-b",
+        )?.displayName;
+      };
+
+      // Compare mode merges columns by target id across runs, so a label that
+      // moved with a run's own coverage would name one target two ways.
+      expect(labelFor(["target-a", "target-b"])).toBe("classifier (2)");
+      expect(labelFor(["target-b"])).toBe("classifier (2)");
+    });
+  });
+
   describe("when an evaluation names a target that has no dataset row", () => {
     it("keeps that target, because the run did execute it", () => {
       const run = runWithRowsFor(["target-classifier"]);

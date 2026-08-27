@@ -145,37 +145,42 @@ describe("BatchTargetHeader", () => {
       expect(screen.getByTestId("target-summary-badge")).toBeInTheDocument();
     });
 
-    /** @scenario "A column header says how much of the dataset its score covers" */
-    it("draws the row count beside a score that covers part of the dataset", () => {
-      const target = createTargetColumn();
-      const aggregates = createAggregate({
-        completedRows: 5,
-        totalRows: 10,
-        overallPassRate: 80,
-      });
+    describe("when the score covers part of the dataset", () => {
+      /** @scenario "A column header says how much of the dataset its score covers" */
+      it("draws the row count beside the score", () => {
+        const target = createTargetColumn();
+        const aggregates = createAggregate({
+          completedRows: 5,
+          totalRows: 10,
+          overallPassRate: 80,
+        });
 
-      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
-        wrapper: Wrapper,
-      });
+        render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+          wrapper: Wrapper,
+        });
 
-      expect(screen.getByText("5/10")).toBeInTheDocument();
+        expect(screen.getByText("5/10")).toBeInTheDocument();
+        expect(screen.getByText("80%")).toBeInTheDocument();
+      });
     });
 
-    /** @scenario "A column that covers the whole dataset shows the score on its own" */
-    it("draws no row count when the score covers every row", () => {
-      const target = createTargetColumn();
-      const aggregates = createAggregate({
-        completedRows: 10,
-        totalRows: 10,
-        overallPassRate: 80,
-      });
+    describe("when the score covers every row", () => {
+      /** @scenario "A column that covers the whole dataset shows the score on its own" */
+      it("draws the score on its own, with no row count", () => {
+        const target = createTargetColumn();
+        const aggregates = createAggregate({
+          completedRows: 10,
+          totalRows: 10,
+          overallPassRate: 80,
+        });
 
-      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
-        wrapper: Wrapper,
-      });
+        render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+          wrapper: Wrapper,
+        });
 
-      expect(screen.queryByText("10/10")).not.toBeInTheDocument();
-      expect(screen.getByText("80%")).toBeInTheDocument();
+        expect(screen.queryByText("10/10")).not.toBeInTheDocument();
+        expect(screen.getByText("80%")).toBeInTheDocument();
+      });
     });
 
     it("renders pass rate in summary badge", () => {
