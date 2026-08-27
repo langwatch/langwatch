@@ -5,9 +5,18 @@
  * The name of the plan is not here: it reads as the page title while the plan
  * is open, so this line can stay on the run itself.
  *
- * A set that runs from code and the one-off bucket are not plans anyone wrote,
- * so neither carries an Edit or a Run. Export lives in the overflow menu, so
- * the line ends on the two actions the prototype draws.
+ * A set that runs from code is not a plan anyone wrote, so it carries neither
+ * "Edit run plan" nor Run. Export lives in the overflow menu, so the line ends
+ * on the two actions the prototype draws.
+ *
+ * "Show run settings" turns on the block under this line that says what the
+ * run was configured with. It is off until it is asked for, so nothing pushes
+ * the results down on a page a person opened to read them.
+ *
+ * How long ago the run started is not on this line. The runs rail beside it
+ * already says that for every run, and the settings block says it again with
+ * the date, so a third copy on the line the results start from says nothing
+ * new.
  *
  * The back control is not here: it lives in the runs rail, beside the list it
  * goes back to.
@@ -17,12 +26,20 @@
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Download, MoreVertical, Pencil, Play, Square } from "lucide-react";
+import {
+  Download,
+  MoreVertical,
+  Pencil,
+  Play,
+  Settings2,
+  Square,
+} from "lucide-react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import { Menu } from "~/components/ui/menu";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
+import { ToggleButton } from "../shared/ToggleButton";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";
 import type { RunPlan } from "./run-plans";
 import { ViewModeToggle } from "./ViewModeToggle";
@@ -30,7 +47,6 @@ import { ViewModeToggle } from "./ViewModeToggle";
 /** Which run is on screen, as the line reads it. */
 export type RunPlanDetailRun = {
   title: string;
-  timeAgo: string;
   note: string | null;
   summary: RunGroupSummary | null;
 };
@@ -49,13 +65,15 @@ export type RunPlanDetailHeaderProps = {
   onEditPlan: (suiteId: string) => void;
   /** Opens the run dialog on this plan. Absent when it cannot be run. */
   onRunPlan?: () => void;
+  /** Whether the run settings block reads under this line. */
+  isRunSettingsShown: boolean;
+  onToggleRunSettings: () => void;
 };
 
 /**
  * Which run is on screen: its number, how it went and the note it carries.
  *
- * How it went reads beside the name, where a person looks first. The age of
- * the run reads on the other end of the line, beside the controls.
+ * How it went reads beside the name, where a person looks first.
  */
 function RunSummary({ run }: { run: RunPlanDetailRun }) {
   return (
@@ -94,6 +112,8 @@ export function RunPlanDetailHeader({
   isExportDisabled,
   onEditPlan,
   onRunPlan,
+  isRunSettingsShown,
+  onToggleRunSettings,
 }: RunPlanDetailHeaderProps) {
   const suiteId = plan.kind === "suite" ? plan.suiteId : null;
 
@@ -110,9 +130,13 @@ export function RunPlanDetailHeader({
 
       <HStack gap={1.5}>
         {run ? (
-          <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
-            {run.timeAgo}
-          </Text>
+          <ToggleButton
+            isOn={isRunSettingsShown}
+            onClick={onToggleRunSettings}
+            data-testid="run-settings-toggle"
+          >
+            <Settings2 size={13} /> Show run settings
+          </ToggleButton>
         ) : null}
 
         <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
@@ -166,8 +190,9 @@ export function RunPlanDetailHeader({
             color={FG_MUTED}
             gap={1.5}
             onClick={() => onEditPlan(suiteId)}
+            data-testid="edit-run-plan-button"
           >
-            <Pencil size={13} /> Edit
+            <Pencil size={13} /> Edit run plan
           </Button>
         ) : null}
 

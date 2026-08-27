@@ -6,7 +6,6 @@
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
- * @see specs/suites/one-off-runs-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -56,6 +55,9 @@ vi.mock("~/utils/api", () => ({
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
+      // The run dialog lists the previous configurations of the scope it
+      // opens on, which it reads off the runs.
+      getRunConfigurations: { useQuery: vi.fn(() => ({ data: [] })) },
       getSuiteRunFreshness: { useQuery: mockFreshnessQuery },
       getScenarioSetBatchRunCount: { useQuery: mockGetBatchRunCount },
       cancelJob: {
@@ -97,6 +99,28 @@ vi.mock("~/utils/api", () => ({
     modelProvider: {
       getAllForProjectForFrontend: {
         useQuery: vi.fn(() => ({ data: [], isLoading: false })),
+      },
+      // The run settings block reads a model back through LLMModelDisplay,
+      // which takes the provider icon from the providers of the project.
+      listAllForProjectForFrontend: {
+        useQuery: vi.fn(() => ({
+          data: {
+            providers: [
+              {
+                provider: "openai",
+                enabled: true,
+                customKeys: null,
+                models: null,
+                embeddingsModels: null,
+                customModels: null,
+                customEmbeddingsModels: null,
+                deploymentMapping: null,
+                extraHeaders: null,
+              },
+            ],
+          },
+          isLoading: false,
+        })),
       },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
@@ -491,15 +515,36 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     renderDetail();
 
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit run plan" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByTestId("run-plan-button"));
 
     const dialog = await screen.findByTestId("run-dialog");
     expect(dialog).toHaveTextContent("Run · Checkout");
   });
 
-  /** @scenario "A set that runs from code has no Run and no Edit" */
-  it("offers neither Run nor Edit on a set that runs from code", () => {
+  /** @scenario "Edit run plan opens the run dialog on the configuration of the plan" */
+  it("opens the plan in the run dialog from Edit run plan, left of Run", async () => {
+    const user = userEvent.setup();
+    const { props } = renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const edit = within(line).getByTestId("edit-run-plan-button");
+    const run = within(line).getByTestId("run-plan-button");
+    expect(edit).toHaveTextContent("Edit run plan");
+    expect(
+      edit.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(edit);
+    // The dialog host holds the plan the id names, so the page hands it the
+    // suite of the open plan rather than opening an empty dialog.
+    expect(props.onEditPlan).toHaveBeenCalledWith("suite_1");
+  });
+
+  /** @scenario "A set that runs from code has no Run and no Edit run plan" */
+  it("offers neither Run nor Edit run plan on a set that runs from code", () => {
     renderDetail({
       plan: {
         slug: "external:nightly-ci",
@@ -515,7 +560,7 @@ describe("<RunPlanDetail/>", () => {
 
     expect(screen.queryByTestId("run-plan-button")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Edit" }),
+      screen.queryByTestId("edit-run-plan-button"),
     ).not.toBeInTheDocument();
   });
 
@@ -612,13 +657,36 @@ describe("<RunPlanDetail/>", () => {
     const name = within(line).getByText("Run #3");
     const summary = within(line).getByTestId("run-metrics-summary");
     const note = within(line).getByTestId("run-summary-note");
-    const age = within(line).getByText(/ago$/);
+    const settings = within(line).getByTestId("run-settings-toggle");
     const toggle = within(line).getByTestId("view-mode-toggle");
+    const edit = within(line).getByTestId("edit-run-plan-button");
+    const runControl = within(line).getByTestId("run-plan-button");
 
     expect(positionOf(name)).toBeLessThan(positionOf(summary));
     expect(positionOf(summary)).toBeLessThan(positionOf(note));
-    expect(positionOf(note)).toBeLessThan(positionOf(age));
-    expect(positionOf(age)).toBeLessThan(positionOf(toggle));
+    expect(positionOf(note)).toBeLessThan(positionOf(settings));
+    expect(positionOf(settings)).toBeLessThan(positionOf(toggle));
+    expect(positionOf(toggle)).toBeLessThan(positionOf(edit));
+    expect(positionOf(edit)).toBeLessThan(positionOf(runControl));
+  });
+
+  /** @scenario "The header line does not repeat when the run started" */
+  it("leaves how long ago the run started off the header line", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    expect(within(line).queryByText("2h ago")).not.toBeInTheDocument();
+
+    // The rail still says it, and the settings block says it again with the
+    // date, so nothing was lost by taking it off the line.
+    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    expect(within(sidebar).getAllByText("2h ago").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+    expect(screen.getByTestId("run-settings-started")).toHaveTextContent(
+      "2h ago",
+    );
   });
 
   /** @scenario "The run header shows the note of the selected run" */
@@ -852,45 +920,165 @@ describe("<RunPlanDetail/>", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });
 
-  /** @scenario "Each run under One-off runs is named for the scenario that ran" */
-  /** @scenario "The finished one-off run is listed under One-off runs" */
-  it("names a one-off run after the scenario that ran", async () => {
+  /**
+   * One batch of three runs of one scenario against one target, started with
+   * one parameter and both simulation models named. The repeat count is the
+   * number of runs sharing a scenario and a target, so three runs is a repeat
+   * count of three.
+   */
+  function configuredBatch(
+    langwatch: Record<string, unknown> = {
+      targetReferenceId: "agent_1",
+      targetType: "http",
+      simulatorModel: "openai/gpt-5-mini",
+      judgeModel: "openai/gpt-5",
+    },
+    extraMetadata: Record<string, unknown> = {
+      parameters: { region: "eu-central" },
+    },
+  ): ScenarioRunData[] {
+    return ["run_a", "run_b", "run_c"].map((scenarioRunId) =>
+      makeRun({
+        batchRunId: "batch_3",
+        scenarioRunId,
+        metadata: { langwatch, ...extraMetadata } as never,
+      }),
+    );
+  }
+
+  /** @scenario "The run settings stay hidden until they are asked for" */
+  it("keeps the run settings off until the toggle is used", () => {
+    setRuns(configuredBatch());
+    renderDetail();
+
+    const toggle = screen.getByTestId("run-settings-toggle");
+    expect(toggle).toHaveTextContent("Show run settings");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("run-settings-block")).not.toBeInTheDocument();
+    // Nothing pushed the results down: the table is what reads under the
+    // header line.
+    expect(screen.getByTestId("run-results-table")).toBeInTheDocument();
+  });
+
+  /** @scenario "The toggle turns the run settings block on and off" */
+  it("turns the block on with the toggle and off again", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    const toggle = screen.getByTestId("run-settings-toggle");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(toggle);
+    expect(screen.getByTestId("run-settings-block")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(toggle);
+    expect(screen.queryByTestId("run-settings-block")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  /** @scenario "The run settings block says what the run was configured with" */
+  it("reads the parameters, the repeat count and both models", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    expect(within(block).getByTestId("run-settings-started")).toHaveTextContent(
+      "2h ago",
+    );
+    // A parameter value is a literal, so it reads in a monospace font.
+    const parameter = within(block).getByText("region = eu-central");
+    expect(parameter.tagName).toBe("CODE");
+
+    expect(within(block).getByTestId("run-settings-repeat")).toHaveTextContent(
+      "3 times",
+    );
+
+    const simulator = within(block).getByTestId("run-settings-simulator");
+    expect(simulator).toHaveTextContent("gpt-5-mini");
+    expect(simulator.querySelector("svg")).not.toBeNull();
+
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("gpt-5");
+    expect(judge.querySelector("svg")).not.toBeNull();
+  });
+
+  /** @scenario "The judge always reads, and a run that named no model says so" */
+  it("reads the judge as naming no model on a run that stamped none", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({ targetReferenceId: "agent_1", targetType: "http" }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    expect(within(block).getByTestId("run-settings-judge")).toHaveTextContent(
+      "No model named",
+    );
+    // The project default is not what the run took, so no model reads here.
+    expect(
+      within(block).queryByTestId("run-settings-simulator"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A run with no parameters and no repeat reads neither" */
+  it("reads neither parameters nor a repeat count when the run had none", async () => {
     const user = userEvent.setup();
     setRuns([
       makeRun({
-        batchRunId: "batch_b",
-        scenarioRunId: "run_b",
-        name: "Angry refund request",
-      }),
-      makeRun({
-        batchRunId: "batch_a",
+        batchRunId: "batch_3",
         scenarioRunId: "run_a",
-        scenarioId: "scen_2",
-        name: "Edge: empty cart",
-        timestamp: NOW - 86_400_000,
+        metadata: {
+          langwatch: { targetReferenceId: "agent_1", targetType: "http" },
+        } as never,
       }),
     ]);
-    const { props } = renderDetail({
-      plan: {
-        slug: "one-off-runs",
-        name: "One-off runs",
-        kind: "one-off",
-        scopeLabel: "one-off runs",
-        scenarioSetId: "__internal__proj_1__on-platform-scenarios",
-        suiteId: null,
-        caseCount: null,
-        lastRun: null,
-      },
-    });
+    renderDetail();
 
-    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
     expect(
-      within(sidebar).getByText("Angry refund request"),
-    ).toBeInTheDocument();
-    expect(within(sidebar).getByText("Edge: empty cart")).toBeInTheDocument();
+      within(block).queryByTestId("run-settings-parameters"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(block).queryByTestId("run-settings-repeat"),
+    ).not.toBeInTheDocument();
+    // The judge still reads, which is the point of the block.
+    expect(within(block).getByTestId("run-settings-judge")).toBeInTheDocument();
+  });
 
-    await user.click(within(sidebar).getByText("Edge: empty cart"));
-    expect(props.onSelectRun).toHaveBeenCalledWith("batch_a");
+  /** @scenario "The note stays in the header line and never moves into the block" */
+  it("keeps the note in the header line when the settings are shown", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch(
+        {
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          judgeModel: "openai/gpt-5",
+        },
+        { note: "switched judge to the stricter criterion" },
+      ),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    expect(
+      within(screen.getByTestId("run-summary-line")).getByTestId(
+        "run-summary-note",
+      ),
+    ).toHaveTextContent("switched judge to the stricter criterion");
+    expect(screen.getByTestId("run-settings-block")).not.toHaveTextContent(
+      "switched judge",
+    );
   });
 
   it("opens the run detail drawer when a result row is chosen", async () => {

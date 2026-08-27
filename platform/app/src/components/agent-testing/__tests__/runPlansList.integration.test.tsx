@@ -1,11 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The Test Runs list: every run plan of a project, what its last run said and
- * where One-off runs sits.
+ * The Test Runs list: every run plan of a project, and what its last run said.
  *
  * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/suites/one-off-runs-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -35,7 +33,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const PROJECT_ID = "proj_1";
 const NOW = 1_700_000_000_000;
 
 function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
@@ -113,10 +110,9 @@ function planRowsOf(plans: RunPlan[]): PlanRowModel[] {
 describe("the Test Runs list", () => {
   afterEach(cleanup);
 
-  /** @scenario "The Test Runs list holds every run plan with One-off runs last" */
-  it("holds every run plan with One-off runs last", () => {
+  /** @scenario "The Test Runs list holds one row for every run plan" */
+  it("holds one row for every run plan and no bucket row", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [
         makeSuite(),
         makeSuite({ id: "suite_2", name: "Refunds", slug: "refunds" }),
@@ -128,12 +124,6 @@ describe("the Test Runs list", () => {
       ],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: {
-        passedCount: 1,
-        failedCount: 0,
-        settledCount: 1,
-        lastRunTimestamp: NOW,
-      },
     });
 
     renderRows(planRowsOf(plans));
@@ -142,9 +132,12 @@ describe("the Test Runs list", () => {
     expect(screen.getByText("Refunds")).toBeInTheDocument();
     expect(screen.getByText("Nightly plan")).toBeInTheDocument();
 
+    // Three plans, three rows. The bucket row that used to collect the runs
+    // belonging to no plan is gone.
     const rows = screen.getAllByTestId(/^run-plan-row-/);
-    expect(rows).toHaveLength(4);
-    expect(within(rows[3]!).getByText("One-off runs")).toBeInTheDocument();
+    expect(rows).toHaveLength(3);
+    expect(screen.queryByText("One-off runs")).not.toBeInTheDocument();
+    expect(screen.queryByText("one-offs")).not.toBeInTheDocument();
   });
 
   /** @scenario "The plan table holds seven columns in one order" */
@@ -172,11 +165,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Run plan column holds only the name" */
   it("holds only the name in the Run plan cell", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     renderRows(planRowsOf(plans));
@@ -190,11 +181,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Last run column reads the age, the scenarios and the runs" */
   it("reads the age, the scenarios and the runs in the Last run cell", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -209,11 +198,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Last run column reads the age, the scenarios and the runs" */
   it("says one scenario and one run without an s", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -230,11 +217,9 @@ describe("the Test Runs list", () => {
   /** @scenario "A run plan with no run in the period says so in the Last run column" */
   it("says nothing ran in the period on a quiet plan", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     renderRows(planRowsOf(plans), { days: 30 });
@@ -250,7 +235,6 @@ describe("the Test Runs list", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("says what the plan covers in the Scope cell", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [
         makeSuite({ scope: { mode: "all" } }),
         makeSuite({
@@ -263,7 +247,6 @@ describe("the Test Runs list", () => {
       ],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     renderRows(planRowsOf(plans));
@@ -284,11 +267,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Targets column names the agents the plan runs against" */
   it("names both agents in the Targets cell", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -305,11 +286,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Pass column is a plain coloured percentage" */
   it("draws the pass rate as a plain percentage with no pill", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -329,11 +308,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The Trend column draws one bar per run, oldest first" */
   it("draws one trend bar per run, oldest first", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -363,11 +340,9 @@ describe("the Test Runs list", () => {
   /** @scenario "The trend bars are softer than the text beside them" */
   it("draws every trend bar at the one shared opacity", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -398,11 +373,9 @@ describe("the Test Runs list", () => {
   /** @scenario "A run plan row shows its last result" */
   it("carries the pass rate of the runs in the window", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
     const checkout = plans.find((plan) => plan.slug === "checkout")!;
 
@@ -424,11 +397,9 @@ describe("the Test Runs list", () => {
   it("ends the row on its menu, with no chevron after it", async () => {
     const user = userEvent.setup();
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     const props = renderRows(planRowsOf(plans));
@@ -445,69 +416,11 @@ describe("the Test Runs list", () => {
     expect(props.onSelectPlan).toHaveBeenCalledWith("checkout");
   });
 
-  /** @scenario The v2 Test Runs list names the internal set "One-off runs" */
-  it("names the internal set One-off runs and marks it as the one-off place", () => {
-    const plans = buildRunPlans({
-      projectId: PROJECT_ID,
-      suites: [makeSuite()],
-      suiteSummaries: {},
-      externalSets: [],
-      oneOffLastRun: {
-        passedCount: 1,
-        failedCount: 0,
-        settledCount: 1,
-        lastRunTimestamp: NOW,
-      },
-    });
-
-    renderRows(planRowsOf(plans));
-
-    const row = screen.getByTestId("run-plan-row-one-off-runs");
-    expect(within(row).getByText("One-off runs")).toBeInTheDocument();
-    expect(within(row).getByText("one-offs")).toBeInTheDocument();
-    // The raw address of the set is never shown.
-    expect(screen.queryByText(/__internal__/)).not.toBeInTheDocument();
-  });
-
-  /** @scenario "One-off runs has no Edit and no Run of its own" */
-  it("offers Open last run but no Edit and no Run on the One-off runs menu", async () => {
-    const user = userEvent.setup();
-    const plans = buildRunPlans({
-      projectId: PROJECT_ID,
-      suites: [makeSuite()],
-      suiteSummaries: {},
-      externalSets: [],
-      oneOffLastRun: {
-        passedCount: 1,
-        failedCount: 0,
-        settledCount: 1,
-        lastRunTimestamp: NOW,
-      },
-    });
-
-    renderRows(planRowsOf(plans));
-    await user.click(
-      screen.getByRole("button", { name: "Actions for One-off runs" }),
-    );
-
-    expect(
-      await screen.findByRole("menuitem", { name: "Open last run" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Edit run plan" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Run" }),
-    ).not.toBeInTheDocument();
-  });
-
   it("lists a set written by code as a run plan of its own", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [],
       suiteSummaries: {},
       externalSets: [makeExternalSet()],
-      oneOffLastRun: null,
     });
 
     renderRows(planRowsOf(plans));
@@ -519,39 +432,8 @@ describe("the Test Runs list", () => {
 });
 
 describe("the run plans of a project", () => {
-  /** @scenario "One-off runs is listed last, after every test suite and custom run plan" */
-  it("lists One-off runs last even when a suite ran more recently", () => {
+  it("sorts every plan by its last run, newest first", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
-      suites: [
-        makeSuite(),
-        makeSuite({ id: "suite_2", name: "Refunds", slug: "refunds" }),
-      ],
-      suiteSummaries: {
-        suite_1: {
-          passedCount: 3,
-          failedCount: 0,
-          totalCount: 3,
-          lastRunTimestamp: NOW,
-        },
-      },
-      externalSets: [],
-      // Older than both suites, and still last.
-      oneOffLastRun: {
-        passedCount: 1,
-        failedCount: 0,
-        settledCount: 1,
-        lastRunTimestamp: NOW - 10 * 86_400_000,
-      },
-    });
-
-    expect(plans[plans.length - 1]?.name).toBe("One-off runs");
-  });
-
-  /** @scenario "The internal run set is pinned in the run set list" */
-  it("holds the internal set in a fixed place next to external sets", () => {
-    const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [
@@ -570,28 +452,19 @@ describe("the run plans of a project", () => {
           totalCount: 2,
         },
       ],
-      oneOffLastRun: {
-        passedCount: 1,
-        failedCount: 0,
-        settledCount: 1,
-        lastRunTimestamp: NOW - 10 * 86_400_000,
-      },
     });
 
-    // The external sets sort by their own run time, a run plan with no run
-    // falls below them, and the internal set stays under all of them however
-    // recently any of them ran.
+    // The external sets sort by their own run time, and a run plan with no
+    // run falls below them.
     expect(plans.map((plan) => plan.name)).toEqual([
       "ci-regression",
       "smoke-tests",
       "Checkout",
-      "One-off runs",
     ]);
   });
 
   it("keeps the command line's throwaway suites out of the list", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [
         makeSuite(),
         makeSuite({
@@ -603,23 +476,17 @@ describe("the run plans of a project", () => {
       ],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
-    expect(plans.map((plan) => plan.name)).toEqual([
-      "Checkout",
-      "One-off runs",
-    ]);
+    expect(plans.map((plan) => plan.name)).toEqual(["Checkout"]);
   });
 
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a folder as covering the scenarios filed in it", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite({ kind: "folder", scope: null })],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     expect(plans[0]?.scopeLabel).toBe("Scenarios in this suite");
@@ -628,11 +495,9 @@ describe("the run plans of a project", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a hand-picked scope as how many scenarios it holds", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [makeSuite({ scope: { mode: "cases" } })],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     expect(plans[0]?.scopeLabel).toBe("3 scenarios");
@@ -641,13 +506,11 @@ describe("the run plans of a project", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a label scope as the labels it names", () => {
     const plans = buildRunPlans({
-      projectId: PROJECT_ID,
       suites: [
         makeSuite({ scope: { mode: "labels", labels: ["smoke", "critical"] } }),
       ],
       suiteSummaries: {},
       externalSets: [],
-      oneOffLastRun: null,
     });
 
     expect(plans[0]?.scopeLabel).toBe("Labelled smoke, critical");

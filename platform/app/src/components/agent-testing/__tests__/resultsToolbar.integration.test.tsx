@@ -61,6 +61,10 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
+        // The run dialog reads the configurations its scope already ran with.
+        getRunConfigurations: {
+          useQuery: () => ({ data: [], isLoading: false }),
+        },
         getSuiteRunData: { invalidate: vi.fn() },
         getScenarioSetBatchHistory: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
@@ -228,11 +232,9 @@ const onNewRunPlan = vi.fn();
 
 function renderList() {
   const plans = buildRunPlans({
-    projectId: PROJECT_ID,
     suites: [makeSuite()],
     suiteSummaries: {},
     externalSets: [],
-    oneOffLastRun: null,
   });
 
   render(

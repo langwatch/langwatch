@@ -14,6 +14,7 @@ import { ChartColumn } from "lucide-react";
 import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
 import { FG_MUTED } from "../shared/design";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
+import { ToggleButton } from "../shared/ToggleButton";
 import { GroupByTabs } from "./GroupByTabs";
 import {
   ResultsFilterMenu,
@@ -116,27 +117,14 @@ export function ResultsFilterRow({
         </Button>
       ) : null}
 
-      {/* An on and off control, so the pressed state is the only signal it
-          needs. A caret would promise a menu that is not there. */}
-      <Button
-        size="xs"
-        variant="outline"
-        height="32px"
-        paddingX="10px"
-        fontSize="12.5px"
-        fontWeight="medium"
-        gap={1.5}
-        aria-pressed={isChartsShown}
-        colorPalette={isChartsShown ? "blue" : undefined}
-        background={isChartsShown ? "blue.subtle" : undefined}
-        borderColor={isChartsShown ? "blue.emphasized" : undefined}
-        color={isChartsShown ? "blue.fg" : undefined}
+      <ToggleButton
+        isOn={isChartsShown}
         onClick={onChartsToggle}
         data-testid="results-charts-toggle"
       >
         <ChartColumn size={13} />
         Charts
-      </Button>
+      </ToggleButton>
 
       <Box flex={1} minWidth={2} />
 

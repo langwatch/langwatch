@@ -80,11 +80,9 @@ function findSelectedBatch({
 }
 
 export function useSelectedBatch({
-  plan,
   batches,
   batchRunId,
 }: {
-  plan: RunPlan;
   batches: RunPlanBatches;
   batchRunId: string | null;
 }) {
@@ -119,8 +117,6 @@ export function useSelectedBatch({
     iterationMap,
     title: selectedBatch
       ? runTitle({
-          plan,
-          batch: selectedBatch,
           index: Math.max(selectedIndex, 0),
           totalCount: totalBatchCount,
           loadedCount: batchRuns.length,

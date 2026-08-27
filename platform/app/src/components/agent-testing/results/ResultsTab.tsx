@@ -12,7 +12,6 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useOpenRunPlan } from "../run/RunPlanDialogHost";
 import { AgentTestingTabLayout } from "../shared/TabLayout";
 import { useNewRunPlanFlow } from "../useAgentTestingPageFlows";
@@ -78,7 +77,6 @@ function TabSkeleton({
 }
 
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
-  const { project } = useOrganizationTeamProject();
   const routing = useAgentTestingRouting();
   const { planSlug, batchRunId, isReady, selectPlan, selectRun } = routing;
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
@@ -86,9 +84,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const handleNewRunPlan = useNewRunPlanFlow();
   const openRunPlan = useOpenRunPlan();
 
-  const selectedPlan = planSlug
-    ? resolveRunPlan({ plans, planSlug, projectId: project?.id ?? "" })
-    : null;
+  const selectedPlan = planSlug ? resolveRunPlan({ plans, planSlug }) : null;
 
   usePlanAsPageTitle(selectedPlan);
 

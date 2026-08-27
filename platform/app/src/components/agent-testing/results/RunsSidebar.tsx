@@ -17,13 +17,11 @@ import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { PeriodControls } from "./period-controls";
 import { RunsSidebarBatchEntry } from "./RunsSidebarBatchEntry";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";
-import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches } from "./useRunPlanBatches";
 
 export const RUNS_SIDEBAR_WIDTH = 230;
 
 export type RunsSidebarProps = {
-  plan: RunPlan;
   runs: Pick<
     RunPlanBatches,
     "batchRuns" | "totalBatchCount" | "hasMore" | "loadMore" | "isLoading"
@@ -52,15 +50,13 @@ function PendingEntry() {
 }
 
 function RunsList({
-  plan,
   runs,
   selectedBatchRunId,
   onSelectRun,
   isPendingShown,
-}: Pick<
-  RunsSidebarProps,
-  "plan" | "runs" | "selectedBatchRunId" | "onSelectRun"
-> & { isPendingShown: boolean }) {
+}: Pick<RunsSidebarProps, "runs" | "selectedBatchRunId" | "onSelectRun"> & {
+  isPendingShown: boolean;
+}) {
   const { batchRuns, isLoading, hasMore, loadMore, totalBatchCount } = runs;
   const isEmptyShown = !isLoading && batchRuns.length === 0 && !isPendingShown;
 
@@ -69,7 +65,6 @@ function RunsList({
       {batchRuns.map((batch, index) => (
         <RunsSidebarBatchEntry
           key={batch.batchRunId}
-          plan={plan}
           batch={batch}
           index={index}
           totalBatchCount={totalBatchCount}
@@ -104,7 +99,6 @@ function RunsList({
 }
 
 export function RunsSidebar({
-  plan,
   runs,
   selectedBatchRunId,
   pendingBatchRunId,
@@ -146,7 +140,6 @@ export function RunsSidebar({
       {isPendingShown ? <PendingEntry /> : null}
 
       <RunsList
-        plan={plan}
         runs={runs}
         selectedBatchRunId={selectedBatchRunId}
         onSelectRun={onSelectRun}

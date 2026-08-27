@@ -26,9 +26,6 @@ export const RESULTS_SEGMENT = "results" as const;
 export const SUITES_SEGMENT = "suites" as const;
 export const EXTERNAL_SEGMENT = "external" as const;
 
-/** The plan slug of the synthesized plan that holds the one-off runs. */
-export const ONE_OFF_RUNS_PLAN_SLUG = "one-off-runs" as const;
-
 export type AgentTestingTab = "cases" | "results";
 
 /**

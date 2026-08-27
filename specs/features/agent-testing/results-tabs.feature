@@ -5,7 +5,10 @@ Feature: The Results tab
 
   Background: three levels.
     The Results tab opens on a list titled "Test Runs". Each row is a run plan:
-    a test suite, a custom run plan, or One-off runs, which is always last.
+    a test suite or a custom run plan. There is no bucket row that collects
+    runs belonging to no plan: a single scenario run gets a run plan of its
+    own, so iterating on one scenario reads as run 1, run 2, run 3 against
+    that agent.
 
     Choosing a row opens that plan. The page title then reads the name of the
     plan. A sidebar on the left lists its runs, newest first, each with its
@@ -18,12 +21,12 @@ Feature: The Results tab
   # --- The Test Runs list ---
 
   @integration
-  Scenario: The Test Runs list holds every run plan with One-off runs last
-    Given a project with two test suites, one custom run plan and some one-off runs
+  Scenario: The Test Runs list holds one row for every run plan
+    Given a project with two test suites and one custom run plan
     When the Results tab is opened
     Then the list is titled "Test Runs"
     And the two suites and the custom plan are listed
-    And "One-off runs" is the last row
+    And no row collects the runs that belong to no plan
 
   @integration
   Scenario: New run plan sits in the header of the Test Runs list
@@ -323,15 +326,23 @@ Feature: The Results tab
   Scenario: A test suite is run from the header of its run plan
     Given a run plan that is a test suite
     When the top of the results is read
-    Then a Run control is offered beside Edit
+    Then a Run control is offered beside "Edit run plan"
     And choosing it opens the run dialog on that suite
 
   @integration
-  Scenario: A set that runs from code has no Run and no Edit
+  Scenario: Edit run plan opens the run dialog on the configuration of the plan
+    Given a run plan that is a test suite
+    When the top of the results is read
+    Then "Edit run plan" reads to the left of the Run control
+    And choosing it opens the run dialog on that plan
+    And the dialog holds the configuration the plan runs with
+
+  @integration
+  Scenario: A set that runs from code has no Run and no Edit run plan
     Given a run plan that a code run writes into
     When the top of the results is read
     Then no Run control is offered
-    And no Edit control is offered
+    And no "Edit run plan" control is offered
 
   @integration
   Scenario: The classic grid can be switched on and stays on
@@ -367,10 +378,18 @@ Feature: The Results tab
     Given a run plan is open
     When the top of the results is read
     Then the number of the selected run, its pass summary and its note read on the left, in that order
-    And how long ago it ran reads on the right, before the view toggle
-    And the view toggle and the actions of the plan read after it
+    And a "Show run settings" toggle reads on the right, before the view toggle
+    And the view toggle, "Edit run plan" and the Run control read after it, in that order
     And they are all on the same line
     And the back control stays in the sidebar
+
+  @integration
+  Scenario: The header line does not repeat when the run started
+    Given a run of a plan is open
+    When the header line is read
+    Then how long ago the run started does not read on it
+    And the runs sidebar still reads it
+    And the run settings block reads it with its date when that block is shown
 
   @integration
   Scenario: The cards of the grid line up with the line above them
@@ -378,6 +397,60 @@ Feature: The Results tab
     When the top of the grid is read
     Then the first card starts at the left edge of the summary line above it
     And the grid takes no padding of its own
+
+  # --- The run settings ---
+
+  @integration
+  Scenario: The run settings stay hidden until they are asked for
+    Given a run of a plan is open
+    When the results are first read
+    Then a "Show run settings" toggle is offered beside the view toggle
+    And it reads as not pressed
+    And no run settings block reads under the header
+    And the results start directly under the header
+
+  @integration
+  Scenario: The toggle turns the run settings block on and off
+    Given a run of a plan is open
+    When "Show run settings" is chosen
+    Then the run settings block reads under the header
+    And the toggle reads as pressed
+    When "Show run settings" is chosen again
+    Then no run settings block reads under the header
+    And the toggle reads as not pressed
+
+  @integration
+  Scenario: The run settings block says what the run was configured with
+    Given a run started with the parameter "region" set to "eu-central", a repeat count of 3, the simulator model "openai/gpt-5-mini" and the judge model "openai/gpt-5"
+    When "Show run settings" is chosen
+    Then the block says when the run started
+    And a block under the header reads the parameter and its value
+    And the parameter reads in a monospace font
+    And the block reads the repeat count
+    And the block reads the simulator model
+    And the block reads the judge model
+    And each model reads with the icon of its provider
+
+  @integration
+  Scenario: The judge always reads, and a run that named no model says so
+    Given a run whose metadata names neither simulation model
+    When "Show run settings" is chosen
+    Then the judge reads as naming no model
+    And no simulator model reads in the block
+
+  @integration
+  Scenario: A run with no parameters and no repeat reads neither
+    Given a run started with no parameters and a repeat count of one
+    When "Show run settings" is chosen
+    Then no parameters read in the block
+    And no repeat count reads in the block
+
+  @integration
+  Scenario: The note stays in the header line and never moves into the block
+    Given a run that carries a note
+    When "Show run settings" is chosen
+    Then the note still reads in the header line
+    And the note does not read in the run settings block
 
   # --- Live runs ---
 

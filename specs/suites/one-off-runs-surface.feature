@@ -1,20 +1,22 @@
-Feature: One-off runs are a run plan of their own
+Feature: The internal run set of a project
   As a person who runs a single test case now and then
-  I want those runs collected in one place
+  I want that run filed somewhere that belongs to the project
   So that a quick run is not lost and does not pollute the suite run plans
 
   Background: what already works.
     Running one test case from the platform puts the run in an internal run set
     that belongs to the project. That set already exists, it already reads with
-    a friendly name instead of its raw address, and each of its batches already
-    carries the name of the test case that ran.
+    a friendly name instead of its raw address on the v1 simulations page, and
+    each of its batches already carries the name of the test case that ran.
 
-    This file pins that behaviour so the v2 rename cannot break it. The rules
-    that decide whether an address is internal are in
+    The rules that decide whether an address is internal are in
     specs/scenarios/internal-set-namespace.feature and are not repeated here.
 
-    In v2 the set reads as "One-off runs". In v1 it keeps the name it has
-    today, so v1 copy does not change.
+    The v2 Results tab lists run plans only. It draws no bucket row for this
+    set: a bucket row states one scenario name in its Scope column while its
+    Targets column merges the targets of several separate runs, which is not
+    true of any one of them. A single scenario run gets a run plan of its own
+    instead, named after the scenario and the agent it ran against.
 
   # --- What already works ---
 
@@ -45,35 +47,7 @@ Feature: One-off runs are a run plan of their own
     When the run sets are listed
     Then the internal run set holds a fixed place in the list
 
-  # --- What v2 adds ---
-
-  @integration
-  Scenario: The v2 Test Runs list names the internal set "One-off runs"
-    Given a project with one test suite and some one-off runs
-    When the v2 Test Runs list is opened
-    Then a row named "One-off runs" is listed
-    And it carries a badge that marks it as the place single runs land
-
-  @integration
-  Scenario: One-off runs is listed last, after every test suite and custom run plan
-    Given a project with two test suites and one custom run plan
-    When the v2 Test Runs list is opened
-    Then "One-off runs" is the last row
-
-  @integration
-  Scenario: One-off runs has no Edit and no Run of its own
-    Given the v2 Test Runs list is open
-    When the row menu of "One-off runs" is opened
-    Then no Edit action is offered
-    And no Run action is offered
-    And Open last run is offered
-
-  @integration
-  Scenario: Each run under One-off runs is named for the test case that ran
-    Given one-off runs of the cases "Angry refund request" and "Edge: empty cart"
-    When "One-off runs" is opened
-    Then the runs sidebar names the two runs after those cases
-    And choosing one shows its results
+  # --- v1 ---
 
   @integration
   Scenario: The v1 pages keep the name they show today

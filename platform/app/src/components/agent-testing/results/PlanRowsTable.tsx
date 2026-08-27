@@ -65,13 +65,6 @@ function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {
       </Badge>
     );
   }
-  if (kind === "one-off") {
-    return (
-      <Badge size="xs" variant="subtle" colorPalette="gray">
-        one-offs
-      </Badge>
-    );
-  }
   return null;
 }
 
