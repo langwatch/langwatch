@@ -6,9 +6,12 @@ import {
   SuiteScopeNotAllowedError,
   suiteSchema,
   type Suite,
+  type SuiteScope,
   type SuiteRunResult,
   SuiteNameTakenError,
   SuiteNotFoundError,
+  SuiteScopeEmptyError,
+  SuiteTargetsRequiredError,
 } from "@langwatch/suite-contract";
 import { AgentService } from "@langwatch/agent-contract";
 import { PromptService } from "@langwatch/prompt-contract";
@@ -197,6 +200,7 @@ describe("SuiteService", () => {
           {
             id: "scenario_active",
             name: "Active scenario",
+            version: 7,
             situation: "A situation",
             criteria: [],
             parameters: {},
@@ -233,6 +237,7 @@ describe("SuiteService", () => {
           scenarios: ["scenario_archived"],
           targets: ["agent_archived"],
         },
+        scenarioVersions: new Map([["scenario_active", 7]]),
       }),
     );
   });
@@ -266,6 +271,163 @@ describe("SuiteService", () => {
       }),
     ).rejects.toBeInstanceOf(AllScenariosArchivedError);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("refuses a folder run without targets before resolving membership", async () => {
+    const scenarios = mockScenarioService({
+      getFolderRunDefinition: vi.fn(),
+    });
+    const service = SuiteService.create({
+      ...serviceOptions(
+        repository({
+          tryFindById: vi
+            .fn()
+            .mockResolvedValue(suite({ kind: "folder", scenarioIds: [], targets: [] })),
+        }),
+        { scenarios },
+      ),
+    });
+
+    await expect(
+      service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "folder-no-target",
+      }),
+    ).rejects.toBeInstanceOf(SuiteTargetsRequiredError);
+    expect(scenarios.getFolderRunDefinition).not.toHaveBeenCalled();
+  });
+
+  it("refuses a folder run when every filed scenario is archived", async () => {
+    const execution = new CapturingExecutionPort();
+    const scenarios = mockScenarioService({
+      getFolderRunDefinition: vi.fn().mockResolvedValue({
+        folder: suite({ kind: "folder", scenarioIds: [] }),
+        scenarioIds: ["scenario_archived"],
+      }),
+      getReferenceStates: vi
+        .fn()
+        .mockResolvedValue([{ id: "scenario_archived", archivedAt: new Date() }]),
+      getRunConfigs: vi.fn(),
+    });
+    const service = SuiteService.create({
+      ...serviceOptions(
+        repository({
+          tryFindById: vi.fn().mockResolvedValue(
+            suite({
+              kind: "folder",
+              scenarioIds: [],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+            }),
+          ),
+        }),
+        { scenarios, execution },
+      ),
+      prompts: mockPromptService({ getExistingIds: vi.fn() }),
+    });
+
+    await expect(
+      service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "folder-all-archived",
+      }),
+    ).rejects.toBeInstanceOf(AllScenariosArchivedError);
+    expect(execution.execute).not.toHaveBeenCalled();
+  });
+
+  const dynamicScopes: Array<{ scope: SuiteScope; membership: string[] }> = [
+    { scope: { mode: "all" }, membership: ["scenario_2", "scenario_1"] },
+    { scope: { mode: "folders", folderIds: ["folder_1"] }, membership: ["scenario_1"] },
+    { scope: { mode: "labels", labels: ["smoke"] }, membership: ["scenario_1"] },
+  ];
+
+  it.each(dynamicScopes)(
+    "resolves $scope.mode scope membership at run time",
+    async ({ scope, membership }) => {
+      const resolveDynamicRunMembership = vi.fn().mockResolvedValue(membership);
+      const execution = new CapturingExecutionPort();
+      const scenarios = mockScenarioService({
+        getReferenceStates: vi
+          .fn()
+          .mockResolvedValue(membership.map((id) => ({ id, archivedAt: null }))),
+        getRunConfigs: vi.fn().mockResolvedValue(
+          membership.map((id) => ({
+            id,
+            name: id,
+            version: 1,
+            situation: "A situation",
+            criteria: [],
+            parameters: null,
+          })),
+        ),
+      });
+      const service = SuiteService.create({
+        ...serviceOptions(
+          repository({
+            tryFindById: vi.fn().mockResolvedValue(
+              suite({
+                kind: "custom",
+                scope,
+                scenarioIds: [],
+                targets: [{ type: "prompt", referenceId: "prompt_1" }],
+              }),
+            ),
+            resolveDynamicRunMembership,
+          }),
+          { scenarios, execution },
+        ),
+        prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+      });
+
+      await service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "dynamic-scope",
+      });
+
+      expect(resolveDynamicRunMembership).toHaveBeenCalledWith({
+        id: "suite_original",
+        projectId: "project_1",
+      });
+      expect(execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: membership }),
+      );
+    },
+  );
+
+  it("refuses a dynamic scope that resolves to no scenarios", async () => {
+    const execution = new CapturingExecutionPort();
+    const service = SuiteService.create({
+      ...serviceOptions(
+        repository({
+          tryFindById: vi.fn().mockResolvedValue(
+            suite({
+              scope: { mode: "all" },
+              scenarioIds: [],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+            }),
+          ),
+          resolveDynamicRunMembership: vi.fn().mockResolvedValue([]),
+        }),
+        { execution },
+      ),
+      scenarios: mockScenarioService({ getReferenceStates: vi.fn() }),
+      prompts: mockPromptService({ getExistingIds: vi.fn() }),
+    });
+
+    await expect(
+      service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "empty-scope",
+      }),
+    ).rejects.toBeInstanceOf(SuiteScopeEmptyError);
+    expect(execution.execute).not.toHaveBeenCalled();
   });
 
   it("batches target checks, filters archived references, and preserves the run idempotency key", async () => {

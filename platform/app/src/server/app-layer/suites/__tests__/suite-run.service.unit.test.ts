@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
 
@@ -14,10 +15,6 @@ vi.mock("@langwatch/observability", () => ({
 vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: () => "batch-run-123",
   generateScenarioRunId: () => "scenario-run-id-1",
-}));
-
-vi.mock("~/server/suites/suite-set-id", () => ({
-  getSuiteSetId: (_suiteId: string) => "set-456",
 }));
 
 vi.mock("~/server/app-layer/tracing", () => ({
@@ -81,7 +78,7 @@ describe("SuiteRunService", () => {
         });
 
         expect(result.batchRunId).toBe("batch-run-123");
-        expect(result.setId).toBe("set-456");
+        expect(result.setId).toBe(getSuiteSetId("suite-1"));
       });
     });
 
