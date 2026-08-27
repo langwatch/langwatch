@@ -26,7 +26,7 @@ export function RailSectionHeading({
   return (
     <Text
       paddingLeft="10px"
-      paddingTop={spaced ? 2 : 1.5}
+      paddingTop={spaced ? 4 : 1.5}
       paddingBottom={0.5}
       fontSize="10px"
       fontWeight="semibold"
