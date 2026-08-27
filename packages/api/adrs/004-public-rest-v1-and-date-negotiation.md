@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-27
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Behavioural contract:**
 [../specs/public-rest.feature](../specs/public-rest.feature)
@@ -10,7 +10,8 @@
 **Related:**
 [the fluent handler contract](./001-rpc-first-fluent-registration.md),
 [explicit RPC namespaces](./002-explicit-version-namespaces.md), and
-[the API framework boundary](./20260820-api-framework-boundary.md).
+[the API framework boundary](./20260820-api-framework-boundary.md), and
+[public REST and internal tRPC ownership](../../../dev/docs/adr/128-public-rest-and-internal-trpc.md).
 
 ## Context
 

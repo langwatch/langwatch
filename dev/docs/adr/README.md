@@ -70,6 +70,7 @@ Reusable framework decisions live with their packages:
 | [111](./111-physical-application-workspaces.md)                        | Physical application workspaces preserve the current deployment topology                                                  | Accepted                  |
 | [112](./112-singular-feature-ownership.md)                             | Product domains use singular feature ownership                                                                            | Accepted                  |
 | [113](./113-explicit-runtime-boot.md)                                  | Explicit runtime boot owns configuration and application construction                                                     | Accepted                  |
+| [128](./128-public-rest-and-internal-trpc.md)                          | Public REST and internal tRPC are separate transport surfaces                                                              | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

@@ -9,4 +9,6 @@ These decisions define the reusable API service framework:
 - [Public REST v1 and date negotiation](./004-public-rest-v1-and-date-negotiation.md)
 
 API family decisions live with their owning feature or in the central
-[application ADR index](../../../dev/docs/adr/README.md).
+[application ADR index](../../../dev/docs/adr/README.md). The ownership and
+trust boundary between public REST and internal tRPC is defined by
+[ADR-128](../../../dev/docs/adr/128-public-rest-and-internal-trpc.md).

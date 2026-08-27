@@ -2,7 +2,10 @@
 
 **Date:** 2026-08-20
 
-**Status:** Proposed
+**Status:** Superseded in part
+
+**Superseded by:**
+[ADR-128](../../../dev/docs/adr/128-public-rest-and-internal-trpc.md)
 
 **Behavioural contracts:**
 [../specs/rpc-endpoints.feature](../specs/rpc-endpoints.feature),
@@ -14,6 +17,11 @@
 [endpoint capabilities are ports](./003-endpoint-capabilities-are-ports.md),
 [the unified authorization engine](../../../dev/docs/adr/092-unified-authorization-engine.md),
 [API discovery](../specs/api-discovery.feature).
+
+This record remains the decision for the compatibility `createService` RPC,
+HTTP and SSE authoring surface. ADR-128 and
+[004](./004-public-rest-v1-and-date-negotiation.md) supersede its shared public
+RPC/REST contract and terminal-handler decisions for modern public REST.
 
 ## Context
 
