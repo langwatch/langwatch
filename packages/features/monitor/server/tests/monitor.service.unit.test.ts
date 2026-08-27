@@ -61,9 +61,7 @@ class FakeRepository extends MonitorRepository {
     this.value = input;
     return input;
   }
-  async update(
-    input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState },
-  ) {
+  async update(input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState }) {
     this.value = { ...monitor, ...input };
     if (!this.value) throw new Error("missing fake monitor");
     return this.value;
@@ -81,6 +79,12 @@ class FakeRepository extends MonitorRepository {
 
 class FakeEvaluatorService extends EvaluatorService {
   async executeCode(): Promise<never> {
+    throw new Error("unused");
+  }
+  async executeNative(): Promise<never> {
+    throw new Error("unused");
+  }
+  augmentResult(): never {
     throw new Error("unused");
   }
   getById = vi.fn<EvaluatorService["getById"]>();
@@ -205,9 +209,9 @@ describe("MonitorService", () => {
     const repository = new FakeRepository();
     repository.value = null;
     const service = MonitorService.create({ repository, evaluators: evaluator });
-    await expect(
-      service.getById({ id: "missing", projectId: "project_1" }),
-    ).rejects.toBeInstanceOf(MonitorNotFoundError);
+    await expect(service.getById({ id: "missing", projectId: "project_1" })).rejects.toBeInstanceOf(
+      MonitorNotFoundError,
+    );
   });
 
   it("replicates a monitor disabled into the target project", async () => {

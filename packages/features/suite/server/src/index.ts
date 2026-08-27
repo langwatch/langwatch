@@ -13,7 +13,7 @@ export {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
   StartSuiteRunCommand,
-} from "./commands/suite-run.commands";
+} from "./adapters/suite-run-commands.adapter";
 export {
   createSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipelineDeps,
