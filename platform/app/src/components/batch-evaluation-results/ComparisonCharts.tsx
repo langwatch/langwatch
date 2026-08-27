@@ -677,7 +677,7 @@ export const ComparisonCharts = ({
         }
       }
 
-      // Use the stored name for display, include color from targetColors
+      // Use the display name, include color from targetColors
       return Array.from(targetGroups.entries()).map(([id, data], index) => ({
         name: data.displayName,
         color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
