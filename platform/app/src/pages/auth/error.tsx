@@ -292,7 +292,13 @@ function recoveryFor({
       };
     default:
       return {
-        prose: ["Redirecting back to sign in, please try again..."],
+        // NAMES THE BUTTON, not a redirect. `SignInError` is rendered from
+        // inside the identifier-first screen for any unrecognised
+        // `?error=`, and that screen mounts no timer — the five-second one
+        // lives in `SignInErrorScreen` and the two-second one in
+        // `LegacySignIn`, neither of which is on this path. Promising a
+        // redirect left people waiting for something that was never coming.
+        prose: ["Something went wrong signing you in. Try again below."],
         action: {
           href: `/auth/signin${
             callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""

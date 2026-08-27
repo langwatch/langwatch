@@ -790,4 +790,90 @@ describe("guardOrganizationId — a join request bounded by its subject", () => 
       ).resolves.toBe("ok");
     });
   });
+
+  describe("when the refusal is about tenancy rather than anything else", () => {
+    it("says so, so a later change cannot pass by refusing differently", async () => {
+      // A bare `rejects.toThrow()` passes for ANY throw — an unknown-model
+      // path, or a typo in the model key that makes the whole entry
+      // unreachable. This is the one case that tells "refused for tenancy"
+      // apart from "refused at all".
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
+/**
+ * The two entries this wave added and did not pin.
+ *
+ * `ScimRequestLog` is admitted for a PLATFORM-scoped `findMany`, because the
+ * retention sweep spans every tenant by definition — and its delete is held
+ * to named ids, so an unbounded one cannot drop every customer's log at once.
+ * `SsoCredential` is admitted by `connectionId`, which is what a read already
+ * holds; a bare read over every tenant's client secrets is what it must
+ * refuse.
+ *
+ * Neither had a test, so widening `platformScopeActions` to include the
+ * delete, or dropping the id predicate, was a silent edit.
+ */
+describe("guardOrganizationId — the directory log and the credential vault", () => {
+  describe("when the retention sweep scans for what has aged out", () => {
+    it("admits the platform-scoped read", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "findMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a delete that names no rows", async () => {
+      // The scan spans every tenant; the delete that follows it must not.
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+
+    it("allows the delete bounded to the ids the scan returned", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { id: { in: ["log_1", "log_2"] } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the credential vault is read", () => {
+    it("allows a read bounded to one connection", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { connectionId: "ssoc_acme" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a read over every tenant's client secrets", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { kind: "oidc-client-secret" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
 });

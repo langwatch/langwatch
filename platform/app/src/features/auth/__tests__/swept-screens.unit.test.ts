@@ -241,11 +241,14 @@ describe("given every unauthenticated screen", () => {
 
     /** @scenario Every stage offers the other door */
     it("carries the address across, in the fragment the browser does not send", () => {
-      const carried = repoFile("features/auth/logic/carriedEmail.ts");
-
-      // A `#` rather than a `?`: the fragment reaches no access log and no
-      // `Referer` header on the way to the other door.
-      expect(carried).toContain("#");
+      // The FRAGMENT rather than the query, because it reaches no access log
+      // and no `Referer` header on the way to the other door.
+      //
+      // Asserted where the behaviour is: `carriedEmail.unit.test.ts` builds
+      // the href and compares the whole string. A `toContain("#")` over this
+      // module's source matched any hash anywhere in it — a private field, a
+      // colour, a comment citing a PR — so it would have gone on passing had
+      // the builder been rewritten to emit `?email=`.
       expect(
         repoFile("features/auth/components/IdentifierFirstSignIn.tsx"),
       ).toContain("email={email}");
