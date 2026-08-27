@@ -277,6 +277,45 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then both are configured
     And each was answered by its own side
 
+  # The question a customer's administrator actually asks, and the one the
+  # paragraph above only PROMISED: my people sign in through our identity
+  # provider today, and you have replaced the sign-in screen — does typing a
+  # work address still take them there?
+  #
+  # Every such organization is on the legacy columns with no connection
+  # registered, so that is the shape these pin: the projection answers
+  # nothing, the legacy columns answer, and what comes out is a REDIRECT.
+  # The scenarios above stop at which side answered and at whether the
+  # connection counts as configured, neither of which is the decision the
+  # person meets.
+  @unit
+  Scenario: An organization signing in through the mounted provider today is still sent to it
+    Given this deployment mounts a provider from its environment
+    And an organization whose legacy columns name that provider for its domain
+    And that organization never registered a connection
+    When one of its people submits their work email
+    Then the decision is a redirect to that provider
+    And the decision carries the reason code "domain_routed"
+    And no password was ever asked for
+
+  @unit
+  Scenario: Their address routes however they happened to type it
+    Given this deployment mounts a provider from its environment
+    And an organization whose legacy columns name that provider for its domain
+    When one of its people submits their work email in mixed case with a plus tag
+    Then the decision is a redirect to that provider
+
+  # The failure that must NOT be a redirect. Sending somebody to a provider
+  # this deployment never mounted is a door that cannot open, and the local
+  # set is what they can actually use.
+  @unit
+  Scenario: An organization naming a provider this deployment does not mount is not sent nowhere
+    Given this deployment mounts a provider from its environment
+    And an organization whose legacy columns name a different provider
+    When one of its people submits their work email
+    Then the decision is the local method set
+    And the decision carries the reason code "method_not_configured"
+
   @unimplemented
   Scenario: Moving from the brokered provider to a direct one does not mint a second account
     Given somebody signs in today through the provider this deployment brokers
