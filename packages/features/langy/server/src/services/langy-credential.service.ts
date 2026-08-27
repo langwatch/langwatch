@@ -16,12 +16,16 @@ const virtualKeyConfigSchema = z
   .object({ modelsAllowed: z.array(z.string()).nullable().default(null) })
   .passthrough();
 
-export interface LangySessionKeyService {
+export interface LangySessionKeyMintingService {
   mint(input: {
     session: LangyCredentialSession;
     projectId: string;
     organizationId: string;
   }): Promise<{ token: string; apiKeyId: string }>;
+  revokeManaged(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<"revoked" | "already_revoked" | "not_found" | "refused">;
 }
 
 export interface LangyVirtualKeyService {
@@ -55,7 +59,7 @@ export interface LangyCredentialErrorReporter {
 
 export type LangyCredentialServiceOptions = {
   repository: LangyCredentialRepository;
-  sessionKeys: LangySessionKeyService;
+  sessionKeys: LangySessionKeyMintingService;
   virtualKeys: LangyVirtualKeyService;
   github: LangyGithubService;
   runtime: LangyCredentialRuntimeService;
@@ -175,6 +179,13 @@ export class LangyCredentialService {
       projectId,
       organizationId: project.organizationId,
     });
+  }
+
+  revokeWorkerSessionKey(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<"revoked" | "already_revoked" | "not_found" | "refused"> {
+    return this.deps.sessionKeys.revokeManaged(input);
   }
 
   async tryGetModelsAllowed(input: {

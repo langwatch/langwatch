@@ -3,9 +3,9 @@ import {
   type LangyCredentialSession,
   type LangyCredentials,
   type LangyMessagePart,
+  LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
 import type { LangyPromptPort } from "./langy-prompt-registry.service";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "./langy-prompt-registry.service";
 import { LangyFinalPartsService } from "./langy-final-parts.service";
 import {
   LangyGithubPermitPort,

@@ -48,7 +48,12 @@ import {
   type ConversationListItem,
   type ConversationListPage,
 } from "./langy-conversation.service";
-import type { LangyTrustedMessageReader } from "./langy-message.service";
+import {
+  LangyMessageService,
+  type LangyTrustedMessageReader,
+} from "./langy-message.service";
+import { LangyTurnService } from "./langy-turn.service";
+import { LangyCredentialService } from "./langy-credential.service";
 import { LangyTurnRelay, type LangyRelayRedis } from "../streaming/langy-turn-relay";
 import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
@@ -83,129 +88,18 @@ type Repositories = {
   relay: RelayRepository;
 };
 
-type AppCapabilities = {
-  conversations: {
-    getPage(input: {
-      projectId: string;
-      userId: string;
-      limit: number;
-      cursor?: ContractConversationListCursor;
-      query?: string;
-    }): Promise<ContractConversationListPage>;
-    getEventsAfter(input: {
-      projectId: string;
-      conversationId: string;
-      userId: string;
-      after: { acceptedAt: number; eventId: string };
-    }): Promise<LangyConversationEventPage>;
-    tryFindByIdVisible(input: {
-      id: string;
-      projectId: string;
-      userId: string;
-    }): Promise<ContractConversationDetail | null>;
-    getById(input: {
-      id: string;
-      projectId: string;
-      userId: string;
-    }): Promise<ContractConversationDetail>;
-    deleteById(input: {
-      id: string;
-      projectId: string;
-      userId: string;
-    }): Promise<boolean>;
-    updateById(input: {
-      id: string;
-      projectId: string;
-      userId: string;
-      title?: string | null;
-      isShared?: boolean;
-    }): Promise<ContractConversationDetail>;
-    forkById(input: {
-      id: string;
-      projectId: string;
-      userId: string;
-    }): Promise<{ conversation: ContractConversationDetail }>;
-    turnExists(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-    }): Promise<boolean>;
-    ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void>;
-    tryGetRunToken(input: {
-      projectId: string;
-      conversationId: string;
-    }): Promise<string | null>;
-    recordToolCallStarted(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-      toolCallId: string;
-      toolName: string;
-      command?: string;
-      input?: unknown;
-    }): Promise<void>;
-    recordToolCallCompleted(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-      toolCallId: string;
-      toolName: string;
-      isError?: boolean;
-      command?: string;
-      input?: unknown;
-      durationMs?: number;
-      errorText?: string;
-    }): Promise<void>;
-    recordTurnHandoff(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-      token: string;
-    }): Promise<void>;
-    recordPlanUpdated(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-      items: Array<{ content: string; status: string }>;
-    }): Promise<void>;
-  };
-  messages: {
-    getAllByConversation(input: {
-      conversationId: string;
-      projectId: string;
-      userId: string;
-    }): Promise<ContractMessageRow[]>;
-  };
-  turns: {
-    startConversationTurn(input: LangyStartConversationTurnInput): Promise<{
-      conversationId: string;
-      turnId: string;
-    }>;
-    stopTurn(input: {
-      projectId: string;
-      conversationId: string;
-      turnId: string;
-      userId: string;
-    }): Promise<void>;
-    warmConversationWorker(input: {
-      projectId: string;
-      session: LangyCredentialSession;
-      requestedConversationId: string | null;
-      modelOverride?: string;
-    }): Promise<{ conversationId: string | null; warmed: boolean }>;
-  };
-  credentials: {
-    tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null>;
-  };
-};
-
 export class LangyService extends LangyServiceContract {
   private constructor(
     private readonly repositories: Repositories | null,
     private readonly feedbackPrompt: LangyFeedbackPromptPolicy,
-    private readonly collaborators: AppCapabilities | null = null,
+    private readonly conversations: LangyConversationService | null = null,
+    private readonly turns: LangyTurnService | null = null,
+    private readonly messages: LangyMessageService | null = null,
+    private readonly credentials: LangyCredentialService | null = null,
     private readonly relayOptions: LangyRelayCompositionOptions | null = null,
-  ) { super(); }
+  ) {
+    super();
+  }
 
   static create(
     options: Repositories,
@@ -214,16 +108,22 @@ export class LangyService extends LangyServiceContract {
     return new LangyService(options, feedbackPrompt);
   }
 
-  /** Builds the process-owned capability around already-composed private collaborators. */
+  /** Builds the process-owned capability from the complete Langy services. */
   static createComposed(
-    collaborators: AppCapabilities,
+    conversations: LangyConversationService,
+    turns: LangyTurnService,
+    messages: LangyMessageService,
+    credentials: LangyCredentialService,
     feedbackPrompt: LangyFeedbackPromptPolicy,
     relayOptions?: LangyRelayCompositionOptions,
   ): LangyService {
     return new LangyService(
       null,
       feedbackPrompt,
-      collaborators,
+      conversations,
+      turns,
+      messages,
+      credentials,
       relayOptions ?? null,
     );
   }
@@ -290,7 +190,7 @@ export class LangyService extends LangyServiceContract {
 
   async stopTurn(input: LangyStopTurnInput & { userId?: string }): Promise<void> {
     if (input.userId !== undefined) {
-      await this.runtime.turns.stopTurn(
+      await this.turnService.stopTurn(
         input as {
           projectId: string;
           conversationId: string;
@@ -338,75 +238,123 @@ export class LangyService extends LangyServiceContract {
     return this.persistence.relay.publish(langyRelayFrameSchema.parse(frame));
   }
 
-  private get runtime(): AppCapabilities {
-    if (this.collaborators === null) {
+  private get conversationService(): LangyConversationService {
+    if (this.conversations === null) {
       throw new Error("Langy runtime is not configured");
     }
-    return this.collaborators;
+    return this.conversations;
   }
 
-  getPage(
-    input: Parameters<AppCapabilities["conversations"]["getPage"]>[0],
-  ): Promise<ContractConversationListPage> {
-    return this.runtime.conversations.getPage(input);
+  private get turnService(): LangyTurnService {
+    if (this.turns === null) {
+      throw new Error("Langy runtime is not configured");
+    }
+    return this.turns;
   }
 
-  getEventsAfter(
-    input: Parameters<AppCapabilities["conversations"]["getEventsAfter"]>[0],
-  ): Promise<LangyConversationEventPage> {
-    return this.runtime.conversations.getEventsAfter(input);
+  private get messageService(): LangyMessageService {
+    if (this.messages === null) {
+      throw new Error("Langy runtime is not configured");
+    }
+    return this.messages;
   }
 
-  tryFindByIdVisible(
-    input: Parameters<AppCapabilities["conversations"]["tryFindByIdVisible"]>[0],
-  ): Promise<ContractConversationDetail | null> {
-    return this.runtime.conversations.tryFindByIdVisible(input);
+  private get credentialService(): LangyCredentialService {
+    if (this.credentials === null) {
+      throw new Error("Langy runtime is not configured");
+    }
+    return this.credentials;
   }
 
-  getById(
-    input: Parameters<AppCapabilities["conversations"]["getById"]>[0],
-  ): Promise<ContractConversationDetail> {
-    return this.runtime.conversations.getById(input);
+  getPage(input: {
+    projectId: string;
+    userId: string;
+    limit: number;
+    cursor?: ContractConversationListCursor;
+    query?: string;
+  }): Promise<ContractConversationListPage> {
+    return this.conversationService.getPage(input);
   }
 
-  getAllByConversation(
-    input: Parameters<AppCapabilities["messages"]["getAllByConversation"]>[0],
-  ): Promise<ContractMessageRow[]> {
-    return this.runtime.messages.getAllByConversation(input);
+  getEventsAfter(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    after: { acceptedAt: number; eventId: string };
+  }): Promise<LangyConversationEventPage> {
+    return this.conversationService.getEventsAfter(input);
   }
 
-  deleteById(
-    input: Parameters<AppCapabilities["conversations"]["deleteById"]>[0],
-  ): Promise<boolean> {
-    return this.runtime.conversations.deleteById(input);
+  tryFindByIdVisible(input: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<ContractConversationDetail | null> {
+    return this.conversationService.tryFindByIdVisible(input);
   }
 
-  updateById(
-    input: Parameters<AppCapabilities["conversations"]["updateById"]>[0],
-  ): Promise<ContractConversationDetail> {
-    return this.runtime.conversations.updateById(input);
+  getById(input: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<ContractConversationDetail> {
+    return this.conversationService.getById(input);
   }
 
-  forkById(
-    input: Parameters<AppCapabilities["conversations"]["forkById"]>[0],
-  ): Promise<{ conversation: ContractConversationDetail }> {
-    return this.runtime.conversations.forkById(input);
+  getAllByConversation(input: {
+    conversationId: string;
+    projectId: string;
+    userId: string;
+  }): Promise<ContractMessageRow[]> {
+    return this.messageService.getAllByConversation(input);
+  }
+
+  deleteById(input: { id: string; projectId: string; userId: string }): Promise<boolean> {
+    return this.conversationService.deleteById(input);
+  }
+
+  updateById(input: {
+    id: string;
+    projectId: string;
+    userId: string;
+    title?: string | null;
+    isShared?: boolean;
+  }): Promise<ContractConversationDetail> {
+    return this.conversationService.updateById(input);
+  }
+
+  forkById(input: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<{ conversation: ContractConversationDetail }> {
+    return this.conversationService.forkById(input);
   }
 
   startConversationTurn(
     input: LangyStartConversationTurnInput,
   ): Promise<{ conversationId: string; turnId: string }> {
-    return this.runtime.turns.startConversationTurn(input);
+    return this.turnService.startConversationTurn(input);
   }
 
-  warmConversationWorker(
-    input: Parameters<AppCapabilities["turns"]["warmConversationWorker"]>[0],
-  ): Promise<{ conversationId: string | null; warmed: boolean }> {
-    return this.runtime.turns.warmConversationWorker(input);
+  warmConversationWorker(input: {
+    projectId: string;
+    session: LangyCredentialSession;
+    requestedConversationId: string | null;
+    modelOverride?: string;
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
+    return this.turnService.warmConversationWorker(input);
   }
 
   tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
-    return this.runtime.credentials.tryGetModelsAllowedForProject(projectId);
+    return this.credentialService.tryGetModelsAllowedForProject(projectId);
+  }
+
+  revokeWorkerSessionKey(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<"revoked" | "already_revoked" | "not_found" | "refused"> {
+    return this.credentialService.revokeWorkerSessionKey(input);
   }
 
   shouldAskFeedback(input: {
@@ -421,44 +369,68 @@ export class LangyService extends LangyServiceContract {
     return this.feedbackPrompt.markShown(input);
   }
 
-  turnExists(
-    input: Parameters<AppCapabilities["conversations"]["turnExists"]>[0],
-  ): Promise<boolean> {
-    return this.runtime.conversations.turnExists(input);
+  turnExists(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return this.conversationService.turnExists(input);
   }
 
   ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void> {
-    return this.runtime.conversations.ingestAgentTurnResult(input);
+    return this.conversationService.ingestAgentTurnResult(input);
   }
 
-  tryGetRunToken(
-    input: Parameters<AppCapabilities["conversations"]["tryGetRunToken"]>[0],
-  ): Promise<string | null> {
-    return this.runtime.conversations.tryGetRunToken(input);
+  tryGetRunToken(input: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<string | null> {
+    return this.conversationService.tryGetRunToken(input);
   }
 
-  recordToolCallStarted(
-    input: Parameters<AppCapabilities["conversations"]["recordToolCallStarted"]>[0],
-  ): Promise<void> {
-    return this.runtime.conversations.recordToolCallStarted(input);
+  recordToolCallStarted(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    toolCallId: string;
+    toolName: string;
+    command?: string;
+    input?: unknown;
+  }): Promise<void> {
+    return this.conversationService.recordToolCallStarted(input);
   }
 
-  recordToolCallCompleted(
-    input: Parameters<AppCapabilities["conversations"]["recordToolCallCompleted"]>[0],
-  ): Promise<void> {
-    return this.runtime.conversations.recordToolCallCompleted(input);
+  recordToolCallCompleted(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    toolCallId: string;
+    toolName: string;
+    isError?: boolean;
+    command?: string;
+    input?: unknown;
+    durationMs?: number;
+    errorText?: string;
+  }): Promise<void> {
+    return this.conversationService.recordToolCallCompleted(input);
   }
 
-  recordTurnHandoff(
-    input: Parameters<AppCapabilities["conversations"]["recordTurnHandoff"]>[0],
-  ): Promise<void> {
-    return this.runtime.conversations.recordTurnHandoff(input);
+  recordTurnHandoff(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    token: string;
+  }): Promise<void> {
+    return this.conversationService.recordTurnHandoff(input);
   }
 
-  recordPlanUpdated(
-    input: Parameters<AppCapabilities["conversations"]["recordPlanUpdated"]>[0],
-  ): Promise<void> {
-    return this.runtime.conversations.recordPlanUpdated(input);
+  recordPlanUpdated(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    items: Array<{ content: string; status: string }>;
+  }): Promise<void> {
+    return this.conversationService.recordPlanUpdated(input);
   }
 
   private async startTurnForConversation(

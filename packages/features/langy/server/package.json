@@ -97,6 +97,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",

@@ -5,7 +5,6 @@ export {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
 } from "../projections/langy-analytics-event.projection";
-export { LangyAnalyticsEventAppendStore } from "../stores/langy-analytics-event.store";
 export type { LangyConversationState } from "../projections/langy-conversation-state.projection";
 export { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection";
 // The turn document's data type, key helpers, and the fold itself live in

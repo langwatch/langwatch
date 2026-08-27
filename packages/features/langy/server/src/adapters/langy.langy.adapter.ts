@@ -1,4 +1,6 @@
 import type { AppendStore, StateProjectionStore } from "@langwatch/eventing";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
 import type {
   LangyConversationStateData,
   LangyConversationTurnCapability,
@@ -36,9 +38,14 @@ import type {
   LangyCredentialErrorReporter,
   LangyCredentialRuntimeService,
   LangyGithubService,
-  LangySessionKeyService,
+  LangySessionKeyMintingService,
   LangyVirtualKeyService,
 } from "../services/langy-credential.service";
+import {
+  LangySessionKeyService,
+  type LangySessionKeyMetricsPort,
+} from "../services/langy-session-key.service";
+import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository";
 import {
   LangyTurnService,
   type LangyTurnTechnicalPorts,
@@ -59,7 +66,7 @@ export abstract class LangyTrustedMessagePort {
 
 /** Application-owned technical credential adapters; the repository remains private. */
 export type LangyCredentialComposition = {
-  sessionKeys: LangySessionKeyService;
+  sessionKeys: LangySessionKeyMintingService;
   virtualKeys: LangyVirtualKeyService;
   github: LangyGithubService;
   runtime: LangyCredentialRuntimeService;
@@ -99,6 +106,7 @@ interface LangyRepositories {
   conversationState: PrismaLangyConversationProjectionRepository;
   conversationTurnState: PrismaLangyConversationTurnProjectionRepository;
   messageStorage: PrismaLangyMessageProjectionRepository;
+  sessionKeys: PrismaLangySessionKeyRepository;
 }
 
 /** Composes the Langy capability graph while keeping persistence private. */
@@ -106,6 +114,7 @@ export class PostgresLangyAdapter {
   private readonly repositories: LangyRepositories;
   private readonly eventingCapabilities: LangyEventingPorts;
   private service: LangyServiceContract | null = null;
+  private sessionKeys: LangySessionKeyService | null = null;
 
   private constructor(private readonly options: PostgresLangyAdapterOptions) {
     this.repositories = {
@@ -120,6 +129,7 @@ export class PostgresLangyAdapter {
         options.database,
       ),
       messageStorage: PrismaLangyMessageProjectionRepository.create(options.database),
+      sessionKeys: PrismaLangySessionKeyRepository.create(options.database),
     };
     this.eventingCapabilities = new LangyEventingPorts(
       this.repositories.conversationState,
@@ -140,6 +150,20 @@ export class PostgresLangyAdapter {
    */
   eventing(): LangyEventingPorts {
     return this.eventingCapabilities;
+  }
+
+  createSessionKeys(input: {
+    apiKeys: ApiKeyService;
+    authz: AuthzService;
+    metrics: LangySessionKeyMetricsPort;
+  }): LangySessionKeyService {
+    if (!this.sessionKeys) {
+      this.sessionKeys = LangySessionKeyService.create({
+        repository: this.repositories.sessionKeys,
+        ...input,
+      });
+    }
+    return this.sessionKeys;
   }
 
   /**
@@ -167,20 +191,18 @@ export class PostgresLangyAdapter {
       ...options.credentials,
     });
 
-    const capabilities = {
+    const turns = LangyTurnService.create({
+      ...options.turns,
       conversations,
-      turns: LangyTurnService.create({
-        ...options.turns,
-        conversations,
-        credentials,
-        messages: this.repositories.messages,
-        admission: this.repositories.admission,
-      }),
+      credentials,
+      messages: this.repositories.messages,
+      admission: this.repositories.admission,
+    });
+    this.service = LangyService.createComposed(
+      conversations,
+      turns,
       messages,
       credentials,
-    };
-    this.service = LangyService.createComposed(
-      capabilities,
       LangyFeedbackPromptPolicy.create({
         redis: options.feedbackPromptRedis ?? null,
       }),

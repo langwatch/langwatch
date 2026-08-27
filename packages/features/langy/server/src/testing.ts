@@ -6,9 +6,10 @@ export type {
   LangyCredentialErrorReporter,
   LangyCredentialRuntimeService,
   LangyGithubService,
-  LangySessionKeyService,
+  LangySessionKeyMintingService,
   LangyVirtualKeyService,
 } from "./services/langy-credential.service";
+export type { LangySessionKeyService } from "./services/langy-session-key.service";
 import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,

@@ -37,6 +37,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import {
+  LANGY_PROMPT_DEFAULT_TAG,
+  type LangyPromptHandle,
+} from "@langwatch/langy-contract";
 
 const logger = createLogger("langwatch:langy:prompt-registry");
 
@@ -48,63 +52,6 @@ export abstract class LangyPromptPort {
     tag: string;
   }): Promise<{ prompt: string } | null>;
 }
-
-/**
- * Well-known handle SLUGS for Langy's registry prompts. Stored org-scoped, so the
- * fully-qualified handle the registry persists is `{organizationId}/{slug}` and
- * every project in the holding org can read it (see the ORGANIZATION scope branch
- * in `LlmConfigRepository.getConfigByIdOrHandleWithLatestVersion`). `tryGetPromptByIdOrHandle`
- * qualifies a bare slug with the caller's org/project context, so these bare
- * slugs are what both the seed and the loader use.
- */
-export const LANGY_PROMPT_HANDLES = {
-  /** The AGENTS.md agent-definition rules doc (the "AGENT.md" of the ask). */
-  agentDefinition: "langy-agent-definition",
-  /** The per-turn control-plane system override block. */
-  turnOverride: "langy-turn-override",
-} as const;
-
-export type LangyPromptHandle =
-  (typeof LANGY_PROMPT_HANDLES)[keyof typeof LANGY_PROMPT_HANDLES];
-
-/**
- * The default tag the loader pins to. Production reads should follow the
- * `production` tag so a new registry version is not live until it is promoted;
- * `latest` (the virtual tag) would make every draft edit immediately live.
- */
-export const LANGY_PROMPT_DEFAULT_TAG = "production";
-
-/**
- * The per-turn `system` override — Langy's role framing, prepended to the turn's
- * context block. This is the in-repo SOURCE OF TRUTH and the loader's fallback
- * for `LANGY_PROMPT_HANDLES.turnOverride`. Kept here (not in the turn service) so
- * the loader, the seed script, and the turn service all read the exact same
- * bytes — no drift between what we seed as version 1 and what we fall back to.
- */
-/**
- * This block rides the per-message `system` field, appended AFTER AGENTS.md in
- * the assembled prompt. It exists as the operator's hot-patch channel: promote
- * a new `langy-turn-override` registry version and the wording changes without
- * a deploy. The worker already carries the persona twice (the build agent's
- * config prompt and AGENTS.md), so the default stays at three lines: repeating
- * the operating rules here made the model read the same commandments three
- * times, and any drift between the copies became a contradiction it had to
- * arbitrate.
- *
- * The rules kept here are the measured defects, because last position in the
- * prompt is the right place to spend on them. Grounding: in production, 40% of
- * turns that reach `status: "completed"` make zero tool calls, so the answer
- * came from the model rather than from the project. Ending: on the pi harness
- * the model closes replies with a next-actions question, which AGENTS.md bans;
- * mid-prompt the ban loses to the model's own habit, so the pointer rides
- * here.
- */
-export const LANGY_TURN_OVERRIDE_FALLBACK = [
-  "You are Langy, the in-product LangWatch assistant.",
-  "AGENTS.md is your operating contract and applies to every reply.",
-  "Facts about the user's project come from what you retrieve this turn, never from memory.",
-  "End on the answer: no closing question or next-actions menu (AGENTS.md names the exceptions).",
-].join(" ");
 
 export interface ResolveLangyPromptParams {
   /** Only the read method is required — keeps this trivially fakeable in tests. */

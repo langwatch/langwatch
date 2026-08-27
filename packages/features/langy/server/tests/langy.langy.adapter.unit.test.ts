@@ -36,7 +36,7 @@ function composition(turns: LangyTurnTechnicalPorts) {
   return {
     commands: commands(),
     credentials: {
-      sessionKeys: { mint: vi.fn() },
+      sessionKeys: { mint: vi.fn(), revokeManaged: vi.fn() },
       virtualKeys: { provision: vi.fn() },
       github: { enabled: false, mintTurnToken: vi.fn() },
       runtime: {

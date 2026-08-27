@@ -1,8 +1,8 @@
-import type { CliResultDigest, CliToolResult } from "@langwatch/langy-contract";
 import {
   LANGY_CARD_FAILED_PART_TYPE,
   LANGY_CARD_PART_TYPE,
   type LangyMessagePart,
+  type LangyFinalToolCall,
   langyMessagePartSchema,
   salvageLangyDerivedCard,
   splitLangyCardFences,
@@ -19,15 +19,7 @@ export type LangyBlockCounter = (reason: string) => void;
  * absent on the wire: it is computed here, by the CLI envelope, when the call
  * was a `langwatch <resource> <verb>`.
  */
-export interface LangyFinalToolCall {
-  id: string;
-  name: string;
-  input?: unknown;
-  output?: string;
-  isError?: boolean;
-  digest?: CliResultDigest;
-  result?: CliToolResult;
-}
+export type { LangyFinalToolCall } from "@langwatch/langy-contract";
 
 /**
  * Assemble the durable assistant-message parts for a finalized turn: the tool

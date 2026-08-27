@@ -7,6 +7,12 @@ export {
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
+export {
+  LANGY_CANDIDATE_PERMISSIONS,
+  LangySessionKeyMetricsPort,
+  LangySessionKeyService,
+} from "./services/langy-session-key.service";
+export type { LangySessionKeyRevocation } from "./services/langy-session-key.service";
 export { ADOPTABLE_CONVERSATION_ID } from "./services/langy.service";
 export type {
   LangyConversationCommands,
@@ -60,7 +66,12 @@ export type {
 export { createLangyConversationProcessingPipeline } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyAnalyticsEventProjectionRecord } from "./adapters/eventing.langy-projections-index.adapter";
-export { LangyAnalyticsEventAppendStore } from "./stores/langy-analytics-event.store";
+export {
+  LangyAnalyticsEventStorageAdapter,
+  NullLangyAnalyticsEventSinkAdapter,
+} from "./adapters/langy-analytics-event-storage.adapter";
+export { LangyAnalyticsEventSinkPort } from "./ports/langy-analytics-event-sink.port";
+export type { LangyAnalyticsEventRecord } from "./ports/langy-analytics-event-sink.port";
 export type { LangyEffectPorts } from "./ports/langy-effect.port";
 export {
   createAgentTurnLivenessSubscriber,
@@ -103,3 +114,14 @@ export {
 export type { LangyHandoffRedis, LangyTurnHandoff } from "./streaming/langy-turn-handoff";
 export { LangyTokenBuffer } from "./streaming/langy-token-buffer";
 export type { LangyStreamEntry } from "./streaming/langy-token-buffer";
+export {
+  abortableDelay,
+  awaitTurnSettlement,
+  settlementFromEvents,
+} from "./streaming/langy-turn-settlement-waiter";
+export { decideSyntheticTerminal } from "./streaming/langy-turn-settlement";
+export type {
+  LangyTurnSettlementReader,
+  LangyTurnSettlementRedis,
+  TurnSettlement,
+} from "./streaming/langy-turn-settlement-waiter";

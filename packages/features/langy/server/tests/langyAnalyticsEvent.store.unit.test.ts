@@ -1,9 +1,10 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import {
-  LangyAnalyticsEventAppendStore,
+  LangyAnalyticsEventSinkPort,
+  LangyAnalyticsEventStorageAdapter,
   type LangyAnalyticsEventProjectionRecord,
-} from "@langwatch/langy-server/eventing/langy-conversation-processing";
+} from "@langwatch/langy-server";
 
 const record: LangyAnalyticsEventProjectionRecord = {
   eventId: "event_1",
@@ -21,17 +22,18 @@ const record: LangyAnalyticsEventProjectionRecord = {
   acceptedAtMs: 1_100,
 };
 
-function makeRepository() {
-  return {
-    insert: vi.fn().mockResolvedValue(undefined),
-    insertBatch: vi.fn().mockResolvedValue(undefined),
-  };
+class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventSinkPort {
+  readonly insert = vi.fn().mockResolvedValue(undefined);
+  readonly insertBatch = vi.fn().mockResolvedValue(undefined);
 }
 
 describe("LangyAnalyticsEventAppendStore", () => {
   it("injects the tenant and resolved trace retention into a single append", async () => {
-    const repository = makeRepository();
-    const store = new LangyAnalyticsEventAppendStore(repository, 49);
+    const sink = new FakeLangyAnalyticsEventSink();
+    const store = LangyAnalyticsEventStorageAdapter.create({
+      sink,
+      defaultRetentionDays: 49,
+    });
 
     await store.append(record, {
       tenantId: createTenantId("project_1"),
@@ -43,15 +45,15 @@ describe("LangyAnalyticsEventAppendStore", () => {
       },
     });
 
-    expect(repository.insert).toHaveBeenCalledWith(
-      { tenantId: "project_1", ...record },
-      45,
-    );
+    expect(sink.insert).toHaveBeenCalledWith({ tenantId: "project_1", ...record }, 45);
   });
 
   it("uses one tenant-scoped batch insert during replay", async () => {
-    const repository = makeRepository();
-    const store = new LangyAnalyticsEventAppendStore(repository, 49);
+    const sink = new FakeLangyAnalyticsEventSink();
+    const store = LangyAnalyticsEventStorageAdapter.create({
+      sink,
+      defaultRetentionDays: 49,
+    });
     const second = {
       ...record,
       eventId: "event_2",
@@ -67,7 +69,7 @@ describe("LangyAnalyticsEventAppendStore", () => {
       },
     });
 
-    expect(repository.insertBatch).toHaveBeenCalledWith(
+    expect(sink.insertBatch).toHaveBeenCalledWith(
       [
         { tenantId: "project_1", ...record },
         { tenantId: "project_1", ...second },
@@ -77,13 +79,16 @@ describe("LangyAnalyticsEventAppendStore", () => {
   });
 
   it("does not call the repository for an empty replay batch", async () => {
-    const repository = makeRepository();
-    const store = new LangyAnalyticsEventAppendStore(repository, 49);
+    const sink = new FakeLangyAnalyticsEventSink();
+    const store = LangyAnalyticsEventStorageAdapter.create({
+      sink,
+      defaultRetentionDays: 49,
+    });
 
     await store.bulkAppend([], {
       tenantId: createTenantId("project_1"),
     });
 
-    expect(repository.insertBatch).not.toHaveBeenCalled();
+    expect(sink.insertBatch).not.toHaveBeenCalled();
   });
 });

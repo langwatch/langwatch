@@ -1,5 +1,5 @@
+import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
 import {
-  LANGY_PROMPT_HANDLES,
   resolveLangyPrompt,
   type LangyPromptPort,
 } from "./langy-prompt-registry.service";

@@ -16,6 +16,8 @@ import type {
   LangyMirrorTier,
 } from "./langy";
 import type { LangyMessagePart } from "./json";
+import type { CliResultDigest } from "./cards/digest";
+import type { CliToolResult } from "./cards/tool-result";
 import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turnWire";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor";
 
@@ -65,7 +67,10 @@ export type LangyStartConversationTurnInput = {
   session: LangyCredentialSession;
   requestedConversationId: string | null;
   adoptConversationId?: boolean;
-  messages: Array<{ role: "user" | "assistant" | "system"; parts: unknown[] }>;
+  messages: Array<{
+    role: "user" | "assistant" | "system";
+    parts: LangyMessagePart[];
+  }>;
   modelOverride?: string;
   isRetry: boolean;
   turnContext: object;
@@ -77,8 +82,18 @@ export type LangyTurnResultInput = {
   turnId: string;
   status: "completed" | "failed";
   text?: string;
-  toolCalls?: unknown[];
+  toolCalls?: LangyFinalToolCall[];
   errorCode?: string;
+};
+
+export type LangyFinalToolCall = {
+  id: string;
+  name: string;
+  input?: unknown;
+  output?: string;
+  isError?: boolean;
+  digest?: CliResultDigest;
+  result?: CliToolResult;
 };
 
 export type LangyConversationTurnCapability = {
@@ -299,6 +314,10 @@ export abstract class LangyService {
     modelOverride?: string;
   }): Promise<{ conversationId: string | null; warmed: boolean }>;
   abstract tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null>;
+  abstract revokeWorkerSessionKey(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<"revoked" | "already_revoked" | "not_found" | "refused">;
   abstract shouldAskFeedback(input: {
     userId: string;
     conversationId: string;

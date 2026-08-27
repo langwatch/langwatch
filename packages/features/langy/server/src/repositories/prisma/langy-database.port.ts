@@ -8,6 +8,7 @@ export interface LangyDatabaseTransaction {
 
 export interface LangyDatabase {
   readonly project: PrismaClient["project"];
+  readonly apiKey: PrismaClient["apiKey"];
   readonly virtualKey: PrismaClient["virtualKey"];
   readonly langyConversationProjection: PrismaClient["langyConversationProjection"];
   readonly langyConversationTurnProjection: PrismaClient["langyConversationTurnProjection"];

@@ -25,6 +25,7 @@
     "@emotion/react": "^11.14.0",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
     "react": "^19.2.7",

@@ -8,7 +8,7 @@
  * user gets copy that names what actually happened instead of a blanket
  * "something went wrong".
  *
- * Content rule (same as `app-layer/langy/errors.ts`): `meta` carries ONLY what
+ * Content rule: `meta` carries ONLY what
  * a user or the UI can act on or safely see — an HTTP status, the timeout we
  * gave up at. NEVER the raw manager/opencode message, a stack, a URL, or an
  * internal identifier. The raw detail keeps going to the server log, which is
