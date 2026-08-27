@@ -2768,7 +2768,8 @@ function listLabels(labels: string[]): string {
 /**
  * Body copy for a node failure that carries the upstream's HTTP status.
  *
- * `meta.upstreamStatus` is attached by `nodeErrorDomain.ts` for every node
+ * `meta.upstreamStatus` is attached by Workflow's node-error contract mapper
+ * for every node
  * code that can have one, precisely so these entries can use it. A status is
  * the one detail that changes what the customer should do: 401/403 is a key
  * they can fix, 429 is a wait, 5xx is the other service's problem. Naming the

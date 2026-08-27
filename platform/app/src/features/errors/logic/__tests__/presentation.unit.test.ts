@@ -589,7 +589,7 @@ describe("explainHandledError", () => {
         // Here `reason` is not a machine sub-classifier: it is the sentence
         // the service wrote for this exact case ("This automation has no email
         // recipients to test-fire to."), and it names WHICH piece is missing.
-        // Authored in `trigger-template.service.ts`, never relayed.
+        // Authored by the automation service, never relayed.
         test_fire_unavailable: new Set(["reason"]),
       };
 

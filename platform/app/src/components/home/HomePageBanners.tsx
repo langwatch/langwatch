@@ -18,7 +18,7 @@ import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
 import { getIsMac } from "~/features/command-bar/utils/platform";
-import { LangyMark } from "~/features/langy/components/LangyMark";
+import { LangyMark } from "@langwatch/langy-web";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";

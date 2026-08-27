@@ -11,10 +11,6 @@ vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", 
   CodeEditor: () => null,
 }));
 
-vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
-  TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
-}));
-
 import {
   type AvailableSource,
   type FieldMapping,
