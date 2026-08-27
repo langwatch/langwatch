@@ -222,7 +222,13 @@ describe("Feature: Test Suites REST API", () => {
       const body = await res.json();
       expect(body.map((one: { id: string }) => one.id)).toEqual([folder.id]);
       expect(body[0].scenarioCount).toBe(0);
-      expect(body[0].platformUrl).toContain(folder.slug);
+      // Which page the link opens is decided per project by the Agent
+      // Testing flag, and the Simulations interface has no page for one test
+      // suite, so the suite slug is in the link only under Agent Testing.
+      // What holds either way is that the link is project-scoped; both
+      // interfaces are pinned in
+      // `src/server/suites/__tests__/platform-path.unit.test.ts`.
+      expect(body[0].platformUrl).toContain(`/${testProject.slug}/`);
     });
   });
 
