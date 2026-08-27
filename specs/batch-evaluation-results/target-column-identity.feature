@@ -17,6 +17,23 @@ Feature: Target column identity on the results page
     Given I am on the experiment results page
 
   # ============================================================================
+  # Column headers
+  # ============================================================================
+
+  @integration
+  Scenario: Two target columns with the same name get separate headers
+    Given a run with two targets both stored under the name "category_classifier"
+    When the results table renders
+    Then one target column header reads "category_classifier (1)"
+    And the other target column header reads "category_classifier (2)"
+
+  @integration
+  Scenario: A target column with a unique name keeps its plain name
+    Given a run with targets named "classifier" and "summarizer"
+    When the results table renders
+    Then the target column headers read "classifier" and "summarizer"
+
+  # ============================================================================
   # Targets the run does not hold
   # ============================================================================
 

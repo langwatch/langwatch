@@ -7,6 +7,7 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { resolveVerdictLabel } from "~/experiments-v3/utils/normalizeComparison";
+import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 
 /**
@@ -84,6 +85,13 @@ export type BatchResultRow = {
 export type BatchTargetColumn = {
   id: string;
   name: string;
+  /**
+   * The name to show the reader. Two targets on one board can carry the
+   * identical stored `name`, so this adds the same "(1)" / "(2)" suffix the
+   * workbench adds, over the columns this run renders. Optional, so callers
+   * that build a column literal fall back to `name`.
+   */
+  displayName?: string;
   type: "prompt" | "agent" | "evaluator" | "custom" | "legacy";
   /** For prompts: the config ID */
   promptId?: string | null;
@@ -308,9 +316,12 @@ export const transformBatchEvaluationData = (
     );
     const runTargets = withData.length > 0 ? withData : targets;
 
-    targetColumns = runTargets.map((target) => ({
+    const displayNames = disambiguateNames(runTargets.map((t) => t.name));
+
+    targetColumns = runTargets.map((target, index) => ({
       id: target.id,
       name: target.name,
+      displayName: displayNames[index] ?? target.name,
       type:
         target.type === "custom"
           ? "custom"
