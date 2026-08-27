@@ -44,7 +44,7 @@ import type {
   DSPyPredictor,
   DSPyRunsSummary,
   DSPyStepSummary,
-} from "../../server/experiments/types";
+} from "@langwatch/experiment-contract";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";

@@ -10,7 +10,7 @@ import {
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
-import { UnavailableExperimentExecutionPort } from "../execution/experiment-execution.port";
+import { UnavailableExperimentExecutionPort } from "../ports/experiment-execution.port";
 import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {

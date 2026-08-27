@@ -7,7 +7,7 @@ import type { Node } from "@xyflow/react";
 import type { Dataset } from "@langwatch/dataset-contract";
 import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { EvaluationExecutionMode, ExperimentType } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -21,13 +21,14 @@ import {
 } from "@langwatch/workflow-contract";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
-import type { DSPyRunsSummary, DSPyStep, DSPyStepSummary } from "../../experiments/types";
+import type {
+  DSPyStep,
+} from "@langwatch/experiment-contract";
+import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-contract";
 import {
-  isLegacyOnlineEvaluationWorkbenchState,
   type WizardState,
   workbenchStateSchema,
-} from "../../experiments/workbenchState";
-import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
+} from "../../experiments/legacy-experiment-workbench.schema";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import {
   type createInnerTRPCContext,
@@ -499,64 +500,10 @@ export const experimentsRouter = createTRPCRouter({
         })
         .catch(mapExperimentError);
 
-      const steps = await ctx.app.experiments.listDspySteps({
+      return ctx.app.experiments.listDspyRuns({
         tenantId: input.projectId,
         experimentId: experiment.id,
       });
-
-      const versionIds = steps
-        .map((s) => s.workflowVersionId)
-        .filter((id): id is string => Boolean(id));
-
-      const versionsMap = await getVersionMap({
-        prisma,
-        projectId: input.projectId,
-        versionIds,
-      });
-
-      // Group by runId
-      const runMap = new Map<string, typeof steps>();
-      for (const step of steps) {
-        let group = runMap.get(step.runId);
-        if (!group) {
-          group = [];
-          runMap.set(step.runId, group);
-        }
-        group.push(step);
-      }
-
-      const result: DSPyRunsSummary[] = Array.from(runMap.entries())
-        .map(([runId, runSteps]) => {
-          const versionId = runSteps.find((s) => s.workflowVersionId)?.workflowVersionId;
-          return {
-            runId,
-            workflow_version: (versionId
-              ? versionsMap[versionId]
-              : undefined) as DSPyRunsSummary["workflow_version"],
-            steps: runSteps
-              .map(
-                (s) =>
-                  ({
-                    run_id: s.runId,
-                    index: s.stepIndex,
-                    score: s.score,
-                    label: s.label,
-                    optimizer: { name: s.optimizerName },
-                    llm_calls_summary: {
-                      total: s.llmCallsTotal,
-                      total_tokens: s.llmCallsTotalTokens,
-                      total_cost: s.llmCallsTotalCost,
-                    },
-                    timestamps: { created_at: s.createdAt },
-                  }) as DSPyStepSummary,
-              )
-              .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
-            created_at: Math.min(...runSteps.map((s) => s.createdAt)),
-          };
-        })
-        .sort((a, b) => b.created_at - a.created_at);
-
-      return result;
     }),
 
   getExperimentDSPyStep: protectedProcedure

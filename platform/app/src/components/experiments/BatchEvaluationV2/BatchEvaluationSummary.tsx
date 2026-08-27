@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FormatMoney } from "../../../optimization_studio/components/FormatMoney";
 import type { AppRouter } from "../../../server/api/root";
-import type { ExperimentRun } from "../../../server/experiments-v3/services/types";
+import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { HoverableBigText } from "../../HoverableBigText";

@@ -15,7 +15,7 @@ import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { showErrorToast } from "~/features/errors";
 import type { Experiment, Project } from "~/generated/prisma/client";
 import { Menu } from "@langwatch/design-system/menu";
-import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { api } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
 import { getEvaluationColumns } from "./utils";

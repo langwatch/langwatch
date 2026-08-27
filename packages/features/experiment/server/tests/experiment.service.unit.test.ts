@@ -14,7 +14,7 @@ import type {
 import { ExperimentRunRepository } from "../src/repositories/experiment-run.repository";
 import { ExperimentDspyRepository } from "../src/repositories/experiment-dspy.repository";
 import { ExperimentService } from "../src/services/experiment.service";
-import { ExperimentExecutionPort } from "../src/execution/experiment-execution.port";
+import { ExperimentExecutionPort } from "../src/ports/experiment-execution.port";
 
 const row = (overrides: Partial<Experiment> = {}): Experiment => ({
   id: "experiment_1",
@@ -146,6 +146,9 @@ class MemoryExperimentRunRepository extends ExperimentRunRepository {
   }
   async tryGet() {
     return null;
+  }
+  async getWorkflowVersions() {
+    return {};
   }
 }
 

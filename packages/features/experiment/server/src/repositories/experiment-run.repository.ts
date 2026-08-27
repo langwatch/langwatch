@@ -4,6 +4,7 @@ import type {
   ExperimentRunListInput,
   ExperimentRunLookup,
   ExperimentRunPageInput,
+  ExperimentRunWorkflowVersion,
   ExperimentRunWithItems,
 } from "@langwatch/experiment-contract";
 
@@ -18,4 +19,8 @@ export abstract class ExperimentRunRepository {
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }>;
   /** Polling semantics: absence and an unavailable analytical store are null. */
   abstract tryGet(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null>;
+  abstract getWorkflowVersions(
+    projectId: string,
+    versionIds: string[],
+  ): Promise<Record<string, ExperimentRunWorkflowVersion>>;
 }

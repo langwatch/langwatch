@@ -20,6 +20,7 @@ import {
   saveExperimentInputSchema,
   startExperimentRunInputSchema,
   type Experiment,
+  type DSPyRunsSummary,
   type ExperimentDspyStep,
   type ExperimentDspyStepLookup,
   type ExperimentDspyStepSummary,
@@ -52,7 +53,7 @@ import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.r
 import {
   UnavailableExperimentExecutionPort,
   type ExperimentExecutionPort,
-} from "../execution/experiment-execution.port";
+} from "../ports/experiment-execution.port";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -269,6 +270,51 @@ export class ExperimentService extends ExperimentServiceContract {
       experimentDspyStepsLookupSchema.parse(input),
     );
     return values.map((value) => experimentDspyStepSummarySchema.parse(value));
+  }
+
+  async listDspyRuns(
+    input: ExperimentDspyStepsLookup,
+  ): Promise<DSPyRunsSummary[]> {
+    const query = experimentDspyStepsLookupSchema.parse(input);
+    const steps = await this.listDspySteps(query);
+    const versionIds = steps.flatMap((step) =>
+      step.workflowVersionId ? [step.workflowVersionId] : [],
+    );
+    const versions = await this.options.runRepository.getWorkflowVersions(
+      query.tenantId,
+      versionIds,
+    );
+    const stepsByRun = new Map<string, ExperimentDspyStepSummary[]>();
+    for (const step of steps) {
+      const runSteps = stepsByRun.get(step.runId) ?? [];
+      runSteps.push(step);
+      stepsByRun.set(step.runId, runSteps);
+    }
+
+    return Array.from(stepsByRun, ([runId, runSteps]) => {
+      const versionId = runSteps.find((step) => step.workflowVersionId)
+        ?.workflowVersionId;
+      return {
+        runId,
+        workflow_version: versionId ? versions[versionId] : void 0,
+        steps: runSteps
+          .map((step) => ({
+            run_id: step.runId,
+            index: step.stepIndex,
+            score: step.score,
+            label: step.label,
+            optimizer: { name: step.optimizerName },
+            llm_calls_summary: {
+              total: step.llmCallsTotal,
+              total_tokens: step.llmCallsTotalTokens,
+              total_cost: step.llmCallsTotalCost,
+            },
+            timestamps: { created_at: step.createdAt },
+          }))
+          .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
+        created_at: Math.min(...runSteps.map((step) => step.createdAt)),
+      };
+    }).sort((a, b) => b.created_at - a.created_at);
   }
 
   async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {

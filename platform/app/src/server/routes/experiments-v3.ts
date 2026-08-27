@@ -32,9 +32,9 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { getServerAuthSession } from "~/server/auth";
 import {
   ExperimentNotFoundError,
+  ExperimentRunNotFoundError as RunNotFoundError,
   InvalidExperimentConfigurationError,
-  RunNotFoundError,
-} from "~/server/experiments/errors";
+} from "@langwatch/experiment-contract";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";

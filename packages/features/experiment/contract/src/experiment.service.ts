@@ -1,4 +1,7 @@
 import type {
+  DSPyRunsSummary,
+} from "./experiment-legacy";
+import type {
   Experiment,
   ExperimentLookup,
   ExperimentPage,
@@ -73,5 +76,6 @@ export abstract class ExperimentService {
   abstract listDspySteps(
     input: ExperimentDspyStepsLookup,
   ): Promise<ExperimentDspyStepSummary[]>;
+  abstract listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]>;
   abstract getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep>;
 }

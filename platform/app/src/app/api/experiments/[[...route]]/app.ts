@@ -16,7 +16,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";

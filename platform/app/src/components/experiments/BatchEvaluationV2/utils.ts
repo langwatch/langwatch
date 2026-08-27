@@ -1,4 +1,4 @@
-import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 
 /**
  * Infer evaluation input/result column sets from a list of results.

@@ -20,7 +20,7 @@ import {
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
-} from "./clickhouse-experiment-run.queries";
+} from "./experiment-run.clickhouse.mapper";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {
@@ -512,7 +512,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         },
         format: "JSONEachRow",
       }),
-      this.versions(
+      this.getWorkflowVersions(
         projectId,
         rows.flatMap((row) => (row.WorkflowVersionId ? [row.WorkflowVersionId] : [])),
       ),
@@ -541,7 +541,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  private async versions(
+  async getWorkflowVersions(
     projectId: string,
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {

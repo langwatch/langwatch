@@ -64,7 +64,7 @@ import {
   type DSPyLLMCall,
   type DSPyStepRESTParams,
   dSPyStepRESTParamsSchema,
-} from "~/server/experiments/types";
+} from "@langwatch/experiment-contract";
 import { filterFieldsEnum } from "~/server/filters/types";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
