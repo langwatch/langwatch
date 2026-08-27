@@ -73,6 +73,7 @@ import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import type { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -163,6 +164,12 @@ export interface AppDependencies {
      * because nothing it does may change what `runs` serves to v1.
      */
     results: ResultAtomsService;
+    /**
+     * The configurations the run dialog offers back: what each run of a plan
+     * was asked to do, read off the runs rather than off the plan row, which
+     * holds only the configuration of its last run.
+     */
+    runConfigurations: RunConfigurationsService;
     /**
      * CSV export of run history. A sibling of `runs` rather than a method on
      * it: the export sweeps with its own keyset pagination and serializers,

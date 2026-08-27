@@ -42,9 +42,17 @@ export const OUTCOME_EXPR = `multiIf(
  * coalescing here is what stops those rows piling onto page one and becoming
  * unreachable for the rest of the sweep.
  */
-export const ATOM_SORT_KEY = "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt))";
+export const ATOM_SORT_KEY =
+  "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt))";
 
-const LANGWATCH_METADATA = "JSONExtractRaw(ifNull(Metadata, '{}'), 'langwatch')";
+/**
+ * The reserved namespace the platform stamps onto a run's metadata.
+ *
+ * Everything the platform knows about a run and did not get from the SDK sits
+ * under this one key, so a customer key can never collide with it.
+ */
+export const LANGWATCH_METADATA =
+  "JSONExtractRaw(ifNull(Metadata, '{}'), 'langwatch')";
 
 /**
  * The target a run was pointed at, as the bare reference id.
@@ -228,7 +236,9 @@ export function buildAtomFilters(filter: ResultsFilter): AtomFilterSql {
   }
 
   if (filter.targetKeys && filter.targetKeys.length > 0) {
-    volatileParts.push(`${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`);
+    volatileParts.push(
+      `${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`,
+    );
     params.atomTargetKeys = filter.targetKeys;
   }
 
