@@ -33,6 +33,10 @@ type RouterDeps struct {
 	// in-process aigateway dispatcher. nil → /go/proxy/v1/* returns the
 	// 501 stub (used by tests that don't exercise the playground path).
 	PlaygroundProxy PlaygroundProxy
+	// StreamHeartbeat is the is_alive_response cadence for
+	// /go/studio/execute, from the operator's
+	// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS. Zero → DefaultStreamHeartbeat.
+	StreamHeartbeat time.Duration
 	// OTel is the OpenTelemetry provider whose `ForceFlush` is called
 	// after each /go/studio/* request, so spans for the just-finished
 	// workflow ship to the collector before the Lambda runtime freezes
@@ -70,7 +74,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 				s.Use(forceFlushMiddleware(deps.OTel))
 			}
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
-			s.Post("/execute", executeStreamHandler(deps.App))
+			s.Post("/execute", executeStreamHandler(deps.App, deps.StreamHeartbeat))
 		})
 		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))

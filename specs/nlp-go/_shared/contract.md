@@ -105,12 +105,12 @@ Server-Sent Events. Event shapes match `langwatch_nlp.studio.types.events.Studio
 
 | event | data |
 |---|---|
-| `is_alive_response` | `{}` — heartbeat every `NLP_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`. |
+| `is_alive_response` | `{}` — heartbeat every `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`. |
 | `execution_state_change` | `{ trace_id, state: { status, nodes: { <node_id>: { status, inputs, outputs, error?, cost?, duration_ms? } } } }` |
 | `done` | `{ trace_id, status: "success" \| "error", result }` |
 | `error` | `{ trace_id, payload: { stack?, message } }` |
 
-- Idle timeout = `NLP_STREAM_IDLE_TIMEOUT_SECONDS` (default 900). On timeout, emit `error` then close.
+- Idle timeout = `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS` (default 720). On timeout, emit `error` then close. **Not implemented.** The knob is read into config and `domain.ErrIdleTimeout` is registered for a 504, but nothing raises it: the SSE drain loop in `adapters/httpapi/handlers.go` has no timer, and `app/engine/stream.go` explicitly defers idle detection to the handler. The scenario is tagged `@unimplemented` in `specs/nlp-go/engine.feature`. Treat this line as intent, not behavior.
 - Client cancellation: closing the connection MUST cancel in-flight node executions (cooperative; nodes check ctx).
 - The sync endpoint `/go/studio/execute_sync` runs the same engine and returns the final `done` payload as JSON when complete.
 

@@ -152,7 +152,7 @@ func TestExecuteSyncHandlerLogsEngineErrorWithEnrichedContext(t *testing.T) {
 // error frame the client sees.
 func TestExecuteStreamHandlerLogsStartFailureWithEnrichedContext(t *testing.T) {
 	application := app.New(app.WithWorkflowExecutor(&failingExecutor{streamErr: errors.New("stream refused to start")}))
-	logs := observedHandlerRequest(t, executeStreamHandler(application))
+	logs := observedHandlerRequest(t, executeStreamHandler(application, DefaultStreamHeartbeat))
 
 	entries := logs.FilterMessage("studio_stream_failed").All()
 	if len(entries) != 1 {
