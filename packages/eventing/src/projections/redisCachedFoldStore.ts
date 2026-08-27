@@ -272,11 +272,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
           state: await this.inner.get(aggregateId, context),
           appliedEventIds: [] as string[],
         };
-    observeEsFoldCacheGetDuration(
-      this.keyPrefix,
-      "clickhouse",
-      performance.now() - startedAt,
-    );
+    observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", performance.now() - startedAt);
     return result;
   }
 

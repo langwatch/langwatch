@@ -97,7 +97,11 @@ export { EventSourcingPipeline } from "./runtimePipeline";
 export { EventSourcingService } from "./services/eventSourcingService";
 export type { JobRegistryEntry } from "./services/queues/queueManager";
 // Stores
-export type { EventStore, EventStoreReadContext } from "./stores/eventStore.types";
+export type {
+  EventStore,
+  EventStoreEventReadInput,
+  EventStoreReadContext,
+} from "./stores/eventStore.types";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,

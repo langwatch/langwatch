@@ -62,6 +62,14 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
   isDeliveryContinuation?: boolean;
 }
 
+/** Required boundary for one immutable event-log read. */
+export interface EventStoreEventReadInput {
+  eventId: string;
+  tenantId: TenantId;
+  aggregateType: AggregateType;
+  aggregateId: string;
+}
+
 /**
  * Read-only event store for querying events.
  * Use this interface when you only need to read events without storing new ones.
@@ -74,6 +82,16 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
  * - MUST return readonly array to prevent caller mutations
  */
 export interface ReadOnlyEventStore<EventType extends Event = Event> {
+  /**
+   * Reads one immutable event inside a tenant-bound aggregate stream.
+   *
+   * The stream boundary is mandatory even though event identifiers are
+   * immutable. A missing event and a mismatched tenant or stream both fail as
+   * not found, so this method cannot be used to enumerate another tenant's
+   * event log.
+   */
+  getEvent(input: EventStoreEventReadInput): Promise<EventType>;
+
   /**
    * Retrieves all events for a given aggregate.
    *

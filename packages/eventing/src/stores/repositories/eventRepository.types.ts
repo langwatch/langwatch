@@ -27,6 +27,20 @@ export interface EventRecord {
  */
 export interface EventRepository {
   /**
+   * Reads one durable event inside its tenant-bound aggregate stream.
+   *
+   * `event_log` event identifiers are immutable, but the complete stream key
+   * is still required: callers must never turn an event id into a cross-tenant
+   * lookup or an unbounded scan.
+   */
+  getEventRecord(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventId: string;
+  }): Promise<EventRecord>;
+
+  /**
    * Retrieves all event records for a given aggregate.
    * Returns raw records without validation or transformation.
    *

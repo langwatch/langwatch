@@ -153,6 +153,19 @@ export class ValidationError extends CriticalError {
   }
 }
 
+/** A tenant-bound event-log read did not find the requested immutable event. */
+export class EventNotFoundError extends CriticalError {
+  override readonly name = "EventNotFoundError";
+
+  constructor(context: {
+    eventId: string;
+    aggregateId: string;
+    aggregateType: string;
+  }) {
+    super("Event was not found in the requested tenant-bound aggregate stream", context);
+  }
+}
+
 /**
  * Error thrown for configuration issues (missing handlers, invalid setup, etc.).
  */

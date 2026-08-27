@@ -4,6 +4,7 @@ import { ValidationError } from "../services/errorHandling";
 import { EventUtils } from "../utils/event.utils";
 import type {
   EventStore as BaseEventStore,
+  EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./eventStore.types";
 import {
@@ -135,6 +136,41 @@ export abstract class AbstractEventStore<
    */
   private hasMissingAggregateId(aggregateId: string): boolean {
     return String(aggregateId).trim().length === 0;
+  }
+
+  async getEvent(input: EventStoreEventReadInput): Promise<EventType> {
+    const operation = `${this.constructor.name}.getEvent`;
+    const { eventId, tenantId, aggregateType, aggregateId } = input;
+    const context = { tenantId };
+    EventUtils.validateTenantId(context, operation);
+
+    if (eventId.trim().length === 0 || this.hasMissingAggregateId(aggregateId)) {
+      throw new ValidationError(
+        "An event read requires a non-empty eventId and aggregateId",
+        "eventId",
+        eventId,
+      );
+    }
+
+    return await this.instrument(
+      operation,
+      {
+        "aggregate.id": aggregateId,
+        "aggregate.type": aggregateType,
+        "event.id": eventId,
+        "tenant.id": context.tenantId,
+      },
+      async () => {
+        const record = await this.repository.getEventRecord({
+          tenantId: context.tenantId,
+          aggregateType,
+          aggregateId,
+          eventId,
+        });
+
+        return recordToEvent<EventType>(record, aggregateId);
+      },
+    );
   }
 
   async getEvents(

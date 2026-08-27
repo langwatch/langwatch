@@ -18,6 +18,75 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
     store = new EventStoreMemory(new EventRepositoryMemory());
   });
 
+  describe("getEvent", () => {
+    it("loads one event only inside its tenant-bound aggregate stream", async () => {
+      const event = EventUtils.createEvent({
+        aggregateType,
+        aggregateId,
+        tenantId,
+        type: eventType,
+        version: eventVersion,
+        data: { value: "expected" },
+        createdAt: 1_000,
+      });
+      await store.storeEvents([event], { tenantId }, aggregateType);
+
+      const loaded = await store.getEvent({
+        eventId: event.id,
+        tenantId,
+        aggregateType,
+        aggregateId,
+      });
+
+      expect(loaded).toEqual(event);
+    });
+
+    it("does not load an event from another tenant with the same immutable id", async () => {
+      const otherTenantId = createTenantId("other-tenant");
+      const event = EventUtils.createEvent({
+        aggregateType,
+        aggregateId,
+        tenantId: otherTenantId,
+        type: eventType,
+        version: eventVersion,
+        data: { value: "other tenant" },
+        createdAt: 1_000,
+      });
+      await store.storeEvents([event], { tenantId: otherTenantId }, aggregateType);
+
+      await expect(
+        store.getEvent({
+          eventId: event.id,
+          tenantId,
+          aggregateType,
+          aggregateId,
+        }),
+      ).rejects.toMatchObject({ name: "EventNotFoundError" });
+    });
+
+    it("does not load an event from a different aggregate in the same tenant", async () => {
+      const event = EventUtils.createEvent({
+        aggregateType,
+        aggregateId: "other-trace",
+        tenantId,
+        type: eventType,
+        version: eventVersion,
+        data: { value: "other aggregate" },
+        createdAt: 1_000,
+      });
+      await store.storeEvents([event], { tenantId }, aggregateType);
+
+      await expect(
+        store.getEvent({
+          eventId: event.id,
+          tenantId,
+          aggregateType,
+          aggregateId,
+        }),
+      ).rejects.toMatchObject({ name: "EventNotFoundError" });
+    });
+  });
+
   describe("getEvents - deduplication", () => {
     it("returns deduplicated events (same Event ID appears once)", async () => {
       const context = { tenantId };

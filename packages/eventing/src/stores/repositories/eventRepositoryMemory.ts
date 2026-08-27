@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { EventNotFoundError } from "../../services/errorHandling";
 import { compareOrdinal } from "../../utils/compareOrdinal";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
@@ -14,6 +15,22 @@ const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 export class EventRepositoryMemory implements EventRepository {
   // Partition by tenant + aggregateType + aggregateId
   private readonly eventsByKey = new Map<string, EventRecord[]>();
+
+  async getEventRecord(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventId: string;
+  }): Promise<EventRecord> {
+    const key = `${request.tenantId}:${request.aggregateType}:${request.aggregateId}`;
+    const record = this.eventsByKey.get(key)?.find((entry) => entry.EventId === request.eventId);
+
+    if (!record) {
+      throw new EventNotFoundError(request);
+    }
+
+    return { ...record };
+  }
 
   async getEventRecords(
     tenantId: string,
