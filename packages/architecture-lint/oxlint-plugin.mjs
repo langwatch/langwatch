@@ -148,6 +148,7 @@ function isFeatureServerCompositionRoot(workspacePath) {
       workspacePath,
     ) ||
     /^platform\/app\/src\/runtime\/(app|worker)\//.test(workspacePath) ||
+    /^platform\/app\/src\/tasks\/[^/]+\.ts$/.test(workspacePath) ||
     workspacePath === "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts"
   );
 }

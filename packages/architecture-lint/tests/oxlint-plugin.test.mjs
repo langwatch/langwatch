@@ -28,6 +28,10 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
     {
+      filename: "platform/app/src/tasks/migrate-agent.ts",
+      code: 'import { AgentMigration } from "@langwatch/agent-server"; export { AgentMigration };',
+    },
+    {
       filename: "apps/worker/src/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },

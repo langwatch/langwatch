@@ -5,28 +5,17 @@
  * AC37 (issue #4133) — "The dataset-content backfill task migrates a
  * postgres-layout dataset onto azure".
  *
- * Exercises the REAL production wiring end-to-end: `migrateDatasetToS3` with
- * `resolveStorage: resolveProjectStorageDestination` and
- * `getStorage: the injected storage resolver` (the real dispatcher, unmocked) — only the
- * env boundary is stubbed (STORED_OBJECTS_BACKEND=azure + AZURE_BLOB_* aimed
+ * Exercises the real production adapter and storage resolver end-to-end. Only
+ * the env boundary is stubbed (STORED_OBJECTS_BACKEND=azure + AZURE_BLOB_* aimed
  * at a real Azurite testcontainer) and the BYOC lookup (no per-project bucket
  * for this test project). Everything from "env says azure" through
  * "AzureDatasetStorage writes chunk objects to Azurite" is real.
  *
  * Uses a real Postgres (via `~/server/db`, same as
  * `dataset.repository.integration.test.ts`) for the Dataset/DatasetRecord
- * rows and the per-dataset advisory lock `migrateDatasetToS3` takes.
+ * rows and the per-dataset advisory lock the adapter takes.
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockEnv } = vi.hoisted(() => ({
   mockEnv: {} as Record<string, string | undefined>,
@@ -40,7 +29,6 @@ import { nanoid } from "nanoid";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { DatasetMigrationService } from "@langwatch/dataset-server";
 import { AppDatasetStorageResolver } from "../../runtime/app/features/dataset-storage";
 import {
   ensureAzuriteContainer,
@@ -48,8 +36,7 @@ import {
   startAzurite,
   stopAzurite,
 } from "../../server/stored-objects/__tests__/azurite-test-support";
-import { resolveProjectStorageDestination } from "../../server/stored-objects/project-storage-destination";
-import { type BackfillDeps, migrateDatasetToS3 } from "../backfillDatasetContentToS3";
+import { migrateDatasetContentToObjectStorage } from "../backfillDatasetContentToS3";
 
 const datasetStorageResolver = new AppDatasetStorageResolver();
 
@@ -103,7 +90,7 @@ afterEach(async () => {
   await prisma.organization.delete({ where: { id: organization.id } });
 });
 
-describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
+describe("PostgresDatasetMigrationAdapter with Azure Blob storage", () => {
   describe("given a dataset whose content still lives in the postgres layout", () => {
     /** @scenario "The dataset-content backfill task migrates a postgres-layout dataset onto azure" */
     it("writes chunked JSONL to Azure Blob and flips contentLayout to chunked", async () => {
@@ -133,16 +120,10 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
         });
       }
 
-      const migration = DatasetMigrationService.create(prisma);
-      const deps: BackfillDeps = {
-        prisma,
-        recordRepository: migration,
-        migration,
-        resolveStorage: resolveProjectStorageDestination,
-        getStorage: datasetStorageResolver.forProject.bind(datasetStorageResolver),
-      };
-
-      const outcome = await migrateDatasetToS3({ dataset, projectId: project.id }, deps);
+      const outcome = await migrateDatasetContentToObjectStorage({
+        datasetId: dataset.id,
+        projectId: project.id,
+      });
 
       expect(outcome).toBe("migrated");
 
@@ -152,6 +133,11 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
       expect(updated.contentLayout).toBe("s3_jsonl");
       expect(updated.rowCount).toBe(3);
       expect(updated.chunkCount).toBeGreaterThan(0);
+      await expect(
+        prisma.datasetRecord.count({
+          where: { datasetId: dataset.id, projectId: project.id },
+        }),
+      ).resolves.toBe(3);
 
       // Reading back through the injected storage resolver proves
       // the migrated content is actually retrievable via the production read
