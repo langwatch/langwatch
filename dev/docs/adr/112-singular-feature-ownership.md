@@ -94,6 +94,8 @@ The initial core catalogue contains the following independently owned domains:
 | `gateway`        | AI gateway policy, virtual keys, budgets, cache rules, and guardrails                   |
 | `github`         | GitHub installations, webhooks, repositories, and pull-request linkage                  |
 | `langy`          | Langy conversations, signals, and jobs                                                  |
+| `log`            | log intake, canonicalisation, processing, storage, and trace contributions              |
+| `metric`         | metric intake, canonicalisation, processing, series, rollups, and trace correlations    |
 | `model-provider` | provider credentials, models, model metadata, and model costs                           |
 | `monitor`        | online monitor definitions and lifecycle                                                |
 | `notification`   | user-facing notification delivery and preferences                                       |
@@ -108,7 +110,7 @@ The initial core catalogue contains the following independently owned domains:
 | `simulation`     | simulation execution and batches                                                        |
 | `stored-object`  | durable object metadata, upload, delivery, and migration                                |
 | `suite`          | suite definitions, run plans, and suite run history                                     |
-| `telemetry`      | standards-compliant telemetry ingestion and collection                                  |
+| `telemetry`      | LangWatch product-usage reporting and diagnostics sent back to LangWatch                |
 | `topic`          | topic models, clustering runs, and clustering status                                    |
 | `trace`          | traces, spans, sharing, overlays, and trace querying                                    |
 | `user`           | user lifecycle, profile, preferences, deactivation, and avatar                          |
@@ -231,7 +233,7 @@ The application inventory is migrated in dependency order:
 5. extract independently owned product resources beginning with
    `model-provider`, `prompt`, and `dataset`, followed by the remaining
    catalogue in dependency order;
-6. extract the observability spine from Telemetry through Trace, then its
+6. extract the observability spine through Trace, Log, and Metric, then its
    Annotation, Data Retention, Data Privacy, Analytics, Dashboard, and Topic
    consumers;
 7. extract platform products including Gateway, GitHub, Coding Agent, Langy,
