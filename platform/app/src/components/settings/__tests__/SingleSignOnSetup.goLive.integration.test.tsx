@@ -229,7 +229,9 @@ describe("given an administrator whose identity provider is registered", () => {
 
   /** @scenario "The journey asks who the connection lets in" */
   it("offers the three answers at the step after the way back in", () => {
-    setupRef.current = setupWith({ goLive: { ...NOTHING_DONE, domainProved: true } });
+    setupRef.current = setupWith({
+      goLive: { ...NOTHING_DONE, domainProved: true },
+    });
 
     draw();
 
@@ -246,7 +248,9 @@ describe("given an administrator whose identity provider is registered", () => {
 
   /** @scenario "The journey asks who the connection lets in" */
   it("says the widest answer rests on the domain proof rather than on a count of who receives mail", () => {
-    setupRef.current = setupWith({ goLive: { ...NOTHING_DONE, domainProved: true } });
+    setupRef.current = setupWith({
+      goLive: { ...NOTHING_DONE, domainProved: true },
+    });
 
     draw();
 

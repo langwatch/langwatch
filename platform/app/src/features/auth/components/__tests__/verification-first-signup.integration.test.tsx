@@ -388,10 +388,10 @@ describe("given the sign-up screen", () => {
         outcome: "redirect_to_connection",
         connectionId: "conn_acme",
         methodSet: [
-          { id: "okta", kind: "oidc", connectionId: "conn_acme" },
+          { id: "okta", kind: "federated", connectionId: "conn_acme" },
         ],
         reasonCode: "domain_routed",
-      } as RoutingDecision);
+      } satisfies RoutingDecision);
 
       const { container } = renderScreen();
 

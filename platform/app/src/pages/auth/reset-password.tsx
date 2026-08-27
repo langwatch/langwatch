@@ -183,7 +183,7 @@ function ResetPasswordForm({ token }: { token: string }) {
    * dead link is somebody who waited too long, and anything else is a
    * password this screen would not take.
    */
-  const announceRefusal = (error: unknown) => {
+  const announceRefusal = (error: Parameters<typeof readResetRefusal>[0]) => {
     const refused = readResetRefusal(error);
     setRefusal(refused);
     report.refused(

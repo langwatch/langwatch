@@ -562,9 +562,7 @@ describe("given a connection the directory has been pushing to", () => {
       // Requests age out of a retention window, so the words are about what
       // this holds rather than about what the provider has ever sent. Only
       // one of those two is ours to assert.
-      expect(
-        within(requests).getByText(/No requests recorded/i),
-      ).toBeTruthy();
+      expect(within(requests).getByText(/No requests recorded/i)).toBeTruthy();
       expect(within(requests).getByText(/thirty days/i)).toBeTruthy();
     });
   });

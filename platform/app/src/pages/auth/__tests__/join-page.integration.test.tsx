@@ -210,7 +210,9 @@ describe("given a lookup that could not be made", () => {
       // of their own while their colleagues were already here.
       expect(screen.getByTestId("lookup-refusal")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /Create a new organization instead/ }),
+        screen.getByRole("button", {
+          name: /Create a new organization instead/,
+        }),
       ).toBeInTheDocument();
       expect(hardRedirectMock).not.toHaveBeenCalled();
     });
