@@ -593,9 +593,9 @@ const LEGACY_INERT: string[] = [
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
   "specs/suites/voice-agents-callout.feature",
-  "specs/topic-clustering/event-sourced-scheduling.feature",
-  "specs/topic-clustering/run-history.feature",
-  "specs/topic-clustering/topics-source-of-truth.feature",
+  "packages/features/topic/specs/event-sourced-scheduling.feature",
+  "packages/features/topic/specs/run-history.feature",
+  "packages/features/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",
@@ -840,8 +840,7 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
 // Non-backtracking: find `@scenario <title>` tokens, then verify proximity
 // to an `it(` / `test(` call with a linear forward scan (see
 // `isFollowedByTestCall`). Doing it all in the regex invites ReDoS.
-const ANNOTATION_RE =
-  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+const ANNOTATION_RE = /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -913,8 +912,7 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 // CRLF tolerance: `\r` is included in the trailing-whitespace class so files
 // committed with Windows line endings still match. The capture groups also
 // exclude `\r` so the title doesn't pick up a trailing CR.
-const BATS_ANNOTATION_RE =
-  /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
+const BATS_ANNOTATION_RE = /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
 
 function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
   for (let i = startLineIdx; i < lines.length; i++) {
@@ -977,8 +975,7 @@ const GO_TEST_FUNC_RE =
 const GO_SUBTEST_HEAD_RE = /^[A-Za-z_][A-Za-z0-9_]*\.Run\(/;
 
 /** What makes a `.Run(...)` call a SUBTEST: the `func(t *testing.T) {` closure. */
-const GO_SUBTEST_CLOSURE_RE =
-  /^func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
+const GO_SUBTEST_CLOSURE_RE = /^func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
 
 /**
  * Longest prefix of a `.Run(` call the scan will read before giving up. The
@@ -1242,9 +1239,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       if (!title) continue;
       // Use the same proximity check as the block form. Walk from the
       // start of the next line.
-      const lineStartOffset = lines
-        .slice(0, i + 1)
-        .reduce((acc, l) => acc + l.length + 1, 0);
+      const lineStartOffset = lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
       if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
       bindings.push({
         title,
@@ -1322,10 +1317,7 @@ function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   return byTitle;
 }
 
-function buildReport(
-  featureRelPath: string,
-  bindingsByTitle: Map<string, BindingRef[]>,
-): Report {
+function buildReport(featureRelPath: string, bindingsByTitle: Map<string, BindingRef[]>): Report {
   const absFeature = resolve(REPO_ROOT, featureRelPath);
   const allScenarios = parseFeature(absFeature);
   const scenarios = allScenarios.filter(
@@ -1344,8 +1336,7 @@ function buildReport(
     scenarios: annotated,
     unbound,
     totalScenarios: allScenarios.length,
-    unimplementedScenarios: allScenarios.filter((s) => s.tags.includes(UNIMPLEMENTED_TAG))
-      .length,
+    unimplementedScenarios: allScenarios.filter((s) => s.tags.includes(UNIMPLEMENTED_TAG)).length,
   };
 }
 
@@ -1497,13 +1488,9 @@ function validateExemptionList({
     if (!allFeatures.includes(entry)) {
       const abs = resolve(REPO_ROOT, entry);
       if (!existsSync(abs)) {
-        errors.push(
-          `${name} entry does not resolve to an existing .feature file: ${entry}`,
-        );
+        errors.push(`${name} entry does not resolve to an existing .feature file: ${entry}`);
       } else {
-        errors.push(
-          `${name} entry is not discovered under the configured spec roots: ${entry}`,
-        );
+        errors.push(`${name} entry is not discovered under the configured spec roots: ${entry}`);
       }
     }
   }
@@ -1596,9 +1583,7 @@ function analyzeParity(): ParityAnalysis {
     staleLegacy: legacy.filter((r) => r.unbound === 0),
     // Ratchet hygiene: an entry that is no longer inert has been fixed, and
     // must leave the list so it can never silently regress.
-    staleInert: LEGACY_INERT.filter(
-      (f) => allFeatures.includes(f) && !inertFeatures.has(f),
-    ),
+    staleInert: LEGACY_INERT.filter((f) => allFeatures.includes(f) && !inertFeatures.has(f)),
     unknownAnnotations,
     listErrors,
   };
