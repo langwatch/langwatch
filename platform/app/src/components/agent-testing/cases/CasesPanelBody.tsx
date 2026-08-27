@@ -6,10 +6,12 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
+  ConnectAgentEmptyState,
   ExternalSetEmptyState,
   FirstCaseEmptyState,
+  FirstSuiteEmptyState,
   NoCasesHereEmptyState,
 } from "./CasesEmptyStates";
 import type { CasesPanelProps } from "./CasesPanel";
@@ -25,19 +27,14 @@ import type { TestCase } from "./test-cases";
 export type CasesPanelBodyProps = CasesPanelProps & {
   /** True for a set that runs from code, which the platform cannot write. */
   isExternal: boolean;
-  caseCount: number;
 };
 
-function selectableCases(props: CasesPanelBodyProps): TestCase[] {
-  return props.looseCases;
-}
-
 function useCaseSelection({
-  flatCases,
-  props,
+  cases,
+  onMoveToSuite,
 }: {
-  flatCases: TestCase[];
-  props: CasesPanelBodyProps;
+  cases: TestCase[];
+  onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -57,15 +54,15 @@ function useCaseSelection({
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const handleMoveConfirm = useCallback(
-    (targetSuiteId: string | null) => {
+    (targetSuiteId: string) => {
       for (const id of selectedIds) {
-        const testCase = flatCases.find((entry) => entry.id === id);
+        const testCase = cases.find((entry) => entry.id === id);
         if (!testCase) continue;
-        props.onMoveToSuite(testCase, targetSuiteId);
+        onMoveToSuite(testCase, targetSuiteId);
       }
       clearSelection();
     },
-    [selectedIds, flatCases, props, clearSelection],
+    [selectedIds, cases, onMoveToSuite, clearSelection],
   );
 
   return {
@@ -78,8 +75,28 @@ function useCaseSelection({
   };
 }
 
+/**
+ * Day zero, in the order a person can act on it: an agent to test comes
+ * before a suite to file scenarios into, and a suite comes before a scenario.
+ */
+function DayZeroEmptyState(props: CasesPanelBodyProps) {
+  if (!props.hasAgent) {
+    return (
+      <ConnectAgentEmptyState
+        canManage={props.canManage}
+        onConnectAgent={props.onConnectAgent}
+      />
+    );
+  }
+  return (
+    <FirstSuiteEmptyState
+      canManage={props.canManage}
+      onNewSuite={props.onNewSuite}
+    />
+  );
+}
+
 export function CasesPanelBody(props: CasesPanelBodyProps) {
-  const flatCases = useMemo(() => selectableCases(props), [props]);
   const {
     selectedIds,
     isSelectionMode,
@@ -87,7 +104,10 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     startMoveToSuite,
     clearSelection,
     handleMoveConfirm,
-  } = useCaseSelection({ flatCases, props });
+  } = useCaseSelection({
+    cases: props.cases,
+    onMoveToSuite: props.onMoveToSuite,
+  });
   const hasLastRunByCase = useCallback(
     (scenarioId: string) => props.lastResults.has(scenarioId),
     [props.lastResults],
@@ -105,7 +125,9 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     );
   }
 
-  if (props.caseCount === 0 && props.folderGroups.length === 0) {
+  if (!props.hasSuite) return <DayZeroEmptyState {...props} />;
+
+  if (props.cases.length === 0) {
     return props.projectHasNoCases ? (
       <FirstCaseEmptyState
         canManage={props.canManage}
@@ -119,10 +141,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
   return (
     <>
       <CasesTable
-        folderGroups={props.folderGroups}
-        looseCases={props.looseCases}
-        isAllView={props.selection.kind === "all"}
-        suites={props.suites}
+        cases={props.cases}
         canManage={props.canManage}
         runningCaseId={props.runningCaseId}
         isSelectionMode={isSelectionMode}
@@ -130,7 +149,6 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         hasLastRunByCase={hasLastRunByCase}
         onToggleSelected={toggleSelected}
         onStartMoveToSuite={startMoveToSuite}
-        onSelectSuite={props.onSelectSuite}
         onRowClick={props.onRowClick}
         onRunCase={props.onRunCase}
         onEdit={props.onEdit}
@@ -139,12 +157,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onOpenLastRun={props.onOpenLastRun}
         onArchive={props.onArchive}
       />
-      <LastRunLine
-        selection={props.selection}
-        folderGroups={props.folderGroups}
-        looseCases={props.looseCases}
-        lastResults={props.lastResults}
-      />
+      <LastRunLine cases={props.cases} lastResults={props.lastResults} />
       <MoveToSuiteSelectionBar
         selectedCount={selectedIds.size}
         suites={props.suites}

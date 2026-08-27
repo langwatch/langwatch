@@ -106,6 +106,13 @@ Feature: The Agent Testing page
     And opening that address again restores the same view
 
   @integration
+  Scenario: An address naming a suite that does not exist degrades to the first one
+    Given a project with test suites
+    When an address naming a suite that was archived is opened
+    Then the first suite of the rail is opened instead
+    And the page does not render broken
+
+  @integration
   Scenario: Choosing a suite in the rail does not reload the page
     Given a run is streaming into the page
     When another test suite is chosen in the rail

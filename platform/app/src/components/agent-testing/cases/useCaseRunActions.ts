@@ -75,7 +75,7 @@ export function useRunStartedHandler({
 }
 
 export type CaseRunActions = {
-  /** The set or case the run dialog is open on, if any. */
+  /** The suite or case the run dialog is open on, if any. */
   runSubject: RunDialogSubject | null;
   closeRunDialog: () => void;
   /** The case whose one-off run is starting, so its row can say so. */
@@ -83,7 +83,8 @@ export type CaseRunActions = {
   clearRunningCase: () => void;
   onRunStarted: (info: RunStartedInfo) => void;
   runCase: (testCase: TestCase) => void;
-  runSelectedSet: () => void;
+  /** Runs the suite that is open. */
+  runSelectedSuite: () => void;
   runSuiteById: (suiteId: string) => void;
 };
 
@@ -91,18 +92,15 @@ export function useCaseRunActions({
   projectId,
   cases,
   suites,
-  selection,
   selectedSuite,
 }: {
   projectId: string;
   cases: TestCase[];
   suites: TestSuiteEntry[];
-  selection: AgentTestingSelection;
   selectedSuite: TestSuiteEntry | null;
 }): CaseRunActions {
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
   const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
-  const lastRunTarget = useAgentTestingStore((state) => state.lastRunTarget);
   const onRunStarted = useRunStartedHandler({ projectId, setRunningCaseId });
 
   const runCase = useCallback(
@@ -120,13 +118,10 @@ export function useCaseRunActions({
     [projectId],
   );
 
-  const runSelectedSet = useCallback(() => {
-    if (selection.kind === "suite" && selectedSuite) {
-      setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
-      return;
-    }
-    setRunSubject({ kind: "all", initialTarget: lastRunTarget });
-  }, [selection, selectedSuite, cases, lastRunTarget]);
+  const runSelectedSuite = useCallback(() => {
+    if (!selectedSuite) return;
+    setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
+  }, [selectedSuite, cases]);
 
   const runSuiteById = useCallback(
     (suiteId: string) => {
@@ -143,7 +138,7 @@ export function useCaseRunActions({
     clearRunningCase: () => setRunningCaseId(null),
     onRunStarted,
     runCase,
-    runSelectedSet,
+    runSelectedSuite,
     runSuiteById,
   };
 }

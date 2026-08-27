@@ -1,6 +1,6 @@
 /**
- * The rail on the left of the Scenarios tab: All scenarios, the test suites
- * of the project, and the sets that run from code.
+ * The rail on the left of the Scenarios tab: the test suites of the project,
+ * then the sets that run from code.
  *
  * The rail is a view over what it is given. Every action it offers is a
  * callback, so the reading of the address and the writing of the data both
@@ -20,7 +20,6 @@ import type {
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { VoiceAgentsCallout } from "~/components/suites/VoiceAgentsCallout";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
-import { NewSuiteDialog } from "./NewSuiteDialog";
 import { SuiteRailFooter } from "./SuiteRailFooter";
 import { SuiteRailSections } from "./SuiteRailSections";
 import type { ExternalSetEntry, TestSuiteEntry } from "./test-cases";
@@ -34,7 +33,14 @@ export const SUITE_ARCHIVE_DESCRIPTION =
   "The scenarios in it are archived as well. Test runs are preserved.";
 
 export type SuiteRailProps = {
-  selection: AgentTestingSelection;
+  /**
+   * The suite that is open, already resolved. The address may name none, so
+   * the rail marks what the tab actually shows rather than what was asked
+   * for.
+   */
+  selectedSuiteId: string | null;
+  /** The set that runs from code that is open, if one is. */
+  selectedExternalSetId: string | null;
   suites: TestSuiteEntry[];
   externalSets: ExternalSetEntry[];
   isLoading?: boolean;
@@ -45,7 +51,8 @@ export type SuiteRailProps = {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelect: (selection: AgentTestingSelection) => void;
-  onCreateSuite: (name: string) => void;
+  /** Asks for the name of a new test suite. */
+  onNewSuite: () => void;
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
   onEditSuite: (suiteId: string) => void;
@@ -60,7 +67,6 @@ export type SuiteRailProps = {
 
 export function SuiteRail(props: SuiteRailProps) {
   const { collapsed, onArchiveSuite, isArchiving = false } = props;
-  const [isNewSuiteOpen, setNewSuiteOpen] = useState(false);
   const [suiteToArchive, setSuiteToArchive] = useState<TestSuiteEntry | null>(
     null,
   );
@@ -80,24 +86,11 @@ export function SuiteRail(props: SuiteRailProps) {
       minWidth={collapsed ? "56px" : `${SUITE_RAIL_WIDTH}px`}
       data-testid="agent-testing-suite-rail"
     >
-      <SuiteRailSections
-        {...props}
-        onNewSuite={() => setNewSuiteOpen(true)}
-        onRequestArchive={setSuiteToArchive}
-      />
+      <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
 
       {!collapsed && <VoiceAgentsCallout />}
 
       <SuiteRailFooter {...props} />
-
-      <NewSuiteDialog
-        open={isNewSuiteOpen}
-        onClose={() => setNewSuiteOpen(false)}
-        onCreate={(name) => {
-          props.onCreateSuite(name);
-          setNewSuiteOpen(false);
-        }}
-      />
 
       <SuiteArchiveDialog
         open={!!suiteToArchive}

@@ -95,6 +95,7 @@ vi.mock("~/utils/api", () => ({
         rename: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
+      getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),

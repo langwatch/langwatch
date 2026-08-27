@@ -1,19 +1,12 @@
 /**
- * The line above the cases table: what is selected, how many cases it holds,
- * the label filter and the entry points that write.
+ * The line above the cases table: the suite that is open, how many cases it
+ * holds, the label filter and the entry points that write.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 
 import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import {
-  ChevronRight,
-  Folder,
-  FolderCode,
-  Pencil,
-  Play,
-  Plus,
-} from "lucide-react";
+import { ChevronRight, Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
@@ -21,9 +14,9 @@ import type { CasesPanelProps } from "./CasesPanel";
 
 export type CasesPanelHeaderProps = Pick<
   CasesPanelProps,
-  | "selection"
   | "title"
   | "canManage"
+  | "hasSuite"
   | "allLabels"
   | "activeLabels"
   | "onToggleLabel"
@@ -39,14 +32,17 @@ export type CasesPanelHeaderProps = Pick<
 };
 
 export function CasesPanelHeader(props: CasesPanelHeaderProps) {
-  const isSuite = props.selection.kind === "suite";
+  // Day zero has no suite to name, so the header stays out of the way and the
+  // body asks the one question there is to ask.
+  if (!props.isExternal && !props.hasSuite) return null;
 
   return (
     <HStack gap={2} minHeight="32px" flexWrap="wrap">
-      {props.isExternal && (
-        <Icon as={FolderCode} boxSize="15px" color={FG_MUTED} />
-      )}
-      {isSuite && <Icon as={Folder} boxSize="15px" color={FG_MUTED} />}
+      <Icon
+        as={props.isExternal ? FolderCode : Folder}
+        boxSize="15px"
+        color={FG_MUTED}
+      />
       <Text fontSize="14px" fontWeight="semibold" color="fg">
         {props.title}
       </Text>
@@ -70,22 +66,14 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
           View results
         </SmallButton>
       ) : (
-        props.canManage && (
-          <CasesPanelActions
-            {...props}
-            allLabels={props.allLabels}
-            activeLabels={props.activeLabels}
-            onToggleLabel={props.onToggleLabel}
-          />
-        )
+        props.canManage && <CasesPanelActions {...props} />
       )}
     </HStack>
   );
 }
 
-/** The write entry points, offered only on a set the platform owns. */
+/** The write entry points, offered only on a suite the platform owns. */
 function CasesPanelActions({
-  selection,
   isRunningSet,
   onRunSet,
   onNewTestCase,
@@ -95,7 +83,6 @@ function CasesPanelActions({
   onToggleLabel,
 }: Pick<
   CasesPanelHeaderProps,
-  | "selection"
   | "isRunningSet"
   | "onRunSet"
   | "onNewTestCase"
@@ -104,21 +91,17 @@ function CasesPanelActions({
   | "activeLabels"
   | "onToggleLabel"
 >) {
-  const isSuite = selection.kind === "suite";
-
   return (
     <>
-      {isSuite && (
-        <SmallButton
-          variant="ghost"
-          background="transparent"
-          borderColor="transparent"
-          onClick={onEditSuite}
-        >
-          <Pencil size={13} />
-          Edit suite
-        </SmallButton>
-      )}
+      <SmallButton
+        variant="ghost"
+        background="transparent"
+        borderColor="transparent"
+        onClick={onEditSuite}
+      >
+        <Pencil size={13} />
+        Edit suite
+      </SmallButton>
       {allLabels.length > 0 && (
         <LabelFilterDropdown
           allLabels={allLabels}
@@ -132,7 +115,7 @@ function CasesPanelActions({
       </SmallButton>
       <SmallButton loading={isRunningSet} onClick={onRunSet}>
         <Play size={13} />
-        {isSuite ? "Run suite" : "Run all"}
+        Run suite
       </SmallButton>
     </>
   );

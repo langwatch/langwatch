@@ -29,6 +29,7 @@ function useCasesInvalidate(projectId: string): () => void {
 export type SuiteMutations = {
   isArchiving: boolean;
   createSuite: (name: string) => void;
+  renameSuite: (input: { suiteId: string; name: string }) => void;
   archiveSuite: (suiteId: string) => void;
 };
 
@@ -52,10 +53,26 @@ export function useSuiteMutations({
     onError: toastOnError("Couldn't create the test suite"),
   });
 
+  const rename = api.suites.folders.rename.useMutation({
+    onSuccess: (folder) => {
+      invalidate();
+      // A rename moves the slug, so the address of the open suite moves with
+      // it. Without this the page would hold a slug nothing answers to.
+      if (folder.id === selectedSuiteId) {
+        selectSuite({ kind: "suite", slug: folder.slug });
+      }
+    },
+    onError: toastOnError("Couldn't rename the test suite"),
+  });
+
   const archive = api.suites.folders.archive.useMutation({
     onSuccess: (_result, variables) => {
       invalidate();
-      if (variables.folderId === selectedSuiteId) selectSuite({ kind: "all" });
+      // The suite the address named is gone, so the tab falls back to the
+      // first suite that is left.
+      if (variables.folderId === selectedSuiteId) {
+        selectSuite({ kind: "suite", slug: null });
+      }
     },
     onError: toastOnError("Couldn't archive the test suite"),
   });
@@ -63,6 +80,8 @@ export function useSuiteMutations({
   return {
     isArchiving: archive.isPending,
     createSuite: (name) => create.mutate({ projectId, name }),
+    renameSuite: ({ suiteId, name }) =>
+      rename.mutate({ projectId, folderId: suiteId, name }),
     archiveSuite: (suiteId) => archive.mutate({ projectId, folderId: suiteId }),
   };
 }
@@ -74,7 +93,7 @@ export type CaseMutations = {
   isArchiving: boolean;
   archiveCase: () => void;
   duplicateCase: (testCase: TestCase) => void;
-  moveCaseToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  moveCaseToSuite: (testCase: TestCase, suiteId: string) => void;
 };
 
 export function useCaseMutations(projectId: string): CaseMutations {

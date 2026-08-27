@@ -25,6 +25,8 @@ type SuiteSummaries = RouterOutputs["suites"]["getSummaries"];
 export type TestCasesData = {
   suites: TestSuiteEntry[];
   cases: TestCase[];
+  /** False while the project has nothing to test, which day zero asks for. */
+  hasAgent: boolean;
   externalSets: ExternalSetEntry[];
   lastResults: Map<string, CaseLastResult>;
   isLastResultsLoading: boolean;
@@ -61,14 +63,21 @@ function useTestCasesQueries(period: Period) {
     enabled: !!project,
   });
 
+  const { data: agents, isLoading: isAgentsLoading } =
+    api.agents.getAll.useQuery({ projectId }, { enabled: !!project });
+
   return {
     folders,
     scenarios,
+    agents,
     externalSetSummaries,
     lastResultRows,
     suiteSummaries,
     isLastResultsLoading,
-    isLoading: isFoldersLoading || isScenariosLoading,
+    // The agent list gates the day-zero question, so a page that has not read
+    // it yet holds the skeleton rather than asking to connect an agent that
+    // is already there.
+    isLoading: isFoldersLoading || isScenariosLoading || isAgentsLoading,
   };
 }
 
@@ -164,6 +173,7 @@ export function useTestCasesData({
   return {
     cases,
     suites,
+    hasAgent: (queries.agents ?? []).length > 0,
     externalSets,
     lastResults,
     isLastResultsLoading: queries.isLastResultsLoading,

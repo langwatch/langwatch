@@ -6,22 +6,17 @@
 import { Box, chakra, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import { useEffect, useState } from "react";
-import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { Dialog } from "~/components/ui/dialog";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { TestSuiteEntry } from "./test-cases";
 
-// Distinct from any real suite id: `null` is the wire value for the unfile
-// target, and a `Select` cannot carry `null` as an option value.
-const UNFILED_VALUE = "__unfiled__";
-
 export type MoveToSuiteSelectionBarProps = {
   selectedCount: number;
   suites: TestSuiteEntry[];
   onClear: () => void;
-  onConfirm: (targetSuiteId: string | null) => void;
+  onConfirm: (targetSuiteId: string) => void;
 };
 
 export function MoveToSuiteSelectionBar({
@@ -78,13 +73,14 @@ function MoveToSuiteDialog({
   selectedCount: number;
   suites: TestSuiteEntry[];
   onCancel: () => void;
-  onConfirm: (targetSuiteId: string | null) => void;
+  onConfirm: (targetSuiteId: string) => void;
 }) {
-  const [value, setValue] = useState<string>(UNFILED_VALUE);
+  const firstSuiteId = suites[0]?.id ?? "";
+  const [value, setValue] = useState<string>(firstSuiteId);
 
   useEffect(() => {
-    if (open) setValue(UNFILED_VALUE);
-  }, [open]);
+    if (open) setValue(firstSuiteId);
+  }, [open, firstSuiteId]);
 
   return (
     <Dialog.Root
@@ -124,7 +120,6 @@ function MoveToSuiteDialog({
                 onChange={(event) => setValue(event.target.value)}
                 data-testid="cases-move-to-suite-select"
               >
-                <option value={UNFILED_VALUE}>{UNFILED_OPTION_LABEL}</option>
                 {suites.map((suite) => (
                   <option key={suite.id} value={suite.id}>
                     {suite.name}
@@ -163,7 +158,8 @@ function MoveToSuiteDialog({
             colorPalette="blue"
             background={undefined}
             borderColor="transparent"
-            onClick={() => onConfirm(value === UNFILED_VALUE ? null : value)}
+            disabled={!value}
+            onClick={() => onConfirm(value)}
             data-testid="cases-move-to-suite-confirm"
           >
             Move

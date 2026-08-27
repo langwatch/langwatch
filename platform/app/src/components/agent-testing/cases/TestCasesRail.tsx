@@ -4,19 +4,18 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { useDrawer } from "~/hooks/useDrawer";
-import { SUITE_EDITOR_DRAWER } from "./AgentTestingSuiteEditorDrawer";
 import { SuiteRail } from "./SuiteRail";
 import type { TestCasesTabModel } from "./useTestCasesTab";
 
 export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
-  const { base, data, suiteMutations, run } = model;
+  const { base, data, view, suiteMutations, suiteDialog, run } = model;
   const { periodPicker } = base;
-  const { openDrawer } = useDrawer();
+  const isExternal = base.selection.kind === "external";
 
   return (
     <SuiteRail
-      selection={base.selection}
+      selectedSuiteId={isExternal ? null : (view.selectedSuite?.id ?? null)}
+      selectedExternalSetId={isExternal ? view.externalSetId : null}
       suites={data.suites}
       externalSets={data.externalSets}
       isLoading={data.isLoading}
@@ -25,10 +24,10 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       collapsed={base.isRailCollapsed}
       onToggleCollapsed={base.toggleRail}
       onSelect={base.selectSuite}
-      onCreateSuite={suiteMutations.createSuite}
+      onNewSuite={suiteDialog.openNew}
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
-      onEditSuite={(suiteId) => openDrawer(SUITE_EDITOR_DRAWER, { suiteId })}
+      onEditSuite={suiteDialog.openEdit}
       onOpenLastRun={(suite) => base.selectPlan(suite.slug)}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}

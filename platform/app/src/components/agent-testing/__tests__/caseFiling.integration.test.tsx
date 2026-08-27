@@ -83,6 +83,7 @@ vi.mock("~/utils/api", () => ({
         rename: { useMutation: mutation(vi.fn()) },
         archive: { useMutation: mutation(vi.fn()) },
       },
+      getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: { useMutation: mutation(vi.fn()) },
       run: { useMutation: mutation(vi.fn()) },

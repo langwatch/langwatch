@@ -1,6 +1,6 @@
 /**
- * The table of scenarios: the name and the labels, with a Run button, an
- * Edit button and a row menu at the end of every row.
+ * The table of scenarios of the open suite: the name and the labels, with a
+ * Run button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
  * without a vertical rule between them, so a long list of cases reads as a
@@ -10,9 +10,9 @@
  * the Results tab. A person who wants the last run of a row reaches it from
  * the row menu.
  *
- * The All scenarios surface reads like a code host root: the test suites sit
- * on top as folder rows, and the cases filed in no test suite sit below as
- * loose rows. A folder row opens its own surface; it does not expand in place.
+ * A row carries no Edit button. Clicking the row opens the editor and Edit
+ * stays in the row menu, so the editor is reachable two ways without a third
+ * control on every line.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -24,21 +24,18 @@ import {
   Checkbox,
   chakra,
   HStack,
-  Icon,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { format } from "date-fns";
-import { FileCheckCorner, MoreVertical, Pencil } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
-import { FolderHeaderRow } from "../shared/FolderHeaderRow";
-import { SmallButton } from "../shared/SmallButton";
 import { RunCaseButton } from "./RunCaseButton";
-import type { CaseGroup, TestCase, TestSuiteEntry } from "./test-cases";
+import type { TestCase } from "./test-cases";
 
 /** The last result of a case, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
@@ -54,17 +51,8 @@ const CHECKBOX_COLUMN = "24px";
 const EXTERNAL_COLUMNS = "minmax(0,1fr) 110px";
 
 export type CasesTableProps = {
-  /** The real test suites, drawn as folder rows on the All scenarios surface. */
-  folderGroups: CaseGroup[];
-  /**
-   * The cases that sit at the root of the surface: on All scenarios the ones
-   * filed in no test suite, on a suite surface every case of that suite.
-   */
-  looseCases: TestCase[];
-  /** True on the All scenarios surface, where folder rows are drawn. */
-  isAllView: boolean;
-  /** The test suites a case can be moved into. */
-  suites: TestSuiteEntry[];
+  /** The scenarios of the open suite, in order. */
+  cases: TestCase[];
   canManage: boolean;
   runningCaseId?: string | null;
   /** True when the table shows checkboxes for a bulk move-to-suite. */
@@ -74,7 +62,6 @@ export type CasesTableProps = {
   onToggleSelected: (scenarioId: string) => void;
   /** Enters selection mode with this row pre-checked. */
   onStartMoveToSuite: (scenarioId: string) => void;
-  onSelectSuite: (suiteId: string) => void;
   onRowClick: (testCase: TestCase) => void;
   /** Opens the run dialog for the case. */
   onRunCase: (testCase: TestCase) => void;
@@ -133,10 +120,7 @@ function TableHeaderRow({
 }
 
 export function CasesTable({
-  folderGroups,
-  looseCases,
-  isAllView: _isAllView,
-  suites: _suites,
+  cases,
   canManage,
   runningCaseId,
   isSelectionMode,
@@ -144,7 +128,6 @@ export function CasesTable({
   hasLastRunByCase,
   onToggleSelected,
   onStartMoveToSuite,
-  onSelectSuite,
   onRowClick,
   onRunCase,
   onEdit,
@@ -165,16 +148,6 @@ export function CasesTable({
         <Text as="span" />
       </TableHeaderRow>
 
-      {folderGroups.map((group, index) => (
-        <FolderHeaderRow
-          key={group.id}
-          name={group.name}
-          caseCount={group.cases.length}
-          templateColumns={templateColumns}
-          separated={index > 0}
-          onClick={() => onSelectSuite(group.id)}
-        />
-      ))}
       <Box
         css={{
           "& > * + *": {
@@ -183,7 +156,7 @@ export function CasesTable({
           },
         }}
       >
-        {looseCases.map((testCase) => (
+        {cases.map((testCase) => (
           <CaseRow
             key={testCase.id}
             testCase={testCase}
@@ -279,12 +252,6 @@ function CaseRow({
         </Box>
       )}
       <HStack gap={1.5} minWidth={0} flexWrap="wrap">
-        <Icon
-          as={FileCheckCorner}
-          boxSize="12px"
-          color={FG_MUTED}
-          flexShrink={0}
-        />
         <chakra.button
           type="button"
           minWidth={0}
@@ -356,18 +323,6 @@ function CaseRowActions({
           isRunning={isRunning}
           onOpen={() => onRunCase(testCase)}
         />
-      )}
-      {canManage && (
-        <SmallButton
-          aria-label={`Edit ${testCase.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onEdit(testCase);
-          }}
-        >
-          <Pencil size={13} />
-          Edit
-        </SmallButton>
       )}
       <CaseRowActionsMenu
         testCase={testCase}

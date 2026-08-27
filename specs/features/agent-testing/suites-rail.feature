@@ -4,9 +4,18 @@ Feature: The test suites rail
   So that I can move between them without losing my place
 
   Background: what the rail holds.
-    The rail is glued to the left edge of the page. It holds All scenarios at
-    the top, then the test suites of the project, then the external sets that
-    run from code. The period picker sits at the foot of the rail.
+    The rail is glued to the left edge of the page. It holds the test suites
+    of the project under a heading, then the external sets that run from code
+    under a heading of their own. The period picker sits at the foot of the
+    rail.
+
+    Both headings are plain labels. Neither one is a control: there is no root
+    list of suites to open, so a heading has nowhere to lead.
+
+    Every project carries a Default test suite, created for it and holding
+    every scenario that named no suite before. Default is an ordinary suite:
+    it is listed first, and it can be renamed, archived and run like any
+    other.
 
     An external set is read-only in the platform. It has no Run and no Edit,
     and choosing it opens its results.
@@ -17,13 +26,32 @@ Feature: The test suites rail
   # --- What is listed ---
 
   @integration
-  Scenario: The rail lists All scenarios, then the test suites, then the external sets
+  Scenario: The rail lists the test suites, then the external sets
     Given a project with two test suites and one external set
     When the Agent Testing page is opened
-    Then "All scenarios" is the first entry
-    And the two test suites follow it under a "Test Suites" heading
+    Then the two test suites read first under a "Test Suites" heading
     And the external set follows them under a "From Code" heading
     And no entry carries a count
+
+  @integration
+  Scenario: The rail offers no root list of every scenario
+    Given a project with two test suites
+    When the rail is read
+    Then no entry named "All scenarios" is offered
+    And the test suites heading is a plain label and not a control
+
+  @integration
+  Scenario: The Default suite is listed first
+    Given a project whose suites are Default, Checkout and Refunds
+    When the rail is read
+    Then "Default" is the first test suite listed
+
+  @integration
+  Scenario: The Default suite carries the actions of an ordinary suite
+    Given the Default test suite in the rail
+    When its row menu is opened
+    Then "New scenario", "Run suite", "Edit suite" and "Archive suite" are offered
+    And nothing marks it as unchangeable
 
   @integration
   Scenario: An external set carries the code icon and no counts
@@ -45,6 +73,7 @@ Feature: The test suites rail
     When the test suites heading is read
     Then a control to create a test suite is offered
     And using it adds the new suite to the rail
+    And the new suite is opened
 
   # --- The row menu ---
 
@@ -74,30 +103,57 @@ Feature: The test suites rail
     Then the archive confirmation dialog opens naming the suite
     And confirming removes the suite from the rail
 
-  # --- Suite editor drawer ---
+  @integration
+  Scenario: Archiving the open suite opens the first suite that is left
+    Given the open test suite is archived
+    When the rail is read again
+    Then the first remaining suite is open
+    And no empty view is shown in between
+
+  # --- The suite editor ---
 
   @integration
-  Scenario: Edit suite opens the suite editor drawer with four tabs
+  Scenario: Edit suite opens a small centered dialog holding only a Name field
     Given a test suite in the rail
     When "Edit suite" is chosen from its row menu
-    Then the suite editor drawer opens
-    And it holds four tabs: "General", "Scenarios", "Simulation models", "Execution"
+    Then a small centered dialog opens titled "Edit test suite"
+    And the only field it holds is "Name"
+    And it is sized to what it holds
 
   @integration
-  Scenario: The Scenarios tab lists the cases filed under the suite and offers add and remove controls
-    Given the suite editor drawer is open on a test suite
-    When the "Scenarios" tab is chosen
-    Then every scenario filed under the suite is listed
-    And every row carries a remove control
-    And an "Add scenarios" control is offered
+  Scenario: The suite editor carries no targets, no models, no repeat count and no evaluators
+    Given the suite editor is open on a test suite
+    When it is read
+    Then no agent, no simulation model, no judge, no repeat count and no evaluator is offered
+    And no tab strip is shown, because a suite is only a grouping
 
   @integration
-  Scenario: Add scenarios opens a picker of cases not currently in the suite
-    Given the suite editor drawer is open on a test suite
-    And a scenario not filed under the suite exists
-    When "Add scenarios" is chosen
-    Then a dialog lists the scenarios not currently in the suite
-    And selecting one and confirming files it under the suite
+  Scenario: The suite editor does not manage which scenarios are in the suite
+    Given the suite editor is open on a test suite
+    When it is read
+    Then it lists no scenarios and offers no way to add or remove one
+    And membership stays in the scenarios table, where "Move to suite..." changes it
+
+  @integration
+  Scenario: Saving the suite editor renames the suite
+    Given the suite editor is open on the suite "Refunds"
+    When the name is changed to "Refunds and returns" and saved
+    Then the rail reads the new name
+    And the dialog closes
+
+  @integration
+  Scenario: The suite editor refuses an empty name
+    Given the suite editor is open on a test suite
+    When the name is cleared and saved
+    Then the dialog says a test suite needs a name
+    And nothing is saved
+
+  @integration
+  Scenario: The suite editor offers no destructive action
+    Given the suite editor is open on a test suite
+    When its actions are read
+    Then only "Cancel" and "Save" are offered
+    And archiving stays in the row menu of the rail, where it already was
 
   @integration
   Scenario: A person with read-only access sees no changing actions in the row menu
@@ -121,6 +177,30 @@ Feature: The test suites rail
     When it is chosen
     Then its runs are shown
     And no Edit control is offered for it
+
+  # --- Day zero ---
+
+  @integration
+  Scenario: A brand new project is asked to name its first test suite
+    Given a new project with an agent connected and no test suite at all
+    When the Agent Testing page is opened
+    Then no suite is open and no empty suite view flashes first
+    And the page asks for the name of the first test suite
+    And no suite named "Default" is offered, because Default is only made for older projects
+
+  @integration
+  Scenario: A project with no agent is asked to connect one first
+    Given a new project with no agent connected and no test suite
+    When the Agent Testing page is opened
+    Then the page offers to connect the agent to be tested
+    And it does not ask for a test suite name yet
+
+  @integration
+  Scenario: Naming the first test suite opens it
+    Given a new project being asked for its first test suite name
+    When a name is given and confirmed
+    Then the suite is created and opened
+    And the rail lists it
 
   # --- The period picker ---
 

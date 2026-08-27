@@ -9,4 +9,6 @@
  */
 
 export const CASE_EDITOR_DRAWER = "agentTestingCaseEditor" as const;
-export const SUITE_EDITOR_DRAWER = "agentTestingSuiteEditor" as const;
+
+/** The drawer that connects the agent to be tested, opened on day zero. */
+export const AGENT_TYPE_SELECTOR_DRAWER = "agentTypeSelector" as const;

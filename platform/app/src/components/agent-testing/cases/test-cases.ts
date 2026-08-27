@@ -1,7 +1,7 @@
 /**
- * The scenarios of a project, and the rules that group and filter them.
+ * The scenarios of a project, and the rules that filter and summarise them.
  *
- * Everything here is pure, so the grouping and the aggregates can be read and
+ * Everything here is pure, so the filtering and the aggregates can be read and
  * tested without a router or a query.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -45,23 +45,6 @@ export type ExternalSetEntry = {
   lastRunTimestamp: number | null;
 };
 
-/** One group of rows under one heading. */
-export type CaseGroup = {
-  /** The folder id of the real test suite. */
-  id: string;
-  name: string;
-  cases: TestCase[];
-};
-
-/**
- * The rows of the All scenarios surface: the real test suites as folder rows
- * on top, and the cases filed in no test suite as loose rows at the root.
- */
-export type CasesRoot = {
-  folderGroups: CaseGroup[];
-  looseCases: TestCase[];
-};
-
 /** The cases that carry at least one of the chosen labels. */
 export function filterCasesByLabels(
   cases: TestCase[],
@@ -80,69 +63,6 @@ export function collectLabels(cases: TestCase[]): string[] {
     for (const label of testCase.labels) labels.add(label);
   }
   return Array.from(labels).sort();
-}
-
-/** The cases of each folder, and the ones that name no folder at all. */
-function bucketCasesByFolder(cases: TestCase[]): {
-  byFolder: Map<string, TestCase[]>;
-  unfiled: TestCase[];
-} {
-  const byFolder = new Map<string, TestCase[]>();
-  const unfiled: TestCase[] = [];
-
-  for (const testCase of cases) {
-    if (!testCase.folderId) {
-      unfiled.push(testCase);
-      continue;
-    }
-    const bucket = byFolder.get(testCase.folderId);
-    if (bucket) bucket.push(testCase);
-    else byFolder.set(testCase.folderId, [testCase]);
-  }
-
-  return { byFolder, unfiled };
-}
-
-/**
- * The rows of the All scenarios surface, as a GitHub repo root reads: the
- * real test suites as folder rows on top, and the cases filed in no test
- * suite as loose rows at the root.
- *
- * With `includeEmpty` on, every listed test suite draws its own folder row,
- * even one that holds no case yet, so a person can open the empty suite from
- * the table. With it off, a suite that holds none of the listed cases is
- * left out, so a label filter hides the headings it empties. Cases that name
- * a folder the rail no longer lists read as loose, so nothing drops off the
- * table.
- */
-export function groupCasesByFolder({
-  cases,
-  suites,
-  includeEmpty = false,
-}: {
-  cases: TestCase[];
-  suites: TestSuiteEntry[];
-  includeEmpty?: boolean;
-}): CasesRoot {
-  const { byFolder, unfiled } = bucketCasesByFolder(cases);
-
-  const folderGroups: CaseGroup[] = [];
-  for (const suite of suites) {
-    const held = byFolder.get(suite.id) ?? [];
-    if (held.length === 0 && !includeEmpty) continue;
-    folderGroups.push({ id: suite.id, name: suite.name, cases: held });
-    byFolder.delete(suite.id);
-  }
-
-  // A case can name a folder the rail does not list, for example one that
-  // was archived while the page was open. Those cases read as loose rather
-  // than dropping off the table.
-  const looseCases = [...unfiled];
-  for (const orphans of byFolder.values()) looseCases.push(...orphans);
-
-  folderGroups.sort((a, b) => a.name.localeCompare(b.name));
-
-  return { folderGroups, looseCases };
 }
 
 const PASSED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([

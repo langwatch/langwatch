@@ -1,68 +1,65 @@
 Feature: The scenarios table
   As a person who owns a set of agent scenarios
-  I want one table with my cases grouped by suite
+  I want the scenarios of one test suite in one table
   So that I can author them and reach anything with a click
 
   Background: what a row shows.
     A row shows the name of the scenario and its labels as small pastel
-    pills. A Run button, an Edit button and a row menu sit at the end of the
-    row. The row carries no author, no date and no version. The row carries
-    no last result: the table is authoring only, and the last run of a case
-    is reached from the row menu or on the Results tab.
+    pills. A Run button and a row menu sit at the end of the row. There is no
+    Edit button: clicking the row opens the editor, and Edit stays in the row
+    menu, so the editor is reachable two ways. There is no leading file icon:
+    it told scenarios apart from folders back when both shared one table, and
+    no such table exists now.
 
-    All scenarios reads like a code host root. The test suites sit on top as
-    folder rows in alphabetical order, and the cases filed in no test suite
-    sit below as loose rows at the root. Under a single suite the rows are
-    flat.
+    The row carries no author, no date and no version. The row carries no
+    last result: the table is authoring only, and the last run of a case is
+    reached from the row menu or on the Results tab.
 
-    A summary line under the table says when the whole set last ran and how
-    it did.
+    One test suite is always open, so the rows are always flat. There is no
+    root list of suites: the rail already lists them.
 
-  # --- Grouping ---
+    A summary line under the table says when the suite last ran and how it
+    did.
 
-  @integration
-  Scenario: All scenarios lists the test suites on top and the loose cases below
-    Given two test suites holding cases, and three cases with no test suite
-    When All scenarios is opened
-    Then the test suites read as folder rows on top in alphabetical order
-    And the loose cases read as their own rows below the folder rows
-    And no folder row expands the cases it holds
+  # --- Which suite is open ---
 
   @integration
-  Scenario: A folder row shows only the folder name and case count
-    Given a test suite holding three cases
-    When All scenarios is opened
-    Then the folder row of that suite reads only the folder name and how many cases it holds
-    And no result summary sits on the folder row
+  Scenario: The table lists the scenarios of the suite the address names
+    Given two test suites holding cases
+    When the address names the second suite
+    Then only the scenarios of that suite are listed
+    And no folder row is drawn
 
   @integration
-  Scenario: Clicking a suite folder row opens that suite
-    Given the All scenarios surface with two test suites
-    When one of the folder rows is clicked
-    Then that suite's surface opens
+  Scenario: An address that names no suite opens the first suite of the rail
+    Given a project with two test suites
+    When the Agent Testing page is opened with no suite in the address
+    Then the first suite of the rail is open
+    And its scenarios are listed
 
   @integration
-  Scenario: The panel title reads Test suites when at least one suite exists
-    Given the All scenarios surface with at least one test suite
-    When the panel header is read
-    Then the title reads "Test suites"
-    And the count that follows reads the total of every case, folder and loose
-
-  @integration
-  Scenario: Zero suites renders no folder rows and no Test suites section header
-    Given a project with no test suites and a few loose cases
-    When All scenarios is opened
-    Then no folder row is rendered
-    And no "Test suites" section header is rendered
-    And the loose cases read as their own rows
-
-  @integration
-  Scenario: A single suite view lists its rows without group headings
-    Given a test suite holding three cases
-    When that suite is chosen in the rail
-    Then the three rows are listed with no group heading
+  Scenario: An address naming a suite that does not exist opens the first suite
+    Given a project with two test suites
+    When the address names a suite that was archived
+    Then the first suite of the rail is open
+    And nothing reads as broken
 
   # --- Row content ---
+
+  @integration
+  Scenario: A row reads the title, the labels, Run and the row menu, in that order
+    Given a scenario with the labels "critical" and "billing"
+    When its row is read
+    Then the title reads first
+    And both labels are shown as pills beside the name
+    And a Run button and a row menu end the row
+    And no Edit button is offered on the row
+
+  @integration
+  Scenario: A row carries no leading file icon
+    Given a scenario row
+    When the leading edge of the row is read
+    Then no file icon is drawn before the title
 
   @integration
   Scenario: The cases table shows the scenario column and the row actions, and no last result
@@ -70,13 +67,6 @@ Feature: The scenarios table
     When the cases table is read
     Then the header carries only a Scenario column
     And no row carries a last result cell
-
-  @integration
-  Scenario: Labels are shown as small pastel pills beside the name
-    Given a scenario with the labels "critical" and "billing"
-    When its row is read
-    Then both labels are shown as pills beside the name
-    And each label gets its own pill colour
 
   # --- Row actions ---
 
@@ -110,11 +100,11 @@ Feature: The scenarios table
     And the selection clears
 
   @integration
-  Scenario: Move to suite... unfiles when 'No test suite' is picked
+  Scenario: The move dialog offers only real test suites
     Given a checkbox selection of one scenario
     When "Move to suite" is clicked in the selection action bar
-    And "No test suite" is picked from the dialog
-    Then every selected scenario is unfiled
+    Then every test suite of the project is offered as a target
+    And no "No test suite" option is offered, because a scenario always sits in one
 
   @integration
   Scenario: Open last run is not offered for a case that never ran
@@ -126,7 +116,7 @@ Feature: The scenarios table
   Scenario: Duplicate creates a copy in the same suite
     Given a scenario in the suite "Refunds"
     When "Duplicate" is chosen
-    Then a copy appears in the "Refunds" group
+    Then a copy appears in the same suite
     And the copy carries the content of the original
 
   @integration
@@ -222,23 +212,31 @@ Feature: The scenarios table
     Given cases with the labels "critical", "billing" and "edge"
     When "critical" is chosen in the label filter
     Then only the cases with that label are listed
-    And the folder rows that hold none of them are hidden
 
   # --- The summary line ---
 
   @integration
-  Scenario: A borderless line under the table says when the set last ran
+  Scenario: A borderless line under the table says when the suite last ran
     Given a test suite with a finished run
     When that suite is opened
-    Then a line under the table reads when it last ran
-    And the date sits directly left of the result of the whole set
+    Then a line under the table reads "Last run on" with the date of that run
+    And the date sits directly left of the result of the whole suite
     And nothing else sits on the line between them
 
+  # --- Empty states ---
+
   @integration
-  Scenario: All scenarios reads Last full run at
-    Given the All scenarios view with a finished full run
-    When the line under the table is read
-    Then it reads "Last full run at" with the date of that run
+  Scenario: An open suite that holds no scenario says what to do
+    Given a project with scenarios in another suite
+    When an empty suite is opened
+    Then a line offers to add a scenario or move one here
+
+  @integration
+  Scenario: A project with no scenario at all explains what a scenario is
+    Given a test suite in a project with no scenario at all
+    When the suite is opened
+    Then an empty state explains what a scenario is
+    And it offers to write the first one
 
   # --- External sets ---
 
