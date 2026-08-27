@@ -169,3 +169,54 @@ Feature: A run plan is identified by its name
     When a run is started under a name of only spaces
     Then the run is refused with a validation error
     And no plan is created
+
+  # --- A refused run leaves no plan ---
+  #
+  # A run is resolved in full before its plan row is written: the cases it
+  # covers, the targets it reaches, and the parameter values each case runs
+  # with. Every check that can refuse a run reads the config the caller sent,
+  # never a stored row, so the plan is written only once the run holds up.
+  #
+  # Both halves matter. A refused run that created a plan leaves a person
+  # reading a plan they never started, with no run under it and nothing saying
+  # why. A refused run that matched an existing plan would have replaced that
+  # plan's stored configuration on the way to being refused, so the plan would
+  # then describe a run that never happened.
+
+  @integration
+  Scenario: A run refused for a missing secret value creates no plan
+    Given a test case that declares a secret run parameter
+    When a run is started under a new name with no value for that secret
+    Then the run is refused with the code "scenario_secret_parameter_missing"
+    And no run plan of that name exists
+    And nothing is scheduled
+
+  @integration
+  Scenario: A run refused for a missing secret value leaves the plan it names unchanged
+    Given a run plan "Nightly" covering one test case against "dev-agent"
+    And a second test case that declares a secret run parameter
+    When a run is started under the name "Nightly" covering the second case with no value for that secret
+    Then the run is refused
+    And "Nightly" still covers the first case against "dev-agent"
+    And nothing is scheduled
+
+  @integration
+  Scenario: A run refused for naming no target creates no plan
+    Given a project with one test case
+    When a run is started under a new name against no target
+    Then the run is refused with the code "suite_targets_required"
+    And no run plan of that name exists
+
+  @integration
+  Scenario: A run refused for covering no case creates no plan
+    Given a project where no test case carries the label "checkout"
+    When a run is started under a new name scoped to that label
+    Then the run is refused with the code "suite_scope_empty"
+    And no run plan of that name exists
+
+  @integration
+  Scenario: A run that supplies the secret value creates its plan and starts
+    Given a test case that declares a secret run parameter
+    When a run is started under a new name with a value for that secret
+    Then a run plan of that name is created
+    And the run is scheduled

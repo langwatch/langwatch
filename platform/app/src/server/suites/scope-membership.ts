@@ -43,6 +43,32 @@ export async function resolveAndCacheScope({
 }): Promise<string[]> {
   await tx.$executeRaw`SELECT id FROM "SimulationSuite" WHERE id = ${suiteId} AND "projectId" = ${projectId} FOR UPDATE`;
 
+  const scenarioIds = await readScopeScenarioIds({ projectId, scope, tx });
+
+  await tx.simulationSuite.update({
+    where: { id: suiteId, projectId },
+    data: { scenarioIds },
+  });
+
+  return scenarioIds;
+}
+
+/**
+ * The project's active scenarios a dynamic scope matches, oldest first.
+ *
+ * The read alone, with no plan row involved. A run started under a name
+ * resolves what it covers through this before its plan exists, and the plan is
+ * then written with the list that came back.
+ */
+export async function readScopeScenarioIds({
+  projectId,
+  scope,
+  tx,
+}: {
+  projectId: string;
+  scope: SuiteScope;
+  tx: Pick<ScopeMembershipClient, "scenario">;
+}): Promise<string[]> {
   const rows = await tx.scenario.findMany({
     where: {
       projectId,
@@ -53,14 +79,7 @@ export async function resolveAndCacheScope({
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });
-  const scenarioIds = rows.map((row) => row.id);
-
-  await tx.simulationSuite.update({
-    where: { id: suiteId, projectId },
-    data: { scenarioIds },
-  });
-
-  return scenarioIds;
+  return rows.map((row) => row.id);
 }
 
 /**

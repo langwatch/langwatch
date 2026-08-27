@@ -13,6 +13,7 @@ import type { Agent } from "~/generated/prisma/client";
 import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
@@ -40,6 +41,18 @@ async function createCase(name: string, folderId?: string) {
   });
 }
 
+/** A case whose run needs a credential supplied when the run starts. */
+async function createSecretCase(name: string) {
+  return scenarioService.create({
+    projectId,
+    name,
+    situation: "The agent calls the billing API",
+    criteria: ["The agent calls the API"],
+    labels: [],
+    parameters: [{ name: "api_token", secret: true }],
+  });
+}
+
 async function createHttpAgent(): Promise<Agent> {
   return prisma.agent.create({
     data: {
@@ -64,6 +77,8 @@ async function runUnderName(params: {
   repeatCount?: number;
   /** The scenarios a hand-picked scope covers. */
   scenarioIds?: string[];
+  /** Values supplied for the run's declared parameters. */
+  parameters?: RunParameterValues;
 }) {
   return suiteService.runPlan({
     projectId,
@@ -80,6 +95,7 @@ async function runUnderName(params: {
       }),
     },
     idempotencyKey: `run-${nanoid(6)}`,
+    ...(params.parameters !== undefined && { parameters: params.parameters }),
   });
 }
 
@@ -511,6 +527,117 @@ describe("resolving a run plan by name", () => {
       });
       expect(plans).toHaveLength(0);
       expect(startSuiteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The run is resolved in full before the plan row is written, so a run the
+   * platform refuses writes nothing at all: it creates no plan, and it does
+   * not replace the config of the plan its name matches.
+   */
+  describe("when the run is refused", () => {
+    /** @scenario "A run refused for a missing secret value creates no plan" */
+    it("creates no plan when a declared secret has no value", async () => {
+      const secretCase = await createSecretCase("Billing check");
+      const agent = await createHttpAgent();
+
+      await expect(
+        runUnderName({
+          name: "Billing nightly",
+          scope: { mode: "cases" },
+          scenarioIds: [secretCase.id],
+          targets: [{ type: "http", referenceId: agent.id }],
+        }),
+      ).rejects.toMatchObject({ code: "scenario_secret_parameter_missing" });
+
+      expect(await plansNamed("Billing nightly")).toHaveLength(0);
+      expect(startSuiteRun).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A run refused for a missing secret value leaves the plan it names unchanged" */
+    it("leaves the config of the plan it names exactly as it was", async () => {
+      const first = await createCase("One");
+      const dev = await createHttpAgent();
+      await runUnderName({
+        name: "Nightly",
+        scope: { mode: "cases" },
+        scenarioIds: [first.id],
+        targets: [{ type: "http", referenceId: dev.id }],
+      });
+      const before = (await plansNamed("Nightly"))[0]!;
+
+      const secretCase = await createSecretCase("Billing check");
+      const prod = await createHttpAgent();
+      await expect(
+        runUnderName({
+          name: "Nightly",
+          scope: { mode: "cases" },
+          scenarioIds: [secretCase.id],
+          targets: [{ type: "http", referenceId: prod.id }],
+          repeatCount: 3,
+        }),
+      ).rejects.toMatchObject({ code: "scenario_secret_parameter_missing" });
+
+      const after = (await plansNamed("Nightly"))[0]!;
+      expect(after.scenarioIds).toEqual([first.id]);
+      expect(after.targets).toEqual([{ type: "http", referenceId: dev.id }]);
+      expect(after.repeatCount).toBe(before.repeatCount);
+      // Nothing was written at all, so the row was never even touched.
+      expect(after.updatedAt).toEqual(before.updatedAt);
+      expect(startSuiteRun).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A run refused for naming no target creates no plan" */
+    it("creates no plan when the run names no target", async () => {
+      await createCase("One");
+
+      await expect(
+        runUnderName({
+          name: "Targetless",
+          scope: { mode: "all" },
+          targets: [],
+        }),
+      ).rejects.toMatchObject({ code: "suite_targets_required" });
+
+      expect(await plansNamed("Targetless")).toHaveLength(0);
+      expect(startSuiteRun).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A run refused for covering no case creates no plan" */
+    it("creates no plan when the scope covers no case", async () => {
+      await createCase("One");
+      const agent = await createHttpAgent();
+
+      await expect(
+        runUnderName({
+          name: "Checkout nightly",
+          scope: { mode: "labels", labels: ["checkout"] },
+          targets: [{ type: "http", referenceId: agent.id }],
+        }),
+      ).rejects.toMatchObject({ code: "suite_scope_empty" });
+
+      expect(await plansNamed("Checkout nightly")).toHaveLength(0);
+      expect(startSuiteRun).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A run that supplies the secret value creates its plan and starts" */
+    it("creates the plan and starts the run when the secret has a value", async () => {
+      const secretCase = await createSecretCase("Billing check");
+      const agent = await createHttpAgent();
+
+      const result = await runUnderName({
+        name: "Billing nightly",
+        scope: { mode: "cases" },
+        scenarioIds: [secretCase.id],
+        targets: [{ type: "http", referenceId: agent.id }],
+        parameters: { api_token: "a-token" },
+      });
+
+      expect(result.created).toBe(true);
+      const plans = await plansNamed("Billing nightly");
+      expect(plans).toHaveLength(1);
+      expect(plans[0]!.scenarioIds).toEqual([secretCase.id]);
+      expect(startedRuns()).toHaveLength(1);
     });
   });
 });
