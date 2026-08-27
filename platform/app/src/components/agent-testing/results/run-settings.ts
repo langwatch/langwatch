@@ -128,22 +128,33 @@ function readActor(scenarioRuns: ScenarioRunData[]): RunActor | null {
 /**
  * What the settings row calls the person who started the run.
  *
- * A run the reader started themselves reads as "You", which is how the rest
- * of the product names them. The two key surfaces name themselves. A run
- * started by another person names no one: the run stores an id, and a name is
- * never made up from an id.
+ * The two key surfaces name themselves. A run the reader started reads as
+ * "You", which is how the rest of the product names them. Any other person
+ * reads by the name their organization membership holds, because on a shared
+ * project most runs were started by somebody else and a blank row would hide
+ * the answer exactly when it is wanted.
+ *
+ * The name is resolved for display only. The run stores the id, so a run from
+ * last month still points at the right person after a rename.
+ *
+ * An id no membership holds reads as nothing at all. A name is never made up
+ * from an id, and the row never carries a placeholder.
  */
 export function runActorName({
   actor,
   viewerUserId,
+  memberNameById,
 }: {
   actor: RunActor | null;
   viewerUserId: string | null | undefined;
+  /** The name each organization member goes by, keyed by their user id. */
+  memberNameById?: Map<string, string>;
 }): string | null {
   if (!actor) return null;
   if (actor.label === "api") return "API";
   if (actor.label === "cli") return "CLI";
-  return actor.id === viewerUserId ? "You" : null;
+  if (actor.id === viewerUserId) return "You";
+  return memberNameById?.get(actor.id) ?? null;
 }
 
 /** Everything the run settings block reads, or null when the batch is empty. */

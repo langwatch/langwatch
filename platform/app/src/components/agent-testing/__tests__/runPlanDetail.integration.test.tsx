@@ -29,6 +29,24 @@ const mockCancelJob = vi.hoisted(() => vi.fn());
 const mockCancelBatchRun = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+// Honors `enabled` the way the real query does, so a test proves both that
+// the roster reaches the row and that it is not fetched when no name is
+// wanted.
+const mockGetOrganizationMembers = vi.hoisted(() =>
+  vi.fn((_input: unknown, options?: { enabled?: boolean }) =>
+    options?.enabled === false
+      ? { data: undefined }
+      : {
+          data: {
+            members: [
+              { user: { id: "user_omar", name: "Omar Haddad", image: null } },
+              // A member with no name of their own never reaches the row.
+              { user: { id: "user_nameless", name: null, image: null } },
+            ],
+          },
+        },
+  ),
+);
 const mockGetSuiteById = vi.hoisted(() =>
   vi.fn(() => ({
     data: {
@@ -124,6 +142,13 @@ vi.mock("~/utils/api", () => ({
       },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+    // The settings row names a teammate from the organization roster, the
+    // same query the other non-admin member pickers read.
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: mockGetOrganizationMembers,
+      },
+    },
   },
 }));
 
@@ -134,6 +159,7 @@ vi.mock("~/hooks/useCan", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
+    organization: { id: "org_1" },
   }),
 }));
 
@@ -1093,6 +1119,89 @@ describe("<RunPlanDetail/>", () => {
     // One row, not two: the person reads at the end of the row the time is on.
     expect(screen.getAllByTestId("run-settings-started")).toHaveLength(1);
     expect(started.textContent?.trim().endsWith("You")).toBe(true);
+    // The reader names themselves, so the roster is never asked for.
+    expect(mockGetOrganizationMembers).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ enabled: true }),
+    );
+  });
+
+  /** @scenario "A run started by a teammate reads that teammate's name" */
+  it("names the teammate who started the run, from the organization roster", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_omar",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("Omar Haddad");
+    // Somebody else started it, so the reader is not named.
+    expect(started).not.toHaveTextContent("You");
+    expect(started).not.toHaveTextContent("user_omar");
+    // The roster was asked for, against this organization.
+    expect(mockGetOrganizationMembers).toHaveBeenCalledWith(
+      { organizationId: "org_1" },
+      expect.objectContaining({ enabled: true }),
+    );
+  });
+
+  /** @scenario "A run whose person matches no member reads the time alone" */
+  it("reads the time alone for a person no membership holds", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_departed",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    expect(started).not.toHaveTextContent("Unknown");
+    expect(started).not.toHaveTextContent("user_departed");
+    // The row ends at the time, with no separator left behind it.
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
+  });
+
+  /** @scenario "A run whose person matches no member reads the time alone" */
+  it("reads the time alone for a member whose row carries no name", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_nameless",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
   });
 
   /** @scenario "A run started with a key that names no person shows only the time" */
@@ -1139,8 +1248,10 @@ describe("<RunPlanDetail/>", () => {
       screen.getByTestId("run-settings-block"),
     ).getByTestId("run-settings-started");
     expect(started).toHaveTextContent("CLI");
-    // The run stores an id, so no name is made up from it.
+    // The run stores an id, so no name is made up from it, and the surface
+    // answers for the run even when the roster holds that id.
     expect(started).not.toHaveTextContent("user_omar");
+    expect(started).not.toHaveTextContent("Omar Haddad");
     expect(started).not.toHaveTextContent("You");
   });
 

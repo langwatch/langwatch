@@ -105,6 +105,13 @@ vi.mock("~/utils/api", () => ({
       getAllPromptsForProject: { useQuery: () => emptyResults.list },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+    // The settings row names whoever started a run from the organization
+    // roster, so the column reads this even when no run names a person.
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
   },
 }));
 

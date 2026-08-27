@@ -440,6 +440,21 @@ Feature: The Results tab
     And no second row is added for the person
 
   @integration
+  Scenario: A run started by a teammate reads that teammate's name
+    Given a run started in the app by another member of the organization
+    When "Show run settings" is chosen
+    Then the row names that member
+    And it does not read "You"
+
+  @integration
+  Scenario: A run whose person matches no member reads the time alone
+    Given a run started in the app by a user id no member holds
+    When "Show run settings" is chosen
+    Then the first row of the block says when the run started
+    And no person reads on that row
+    And no name is made up from the recorded user id
+
+  @integration
   Scenario: A run started with a key that names no person shows only the time
     Given a run whose metadata records no actor
     When "Show run settings" is chosen

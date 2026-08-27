@@ -12,6 +12,8 @@ import { useExportScenarioRuns } from "~/components/suites/useExportScenarioRuns
 import { useCan } from "~/hooks/useCan";
 import { useNow } from "~/hooks/useNow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { RunActor } from "~/server/scenarios/run-actor";
+import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { PeriodControls } from "./period-controls";
@@ -52,6 +54,46 @@ export type RunPlanResultsColumnState = {
   runDialog: ReturnType<typeof useRunPlanRunDialog>;
 };
 
+/**
+ * What the settings row calls whoever started a run.
+ *
+ * The roster is asked for only when a name is actually wanted: a run the
+ * reader started, one started through a key, and one with no person behind it
+ * all name themselves. The query is the one the other non-admin member
+ * pickers read, so the roster is usually already in cache.
+ *
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+function useRunStartedByLabel(actor: RunActor | null): string | null {
+  const { organization } = useOrganizationTeamProject();
+  // The reader's own id, which is what lets a run they started read as "You".
+  // Read without requiring a session: the page is already behind the sign-in
+  // gate, and a redirect does not belong to this hook.
+  const { data: session } = useSession();
+  const viewerUserId = session?.user?.id;
+  const needsMemberName =
+    actor?.label === "user" && !!actor.id && actor.id !== viewerUserId;
+
+  const members =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId: organization?.id ?? "" },
+      { enabled: !!organization?.id && needsMemberName },
+    );
+
+  // Members whose row carries no name are left out, so an empty name can
+  // never reach the row as an empty label.
+  const memberNameById = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const member of members.data?.members ?? []) {
+      const name = member.user.name?.trim();
+      if (name) byId.set(member.user.id, name);
+    }
+    return byId;
+  }, [members.data]);
+
+  return runActorName({ actor, viewerUserId, memberNameById });
+}
+
 export function useRunPlanResultsColumn({
   plan,
   batches,
@@ -64,10 +106,6 @@ export function useRunPlanResultsColumn({
   periodControls: PeriodControls;
 }): RunPlanResultsColumnState {
   const { project } = useOrganizationTeamProject();
-  // The reader's own id, which is what lets a run they started read as
-  // "You". Read without requiring a session: the page is already behind the
-  // sign-in gate, and a redirect does not belong to this hook.
-  const { data: session } = useSession();
   const { can } = useCan();
   const now = useNow();
   const canManage = can("scenarios:manage");
@@ -92,10 +130,7 @@ export function useRunPlanResultsColumn({
       ? null
       : `${format(new Date(startedAt), "d MMM yyyy, HH:mm")} · ${formatTimeAgoCompact(startedAt, now)}`;
 
-  const runStartedByLabel = runActorName({
-    actor: runSettings?.actor ?? null,
-    viewerUserId: session?.user?.id,
-  });
+  const runStartedByLabel = useRunStartedByLabel(runSettings?.actor ?? null);
 
   const cancel = useRunPlanCancel({
     scenarioSetId: plan.scenarioSetId,
