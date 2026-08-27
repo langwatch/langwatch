@@ -392,6 +392,14 @@ export function VerificationFirstSignUp() {
           className="lw-auth-alert"
         />
       ) : null}
+      {/* The router decides whether this address may hold a password at all,
+          so a failure here is not a detail to swallow — it is the reason the
+          journey stopped, and it belongs on screen with a way to try again. */}
+      <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Couldn't check how you sign in"
+        className="lw-auth-alert"
+      />
       <HandledErrorAlert
         error={passkeyError}
         fallbackTitle="Could not use a passkey"
@@ -423,6 +431,14 @@ export function VerificationFirstSignUp() {
             setRoutedEmail(email);
             return;
           }
+          // NO ANSWER IS NOT "NO CONNECTION". `decide` swallows every failure
+          // and returns null, so a routing outage — or simply spending the
+          // per-address budget from a shared office network — used to fall
+          // straight through to the password step and mint a password account
+          // on a domain that routes through an identity provider, which is
+          // the one thing the connection exists to prevent. The error is
+          // rendered above; stopping here is what makes it mean something.
+          if (!decision) return;
           setSigningUpEmail(email);
         }}
         footer={

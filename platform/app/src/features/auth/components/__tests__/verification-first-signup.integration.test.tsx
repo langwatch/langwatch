@@ -381,6 +381,36 @@ describe("given the sign-up screen", () => {
     });
   });
 
+  describe("when the router cannot answer at all", () => {
+    it("stops rather than offering a password on an address it never checked", async () => {
+      // The routing check is what stands between somebody at an
+      // SSO-enforced company and a password account on that domain — the one
+      // thing the connection exists to prevent. `decide` swallows every
+      // failure and answers null, so falling through on a null was the same
+      // as deciding "no connection" without asking. A routing outage does it,
+      // and so does spending the per-address budget from a shared office
+      // network, which is the ordinary case.
+      routeMock.mockRejectedValue(new Error("routing is down"));
+
+      const { container } = renderScreen();
+
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      // No credential step, because nothing said this address may hold one.
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      // And the reason is on screen rather than swallowed, so the person
+      // knows to try again instead of staring at a form that did nothing.
+      expect(
+        await screen.findByText(/couldn't check how you sign in/i),
+      ).toBeVisible();
+    });
+  });
+
   describe("when a field the server rejects comes back", () => {
     /** @scenario Sign-up hands a single-sign-on domain to its provider */
     it("hands a routed domain to its provider instead of asking for a credential", async () => {
