@@ -1,13 +1,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
-import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
-import { AppIngestionSourceAdapter } from "~/runtime/app/features/governance/ingestion-source.adapter";
-import { AppIngestionSourceActivityAdapter } from "~/runtime/app/features/governance/ingestion-source-activity.adapter";
+import { AppGovernanceRuntime } from "@langwatch/enterprise-api/governance/runtime";
+import { AppGovernanceEventingAdapter } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
+import { AppGovernanceBudgetOverviewPort } from "~/server/app-layer/presets";
+import { AppIngestionSourceAdapter } from "@langwatch/enterprise-api/governance/ingestion-source.adapter";
+import { AppIngestionSourceActivityAdapter } from "@langwatch/enterprise-api/governance/ingestion-source-activity.adapter";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
-import { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
-import { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
-import { PersonalUsageClickHouseRepository } from "~/runtime/app/features/governance/personal-usage.clickhouse.repository";
+import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
+import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/governance/governance-trace-activity.adapter";
+import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
 import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
@@ -18,13 +19,20 @@ import { createRetentionFloorService } from "~/server/app-layer/clients/clickhou
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { decrypt, encrypt } from "~/utils/encryption";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { modelProviders as modelProviderRegistry } from "@langwatch/model-provider-contract";
+import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 type ClickHouseClientLike = ClickHouseClient;
 
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
-import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
+import {
+  GatewaySpendEventsClickHouseAdapter,
+  GatewaySpendEventsService,
+} from "@langwatch/gateway-server";
+import { GatewayVirtualKeySpendAdapter } from "@langwatch/gateway-server";
 
 /**
  * Installs an App singleton whose ClickHouse-backed repositories are real and
@@ -64,16 +72,14 @@ export function installClickHouseTestApp({
    * `resolveClient`, which is correct whenever the test has a single
    * ClickHouse behind both.
    */
-  resolveOrganizationClient?: (
-    organizationId: string,
-  ) => Promise<ClickHouseClientLike | null>;
+  resolveOrganizationClient?: (organizationId: string) => Promise<ClickHouseClientLike | null>;
   /**
    * The connection routes under test read as `getApp().redis` (ADR-093).
    * Defaults to none, which is right for a test that asserts only on rows; a
    * test whose route needs Redis passes the one it already opened.
    */
   redis?: RedisConnection | null;
-}): void {
+}) {
   const required: ClickHouseClientResolver = async (tenantId) => {
     const client = await resolveClient(tenantId);
     if (!client) {
@@ -90,31 +96,59 @@ export function installClickHouseTestApp({
     return client;
   };
 
-  const governanceTraceActivity = new GovernanceTraceActivityClickHouseRepository(
-    required,
-  );
-  const governanceOcsfEvents = new GovernanceOcsfEventsClickHouseRepository(required);
-  const personalUsage = new PersonalUsageClickHouseRepository(required);
+  const governanceTraceActivity = new AppGovernanceTraceActivityAdapter(required);
+  const governanceOcsfEvents = new AppGovernanceOcsfEventsAdapter(required);
+  const personalUsage = new AppPersonalUsageReadAdapter(required);
   const baseApp = createTestApp();
-  const governanceRuntime = AppGovernanceRuntime.create(prisma, {
+  const governanceVirtualKeys = VirtualKeyService.create(prisma, baseApp.projects);
+  const governanceOptions = {
     organizations: baseApp.organizations,
     projects: baseApp.projects,
+    apiKeys: baseApp.apiKeys,
     gatewayBaseUrl: "http://localhost:5563",
     setupActivity: governanceTraceActivity,
     ocsfEvents: governanceOcsfEvents,
     personalUsage,
-  });
+    virtualKeys: governanceVirtualKeys,
+    budgetOverview: AppGovernanceBudgetOverviewPort.create({
+      database: prisma,
+      organizations: baseApp.organizations,
+      personalUsage,
+      virtualKeys: governanceVirtualKeys,
+    }),
+    providers: {
+      list: () =>
+        Object.entries(modelProviderRegistry).map(([providerKey, provider]) => ({
+          providerKey,
+          displayName: provider.name,
+          type: provider.type,
+        })),
+    },
+    contacts: {
+      tryResolveAdminEmail: (organizationId: string) =>
+        resolveOrgAdminEmail({ prisma, organizationId }),
+    },
+  };
   const ingestionSources = AppIngestionSourceAdapter.create({
-    database: prisma,
-    projects: governanceRuntime.projects,
     plans: { getActivePlan: async () => FREE_PLAN },
     lifecycle: { sync: async () => undefined },
     secretPepper: "test-ingestion-secret-pepper",
-  }).build();
+    encryption: { encrypt, decrypt },
+  });
   const activity = AppIngestionSourceActivityAdapter.create({
     database: prisma,
     resolveClient: requiredOrg,
-  }).build();
+  }).clickhouse();
+  const governance = AppGovernanceRuntime.create(prisma, {
+    ...governanceOptions,
+    eventing: AppGovernanceEventingAdapter.noopGovernancePort(),
+    activityClickhouse: activity,
+    ingestionSourceEntitlements: ingestionSources.entitlements(),
+    ingestionSourceLifecycle: ingestionSources.lifecycle(),
+    ingestionEncryption: ingestionSources.encryption(),
+    ingestionSecretPepper: ingestionSources.secretPepper(),
+    ingestionDiagnostics: ingestionSources.diagnostics(),
+  });
   const evaluations = AppEvaluationRuntime.create({
     resolveClickHouse: async (tenantId) => {
       const client = await required(tenantId);
@@ -123,20 +157,22 @@ export function installClickHouseTestApp({
         query: async (input) => {
           const result = await client.query(input as never);
           return {
-            json: async <Result>() =>
-              (await result.json<Result>()) as unknown as Result[],
+            json: async <Result>() => (await result.json<Result>()) as unknown as Result[],
           };
         },
       };
     },
-    retentionFloor: createRetentionFloorService(baseApp.retentionPolicyCache),
+    retentionFloor: createRetentionFloorService(baseApp.dataRetention),
     execution: AppEvaluationExecutionPort.create(async () => ({
       status: "skipped",
     })),
     workflows: baseApp.workflows,
+    featureFlags: baseApp.featureFlags,
+    storedObjects: baseApp.storedObjects,
+    inputsOffloadConfig: baseApp.config.evaluationInputsOffload,
   }).build();
 
-  globalForApp.__langwatch_app = createTestApp({
+  const app = createTestApp({
     clickhouse: {
       enabled: true,
       resolveClient: required,
@@ -146,25 +182,14 @@ export function installClickHouseTestApp({
     redis: redis ?? null,
     gateway: {
       ...baseApp.gateway,
-      budgets: new GatewayBudgetClickHouseRepository(required),
-      virtualKeySpend: new GatewayVirtualKeySpendRepository(required),
-      spendEvents: new GatewaySpendEventsRepository(required),
+      budgets: GatewayBudgetLedgerAdapter.create(required),
+      virtualKeySpend: GatewayVirtualKeySpendAdapter.create(required),
+      spendEvents: GatewaySpendEventsService.create(
+        GatewaySpendEventsClickHouseAdapter.create(required),
+      ),
       webhookEvents: WebhookEventsClickHouseRepository.create(required),
     },
-    governance: {
-      ...baseApp.governance,
-      activity,
-      ingestionTemplates: governanceRuntime.ingestionTemplates,
-      ingestionSources,
-      setupState: governanceRuntime.setupState,
-      ocsfExport: governanceRuntime.ocsfExport,
-      ottlGateway: governanceRuntime.ottlGateway,
-      canonicalCostExtractor: governanceRuntime.canonicalCostExtractor,
-      ocsfEvents: governanceOcsfEvents,
-      traceActivity: governanceTraceActivity,
-      kpis: new GovernanceKpisClickHouseRepository(required),
-      personalUsage: governanceRuntime.personalUsage,
-    },
+    governance,
     organizations: baseApp.organizations,
     projects: baseApp.projects,
     billableEvents: ClickHouseBillingAdapter.create({
@@ -173,6 +198,8 @@ export function installClickHouseTestApp({
     }).build(),
     evaluations,
   });
+  globalForApp.__langwatch_app = app;
+  return app;
 }
 
 /** Drops the singleton this installed. Pair with it in `afterAll`. */

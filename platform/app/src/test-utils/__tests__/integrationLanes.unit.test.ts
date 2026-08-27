@@ -20,7 +20,7 @@ describe("integration test lanes", () => {
     it("runs in the component lane when it names no datastore", () => {
       const source = `${jsdomHeader}
         import { render } from "@testing-library/react";
-        import { Button } from "../Button";
+        import { Button } from "@langwatch/trace-server";
         it("renders", () => { render(<Button />); });
       `;
 
