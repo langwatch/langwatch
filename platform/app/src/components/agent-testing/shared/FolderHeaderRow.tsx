@@ -63,9 +63,7 @@ export function FolderHeaderRow({
         <Text
           fontSize="10.5px"
           color={FG_MUTED}
-          aria-label={
-            caseCount === 1 ? "1 scenario" : `${caseCount} scenarios`
-          }
+          aria-label={caseCount === 1 ? "1 scenario" : `${caseCount} scenarios`}
         >
           {caseCount}
         </Text>
