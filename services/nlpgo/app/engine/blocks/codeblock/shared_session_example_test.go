@@ -197,6 +197,47 @@ func TestSharedSessionCodeAgent_RowsThatStartTogetherLogInOnce(t *testing.T) {
 	}
 }
 
+// @scenario "Rows that start together log in once when the login is slow"
+//
+// The claim only earns its keep while a login is in flight, and a login that
+// answers instantly barely opens that window. Here it takes three seconds,
+// which is inside the lifetime the example gives the claim, so the rows beside
+// the winner wait through it rather than logging in themselves.
+func TestSharedSessionCodeAgent_RowsThatStartTogetherLogInOnceOnASlowLogin(t *testing.T) {
+	const rows = 4
+
+	stubs := newSharedSessionStubs(t, "p4ssw0rd")
+	stubs.loginDelay = 3 * time.Second
+	code := loadSharedSessionExample(t)
+
+	executor := sharedSessionExec(t, stubs.cacheServer.URL)
+	results := make([]*codeblock.Result, rows)
+	errs := make([]error, rows)
+	var wg sync.WaitGroup
+	wg.Add(rows)
+	for i := range results {
+		go func(index int) {
+			defer wg.Done()
+			results[index], errs[index] = executor.Execute(
+				context.Background(), stubs.rowRequest(code))
+		}(i)
+	}
+	wg.Wait()
+
+	for i := range results {
+		require.NoError(t, errs[i], "row %d", i)
+		require.Nil(t, results[i].Error, "row %d: %+v", i, results[i].Error)
+	}
+
+	assert.Equal(t, 1, stubs.loginCount(),
+		"the rows beside the winner wait out the login rather than repeating it")
+	assert.Equal(t, 1, stubs.claimsTaken())
+	require.Len(t, stubs.apiSessions, rows)
+	for _, presented := range stubs.apiSessions {
+		assert.Equal(t, "session-1", presented)
+	}
+}
+
 // @scenario "A row logs in itself when the row that took the login stores nothing"
 //
 // A claim that is never followed by a write would otherwise hold every other

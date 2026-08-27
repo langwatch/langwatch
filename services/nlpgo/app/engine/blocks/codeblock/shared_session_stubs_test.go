@@ -118,9 +118,12 @@ type sharedSessionStubs struct {
 	cacheWrites     []cacheWrite
 	cacheClaims     []cacheClaim
 	holdLoginClaims int
-	rejectLogin     bool
-	rejectWrite     bool
-	failCache       bool
+	// How long the login service takes to answer. A real login is not
+	// instant, and the claim only earns its keep while one is in flight.
+	loginDelay  time.Duration
+	rejectLogin bool
+	rejectWrite bool
+	failCache   bool
 
 	// stored mirrors the agent cache: name -> entry, each with its own expiry.
 	stored map[string]cacheEntry
@@ -151,11 +154,18 @@ func newSharedSessionStubs(t *testing.T, password string) *sharedSessionStubs {
 		s.mu.Lock()
 		s.loginRequests = append(s.loginRequests, req)
 		reject := s.rejectLogin
+		delay := s.loginDelay
 		minted := fmt.Sprintf("session-%d", len(s.loginRequests))
 		if !reject && req.Password == s.password {
 			s.mintedSessions = append(s.mintedSessions, minted)
 		}
 		s.mu.Unlock()
+
+		// Outside the lock, so several logins in flight overlap the way they
+		// would against a real target.
+		if delay > 0 {
+			time.Sleep(delay)
+		}
 		if reject || req.Password != s.password {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprint(w, `{"error":"invalid_credentials"}`)

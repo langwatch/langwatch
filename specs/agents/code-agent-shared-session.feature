@@ -80,6 +80,17 @@ Feature: A code agent logs in once for a whole run
       # rows beside it read what it stored.
 
     @integration
+    Scenario: Rows that start together log in once when the login is slow
+      Given the cache holds no session
+      And the target system takes seconds to answer a login
+      When four rows start at the same moment
+      Then exactly one row logs in
+      And every row answers with the session that row stored
+      # The claim only earns its keep while a login is in flight. The rows
+      # beside the winner wait through the login rather than starting their
+      # own, for as long as the claim's lifetime covers it.
+
+    @integration
     Scenario: A row logs in itself when the row that took the login stores nothing
       Given another row took the login and stored no session
       When the row runs
