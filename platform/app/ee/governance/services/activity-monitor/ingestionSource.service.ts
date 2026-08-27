@@ -870,10 +870,9 @@ export class IngestionSourceService {
     });
     if (!collider?.archivedAt) return;
 
-    const suffix = collider.id.slice(-6);
     await this.prisma.ingestionSource.update({
       where: { id: collider.id },
-      data: { name: `${name} (archived ${suffix})` },
+      data: { name: `${name} (archived ${collider.id})` },
     });
   }
 

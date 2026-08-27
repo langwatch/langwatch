@@ -16809,11 +16809,9 @@ description: Read Copilot Studio conversations from your Power Platform Datavers
 sidebarTitle: Microsoft Copilot Studio
 ---
 
-<Info>**Replaces:** the retired `copilot_studio` source, which polled Microsoft's directory audit, a log that records directory changes and has never contained a conversation. See [the retired source](/ai-governance/ingestion-sources/copilot-studio) for context.</Info>
-
 The source type is `copilot_studio_dataverse`. It connects to one Power
 Platform environment and queries the `conversationtranscripts` table on a
-15-minute cadence. No Microsoft Graph or directory permission is involved.
+15-minute cadence.
 
 ## What it reads
 
@@ -16833,13 +16831,23 @@ Each conversation produces one trace, with:
 
 ## What the admin sets up
 
-### In Azure and Power Platform
+### In the Microsoft Entra admin centre
 
-1. **App registrations** (Azure portal): register one application (e.g. `langwatch-copilot-reader`).
-2. **Certificates & secrets** (Azure portal): create a client secret and copy the value.
-3. **Power Platform admin centre**: in the target environment, create an application user for the app registration and grant it a security role that can read the `conversationtranscripts` and `bot` tables.
+Done once for the whole organisation:
 
-No directory permission is needed. The puller never calls Microsoft Graph.
+1. **App registrations** → New registration. Give it a name (e.g. `langwatch-copilot-reader`), choose the single-tenant option.
+2. Copy the **Application (client) ID** and **Directory (tenant) ID** from the overview page.
+3. **Certificates & secrets** → New client secret. Copy the **Value** column immediately; Microsoft never shows it again.
+4. *(Optional)* **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
+
+### In the Power Platform admin centre
+
+Repeated for every environment that has agents:
+
+5. **Environments** → pick the environment → Settings → Users + permissions → Application users → New app user.
+6. Paste the Application ID, choose a business unit, and assign the **Service Reader** role.
+
+<Note>Service Reader is the tightest stock role that grants read access to both `bot` and `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer only reads records the account created itself, which for a service account is none. See the [security roles reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for details.</Note>
 
 ### In LangWatch
 
@@ -16848,9 +16856,9 @@ Create a source of type **Microsoft Copilot Studio** and fill in:
 | Field | Required | Description |
 |---|---|---|
 | Power Platform environment URL | yes | `https://org12345.crm.dynamics.com`, from the admin centre |
-| Microsoft Entra tenant ID | yes | The tenant the app registration lives in |
+| Microsoft Entra tenant ID | yes | The directory the app registration lives in |
 | App registration client ID | yes | From the app registration overview |
-| App registration client secret | yes | The secret value (shown once in Azure) |
+| App registration client secret | yes | The secret value (shown once) |
 
 The environment URL must be an `https` address on a domain Microsoft serves
 Power Platform from (`.dynamics.com`, `.microsoftdynamics.us`,
@@ -16875,9 +16883,9 @@ skips or re-reads a row. Default cadence is every 15 minutes.
   Redirects are never followed.
 - **The environment URL is checked at save time.** An address outside Microsoft's
   known Power Platform domains is refused before it is stored.
-- **No directory access.** Person attribution uses the raw directory account
-  identifier (`aadObjectId`) stored in the activity. Resolving it to a name
-  happens elsewhere, so the puller never needs Graph API access.
+- **Directory access is optional.** When `Directory.Read.All` is granted, the
+  puller resolves the person's directory identifier to a name and department.
+  Without it, conversations still arrive with the raw `aadObjectId` only.
 
 ## What shows up
 
@@ -16891,7 +16899,8 @@ Each conversation trace includes these attributes:
 - `langwatch.user.id`: the person's directory account on each user turn
 
 The model attribute is `microsoft/copilot-studio`, a product label, not a
-priced model. The agent record in the environment carries no model information.
+priced model. The agent record in the environment does not expose which model
+the agent uses.
 
 ## Limitations
 
@@ -16902,6 +16911,8 @@ priced model. The agent record in the environment carries no model information.
   (a row that was already deleted) marks the conversation incomplete.
 - Agent names require the credential to read the `bot` table. If it cannot, conversations
   still arrive but without an agent name, and the log says why.
+- The transcript has no token counts and no cost figures. Those come from Azure
+  cost reports, which require a separate billing-plan setup.
 
 ---
 
