@@ -647,6 +647,13 @@ export type GatewayCacheRule = Prisma.GatewayCacheRuleModel
  */
 export type FeatureFlag = Prisma.FeatureFlagModel
 /**
+ * Model FeatureFlagExperimentSetting
+ * One experiment setting per (flag, subject). A USER row is that person's
+ * own opt-in; an ORGANIZATION or PROJECT row is an owner's explicit policy
+ * for that exact scope. No row means inherit.
+ */
+export type FeatureFlagExperimentSetting = Prisma.FeatureFlagExperimentSettingModel
+/**
  * Model ProcessManagerInstance
  * Durable state for a long-running event-sourced process.
  */

@@ -476,6 +476,15 @@ export const GatewayGuardrailFailureMode = {
 export type GatewayGuardrailFailureMode = (typeof GatewayGuardrailFailureMode)[keyof typeof GatewayGuardrailFailureMode]
 
 
+export const FeatureFlagExperimentSubjectType = {
+  USER: 'USER',
+  ORGANIZATION: 'ORGANIZATION',
+  PROJECT: 'PROJECT'
+} as const
+
+export type FeatureFlagExperimentSubjectType = (typeof FeatureFlagExperimentSubjectType)[keyof typeof FeatureFlagExperimentSubjectType]
+
+
 export const ProcessManagerOutboxStatus = {
   pending: 'pending',
   dispatched: 'dispatched',

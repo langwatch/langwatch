@@ -1295,6 +1295,23 @@ export type EnumGatewayCacheRuleModeWithAggregatesFilter<$PrismaModel = never> =
   _max?: Prisma.NestedEnumGatewayCacheRuleModeFilter<$PrismaModel>
 }
 
+export type EnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.FeatureFlagExperimentSubjectType | Prisma.EnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel> | $Enums.FeatureFlagExperimentSubjectType
+}
+
+export type EnumFeatureFlagExperimentSubjectTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FeatureFlagExperimentSubjectType | Prisma.EnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeWithAggregatesFilter<$PrismaModel> | $Enums.FeatureFlagExperimentSubjectType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel>
+}
+
 export type EnumProcessManagerOutboxStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.ProcessManagerOutboxStatus | Prisma.EnumProcessManagerOutboxStatusFieldRefInput<$PrismaModel>
   in?: $Enums.ProcessManagerOutboxStatus[] | Prisma.ListEnumProcessManagerOutboxStatusFieldRefInput<$PrismaModel>
@@ -2562,6 +2579,23 @@ export type NestedEnumGatewayCacheRuleModeWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumGatewayCacheRuleModeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumGatewayCacheRuleModeFilter<$PrismaModel>
+}
+
+export type NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.FeatureFlagExperimentSubjectType | Prisma.EnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel> | $Enums.FeatureFlagExperimentSubjectType
+}
+
+export type NestedEnumFeatureFlagExperimentSubjectTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FeatureFlagExperimentSubjectType | Prisma.EnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FeatureFlagExperimentSubjectType[] | Prisma.ListEnumFeatureFlagExperimentSubjectTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeWithAggregatesFilter<$PrismaModel> | $Enums.FeatureFlagExperimentSubjectType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFeatureFlagExperimentSubjectTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumProcessManagerOutboxStatusFilter<$PrismaModel = never> = {

@@ -147,6 +147,7 @@ export const ModelName = {
   GatewayChangeEvent: 'GatewayChangeEvent',
   GatewayCacheRule: 'GatewayCacheRule',
   FeatureFlag: 'FeatureFlag',
+  FeatureFlagExperimentSetting: 'FeatureFlagExperimentSetting',
   ProcessManagerInstance: 'ProcessManagerInstance',
   ProcessManagerInbox: 'ProcessManagerInbox',
   ProcessManagerOutbox: 'ProcessManagerOutbox',
@@ -1880,6 +1881,19 @@ export const FeatureFlagScalarFieldEnum = {
 } as const
 
 export type FeatureFlagScalarFieldEnum = (typeof FeatureFlagScalarFieldEnum)[keyof typeof FeatureFlagScalarFieldEnum]
+
+
+export const FeatureFlagExperimentSettingScalarFieldEnum = {
+  flagKey: 'flagKey',
+  subjectType: 'subjectType',
+  subjectId: 'subjectId',
+  enabled: 'enabled',
+  changedByUserId: 'changedByUserId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FeatureFlagExperimentSettingScalarFieldEnum = (typeof FeatureFlagExperimentSettingScalarFieldEnum)[keyof typeof FeatureFlagExperimentSettingScalarFieldEnum]
 
 
 export const ProcessManagerInstanceScalarFieldEnum = {

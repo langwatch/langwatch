@@ -104,6 +104,12 @@
       "subjects": ["experiment"]
     },
     {
+      "id": "feature-flag",
+      "root": "packages/features/feature-flag",
+      "classification": "core",
+      "subjects": ["feature-flag"]
+    },
+    {
       "id": "gateway",
       "root": "packages/features/gateway",
       "classification": "core",

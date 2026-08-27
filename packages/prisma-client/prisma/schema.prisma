@@ -3752,25 +3752,18 @@ model GatewayCacheRule {
 }
 
 // FeatureFlag stores the postgres-backed value for one registered
-// flag, used to keep system-scoped kill switches and pipeline toggles
-// off PostHog (see specs/ops/internal-feature-flags.feature). The
-// in-code registry holds metadata (scope, description, default); this
-// table just holds the current operator-set value. Absence of a row
-// means "use the registry default".
-//
-// One row per flag key. No per-tenant overrides: system kill switches
-// flip cluster-wide; PostHog still owns user/A-B targeting for product
-// flags via the PRODUCT scope path in featureFlagService.
+// flag. The in-code registry holds the metadata (scope, description,
+// default); this table holds only the current operator-set value, and the
+// absence of a row means "use the registry default". One row per flag key,
+// cluster-wide: per-tenant and percentage targeting live in `rules`.
 model FeatureFlag {
   key          String   @id
   enabled      Boolean
-  // Optional list of targeting rules evaluated before the `enabled`
-  // fallback. Each rule is `{ match: { projectId?, organizationId? },
-  // enabled: boolean }` - first match wins. Shape lives in
-  // `src/server/featureFlag/rules.ts` so it can grow over time
-  // (percentage rollouts, email-domain matches, etc.) without a
-  // migration. Storing as JSON keeps the surface flexible while
-  // postgres handles the row-level cache invalidation.
+  // Targeting rules evaluated before the `enabled` fallback; first match
+  // wins. Each rule is `{ match: { projectId?, organizationId?,
+  // percentage? }, enabled: boolean }`. The shape lives in
+  // @langwatch/feature-flag-contract and stays JSON so it can grow
+  // without a migration.
   rules        Json?
   // Last operator to flip the value. Free-form string (user id), no FK
   // because the same table serves SaaS and self-hosted installs where
@@ -3778,6 +3771,28 @@ model FeatureFlag {
   lastEditedBy String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+}
+
+enum FeatureFlagExperimentSubjectType {
+  USER
+  ORGANIZATION
+  PROJECT
+}
+
+/// One experiment setting per (flag, subject). A USER row is that person's
+/// own opt-in; an ORGANIZATION or PROJECT row is an owner's explicit policy
+/// for that exact scope. No row means inherit.
+model FeatureFlagExperimentSetting {
+  flagKey         String
+  subjectType     FeatureFlagExperimentSubjectType
+  subjectId       String
+  enabled         Boolean
+  changedByUserId String?
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @default(now()) @updatedAt
+
+  @@id([flagKey, subjectType, subjectId])
+  @@index([subjectType, subjectId])
 }
 
 /// Durable state for a long-running event-sourced process.
