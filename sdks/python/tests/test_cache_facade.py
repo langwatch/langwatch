@@ -54,8 +54,22 @@ class CacheStub:
                 },
             )
 
-        name = path.removeprefix("/api/agent-cache/")
+        name = path.removeprefix("/api/agent-cache/").removesuffix("/claim")
         body: Dict[str, Any] = json.loads(request.content) if request.content else {}
+
+        if request.method == "POST" and path.endswith("/claim"):
+            claimed = name not in self.stored
+            if claimed:
+                self.stored[name] = body["value"]
+                self.written_ttls.append(body.get("ttl_seconds"))
+            return httpx.Response(
+                200,
+                json={
+                    "name": name,
+                    "claimed": claimed,
+                    "ttl_seconds": body.get("ttl_seconds", 900),
+                },
+            )
 
         if request.method == "GET":
             if name not in self.stored:
@@ -135,6 +149,29 @@ class TestSet:
         facade_over(stub).set("ACME_SESSION", "second")
 
         assert stub.stored == {"ACME_SESSION": "second"}
+
+
+class TestClaim:
+    def test_takes_a_name_the_project_does_not_hold(self):
+        stub = CacheStub()
+
+        assert facade_over(stub).claim("ACME_SESSION", "session-1") is True
+        assert stub.stored == {"ACME_SESSION": "session-1"}
+        assert ("POST", "/api/agent-cache/ACME_SESSION/claim") in stub.calls
+
+    # @scenario "The SDK answers a lost claim with false"
+    def test_answers_false_when_the_name_is_already_held(self):
+        stub = CacheStub(stored={"ACME_SESSION": "first"})
+
+        assert facade_over(stub).claim("ACME_SESSION", "second") is False
+        assert stub.stored == {"ACME_SESSION": "first"}
+
+    def test_carries_the_lifetime_the_caller_named(self):
+        stub = CacheStub()
+
+        facade_over(stub).claim("ACME_SESSION", "session-1", ttl_seconds=840)
+
+        assert stub.written_ttls == [840]
 
 
 class TestDelete:

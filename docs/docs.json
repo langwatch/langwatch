@@ -1369,6 +1369,7 @@
               "api-reference/agent-cache/overview",
               "api-reference/agent-cache/get-entry",
               "api-reference/agent-cache/put-entry",
+              "api-reference/agent-cache/claim-entry",
               "api-reference/agent-cache/delete-entry"
             ]
           },
