@@ -40,6 +40,13 @@ Feature: Target column identity on the results page
     Then the headers of the first target start with "classifier_(1)"
     And the headers of the second target start with "classifier_(2)"
 
+  @integration
+  Scenario: Compare mode numbers same-named target columns too
+    Given two runs each with two targets stored under the name "category_classifier"
+    When the comparison table renders
+    Then one target column header reads "category_classifier (1)"
+    And the other target column header reads "category_classifier (2)"
+
   # ============================================================================
   # Chart axis labels
   # ============================================================================

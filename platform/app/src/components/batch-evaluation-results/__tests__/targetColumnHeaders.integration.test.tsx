@@ -69,6 +69,29 @@ const renderTableFor = (names: string[]) => {
   );
 };
 
+/** The same run twice, which is what puts the table in comparison mode. */
+const renderComparisonFor = (names: string[]) => {
+  const runs = ["run-1", "run-2"].map((runId) => ({
+    runId,
+    runName: runId,
+    color: "#3182ce",
+    isLoading: false,
+    data: {
+      ...transformBatchEvaluationData(runWithTargetNames(names)),
+      runId,
+    },
+  }));
+
+  render(
+    <BatchEvaluationResultsTable
+      data={runs[0]!.data}
+      comparisonData={runs}
+      disableVirtualization
+    />,
+    { wrapper: Wrapper },
+  );
+};
+
 afterEach(() => {
   cleanup();
 });
@@ -94,6 +117,19 @@ describe("given targets with names of their own", () => {
 
       expect(screen.getByText("classifier")).toBeInTheDocument();
       expect(screen.getByText("summarizer")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given two runs whose targets share one name", () => {
+  describe("when the comparison table renders", () => {
+    /** @scenario "Compare mode numbers same-named target columns too" */
+    it("numbers each column the way single-run mode does", () => {
+      renderComparisonFor(["category_classifier", "category_classifier"]);
+
+      expect(screen.getByText("category_classifier (1)")).toBeInTheDocument();
+      expect(screen.getByText("category_classifier (2)")).toBeInTheDocument();
+      expect(screen.queryByText("category_classifier")).not.toBeInTheDocument();
     });
   });
 });
