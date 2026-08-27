@@ -41,22 +41,22 @@ vi.mock("~/server/modelProviders/llmModelCost", async (importOriginal) => {
   return { ...original, getStaticModelCosts: () => catalog };
 });
 
-import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
+import { AppGatewayDebitAdapter } from "@langwatch/enterprise-api/governance/gateway-debit.adapter";
 import { deliverPayloadToRow, webhookDeliveryPM } from "~/runtime/app/features/webhooks";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
-} from "../projections/gatewaySpend.foldProjection";
-import type { ConfirmSpendCommandData } from "../schemas/commands";
+} from "@langwatch/gateway-server";
+import type { ConfirmSpendCommandData } from "@langwatch/gateway-server";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
-import type { GatewaySpendConfirmedEvent } from "../schemas/events";
+} from "@langwatch/gateway-server";
+import type { GatewaySpendConfirmedEvent } from "@langwatch/gateway-server";
 import { rateSpendNanoUsd } from "../services/spend-rating.service";
 
 const TENANT = "proj_price";

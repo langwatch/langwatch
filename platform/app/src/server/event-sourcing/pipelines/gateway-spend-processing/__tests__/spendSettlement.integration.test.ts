@@ -19,14 +19,12 @@ describe("settlement on the spend record (real ClickHouse)", () => {
   it("folds admit, settle, then a late confirm superseding the settled row", async () => {
     const { startTestContainers, stopTestContainers } =
       await import("~/server/event-sourcing/__tests__/integration/testContainers");
-    const { GatewaySpendEventsRepository } =
-      await import("~/server/gateway/spendEvents.clickhouse.repository");
-    const { GatewaySpendFoldProjection } =
-      await import("../projections/gatewaySpend.foldProjection");
+    const { GatewaySpendEventsRepository } = await import("@langwatch/gateway-server");
+    const { GatewaySpendFoldProjection } = await import("@langwatch/gateway-server");
     const { GatewaySpendStore } = await import("../projections/gatewaySpend.store");
     const { spendRowToEnvelope } = await import("~/runtime/app/features/webhooks");
     const { EventUtils, createTenantId } = await import("@langwatch/eventing");
-    const constants = await import("../schemas/constants");
+    const constants = await import("@langwatch/gateway-server");
 
     const containers = await startTestContainers();
     const repo = new GatewaySpendEventsRepository(

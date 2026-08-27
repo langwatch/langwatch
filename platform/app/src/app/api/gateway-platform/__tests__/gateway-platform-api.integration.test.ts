@@ -46,9 +46,9 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
-import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { currentPeriodStart } from "@langwatch/gateway-server";
+import { nextAnchoredResetAt } from "@langwatch/gateway-server";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,

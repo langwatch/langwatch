@@ -28,6 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
@@ -36,6 +37,7 @@ import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
+const projects = createTestApp().projects;
 
 const ORG_ID = `org-rmm-${suffix}`;
 const TEAM_ID = `team-rmm-${suffix}`;
@@ -252,7 +254,7 @@ describe("keys that predate the routing choice keep falling back against real PG
 
   /** @scenario Keys that existed before the routing choice keep failing over */
   it("a key in the migrated state materialises the full fallback chain", async () => {
-    const service = VirtualKeyService.create(prisma);
+    const service = VirtualKeyService.create(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_ID,
       name: `rmm-migrated-${suffix}`,
@@ -262,7 +264,9 @@ describe("keys that predate the routing choice keep falling back against real PG
       routingMode: "FALLBACK_ALL",
     });
 
-    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(virtualKey);
+    const bundle = await new GatewayConfigMaterialiser(prisma, projects).materialise(
+      virtualKey,
+    );
 
     expect(bundle.routing_mode).toBe("fallback_all");
     expect(bundle.fallback.chain).toEqual(
@@ -273,7 +277,7 @@ describe("keys that predate the routing choice keep falling back against real PG
   });
 
   it("a new key created without a routing choice does not fall back", async () => {
-    const service = VirtualKeyService.create(prisma);
+    const service = VirtualKeyService.create(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_ID,
       name: `rmm-new-${suffix}`,
@@ -283,7 +287,9 @@ describe("keys that predate the routing choice keep falling back against real PG
 
     expect(virtualKey.routingMode).toBe("NONE");
 
-    const bundle = await new GatewayConfigMaterialiser(prisma).materialise(virtualKey);
+    const bundle = await new GatewayConfigMaterialiser(prisma, projects).materialise(
+      virtualKey,
+    );
     expect(bundle.routing_mode).toBe("none");
     expect(bundle.fallback.max_attempts).toBe(1);
   });

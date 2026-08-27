@@ -12,12 +12,12 @@
  * The token format is `vk-lw-<ulid>` with no live/test discriminator;
  * the gateway never branches on environment, so there is no env field.
  */
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
+import type { ProjectService } from "@langwatch/project-contract";
 
-import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
-import { traceProjectsByIds } from "./scopeResolver";
-import type { VirtualKeyWithScopes } from "./virtualKey.repository";
-import { toWireEnum } from "./wireEnums";
+import { metadataFromRow, type ResourceMetadata } from "@langwatch/gateway-server";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-server";
+import { toWireEnum } from "@langwatch/gateway-server";
 
 /**
  * The one fact about a key's trace destination that is not on the key row.
@@ -39,18 +39,17 @@ export type TraceDestinationFacts = {
  * project, which is the failure this field exists to prevent.
  */
 export async function loadTraceDestinationFacts({
-  client,
+  projects,
   virtualKeys,
 }: {
-  client: PrismaClient | Prisma.TransactionClient;
+  projects: ProjectService;
   virtualKeys: { traceProjectId: string | null }[];
 }): Promise<TraceDestinationFacts> {
-  const projects = await traceProjectsByIds(
-    client,
-    virtualKeys.map((vk) => vk.traceProjectId),
+  const destinationRows = await projects.listTraceDestinations(
+    virtualKeys.flatMap((vk) => (vk.traceProjectId ? [vk.traceProjectId] : [])),
   );
   const archivedProjectIds = new Set<string>();
-  for (const project of projects.values()) {
+  for (const project of destinationRows) {
     if (project.archivedAt) archivedProjectIds.add(project.id);
   }
   return { archivedProjectIds };

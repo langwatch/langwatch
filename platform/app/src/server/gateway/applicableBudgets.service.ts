@@ -12,25 +12,21 @@
  * its "spent so far" agree wherever they are shown.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { ProjectService } from "@langwatch/project-contract";
 
 import type {
   BudgetSpendTarget,
-  GatewayBudgetClickHouseRepository,
-} from "./budget.clickhouse.repository";
-import { budgetPeriodFloorMs } from "./budgetPeriod";
-import {
-  type BudgetResolutionTarget,
-  resolveApplicableBudgets,
-} from "./budgetResolution.service";
-import { resolveProviderLabels } from "./providerLabels";
-import {
-  decideTraceDestination,
-  type TraceProject,
-  traceProjectFor,
-} from "./scopeResolver";
-import { resolveScopeTargetsBatch, scopeTargetKey } from "./scopeTargets";
-import { organizationSpendTenantIds } from "./spendTenants";
-import type { ScopeInput } from "./virtualKey.repository";
+  GatewayBudgetSpendPort,
+} from "@langwatch/gateway-server";
+import { budgetPeriodFloorMs } from "@langwatch/gateway-server";
+import { resolveProviderLabels } from "@langwatch/gateway-server";
+import { scopeTargetKey } from "@langwatch/gateway-server";
+import type { ScopeInput } from "@langwatch/gateway-server";
+import type {
+  GatewayBudgetResolutionTarget,
+  GatewayResolvedBudget,
+  GatewayService,
+} from "@langwatch/gateway-contract";
 
 export type DraftVirtualKey = {
   organizationId: string;
@@ -75,8 +71,10 @@ export type ApplicableBudget = {
 
 export async function resolveApplicableBudgetsForDraftKey(
   prisma: PrismaClient,
+  projects: ProjectService,
   draft: DraftVirtualKey,
-  chRepo?: GatewayBudgetClickHouseRepository,
+  budgetDecisions: GatewayService,
+  chRepo?: GatewayBudgetSpendPort,
 ): Promise<ApplicableBudget[]> {
   // Where this key's traces land, which is what decides whether team- and
   // project-scoped budgets reach it at all.
@@ -91,11 +89,14 @@ export async function resolveApplicableBudgetsForDraftKey(
   // answer is the decision the save is about to make. A draft the save would
   // refuse previews as no destination, which is what an incomplete form is.
   const traceProject = draft.virtualKeyId
-    ? await traceProjectFor(prisma, draft.traceProjectId)
-    : await decidedTraceProject({ prisma, draft });
+    ? draft.traceProjectId
+      ? await projects.tryGetTraceDestination(draft.traceProjectId)
+      : null
+    : await decidedTraceProject({ projects, draft });
 
   return await resolveApplicableBudgetsForTarget(
     prisma,
+    budgetDecisions,
     {
       organizationId: draft.organizationId,
       virtualKeyId: draft.virtualKeyId,
@@ -121,17 +122,17 @@ export async function resolveApplicableBudgetsForDraftKey(
  */
 export async function resolveApplicableBudgetsForTarget(
   prisma: PrismaClient,
-  target: BudgetResolutionTarget,
-  chRepo?: GatewayBudgetClickHouseRepository,
+  budgetDecisions: GatewayService,
+  target: GatewayBudgetResolutionTarget,
+  chRepo?: GatewayBudgetSpendPort,
 ): Promise<ApplicableBudget[]> {
-  const resolved = await resolveApplicableBudgets({ client: prisma, target });
+  const resolved = await budgetDecisions.resolveApplicableBudgets(target);
   if (resolved.length === 0) return [];
 
   // Independent lookups on an interactive path: run them together.
   const [spentByBudgetId, targets, providerLabels] = await Promise.all([
-    loadSpend(prisma, target.organizationId, resolved, chRepo),
-    resolveScopeTargetsBatch(
-      prisma,
+    loadSpend(budgetDecisions, target.organizationId, resolved, chRepo),
+    budgetDecisions.resolveScopeTargets(
       resolved.map((r) => r.budget),
       target.organizationId,
     ),
@@ -171,31 +172,30 @@ export async function resolveApplicableBudgetsForTarget(
  * get. A draft the save would refuse has none yet.
  */
 async function decidedTraceProject({
-  prisma,
+  projects,
   draft,
 }: {
-  prisma: PrismaClient;
+  projects: ProjectService;
   draft: DraftVirtualKey;
-}): Promise<TraceProject | null> {
-  const decision = await decideTraceDestination(prisma, {
+}) {
+  const decision = await projects.resolveTraceDestination({
     organizationId: draft.organizationId,
-    scopes: draft.scopes.map((s) => ({
-      scopeType: s.scopeType,
-      scopeId: s.scopeId,
-    })),
+    projectScopeIds: draft.scopes
+      .filter((scope) => scope.scopeType === "PROJECT")
+      .map((scope) => scope.scopeId),
     traceProjectId: draft.traceProjectId,
   });
   return decision.outcome === "resolved" ? decision.project : null;
 }
 
 async function loadSpend(
-  prisma: PrismaClient,
+  budgetDecisions: GatewayService,
   organizationId: string,
-  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
-  chRepo?: GatewayBudgetClickHouseRepository,
+  resolved: GatewayResolvedBudget[],
+  chRepo?: GatewayBudgetSpendPort,
 ): Promise<Map<string, string>> {
   if (!chRepo) return new Map();
-  const tenantIds = await organizationSpendTenantIds(prisma, organizationId);
+  const tenantIds = await budgetDecisions.listSpendTenantIds(organizationId);
   if (tenantIds.length === 0) return new Map();
   const targets: BudgetSpendTarget[] = resolved.map((r) => ({
     budgetId: r.budget.id,

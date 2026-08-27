@@ -24,9 +24,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer";
 import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { computeConfigETag } from "../configETag";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-rot-${suffix}`;
@@ -133,7 +136,7 @@ describe("provider credential rotation reaches the gateway", () => {
       where: { organizationId: ORG_ID },
     });
 
-    await ModelProviderService.create(prisma).updateModelProvider({
+    await getApp().modelProviders.upsert({
       id: MP_ID,
       organizationId: ORG_ID,
       provider: "openai",
@@ -152,7 +155,7 @@ describe("provider credential rotation reaches the gateway", () => {
       where: { organizationId: ORG_ID },
     });
 
-    await ModelProviderService.create(prisma).updateModelProvider({
+    await getApp().modelProviders.upsert({
       id: MP_ID,
       organizationId: ORG_ID,
       provider: "openai",
@@ -165,7 +168,7 @@ describe("provider credential rotation reaches the gateway", () => {
     ]);
 
     // Put it back so the later cases run against an enabled row.
-    await ModelProviderService.create(prisma).updateModelProvider({
+    await getApp().modelProviders.upsert({
       id: MP_ID,
       organizationId: ORG_ID,
       provider: "openai",
@@ -337,7 +340,7 @@ describe("provider credential rotation reaches the gateway", () => {
       where: { organizationId: ORG_ID },
     });
 
-    await ModelProviderService.create(prisma).deleteModelProvider({
+    await getApp().modelProviders.delete({
       id: MP_ID,
       organizationId: ORG_ID,
       provider: "openai",

@@ -28,9 +28,9 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayUsageService } from "../usage.service";
 import {
-  GatewayVirtualKeySpendRepository,
+  GatewayVirtualKeySpendAdapter,
   startOfCurrentMonthUTC,
-} from "../virtualKeySpend.clickhouse.repository";
+} from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-spend-${suffix}`;
@@ -107,7 +107,7 @@ function usageService(): GatewayUsageService {
   return GatewayUsageService.create({
     prisma,
     chRepo: undefined,
-    spendRepo: new GatewayVirtualKeySpendRepository(async () => ch),
+    spendRepo: GatewayVirtualKeySpendAdapter.create(async () => ch),
   });
 }
 

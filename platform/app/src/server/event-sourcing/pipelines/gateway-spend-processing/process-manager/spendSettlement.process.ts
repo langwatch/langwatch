@@ -12,8 +12,8 @@ import { z } from "zod";
 // `vi.mock` factory into a hoisting failure. Nothing here needs the
 // repository at runtime: the sweep's bounds arrive as deps.
 import type { OpenAdmission } from "../repositories/openAdmissions.clickhouse.repository";
-import type { SettleSpendCommandData } from "../schemas/commands";
-import type { GatewaySpendProcessingEvent } from "../schemas/events";
+import type { SettleSpendCommandData } from "@langwatch/gateway-server";
+import type { GatewaySpendProcessingEvent } from "@langwatch/gateway-server";
 
 const logger = createLogger("langwatch:gateway-spend:settlement");
 

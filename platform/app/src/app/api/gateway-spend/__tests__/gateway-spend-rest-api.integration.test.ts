@@ -23,11 +23,12 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import {
   GatewaySpendEventsRepository,
+  GatewaySpendEventsService,
   type SpendEventRow,
-} from "~/server/gateway/spendEvents.clickhouse.repository";
+} from "@langwatch/gateway-server";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -63,7 +64,9 @@ vi.mock("~/server/app-layer/app", async () => {
       gateway: {
         budgets: new GatewayBudgetClickHouseRepository(resolveTestClickHouseClient),
         virtualKeySpend: undefined,
-        spendEvents: new GatewaySpendEventsRepository(resolveTestClickHouseClient),
+        spendEvents: GatewaySpendEventsService.create(
+          new GatewaySpendEventsRepository(resolveTestClickHouseClient),
+        ),
         webhookEvents: WebhookEventsClickHouseRepository.create(
           resolveTestClickHouseClient,
         ),

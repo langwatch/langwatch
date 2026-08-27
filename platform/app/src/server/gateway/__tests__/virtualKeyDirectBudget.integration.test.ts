@@ -22,7 +22,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { loadDirectBudgetsForKeys } from "../virtualKeyDirectBudget.service";
 import {
   ALL_KEY_IDS,

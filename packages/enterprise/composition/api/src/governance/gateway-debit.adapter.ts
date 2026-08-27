@@ -11,11 +11,11 @@ import {
 import {
   budgetAppliesToProvider,
   budgetPeriodFloorMs,
-  ChangeEventRepository,
   currentPeriodStart,
-  resolveApplicableBudgets,
   type BudgetSpendTarget,
+  type GatewayChangeEventsPort,
 } from "@langwatch/gateway-server";
+import type { GatewayService } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
@@ -83,6 +83,8 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
   private constructor(
     private readonly database: PrismaClient,
     private readonly budgets: GatewayGovernanceBudgetStore,
+    private readonly budgetDecisions: GatewayService,
+    private readonly gatewayChanges: GatewayChangeEventsPort,
     private readonly changeEvents: GatewayBudgetChangeEventDedupe | undefined,
   ) {
     super();
@@ -91,16 +93,21 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
   static create(
     database: PrismaClient,
     budgets: GatewayGovernanceBudgetStore,
+    budgetDecisions: GatewayService,
+    gatewayChanges: GatewayChangeEventsPort,
     changeEvents?: GatewayBudgetChangeEventDedupe,
   ): AppGatewayGovernancePort {
-    return new AppGatewayGovernancePort(database, budgets, changeEvents);
+    return new AppGatewayGovernancePort(
+      database,
+      budgets,
+      budgetDecisions,
+      gatewayChanges,
+      changeEvents,
+    );
   }
 
   async resolveBudgetDebits(input: GovernanceBudgetResolutionInput) {
-    const resolved = await resolveApplicableBudgets({
-      client: this.database,
-      target: input.target,
-    });
+    const resolved = await this.budgetDecisions.resolveApplicableBudgets(input.target);
 
     return resolved
       .filter(({ budget }) => budgetAppliesToProvider(budget, input.providerKey))
@@ -131,7 +138,7 @@ export class AppGatewayGovernancePort extends GatewayGovernancePort {
     virtualKeyId: string;
     budgetIds: string[];
   }): Promise<void> {
-    await new ChangeEventRepository(this.database).append({
+    await this.gatewayChanges.append({
       organizationId: input.organizationId,
       projectId: input.projectId,
       kind: "BUDGET_UPDATED",

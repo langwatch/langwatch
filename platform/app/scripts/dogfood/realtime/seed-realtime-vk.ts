@@ -218,7 +218,7 @@ async function main() {
     displayName: user.name ?? null,
     displayEmail: user.email ?? args.email,
   });
-  const minted = await app.governance.personalVirtualKeys.issue({
+  const minted = await app.governance.personalVirtualKeyIssue({
     userId: user.id,
     organizationId: org.id,
     personalProjectId: workspace.project.id,

@@ -25,15 +25,13 @@ import {
   spendSettlementPM,
 } from "./process-manager/spendSettlement.process";
 import {
-  GatewaySpendFoldProjection,
+  createGatewaySpendFoldProjection,
   type GatewaySpendState,
-} from "./projections/gatewaySpend.foldProjection";
-import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
-} from "./schemas/constants";
-import type { GatewaySpendProcessingEvent } from "./schemas/events";
+  type GatewaySpendProcessingEvent,
+} from "@langwatch/gateway-server";
 
 export interface GatewaySpendProcessingPipelineDeps {
   gatewaySpendStore: FoldProjectionStore<GatewaySpendState>;
@@ -80,7 +78,7 @@ export function createGatewaySpendProcessingPipeline(
     }),
   })
     .withClickHouseFoldProjection(
-      new GatewaySpendFoldProjection({ store: deps.gatewaySpendStore }),
+      createGatewaySpendFoldProjection(deps.gatewaySpendStore),
     )
     .withCommand("admitSpend", AdmitSpendCommand)
     .withCommand("confirmSpend", ConfirmSpendCommand)

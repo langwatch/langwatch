@@ -32,7 +32,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayAuditAdapter } from "../auditLog.repository";
+import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-audit-${suffix}`;
@@ -44,7 +44,7 @@ const BUDGET_ID = `bdg-audit-${suffix}`;
 
 describe("AuditLog consolidation — gateway writes land in platform AuditLog", () => {
   const organizations = new PrismaOrganizationRepository(prisma);
-  const auditLog = new GatewayAuditAdapter(prisma);
+  const auditLog = createGatewayAuditPort(prisma);
 
   beforeAll(async () => {
     await startTestContainers();

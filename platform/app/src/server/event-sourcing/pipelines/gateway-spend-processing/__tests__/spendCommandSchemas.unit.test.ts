@@ -15,7 +15,7 @@ import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
-} from "../schemas/commands";
+} from "@langwatch/gateway-server";
 
 /** Exactly what the Go emitter sends, mapped through the ingest route. */
 const wireAdmission = {

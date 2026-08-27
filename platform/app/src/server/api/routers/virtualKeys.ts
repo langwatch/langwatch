@@ -18,10 +18,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
-import { GatewayUsageService } from "~/server/gateway/usage.service";
+import { GatewayUsageService } from "@langwatch/gateway-server";
 import {
   assertActorCanManageAllScopes,
   assertActorCanOperateOnAnyScope,
@@ -35,20 +35,11 @@ import {
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-} from "~/server/gateway/virtualKey.config";
-import {
-  loadTraceDestinationFacts,
-  toVirtualKeyCamelDto,
-} from "~/server/gateway/virtualKey.dto";
-import {
-  VirtualKeyService,
-  virtualKeyBudgetInputSchema,
-} from "~/server/gateway/virtualKey.service";
+import { parseVirtualKeyConfig, virtualKeyConfigSchema } from "@langwatch/gateway-contract";
+import { loadTraceDestinationFacts, toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
 import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { startOfCurrentMonthUTC } from "@langwatch/gateway-server";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -68,16 +59,12 @@ function sessionActor(session: Session): VirtualKeyActor {
  * as virtual-key-access-boundaries.feature pins.
  */
 async function requireVisibleVk(
-  ctx: { prisma: PrismaClient; session: Session },
+  ctx: { prisma: PrismaClient; session: Session; app: App },
   organizationId: string,
   id: string,
 ) {
-  const membership = await loadMembershipSet(
-    ctx.prisma,
-    organizationId,
-    ctx.session.user.id,
-  );
-  return requireVisibleVkForMembership(VirtualKeyService.create(ctx.prisma), membership, {
+  const membership = await loadMembershipSet(ctx.prisma, organizationId, ctx.session.user.id);
+  return requireVisibleVkForMembership(ctx.app.gateway.virtualKeys, membership, {
     id,
     organizationId,
   });
@@ -108,14 +95,14 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         ctx.session.user.id,
       );
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const keys = (await service.getAll(input.organizationId)).filter((vk) =>
         isVisibleToMembership(membership, vk.scopes),
       );
       // One read of the destinations for the whole page: a listing must not
       // cost a query per key to say where each one's traffic goes.
       const facts = await loadTraceDestinationFacts({
-        client: ctx.prisma,
+        projects: ctx.app.projects,
         virtualKeys: keys,
       });
       return keys.map((vk) => toVirtualKeyCamelDto({ virtualKey: vk, facts }));
@@ -136,7 +123,7 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto({
         virtualKey: vk,
         facts: await loadTraceDestinationFacts({
-          client: ctx.prisma,
+          projects: ctx.app.projects,
           virtualKeys: [vk],
         }),
       });
@@ -165,7 +152,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // Without the ClickHouse spend source there is no number to report.
       // Failing loudly lets the column render "unavailable" instead of a
       // confident $0.00 that cannot be told apart from a zero-spend key.
-      const spendRepo = getApp().gateway.virtualKeySpend;
+      const spendRepo = ctx.app.gateway.virtualKeySpend;
       if (!spendRepo) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -177,7 +164,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         ctx.session.user.id,
       );
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const keys = (await service.getAll(input.organizationId)).filter((vk) =>
         isVisibleToMembership(membership, vk.scopes),
       );
@@ -197,7 +184,7 @@ export const virtualKeysRouter = createTRPCRouter({
           prisma: ctx.prisma,
           organizationId: input.organizationId,
           virtualKeyIds: keys.map((k) => k.id),
-          chRepo: getApp().gateway.budgets,
+          chRepo: ctx.app.gateway.budgets,
           now,
         }),
       ]);
@@ -250,6 +237,7 @@ export const virtualKeysRouter = createTRPCRouter({
         const vk = await requireVisibleVk(ctx, input.organizationId, input.virtualKeyId);
         return resolveApplicableBudgetsForDraftKey(
           ctx.prisma,
+          ctx.app.projects,
           {
             organizationId: input.organizationId,
             virtualKeyId: vk.id,
@@ -260,7 +248,8 @@ export const virtualKeysRouter = createTRPCRouter({
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
-          getApp().gateway.budgets,
+          ctx.app.gateway.budgetDecisions,
+          ctx.app.gateway.budgets,
         );
       }
       // For a draft (create drawer): the caller must hold
@@ -273,11 +262,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.scopes,
       );
       await assertScopesBelongToOrg(ctx.prisma, input.organizationId, input.scopes);
-      await assertTraceProjectBelongsToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.traceProjectId,
-      );
+      await assertTraceProjectBelongsToOrg(ctx.prisma, input.organizationId, input.traceProjectId);
       if (input.traceProjectId) {
         await assertActorCanManageAllScopes(
           { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -303,6 +288,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }
       return resolveApplicableBudgetsForDraftKey(
         ctx.prisma,
+        ctx.app.projects,
         {
           organizationId: input.organizationId,
           virtualKeyId: null,
@@ -310,7 +296,8 @@ export const virtualKeysRouter = createTRPCRouter({
           traceProjectId: input.traceProjectId ?? null,
           principalUserId: input.principalUserId ?? null,
         },
-        getApp().gateway.budgets,
+        ctx.app.gateway.budgetDecisions,
+        ctx.app.gateway.budgets,
       );
     }),
 
@@ -345,11 +332,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.scopes,
       );
       await assertScopesBelongToOrg(ctx.prisma, input.organizationId, input.scopes);
-      await assertTraceProjectBelongsToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.traceProjectId,
-      );
+      await assertTraceProjectBelongsToOrg(ctx.prisma, input.organizationId, input.traceProjectId);
       // The destination routes traces AND budget debits into that
       // project, so choosing it needs the same manage grant the old
       // PROJECT scope enforced; tenancy alone would let a team manager
@@ -370,7 +353,7 @@ export const virtualKeysRouter = createTRPCRouter({
         vkProjectId,
         input.config?.guardrailAttachments,
       );
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const { virtualKey, secret } = await service.create({
         organizationId: input.organizationId,
         name: input.name,
@@ -389,7 +372,7 @@ export const virtualKeysRouter = createTRPCRouter({
         virtualKey: toVirtualKeyCamelDto({
           virtualKey,
           facts: await loadTraceDestinationFacts({
-            client: ctx.prisma,
+            projects: ctx.app.projects,
             virtualKeys: [virtualKey],
           }),
         }),
@@ -421,7 +404,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const existing = await requireExistingVk(service, input.id, input.organizationId);
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
@@ -458,9 +441,7 @@ export const virtualKeysRouter = createTRPCRouter({
         vkId: input.id,
         inputScopes: input.scopes,
         traceProjectId:
-          input.traceProjectId !== undefined
-            ? input.traceProjectId
-            : existing.traceProjectId,
+          input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
       });
       // Newly-submitted attachments are always validated. When the caller
       // is ALSO changing scopes (a possible project move) but did not
@@ -496,7 +477,7 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto({
         virtualKey: updated,
         facts: await loadTraceDestinationFacts({
-          client: ctx.prisma,
+          projects: ctx.app.projects,
           virtualKeys: [updated],
         }),
       });
@@ -511,7 +492,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -527,7 +508,7 @@ export const virtualKeysRouter = createTRPCRouter({
         virtualKey: toVirtualKeyCamelDto({
           virtualKey,
           facts: await loadTraceDestinationFacts({
-            client: ctx.prisma,
+            projects: ctx.app.projects,
             virtualKeys: [virtualKey],
           }),
         }),
@@ -544,7 +525,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -559,7 +540,7 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto({
         virtualKey: updated,
         facts: await loadTraceDestinationFacts({
-          client: ctx.prisma,
+          projects: ctx.app.projects,
           virtualKeys: [updated],
         }),
       });
@@ -574,7 +555,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -590,7 +571,7 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto({
         virtualKey: updated,
         facts: await loadTraceDestinationFacts({
-          client: ctx.prisma,
+          projects: ctx.app.projects,
           virtualKeys: [updated],
         }),
       });
@@ -605,7 +586,7 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const service = VirtualKeyService.create(ctx.prisma);
+      const service = ctx.app.gateway.virtualKeys;
       const existing = await requireExistingVk(service, input.id, input.organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -620,7 +601,7 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto({
         virtualKey: updated,
         facts: await loadTraceDestinationFacts({
-          client: ctx.prisma,
+          projects: ctx.app.projects,
           virtualKeys: [updated],
         }),
       });

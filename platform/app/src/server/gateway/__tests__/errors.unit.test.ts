@@ -22,7 +22,7 @@ import {
   GatewayScopeOrgMismatchError,
   GatewaySpendUnavailableError,
   VirtualKeyNotFoundError,
-} from "../errors";
+} from "@langwatch/gateway-server";
 
 /** The client-side shape, as it arrives after serialisation. */
 const asShape = (error: {

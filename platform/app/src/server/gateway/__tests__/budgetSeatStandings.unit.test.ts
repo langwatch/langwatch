@@ -15,9 +15,9 @@ import { type GatewayBudget, Prisma, type PrismaClient } from "~/generated/prism
 import type {
   BucketSpend,
   GatewayBudgetClickHouseRepository,
-} from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "../wireMoney";
+} from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-server";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -90,11 +90,11 @@ function mockChRepo(args: {
   } as unknown as GatewayBudgetClickHouseRepository;
 }
 
-describe("GatewayBudgetService per-person standing", () => {
+describe("GatewayService per-person standing", () => {
   describe("when ten people have spent and three have reached the cap", () => {
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("reports ten seen and three over", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate()]),
         mockChRepo({
           // Three at or over $1.00, seven under.
@@ -121,7 +121,7 @@ describe("GatewayBudgetService per-person standing", () => {
 
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("counts somebody exactly on their limit as over, matching what the gateway blocks on", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate()]),
         mockChRepo({ breakdown: bucketsOf("0.999999", "1.000000") }),
       );
@@ -136,7 +136,7 @@ describe("GatewayBudgetService per-person standing", () => {
   describe("when a person's usage priced to nothing", () => {
     /** @scenario "A per-person template counts an unpriced user but not a user who only ever failed" */
     it("still counts them as a person the template is watching", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate()]),
         mockChRepo({ breakdown: bucketsOf("0.000000") }),
       );
@@ -151,7 +151,7 @@ describe("GatewayBudgetService per-person standing", () => {
   describe("when the template has seen nobody yet", () => {
     /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
     it("reports zero seen and zero over rather than leaving the figures absent", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate()]),
         mockChRepo({ breakdown: [] }),
       );
@@ -167,7 +167,7 @@ describe("GatewayBudgetService per-person standing", () => {
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("leaves both figures absent on every scope that is not a template", async () => {
       const breakdownSpy = vi.fn(async () => bucketsOf("2.000000"));
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate(), stubProjectBudget()]),
         mockChRepo({ breakdownSpy }),
       );
@@ -187,7 +187,7 @@ describe("GatewayBudgetService per-person standing", () => {
   describe("when the per-bucket read cannot reach ClickHouse", () => {
     /** @scenario "A budget whose spend cannot be totalled says so instead of showing zero" */
     it("degrades the whole list to spend-unavailable rather than showing a made-up headcount", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrisma([stubTemplate()]),
         mockChRepo({ throwOnBreakdown: true }),
       );

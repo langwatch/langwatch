@@ -15,10 +15,10 @@
 import type { GatewayBudget, PrismaClient } from "~/generated/prisma/client";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
-  type GatewayBudgetClickHouseRepository,
+  type GatewayBudgetSpendPort,
   spendTargetsForBudgets,
-} from "./budget.clickhouse.repository";
-import { nextResetAt } from "./budgetWindow";
+} from "@langwatch/gateway-server";
+import { nextResetAt } from "@langwatch/gateway-server";
 
 export type VirtualKeyDirectBudget = {
   budgetId: string;
@@ -43,7 +43,7 @@ export async function loadDirectBudgetsForKeys(args: {
   prisma: PrismaClient;
   organizationId: string;
   virtualKeyIds: string[];
-  chRepo: GatewayBudgetClickHouseRepository | undefined;
+  chRepo: GatewayBudgetSpendPort | undefined;
   /**
    * The instant the periods are computed from. Injectable so a test that
    * wrote a debit at a known time reads the same period back instead of
@@ -152,7 +152,7 @@ async function loadPeriodSpend(args: {
   prisma: PrismaClient;
   organizationId: string;
   budgets: GatewayBudget[];
-  chRepo: GatewayBudgetClickHouseRepository | undefined;
+  chRepo: GatewayBudgetSpendPort | undefined;
   now: Date;
 }): Promise<Map<string, string> | null> {
   const { prisma, organizationId, budgets, chRepo, now } = args;

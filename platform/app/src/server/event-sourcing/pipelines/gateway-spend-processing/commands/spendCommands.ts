@@ -9,7 +9,7 @@ import {
   failSpendCommandDataSchema,
   type SettleSpendCommandData,
   settleSpendCommandDataSchema,
-} from "../schemas/commands";
+} from "@langwatch/gateway-server";
 import {
   ADMIT_SPEND_COMMAND_TYPE,
   CONFIRM_SPEND_COMMAND_TYPE,
@@ -21,13 +21,13 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   SETTLE_SPEND_COMMAND_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/gateway-server";
 import type {
   GatewaySpendAdmittedEvent,
   GatewaySpendConfirmedEvent,
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
-} from "../schemas/events";
+} from "@langwatch/gateway-server";
 
 /**
  * The four spend commands are pure appends: validate, stamp identity, emit

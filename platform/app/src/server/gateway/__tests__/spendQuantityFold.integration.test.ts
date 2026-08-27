@@ -20,9 +20,9 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
-import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
-import { GatewaySpendEventsRepository } from "../spendEvents.clickhouse.repository";
+import type { GatewaySpendState } from "@langwatch/gateway-server";
+import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "@langwatch/gateway-server";
+import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const TENANT = `proj-qty-${suffix}`;
@@ -104,7 +104,7 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           },
         ]);
 
-        const read = await repository().readForFold({
+        const read = await repository().tryReadForFold({
           tenantId: TENANT,
           gatewayRequestId,
         });
@@ -138,7 +138,7 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           },
         ]);
 
-        const read = await repository().readForFold({
+        const read = await repository().tryReadForFold({
           tenantId: TENANT,
           gatewayRequestId,
         });
@@ -207,7 +207,7 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
         });
 
-        const read = await repository().readForFold({
+        const read = await repository().tryReadForFold({
           tenantId: TENANT,
           gatewayRequestId,
         });
@@ -243,8 +243,8 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
 
         // The admission arrives after the outcome. The fold loads this state
         // from the store, fills the attribution and writes the whole row back,
-        // so anything readForFold cannot decode is lost on this write.
-        const loaded = await repository().readForFold({
+        // so anything tryReadForFold cannot decode is lost on this write.
+        const loaded = await repository().tryReadForFold({
           tenantId: TENANT,
           gatewayRequestId,
         });
@@ -262,7 +262,7 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           },
         ]);
 
-        const after = await repository().readForFold({
+        const after = await repository().tryReadForFold({
           tenantId: TENANT,
           gatewayRequestId,
         });

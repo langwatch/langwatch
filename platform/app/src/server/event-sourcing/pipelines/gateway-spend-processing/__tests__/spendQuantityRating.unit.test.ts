@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../schemas/commands";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "@langwatch/gateway-server";
 import {
   NO_RATE_RULE_CODE,
   rateSpendNanoUsd,

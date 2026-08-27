@@ -12,10 +12,12 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import { VirtualKeyService } from "../virtualKey.service";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
+const projects = createTestApp().projects;
 
 function vkRow(purpose: "USER" | "LANGY") {
   return {
@@ -51,14 +53,14 @@ const mutationInput = {
 describe("VirtualKeyService product-managed guard", () => {
   describe("given a product-managed key", () => {
     it("reports it as absent on getById", async () => {
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")), projects);
 
       await expect(sut.getById("vk_1", "org_1")).resolves.toBeNull();
     });
 
     /** @scenario "Product-managed virtual keys refuse customer mutations" */
     it("refuses update with NOT_FOUND", async () => {
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")), projects);
 
       await expect(
         sut.update({ ...mutationInput, name: "renamed" }),
@@ -66,7 +68,7 @@ describe("VirtualKeyService product-managed guard", () => {
     });
 
     it("refuses rotate with NOT_FOUND, so no fresh secret is minted", async () => {
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")), projects);
 
       await expect(sut.rotate(mutationInput)).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -74,7 +76,7 @@ describe("VirtualKeyService product-managed guard", () => {
     });
 
     it("refuses revoke with NOT_FOUND", async () => {
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("LANGY")), projects);
 
       await expect(sut.revoke(mutationInput)).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -84,7 +86,7 @@ describe("VirtualKeyService product-managed guard", () => {
 
   describe("given a customer-owned key", () => {
     it("returns it from getById", async () => {
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER")), projects);
 
       await expect(sut.getById("vk_1", "org_1")).resolves.toMatchObject({
         id: "vk_1",
@@ -95,7 +97,7 @@ describe("VirtualKeyService product-managed guard", () => {
     it("lets a mutation past the guard", async () => {
       // Proves the guard is discriminating on purpose rather than refusing
       // everything: a USER key gets as far as the write transaction.
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER")));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER")), projects);
 
       await expect(sut.revoke(mutationInput)).rejects.toThrow(REACHED_TRANSACTION);
     });
@@ -105,7 +107,7 @@ describe("VirtualKeyService product-managed guard", () => {
     /** @scenario "Product-managed virtual keys are absent from customer listings" */
     it("constrains the organization listing to customer-owned keys", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany), projects);
 
       await sut.getAll("org_1");
 
@@ -121,7 +123,7 @@ describe("VirtualKeyService product-managed guard", () => {
 
     it("constrains the scope listing to customer-owned keys", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
-      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany));
+      const sut = VirtualKeyService.create(mockPrisma(vkRow("USER"), findMany), projects);
 
       await sut.getAllForScope({ scopeType: "PROJECT", scopeId: "proj_1" });
 

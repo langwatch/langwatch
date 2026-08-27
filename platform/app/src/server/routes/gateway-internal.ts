@@ -31,15 +31,12 @@ import {
   failSpendWireSchema,
   type SpendUsage,
   spendUsageSchema,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+} from "@langwatch/gateway-server";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "@langwatch/gateway-server";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { bucketPeriodFloorMs } from "~/server/gateway/budgetPeriod";
-import {
-  attributedUserBucketScopeId,
-  bucketScopeIdFor,
-} from "~/server/gateway/budgetResolution.service";
+import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
+import { bucketPeriodFloorMs } from "@langwatch/gateway-server";
+import { attributedUserBucketScopeId, bucketScopeIdFor } from "@langwatch/gateway-server";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
@@ -53,14 +50,12 @@ import {
   reportRealtimeSessionUsage,
   reserveRealtimeSession,
 } from "~/server/gateway/realtimeSession.service";
-import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
   parseVirtualKey,
   VirtualKeyCryptoError,
-} from "~/server/gateway/virtualKey.crypto";
-import { ROUTING_POLICY_SELECT } from "~/server/gateway/virtualKey.repository";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+} from "@langwatch/gateway-server";
+import { gatewayRoutingPolicySelect } from "@langwatch/gateway-server";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
 // route (uniform with `files/.../app.ts`), rather than an app-wide
@@ -416,7 +411,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     return c.json(rejectionBody(parseRejection), parseRejection.status);
   }
 
-  const service = VirtualKeyService.create(prisma);
+  const service = c.app.gateway.virtualKeys;
   const vk = await service.getByHashedSecretInternal(hashVirtualKeySecret(presented));
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
@@ -446,7 +441,9 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   // before the destination was stored in an organization with no governance
   // project to fall back to; the gateway then skips span export rather than
   // failing the auth handshake.
-  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
+  const traceProject = vk.traceProjectId
+    ? await c.app.projects.tryGetTraceDestination(vk.traceProjectId)
+    : null;
 
   // notAfter ends the token at the key's expiration date when that arrives
   // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
@@ -553,7 +550,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
       // Without it the materialiser reads an absent relation and emits an
       // empty alias map plus empty deny/allow lists, so the gateway never
       // resolves an alias and never enforces a model deny rule.
-      routingPolicy: { select: ROUTING_POLICY_SELECT },
+      routingPolicy: { select: gatewayRoutingPolicySelect },
     },
   });
   if (!vk) {
@@ -571,7 +568,9 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
 
   const materialiser = new GatewayConfigMaterialiser(
     prisma,
-    getApp().gateway.budgets ?? null,
+    c.app.projects,
+    c.var.langwatchApp.gateway.budgets ?? null,
+    c.var.langwatchApp.gateway.budgetDecisions,
   );
 
   const ifNoneMatch = c.req.header("If-None-Match");
@@ -642,7 +641,7 @@ secured.access(gatewayPolicy()).get("/changes", async (c) => {
     1,
     Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
   );
-  const repo = new ChangeEventRepository(prisma);
+  const repo = c.var.langwatchApp.gateway.changes;
   const deadline = Date.now() + timeoutSeconds * 1000;
 
   while (Date.now() < deadline) {
@@ -775,7 +774,7 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
 /** Spend in one budget bucket, in micro USD. An organization with no
  *  projects has nothing to read, so it reports zero. */
 async function bucketSpentMicroUsd(params: {
-  budgetRepository: GatewayBudgetClickHouseRepository;
+  budgetRepository: GatewayBudgetSpendPort;
   budget: GatewayBudget;
   bucketScopeId: string;
   periodFloorMs: number | undefined;

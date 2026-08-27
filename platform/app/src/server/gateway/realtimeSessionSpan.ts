@@ -22,8 +22,8 @@ import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
 import { getApp } from "~/server/app-layer/app";
 import { ATTR_KEYS as ATTR } from "@langwatch/trace-contract";
-import type { SpendUsage } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { SpendUsage } from "@langwatch/gateway-server";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:gateway:realtime-session-span");
 

@@ -24,9 +24,9 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../process-manager/spendSettlement.process";
-import type { GatewaySpendState } from "../../projections/gatewaySpend.foldProjection";
+import type { GatewaySpendState } from "@langwatch/gateway-server";
 import {
   ClickHouseOpenAdmissionFinder,
   type OpenAdmission,

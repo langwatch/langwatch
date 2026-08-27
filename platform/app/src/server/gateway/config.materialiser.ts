@@ -18,13 +18,14 @@ import type {
 
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-contract";
-import { modelProviders } from "../modelProviders/registry";
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
-import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
+import { modelProviders } from "@langwatch/model-provider-contract";
+import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
+import type { ProjectService } from "@langwatch/project-contract";
 import {
-  type ResolvedBudget,
-  resolveApplicableBudgets,
-} from "./budgetResolution.service";
+  budgetPeriodFloorMs,
+  effectiveBudgetPeriod,
+  PrismaGatewayAdapter,
+} from "@langwatch/gateway-server";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { computeConfigETag } from "./configETag";
 import { withTierFallthrough } from "./modelTierFallthrough";
@@ -32,11 +33,13 @@ import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
   eligibleModelProvidersForVk,
   scopeReachableModelProvidersForVk,
-  traceProjectFor,
 } from "./scopeResolver";
-import { organizationSpendTenantIds } from "./spendTenants";
-import { parseVirtualKeyConfig } from "./virtualKey.config";
-import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+import {
+  parseVirtualKeyConfig,
+  type GatewayResolvedBudget,
+  type GatewayService,
+} from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-server";
 
 export type GuardrailWire = {
   id: string;
@@ -280,7 +283,13 @@ export type GatewayConfigPayload = {
 export class GatewayConfigMaterialiser {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
+    private readonly projects: ProjectService,
+    private readonly chRepo: GatewayBudgetSpendPort | null = null,
+    private readonly budgetDecisions: GatewayService = PrismaGatewayAdapter.create({
+      database: prisma,
+      projects,
+      budgetSpend: chRepo ?? undefined,
+    }).build(),
   ) {}
 
   /**
@@ -338,7 +347,9 @@ export class GatewayConfigMaterialiser {
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await eligibleModelProvidersForVk(this.prisma, vk);
-    const traceProject = await traceProjectFor(this.prisma, vk.traceProjectId);
+    const traceProject = vk.traceProjectId
+      ? await this.projects.tryGetTraceDestination(vk.traceProjectId)
+      : null;
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
@@ -469,7 +480,7 @@ export class GatewayConfigMaterialiser {
       return new Map();
     }
     try {
-      const tenantIds = await organizationSpendTenantIds(this.prisma, vk.organizationId);
+      const tenantIds = await this.budgetDecisions.listSpendTenantIds(vk.organizationId);
       if (tenantIds.length === 0) return new Map();
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the
@@ -513,16 +524,13 @@ export class GatewayConfigMaterialiser {
   private async applicableBudgets(
     vk: VirtualKey,
     traceProject: { id: string; teamId: string } | null,
-  ): Promise<ResolvedBudget[]> {
-    return resolveApplicableBudgets({
-      client: this.prisma,
-      target: {
-        organizationId: vk.organizationId,
-        virtualKeyId: vk.id,
-        teamId: traceProject?.teamId ?? null,
-        projectId: traceProject?.id ?? null,
-        principalUserId: vk.principalUserId,
-      },
+  ): Promise<GatewayResolvedBudget[]> {
+    return this.budgetDecisions.resolveApplicableBudgets({
+      organizationId: vk.organizationId,
+      virtualKeyId: vk.id,
+      teamId: traceProject?.teamId ?? null,
+      projectId: traceProject?.id ?? null,
+      principalUserId: vk.principalUserId,
     });
   }
 }

@@ -7,17 +7,21 @@
  * Real Postgres + real ClickHouse, no mocks. Cost is written by the real
  * process manager through the real repository, and read back both through the
  * dedicated pulled read and — for the enforcement gate — through
- * `GatewayBudgetService.check`, which is the actual pre-request decision the
+ * `GatewayService.check`, which is the actual pre-request decision the
  * gateway makes. Asserting on anything less than `check` would prove that a
  * number looked right, not that a customer's request was still served.
  *
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088.
  */
+import type { RecordPulledUsageCommand } from "@langwatch/enterprise-governance-contract";
 import {
-  AppPulledUsageLedgerService,
-  type AppWritePulledUsagePayload,
-} from "@ee/governance/process-manager/pulledUsageLedger.process";
+  PulledUsageEventingAdapter,
+  PulledUsageLedgerPort,
+  PulledUsageLedgerProcess,
+  type PulledUsageLedgerRow,
+} from "@langwatch/enterprise-governance-server";
+import { EventSourcing, InMemoryProcessStore, mapCommands } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
@@ -30,8 +34,8 @@ import {
 import {
   GatewayBudgetClickHouseRepository,
   PULLED_USAGE_SCOPE,
-} from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
+} from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-pulled-${suffix}`;
@@ -53,8 +57,35 @@ const WINDOW_TO = new Date("2026-09-01T00:00:00.000Z");
 const BUCKET_AT = new Date("2026-08-03T00:00:00.000Z");
 
 let chRepo: GatewayBudgetClickHouseRepository;
-let service: GatewayBudgetService;
-let writePulledUsage: (payload: AppWritePulledUsagePayload) => Promise<void>;
+let service: GatewayService;
+let eventSourcing: EventSourcing | undefined;
+let writePulledUsage: (payload: PulledUsageWrite) => Promise<void>;
+
+type PulledUsageWrite = {
+  restatement_key: string;
+  tenant_id: string;
+  scope_id: string;
+  organization_id: string;
+  team_id: string | null;
+  model: string;
+  cost_nano_usd: number;
+  tokens_input: number;
+  tokens_output: number;
+  tokens_cache_read: number;
+  tokens_cache_write: number;
+  occurred_at_ms: number;
+  observed_at_ms: number;
+};
+
+class ClickHousePulledUsageLedgerPort extends PulledUsageLedgerPort {
+  constructor(private readonly repository: GatewayBudgetClickHouseRepository) {
+    super();
+  }
+
+  insert(rows: PulledUsageLedgerRow[]): Promise<void> {
+    return this.repository.insertPulledUsageRows(rows);
+  }
+}
 
 /** One pulled usage item, as the process manager mints it. */
 function pulledItem(options: {
@@ -64,7 +95,7 @@ function pulledItem(options: {
   teamId?: string | null;
   observedAt: Date;
   tokensInput?: number;
-}): AppWritePulledUsagePayload {
+}): PulledUsageWrite {
   return {
     restatement_key: options.restatementKey,
     tenant_id: GOV_PROJECT_ID,
@@ -201,12 +232,48 @@ beforeAll(async () => {
     return client;
   };
   chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
-  service = new GatewayBudgetService(prisma, undefined, undefined, chRepo);
-  const ledger = AppPulledUsageLedgerService.create(chRepo);
-  writePulledUsage = (payload) => ledger.write(payload);
+  service = GatewayService.create(prisma, chRepo);
+  eventSourcing = new EventSourcing({
+    processStore: new InMemoryProcessStore(),
+    executionTarget: "all",
+  });
+  const pipeline = eventSourcing.register(
+    PulledUsageEventingAdapter.create({
+      ledger: PulledUsageLedgerProcess.create(
+        new ClickHousePulledUsageLedgerPort(chRepo),
+      ),
+    }).build(),
+  );
+  const commands = mapCommands(pipeline.commands);
+  writePulledUsage = (payload) =>
+    commands.recordPulledUsage({
+      tenantId: payload.tenant_id,
+      occurredAt: payload.observed_at_ms,
+      data: {
+        itemKey: payload.restatement_key,
+        restatementKey: payload.restatement_key,
+        source: "integration",
+        ingestionSourceId: "ingestion-source",
+        organizationId: payload.organization_id,
+        teamId: payload.team_id,
+        projectId: null,
+        model: payload.model,
+        tokensInput: payload.tokens_input,
+        tokensOutput: payload.tokens_output,
+        tokensCacheRead: payload.tokens_cache_read,
+        tokensCacheWrite: payload.tokens_cache_write,
+        costNanoUsd: payload.cost_nano_usd,
+        rateVersion: null,
+        costBasis: "provider_reported",
+        costStatus: "exact",
+        occurredAtMs: payload.occurred_at_ms,
+        observedAtMs: payload.observed_at_ms,
+      },
+    } satisfies RecordPulledUsageCommand);
 }, 180_000);
 
 afterAll(async () => {
+  await eventSourcing?.close();
   await stopTestContainers();
 });
 

@@ -15,7 +15,8 @@
  * Spec: specs/ai-gateway/audio-endpoints.feature
  */
 import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
-import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
+import { AppGatewayDebitAdapter } from "@langwatch/enterprise-api/governance/gateway-debit.adapter";
+import { AppGatewayGovernancePort } from "~/server/app-layer/presets";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
@@ -27,9 +28,9 @@ import {
 import {
   EMPTY_SPEND_USAGE,
   type SpendUsage,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+} from "@langwatch/gateway-server";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-tts-${suffix}`;
@@ -144,10 +145,9 @@ beforeAll(async () => {
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   });
-  const debitRuntime = AppGatewayDebitAdapter.create({
-    prisma,
-    budgetCHRepository: chRepo,
-  }).build();
+  const debitRuntime = AppGatewayDebitAdapter.create(
+    AppGatewayGovernancePort.create(prisma, chRepo),
+  ).build();
   writeDebits = (payload) => debitRuntime.write(payload);
 }, 180_000);
 

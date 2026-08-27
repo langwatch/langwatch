@@ -21,11 +21,11 @@ import {
 import {
   type BudgetDebitRow,
   GatewayBudgetClickHouseRepository,
-} from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
-import { bucketPeriodFloorMs, budgetPeriodFloorMs } from "../budgetPeriod";
-import { attributedUserBucketScopeId } from "../budgetResolution.service";
-import { anchoredPeriodStart, nextAnchoredResetAt } from "../budgetWindow";
+} from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
+import { bucketPeriodFloorMs, budgetPeriodFloorMs } from "@langwatch/gateway-server";
+import { attributedUserBucketScopeId } from "@langwatch/gateway-server";
+import { anchoredPeriodStart, nextAnchoredResetAt } from "@langwatch/gateway-server";
 
 /**
  * A month cycle phased to the 17th at 09:00 UTC: far enough in the past
@@ -63,7 +63,7 @@ const USER_ID = `usr-attr-${suffix}`;
 const VK_ID = `vk_attr_${suffix}`;
 
 let chRepo: GatewayBudgetClickHouseRepository;
-let service: GatewayBudgetService;
+let service: GatewayService;
 
 function debitRow(
   over: Partial<BudgetDebitRow> &
@@ -139,7 +139,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
       if (!client) throw new Error("test ClickHouse client unavailable");
       return client;
     });
-    service = GatewayBudgetService.create(prisma, chRepo);
+    service = GatewayService.create(prisma, chRepo);
   }, 120_000);
 
   afterAll(async () => {

@@ -4,8 +4,8 @@ import { type GatewayBudget, Prisma, type PrismaClient } from "~/generated/prism
 import type {
   GatewayBudgetClickHouseRepository,
   LedgerEventRow,
-} from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
+} from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 
 function mockChRepoWithEvents(
   events: Array<Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">>,
@@ -78,10 +78,10 @@ const baseCheck = {
   principalUserId: null,
 };
 
-describe("GatewayBudgetService.check", () => {
+describe("GatewayService.check", () => {
   describe("when no budgets are applicable", () => {
     it("returns allow with empty warnings / blockedBy", async () => {
-      const sut = GatewayBudgetService.create(mockPrismaWithBudgets([]));
+      const sut = GatewayService.create(mockPrismaWithBudgets([]));
 
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
 
@@ -94,7 +94,7 @@ describe("GatewayBudgetService.check", () => {
 
   describe("when projected spend stays well under limit", () => {
     it("returns allow without warnings", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("10.00") })]),
       );
 
@@ -106,7 +106,7 @@ describe("GatewayBudgetService.check", () => {
 
   describe("when projected spend crosses the 80% threshold on a BLOCK budget", () => {
     it("returns soft_warn — warning but not blocked", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("75.00") })]),
       );
 
@@ -120,7 +120,7 @@ describe("GatewayBudgetService.check", () => {
   describe("when projected spend reaches the hard limit on a BLOCK budget", () => {
     /** @scenario Hard-block budget returns 402 when spent >= limit */
     it("returns hard_block with a descriptive reason", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("95.00") })]),
       );
 
@@ -156,12 +156,9 @@ describe("GatewayBudgetService.check", () => {
             spentUsd: "95",
           },
         ],
-      } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
+      } as unknown as Parameters<typeof GatewayService.create>[1];
 
-      const sut = GatewayBudgetService.create(
-        mockPrismaWithBudgets([budget]),
-        chRepoStub,
-      );
+      const sut = GatewayService.create(mockPrismaWithBudgets([budget]), chRepoStub);
 
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
 
@@ -180,7 +177,7 @@ describe("GatewayBudgetService.check", () => {
   describe("when a WARN budget crosses its limit", () => {
     /** @scenario Soft budget emits warning header but allows the call */
     it("warns but does not block", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([
           stubBudget({
             onBreach: "WARN",
@@ -200,7 +197,7 @@ describe("GatewayBudgetService.check", () => {
     /** @scenario Sum-of-breaches rule — any block-breach blocks */
     /** @scenario Most restrictive budget wins when multiple apply */
     it("still hard_blocks (sum-of-breaches semantics)", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([
           stubBudget({
             id: "b_org",
@@ -226,7 +223,7 @@ describe("GatewayBudgetService.check", () => {
 
   describe("scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
     it("echoes every applicable budget, not just warn/block ones", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([
           stubBudget({
             id: "b_org",
@@ -253,7 +250,7 @@ describe("GatewayBudgetService.check", () => {
     });
 
     it("reports spent_usd as 0 for budgets whose window has rolled over", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([
           stubBudget({
             spentUsd: new Prisma.Decimal("99.00"),
@@ -270,7 +267,7 @@ describe("GatewayBudgetService.check", () => {
 
   describe("when the stale spent_usd indicates the window has reset", () => {
     it("treats effective spent as 0 and allows the request", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithBudgets([
           stubBudget({
             spentUsd: new Prisma.Decimal("99.00"),
@@ -293,7 +290,7 @@ describe("GatewayBudgetService.check", () => {
  * resolver must return the right shape with the right human-friendly
  * name. Covered under one describe so the full prism is visible.
  */
-describe("GatewayBudgetService.getDetail", () => {
+describe("GatewayService.getDetail", () => {
   type Findable = {
     findFirst: unknown;
     findUnique: unknown;
@@ -357,7 +354,7 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when the budget does not exist", () => {
     it("returns null", async () => {
-      const sut = GatewayBudgetService.create(mockPrismaWithDetail(null, null));
+      const sut = GatewayService.create(mockPrismaWithDetail(null, null));
       const detail = await sut.getDetail("b_missing", "org_01");
       expect(detail).toBeNull();
     });
@@ -365,7 +362,7 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when scope is ORGANIZATION", () => {
     it("resolves the scope target to the org name/slug", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithDetail(
           stubBudget({ scopeType: "ORGANIZATION", scopeId: "org_01" }),
           { name: "Acme Inc.", slug: "acme" },
@@ -385,7 +382,7 @@ describe("GatewayBudgetService.getDetail", () => {
     it("includes the display prefix + project slug for linkback", async () => {
       // The VK's PROJECT scope points at project_01, whose slug comes
       // back from the batch resolver's slug map.
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithDetail(stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }), {
           name: "prod-openai",
           displayPrefix: "lw_live_abc",
@@ -404,7 +401,7 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when scope is PRINCIPAL", () => {
     it("prefers user.name but falls back to email then id", async () => {
-      const sut1 = GatewayBudgetService.create(
+      const sut1 = GatewayService.create(
         mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
           name: "Alex Chen",
           email: "alex@example.com",
@@ -414,7 +411,7 @@ describe("GatewayBudgetService.getDetail", () => {
         "Alex Chen",
       );
 
-      const sut2 = GatewayBudgetService.create(
+      const sut2 = GatewayService.create(
         mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
           name: null,
           email: "alex@example.com",
@@ -424,7 +421,7 @@ describe("GatewayBudgetService.getDetail", () => {
         "alex@example.com",
       );
 
-      const sut3 = GatewayBudgetService.create(
+      const sut3 = GatewayService.create(
         mockPrismaWithDetail(
           stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
           null,
@@ -439,7 +436,7 @@ describe("GatewayBudgetService.getDetail", () => {
       // Scope FKs are ON DELETE CASCADE, but if the row is stale (null on
       // lookup) the resolver must not null-pointer-crash. Detail page
       // should still render.
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithDetail(stubBudget({ scopeType: "TEAM", scopeId: "team_01" }), null),
       );
       const detail = await sut.getDetail("b_01", "org_01");
@@ -450,7 +447,7 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("ledger join", () => {
     it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
-      const sut = GatewayBudgetService.create(
+      const sut = GatewayService.create(
         mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),
         mockChRepoWithEvents([{ id: "l_01" }]),
       );

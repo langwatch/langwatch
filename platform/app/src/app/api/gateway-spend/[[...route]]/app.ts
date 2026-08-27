@@ -25,18 +25,18 @@ import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
-import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
+import { applicableEndUserCaps } from "@langwatch/gateway-server";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
-} from "~/server/gateway/spendEvents.clickhouse.repository";
-import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
+  GatewaySpendEventsService,
+} from "@langwatch/gateway-server";
 import {
   SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
   spendFiltersFromQuery,
   spendSummaryStatusFilter,
-} from "~/server/gateway/spendFilters";
+} from "@langwatch/gateway-server";
 import {
   assertGroupingIsWalkable,
   isIanaTimeZone,
@@ -44,9 +44,11 @@ import {
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
-} from "~/server/gateway/spendGrouping";
+} from "@langwatch/gateway-server";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
-import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
+import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
+import { FixedGatewaySettlementPolicy } from "@langwatch/gateway-server";
+import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-server";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
@@ -67,9 +69,9 @@ patchZodOpenapi();
  * instance `getApp()` hands out instead of each minting its own (#6248).
  */
 function requireSpendEventsService(): GatewaySpendEventsService {
-  const repository = getApp().gateway.spendEvents;
-  if (!repository) throw new ClickHouseUnavailableError();
-  return new GatewaySpendEventsService(repository);
+  const service = getApp().gateway.spendEvents;
+  if (!service) throw new ClickHouseUnavailableError();
+  return service;
 }
 
 /**
@@ -221,9 +223,7 @@ const endUserCapSchema = z.object({
   anchor_id: z.string(),
   window: z.string(),
   on_breach: z.enum(["block", "warn"]),
-  limit_usd: z
-    .string()
-    .describe(`The cap for this end user. ${USD_DISPLAY_STRING_FORMAT}`),
+  limit_usd: z.string().describe(`The cap for this end user. ${USD_DISPLAY_STRING_FORMAT}`),
   spent_usd: z.string().describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
   period_started_at: z.string(),
 });
@@ -283,9 +283,7 @@ const groupBySchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, message });
       return z.NEVER;
     };
-    const unknown = keys.filter(
-      (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
-    );
+    const unknown = keys.filter((key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey));
     if (unknown.length > 0) {
       return refuse(`group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`);
     }
@@ -427,6 +425,7 @@ secured.access(requires("gatewaySpend:view")).get(
       toMs: query.to,
       nowMs: Date.now(),
       allowUnstable: query.allow_unstable,
+      settlementPolicy: FixedGatewaySettlementPolicy.create(settlementGraceMs()),
     });
     const scope = await resolveSpendScope({
       organizationId: organization.id,
@@ -743,12 +742,9 @@ secured.access(requires("gatewaySpend:manage")).post(
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),
       endpoints,
-      pruneExpiredIdempotencyReceipts: (now) =>
-        pruneExpiredIdempotencyReceipts({ prisma, now }),
-      dispatch: ({ destination, ...input }) =>
-        webhookDestinationFor(destination).send(input),
-      getPlan: (organizationId) =>
-        getApp().planProvider.getActivePlan({ organizationId }),
+      pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts({ prisma, now }),
+      dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
+      getPlan: (organizationId) => getApp().planProvider.getActivePlan({ organizationId }),
     };
 
     // One replay identity per call: it salts batch ids and inbox source

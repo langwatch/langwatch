@@ -21,7 +21,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewaySpendEventsRepository } from "../spendEvents.clickhouse.repository";
+import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
 import { clearSpendScopeCache, resolveSpendScope } from "../spendScope";
 
 const suffix = nanoid(8);

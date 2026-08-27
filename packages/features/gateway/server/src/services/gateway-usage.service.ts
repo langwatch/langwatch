@@ -22,10 +22,10 @@
  * project is how the Usage page rendered "No usage in this window" while
  * the keys table showed spend for the same keys.
  */
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
-import type { GatewayVirtualKeySpendRepository } from "./virtualKeySpend.clickhouse.repository";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
 
 export type UsageWindow = { fromDate: Date; toDate: Date };
 
@@ -80,8 +80,8 @@ const RECENT_DEBITS_LIMIT = 20;
 export class GatewayUsageService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly chRepo?: GatewayBudgetClickHouseRepository,
-    private readonly spendRepo?: GatewayVirtualKeySpendRepository,
+    private readonly chRepo?: GatewayBudgetSpendPort,
+    private readonly spendRepo?: GatewayVirtualKeySpendPort,
   ) {}
 
   /**
@@ -92,8 +92,8 @@ export class GatewayUsageService {
    */
   static create(args: {
     prisma: PrismaClient;
-    chRepo: GatewayBudgetClickHouseRepository | undefined;
-    spendRepo: GatewayVirtualKeySpendRepository | undefined;
+    chRepo: GatewayBudgetSpendPort | undefined;
+    spendRepo: GatewayVirtualKeySpendPort | undefined;
   }): GatewayUsageService {
     return new GatewayUsageService(args.prisma, args.chRepo, args.spendRepo);
   }
@@ -288,9 +288,7 @@ export class GatewayUsageService {
       where: { id: { in: virtualKeyIds } },
       select: { id: true, name: true, displayPrefix: true },
     });
-    return new Map(
-      keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]),
-    );
+    return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
   }
 
   /** Every project of the org: the tenant set gateway traces can land in. */

@@ -5,7 +5,7 @@
  * The two drawers render the same field, so the copy and the limits live here
  * rather than being written twice and drifting apart.
  */
-import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "~/server/gateway/virtualKey.config";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
 /**
  * The paragraph behind the field's (i). Everything a person needs before

@@ -1,5 +1,5 @@
 import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
-import { isDispatchableProvider } from "~/server/modelProviders/registry";
+import { isDispatchableProvider } from "@langwatch/model-provider-contract";
 import { SCOPE_BREADTH, scopeBreadthRank } from "~/utils/scopeBreadth";
 
 /**

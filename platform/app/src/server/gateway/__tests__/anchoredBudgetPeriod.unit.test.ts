@@ -10,8 +10,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { explainHandledError } from "~/features/errors/logic/presentation";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { GatewayBudgetService } from "../budget.service";
-import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "../budgetPeriod";
+import { GatewayService } from "@langwatch/gateway-server";
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-server";
 
 describe("budgetPeriodFloorMs on an anchored budget", () => {
   const anchor = new Date("2026-06-17T09:00:00.000Z");
@@ -180,7 +180,7 @@ describe("effectiveBudgetPeriod", () => {
   });
 });
 
-describe("GatewayBudgetService.create with a cycle anchor", () => {
+describe("GatewayService.create with a cycle anchor", () => {
   const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
   function mockPrisma(): PrismaClient {
@@ -214,7 +214,7 @@ describe("GatewayBudgetService.create with a cycle anchor", () => {
   /** @scenario "A cycle anchor needs a cyclic window" */
   it("refuses an anchor on the two windows that do not cycle", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = GatewayBudgetService.create(mockPrisma());
+      const sut = GatewayService.create(mockPrisma());
       // The whole refusal contract, not just the code: the message is what
       // the REST body carries, the fault is what decides whether this is an
       // incident or routine, and meta.window is the caller's own value.
@@ -245,7 +245,7 @@ describe("GatewayBudgetService.create with a cycle anchor", () => {
   });
 
   it("accepts an anchor on a cyclic window", async () => {
-    const sut = GatewayBudgetService.create(mockPrisma());
+    const sut = GatewayService.create(mockPrisma());
     await expect(sut.create({ ...baseInput, window: "MONTH" })).rejects.toThrow(
       REACHED_TRANSACTION,
     );
@@ -253,7 +253,7 @@ describe("GatewayBudgetService.create with a cycle anchor", () => {
 
   it("leaves the two non-cycling windows alone when no anchor is sent", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = GatewayBudgetService.create(mockPrisma());
+      const sut = GatewayService.create(mockPrisma());
       await expect(
         sut.create({ ...baseInput, window, cycleAnchorAt: null }),
       ).rejects.toThrow(REACHED_TRANSACTION);

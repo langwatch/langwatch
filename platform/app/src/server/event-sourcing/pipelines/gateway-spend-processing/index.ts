@@ -3,6 +3,10 @@ export {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
   type GatewaySpendStatus,
-} from "./projections/gatewaySpend.foldProjection";
+} from "@langwatch/gateway-server";
 export { GatewaySpendStore } from "./projections/gatewaySpend.store";
-export * from "./schemas/constants";
+export {
+  GATEWAY_SPEND_AGGREGATE_TYPE,
+  GATEWAY_SPEND_PIPELINE_NAME,
+  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
+} from "@langwatch/gateway-server";

@@ -15,6 +15,7 @@ import { AppGovernanceSignalsService } from "@langwatch/enterprise-api/governanc
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
+import type { ProjectService } from "@langwatch/project-contract";
 import type {
   GatewayBudget,
   Prisma,
@@ -22,27 +23,25 @@ import type {
   VirtualKey,
   VirtualKeyRoutingMode,
 } from "~/generated/prisma/client";
-import { GatewayAuditAdapter } from "./auditLog.repository";
-import { serializeRowForAudit } from "./auditSerializer";
-import { nextResetAt } from "./budgetWindow";
-import { ChangeEventRepository } from "./changeEvent.repository";
+import type { GatewayAuditPort } from "@langwatch/gateway-server";
+import { serializeRowForAudit } from "@langwatch/gateway-server";
+import { nextResetAt } from "@langwatch/gateway-server";
+import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
+import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
+import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import {
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,
   translateExternalIdConflict,
   VirtualKeyExpiryInPastError,
-} from "./errors";
+} from "@langwatch/gateway-server";
 import {
   identityPatchData,
   metadataPatch,
   type ResourceMetadata,
-} from "./resourceMetadata";
-import {
-  decideTraceDestination,
-  scopeReachableModelProvidersForVk,
-  type TraceDestinationInput,
-} from "./scopeResolver";
+} from "@langwatch/gateway-server";
+import { scopeReachableModelProvidersForVk } from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
   type GuardrailAttachment,
@@ -50,17 +49,18 @@ import {
   parseVirtualKeyConfig,
   type VirtualKeyConfig,
   virtualKeyConfigSchema,
-} from "./virtualKey.config";
+} from "@langwatch/gateway-contract";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
   parseVirtualKey,
-} from "./virtualKey.crypto";
+} from "@langwatch/gateway-server";
 import {
   type ScopeInput,
-  VirtualKeyRepository,
+  type GatewayVirtualKeysPort,
   type VirtualKeyWithScopes,
-} from "./virtualKey.repository";
+} from "@langwatch/gateway-server";
+import { createGatewayVirtualKeysPort } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -228,19 +228,21 @@ export class VirtualKeyService {
 
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly repository: VirtualKeyRepository,
-    private readonly changeEvents: ChangeEventRepository,
-    private readonly auditLog: GatewayAuditAdapter,
+    private readonly projects: ProjectService,
+    private readonly repository: GatewayVirtualKeysPort,
+    private readonly changeEvents: GatewayChangeEventsPort,
+    private readonly auditLog: GatewayAuditPort,
   ) {
     this.governanceSignals = AppGovernanceSignalsService.disabled();
   }
 
-  static create(prisma: PrismaClient): VirtualKeyService {
+  static create(prisma: PrismaClient, projects: ProjectService): VirtualKeyService {
     return new VirtualKeyService(
       prisma,
-      new VirtualKeyRepository(prisma),
-      new ChangeEventRepository(prisma),
-      new GatewayAuditAdapter(prisma),
+      projects,
+      createGatewayVirtualKeysPort(prisma),
+      createGatewayChangeEventsPort(prisma),
+      createGatewayAuditPort(prisma),
     );
   }
 
@@ -282,7 +284,7 @@ export class VirtualKeyService {
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes | null> {
-    const vk = await this.repository.findById(id, organizationId);
+    const vk = await this.repository.tryFindById(id, organizationId);
     if (!vk || isProductManaged(vk)) return null;
     return vk;
   }
@@ -291,7 +293,7 @@ export class VirtualKeyService {
   async getByHashedSecretInternal(
     hashedSecret: string,
   ): Promise<VirtualKeyWithScopes | null> {
-    return this.repository.findByHashedSecret(hashedSecret);
+    return this.repository.tryFindByHashedSecret(hashedSecret);
   }
 
   async create(input: CreateVirtualKeyInput): Promise<CreatedVirtualKey> {
@@ -324,16 +326,14 @@ export class VirtualKeyService {
 
     const id = this.nextVirtualKeyId();
 
+    const traceProjectId = await this.resolveStoredTraceDestination({
+      organizationId: input.organizationId,
+      scopes: input.scopes,
+      traceProjectId: input.traceProjectId ?? null,
+    });
+
     const created = await this.prisma
       .$transaction(async (tx) => {
-        const traceProjectId = await this.resolveStoredTraceDestination(
-          {
-            organizationId: input.organizationId,
-            scopes: input.scopes,
-            traceProjectId: input.traceProjectId ?? null,
-          },
-          tx,
-        );
         const vk = await this.repository.create(
           {
             id,
@@ -452,6 +452,8 @@ export class VirtualKeyService {
     assertProvidersAllowedShape(input.config?.providersAllowed);
     assertExpiryInFuture({ expiresAt: input.expiresAt });
 
+    const traceProjectId = await this.nextStoredTraceDestination({ existing, input });
+
     const updated = await this.prisma
       .$transaction(async (tx) => {
         if (input.scopes) {
@@ -463,11 +465,6 @@ export class VirtualKeyService {
           }
           await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
-
-        const traceProjectId = await this.nextStoredTraceDestination(
-          { existing, input },
-          tx,
-        );
 
         const vk = await tx.virtualKey.update({
           where: { id: input.id, organizationId: input.organizationId },
@@ -820,7 +817,7 @@ export class VirtualKeyService {
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes> {
-    const existing = await this.repository.findById(id, organizationId);
+    const existing = await this.repository.tryFindById(id, organizationId);
     if (!existing || isProductManaged(existing)) {
       throw new TRPCError({
         code: "NOT_FOUND",
@@ -1009,7 +1006,7 @@ export class VirtualKeyService {
    *
    * Per-key spend is read off the trace path, so the project a key traces
    * into is the project its spend is attributed to. The four cases live in
-   * `decideTraceDestination`; what belongs here is what each refusal means
+   * `ProjectService.resolveTraceDestination`; what belongs here is what each refusal means
    * to the person who asked for the key:
    *
    *   - `gateway_trace_project_unknown`: the destination named is not a live
@@ -1027,10 +1024,15 @@ export class VirtualKeyService {
    * Spec: specs/ai-gateway/virtual-key-creation.feature
    */
   private async resolveStoredTraceDestination(
-    input: TraceDestinationInput,
-    tx: Prisma.TransactionClient,
+    input: Pick<CreateVirtualKeyInput, "organizationId" | "scopes" | "traceProjectId">,
   ): Promise<string> {
-    const decision = await decideTraceDestination(tx, input);
+    const decision = await this.projects.resolveTraceDestination({
+      organizationId: input.organizationId,
+      projectScopeIds: input.scopes
+        .filter((scope) => scope.scopeType === "PROJECT")
+        .map((scope) => scope.scopeId),
+      traceProjectId: input.traceProjectId,
+    });
     switch (decision.outcome) {
       case "resolved":
         return decision.project.id;
@@ -1064,22 +1066,19 @@ export class VirtualKeyService {
    * governance project to fall back to. Those resolve like a create, so the
    * next touch either gives the key's traces a home or does not go through.
    */
-  private async nextStoredTraceDestination(
-    args: { existing: VirtualKeyWithScopes; input: UpdateVirtualKeyInput },
-    tx: Prisma.TransactionClient,
-  ): Promise<string> {
+  private async nextStoredTraceDestination(args: {
+    existing: VirtualKeyWithScopes;
+    input: UpdateVirtualKeyInput;
+  }): Promise<string> {
     const { existing, input } = args;
     if (input.traceProjectId === undefined && existing.traceProjectId) {
       return existing.traceProjectId;
     }
-    return this.resolveStoredTraceDestination(
-      {
-        organizationId: input.organizationId,
-        scopes: input.scopes ?? existing.scopes,
-        traceProjectId: input.traceProjectId ?? null,
-      },
-      tx,
-    );
+    return this.resolveStoredTraceDestination({
+      organizationId: input.organizationId,
+      scopes: input.scopes ?? existing.scopes,
+      traceProjectId: input.traceProjectId ?? null,
+    });
   }
 
   /**

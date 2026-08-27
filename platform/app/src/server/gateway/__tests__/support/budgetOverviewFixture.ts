@@ -9,6 +9,7 @@
  * copying 300 lines of seed.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { usdToNanoUsd } from "@langwatch/gateway-server";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 
@@ -22,8 +23,6 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "../../budget.clickhouse.repository";
 import { BudgetOverviewService } from "../../budgetOverview.service";
-import { groupBucketScopeId } from "../../budgetResolution.service";
-import { usdToNanoUsd } from "../../wireMoney";
 
 export const suffix = nanoid(8);
 export const ORG_ID = `org-bov-${suffix}`;

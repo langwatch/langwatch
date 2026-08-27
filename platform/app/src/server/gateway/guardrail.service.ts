@@ -19,8 +19,9 @@ import type {
 } from "~/generated/prisma/client";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 
-import { GatewayAuditAdapter } from "./auditLog.repository";
-import { serializeRowForAudit } from "./auditSerializer";
+import type { GatewayAuditPort } from "@langwatch/gateway-server";
+import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
+import { serializeRowForAudit } from "@langwatch/gateway-server";
 
 export type CreateGuardrailInput = {
   projectId: string;
@@ -53,7 +54,7 @@ export class GatewayGuardrailService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly evaluators: EvaluatorService,
-    private readonly auditLog = new GatewayAuditAdapter(prisma),
+    private readonly auditLog: GatewayAuditPort = createGatewayAuditPort(prisma),
   ) {}
 
   static create(

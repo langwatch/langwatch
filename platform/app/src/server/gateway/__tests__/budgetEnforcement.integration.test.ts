@@ -14,7 +14,8 @@
  * if the ladder from allow to warn to block ever stops working.
  */
 import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
-import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
+import { AppGatewayDebitAdapter } from "@langwatch/enterprise-api/governance/gateway-debit.adapter";
+import { AppGatewayGovernancePort } from "~/server/app-layer/presets";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
@@ -30,8 +31,8 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-enf-${suffix}`;
@@ -92,7 +93,7 @@ function servedRequest(options: {
 holdClickHouseSchemaLockForFile();
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
-  let service: GatewayBudgetService;
+  let service: GatewayService;
   let recordOneRequest: () => Promise<void>;
   let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;
 
@@ -187,12 +188,11 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       return client;
     };
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
-    service = GatewayBudgetService.create(prisma, chRepo);
+    service = GatewayService.create(prisma, chRepo);
 
-    const debitRuntime = AppGatewayDebitAdapter.create({
-      prisma,
-      budgetCHRepository: chRepo,
-    }).build();
+    const debitRuntime = AppGatewayDebitAdapter.create(
+      AppGatewayGovernancePort.create(prisma, chRepo),
+    ).build();
     writeDebits = (payload) => debitRuntime.write(payload);
 
     recordOneRequest = async () => {
@@ -286,7 +286,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   describe("when spend totals cannot be read", () => {
     /** @scenario "A budget whose spend cannot be totalled says so instead of showing zero" */
     it("reports spend as unavailable rather than as zero", async () => {
-      const withoutLedger = GatewayBudgetService.create(prisma, undefined);
+      const withoutLedger = GatewayService.create(prisma, undefined);
 
       const { budgets, spendAvailable } = await withoutLedger.listWithHealth(ORG_ID);
 
@@ -317,7 +317,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     // Captured in beforeAll, while the schema is still on the 00055 view,
     // so the assertions below never depend on live schema mutations from
     // inside a test body.
-    let preRebuildDecision: Awaited<ReturnType<GatewayBudgetService["check"]>>;
+    let preRebuildDecision: Awaited<ReturnType<GatewayService["check"]>>;
 
     const decidePreProject = async () =>
       await service.check({

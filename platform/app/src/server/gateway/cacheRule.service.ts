@@ -43,10 +43,12 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 
-import { GatewayAuditAdapter } from "./auditLog.repository";
-import { serializeRowForAudit } from "./auditSerializer";
-import { ChangeEventRepository } from "./changeEvent.repository";
-import { keysetAfter } from "./wirePagination";
+import type { GatewayAuditPort } from "@langwatch/gateway-server";
+import { serializeRowForAudit } from "@langwatch/gateway-server";
+import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
+import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
+import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { keysetAfter } from "@langwatch/gateway-server";
 
 export type CacheRuleMatchers = {
   vk_id?: string;
@@ -148,8 +150,10 @@ export interface CacheRuleCursor {
 export class GatewayCacheRuleService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly changeEvents = new ChangeEventRepository(prisma),
-    private readonly auditLog = new GatewayAuditAdapter(prisma),
+    private readonly changeEvents: GatewayChangeEventsPort = createGatewayChangeEventsPort(
+      prisma,
+    ),
+    private readonly auditLog: GatewayAuditPort = createGatewayAuditPort(prisma),
   ) {}
 
   static create(prisma: PrismaClient): GatewayCacheRuleService {

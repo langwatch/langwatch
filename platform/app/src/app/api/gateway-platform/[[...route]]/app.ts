@@ -7,7 +7,7 @@
  * or `X-Auth-Token`), or a scoped API key. There is exactly one
  * implementation of every write rule: handlers route through the SAME
  * service-layer methods and pre-flight asserts the tRPC mutations use
- * (`VirtualKeyService`, `GatewayBudgetService`, `virtualKey.authz`), so
+ * (`VirtualKeyService`, `GatewayService`, `virtualKey.authz`), so
  * the two doors cannot drift apart. Handlers translate wire casing and
  * map TRPCError onto HTTP; they add no business rules of their own.
  *
@@ -26,6 +26,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
 import {
@@ -36,16 +37,16 @@ import {
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { toBudgetDto } from "~/server/gateway/budget.dto";
-import type { BudgetScope } from "~/server/gateway/budget.service";
+import { toBudgetDto } from "@langwatch/gateway-server";
+import type { BudgetScope } from "@langwatch/gateway-server";
 import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
   resourceMetadataSchema,
-} from "~/server/gateway/resourceMetadata";
-import { GatewayUsageService } from "~/server/gateway/usage.service";
+} from "@langwatch/gateway-server";
+import { GatewayUsageService } from "@langwatch/gateway-server";
 import {
   assertActorCanManageAllScopes,
   assertActorCanOperateOnAnyScope,
@@ -59,16 +60,13 @@ import {
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-} from "~/server/gateway/virtualKey.config";
+import { parseVirtualKeyConfig, virtualKeyConfigSchema } from "@langwatch/gateway-contract";
 import {
   loadTraceDestinationFacts,
   toVirtualKeySnakeDto,
   type VirtualKeySnakeDto,
 } from "~/server/gateway/virtualKey.dto";
-import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-server";
 // GatewayProviderCredentialService removed in iter 110; /providers REST
 // routes return 410 Gone until A3 lands the ModelProvider-backed
 // replacement surface (current proposal: fold into /model-providers).
@@ -78,20 +76,17 @@ import {
   VirtualKeyService,
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
-import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
+import { startOfCurrentMonthUTC } from "@langwatch/gateway-server";
+import { toStoredEnum, toWireEnum } from "@langwatch/gateway-server";
+import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-server";
 import {
   decodePageCursor,
   nextPageCursor,
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
-} from "~/server/gateway/wirePagination";
+} from "@langwatch/gateway-server";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import {
-  canonicalBaseResponses,
-  canonicalConflictResponses,
-} from "../../shared/base-responses";
+import { canonicalBaseResponses, canonicalConflictResponses } from "../../shared/base-responses";
 import { requestTraceIds } from "../../shared/canonical-error";
 import {
   idempotencyKeyParameter,
@@ -122,15 +117,7 @@ const budgetScopeTypeSchema = z.enum([
   "attributed_user",
 ]);
 
-const budgetWindowSchema = z.enum([
-  "minute",
-  "hour",
-  "day",
-  "week",
-  "month",
-  "total",
-  "manual",
-]);
+const budgetWindowSchema = z.enum(["minute", "hour", "day", "week", "month", "total", "manual"]);
 
 const onBreachSchema = z.enum(["block", "warn"]);
 
@@ -195,9 +182,7 @@ const budgetDtoSchema = z.object({
   on_breach: onBreachSchema,
   limit_usd: z
     .string()
-    .describe(
-      `Display value. ${USD_DISPLAY_STRING_FORMAT} Use limit_nano_usd for arithmetic.`,
-    ),
+    .describe(`Display value. ${USD_DISPLAY_STRING_FORMAT} Use limit_nano_usd for arithmetic.`),
   limit_nano_usd: z
     .number()
     .int()
@@ -258,9 +243,7 @@ const spendSummaryDtoSchema = z.object({
   virtual_key_id: z.string(),
   spent_usd: z
     .string()
-    .describe(
-      `Spend over the window, summed from the cost path. ${USD_DISPLAY_STRING_FORMAT}`,
-    ),
+    .describe(`Spend over the window, summed from the cost path. ${USD_DISPLAY_STRING_FORMAT}`),
   requests: z.number().int(),
   /** Epoch milliseconds, the unit every spend surface takes and returns. */
   window: z.object({
@@ -411,9 +394,7 @@ function createdAtIdCursor(
 }
 
 /** The (priority, createdAt, id) sort key a cache-rule cursor names. */
-function cacheRuleCursor(
-  encoded: string | undefined,
-): CacheRuleCursor | null | undefined {
+function cacheRuleCursor(encoded: string | undefined): CacheRuleCursor | null | undefined {
   if (encoded === undefined) return undefined;
   const parts = decodePageCursor(encoded, 3);
   if (!parts) return null;
@@ -627,20 +608,26 @@ const createBudgetSchema = z.object({
  * sending its traces to a project the customer deleted, so nothing else the
  * caller can read says the destination is gone.
  */
-async function toVkDto(vk: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
+async function toVkDto(
+  vk: VirtualKeyWithScopes,
+  projects: ProjectService,
+): Promise<VirtualKeySnakeDto> {
   return toVirtualKeySnakeDto({
     virtualKey: vk,
     facts: await loadTraceDestinationFacts({
-      client: prisma,
+      projects,
       virtualKeys: [vk],
     }),
   });
 }
 
 /** `toVkDto` for a page, in one read of the destinations however long it is. */
-async function toVkDtos(vks: VirtualKeyWithScopes[]): Promise<VirtualKeySnakeDto[]> {
+async function toVkDtos(
+  vks: VirtualKeyWithScopes[],
+  projects: ProjectService,
+): Promise<VirtualKeySnakeDto[]> {
   const facts = await loadTraceDestinationFacts({
-    client: prisma,
+    projects,
     virtualKeys: vks,
   });
   return vks.map((vk) => toVirtualKeySnakeDto({ virtualKey: vk, facts }));
@@ -791,8 +778,7 @@ function budgetFromWire(
   if (budget === undefined) return undefined;
   if (budget === null) return null;
   const parsed = virtualKeyBudgetInputSchema.safeParse({
-    limitUsd:
-      typeof budget.limit_usd === "number" ? String(budget.limit_usd) : budget.limit_usd,
+    limitUsd: typeof budget.limit_usd === "number" ? String(budget.limit_usd) : budget.limit_usd,
     window: toStoredEnum(budget.window),
     onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
     name: budget.name,
@@ -824,22 +810,16 @@ async function authorizeVirtualKeyUpdate({
   patch,
 }: {
   actor: VirtualKeyActor;
-  service: ReturnType<typeof VirtualKeyService.create>;
+  service: VirtualKeyService;
   id: string;
   organizationId: string;
   fallbackProjectId: string;
   patch: z.infer<typeof updateVirtualKeySchema>;
 }): Promise<ScopeInput[] | undefined> {
   const existing = await requireExistingVk(service, id, organizationId);
-  await assertActorCanOperateOnAnyScope(
-    { prisma, actor },
-    existing.scopes,
-    "virtualKeys:update",
-  );
+  await assertActorCanOperateOnAnyScope({ prisma, actor }, existing.scopes, "virtualKeys:update");
 
-  const scopes = patch.scopes
-    ? scopesFromWire(patch.scopes, fallbackProjectId)
-    : undefined;
+  const scopes = patch.scopes ? scopesFromWire(patch.scopes, fallbackProjectId) : undefined;
   if (scopes) {
     await assertActorCanManageAllScopes({ prisma, actor }, scopes);
     await assertScopesBelongToOrg(prisma, organizationId, scopes);
@@ -860,9 +840,7 @@ async function authorizeVirtualKeyUpdate({
     vkId: id,
     inputScopes: scopes,
     traceProjectId:
-      patch.trace_project_id !== undefined
-        ? patch.trace_project_id
-        : existing.traceProjectId,
+      patch.trace_project_id !== undefined ? patch.trace_project_id : existing.traceProjectId,
   });
   // Newly-submitted attachments are always validated. A scope change without
   // re-sent config revalidates the existing attachments against the new
@@ -872,11 +850,7 @@ async function authorizeVirtualKeyUpdate({
     (scopes !== undefined
       ? parseVirtualKeyConfig(existing.config).guardrailAttachments
       : undefined);
-  await assertGuardrailAttachmentsAllowed(
-    { prisma, actor },
-    vkProjectId,
-    attachmentsToCheck,
-  );
+  await assertGuardrailAttachmentsAllowed({ prisma, actor }, vkProjectId, attachmentsToCheck);
 
   return scopes;
 }
@@ -920,7 +894,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     if (cursor === null) return invalidCursor(c);
 
     const organizationId = await orgIdForProject(project.id);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     const membership = membershipForApiCaller(project);
     const rows = await service.getPage({
       organizationId,
@@ -936,11 +910,9 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     return c.json({
       data: await toVkDtos(
         rows.filter((vk) => isVisibleToMembership(membership, vk.scopes)),
+        c.app.projects,
       ),
-      next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [
-        vk.createdAt.getTime(),
-        vk.id,
-      ]),
+      next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [vk.createdAt.getTime(), vk.id]),
     });
   },
 );
@@ -992,18 +964,14 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
     const scopes = scopesFromWire(body.data.scopes, project.id);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       // The SAME pre-flight sequence the tRPC create runs, with the actor
       // swapped for the API credential: manage at every requested scope,
       // scopes inside the caller's org, guardrail refs project-local.
       await assertActorCanManageAllScopes({ prisma, actor }, scopes);
       await assertScopesBelongToOrg(prisma, organizationId, scopes);
-      await assertTraceProjectBelongsToOrg(
-        prisma,
-        organizationId,
-        body.data.trace_project_id,
-      );
+      await assertTraceProjectBelongsToOrg(prisma, organizationId, body.data.trace_project_id);
       // The destination routes traces AND budget debits into that
       // project, so choosing it needs the same manage grant the old
       // PROJECT scope enforced.
@@ -1061,7 +1029,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           // use, so the secret has to transit the receipt.
           return {
             status: 201,
-            body: { virtual_key: await toVkDto(virtualKey), secret },
+            body: { virtual_key: await toVkDto(virtualKey, c.app.projects), secret },
           };
         },
       });
@@ -1098,14 +1066,14 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     const organizationId = await orgIdForProject(project.id);
     try {
       const vk = await requireVisibleVk(service, membershipForApiCaller(project), {
         id,
         organizationId,
       });
-      return c.json({ virtual_key: await toVkDto(vk) });
+      return c.json({ virtual_key: await toVkDto(vk, c.app.projects) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1151,8 +1119,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       windowParse.data.from !== undefined
         ? new Date(windowParse.data.from)
         : startOfCurrentMonthUTC(now);
-    const toDate =
-      windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
+    const toDate = windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
     if (fromDate.getTime() >= toDate.getTime()) {
       return errorResponse(c, {
         status: 400,
@@ -1162,7 +1129,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
     }
 
     const organizationId = await orgIdForProject(project.id);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     let vk;
     try {
       vk = await requireVisibleVk(service, membershipForApiCaller(project), {
@@ -1240,7 +1207,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
     const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       const scopes = await authorizeVirtualKeyUpdate({
         actor,
@@ -1266,7 +1233,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         externalId: body.data.external_id,
         metadata: body.data.metadata,
       });
-      return c.json({ virtual_key: await toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated, c.app.projects) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1302,7 +1269,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
@@ -1315,7 +1282,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: await toVkDto(virtualKey), secret });
+      return c.json({ virtual_key: await toVkDto(virtualKey, c.app.projects), secret });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1339,8 +1306,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
               reason: {
                 type: "string",
                 maxLength: 500,
-                description:
-                  "Operator note, audit-logged and shown in the key's detail view.",
+                description: "Operator note, audit-logged and shown in the key's detail view.",
               },
             },
           },
@@ -1369,7 +1335,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
     if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
@@ -1383,7 +1349,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         actorUserId,
         reason: body.data.reason ?? null,
       });
-      return c.json({ virtual_key: await toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated, c.app.projects) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1414,7 +1380,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
@@ -1427,7 +1393,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: await toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated, c.app.projects) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1458,7 +1424,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
-    const service = VirtualKeyService.create(prisma);
+    const service = c.app.gateway.virtualKeys;
     try {
       const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
@@ -1471,7 +1437,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: await toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated, c.app.projects) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1490,8 +1456,7 @@ secured.access(apiKeyPermission("gatewayProviders:view")).get(
     responses: {
       ...canonicalBaseResponses,
       410: {
-        description:
-          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+        description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },
@@ -1518,8 +1483,7 @@ secured.access(apiKeyPermission("gatewayProviders:manage")).post(
     responses: {
       ...canonicalBaseResponses,
       410: {
-        description:
-          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+        description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },
@@ -1630,10 +1594,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
           reachable: scopeReach.get(b.id)?.reachable,
         }),
       ),
-      next_cursor: nextPageCursor(rows, page.data.limit, (b) => [
-        b.createdAt.getTime(),
-        b.id,
-      ]),
+      next_cursor: nextPageCursor(rows, page.data.limit, (b) => [b.createdAt.getTime(), b.id]),
     });
   },
 );
@@ -1754,9 +1715,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
             providerKey: body.data.provider_key ?? null,
             externalId: body.data.external_id,
             metadata: body.data.metadata,
-            cycleAnchorAt: body.data.cycle_anchor_at
-              ? new Date(body.data.cycle_anchor_at)
-              : null,
+            cycleAnchorAt: body.data.cycle_anchor_at ? new Date(body.data.cycle_anchor_at) : null,
             allowUnreachable: body.data.allow_unreachable,
             actorUserId,
           });
@@ -1959,8 +1918,7 @@ secured.access(apiKeyPermission("gatewayProviders:update")).patch(
     responses: {
       ...canonicalBaseResponses,
       410: {
-        description:
-          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+        description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },
@@ -1987,8 +1945,7 @@ secured.access(apiKeyPermission("gatewayProviders:manage")).delete(
     responses: {
       ...canonicalBaseResponses,
       410: {
-        description:
-          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+        description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
           "application/json": { schema: resolver(apiErrorSchema) },
         },

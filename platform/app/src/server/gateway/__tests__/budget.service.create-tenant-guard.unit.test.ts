@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { GatewayBudgetService } from "../budget.service";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
@@ -42,11 +42,11 @@ const baseInput = {
   actorUserId: "user_1",
 };
 
-describe("GatewayBudgetService.create cross-org scope guard", () => {
+describe("GatewayService.create cross-org scope guard", () => {
   describe("when a TEAM-scoped budget targets a team in another organization", () => {
     /** @scenario "A team or project budget scoped to another organization is rejected" */
     it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = GatewayBudgetService.create(mockPrisma({ team: null }));
+      const sut = GatewayService.create(mockPrisma({ team: null }));
       await expect(
         sut.create({
           ...baseInput,
@@ -58,7 +58,7 @@ describe("GatewayBudgetService.create cross-org scope guard", () => {
 
   describe("when a PROJECT-scoped budget targets a project in another organization", () => {
     it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = GatewayBudgetService.create(mockPrisma({ project: null }));
+      const sut = GatewayService.create(mockPrisma({ project: null }));
       await expect(
         sut.create({
           ...baseInput,
@@ -70,7 +70,7 @@ describe("GatewayBudgetService.create cross-org scope guard", () => {
 
   describe("when the TEAM belongs to the caller's organization", () => {
     it("passes the guard and proceeds to persist", async () => {
-      const sut = GatewayBudgetService.create(mockPrisma({ team: { id: "team_ok" } }));
+      const sut = GatewayService.create(mockPrisma({ team: { id: "team_ok" } }));
       await expect(
         sut.create({
           ...baseInput,

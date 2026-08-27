@@ -49,7 +49,7 @@
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { eligibleModelProvidersForVk } from "./scopeResolver";
-import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-server";
 
 export async function computeConfigETag({
   prisma,

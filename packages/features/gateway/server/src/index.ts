@@ -1,5 +1,7 @@
 export { GatewayService } from "./services/gateway.service";
 export { GatewaySpendEventsService } from "./services/gateway-spend-events.service";
+export { applicableEndUserCaps } from "./services/gateway-end-user-caps.service";
+export * from "./services/gateway-usage.service";
 export { PrismaGatewayAdapter } from "./adapters/gateway.adapter";
 export { GatewayBudgetSpendPort } from "./ports/gateway-budget-spend.port";
 export * from "./ports/gateway-budget-spend.port";
@@ -17,10 +19,7 @@ export * from "./adapters/gateway-spend-events.adapter";
 export * from "./adapters/gateway-spend-events-clickhouse.adapter";
 export * from "./adapters/gateway-spend-cursor.adapter";
 export * from "./adapters/gateway-spend-fold.adapter";
-export {
-  budgetPeriodFloorMs,
-  currentPeriodStart,
-} from "./adapters/gateway-period.adapter";
+export { budgetPeriodFloorMs, currentPeriodStart } from "./adapters/gateway-period.adapter";
 export * from "./adapters/gateway-audit-serializer.adapter";
 export * from "./adapters/gateway-budget-dto.adapter";
 export {

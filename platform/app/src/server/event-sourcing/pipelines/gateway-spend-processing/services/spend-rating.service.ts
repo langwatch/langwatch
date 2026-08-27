@@ -3,12 +3,12 @@ import {
   getStaticModelCosts,
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
-import { llmModels } from "~/server/modelProviders/loadModelCatalog";
+import { llmModels } from "@langwatch/model-provider-contract";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
-import type { SpendUsage } from "../schemas/commands";
+import type { SpendUsage } from "@langwatch/gateway-server";
 
 /**
  * Rating for the gateway spend pipeline: quantities in, integer nano-USD out.

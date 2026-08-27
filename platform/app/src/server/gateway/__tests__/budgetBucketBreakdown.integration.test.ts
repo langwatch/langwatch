@@ -30,8 +30,8 @@ import {
 import {
   type BucketSpend,
   GatewayBudgetClickHouseRepository,
-} from "../budget.clickhouse.repository";
-import { PROVIDER_BUCKET_SEPARATOR } from "../budgetResolution.service";
+} from "@langwatch/gateway-server";
+import { PROVIDER_BUCKET_SEPARATOR } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-breakdown-${suffix}`;

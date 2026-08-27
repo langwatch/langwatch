@@ -8,10 +8,10 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { GatewayBudgetWithSeats } from "~/server/gateway/budget.service";
-import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
-import { providerLabelFor, resolveProviderLabels } from "~/server/gateway/providerLabels";
-import { resolveScopeTargetsBatch, scopeTargetKey } from "~/server/gateway/scopeTargets";
+import type { GatewayBudgetWithSeats } from "@langwatch/gateway-server";
+import { effectiveBudgetPeriod } from "@langwatch/gateway-server";
+import { providerLabelFor, resolveProviderLabels } from "@langwatch/gateway-server";
+import { scopeTargetKey } from "@langwatch/gateway-server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -52,8 +52,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const { budgets, spendAvailable, scopeReach } =
         await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
-      const scopeTargets = await resolveScopeTargetsBatch(
-        ctx.prisma,
+      const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
         budgets,
         input.organizationId,
       );
@@ -83,8 +82,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         where: { id: input.projectId },
         select: { team: { select: { organizationId: true } } },
       });
-      const scopeTargets = await resolveScopeTargetsBatch(
-        ctx.prisma,
+      const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
         budgets,
         project?.team.organizationId ?? null,
       );

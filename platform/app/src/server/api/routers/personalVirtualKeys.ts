@@ -100,7 +100,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         }
       }
 
-      const keys = await ctx.app.governance.personalVirtualKeys.list({
+      const keys = await ctx.app.governance.personalVirtualKeyList({
         userId: principalUserId,
         organizationId: input.organizationId,
       });
@@ -170,7 +170,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
 
       let issued;
       try {
-        issued = await ctx.app.governance.personalVirtualKeys.issue({
+        issued = await ctx.app.governance.personalVirtualKeyIssue({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           personalProjectId: workspace.project.id,
@@ -227,7 +227,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       });
 
       try {
-        await ctx.app.governance.personalVirtualKeys.revoke({
+        await ctx.app.governance.personalVirtualKeyRevoke({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           virtualKeyId: input.id,

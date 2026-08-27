@@ -14,8 +14,8 @@ import {
   GatewayScopeOrgMismatchError,
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
-} from "./errors";
-import type { GuardrailAttachment } from "./virtualKey.config";
+} from "@langwatch/gateway-server";
+import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import type { VirtualKeyService } from "./virtualKey.service";
 
 /**

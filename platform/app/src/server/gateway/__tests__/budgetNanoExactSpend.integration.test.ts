@@ -22,7 +22,8 @@
  * and real per-request costs are routinely this shape.
  */
 import { type WriteGatewayDebitsPayload } from "@langwatch/enterprise-governance-server";
-import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
+import { AppGatewayDebitAdapter } from "@langwatch/enterprise-api/governance/gateway-debit.adapter";
+import { AppGatewayGovernancePort } from "~/server/app-layer/presets";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
@@ -32,9 +33,9 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
-import { toBudgetDto } from "../budget.dto";
-import { GatewayBudgetService } from "../budget.service";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { toBudgetDto } from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-nano-${suffix}`;
@@ -61,7 +62,7 @@ const ROUNDED_FIRST_NANO = 75_000;
 
 const LOOSE_LIMIT_USD = "5";
 
-let service: GatewayBudgetService;
+let service: GatewayService;
 let chRepo: GatewayBudgetClickHouseRepository;
 let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;
 
@@ -246,11 +247,10 @@ beforeAll(async () => {
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   });
-  service = GatewayBudgetService.create(prisma, chRepo);
-  const debitRuntime = AppGatewayDebitAdapter.create({
-    prisma,
-    budgetCHRepository: chRepo,
-  }).build();
+  service = GatewayService.create(prisma, chRepo);
+  const debitRuntime = AppGatewayDebitAdapter.create(
+    AppGatewayGovernancePort.create(prisma, chRepo),
+  ).build();
   writeDebits = (payload) => debitRuntime.write(payload);
 }, 180_000);
 

@@ -13,23 +13,19 @@
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getApp } from "~/server/app-layer/app";
-import { VirtualKeyNotFoundError } from "~/server/gateway/errors";
-import { GatewayUsageService } from "~/server/gateway/usage.service";
-import {
-  isVisibleToMembership,
-  loadMembershipSet,
-} from "~/server/gateway/virtualKey.authz";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import type { App } from "~/server/app-layer/app";
+import { VirtualKeyNotFoundError } from "@langwatch/gateway-server";
+import { GatewayUsageService } from "@langwatch/gateway-server";
+import { isVisibleToMembership, loadMembershipSet } from "~/server/gateway/virtualKey.authz";
 
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-function usageService(prisma: PrismaClient) {
+function usageService(prisma: PrismaClient, gateway: App["gateway"]) {
   return GatewayUsageService.create({
     prisma,
-    chRepo: getApp().gateway.budgets,
-    spendRepo: getApp().gateway.virtualKeySpend,
+    chRepo: gateway.budgets,
+    spendRepo: gateway.virtualKeySpend,
   });
 }
 
@@ -57,10 +53,10 @@ export const gatewayUsageRouter = createTRPCRouter({
         input.organizationId,
         ctx.session.user.id,
       );
-      const keys = (
-        await VirtualKeyService.create(ctx.prisma).getAll(input.organizationId)
-      ).filter((vk) => isVisibleToMembership(membership, vk.scopes));
-      return usageService(ctx.prisma).summary({
+      const keys = (await ctx.app.gateway.virtualKeys.getAll(input.organizationId)).filter((vk) =>
+        isVisibleToMembership(membership, vk.scopes),
+      );
+      return usageService(ctx.prisma, ctx.app.gateway).summary({
         organizationId: input.organizationId,
         virtualKeyIds: keys.map((k) => k.id),
         window: {
@@ -90,7 +86,7 @@ export const gatewayUsageRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Same visibility rule as virtualKeys.get: a key the caller can't
       // see is indistinguishable from one that doesn't exist.
-      const vk = await VirtualKeyService.create(ctx.prisma).getById(
+      const vk = await ctx.app.gateway.virtualKeys.getById(
         input.virtualKeyId,
         input.organizationId,
       );
@@ -105,7 +101,7 @@ export const gatewayUsageRouter = createTRPCRouter({
       if (!isVisibleToMembership(membership, vk.scopes)) {
         throw new VirtualKeyNotFoundError();
       }
-      return usageService(ctx.prisma).summaryForVirtualKey({
+      return usageService(ctx.prisma, ctx.app.gateway).summaryForVirtualKey({
         organizationId: input.organizationId,
         virtualKeyId: input.virtualKeyId,
         window: {

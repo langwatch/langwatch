@@ -26,11 +26,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -50,6 +51,7 @@ vi.mock("~/server/app-layer/app", () => ({
 import { app } from "../gateway-internal";
 
 const suffix = nanoid(8);
+const projects = createTestApp().projects;
 const ORG_ID = `org-cfgroute-${suffix}`;
 const TEAM_ID = `team-cfgroute-${suffix}`;
 const PROJECT_ID = `proj-cfgroute-${suffix}`;
@@ -281,7 +283,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
       const before = await fetchConfig(VK_EXPIRING_ID);
       const shortened = new Date(Date.now() + DAY_MS);
 
-      await VirtualKeyService.create(prisma).update({
+      await VirtualKeyService.create(prisma, projects).update({
         id: VK_EXPIRING_ID,
         organizationId: ORG_ID,
         actorUserId: USER_ID,

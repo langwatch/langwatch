@@ -1,35 +1,8 @@
-/**
- * What a provider slot tells the gateway it serves.
- *
- * The gateway routes a bare model name to the provider that declares it, which
- * is what lets a customer call a model they configured without writing a
- * provider prefix. Two sources feed the list:
- *
- *   - the models the customer declared on the row (custom models and custom
- *     embeddings models), which is the only place a self-hosted or proxied
- *     model id is written down at all, and
- *   - for the hosted families, the model catalog the platform already ships,
- *     so "gpt-5-mini" reaches the OpenAI provider on a key that also holds
- *     Anthropic.
- *
- * This is a ROUTING vocabulary. It never widens what a key may call:
- * `models_allowed` stays the allowlist and is applied separately.
- */
+import {
+  llmModels,
+  toLegacyCompatibleCustomModels,
+} from "@langwatch/model-provider-contract";
 
-import { toLegacyCompatibleCustomModels } from "../modelProviders/customModel.schema";
-import { llmModels } from "../modelProviders/loadModelCatalog";
-
-/**
- * Provider keys whose models the platform already knows, mapped to the prefix
- * those models carry in the shipped catalog (`llmModels.json` keys are written
- * "<family>/<model>").
- *
- * Only families whose model ids are stable and vendor-owned belong here. Groq
- * and Cerebras serve other vendors' open models under ids that change with
- * whatever the customer's account has, so shipping a list for them would claim
- * knowledge we do not have. They declare nothing and keep being reached the way
- * they always were.
- */
 const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   openai: "openai",
   anthropic: "anthropic",
@@ -39,11 +12,6 @@ const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   voyage: "voyageai",
 };
 
-/**
- * Bare model ids per hosted family, computed once. The catalog keys carry the
- * family prefix and the gateway matches the id a caller actually sends, so the
- * prefix is stripped here rather than at every provider slot.
- */
 const hostedCatalogByProvider = buildHostedCatalog();
 
 function buildHostedCatalog(): Record<string, string[]> {
@@ -58,15 +26,6 @@ function buildHostedCatalog(): Record<string, string[]> {
   return out;
 }
 
-/**
- * The model ids a provider row declares, deduplicated and sorted so the wire
- * payload, and therefore the config ETag, does not move when nothing changed.
- *
- * Returns undefined when the row declares nothing. That is deliberately
- * different from an empty list: a provider that has told the gateway nothing
- * cannot be ruled out by a model it does not list, and it stays a candidate for
- * a name no other provider claims.
- */
 export function declaredModelsForProvider(mp: {
   provider: string;
   customModels: unknown;
@@ -87,6 +46,6 @@ export function declaredModelsForProvider(mp: {
     declared.add(id);
   }
 
-  if (declared.size === 0) return undefined;
+  if (declared.size === 0) return void 0;
   return [...declared].sort();
 }

@@ -25,11 +25,11 @@ import {
   type ConfirmSpendCommandData,
   EMPTY_SPEND_USAGE,
   type SpendUsage,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+} from "@langwatch/gateway-server";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "@langwatch/gateway-server";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import { recordRealtimeSessionSpan } from "./realtimeSessionSpan";
-import { parseVirtualKeyConfig } from "./virtualKey.config";
+import { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 

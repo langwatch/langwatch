@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "~/server/gateway/wireMoney";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-server";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewayBudgetsRouter } from "../gatewayBudgets";
 

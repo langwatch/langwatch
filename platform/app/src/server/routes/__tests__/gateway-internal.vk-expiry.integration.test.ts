@@ -13,6 +13,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
@@ -21,6 +22,7 @@ import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { app } from "../gateway-internal";
 
 const suffix = nanoid(8);
+const projects = createTestApp().projects;
 const ORG_ID = `org-vkex-${suffix}`;
 const TEAM_ID = `team-vkex-${suffix}`;
 const PROJECT_ID = `proj-vkex-${suffix}`;
@@ -62,7 +64,7 @@ async function resolveCode(secret: string): Promise<{
 describe("virtual key expiry (real PG + internal route)", () => {
   let previousSecret: string | undefined;
   let previousJwtSecret: string | undefined;
-  const service = VirtualKeyService.create(prisma);
+  const service = VirtualKeyService.create(prisma, projects);
 
   beforeAll(async () => {
     await startTestContainers();

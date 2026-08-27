@@ -7,9 +7,7 @@
  */
 import { z } from "zod";
 
-import { getApp } from "~/server/app-layer/app";
-import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
-import { spendFiltersSchema } from "~/server/gateway/spendFilters";
+import { spendFiltersSchema } from "@langwatch/gateway-server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -36,8 +34,8 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
     )
     .permission("gatewayUsage:view")
     .query(async ({ ctx, input }) => {
-      const repository = getApp().gateway.spendEvents;
-      if (!repository) {
+      const service = ctx.app.gateway.spendEvents;
+      if (!service) {
         return {
           rows: [],
           nextCursor: null,
@@ -45,7 +43,6 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
           clickHouseDisabled: true,
         };
       }
-      const service = new GatewaySpendEventsService(repository);
       const { rows, nextCursor } = await service.getSpendEventsPage({
         tenantId: input.projectId,
         fromMs: input.fromMs,
@@ -55,9 +52,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         limit: input.limit ?? 50,
       });
 
-      const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter(
-        (id) => id.length > 0,
-      );
+      const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
       // VirtualKey is ORG-scoped post-collapse (no projectId column); the
       // ids come from this project's own tenant-filtered spend rows, and
       // the org fence keeps a foreign id from resolving to a name.

@@ -6,7 +6,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { SpendEventRow } from "@langwatch/gateway-server";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
 
@@ -38,14 +38,14 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-const readSpendEventsPage = vi.hoisted(() => vi.fn());
+const getSpendEventsPage = vi.hoisted(() => vi.fn());
 
 // The router takes the spend-events repository from the App, so standing
 // in for the store means standing in for `getApp()`. `current` toggles
 // between the repository and undefined to stand in for a deployment
 // without ClickHouse.
-const spendEventsRepository = vi.hoisted(() => ({
-  current: undefined as { readSpendEventsPage: typeof readSpendEventsPage } | undefined,
+const spendEventsService = vi.hoisted(() => ({
+  current: undefined as { getSpendEventsPage: typeof getSpendEventsPage } | undefined,
 }));
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
@@ -54,7 +54,7 @@ vi.mock("~/server/app-layer/app", async () => {
     tryGetApp: () => null,
     getApp: () => ({
       permissions: appPermissionsService(),
-      gateway: { spendEvents: spendEventsRepository.current },
+      gateway: { spendEvents: spendEventsService.current },
     }),
   };
 });
@@ -120,8 +120,8 @@ describe("gatewaySpendEventsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    spendEventsRepository.current = { readSpendEventsPage };
-    readSpendEventsPage.mockResolvedValue({
+    spendEventsService.current = { getSpendEventsPage };
+    getSpendEventsPage.mockResolvedValue({
       rows: [SPEND_ROW],
       nextCursor: null,
     });
@@ -144,7 +144,7 @@ describe("gatewaySpendEventsRouter", () => {
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
       limit: 25,
     });
-    expect(readSpendEventsPage).toHaveBeenCalledWith({
+    expect(getSpendEventsPage).toHaveBeenCalledWith({
       tenantId: PROJECT_ID,
       fromMs: BASE_INPUT.fromMs,
       toMs: BASE_INPUT.toMs,
@@ -174,7 +174,7 @@ describe("gatewaySpendEventsRouter", () => {
 
   /** @scenario The ledger degrades to an empty page without ClickHouse */
   it("degrades to an empty page when ClickHouse is disabled", async () => {
-    spendEventsRepository.current = undefined;
+    spendEventsService.current = undefined;
     const caller = buildCaller();
     const result = await caller.list(BASE_INPUT);
     expect(result).toMatchObject({
@@ -182,7 +182,7 @@ describe("gatewaySpendEventsRouter", () => {
       nextCursor: null,
       clickHouseDisabled: true,
     });
-    expect(readSpendEventsPage).not.toHaveBeenCalled();
+    expect(getSpendEventsPage).not.toHaveBeenCalled();
   });
 
   /** @scenario The ledger requires the gateway usage view scope */
@@ -190,6 +190,6 @@ describe("gatewaySpendEventsRouter", () => {
     denied.add("gatewayUsage:view");
     const caller = buildCaller();
     await expect(caller.list(BASE_INPUT)).rejects.toThrow("You do not have permission");
-    expect(readSpendEventsPage).not.toHaveBeenCalled();
+    expect(getSpendEventsPage).not.toHaveBeenCalled();
   });
 });

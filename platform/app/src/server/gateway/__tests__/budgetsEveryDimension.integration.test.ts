@@ -18,22 +18,24 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
-import { GatewayBudgetService } from "../budget.service";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 import {
   budgetAppliesToProvider,
   resolveApplicableBudgets,
-} from "../budgetResolution.service";
+} from "@langwatch/gateway-server";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
-import { VirtualKeyRepository } from "../virtualKey.repository";
+import { VirtualKeyRepository } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
+const projects = createTestApp().projects;
 const ORG_ID = `org-nxn-${suffix}`;
 const TEAM_ID = `team-nxn-${suffix}`;
 const PROJECT_ID = `proj-nxn-${suffix}`;
@@ -332,7 +334,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // fallback: the repo the service was constructed with. Without it,
       // per-member buckets collapse into the single spentUsd figure and
       // every member would be capped at the group's combined spend.
-      const service = GatewayBudgetService.create(prisma);
+      const service = GatewayService.create(prisma);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -361,7 +363,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       const chRepo = new GatewayBudgetClickHouseRepository(
         async () => ch as ClickHouseClient,
       );
-      const service = GatewayBudgetService.create(prisma, chRepo);
+      const service = GatewayService.create(prisma, chRepo);
       const row = await service.create({
         organizationId: ORG_ID,
         scope: { kind: "GROUP", groupId: GROUP_ID },
@@ -408,7 +410,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       const chRepo = new GatewayBudgetClickHouseRepository(
         async () => ch as ClickHouseClient,
       );
-      const service = GatewayBudgetService.create(prisma, chRepo);
+      const service = GatewayService.create(prisma, chRepo);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -526,7 +528,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        null,
+      ).materialise(vk!);
 
       const openAiBudget = bundle.budgets.find((b) => b.id === BUDGET_PROJECT_OPENAI_ID);
       expect(openAiBudget?.provider_key).toBe(MP_OPENAI_ID);
@@ -579,7 +585,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(prisma, chRepo).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        chRepo,
+      ).materialise(vk!);
 
       const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
       // The gateway enforces spent >= limit on exactly this bucket. Reading
@@ -661,7 +671,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("pins max_attempts to 1 when routing mode is NONE", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        null,
+      ).materialise(vk!);
       expect(bundle.fallback.max_attempts).toBe(1);
 
       await prisma.virtualKey.update({
@@ -671,6 +685,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       const fallbackVk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
       const fallbackBundle = await new GatewayConfigMaterialiser(
         prisma,
+        projects,
         null,
       ).materialise(fallbackVk!);
       expect(fallbackBundle.routing_mode).toBe("fallback_all");
@@ -682,9 +697,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("filters providers[] by providers_allowed and keeps All open-ended", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const openVk = await repo.findById(VK_SHARED_ID, ORG_ID);
-      const openBundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
-        openVk!,
-      );
+      const openBundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        null,
+      ).materialise(openVk!);
       expect(openBundle.providers_allowed).toBeNull();
       expect(openBundle.providers.map((p) => p.id).sort()).toEqual(
         [MP_ANTHROPIC_ID, MP_OPENAI_ID].sort(),
@@ -697,6 +714,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       const narrowedVk = await repo.findById(VK_SHARED_ID, ORG_ID);
       const narrowedBundle = await new GatewayConfigMaterialiser(
         prisma,
+        projects,
         null,
       ).materialise(narrowedVk!);
       expect(narrowedBundle.providers_allowed).toEqual([MP_OPENAI_ID]);
@@ -722,9 +740,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The key was created before this provider existed and was never
       // edited: leaving the list open has to mean future providers too,
       // otherwise "all" is only ever a snapshot of creation day.
-      const openBundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
-        (await repo.findById(VK_SHARED_ID, ORG_ID))!,
-      );
+      const openBundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        null,
+      ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
       expect(openBundle.providers.map((p) => p.id)).toContain(lateProviderId);
 
       await prisma.virtualKey.update({
@@ -733,6 +753,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       });
       const narrowedBundle = await new GatewayConfigMaterialiser(
         prisma,
+        projects,
         null,
       ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
       expect(narrowedBundle.providers.map((p) => p.id)).not.toContain(lateProviderId);
@@ -742,7 +763,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
   describe("given a budget attached to the key itself", () => {
     /** @scenario "Creating a key with a budget creates both or neither" */
     it("creates the key and its budget in one transaction", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `budgeted-${suffix}`,
@@ -764,7 +785,11 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(budget!.window).toBe("DAY");
       expect(budget!.archivedAt).toBeNull();
       // The cap has to reach the gateway, not just the database.
-      const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        projects,
+        null,
+      ).materialise(
         (await new VirtualKeyRepository(prisma).findById(virtualKey.id, ORG_ID))!,
       );
       expect(bundle.budgets.map((b) => b.id)).toContain(budget!.id);
@@ -772,7 +797,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Revoking a key retires its budget instead of deleting it" */
     it("archives the key's budget on revoke and keeps the row", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `revoked-${suffix}`,
@@ -805,7 +830,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // key. It is not drawer-managed, so the key never owned it, but its
       // scope is that key and nothing else. Once the key is REVOKED, which is
       // terminal, it can never count spend again.
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `standalone-budget-${suffix}`,
@@ -845,7 +870,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // ATTRIBUTED_USER hangs one allowance off each end user the anchor's
       // traffic is attributed to. When the anchor is the key, a dead key
       // means a template that can never open another bucket.
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `per-user-anchor-${suffix}`,
@@ -884,7 +909,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The boundary the case above must not cross. A project outlives any
       // one key, so its cap is still a live control the moment another key
       // is scoped there.
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `project-budget-survivor-${suffix}`,
@@ -923,7 +948,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The permission boundary the revoke change must not widen: the key is
       // still alive here, so an independently created cap on it is still an
       // enforcement control and virtualKeys:update must not retire it.
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `drawer-clear-keeps-${suffix}`,
@@ -962,7 +987,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Removing a key's budget from the drawer archives it" */
     it("archives rather than deletes when the budget field is cleared", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `cleared-${suffix}`,
@@ -1096,7 +1121,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           },
         },
       });
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -1115,7 +1140,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     /** @scenario "Unticking every provider is refused rather than saved" */
     /** @scenario "A key cannot be saved with no providers at all" */
     it("rejects an empty provider allowlist", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -1141,7 +1166,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
         },
       });
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       try {
         // Anthropic is scope-reachable but omitted by the policy. The save must
         // succeed: the policy blocks it at dispatch, not at save.
@@ -1171,7 +1196,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "A new key defaults to no fallback" */
     it("defaults a newly created key to routing mode NONE", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `default-routing-${suffix}`,
@@ -1184,7 +1209,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Routing mode and routing policy cannot contradict each other" */
     it("refuses POLICY without a policy and NONE with one", async () => {
-      const service = VirtualKeyService.create(prisma);
+      const service = VirtualKeyService.create(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,

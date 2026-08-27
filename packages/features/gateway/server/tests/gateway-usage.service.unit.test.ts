@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayUsageService } from "../usage.service";
+import { GatewayUsageService } from "../src/services/gateway-usage.service";
 import type {
   GatewayTraceRow,
   GatewayUsageBucket,
-  GatewayVirtualKeySpendRepository,
-} from "../virtualKeySpend.clickhouse.repository";
+  GatewayVirtualKeySpendPort,
+} from "@langwatch/gateway-server";
 
 type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"> & {
   model?: string;
@@ -26,7 +26,7 @@ function mockPrisma(
   } as unknown as PrismaClient;
 }
 
-function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendRepository {
+function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendPort {
   const rows: GatewayTraceRow[] = traces.map((t, i) => ({
     traceId: `trace_${i}`,
     virtualKeyId: t.virtualKeyId,
@@ -50,9 +50,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendRepository {
       const key = `${r.virtualKeyId}|${model}|${day}`;
       const existing = byKey.get(key);
       if (existing) {
-        existing.totalUsd = new Prisma.Decimal(existing.totalUsd)
-          .plus(r.costUsd)
-          .toString();
+        existing.totalUsd = new Prisma.Decimal(existing.totalUsd).plus(r.costUsd).toString();
         existing.requests += 1;
         existing.blockedRequests += r.blockedByGuardrail ? 1 : 0;
       } else {
@@ -73,19 +71,13 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpendRepository {
   return {
     usageBuckets: async ({ virtualKeyIds }: { virtualKeyIds?: string[] }) =>
       bucketsFor(filtered(virtualKeyIds)),
-    gatewayTraces: async ({
-      virtualKeyIds,
-      limit,
-    }: {
-      virtualKeyIds?: string[];
-      limit: number;
-    }) =>
+    gatewayTraces: async ({ virtualKeyIds, limit }: { virtualKeyIds?: string[]; limit: number }) =>
       filtered(virtualKeyIds)
         .slice()
         .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
         .slice(0, limit),
     spendByVirtualKey: async () => [],
-  } as unknown as GatewayVirtualKeySpendRepository;
+  } as unknown as GatewayVirtualKeySpendPort;
 }
 
 function service(

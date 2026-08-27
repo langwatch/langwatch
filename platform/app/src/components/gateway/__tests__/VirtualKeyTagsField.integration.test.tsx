@@ -18,7 +18,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "~/server/gateway/virtualKey.config";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
 import { VirtualKeyCreateDrawer } from "../VirtualKeyCreateDrawer";
 
@@ -199,17 +199,14 @@ describe("given the New virtual key drawer is open", () => {
     it("warns that the extra ones will not be saved", async () => {
       renderDrawer();
 
-      const tooMany = Array.from(
-        { length: VK_TAGS_MAX_COUNT + 1 },
-        (_, i) => `team=${i}`,
-      ).join(",");
+      const tooMany = Array.from({ length: VK_TAGS_MAX_COUNT + 1 }, (_, i) => `team=${i}`).join(
+        ",",
+      );
       await userEvent.click(tagsInput());
       await userEvent.paste(tooMany);
 
       expect(
-        within(tagsField()).getByText(
-          `Only the first ${VK_TAGS_MAX_COUNT} tags will be saved.`,
-        ),
+        within(tagsField()).getByText(`Only the first ${VK_TAGS_MAX_COUNT} tags will be saved.`),
       ).toBeInTheDocument();
     });
   });

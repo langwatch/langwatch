@@ -10,7 +10,7 @@ import {
   normalizeVkTags,
   VK_TAG_MAX_LENGTH,
   VK_TAGS_MAX_COUNT,
-} from "~/server/gateway/virtualKey.config";
+} from "@langwatch/gateway-contract";
 
 import {
   parseTagsCsv,

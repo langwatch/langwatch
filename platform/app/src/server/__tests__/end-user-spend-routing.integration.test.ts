@@ -27,9 +27,12 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
-import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import {
+  GatewaySpendEventsClickHouseAdapter,
+  GatewaySpendEventsService,
+} from "@langwatch/gateway-server";
+import { GatewayVirtualKeySpendAdapter } from "@langwatch/gateway-server";
 
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
@@ -53,8 +56,10 @@ vi.mock("~/server/app-layer/app", async () => {
       },
       gateway: {
         budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
-        virtualKeySpend: new GatewayVirtualKeySpendRepository(async () => chClient),
-        spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+        virtualKeySpend: GatewayVirtualKeySpendAdapter.create(async () => chClient),
+        spendEvents: GatewaySpendEventsService.create(
+          GatewaySpendEventsClickHouseAdapter.create(async () => chClient),
+        ),
         webhookEvents: WebhookEventsClickHouseRepository.create(async () => chClient),
       },
     }),

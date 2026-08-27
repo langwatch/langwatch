@@ -22,7 +22,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
-import { resolveBudgetScopeReach } from "../budgetScopeReach";
+import { resolveBudgetScopeReach } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-reach-${suffix}`;

@@ -17,14 +17,14 @@
  * is correct precisely because it is not on this path.
  */
 
-import { AppGatewayDebitAdapter } from "~/runtime/app/features/governance/gateway-debit.adapter";
+import { AppGatewayDebitAdapter } from "@langwatch/enterprise-api/governance/gateway-debit.adapter";
 import { webhookDeliveryPM } from "~/runtime/app/features/webhooks";
 import { describe, expect, it, vi } from "vitest";
 import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/gateway-server";
 
 type Handler = (
   state: unknown,
@@ -160,10 +160,7 @@ describe("transient process message keys", () => {
     /** @scenario A transient process mints message keys that a redelivery re-derives exactly */
     it("mints the same keys regardless of wall clock", () => {
       const { handlers, initial } = capture(
-        AppGatewayDebitAdapter.create({
-          prisma: {} as never,
-          budgetCHRepository: {} as never,
-        })
+        AppGatewayDebitAdapter.create({} as never)
           .build()
           .processManager() as unknown as (pm: unknown) => unknown,
       );

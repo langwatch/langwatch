@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { readHandledError } from "~/features/errors";
 import { prisma } from "~/server/db";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
@@ -20,6 +21,7 @@ import { loadTraceDestinationFacts, toVirtualKeySnakeDto } from "../virtualKey.d
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);
+const projects = createTestApp().projects;
 const ORG_ID = `org-vkexp-${suffix}`;
 const TEAM_ID = `team-vkexp-${suffix}`;
 const PROJECT_ID = `proj-vkexp-${suffix}`;
@@ -37,7 +39,7 @@ function codeOf(error: unknown): string | null {
 }
 
 describe("virtual key expiration dates (real PG)", () => {
-  const service = VirtualKeyService.create(prisma);
+  const service = VirtualKeyService.create(prisma, projects);
 
   beforeAll(async () => {
     await startTestContainers();

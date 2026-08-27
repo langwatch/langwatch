@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { GatewayScopeOrgMismatchError } from "~/server/gateway/errors";
+import { GatewayService } from "@langwatch/gateway-server";
+import { GatewayScopeOrgMismatchError } from "@langwatch/gateway-server";
 
 function serviceWith(vkFound: boolean, projectFound: boolean) {
   const prisma = {
@@ -15,7 +15,7 @@ function serviceWith(vkFound: boolean, projectFound: boolean) {
   } as never;
   // The ClickHouse repo's presence is what template creation requires;
   // validation throws before any spend read, so a bare object suffices.
-  return GatewayBudgetService.create(prisma, {} as never);
+  return GatewayService.create(prisma, {} as never);
 }
 
 const base = {

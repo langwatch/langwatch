@@ -25,8 +25,8 @@ import { dirname, resolve } from "node:path";
 
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { nextResetAt } from "~/server/gateway/budgetWindow";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
+import { nextResetAt } from "@langwatch/gateway-server";
 
 const TAG = "vkpolish";
 
@@ -130,7 +130,7 @@ async function purgePrevious(target: SeedTarget) {
 }
 
 async function createKeys(target: SeedTarget): Promise<Map<string, string>> {
-  const service = VirtualKeyService.create(prisma);
+  const service = initializeDefaultApp({ processRole: "web" }).gateway.virtualKeys;
   const base = {
     organizationId: target.organizationId,
     actorUserId: target.userId,

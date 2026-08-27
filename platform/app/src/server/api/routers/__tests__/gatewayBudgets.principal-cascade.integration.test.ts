@@ -6,7 +6,7 @@
  * mocks of the budget service.
  *
  * Pins:
- *   1. PRINCIPAL kind round-trips through GatewayBudgetService.create
+ *   1. PRINCIPAL kind round-trips through GatewayService.create
  *      and persists with `scopeType=PRINCIPAL` and the user as `scopeId`.
  *   2. Cross-org guard rejects principalUserId from outside the org.
  *   3. With ALL 5 scopes (org+team+project+VK+principal) configured,
@@ -22,7 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Prisma } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const ns = nanoid(8);
 const ORG_ID = `org-pcasc-${ns}`;
@@ -33,8 +33,8 @@ const ALICE_ID = `usr-alice-${ns}`;
 const OUTSIDER_ID = `usr-outsider-${ns}`;
 const ACTOR_ID = `usr-actor-${ns}`;
 
-describe("GatewayBudgetService — PRINCIPAL cascade", () => {
-  let service: GatewayBudgetService;
+describe("GatewayService — PRINCIPAL cascade", () => {
+  let service: GatewayService;
 
   beforeAll(async () => {
     // Org + team + project — minimal scaffolding for FK satisfaction.
@@ -101,7 +101,7 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
       },
     });
 
-    service = GatewayBudgetService.create(prisma);
+    service = GatewayService.create(prisma);
   });
 
   afterAll(async () => {

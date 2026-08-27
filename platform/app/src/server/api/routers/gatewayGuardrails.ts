@@ -8,7 +8,7 @@
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
 
-import { z } from "zod/v4";
+import { z } from "zod";
 import {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,

@@ -7,7 +7,7 @@ import openapi from "~/app/api/openapiLangWatch.json";
 import {
   SPEND_STATUS_IN_FLIGHT,
   spendFilterQueryShape,
-} from "~/server/gateway/spendFilters";
+} from "@langwatch/gateway-server";
 
 const EVENTS = "/api/gateway/v1/spend-events";
 const SUMMARIES = "/api/gateway/v1/spend-summaries";

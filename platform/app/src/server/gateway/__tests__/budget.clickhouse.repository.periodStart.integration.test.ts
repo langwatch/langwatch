@@ -33,7 +33,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-periodstart-${suffix}`;

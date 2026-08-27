@@ -17,8 +17,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { toBudgetDto } from "../budget.dto";
-import { GatewayBudgetService } from "../budget.service";
+import { toBudgetDto } from "@langwatch/gateway-server";
+import { GatewayService } from "@langwatch/gateway-server";
 
 const suffix = nanoid(8);
 
@@ -37,7 +37,7 @@ const EMPTY_PROJECT_ID = `proj-empty-${suffix}`;
 
 const ADMIN_ID = `usr-admin-${suffix}`;
 
-const service = () => GatewayBudgetService.create(prisma, undefined);
+const service = () => GatewayService.create(prisma, undefined);
 
 async function createProjectBudget(options: {
   organizationId: string;

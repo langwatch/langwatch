@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { GatewayBudgetService } from "../budget.service";
+import { GatewayService } from "@langwatch/gateway-server";
 import {
   ACCESS_TOKEN,
   BUDGET_ARCHIVED_ID,
@@ -219,7 +219,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
   describe("given an organization budget with debits in two projects", () => {
     /** @scenario "An organization budget's recent activity lists debits from every project it spans" */
     it("lists the org budget's debits from both projects", async () => {
-      const service = GatewayBudgetService.create(prisma, chRepo());
+      const service = GatewayService.create(prisma, chRepo());
       const detail = await service.getDetail(BUDGET_ORG_ID, ORG_ID);
       expect(detail).not.toBeNull();
       const ids = detail!.recentLedger.map((l) => l.id);

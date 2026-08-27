@@ -28,16 +28,19 @@ import {
   resolveEligible,
 } from "~/components/gateway/eligibleModelProviders";
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import {
   eligibleModelProvidersForVk,
   scopeReachableModelProvidersForVk,
 } from "../scopeResolver";
-import { VirtualKeyRepository } from "../virtualKey.repository";
+import { VirtualKeyRepository } from "@langwatch/gateway-server";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-elig-${suffix}`;
@@ -78,9 +81,9 @@ const RP_PROVIDER_IDS = [MP_ORG_ID, MP_PROJECT_ID];
  * types rather than casting past them.
  */
 async function resolveAsTheDrawerWould() {
-  const service = ModelProviderService.create(prisma);
-  const providers: OrgModelProvider[] =
-    await service.listOrgModelProvidersForFrontend(ORG_ID);
+  const providers: OrgModelProvider[] = await getApp().modelProviders.listForOrganization(
+    { organizationId: ORG_ID },
+  );
   const hierarchy = buildScopeHierarchy(
     [
       { id: PROJECT_ID, teamId: TEAM_ID },
@@ -339,9 +342,8 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
         .map((p) => p.id)
         .sort();
 
-      const service = ModelProviderService.create(prisma);
       const providers: OrgModelProvider[] =
-        await service.listOrgModelProvidersForFrontend(ORG_ID);
+        await getApp().modelProviders.listForOrganization({ organizationId: ORG_ID });
       const hierarchy = buildScopeHierarchy(
         [
           { id: PROJECT_ID, teamId: TEAM_ID },

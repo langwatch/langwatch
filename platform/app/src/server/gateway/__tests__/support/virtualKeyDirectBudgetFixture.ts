@@ -9,8 +9,6 @@
 import { nanoid } from "nanoid";
 
 import { prisma } from "~/server/db";
-import type { GatewayBudgetClickHouseRepository } from "../../budget.clickhouse.repository";
-import { usdToNanoUsd } from "../../wireMoney";
 
 const suffix = nanoid(8);
 

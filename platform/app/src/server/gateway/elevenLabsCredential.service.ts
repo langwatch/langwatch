@@ -15,7 +15,7 @@
 import { createLogger } from "@langwatch/observability";
 import { prisma } from "~/server/db";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
-import { isElevenLabsHost } from "~/server/modelProviders/registry";
+import { isElevenLabsHost } from "@langwatch/model-provider-contract";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");
 

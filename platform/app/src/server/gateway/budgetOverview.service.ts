@@ -29,24 +29,24 @@ import type {
   PersonalUsageBreakdown,
   PersonalUsageQueryInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   GatewayBudget,
   GatewayBudgetScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
 
 import {
   type ApplicableBudget,
   resolveApplicableBudgetsForTarget,
 } from "./applicableBudgets.service";
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
-import { spendTargetsForBudgets } from "./budget.clickhouse.repository";
-import { nextResetAt } from "./budgetWindow";
-import { resolveProviderLabels } from "./providerLabels";
-import { resolveScopeTargetsBatch, scopeTargetKey } from "./scopeTargets";
-import { organizationSpendTenantIds } from "./spendTenants";
+import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
+import type { GatewayService } from "@langwatch/gateway-contract";
+import { spendTargetsForBudgets } from "@langwatch/gateway-server";
+import { nextResetAt } from "@langwatch/gateway-server";
+import { resolveProviderLabels } from "@langwatch/gateway-server";
+import { scopeTargetKey } from "@langwatch/gateway-server";
 
 /**
  * How binding a budget scope is to the person reading, most binding
@@ -135,23 +135,29 @@ export class BudgetOverviewService {
   private constructor(
     private readonly prisma: PrismaClient,
     private readonly organizations: OrganizationService,
+    private readonly featureFlags: FeatureFlagService,
     private readonly personalVirtualKeys: PersonalVirtualKeyReader,
     private readonly personalUsage: PersonalUsageReader | undefined,
-    private readonly chRepo?: GatewayBudgetClickHouseRepository,
+    private readonly budgetDecisions: GatewayService,
+    private readonly chRepo?: GatewayBudgetSpendPort,
   ) {}
 
   static create(options: {
     database: PrismaClient;
     organizations: OrganizationService;
+    featureFlags: FeatureFlagService;
     personalVirtualKeys: PersonalVirtualKeyReader;
+    budgetDecisions: GatewayService;
     personalUsage?: PersonalUsageReader;
-    budgetRepository?: GatewayBudgetClickHouseRepository;
+    budgetRepository?: GatewayBudgetSpendPort;
   }): BudgetOverviewService {
     return new BudgetOverviewService(
       options.database,
       options.organizations,
+      options.featureFlags,
       options.personalVirtualKeys,
       options.personalUsage,
+      options.budgetDecisions,
       options.budgetRepository,
     );
   }
@@ -167,9 +173,9 @@ export class BudgetOverviewService {
     userId: string;
     includeTopModels?: boolean;
   }): Promise<BudgetOverviewForUser> {
-    const membership = await this.prisma.organizationUser.findFirst({
-      where: { organizationId: input.organizationId, userId: input.userId },
-      select: { userId: true },
+    const membership = await this.organizations.isMember({
+      organizationId: input.organizationId,
+      userId: input.userId,
     });
     if (!membership) {
       return { gatewayAccess: false, reason: "no_membership", budgets: [] };
@@ -177,11 +183,11 @@ export class BudgetOverviewService {
 
     // Same gate + same default as the device-flow approve path: the flag
     // ships on and only an explicit off turns the member surfaces dark.
-    const governanceEnabled = await featureFlagService
+    const governanceEnabled = await this.featureFlags
       .isEnabled("release_ui_ai_governance_enabled", {
-        distinctId: input.userId,
+        kind: "organization",
+        userId: input.userId,
         organizationId: input.organizationId,
-        defaultValue: true,
       })
       .catch(() => true);
     if (!governanceEnabled) {
@@ -208,6 +214,7 @@ export class BudgetOverviewService {
     const [applicable, topModels] = await Promise.all([
       resolveApplicableBudgetsForTarget(
         this.prisma,
+        this.budgetDecisions,
         {
           organizationId: input.organizationId,
           teamId: workspace?.team.id ?? null,
@@ -238,9 +245,7 @@ export class BudgetOverviewService {
           scopeClass,
           scopePhrase: scopePhraseFor(scopeClass, budget.scopeLabel),
           resetsAt: resetsAtFor(budget.window),
-          ...(topModels && topModels.length > 0 && scopeClass === "personal"
-            ? { topModels }
-            : {}),
+          ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
         };
       })
       .sort(byMostBindingFirst);
@@ -265,14 +270,13 @@ export class BudgetOverviewService {
     if (!budget) return null;
 
     const [targets, providerLabels, spentUsd] = await Promise.all([
-      resolveScopeTargetsBatch(this.prisma, [budget], input.organizationId),
+      this.budgetDecisions.resolveScopeTargets([budget], input.organizationId),
       resolveProviderLabels({ prisma: this.prisma, budgets: [budget] }),
       this.loadSpendForBudget(budget, input.organizationId),
     ]);
 
     const scopeLabel =
-      targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ??
-      budget.scopeId;
+      targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId;
     const scopeClass = absoluteScopeClass(budget.scopeType) ?? "other";
     return {
       id: budget.id,
@@ -297,12 +301,9 @@ export class BudgetOverviewService {
     };
   }
 
-  private async loadSpendForBudget(
-    budget: GatewayBudget,
-    organizationId: string,
-  ): Promise<string> {
+  private async loadSpendForBudget(budget: GatewayBudget, organizationId: string): Promise<string> {
     if (!this.chRepo) return "0";
-    const tenantIds = await organizationSpendTenantIds(this.prisma, organizationId);
+    const tenantIds = await this.budgetDecisions.listSpendTenantIds(organizationId);
     if (tenantIds.length === 0) return "0";
     const now = new Date();
     try {
@@ -408,10 +409,7 @@ function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass | null 
  * /me page, the CLI epilogue, and the settings surfaces can never label
  * the same budget differently.
  */
-export function scopePhraseFor(
-  scopeClass: BudgetOverviewScopeClass,
-  scopeLabel: string,
-): string {
+export function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string): string {
   switch (scopeClass) {
     case "organization":
       return "whole organization budget";
