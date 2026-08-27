@@ -95,5 +95,18 @@ describe("the pages under /settings", () => {
 
       expect(source).toContain("<SettingsLayout");
     });
+
+    /** @scenario An address that only forwards is not framed on the way past */
+    /** @scenario The old role bindings address forwards onto the tab it became */
+    it("forwards the old role-bindings address onto the tab it became", () => {
+      const source = readFileSync(
+        sourceFileOf("pages/settings/role-bindings"),
+        "utf-8",
+      );
+
+      expect(source).toContain("<Navigate");
+      expect(source).toContain("/settings/roles?tab=assignments");
+      expect(source).not.toContain("<SettingsLayout");
+    });
   });
 });
