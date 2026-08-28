@@ -96,7 +96,7 @@ import type { BroadcastService } from "../../app-layer/broadcast/broadcast.servi
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import {
   EventingCodingAgentProcessingAdapter,
-  PrometheusCodingAgentCostMetricsAdapter,
+  OtelCodingAgentCostMetricsAdapter,
   SystemCodingAgentClock,
   createCodingAgentLogFactsDispatchSubscriber,
   createCodingAgentMetricFactsDispatchSubscriber,
@@ -637,7 +637,7 @@ export class PipelineRegistry {
     // Registered BEFORE the metric, log and trace pipelines: their
     // coding-agent dispatch subscribers close over this pipeline's
     // contribution commands.
-    const codingAgentCostMetrics = PrometheusCodingAgentCostMetricsAdapter.create();
+    const codingAgentCostMetrics = OtelCodingAgentCostMetricsAdapter.create();
     const codingAgentTraces = AppCodingAgentTraceProcessingAdapter.create({
       traceCanonicalisation: this.deps.traceCanonicalisation,
       spans: this.deps.traces.spans,
@@ -989,7 +989,7 @@ export class PipelineRegistry {
    * Log and Trace pipelines and close over this pipeline's commands, so this
    * registers before all three.
    */
-  private registerCodingAgentPipeline(costMetrics: PrometheusCodingAgentCostMetricsAdapter) {
+  private registerCodingAgentPipeline(costMetrics: OtelCodingAgentCostMetricsAdapter) {
     return this.deps.eventSourcing.register(
       EventingCodingAgentProcessingAdapter.create({
         traceCanonicalisation: this.deps.traceCanonicalisation,

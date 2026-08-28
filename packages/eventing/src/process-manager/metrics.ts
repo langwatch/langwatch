@@ -1,4 +1,4 @@
-import { Gauge, register } from "prom-client";
+import { observableGauge } from "@langwatch/observability/metrics";
 
 /**
  * Fleet-level process-manager gauges (phase 3 of
@@ -6,10 +6,21 @@ import { Gauge, register } from "prom-client";
  * the /ops/processes page shows, exported so alerting can watch them without
  * a human on the page.
  *
- * Every value is a GLOBAL table count reported by every scraping pod — the
- * same shape as gq_blocked_groups — so dashboards and alerts must aggregate
- * with max() across pods, never sum().
+ * Every value is a GLOBAL table count reported by every pod — the same shape
+ * as gq_blocked_groups — so dashboards and alerts must aggregate with max()
+ * across pods, never sum().
+ *
+ * These are observable gauges: they are read on the exporter's interval
+ * rather than written when something changes. Two differences from the
+ * `prom-client` `collect()` they replace, both improvements:
+ *
+ *   - The read cadence is now fixed and known, instead of being whatever the
+ *     scrapers were configured with multiplied by how many were watching.
+ *   - A series that is not observed in an interval is simply absent. Under
+ *     `collect()` a stale label combination lingered until something called
+ *     `reset()`, which is why the old implementation had to.
  */
+
 const metricNames = [
   "pm_instances",
   "pm_instances_overdue_wakes",
@@ -18,10 +29,6 @@ const metricNames = [
   "pm_outbox_lapsed_leases",
   "pm_outbox_dead",
 ] as const;
-
-for (const name of metricNames) {
-  register.removeSingleMetric(name);
-}
 
 export interface ProcessFleetMetricsRow {
   processName: string;
@@ -38,9 +45,10 @@ type FleetReader = () => Promise<ProcessFleetMetricsRow[]>;
 let readFleet: FleetReader | null = null;
 
 /**
- * Scrape-time cache: six gauges collect on every scrape, and each must see
- * the same read rather than issuing six aggregate queries per scrape.
- * In-flight reads are shared; a settled read serves ten seconds.
+ * Collection-time cache: six gauges are observed within milliseconds of each
+ * other on every export, and each must see the same read rather than issuing
+ * six aggregate queries. In-flight reads are shared; a settled read serves ten
+ * seconds, comfortably inside one export interval.
  */
 let cached: { at: number; rows: ProcessFleetMetricsRow[] } | null = null;
 let inFlight: Promise<ProcessFleetMetricsRow[]> | null = null;
@@ -57,7 +65,7 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
     })
     .catch(() => {
       // A failed read reports nothing rather than stale numbers presented
-      // as fresh; the scrape itself still succeeds.
+      // as fresh; the export itself still succeeds.
       return cached?.rows ?? [];
     })
     .finally(() => {
@@ -67,7 +75,7 @@ async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
 }
 
 /**
- * Wire the source the gauges read on scrape. Called once from the
+ * Wire the source the gauges read on collection. Called once from the
  * composition root on processes that run the substrate; before it is called
  * the gauges report nothing.
  */
@@ -80,47 +88,38 @@ function fleetGauge(
   name: (typeof metricNames)[number],
   help: string,
   pick: (row: ProcessFleetMetricsRow) => number,
-): Gauge {
-  return new Gauge({
-    name,
-    help: `${help} Global count reported per pod — aggregate with max(), not sum().`,
-    labelNames: ["process_name"],
-    async collect() {
-      const rows = await readCounts();
-      this.reset();
-      for (const row of rows) {
-        this.set({ process_name: row.processName }, pick(row));
+): void {
+  observableGauge(
+    {
+      name,
+      description: `${help} Global count reported per pod — aggregate with max(), not sum().`,
+    },
+    async (observer) => {
+      for (const row of await readCounts()) {
+        observer.observe(pick(row), { process_name: row.processName });
       }
     },
-  });
+  );
 }
 
-export const pmInstances = fleetGauge(
-  "pm_instances",
-  "Process-manager instances per process name.",
-  (r) => r.instances,
-);
-export const pmInstancesOverdueWakes = fleetGauge(
+fleetGauge("pm_instances", "Process-manager instances per process name.", (r) => r.instances);
+fleetGauge(
   "pm_instances_overdue_wakes",
   "Instances whose next wake is past due beyond the ops threshold.",
   (r) => r.overdueWakes,
 );
-export const pmOutboxPending = fleetGauge(
-  "pm_outbox_pending",
-  "Pending outbox messages per process name.",
-  (r) => r.pendingMessages,
-);
-export const pmOutboxOverduePending = fleetGauge(
+fleetGauge("pm_outbox_pending", "Pending outbox messages per process name.", (r) => r.pendingMessages);
+fleetGauge(
   "pm_outbox_overdue_pending",
   "Pending outbox messages long past their next attempt with no live lease.",
   (r) => r.overduePending,
 );
-export const pmOutboxLapsedLeases = fleetGauge(
+fleetGauge(
   "pm_outbox_lapsed_leases",
   "Pending outbox messages whose dispatch lease expired (dispatcher died or still delivering).",
   (r) => r.lapsedLeases,
 );
-export const pmOutboxDead = fleetGauge(
+fleetGauge(
   "pm_outbox_dead",
   "Dead outbox messages per process name — intents that will not happen until redriven.",
   (r) => r.deadMessages,

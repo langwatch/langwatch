@@ -1,4 +1,4 @@
-import { Counter, register } from "prom-client";
+import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   CodingAgentCostMetricsPort,
   type CodingAgentCostMetric,
@@ -17,40 +17,29 @@ import {
  *
  * Recorded after contribution events commit. A bounded, process-local event-id
  * set suppresses immediate queue redelivery while avoiding unbounded memory.
- * Prometheus counters and this set both reset on worker restart, so this is an
+ * Counters and this set both reset on worker restart, so this is an
  * operational metric rather than a durable billing ledger.
  */
-const metricNames = [
-  "coding_agent_cost_computed_usd_total",
-  "coding_agent_cost_reported_usd_total",
-] as const;
-const MAX_RECORDED_EVENT_IDS = 100_000;
-
-export class PrometheusCodingAgentCostMetricsAdapter extends CodingAgentCostMetricsPort {
+export class OtelCodingAgentCostMetricsAdapter extends CodingAgentCostMetricsPort {
   private readonly recorded = new Set<string>();
 
   private constructor(
-    private readonly computed: Counter<"agent" | "model">,
-    private readonly reported: Counter<"agent" | "model">,
+    private readonly computed: CounterHandle,
+    private readonly reported: CounterHandle,
   ) {
     super();
   }
 
-  static create(): PrometheusCodingAgentCostMetricsAdapter {
-    for (const name of metricNames) {
-      register.removeSingleMetric(name);
-    }
-
-    return new PrometheusCodingAgentCostMetricsAdapter(
-      new Counter({
-        name: metricNames[0],
-        help: "Coding-agent cost computed from tokens against the model registry, in USD",
-        labelNames: ["agent", "model"] as const,
+  static create(): OtelCodingAgentCostMetricsAdapter {
+    return new OtelCodingAgentCostMetricsAdapter(
+      counter({
+        name: "coding_agent_cost_computed_usd_total",
+        description:
+          "Coding-agent cost computed from tokens against the model registry, in USD",
       }),
-      new Counter({
-        name: metricNames[1],
-        help: "Coding-agent cost as reported by the agent about its own bill, in USD",
-        labelNames: ["agent", "model"] as const,
+      counter({
+        name: "coding_agent_cost_reported_usd_total",
+        description: "Coding-agent cost as reported by the agent about its own bill, in USD",
       }),
     );
   }
@@ -65,7 +54,7 @@ export class PrometheusCodingAgentCostMetricsAdapter extends CodingAgentCostMetr
 
   private record(
     authority: "computed" | "reported",
-    counter: Counter<"agent" | "model">,
+    metric: CounterHandle,
     input: CodingAgentCostMetric,
   ): void {
     if (input.valueUsd <= 0) {
@@ -82,6 +71,8 @@ export class PrometheusCodingAgentCostMetricsAdapter extends CodingAgentCostMetr
     }
 
     this.recorded.add(key);
-    counter.inc({ agent: input.agent, model: input.model }, input.valueUsd);
+    metric.inc({ agent: input.agent, model: input.model }, input.valueUsd);
   }
 }
+
+const MAX_RECORDED_EVENT_IDS = 100_000;

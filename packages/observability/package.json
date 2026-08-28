@@ -18,7 +18,9 @@
     "./context": "./src/context/index.ts",
     "./node": "./src/node/index.ts",
     "./request": "./src/request/requestLogging.ts",
-    "./tracing": "./src/trace/traceContext.ts"
+    "./tracing": "./src/trace/traceContext.ts",
+    "./metrics": "./src/metrics/index.ts",
+    "./metrics/testing": "./src/metrics/testing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

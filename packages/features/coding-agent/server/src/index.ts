@@ -13,7 +13,7 @@ export {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipelineDeps,
 } from "./adapters/eventing.coding-agent-processing.adapter";
-export { PrometheusCodingAgentCostMetricsAdapter } from "./adapters/prometheus.coding-agent-cost-metrics.adapter";
+export { OtelCodingAgentCostMetricsAdapter } from "./adapters/otel.coding-agent-cost-metrics.adapter";
 export { CodingAgentCostMetricsPort } from "./ports/coding-agent-cost-metrics.port";
 export { CodingAgentTraceProcessingPort } from "./ports/coding-agent-trace-processing.port";
 export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/coding-agent-log-facts-dispatch.subscriber";

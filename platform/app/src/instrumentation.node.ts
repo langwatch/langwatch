@@ -7,6 +7,7 @@
 import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";
+import { activateMetrics, metricHistogramViews } from "@langwatch/observability/metrics";
 import type { TelemetryConfig } from "@langwatch/config";
 import type { ExportResult } from "@opentelemetry/core";
 import type { Sampler } from "@opentelemetry/sdk-trace-base";
@@ -286,7 +287,7 @@ export function initializeInstrumentation(config: TelemetryConfig): void {
       require("@opentelemetry/host-metrics") as typeof import("@opentelemetry/host-metrics");
     const { resourceFromAttributes } =
       require("@opentelemetry/resources") as typeof import("@opentelemetry/resources");
-    const { MeterProvider, PeriodicExportingMetricReader } =
+    const { AggregationType, MeterProvider, PeriodicExportingMetricReader } =
       require("@opentelemetry/sdk-metrics") as typeof import("@opentelemetry/sdk-metrics");
 
     const metricAttrs: Record<string, string> = {
@@ -299,6 +300,20 @@ export function initializeInstrumentation(config: TelemetryConfig): void {
 
     const meterProvider = new MeterProvider({
       resource: resourceFromAttributes(metricAttrs),
+      // Bucket boundaries are a property of the provider in OpenTelemetry, not
+      // of the instrument the way prom-client's `buckets` were. Without these
+      // views every histogram would silently take the SDK's generic 0…10000
+      // boundaries, and `histogram_quantile` over payload sizes, span counts
+      // or multi-minute jobs would return plausible nonsense. The boundaries
+      // themselves live in @langwatch/observability/metrics, which is also
+      // what the instruments read, so the two cannot drift.
+      views: metricHistogramViews().map(({ instrumentName, boundaries }) => ({
+        instrumentName,
+        aggregation: {
+          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+          options: { boundaries: [...boundaries], recordMinMax: true },
+        },
+      })),
       readers: [
         new PeriodicExportingMetricReader({
           exporter: new OTLPMetricExporterBase(
@@ -324,6 +339,11 @@ export function initializeInstrumentation(config: TelemetryConfig): void {
       ],
     });
     metrics.setGlobalMeterProvider(meterProvider);
+    // Instruments declared at module scope resolved a no-op meter until now —
+    // `metrics.getMeter()` has no upgrading proxy the way `trace.getTracer()`
+    // does. This point them at the provider above and installs the observable
+    // gauges that had nowhere to register.
+    activateMetrics();
 
     new HostMetrics({
       meterProvider,
