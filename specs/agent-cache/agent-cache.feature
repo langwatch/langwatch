@@ -190,15 +190,23 @@ Feature: The agent cache
       When the agent claims ACME_SESSION
       Then the agent is given false, and no exception is raised
 
-  Rule: A run reaches the cache with a key minted for that run
+  Rule: A run reaches the cache with a key the project's runs share
 
     # The key is bound to one project, holds the manage grain and nothing
     # else, and expires after twelve hours. It is never the project key. In a
     # shared project it belongs to no user. A personal workspace admits no
     # principal but its owner, so there the key is the owner's own, which is
-    # the owner acting programmatically. A run that cannot mint one still
+    # the owner acting programmatically. A run that cannot get one still
     # runs: every row does its own work, which is what a run without the
     # cache does anyway.
+    #
+    # Every run of a project holds the same authority over the same cache, so
+    # the runs share one key rather than minting one each: a project that runs
+    # all day mints a few keys, one that runs nothing mints none. The shared
+    # token is held encrypted for eight of the key's twelve hours, so a run
+    # that picks it up late still holds a key with hours to live, and the key
+    # stays short-lived because the plaintext is never written anywhere
+    # durable.
     #
     # The manage grain alone, because it is what all three routes ask for.
     # Adding agentCache:view would reach no route today, and would hand every
@@ -206,15 +214,29 @@ Feature: The agent cache
 
     @integration
     Scenario: The sandbox key reaches the agent cache
-      Given a key minted for one run of this project
+      Given a key minted for the runs of this project
       When the run stores an entry and reads it back
       Then the request succeeds
 
     @integration
     Scenario: The sandbox key reaches nothing else
-      Given a key minted for one run of this project
+      Given a key minted for the runs of this project
       When the run calls another route in the same project
       Then the request is refused as forbidden
+
+    @integration
+    Scenario: A later run in the same project reuses the key
+      Given a run of this project got a key
+      When a later run of the same project asks for one
+      Then it is given the same key
+      And no second key is minted
+      And the key still reaches the agent cache
+
+    @unit
+    Scenario: A shared key the platform can no longer read is replaced
+      Given the held token cannot be read
+      When a run asks for a key
+      Then a new key is minted and shared from then on
 
     @integration
     Scenario: A run in a personal workspace gets a key its owner holds
@@ -231,7 +253,7 @@ Feature: The agent cache
 
     @unit
     Scenario: A run whose key could not be minted still runs
-      Given the platform cannot mint a sandbox key
+      Given the platform holds no shared key and cannot mint one
       When the run starts
       Then the run executes with no cache credential
       And the failure is warned about, not raised

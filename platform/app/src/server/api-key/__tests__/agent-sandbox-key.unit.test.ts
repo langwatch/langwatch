@@ -1,19 +1,33 @@
 /**
- * Unit coverage for the run-scoped sandbox key: what it asks for, what a
- * failed mint does to the run, and what the sweep is allowed to touch.
+ * Unit coverage for the sandbox key: what it asks for, how the runs of a
+ * project share it, what a failed mint does to the run, and what the sweep
+ * is allowed to touch.
  *
  * Spec: specs/agent-cache/agent-cache.feature
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { TtlCache } from "~/server/utils/ttlCache";
 import {
+  AGENT_SANDBOX_KEY_REUSE_MS,
+  getOrMintAgentSandboxApiKey,
   mintAgentSandboxApiKey,
   reapExpiredAgentSandboxApiKeys,
-  tryMintAgentSandboxApiKey,
+  tryGetAgentSandboxApiKey,
 } from "../agent-sandbox-key";
 import { ApiKeyService } from "../api-key.service";
 import { AGENT_SANDBOX_API_KEY_NAME } from "../reserved-names";
+
+// Reversible stand-ins, so a test can tell what was held and can plant a
+// value the real decrypt would refuse.
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (value: string) => `enc:${value}`,
+  decrypt: (value: string) => {
+    if (!value.startsWith("enc:")) throw new Error("unreadable");
+    return value.slice("enc:".length);
+  },
+}));
 
 const create = vi.fn();
 
@@ -156,14 +170,100 @@ describe("the agent sandbox key", () => {
     });
   });
 
-  describe("given a platform that cannot mint a key", () => {
+  describe("given a run of the project already got a key", () => {
+    const freshCache = () =>
+      new TtlCache<string>(AGENT_SANDBOX_KEY_REUSE_MS, "test:sandbox-key:");
+
+    describe("when a later run of the same project asks for one", () => {
+      it("is given the same key, and mints no second one", async () => {
+        const cache = freshCache();
+
+        const first = await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_1",
+          organizationId: "organization_1",
+          cache,
+        });
+        const second = await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_1",
+          organizationId: "organization_1",
+          cache,
+        });
+
+        expect(first).toBe("sk-lw-minted");
+        expect(second).toBe(first);
+        expect(create).toHaveBeenCalledTimes(1);
+      });
+
+      it("holds the shared token encrypted, never in the clear", async () => {
+        const cache = freshCache();
+
+        await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_1",
+          organizationId: "organization_1",
+          cache,
+        });
+
+        expect(await cache.get("project_1")).toBe("enc:sk-lw-minted");
+      });
+    });
+
+    describe("when a run of another project asks for one", () => {
+      it("mints that project its own key", async () => {
+        const cache = freshCache();
+
+        await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_1",
+          organizationId: "organization_1",
+          cache,
+        });
+        await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_2",
+          organizationId: "organization_1",
+          cache,
+        });
+
+        expect(create).toHaveBeenCalledTimes(2);
+        expect(create.mock.calls[1]?.[0]).toMatchObject({
+          bindings: [
+            { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project_2" },
+          ],
+        });
+      });
+    });
+
+    describe("when the held token can no longer be read", () => {
+      /** @scenario "A shared key the platform can no longer read is replaced" */
+      it("mints a new key and shares that one from then on", async () => {
+        const cache = freshCache();
+        await cache.set("project_1", "written-before-the-secret-changed");
+
+        const token = await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId: "project_1",
+          organizationId: "organization_1",
+          cache,
+        });
+
+        expect(token).toBe("sk-lw-minted");
+        expect(create).toHaveBeenCalledTimes(1);
+        expect(await cache.get("project_1")).toBe("enc:sk-lw-minted");
+      });
+    });
+  });
+
+  describe("given a platform that holds no shared key and cannot mint one", () => {
     describe("when a run asks for one", () => {
       /** @scenario "A run whose key could not be minted still runs" */
       it("answers with no key rather than raising", async () => {
         create.mockRejectedValue(new Error("the ledger is unreachable"));
 
         await expect(
-          tryMintAgentSandboxApiKey({
+          tryGetAgentSandboxApiKey({
             prisma,
             projectId: "project_1",
             organizationId: "organization_1",

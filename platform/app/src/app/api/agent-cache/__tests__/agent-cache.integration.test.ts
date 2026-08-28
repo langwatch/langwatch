@@ -18,10 +18,15 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { mintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
+import {
+  AGENT_SANDBOX_KEY_REUSE_MS,
+  getOrMintAgentSandboxApiKey,
+  mintAgentSandboxApiKey,
+} from "~/server/api-key/agent-sandbox-key";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { AGENT_SANDBOX_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
+import { TtlCache } from "~/server/utils/ttlCache";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -51,13 +56,19 @@ describe("Feature: the agent cache", () => {
   let personalProjectId: string;
   let personalSandboxToken: string;
 
-  const headersFor = (token: string, forProjectId: string = projectId) => ({
+  const headersFor = ({
+    token,
+    forProjectId = projectId,
+  }: {
+    token: string;
+    forProjectId?: string;
+  }) => ({
     Authorization: `Bearer ${token}`,
     "X-Project-Id": forProjectId,
   });
 
   const readEntry = (name: string, token: string) =>
-    app.request(`/api/agent-cache/${name}`, { headers: headersFor(token) });
+    app.request(`/api/agent-cache/${name}`, { headers: headersFor({ token }) });
 
   const writeEntry = (
     name: string,
@@ -66,7 +77,7 @@ describe("Feature: the agent cache", () => {
   ) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "PUT",
-      headers: { ...headersFor(token), "Content-Type": "application/json" },
+      headers: { ...headersFor({ token }), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
@@ -77,14 +88,14 @@ describe("Feature: the agent cache", () => {
   ) =>
     app.request(`/api/agent-cache/${name}/claim`, {
       method: "POST",
-      headers: { ...headersFor(token), "Content-Type": "application/json" },
+      headers: { ...headersFor({ token }), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
   const removeEntry = (name: string, token: string) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "DELETE",
-      headers: headersFor(token),
+      headers: headersFor({ token }),
     });
 
   beforeAll(async () => {
@@ -515,9 +526,68 @@ describe("Feature: the agent cache", () => {
       /** @scenario "The sandbox key reaches nothing else" */
       it("is refused everywhere else in the project", async () => {
         const res = await promptsApp.request("/api/prompts", {
-          headers: headersFor(sandboxToken),
+          headers: headersFor({ token: sandboxToken }),
         });
         expect(res.status).toBe(403);
+      });
+    });
+  });
+
+  describe("given a run of this project already got a key", () => {
+    // The test's own store rather than the module's, so what this test
+    // shares is not left behind for eight hours.
+    const sharedKeys = new TtlCache<string>(
+      AGENT_SANDBOX_KEY_REUSE_MS,
+      `ttlcache:agent-sandbox-key-${ns}:`,
+    );
+
+    afterAll(async () => {
+      await sharedKeys.delete(projectId);
+    });
+
+    describe("when a later run of the same project asks for one", () => {
+      /** @scenario "A later run in the same project reuses the key" */
+      it("is given the same key, and no second key is minted", async () => {
+        const mintedBefore = await prisma.apiKey.count({
+          where: {
+            organizationId: testOrganization.id,
+            name: AGENT_SANDBOX_API_KEY_NAME,
+            roleBindings: { some: { scopeId: projectId } },
+          },
+        });
+
+        const first = await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId,
+          organizationId: testOrganization.id,
+          cache: sharedKeys,
+        });
+        const second = await getOrMintAgentSandboxApiKey({
+          prisma,
+          projectId,
+          organizationId: testOrganization.id,
+          cache: sharedKeys,
+        });
+
+        expect(second).toBe(first);
+        const mintedAfter = await prisma.apiKey.count({
+          where: {
+            organizationId: testOrganization.id,
+            name: AGENT_SANDBOX_API_KEY_NAME,
+            roleBindings: { some: { scopeId: projectId } },
+          },
+        });
+        expect(mintedAfter).toBe(mintedBefore + 1);
+
+        const written = await writeEntry("ACME_FROM_SHARED_KEY", second, {
+          value: "written-with-the-shared-key",
+        });
+        expect(written.status).toBe(200);
+        const res = await readEntry("ACME_FROM_SHARED_KEY", second);
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { value: string }).value).toBe(
+          "written-with-the-shared-key",
+        );
       });
     });
   });
@@ -546,7 +616,10 @@ describe("Feature: the agent cache", () => {
           {
             method: "PUT",
             headers: {
-              ...headersFor(personalSandboxToken, personalProjectId),
+              ...headersFor({
+                token: personalSandboxToken,
+                forProjectId: personalProjectId,
+              }),
               "Content-Type": "application/json",
             },
             body: JSON.stringify({ value: "written-in-the-owner-sandbox" }),
@@ -556,7 +629,12 @@ describe("Feature: the agent cache", () => {
 
         const res = await app.request(
           "/api/agent-cache/ACME_FROM_PERSONAL_SANDBOX",
-          { headers: headersFor(personalSandboxToken, personalProjectId) },
+          {
+            headers: headersFor({
+              token: personalSandboxToken,
+              forProjectId: personalProjectId,
+            }),
+          },
         );
         expect(res.status).toBe(200);
         expect(((await res.json()) as { value: string }).value).toBe(

@@ -1,5 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { decrypt, encrypt } from "~/utils/encryption";
+import { TtlCache } from "../utils/ttlCache";
 import { ApiKeyService } from "./api-key.service";
 import { AGENT_SANDBOX_API_KEY_NAME } from "./reserved-names";
 
@@ -12,6 +14,31 @@ const logger = createLogger("langwatch:api-key:agent-sandbox");
  * without the key does anyway.
  */
 export const AGENT_SANDBOX_KEY_TTL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * How long the runs of one project share a key before the next one is
+ * minted. Shorter than the key's own lifetime by a margin no run outlasts,
+ * so a run that picks up a shared key near the end of this window still
+ * holds a key with hours to live.
+ *
+ * Sharing is what keeps the key ledger small: a project that runs all day
+ * mints three keys, not one per run, and a project that runs nothing mints
+ * none. The key stays short-lived either way, because the token is only
+ * held for this window and never written to a durable store.
+ */
+export const AGENT_SANDBOX_KEY_REUSE_MS = 8 * 60 * 60 * 1000;
+
+const AGENT_SANDBOX_KEY_CACHE_PREFIX = "ttlcache:agent-sandbox-key:";
+
+/**
+ * The token each project's runs currently share, encrypted at rest, keyed by
+ * project id. The database holds only the token's hash, so this is the one
+ * place the plaintext survives past the mint, and only for the reuse window.
+ */
+const sharedKeys = new TtlCache<string>(
+  AGENT_SANDBOX_KEY_REUSE_MS,
+  AGENT_SANDBOX_KEY_CACHE_PREFIX,
+);
 
 /**
  * The whole surface a sandbox key reaches: the project's agent cache, and
@@ -69,13 +96,14 @@ async function sandboxKeyOwner({
  * Mint the credential a code agent's sandbox authenticates with.
  *
  * The key is bound to one project and holds the agent cache grains only, so
- * it is strictly narrower than the project key that authorized the run. The
- * run mints one and every row of that run shares it. In a shared project it
- * belongs to no user; in a personal workspace it belongs to the workspace
- * owner, see {@link sandboxKeyOwner}.
+ * it is strictly narrower than the project key that authorized the run. In a
+ * shared project it belongs to no user; in a personal workspace it belongs
+ * to the workspace owner, see {@link sandboxKeyOwner}.
  *
- * The token is returned once and is unrecoverable afterwards; only its hash is
- * stored. Nothing logs it.
+ * Runs do not call this directly: {@link getOrMintAgentSandboxApiKey} hands
+ * out the project's shared key and mints a new one here only when there is
+ * none to share. The token is returned once and is unrecoverable from the
+ * database afterwards; only its hash is stored there. Nothing logs it.
  */
 export async function mintAgentSandboxApiKey({
   prisma,
@@ -92,8 +120,8 @@ export async function mintAgentSandboxApiKey({
     isSystemManaged: true,
     name: AGENT_SANDBOX_API_KEY_NAME,
     description:
-      "Short-lived key for one code agent run. Reaches the project's agent " +
-      "cache and nothing else, and expires by itself.",
+      "Short-lived key shared by the code agent runs of one project. Reaches " +
+      "the project's agent cache and nothing else, and expires by itself.",
     // In a shared project there is no person behind a run's sandbox, and a
     // key with no owner has no user ceiling to clamp, so the grains below are
     // the whole ceiling. A personal workspace takes only its owner's own key.
@@ -110,13 +138,60 @@ export async function mintAgentSandboxApiKey({
 }
 
 /**
- * Mint a sandbox key, or report that the run goes without one.
+ * The key a run of this project puts in its sandbox: the one the project's
+ * runs currently share, or a freshly minted one when there is none.
+ *
+ * Every run of a project holds the same authority over the same cache, so
+ * one key serves them all. The shared token is held encrypted for
+ * {@link AGENT_SANDBOX_KEY_REUSE_MS}; once that passes, or when the held
+ * value cannot be read (the instance's encryption key changed, or the store
+ * lost the entry), the next run mints a new key and shares it in turn. Two
+ * runs that start together on an empty store may both mint; both keys are
+ * valid and the later one is the one shared from then on.
+ *
+ * `cache` is for tests, which hand in their own store rather than sharing
+ * the module's.
+ */
+export async function getOrMintAgentSandboxApiKey({
+  prisma,
+  projectId,
+  organizationId,
+  cache = sharedKeys,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  organizationId: string;
+  cache?: TtlCache<string>;
+}): Promise<string> {
+  const held = await cache.get(projectId);
+  if (held !== undefined) {
+    try {
+      return decrypt(held);
+    } catch {
+      logger.warn(
+        { projectId },
+        "the shared agent sandbox key could not be read; minting a new one",
+      );
+    }
+  }
+
+  const token = await mintAgentSandboxApiKey({
+    prisma,
+    projectId,
+    organizationId,
+  });
+  await cache.set(projectId, encrypt(token));
+  return token;
+}
+
+/**
+ * Get the sandbox key for a run, or report that the run goes without one.
  *
  * A run that cannot get a key must still run: its rows each do their own work
  * and the cache simply never answers. So a failure here is a warning and an
  * `undefined`, never a thrown error that would stop the run.
  */
-export async function tryMintAgentSandboxApiKey({
+export async function tryGetAgentSandboxApiKey({
   prisma,
   projectId,
   organizationId,
@@ -126,7 +201,7 @@ export async function tryMintAgentSandboxApiKey({
   organizationId: string;
 }): Promise<string | undefined> {
   try {
-    return await mintAgentSandboxApiKey({
+    return await getOrMintAgentSandboxApiKey({
       prisma,
       projectId,
       organizationId,
@@ -134,7 +209,7 @@ export async function tryMintAgentSandboxApiKey({
   } catch (error) {
     logger.warn(
       { projectId, error },
-      "could not mint an agent sandbox key; the run continues without the agent cache",
+      "could not get an agent sandbox key; the run continues without the agent cache",
     );
     return undefined;
   }
