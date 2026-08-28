@@ -370,10 +370,13 @@ const updateProjectLambdaImage = async (
 const reconcileProjectLambdaConfig = async (
   lambda: LambdaClient,
   functionName: string,
-  config: LangWatchLambdaConfig,
-  currentConfig: FunctionConfiguration,
-  projectId: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    currentConfig: FunctionConfiguration;
+    projectId: string;
+  },
 ): Promise<FunctionConfiguration | null> => {
+  const { config, currentConfig, projectId } = params;
   const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
   const currentEnv = currentConfig.Environment?.Variables ?? {};
   const envDrifted = Object.entries(desiredEnv).some(
@@ -500,6 +503,148 @@ export const getProjectLambdaArn = async (
   return resolution;
 };
 
+/**
+ * Swap a Lambda's container image when the desired URI has drifted from
+ * what's deployed. Returns the updated configuration, or `null` when no
+ * update was needed or attempted.
+ */
+const updateProjectLambdaImageIfDrifted = async (
+  lambda: LambdaClient,
+  functionName: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    projectId: string;
+    currentImageUri: string | undefined;
+  },
+): Promise<FunctionConfiguration | null> => {
+  const { config, projectId, currentImageUri } = params;
+
+  if (!currentImageUri || currentImageUri === config.image_uri) {
+    return null;
+  }
+
+  logger.info(
+    { projectId },
+    `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
+  );
+
+  try {
+    const updated = await updateProjectLambdaImage(
+      lambda,
+      functionName,
+      config.image_uri,
+      projectId,
+    );
+    // AWS rejects UpdateFunctionConfiguration while a code update is still in
+    // flight ("ResourceConflictException: An update is in progress"), so the
+    // code update must fully land before a reconcile can follow.
+    await pollLambdaUntilReady(lambda, functionName);
+    return updated;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("An update is in progress")
+    ) {
+      logger.info(
+        { projectId },
+        "Lambda function update in progress, skipping update",
+      );
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * `reconcileProjectLambdaConfig`, tolerant of a concurrent update: AWS
+ * rejects `UpdateFunctionConfiguration` while another update is in flight,
+ * which is expected under overlapping reconcile attempts and not an error.
+ */
+const reconcileProjectLambdaConfigSafely = async (
+  lambda: LambdaClient,
+  functionName: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    currentConfig: FunctionConfiguration;
+    projectId: string;
+  },
+): Promise<FunctionConfiguration | null> => {
+  try {
+    return await reconcileProjectLambdaConfig(lambda, functionName, params);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("An update is in progress")
+    ) {
+      logger.info(
+        { projectId: params.projectId },
+        "Lambda function config reconcile skipped, update in progress",
+      );
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Bring an already-existing Lambda's container image and configuration in
+ * line with what this invocation wants: swap the image if the URI drifted,
+ * then reconcile env vars / memory against the pre-update configuration
+ * baseline. Split out of `resolveProjectLambdaArn` to keep that function
+ * under the house line-count limit.
+ */
+const syncExistingProjectLambda = async (
+  lambda: LambdaClient,
+  functionName: string,
+  params: {
+    config: LangWatchLambdaConfig;
+    projectId: string;
+    existingConfig: FunctionConfiguration;
+  },
+): Promise<FunctionConfiguration> => {
+  const { config, projectId, existingConfig } = params;
+  let lambdaConfig = existingConfig;
+
+  // Get complete function details to check image URI
+  const getFunctionCommand = new GetFunctionCommand({
+    FunctionName: functionName,
+  });
+  const functionDetails = await lambda.send(getFunctionCommand);
+
+  const updatedByImage = await updateProjectLambdaImageIfDrifted(
+    lambda,
+    functionName,
+    {
+      config,
+      projectId,
+      currentImageUri: functionDetails.Code?.ImageUri,
+    },
+  );
+  if (updatedByImage) {
+    lambdaConfig = updatedByImage;
+  }
+
+  // `functionDetails.Configuration` was fetched before either update, and is
+  // a correct drift baseline regardless: UpdateFunctionCode never changes
+  // Environment or MemorySize.
+  if (functionDetails.Configuration) {
+    const reconciled = await reconcileProjectLambdaConfigSafely(
+      lambda,
+      functionName,
+      {
+        config,
+        currentConfig: functionDetails.Configuration,
+        projectId,
+      },
+    );
+    if (reconciled) {
+      lambdaConfig = reconciled;
+    }
+  }
+
+  return lambdaConfig;
+};
+
 const resolveProjectLambdaArn = async (
   projectId: string,
   config: LangWatchLambdaConfig,
@@ -540,74 +685,11 @@ const resolveProjectLambdaArn = async (
       }
     }
   } else {
-    // Get complete function details to check image URI
-    const getFunctionCommand = new GetFunctionCommand({
-      FunctionName: functionName,
+    lambdaConfig = await syncExistingProjectLambda(lambda, functionName, {
+      config,
+      projectId,
+      existingConfig: lambdaConfig,
     });
-    const functionDetails = await lambda.send(getFunctionCommand);
-
-    const currentImageUri = functionDetails.Code?.ImageUri;
-    if (currentImageUri && currentImageUri !== config.image_uri) {
-      logger.info(
-        { projectId },
-        `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
-      );
-
-      try {
-        lambdaConfig = await updateProjectLambdaImage(
-          lambda,
-          functionName,
-          config.image_uri,
-          projectId,
-        );
-        // AWS rejects UpdateFunctionConfiguration while a code update is still
-        // in flight ("ResourceConflictException: An update is in progress"), so
-        // the code update must fully land before the reconcile below fires.
-        await pollLambdaUntilReady(lambda, functionName);
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes("An update is in progress")
-        ) {
-          logger.info(
-            { projectId },
-            "Lambda function update in progress, skipping update",
-          );
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    // `functionDetails.Configuration` was fetched before either update, and is
-    // a correct drift baseline regardless: UpdateFunctionCode never changes
-    // Environment or MemorySize.
-    if (functionDetails.Configuration) {
-      try {
-        const reconciled = await reconcileProjectLambdaConfig(
-          lambda,
-          functionName,
-          config,
-          functionDetails.Configuration,
-          projectId,
-        );
-        if (reconciled) {
-          lambdaConfig = reconciled;
-        }
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes("An update is in progress")
-        ) {
-          logger.info(
-            { projectId },
-            "Lambda function config reconcile skipped, update in progress",
-          );
-        } else {
-          throw error;
-        }
-      }
-    }
   }
 
   // Poll until Lambda is ready
