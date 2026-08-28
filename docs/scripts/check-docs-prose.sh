@@ -93,7 +93,8 @@ for file in "${FILES[@]}"; do
       while IFS= read -r match; do
         lineno="${match%%:*}"
         text="${match#*:}"
-        echo "::error file=$rel,line=$lineno::$text  [$label]"
+        word=$(printf '%s' "$text" | grep -oiE "$pattern" | head -1)
+        echo "::error file=$rel,line=$lineno::The word \"$word\" is forbidden ($label). Read https://nexus.langwatch.ai/wiki/docs-writing-rules to learn how to write better docs. Load your nexus access skill to read it; if you do not have one or do not know how to access Nexus, ask your user for access so you can pass this CI check. Line: $text"
         ERRORS=$((ERRORS + 1))
       done <<< "$matches"
     fi
