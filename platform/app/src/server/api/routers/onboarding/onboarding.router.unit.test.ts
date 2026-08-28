@@ -36,14 +36,6 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("../organization", () => ({
-  organizationRouter: {
-    createCaller: vi.fn(() => ({
-      createAndAssign: mockCreateAndAssign,
-    })),
-  },
-}));
-
 vi.mock("~/runtime/app/internal-api/project.router", () => ({
   projectRouter: {
     createCaller: vi.fn(() => ({
@@ -57,6 +49,7 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
     organizations: {
+      createAndAssign: mockCreateAndAssign,
       ensurePersonalWorkspace: mockEnsurePersonalWorkspace,
     },
     notifications: {
@@ -85,7 +78,6 @@ import { onboardingRouter } from "./onboarding.router";
 
 describe("onboarding.initializeOrganization", () => {
   const orgResult = {
-    success: true,
     organization: { id: "org_1", name: "Acme Corp" },
     team: { id: "team_1", name: "Acme Team", slug: "acme-team" },
   };
@@ -195,10 +187,12 @@ describe("onboarding.initializeOrganization", () => {
       });
 
       expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        userId: "user_1",
         orgName: "Acme Corp",
         phoneNumber: undefined,
         signUpData: { terms: true },
         primaryIntent: "AGENT_GOVERNANCE",
+        userDisplayName: "Jane Doe",
       });
     });
 
@@ -340,10 +334,12 @@ describe("onboarding.initializeOrganization", () => {
       // SIBLING field only — any drift here breaks Customer.io/HubSpot
       // segmentation (C2).
       expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        userId: "user_1",
         orgName: "Acme Corp",
         phoneNumber: "+31 20 123 4567",
         signUpData: llmOpsSignUpData,
         primaryIntent: "LLM_OPS",
+        userDisplayName: "Jane Doe",
       });
     });
   });

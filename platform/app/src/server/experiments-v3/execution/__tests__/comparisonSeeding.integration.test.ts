@@ -53,12 +53,6 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
     },
   ),
 }));
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: vi.fn(async (event: unknown) => event),
-}));
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
-  loadDatasets: vi.fn(async (event: unknown) => event),
-}));
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     experimentRuns: {

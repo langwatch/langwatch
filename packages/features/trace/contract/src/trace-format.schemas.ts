@@ -780,3 +780,27 @@ export type DatasetSpan =
       RAGSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
     > & { params: Record<string, any>; model?: string | null });
+
+const datasetSpanShape = {
+  params: z.record(z.string(), z.any()),
+  model: z.string().optional(),
+};
+
+const omittedForDataset = {
+  trace_id: true,
+  timestamps: true,
+  metrics: true,
+  params: true,
+} as const;
+
+/**
+ * The runtime validator for {@link DatasetSpan}: a trace span reduced to what a
+ * dataset row carries. It lives beside the type because it is derived from the
+ * same span schemas — `@langwatch/dataset-contract` keeps a span-shaped record
+ * so it need not depend on this package, which validates nothing.
+ */
+export const datasetSpanSchema = z.union([
+  baseSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
+  lLMSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
+  rAGSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
+]);

@@ -33,7 +33,7 @@ import {
   type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";

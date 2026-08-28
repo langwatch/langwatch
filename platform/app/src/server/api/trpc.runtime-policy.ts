@@ -1,7 +1,7 @@
 /**
  * The app process's tRPC policy, composed.
  *
- * The middlewares themselves are `@langwatch/trpc`'s — tracing, request
+ * The middlewares themselves are `@langwatch/api/trpc`'s — tracing, request
  * logging, handled-error translation, the fail-closed permission backstop and
  * the audit trail are framework policy, not this application's. What is
  * decided here is everything portable code cannot decide: who the caller is,
@@ -16,7 +16,7 @@ import {
   type TrpcErrorReportingPort,
   type TrpcIdentityPort,
   type TrpcTranslatedCause,
-} from "@langwatch/trpc";
+} from "@langwatch/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";

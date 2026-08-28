@@ -38,6 +38,7 @@ class GrantsFake extends AuthzGrantsService {
   updateBinding = vi.fn();
   deleteBinding = vi.fn();
   applyMemberBindings = vi.fn();
+  invalidateOrganization = vi.fn();
 }
 
 function repository(): ScimRepositoryPort {

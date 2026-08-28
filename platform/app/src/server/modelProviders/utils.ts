@@ -6,12 +6,12 @@ import {
   type ModelProviderAlternateResolution,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import { env } from "@langwatch/trace-server";
+import { env } from "../../env.mjs";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
-} from "../api/routers/modelProviders.utils";
+} from "@langwatch/model-provider-server";
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { getCodexVercelAIModel } from "./codexGatewayModel";

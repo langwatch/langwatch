@@ -1,6 +1,8 @@
-import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import {
+  createOrUpdateQueueItems,
+  PostgresAnnotationAdapter,
+} from "@langwatch/annotation-server";
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -9,7 +11,7 @@ import {
   createAnnotationTestUsers,
 } from "~/test-utils/annotation-test-services";
 import { createInnerTRPCContext } from "../../trpc";
-import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
+import { annotationRouter } from "../annotation";
 
 // The declared permission seam resolves its service from the App.
 vi.mock("~/server/app-layer/app", async () => {
@@ -32,7 +34,6 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 const annotationScoreCount = vi.fn();
-const traceCanonicalisation = TraceCanonicalisationService.create();
 const annotationQueueCount = vi.fn();
 const annotationQueueFindFirst = vi.fn();
 const annotationQueueCreate = vi.fn();
@@ -218,9 +219,8 @@ describe("annotation queue references", () => {
         projectId: "project_1",
         annotators: ["queue-foreign-queue"],
         userId: "creator_1",
-        prisma,
         annotations: annotationService(),
-        traceCanonicalisation,
+        findExistingTraceIds: async ({ traceIds }) => traceIds,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -241,9 +241,8 @@ describe("annotation queue references", () => {
         projectId: "project_1",
         annotators: ["user-foreign-user"],
         userId: "creator_1",
-        prisma,
         annotations: annotationService(),
-        traceCanonicalisation,
+        findExistingTraceIds: async ({ traceIds }) => traceIds,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -260,9 +259,7 @@ describe("annotation queue references", () => {
       projectId: "project_1",
       annotators: ["queue-queue-with-hyphens", "user-user-with-hyphens"],
       userId: "creator_1",
-      prisma,
       annotations: annotationService(),
-      traceCanonicalisation,
       // Which ids resolve to a trace is ClickHouse's answer; this file is about
       // which annotators the references are allowed to name.
       findExistingTraceIds: async ({ traceIds }) => traceIds,
@@ -291,9 +288,7 @@ describe("annotation queue references", () => {
       projectId: "project_1",
       annotators: ["user-user_1"],
       userId: "next-creator",
-      prisma,
       annotations: annotationService(),
-      traceCanonicalisation,
       findExistingTraceIds: async ({ traceIds }) => traceIds,
     });
 

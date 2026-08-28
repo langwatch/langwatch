@@ -47,7 +47,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";

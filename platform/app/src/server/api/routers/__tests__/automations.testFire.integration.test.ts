@@ -39,7 +39,7 @@ vi.mock("../../../rateLimit", async (importOriginal) => {
   };
 });
 
-import { automationRouter } from "../automations";
+import { appRouter } from "../../root";
 
 const SESSION_EMAIL = "owner@langwatch.test";
 const ATTACKER_EMAIL = "victim@elsewhere.test";
@@ -56,12 +56,17 @@ function createTestCaller(overrides?: { email?: string | null }) {
     req: undefined,
     res: undefined,
     prisma: {},
+    // The transport is package-owned and reads its services off the request
+    // context, so the composed test App has to be ON the context rather than
+    // only in the global slot.
+    app: globalForApp.__langwatch_app,
+    actor: () => ({ id: "user_test_123" }),
     permissionChecked: false,
     publiclyShared: false,
     organizationRole: undefined,
   } as any;
 
-  return automationRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).automation;
 }
 
 describe("automationRouter.testFireTemplate", () => {

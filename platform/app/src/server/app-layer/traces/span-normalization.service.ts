@@ -11,8 +11,7 @@ import type {
   NormalizedEvent,
   NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
-import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import { IdUtils, TraceRequestUtils } from "@langwatch/trace-server";
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(

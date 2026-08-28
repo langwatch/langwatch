@@ -133,6 +133,8 @@ export function resolveShutdownBudget(): ShutdownBudget {
     queueDrainMs,
     appCloseMs,
     processDeadlineMs,
+    httpClosePhaseMs,
+    httpDrainGraceMs: httpClosePhaseMs - HTTP_CLOSE_SLACK_MS,
     requiredGracePeriodSeconds: Math.ceil((processDeadlineMs + KUBELET_SLACK_MS) / 1000),
   };
 }

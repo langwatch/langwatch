@@ -6,7 +6,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKBENCH_ACTIONS } from "~/experiments-v3/actions/manifest";
 import { StaleWorkbenchStateError, type ExperimentService } from "@langwatch/experiment-contract";
-import { executeBackendAction } from "../uiActionBackendExecutor";
+import {
+  type BackendRunServices,
+  executeBackendAction,
+} from "../uiActionBackendExecutor";
 
 vi.mock(
   import("~/server/experiments-v3/execution/savedStateExecution"),
@@ -35,6 +38,18 @@ const CONTEXT = {
   evaluationDefaultConcurrency: 10,
   experimentSlug: "my-exp",
 };
+
+/**
+ * The run dependencies the route hands the executor. Both consumers of them —
+ * `prepareSavedStateExecution` and `startPollingRun` — are mocked here, so the
+ * suite only needs them to exist and be passed through.
+ */
+const RUN_SERVICES = {
+  evaluators: {},
+  modelProviders: {},
+  nlpLambda: {},
+  workflows: {},
+} as unknown as BackendRunServices;
 
 const BASE_STATE = {
   name: "My experiment",
@@ -157,6 +172,7 @@ describe("executeBackendAction", () => {
       await expect(
         executeBackendAction({
           experiments,
+          runServices: RUN_SERVICES,
           context: { ...CONTEXT, experimentSlug: undefined },
           kind: "workbench.duplicateTarget",
           definition: WORKBENCH_ACTIONS["workbench.duplicateTarget"],
@@ -172,6 +188,7 @@ describe("executeBackendAction", () => {
       const experiments = makeExperiments();
       const result = (await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.duplicateTarget",
         definition: WORKBENCH_ACTIONS["workbench.duplicateTarget"],
@@ -197,6 +214,7 @@ describe("executeBackendAction", () => {
       });
       const result = (await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.duplicateTarget",
         definition: WORKBENCH_ACTIONS["workbench.duplicateTarget"],
@@ -212,6 +230,7 @@ describe("executeBackendAction", () => {
       await expect(
         executeBackendAction({
           experiments,
+          runServices: RUN_SERVICES,
           context: CONTEXT,
           kind: "workbench.duplicateTarget",
           definition: WORKBENCH_ACTIONS["workbench.duplicateTarget"],
@@ -234,6 +253,7 @@ describe("executeBackendAction", () => {
       const experiments = makeExperiments();
       const result = (await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.getState",
         definition: WORKBENCH_ACTIONS["workbench.getState"],
@@ -254,6 +274,7 @@ describe("executeBackendAction", () => {
 
       const result = (await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.run",
         definition: WORKBENCH_ACTIONS["workbench.run"],
@@ -273,6 +294,7 @@ describe("executeBackendAction", () => {
 
       await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.run",
         definition: WORKBENCH_ACTIONS["workbench.run"],
@@ -297,6 +319,7 @@ describe("executeBackendAction", () => {
 
       await executeBackendAction({
         experiments,
+        runServices: RUN_SERVICES,
         context: CONTEXT,
         kind: "workbench.run",
         definition: WORKBENCH_ACTIONS["workbench.run"],
@@ -377,6 +400,7 @@ describe("executeBackendAction", () => {
 
         await executeBackendAction({
           experiments,
+          runServices: RUN_SERVICES,
           context: CONTEXT,
           kind: "workbench.run",
           definition: WORKBENCH_ACTIONS["workbench.run"],

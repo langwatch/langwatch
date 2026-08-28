@@ -20,7 +20,7 @@ export class LiteMemberRestrictedError extends HandledError {
  * has somewhere to go — ask an organization admin for the role. It was a bare
  * `new Error("You do not have permission to access this project resource")`,
  * which cost twice over. It reached customers as the generic "unknown"
- * state with a trace id, and `app/api/files/[[...route]]/app.ts` had to compare
+ * state with a trace id, and the files REST family had to compare
  * that sentence word for word to tell a denial (403) from an outage (5xx) — so
  * rewording the copy would have silently reclassified every denial as a server
  * fault, with nothing to catch it.

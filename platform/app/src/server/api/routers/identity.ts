@@ -9,11 +9,8 @@
  *
  * Spec: specs/identity/identifier-model.feature.
  */
-import {
-  createIdentityTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createIdentityTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,
@@ -53,7 +50,6 @@ export const identityRouter = createIdentityTrpcRouter({
   protectedProcedure: authProtectedProcedure,
   middlewares,
   ports: {
-    completeEmailVerification: (input) =>
-      verificationCeremony().completeEmailVerification(input),
+    completeEmailVerification: (input) => verificationCeremony().completeEmailVerification(input),
   },
 });

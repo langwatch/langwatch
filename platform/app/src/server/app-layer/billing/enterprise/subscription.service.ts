@@ -9,6 +9,7 @@ import {
 import type { PrismaClient, Subscription } from "~/generated/prisma/client";
 import { getApp } from "../../app";
 import type { OrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import type { SubscriptionRepository } from "~/server/app-layer/subscription/subscription.repository";
 import type {
   DisplayInvoice,
@@ -48,13 +49,23 @@ const toBillingRepository = (
 
 const toBillingOrganizationRepository = (
   repository: OrganizationRepository,
+  prisma: PrismaClient,
 ): BillingOrganizationPort =>
   ({
     tryGetPricingModel: (organizationId) => repository.getPricingModel(organizationId),
     tryGetStripeCustomerId: (organizationId) =>
       repository.getStripeCustomerId(organizationId),
     tryFindName: (organizationId) => repository.findNameById(organizationId),
-    tryFindFirstTeamId: async () => null,
+    // The organization's oldest team, which seat-event checkout stamps onto
+    // every invite it creates. Answering null here sends `teamIds: ""`.
+    tryFindFirstTeamId: async (organizationId: string) => {
+      const team = await prisma.team.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      return team?.id ?? null;
+    },
   }) as BillingOrganizationPort;
 
 const createNotifier = (): BillingSubscriptionNotifierPort => ({
@@ -80,23 +91,14 @@ export class EESubscriptionService implements SubscriptionService {
   }): EESubscriptionService {
     const organizationRepository = toBillingOrganizationRepository(
       options.organizationRepository,
+      options.prisma,
     );
     const service = BillingSubscriptionService.create({
       repository: toBillingRepository(options.repository),
       organizationRepository,
-      teamRepository: {
-        tryFindFirstTeamId: async (organizationId) => {
-          const team = await options.prisma.team.findFirst({
-            where: { organizationId },
-            orderBy: { createdAt: "asc" },
-            select: { id: true },
-          });
-          return team?.id ?? null;
-        },
-      },
       stripe: options.stripe,
       itemCalculator: options.itemCalculator as any,
-      seatEventFns: options.seatEventFns,
+      seatEventService: options.seatEventFns,
       notifier: createNotifier(),
     });
     return new EESubscriptionService(service, options.repository);
@@ -121,7 +123,7 @@ export class EESubscriptionService implements SubscriptionService {
         repository,
         stripe,
         itemCalculator,
-        organizationRepository: persistence.organization,
+        organizationRepository: new PrismaOrganizationRepository(db),
         seatEventFns,
       }),
       "EESubscriptionService",

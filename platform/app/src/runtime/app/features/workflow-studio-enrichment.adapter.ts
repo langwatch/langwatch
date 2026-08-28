@@ -4,7 +4,7 @@ import {
   WorkflowProjectEnvironmentPort,
   type WorkflowLlmParameterResolution,
 } from "@langwatch/workflow-server";
-import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { decrypt } from "~/utils/encryption";
 
 type ProjectEnvironmentDatabase = {

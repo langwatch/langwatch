@@ -127,14 +127,9 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       // `secretKeyRef:` sibling, mirroring the awsS3 provider's shape.
       for (const field of ["accountName", "accountKey", "container"]) {
         const fieldBlock = values.match(
-          new RegExp(
-            `${field}:\\s*\\n\\s*value:[^\\n]*\\n(?:[^\\n]*\\n)?\\s*secretKeyRef:`,
-          ),
+          new RegExp(`${field}:\\s*\\n\\s*value:[^\\n]*\\n(?:[^\\n]*\\n)?\\s*secretKeyRef:`),
         );
-        expect(
-          fieldBlock,
-          `expected ${field} to declare value + secretKeyRef`,
-        ).not.toBeNull();
+        expect(fieldBlock, `expected ${field} to declare value + secretKeyRef`).not.toBeNull();
       }
     });
   });
@@ -212,9 +207,7 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
   describe("when the environment-variables doc is loaded", () => {
     /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
     it("documents LANGWATCH_LOCAL_STORAGE_PATH and the shared dataplane bucket", () => {
-      const doc = readRepoFile(
-        "docs/self-hosting/configuration/environment-variables.mdx",
-      );
+      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
 
       // The env var operators need to set for local-FS dev/single-pod use
       expect(doc).toContain("LANGWATCH_LOCAL_STORAGE_PATH");
@@ -256,9 +249,7 @@ describe(".env.example carries the local storage path config", () => {
       // The default that maps to the LocalFilesystemDriver fallback in
       // stored-objects.service.ts — keeping these in sync matters because
       // a `make quickstart` user with no .env override gets the same path.
-      expect(example).toMatch(
-        /LANGWATCH_LOCAL_STORAGE_PATH=\/var\/lib\/langwatch\/objects/,
-      );
+      expect(example).toMatch(/LANGWATCH_LOCAL_STORAGE_PATH=\/var\/lib\/langwatch\/objects/);
       // The multi-pod warning must be co-located with the var so a
       // production operator copying .env.example sees the caveat.
       expect(example).toMatch(/multi-pod|Multi-pod/);
@@ -283,17 +274,10 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
 
     /** @scenario "Self-hosting docs describe the enterprise authentication path" */
     it("documents every auth mode, the required role assignment, and the AKS-only limit", () => {
-      const doc = readRepoFile(
-        "docs/self-hosting/configuration/environment-variables.mdx",
-      );
+      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
 
       expect(doc).toContain("AZURE_BLOB_AUTH_MODE");
-      for (const mode of [
-        "sharedKey",
-        "workloadIdentity",
-        "managedIdentity",
-        "azureCli",
-      ]) {
+      for (const mode of ["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"]) {
         expect(doc).toContain(mode);
       }
 
@@ -312,9 +296,7 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
   describe("when the self-hosting environment-variables doc is loaded", () => {
     /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
     it("documents the Azure stored-objects block with the explicit-toggle rationale", () => {
-      const doc = readRepoFile(
-        "docs/self-hosting/configuration/environment-variables.mdx",
-      );
+      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
 
       expect(doc).toContain("STORED_OBJECTS_BACKEND");
       expect(doc).toContain("AZURE_BLOB_ACCOUNT_NAME");
@@ -329,28 +311,28 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
 describe("Route handlers delegate to the service and never touch the repository directly", () => {
   describe("when /api/scenario-events route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
-    it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile(
-        "platform/app/src/app/api/scenario-events/[[...route]]/app.ts",
-      );
+    it("takes media extraction as an injected port and does not import the repository", () => {
+      // The family moved to `@langwatch/platform-api`, which has no stored
+      // objects of its own: the walk arrives as a port the process binds to
+      // its own service, so the transport cannot reach past it.
+      const route = readRepoFile("apps/api/src/features/scenario/scenario-event-rest.ts");
 
-      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
+      expect(route).toContain("extractInlineMedia");
       // Direct repository import would be a layering violation
-      expect(route).not.toContain(
-        'from "~/server/stored-objects/stored-objects.repository"',
-      );
+      expect(route).not.toContain("stored-objects.repository");
     });
   });
 
   describe("when /api/files/:id route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile("platform/app/src/app/api/files/[[...route]]/app.ts");
+      const route = readRepoFile("apps/api/src/features/stored-object/files-rest.ts");
 
-      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
-      expect(route).not.toContain(
-        'from "~/server/stored-objects/stored-objects.repository"',
-      );
+      // The family takes the stored-object services as arguments now, so the
+      // assertion is that it dispatches through a service at all and still
+      // never names a repository.
+      expect(route).toContain("storedObjects()");
+      expect(route).not.toContain("stored-objects.repository");
     });
   });
 });
@@ -410,9 +392,7 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
       // Schema name must NOT be hardcoded — Prisma reads schema from the
       // connection string, not the DDL. A qualified name would skew when
       // CLICKHOUSE_DATABASE is overridden in CI / multi-env deployments.
-      expect(migration).not.toMatch(
-        /CREATE TABLE IF NOT EXISTS\s+\$\{?CLICKHOUSE_DATABASE/,
-      );
+      expect(migration).not.toMatch(/CREATE TABLE IF NOT EXISTS\s+\$\{?CLICKHOUSE_DATABASE/);
     });
   });
 });

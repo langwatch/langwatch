@@ -1,11 +1,11 @@
+import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import {
-  AuthenticatedActorRequiredError,
   createRestService,
   createService,
   type MountedRoute,
   type RequestActor,
   type StaticRestVersioning,
-} from "@langwatch/api";
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import type { Project } from "~/generated/prisma/client";
@@ -32,18 +32,13 @@ import type { App } from "~/server/app-layer/app";
  *
  * Authentication, permission enforcement and route-policy registration are
  * derived from the endpoint's single `withPermission(...)` declaration. A
- * feature installer only supplies its RPC/REST operations and schemas.
+ * feature installer only supplies its REST operations and schemas.
  */
-export function createProjectApiService(options: {
-  name: string;
-  basePath: string;
-  openapiUrl?: string;
-}) {
+export function createProjectApiService(options: { name: string; basePath: string }) {
   const family = familyFromBasePath(options.basePath);
   return createService<Project, App>({
     name: options.name,
     basePath: options.basePath,
-    openapiUrl: options.openapiUrl,
     middleware: [appContextMiddleware],
     app: appFromContext,
     actor: resolveRequestActor,
@@ -59,15 +54,14 @@ export function createProjectApiService(options: {
  * Project-scoped composition for the validated public REST surface.
  *
  * It deliberately shares the auth, input-target, API-key ceiling and route
- * policy seams with RPC. A feature only declares its REST schemas and maps a
- * validated request to its composed service.
+ * policy seams with the canonical project API. A feature only declares its
+ * REST schemas and maps a validated request to its composed service.
  */
 export function createProjectRestApiService(options: {
   name: string;
   basePath?: string;
   staticVersioning?: StaticRestVersioning;
   maxInputBytes: number;
-  openapiUrl?: string;
   rateLimitOptOut: string;
   resourceLimitOptOut: string;
 }) {
@@ -78,7 +72,6 @@ export function createProjectRestApiService(options: {
     basePath,
     staticVersioning: options.staticVersioning,
     maxInputBytes: options.maxInputBytes,
-    openapiUrl: options.openapiUrl,
     middleware: [appContextMiddleware],
     app: appFromContext,
     actor: resolveRequestActor,
@@ -118,12 +111,8 @@ function resolveRequestActor(context: Context): RequestActor {
 
 function registerProjectApiRoute({ route, family }: { route: MountedRoute; family: string }): void {
   let policy = null;
-  if (route.isNamespaceGuard || route.isDiscoverEndpoint) {
-    policy = publicEndpoint(
-      route.isDiscoverEndpoint
-        ? "RPC discovery publishes schemas and no tenant data"
-        : "version namespace guard serves only a 404",
-    );
+  if (route.isNamespaceGuard) {
+    policy = publicEndpoint("version namespace guard serves only a 404");
   } else if (route.config?.permission) {
     policy = requires(route.config.permission);
   }

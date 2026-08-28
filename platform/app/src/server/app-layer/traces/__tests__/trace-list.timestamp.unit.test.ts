@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { mapTraceSummaryToHeader } from "~/server/api/routers/tracesV2";
+import { mapTraceSummaryToHeader } from "@langwatch/trace-server";
 import { mapToTraceListItem } from "../trace-list.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 

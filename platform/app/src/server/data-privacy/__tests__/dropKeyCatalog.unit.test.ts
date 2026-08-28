@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compileAttributePatterns } from "../attributePatternMatcher";
+import { compileAttributePatterns } from "@langwatch/data-privacy-contract";
 import {
   type Disposition,
   EMPTY_AUDIENCE,

@@ -45,13 +45,13 @@ export class TraceUsageService {
       { organizationId, projectIds },
       "getCurrentMonthCount: querying trace_summaries",
     );
-    const total = await getApp().billingQueries.queryTraceSummariesTotalUniq({
+    const total = await getApp().billingQueries.tryQueryTraceSummariesTotalUniq({
       projectIds,
       billingMonth,
     });
 
     if (total === null) {
-      // queryTraceSummariesTotalUniq returns null only when no ClickHouse
+      // tryQueryTraceSummariesTotalUniq returns null only when no ClickHouse
       // client is available — the count is unknown, which is not the same
       // fact as zero and must not be reported as one. Nothing is cached
       // either way: caching an unknown would make a five-minute TTL out of a
@@ -98,7 +98,7 @@ export class TraceUsageService {
         projectId,
         // null means ClickHouse is unavailable, so this project's count is
         // unknown rather than zero.
-        count: await getApp().billingQueries.queryTraceSummariesTotalUniq({
+        count: await getApp().billingQueries.tryQueryTraceSummariesTotalUniq({
           projectIds: [projectId],
           billingMonth,
         }),

@@ -9,11 +9,8 @@
  * back against, and the automation secret redaction.
  */
 import type { Trigger } from "@langwatch/automation-contract";
-import {
-  createGraphTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createGraphTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import { redactActionParamsFor } from "~/runtime/app/features/automation-adapters/providers/registry";
 import {
   checkDeclaredPermission,

@@ -13,11 +13,8 @@
  *
  * Spec: specs/evaluators/azure-safety-byok-gating.feature.
  */
-import {
-  createEvaluationTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createEvaluationTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import {
@@ -78,8 +75,7 @@ export const evaluationsRouter = createEvaluationTrpcRouter({
       getAzureSafetyEnvFromProject(ctx.app.modelProviders, projectId),
 
     evaluatorUnavailability,
-    missingEnvironmentVariables: (envVars) =>
-      envVars.filter((envVar) => !process.env[envVar]),
+    missingEnvironmentVariables: (envVars) => envVars.filter((envVar) => !process.env[envVar]),
 
     runEvaluationForTrace: async (ctx: TRPCContext, input) => {
       const protections = await getUserProtectionsForProject(ctx, {

@@ -3,8 +3,8 @@
  * members, and its invites, addressed with no {orgId} segment because the
  * organization is implied by the credential.
  *
- * Built on `@langwatch/api` through the management spine, so every
- * endpoint declares its RBAC permission once and gets the SecuredApp policy
+ * Built on the versioned family the process's REST service hands out, so every
+ * endpoint declares its RBAC permission once and gets the route-policy
  * registration, the org-key authentication (throwing mode), the permission
  * check (403) and the Enterprise plan gate (402) in that order. Every dated
  * version of a documented endpoint — plus `latest` — reaches the OpenAPI
@@ -20,7 +20,8 @@
 import { z } from "zod";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
-import { appRestManagement } from "~/server/api/management/managed-service";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { appRestSecurity } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { InviteService } from "~/server/invites/invite.service";
 import {
@@ -51,10 +52,10 @@ import {
   userIdParamsSchema,
 } from "./wire";
 
-const { service, guard } = appRestManagement.createFamily({
+const { service, policy } = appRestSecurity.createVersionedApp({
   name: "organization",
   basePath: "/api/organization",
-  feature: "MANAGEMENT_API",
+  routeMiddleware: [requireEnterprisePlanRest("MANAGEMENT_API")],
 });
 
 // ── service wiring ───────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ export const app = service
   })
   // ── profile ────────────────────────────────────────────────────────────────
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, getOrganizationHandler, (b) =>
-    guard("organization:view")(b)
+    policy("organization:view")(b)
       .withOutput(organizationSettingsSchema)
       .withDocs({
         operationId: "getOrganization",
@@ -78,7 +79,7 @@ export const app = service
       }),
   )
   .registerRoute("patch", "/", MANAGEMENT_API_VERSION, updateOrganizationHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withInput(updateOrganizationSchema)
       .withOutput(organizationSettingsSchema)
       .withDocs({
@@ -90,7 +91,7 @@ export const app = service
   )
   // ── member reads ───────────────────────────────────────────────────────────
   .registerRoute("get", "/members", MANAGEMENT_API_VERSION, listMembersHandler, (b) =>
-    guard("organization:view")(b)
+    policy("organization:view")(b)
       .withQuery(listMembersQuerySchema)
       .withOutput(
         z.object({
@@ -106,7 +107,7 @@ export const app = service
       }),
   )
   .registerRoute("get", "/members/:userId", MANAGEMENT_API_VERSION, getMemberHandler, (b) =>
-    guard("organization:view")(b)
+    policy("organization:view")(b)
       .withParams(userIdParamsSchema)
       .withOutput(memberWithTeamsSchema)
       .withDocs({
@@ -122,7 +123,7 @@ export const app = service
     MANAGEMENT_API_VERSION,
     memberAccessHandler,
     (b) =>
-      guard("organization:manage")(b)
+      policy("organization:manage")(b)
         .withParams(userIdParamsSchema)
         .withOutput(accessBreakdownSchema)
         .withDocs({
@@ -134,7 +135,7 @@ export const app = service
   )
   // ── member writes ──────────────────────────────────────────────────────────
   .registerRoute("patch", "/members/:userId", MANAGEMENT_API_VERSION, updateMemberHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withParams(userIdParamsSchema)
       .withInput(updateMemberSchema)
       .withOutput(updatedMemberSchema)
@@ -146,7 +147,7 @@ export const app = service
       }),
   )
   .registerRoute("delete", "/members/:userId", MANAGEMENT_API_VERSION, removeMemberHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withParams(userIdParamsSchema)
       .withOutput(successSchema)
       .withDocs({
@@ -158,7 +159,7 @@ export const app = service
   )
   // ── invites ────────────────────────────────────────────────────────────────
   .registerRoute("get", "/invites", MANAGEMENT_API_VERSION, listInvitesHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withOutput(z.object({ invites: z.array(inviteSchema) }))
       .withDocs({
         operationId: "listOrganizationInvites",
@@ -168,7 +169,7 @@ export const app = service
       }),
   )
   .registerRoute("post", "/invites", MANAGEMENT_API_VERSION, createInvitesHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withInput(createInvitesSchema)
       .withOutput(createdInvitesSchema)
       .withStatus(201)
@@ -180,7 +181,7 @@ export const app = service
       }),
   )
   .registerRoute("delete", "/invites/:id", MANAGEMENT_API_VERSION, revokeInviteHandler, (b) =>
-    guard("organization:manage")(b)
+    policy("organization:manage")(b)
       .withParams(z.object({ id: z.string().min(1) }))
       .withOutput(successSchema)
       .withDocs({

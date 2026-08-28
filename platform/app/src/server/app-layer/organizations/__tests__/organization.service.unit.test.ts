@@ -24,9 +24,9 @@ const { mockRevokeAllTraceShares, mockCheckLimit, mockInvalidateOrganization } =
 
 // Disabling a seat is not a grant write, so the service retires the
 // organization's cached authorization snapshots itself.
-vi.mock("../../authz/runtime", () => ({
-  grantsService: () => ({
-    invalidateOrganization: mockInvalidateOrganization,
+vi.mock("../../app", () => ({
+  getApp: () => ({
+    authzGrants: { invalidateOrganization: mockInvalidateOrganization },
   }),
 }));
 

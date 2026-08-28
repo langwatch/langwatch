@@ -3,19 +3,19 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
+import { SYNTHETIC_TRACE_SPAN_NAMES } from "@langwatch/trace-contract";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import { type TraceSummaryData } from "@langwatch/trace-contract";
-import { MAX_PROCESSED_SPANS } from "@langwatch/trace-server";
-import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
+  DEFERRED_ORIGIN_CHECK_DELAY_MS,
+  MAX_PROCESSED_SPANS,
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
-import { DEFERRED_CHECK_DELAY_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/originGate.subscriber";
+} from "@langwatch/trace-server";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG = "ops_es_causality_loop_guard_disabled";
 
@@ -45,9 +45,9 @@ export interface EvaluationTriggerSubscriberDeps {
 function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
   // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
   // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
-  // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
+  // share `SYNTHETIC_TRACE_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
   // future synthetic name updates both sites at once.
-  return !(isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name));
+  return !(isSpanReceivedEvent(event) && SYNTHETIC_TRACE_SPAN_NAMES.has(event.data.span.name));
 }
 
 /**
@@ -359,7 +359,7 @@ function buildSendOptions({
       // so that if the subscriber fires twice (once from a late span,
       // once from the deferred OriginResolvedEvent), the second
       // dispatch is squashed by the dedup key.
-      ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+      ttlMs: DEFERRED_ORIGIN_CHECK_DELAY_MS + 60_000,
       // Honor the still-alive dedup key even after the first command was
       // dispatched, so the second trigger is squashed rather than
       // DEL+restaged into a duplicate evaluation run (#3912).

@@ -473,8 +473,8 @@ export class GatewayConfigMaterialiser {
    * budgets see ledger rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
-    vk: VirtualKey,
-    budgets: ResolvedBudget[],
+    vk: VirtualKeyWithScopes,
+    budgets: GatewayResolvedBudget[],
   ): Promise<Map<string, string>> {
     if (this.chRepo === null || budgets.length === 0) {
       return new Map();
@@ -522,7 +522,7 @@ export class GatewayConfigMaterialiser {
    * with what they pick.
    */
   private async applicableBudgets(
-    vk: VirtualKey,
+    vk: VirtualKeyWithScopes,
     traceProject: { id: string; teamId: string } | null,
   ): Promise<GatewayResolvedBudget[]> {
     return this.budgetDecisions.resolveApplicableBudgets({
@@ -752,14 +752,18 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   // the vendor directly and must reach the residency host the customer
   // chose: a signed URL minted against the default host is signed in the
   // wrong region.
-  const supportsBaseURLOverride =
+  //
+  // The registry is indexed by the narrowed literal rather than a widened
+  // key, so the registry itself proves each of these four declares an
+  // `endpointKey`. A registry entry losing one fails here rather than
+  // silently emitting a slot with no base_url.
+  const endpointKey =
     mp.provider === "custom" ||
     mp.provider === "openai" ||
     mp.provider === "anthropic" ||
-    mp.provider === "elevenlabs";
-  const endpointKey = supportsBaseURLOverride
-    ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
-    : undefined;
+    mp.provider === "elevenlabs"
+      ? modelProviders[mp.provider].endpointKey
+      : undefined;
   const registryBaseURL = endpointKey ? pickString(customKeys, endpointKey) : undefined;
   const baseURL =
     pickString(customKeys, "base_url") ??
@@ -922,7 +926,7 @@ function budgetSpentMicroUSD(
 }
 
 function budgetToWire(
-  { budget: b, bucketScopeId, principalUserId }: ResolvedBudget,
+  { budget: b, bucketScopeId, principalUserId }: GatewayResolvedBudget,
   spendByBudgetId: Map<string, string>,
 ): BudgetWire {
   return {

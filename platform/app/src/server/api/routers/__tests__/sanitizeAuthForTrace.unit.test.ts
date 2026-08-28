@@ -6,7 +6,7 @@
  * before being included in trace metadata.
  */
 import { describe, expect, it } from "vitest";
-import { buildTraceTestContext, sanitizeHeadersForTrace } from "../httpProxyTracing";
+import { buildTraceTestContext, sanitizeHeadersForTrace } from "@langwatch/agent-server";
 
 describe("sanitizeHeadersForTrace()", () => {
   describe("when Authorization header contains a bearer token", () => {

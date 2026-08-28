@@ -23,7 +23,7 @@ import {
 } from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 
-import type { Protections } from "../../../traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { allocateNextGridRow } from "../../allocateNextGridRow";
 import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import { dashboardBelongsToProject } from "../../dashboardBelongsToProject";

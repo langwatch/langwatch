@@ -7,13 +7,13 @@ import {
   testManagedProviders,
   testModelProviders,
 } from "../../../modelProviders/__tests__/model-provider-services.test-support";
+import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import {
   getModelMetadataForFrontend,
   type LegacyModelProviderExecution,
-  type ModelMetadataForFrontend,
   mergeCustomModelMetadata,
   prepareLitellmParams as prepareLitellmParamsWithServices,
-} from "../modelProviders.utils";
+} from "@langwatch/model-provider-server";
 
 /**
  * Unit tests for modelProviders router helper functions

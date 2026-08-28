@@ -13,9 +13,8 @@ import type {
   TraceInput,
   TraceOutput,
 } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import { redactHiddenAttributes, type Protections } from "@langwatch/trace-server";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
-import { redactHiddenAttributes } from "./redactAttributes";
 
 // Stable display order for the content categories a drop policy can strip, so
 // the trace-view marker always lists them the same way ("input, output").

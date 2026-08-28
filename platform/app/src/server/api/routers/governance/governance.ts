@@ -23,7 +23,7 @@ import {
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
-import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "~/server/api/enterprise";
+import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "@langwatch/enterprise-plan-gate";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";

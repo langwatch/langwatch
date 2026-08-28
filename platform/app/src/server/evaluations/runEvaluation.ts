@@ -12,7 +12,7 @@ import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-executi
 import { codeEvaluatorIdFromCheckType } from "@langwatch/evaluator-contract";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { env } from "../../env.mjs";
@@ -414,11 +414,11 @@ export const runEvaluation = async ({
   // already scrubbed, or content that was dropped, is reflected in the result.
   if (isNativeEvaluatorType(builtInEvaluatorType)) {
     const nativeResult = await executeNativeEvaluation({
-      evaluators: deps.evaluators,
+      evaluators,
       evaluatorType: builtInEvaluatorType,
       data: data.data,
     });
-    return deps.evaluators.augmentResult({
+    return evaluators.augmentResult({
       evaluatorType: builtInEvaluatorType,
       mappedData: data.data,
       settings,
@@ -617,7 +617,7 @@ export const runEvaluation = async ({
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
-  return deps.evaluators.augmentResult({
+  return evaluators.augmentResult({
     evaluatorType: builtInEvaluatorType,
     mappedData: data.data,
     settings,

@@ -11,13 +11,10 @@ import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type {
-  Entry,
-  Field,
-  StudioWorkflow as WorkflowDSL,
-} from "@langwatch/workflow-contract";
+import type { Entry, Field, StudioWorkflow as WorkflowDSL } from "@langwatch/workflow-contract";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
+import type { WorkflowEvaluationOutcome } from "@langwatch/platform-api";
 
 export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
@@ -83,6 +80,44 @@ export class WorkflowEvaluationService {
       workflows,
       defaultConcurrency,
     );
+  }
+
+  /**
+   * The same trigger, as the REST boundary reads it: a run, or a refusal
+   * carrying the status and the sentence the caller is answered with.
+   *
+   * The three refusals are named by this module's own error classes, so the
+   * mapping lives beside them rather than in a transport that would have to
+   * recognise them by identity across a package boundary. Anything else is
+   * rethrown and degrades to an unknown error with a trace id, which is what
+   * an infrastructure failure should do.
+   */
+  async triggerEvaluationForRest(input: {
+    projectId: string;
+    projectSlug: string;
+    workflowId: string;
+    versionId?: string;
+    data?: Record<string, unknown>[];
+    datasetId?: string;
+    parameters?: WorkflowEvaluationParameters;
+    rowIndices?: number[];
+  }): Promise<WorkflowEvaluationOutcome> {
+    try {
+      const result = await this.triggerEvaluation(input);
+
+      return { ok: true, ...result };
+    } catch (error) {
+      if (error instanceof WorkflowNotFoundError) {
+        return { ok: false, status: 404, error: "Workflow not found" };
+      }
+      if (error instanceof NoCommittedVersionError) {
+        return { ok: false, status: 400, error: error.message };
+      }
+      if (error instanceof EvaluationInputError) {
+        return { ok: false, status: error.status as 400 | 404, error: error.message };
+      }
+      throw error;
+    }
   }
 
   async triggerEvaluation({

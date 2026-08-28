@@ -29,19 +29,27 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
+import { comparisonDependencies } from "~/experiments-v3/execution/buildExecutionRequest";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import {
   nodeErrorToDomainError,
   type ExecutionState,
+  type StudioClientEvent,
   type StudioServerEvent,
   type StudioWorkflow,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import { prisma } from "~/server/db";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+  type SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
 import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
@@ -2682,7 +2690,7 @@ const recordCarriedOverBoard = async ({
   datasetRows: Array<Record<string, unknown>>;
   state: EvaluationsV3State;
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
-  commands: ReturnType<typeof getApp>["experimentRuns"];
+  commands: ReturnType<typeof getApp>["experiments"];
 }): Promise<void> => {
   if (cells.length === 0) return;
 
@@ -2762,6 +2770,7 @@ export async function* runOrchestrator(
     defaultConcurrency,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
+    carriedOverCells,
     modelProviders,
     nlpLambda,
     workflows,

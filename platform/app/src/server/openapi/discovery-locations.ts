@@ -2,19 +2,16 @@
  * The locations the API description is published at, and the one sentence that
  * says why reading it needs no credential.
  *
- * Shared by the two discovery route modules so the copy in `/llms.txt`, the URL
- * the RPC catalogue points back at, and the paths `start.ts` routes to the API
- * are the same strings rather than three that agree today.
+ * Shared by the two discovery route modules so the copy in `/llms.txt` and the
+ * paths `start.ts` routes to the API are the same strings rather than two that
+ * agree today.
  */
 
-/** The conventional location. What `/llms.txt` and the catalogue point at. */
+/** The conventional location. What `/llms.txt` points at. */
 export const WELL_KNOWN_OPENAPI_PATH = "/.well-known/openapi";
 
 /** The same document under the API namespace, for a caller already inside it. */
 export const API_OPENAPI_PATH = "/api/openapi.json";
-
-/** The root RPC catalogue: the service index, POST because it is an RPC. */
-export const RPC_DISCOVER_PATH = "/api/rpc.discover";
 
 /** The plain-text index, for a reader arriving with no schema in mind. */
 export const LLMS_TXT_PATH = "/llms.txt";
@@ -25,10 +22,7 @@ export const LLMS_TXT_PATH = "/llms.txt";
  * single-page-app fallback answers with the HTML shell and a 200 that a caller
  * reads as success.
  */
-export const ROOT_DISCOVERY_PATHS: readonly string[] = [
-  WELL_KNOWN_OPENAPI_PATH,
-  LLMS_TXT_PATH,
-];
+export const ROOT_DISCOVERY_PATHS: readonly string[] = [WELL_KNOWN_OPENAPI_PATH, LLMS_TXT_PATH];
 
 /**
  * True for a root-level path that belongs to the API rather than the SPA.
@@ -56,9 +50,9 @@ const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, 
  * Vite matches `server.proxy` regex keys against the full request URL, path and
  * query, so the optional trailing slash and query string are both part of it.
  */
-export const ROOT_DISCOVERY_PROXY_PATTERN = `^(?:${ROOT_DISCOVERY_PATHS.map(
-  escapeForRegExp,
-).join("|")})/?(?:\\?.*)?$`;
+export const ROOT_DISCOVERY_PROXY_PATTERN = `^(?:${ROOT_DISCOVERY_PATHS.map(escapeForRegExp).join(
+  "|",
+)})/?(?:\\?.*)?$`;
 
 /**
  * Why every discovery location is unauthenticated. A caller reads the

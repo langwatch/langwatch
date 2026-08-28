@@ -92,7 +92,12 @@ import { getAllForProjectInput, tracesFilterInput } from "./routers/traces.schem
 import type { TRPCContext } from "./trpc.context";
 import { getUserProtectionsForProject } from "./utils";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
-import { GatewayUsageService, resolveProviderLabels } from "@langwatch/gateway-server";
+import { GatewayUsageService } from "@langwatch/gateway-server";
+// Prisma persistence, so it cannot come through the package root:
+// `private-runtime-export` forbids a feature server index exporting from
+// `repositories/`. The package's `./composition/*` subpaths are the sanctioned
+// way for a composition root to reach one.
+import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";

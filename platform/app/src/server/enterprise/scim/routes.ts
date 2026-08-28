@@ -25,7 +25,7 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
-import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { createServiceApp } from "~/server/api/security";
 import { internalSecret, publicEndpoint } from "@langwatch/platform-api/app-rest";
 

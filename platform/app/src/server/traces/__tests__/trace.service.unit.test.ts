@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { AmbiguousTraceIdPrefixError, TraceService } from "../trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 

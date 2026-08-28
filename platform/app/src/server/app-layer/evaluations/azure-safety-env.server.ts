@@ -1,5 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { getProjectModelProviders } from "../../api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 
 /**

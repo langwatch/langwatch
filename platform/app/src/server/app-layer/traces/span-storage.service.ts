@@ -14,12 +14,14 @@ import type {
   NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
-  SpanResourceInfo,
   SpanStorageRepository,
-  SpanSummaryRow,
-  TraceEventRollup,
   TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
+import type {
+  SpanResourceInfo,
+  SpanSummaryRow,
+  TraceEventRollup,
+} from "@langwatch/trace-contract";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { redactSpanContent } from "./visibility-window.service";

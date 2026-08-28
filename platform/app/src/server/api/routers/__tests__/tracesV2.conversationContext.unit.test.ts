@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
-import { toConversationContextTurn } from "../tracesV2";
+import type { TraceListItem } from "@langwatch/trace-contract";
+import {
+  toConversationContextTurn as toConversationContextTurnWithPorts,
+  type TraceContentPrivacyPort,
+  type V2Protections,
+} from "@langwatch/trace-server";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+} from "~/server/data-privacy/dropKeyCatalog";
+
+/** The real data-privacy vocabulary, wired as the port the mapper now takes. */
+const contentPrivacy: TraceContentPrivacyPort = {
+  contentKeyCatalog: CONTENT_KEY_CATALOG,
+  droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
+  piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+  getResolvedPolicyForProject: () => {
+    throw new Error("the resolved data-privacy policy is not read by these cases");
+  },
+};
+
+function toConversationContextTurn(input: { trace: TraceListItem; protections: V2Protections }) {
+  return toConversationContextTurnWithPorts({ ...input, contentPrivacy });
+}
 
 function listItem(overrides: Partial<TraceListItem> = {}): TraceListItem {
   return {

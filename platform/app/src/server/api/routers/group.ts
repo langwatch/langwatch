@@ -8,11 +8,8 @@
  * its authorization middlewares, and the Enterprise plan gate behind groups,
  * which reads this process's billing store.
  */
-import {
-  createGroupTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createGroupTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,
@@ -20,7 +17,7 @@ import {
   declaredServiceAuthorization,
 } from "~/server/app-layer/authz/trpc-middleware";
 import type { TRPCContext } from "~/server/api/trpc.context";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { appTrpcRoot } from "../trpc.root";
 import {
   auditLogMutations,

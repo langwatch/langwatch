@@ -16,7 +16,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),

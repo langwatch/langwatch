@@ -2,8 +2,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderDisabledError } from "../../../modelProviders/modelProviderDisabledError";
+import { createTranslateTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
+import { wrapAiCall } from "../../../modelProviders/aiCallFailedError";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "../../../app-layer/authz/trpc-middleware";
 import { createInnerTRPCContext, errorFormatter } from "../../trpc";
-import { translateRouter } from "../translate";
+import { appTrpcRoot } from "../../trpc.root";
+import {
+  auditLogMutations,
+  authProtectedProcedure,
+  enforcePermissionCheck,
+  handledErrorMiddleware,
+  loggerMiddleware,
+  tracerMiddleware,
+} from "../../trpc.runtime-policy";
+import { scopeLineageGuard } from "../../trpc.scope-lineage-middleware";
+
+/**
+ * The transport is package-owned, so the test mounts it the way the process
+ * does — the same middleware chain, in the same order — rather than importing
+ * a router that no longer exists in this application.
+ */
+const translateRouter = createTranslateTrpcRouter({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares: {
+    tracer: tracerMiddleware,
+    logger: loggerMiddleware,
+    handledError: handledErrorMiddleware,
+    scopeLineageGuard,
+    declaredCheck: declaredCheckFrom({
+      permission: checkDeclaredPermission,
+      permissionAny: checkDeclaredPermissionAny,
+      noPermission: declaredNoPermission,
+      serviceAuthorized: declaredServiceAuthorization,
+    }),
+    enforceCheck: enforcePermissionCheck,
+    auditMutations: auditLogMutations,
+  },
+  ports: { wrapAiCall },
+});
 
 // Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
 // Regression: translate previously rewrapped every failure in a generic

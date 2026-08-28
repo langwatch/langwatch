@@ -41,11 +41,13 @@ import {
 } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createRoleBindingsRestApp } from "@langwatch/platform-api";
-import { appRestManagement } from "~/server/api/management/managed-service";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { appRestSecurity } from "~/server/api/security";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 
 const app = createRoleBindingsRestApp({
-  management: appRestManagement,
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("MANAGEMENT_API"),
   permissions: () => getApp().permissions,
   grants: () => getApp().authzGrants,
   ledgerActor: orgRequestLedgerActor,

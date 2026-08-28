@@ -2,7 +2,7 @@ import {
   getProjectModelProviders,
   prepareEnvKeys,
   prepareLitellmParams,
-} from "~/server/api/routers/modelProviders.utils";
+} from "@langwatch/model-provider-server";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";

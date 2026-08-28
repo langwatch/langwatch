@@ -32,21 +32,14 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const {
-  mockGetRunIdsForSet,
-  mockDeleteRun,
-  mockMessageSnapshot,
-  mockStoreFromBytes,
-  mockGetById,
-} = vi.hoisted(() => ({
-  mockGetRunIdsForSet: vi
-    .fn()
-    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
-  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-  mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
-  mockStoreFromBytes: vi.fn(),
-  mockGetById: vi.fn(),
-}));
+const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot, mockStoreFromBytes, mockGetById } =
+  vi.hoisted(() => ({
+    mockGetRunIdsForSet: vi.fn().mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
+    mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+    mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+    mockStoreFromBytes: vi.fn(),
+    mockGetById: vi.fn(),
+  }));
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -155,8 +148,28 @@ vi.mock("~/env.mjs", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { app } from "~/app/api/scenario-events/[[...route]]/app";
+import { createScenarioEventsRestApp } from "@langwatch/platform-api";
 import { ScenarioEventType } from "@langwatch/scenario-contract";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import { blockTraceUsageExceededMiddleware } from "~/app/api/middleware";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { bodyLimit } from "~/server/routes/_lib/body-limit";
+import { extractInlineMediaFromEvent } from "../content-extractor";
+
+const { hono: app } = createScenarioEventsRestApp({
+  security: appRestSecurity,
+  simulations: () => getApp().simulations,
+  scenarioTabs: () => getApp().scenarioTabs,
+  broadcast: () => getApp().broadcast,
+  extractInlineMedia: (input) =>
+    extractInlineMediaFromEvent({ ...input, service: getApp().storedObjects }),
+  traceUsageGuard: blockTraceUsageExceededMiddleware,
+  bodyLimit,
+});
+
+const request = (path: string, init?: RequestInit) =>
+  app.request(path, init, appContextBindingsFor(getApp()));
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -378,7 +391,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       // bodyLimit is 50 * 1024 * 1024 = 52428800 bytes
       const oversizedBody = "x".repeat(52_428_801);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -402,7 +415,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeEventWithInlineImage(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -429,7 +442,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeEventWithInlineImage(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -463,7 +476,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeMessageSnapshotWithInputAudio(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -504,7 +517,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeMessageSnapshotWithImage(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -578,7 +591,7 @@ describe("POST /api/scenario-events (ingest)", () => {
         ],
       };
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -612,7 +625,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeMessageSnapshotWithOpenAiFile(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -638,7 +651,7 @@ describe("POST /api/scenario-events (ingest)", () => {
     it("returns 401", async () => {
       const body = makeRunStartedEvent();
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -664,7 +677,7 @@ describe("POST /api/scenario-events (ingest)", () => {
       const scenarioRunId = `run-${nanoid(6)}`;
       const body = makeEventWithInlineImage(scenarioRunId);
 
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
@@ -685,10 +698,7 @@ describe("POST /api/scenario-events (ingest)", () => {
         return Array.isArray(ctx?.stored_object_ids);
       });
 
-      expect(
-        matchingCall,
-        "expected an info-level log with stored_object_ids",
-      ).toBeDefined();
+      expect(matchingCall, "expected an info-level log with stored_object_ids").toBeDefined();
       const ctx = matchingCall![0] as { stored_object_ids: string[] };
       expect(ctx.stored_object_ids).toContain(id1);
     });
@@ -705,7 +715,7 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   describe("when no scenarioSetId is provided", () => {
     /** @scenario "DELETE without scenarioSetId is refused" */
     it("refuses the request and archives nothing — never wipes the whole project", async () => {
-      const res = await app.request("/api/scenario-events", {
+      const res = await request("/api/scenario-events", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
@@ -724,7 +734,7 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   describe("when scenarioSetId is empty", () => {
     /** @scenario "DELETE with empty scenarioSetId is refused" */
     it("refuses the request and archives nothing", async () => {
-      const res = await app.request("/api/scenario-events?scenarioSetId=", {
+      const res = await request("/api/scenario-events?scenarioSetId=", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
@@ -743,7 +753,7 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
         reachedCap: false,
       });
 
-      const res = await app.request("/api/scenario-events?scenarioSetId=set-a", {
+      const res = await request("/api/scenario-events?scenarioSetId=set-a", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
@@ -784,7 +794,7 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
         reachedCap: true,
       });
 
-      const res = await app.request("/api/scenario-events?scenarioSetId=big-set", {
+      const res = await request("/api/scenario-events?scenarioSetId=big-set", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });

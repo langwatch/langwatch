@@ -22,9 +22,11 @@
  */
 import "~/server/api-router";
 
-import { allRegisteredRoutes, isApiKeyReachable, policyPermissions } from "@langwatch/api";
+import { isApiKeyReachable, policyPermissions } from "@langwatch/api";
+import { allRegisteredRoutes } from "@langwatch/api/rest";
 import {
   createAppRestFeatures,
+  portsUnavailableOffRequestPath,
   servicesUnavailableOffRequestPath,
 } from "@langwatch/platform-api/app-rest";
 
@@ -33,6 +35,7 @@ import { appRestSecurity } from "~/server/api/security";
 createAppRestFeatures({
   security: appRestSecurity,
   services: servicesUnavailableOffRequestPath("while auditing the route registry"),
+  ports: portsUnavailableOffRequestPath("while auditing the route registry"),
 });
 
 /**

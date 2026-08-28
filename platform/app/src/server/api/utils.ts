@@ -28,7 +28,7 @@ import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPo
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
-import type { CategoryVisibility, Protections } from "../traces/protections";
+import type { CategoryVisibility, Protections } from "@langwatch/trace-server";
 import { isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");

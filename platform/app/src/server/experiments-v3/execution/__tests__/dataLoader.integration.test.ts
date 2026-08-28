@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
+import { PromptService } from "@langwatch/prompt-contract";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
 import {

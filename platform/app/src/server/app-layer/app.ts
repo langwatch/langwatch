@@ -245,10 +245,10 @@ export class App {
     this.simulationExports = deps.simulationExports;
     this.topics = deps.topics;
     this.topicClustering = deps.commands.topicClustering;
-    this.codingAgents = {
-      ...deps.codingAgents,
-      ...deps.commands.codingAgents,
-    };
+    // `CodingAgentService` carries its behaviour on the prototype, so a spread
+    // would copy the commands and silently drop every method. Same shape as
+    // `evaluations` above.
+    this.codingAgents = Object.assign(deps.codingAgents, deps.commands.codingAgents);
     this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;

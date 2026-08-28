@@ -38,7 +38,7 @@ import {
 import { DERIVED_ATTRS } from "./log-content-derivation";
 import type { LogRecordStorageService } from "./log-record-storage.service";
 import type { StoredLogRecordRow } from "./repositories/log-record-storage.repository";
-import type { SpanSummaryRow } from "./repositories/span-storage.repository";
+import type { SpanSummaryRow } from "@langwatch/trace-contract";
 
 /**
  * The trace-origin value Claude Code (and other coding assistants) carry. Only

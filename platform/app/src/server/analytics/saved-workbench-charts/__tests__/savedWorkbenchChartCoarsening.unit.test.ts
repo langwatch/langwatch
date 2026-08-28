@@ -20,7 +20,7 @@
 import { describe, expect, it } from "vitest";
 import type { CustomGraph } from "~/generated/prisma/client";
 
-import type { Protections } from "../../../traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import { recordingExecutor } from "../../lwql/executor.testFakes";
 import { LangWatchQLService } from "../../lwql/lwql.service";

@@ -9,7 +9,7 @@
  * ClickHouse/Postgres execution that consumes `plan` lives in the trace service.
  */
 
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { type ProjectionSource, type ResolvedField, resolveField } from "./catalog";
 import {
   type CompiledProjection,

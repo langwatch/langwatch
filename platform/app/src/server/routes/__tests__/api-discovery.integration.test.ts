@@ -129,7 +129,7 @@ describe("API discovery", () => {
   describe("given a reader arriving with no schema in mind", () => {
     describe("when it requests the plain-text index", () => {
       /** @scenario "The plain-text index names the service and points at the schema" */
-      it("names LangWatch and links to the document and the catalogue", async () => {
+      it("names LangWatch and links to the document", async () => {
         const res = await rootApp.request("/llms.txt", { method: "GET" });
         const text = await res.text();
 
@@ -137,7 +137,6 @@ describe("API discovery", () => {
         expect(res.headers.get("content-type")).toContain("text/plain");
         expect(text).toContain("# LangWatch");
         expect(text).toContain(WELL_KNOWN);
-        expect(text).toContain("/api/rpc.discover");
       });
 
       /**
@@ -151,9 +150,7 @@ describe("API discovery", () => {
         const text = await res.text();
 
         expect(text).toContain("Authorization: Bearer");
-        expect(text.indexOf("Authorization: Bearer")).toBeLessThan(
-          text.indexOf("X-Auth-Token"),
-        );
+        expect(text.indexOf("Authorization: Bearer")).toBeLessThan(text.indexOf("X-Auth-Token"));
         expect(text).toMatch(/X-Auth-Token[^\n]*\n?[^\n]*legacy/i);
       });
 
@@ -164,12 +161,8 @@ describe("API discovery", () => {
        */
       /** @scenario "The plain-text index stays small enough to read speculatively" */
       it("stays orders of magnitude smaller than the document", async () => {
-        const index = await (
-          await rootApp.request("/llms.txt", { method: "GET" })
-        ).text();
-        const document = await (
-          await rootApp.request(WELL_KNOWN, { method: "GET" })
-        ).text();
+        const index = await (await rootApp.request("/llms.txt", { method: "GET" })).text();
+        const document = await (await rootApp.request(WELL_KNOWN, { method: "GET" })).text();
 
         expect(index.length).toBeLessThan(4_000);
         expect(index.length * 50).toBeLessThan(document.length);
@@ -255,67 +248,6 @@ describe("API discovery", () => {
         expect(tag).toBeTruthy();
         expect(underApi.headers.get("etag")).toBe(tag);
         expect(canonical.headers.get("etag")).toBe(tag);
-      });
-    });
-  });
-
-  describe("given a caller that wants the RPC fleet", () => {
-    describe("when it POSTs to the catalogue", () => {
-      /** @scenario "Discovering a catalogue is itself an RPC" */
-      it("answers a POST at the dotted name", async () => {
-        const res = await app.request("/api/rpc.discover", { method: "POST" });
-
-        expect(res.status).toBe(200);
-        expect(res.headers.get("content-type")).toContain("application/json");
-      });
-
-      /** @scenario "The root catalogue links to every service's catalogue" */
-      it("lists every framework service with the URL of its own catalogue, repeating no operation", async () => {
-        const res = await app.request("/api/rpc.discover", { method: "POST" });
-        const catalogue = (await res.json()) as {
-          openapi: string;
-          services: { name: string; discover: string }[];
-        };
-
-        expect(catalogue.openapi).toBe(WELL_KNOWN);
-        expect(catalogue).not.toHaveProperty("operations");
-        expect(catalogue.services).toEqual([
-          {
-            name: "organization",
-            discover: "/api/organization/latest/rpc.discover",
-          },
-          {
-            name: "role-bindings",
-            discover: "/api/role-bindings/latest/rpc.discover",
-          },
-          { name: "roles", discover: "/api/roles/latest/rpc.discover" },
-          {
-            name: "scim-tokens",
-            discover: "/api/scim-tokens/latest/rpc.discover",
-          },
-        ]);
-      });
-
-      it("and the service catalogue it points at answers", async () => {
-        const { app: rolesApp } = await import("~/app/api/roles/[[...route]]/app");
-
-        const res = await rolesApp.request("/api/roles/latest/rpc.discover", {
-          method: "POST",
-        });
-
-        expect(res.status).toBe(200);
-        const catalogue = (await res.json()) as { operations: unknown[] };
-        // The management families are REST: no dotted operations yet, and an
-        // empty catalogue is an honest answer, not a missing one.
-        expect(catalogue.operations).toEqual([]);
-      });
-    });
-
-    describe("when it GETs the catalogue", () => {
-      it("refuses, because an RPC is a POST", async () => {
-        const res = await app.request("/api/rpc.discover", { method: "GET" });
-
-        expect(res.status).toBe(404);
       });
     });
   });

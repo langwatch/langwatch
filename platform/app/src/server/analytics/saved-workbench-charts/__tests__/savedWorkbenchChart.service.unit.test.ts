@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import type { CustomGraph } from "~/generated/prisma/client";
 
-import type { Protections } from "../../../traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import type { LangWatchQLExecutor } from "../../lwql/executor";
 import { recordingExecutor } from "../../lwql/executor.testFakes";

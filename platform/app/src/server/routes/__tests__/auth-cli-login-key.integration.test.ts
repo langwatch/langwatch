@@ -43,7 +43,8 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
-import { app as projectsApp } from "../../../app/api/projects/[[...route]]/app";
+import { createProjectRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
 import { app as tracesApp } from "../../../app/api/traces/[[...route]]/app";
 import { app } from "../auth-cli";
 
@@ -382,6 +383,12 @@ afterAll(async () => {
   });
   await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   await stopTestContainers().catch(() => {});
+});
+
+const { hono: projectsApp } = createProjectRestApp({
+  security: appRestSecurity,
+  projects: () => getApp().projects,
+  apiKeys: () => getApp().apiKeys,
 });
 
 describe("CLI login user-scoped key, given a device-session flow", () => {

@@ -10,7 +10,7 @@
  * specs/rbac/typed-permission-declarations.feature is the behavioural
  * contract these pin.
  */
-import type { EndpointConfig } from "@langwatch/api";
+import type { EndpointConfig } from "@langwatch/api/rest";
 import type { Authorized } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";

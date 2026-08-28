@@ -1,4 +1,9 @@
 import type {
+  SessionGroupCodingAgentDto,
+  SessionGroupDto,
+  SessionGroupsResult,
+} from "@langwatch/trace-contract";
+import type {
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsRepository,
@@ -61,75 +66,6 @@ function teasedSession(session: SessionGroupDto): SessionGroupDto {
         }
       : session.codingAgent,
   };
-}
-
-export interface SessionGroupCodingAgentDto {
-  modelCalls: number;
-  compactions: number;
-  peakContextTokens: number;
-  subAgents: number;
-  /**
-   * Where the session ran, from the LangWatch companion event, and the title
-   * the agent generated for it. Null for every session whose agent has no
-   * companion emitter, which is most of them.
-   */
-  repositoryHost: string | null;
-  repositoryOwner: string | null;
-  repositoryName: string | null;
-  gitBranch: string | null;
-  gitWorktree: string | null;
-  title: string | null;
-  /**
-   * The pull request this session's work belongs to, decided by the tenure
-   * rule over the branch's mapped pull requests. Null for a session with no
-   * git context, a repository the organization's GitHub connection does not
-   * reach, or a branch whose pull request has not been opened yet.
-   */
-  pullRequest: SessionGroupPullRequestDto | null;
-}
-
-export interface SessionGroupDto {
-  conversationId: string;
-  traceCount: number;
-  totalCost: number;
-  totalTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  contextSizeTokens: number | null;
-  totalDurationMs: number;
-  startedAtMs: number;
-  lastActivityMs: number;
-  models: string[];
-  primaryModel: string;
-  serviceName: string;
-  errorCount: number;
-  warningCount: number;
-  totalSpans: number;
-  /**
-   * The session's most recent trace, the one a click on the row opens. Null
-   * when the rollup named none.
-   */
-  lastTraceId: string | null;
-  /** Latest trace's computed input/output previews for the row label. */
-  input: string | null;
-  output: string | null;
-  /**
-   * Pre-folded coding-agent counters when a `coding_agent_sessions` row
-   * exists for this conversation id; null for ordinary conversations.
-   */
-  codingAgent: SessionGroupCodingAgentDto | null;
-}
-
-export interface SessionGroupsResult {
-  sessions: SessionGroupDto[];
-  totalHits: number;
-  nextCursor: string | null;
-}
-
-export interface SessionGroupPullRequestDto {
-  number: number;
-  htmlUrl: string;
-  title: string;
 }
 
 interface SessionGroupsParams {

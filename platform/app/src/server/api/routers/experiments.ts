@@ -9,11 +9,8 @@
  * collaborators an experiment still reaches through the application while
  * those verticals are drained.
  */
-import {
-  createExperimentTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createExperimentTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 import {

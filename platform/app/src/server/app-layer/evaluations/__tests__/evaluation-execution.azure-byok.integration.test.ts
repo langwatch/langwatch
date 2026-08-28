@@ -26,9 +26,9 @@ const { getProjectModelProvidersMock } = vi.hoisted(() => ({
   getProjectModelProvidersMock: vi.fn(),
 }));
 
-vi.mock("~/server/api/routers/modelProviders.utils", async (importOriginal) => {
+vi.mock("@langwatch/model-provider-server", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("~/server/api/routers/modelProviders.utils")>();
+    await importOriginal<typeof import("@langwatch/model-provider-server")>();
   return {
     ...actual,
     getProjectModelProviders: getProjectModelProvidersMock,

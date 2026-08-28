@@ -28,7 +28,7 @@ export class EventUsageService {
     }
 
     const billingMonth = getBillingMonth();
-    const count = await tryGetApp()!.billingQueries.queryBillableEventsTotalUniq({
+    const count = await tryGetApp()!.billingQueries.tryQueryBillableEventsTotalUniq({
       organizationId,
       billingMonth,
     });

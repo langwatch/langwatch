@@ -21,11 +21,9 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import zodToJsonSchema from "zod-to-json-schema";
 import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { enforceApiKeyCeiling, extractCredentials } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
 import type { App } from "~/server/app-layer/app";
 import {
   LangyApiCredentialInvalidError,
@@ -33,9 +31,9 @@ import {
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
-} from "~/server/app-layer/langy/errors";
-import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
-import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+} from "@langwatch/langy-contract";
+import { LangyTokenBuffer } from "@langwatch/langy-server";
+import { resolveLangyKeyIdentity } from "~/runtime/app/features/langy-api-key-identity.adapter";
 import { LangyUiActionUnknownError } from "~/server/app-layer/langy/ui-actions/errors";
 import { findPageAction, listPageActions } from "~/server/app-layer/langy/ui-actions/pageManifests";
 import {
@@ -43,13 +41,10 @@ import {
   type UiActionRedis,
 } from "~/server/app-layer/langy/ui-actions/ui-action.service";
 import { executeBackendAction } from "~/server/app-layer/langy/ui-actions/uiActionBackendExecutor";
-import { prisma } from "~/server/db";
 import { bodyLimit } from "./_lib/body-limit";
 
-const tokenResolver = TokenResolver.create(prisma);
-
 const AUTH_REASON =
-  "session key resolved in-handler via TokenResolver + enforceApiKeyCeiling on the dispatched action's own permission, then bridged to the owning user by resolveLangyKeyIdentity";
+  "session key resolved in-handler by the API-key service + enforceApiKeyCeiling on the dispatched action's own permission, then bridged to the owning user by resolveLangyKeyIdentity";
 
 /** An action payload is a small JSON document, never an upload. */
 const MAX_ACTION_BODY_BYTES = 256 * 1024;
@@ -86,20 +81,23 @@ async function authorizeUiRequest(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) throw new LangyApiCredentialMissingError();
 
-  const resolved = await tokenResolver.resolve({
+  const resolved = await c.app.apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
   if (!resolved) throw new LangyApiCredentialInvalidError();
 
   const surfaceOpen = await c.app.featureFlags.isEnabled("release_langy_ui_actions", {
-    distinctId: resolved.project.id,
+    kind: "project",
     projectId: resolved.project.id,
     organizationId: resolved.project.team.organizationId,
   });
   if (!surfaceOpen) return { dark: true as const };
 
-  const identity = await resolveLangyKeyIdentity({ resolved });
+  const identity = await resolveLangyKeyIdentity({
+    resolved,
+    featureFlags: c.app.featureFlags,
+  });
   if (!identity.ok) {
     throw new LangyApiIdentityDeniedError(
       identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
@@ -129,11 +127,19 @@ function createService({
   const redis = app.redis as unknown as UiActionRedis;
   return new LangyUiActionService({
     redis,
-    conversations: app.langy.conversations,
-    buffer: createLangyTokenBuffer({ redis: app.redis }),
+    conversations: {
+      findByIdVisible: (args) => app.langy.tryFindByIdVisible(args),
+    },
+    buffer: LangyTokenBuffer.create({ redis: app.redis }),
     backendRunner: ({ kind, definition, payload, experimentSlug }) =>
       executeBackendAction({
         experiments: app.experiments,
+        runServices: {
+          evaluators: app.evaluators,
+          modelProviders: app.modelProviders,
+          nlpLambda: app.nlpLambda,
+          workflows: app.workflows,
+        },
         context: {
           ...context,
           experimentSlug,
@@ -197,7 +203,13 @@ secured.access(uiActionAuth).get("/actions", async (c) => {
         kind: action.kind,
         permission: action.requiredPermission,
         backend: action.backend,
-        payloadSchema: zodToJsonSchema(action.payloadSchema),
+        // Zod 4 renders its own JSON Schema; `zod-to-json-schema` only types
+        // against zod 3. Pinned to draft-07 and inlined so the document the
+        // CLI reads is the one this surface has always published.
+        payloadSchema: z.toJSONSchema(action.payloadSchema, {
+          target: "draft-07",
+          reused: "inline",
+        }),
       })),
     },
     200,

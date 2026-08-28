@@ -11,7 +11,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import type { TraceService } from "~/server/traces/trace.service";
 import {
   CSV_NEWLINE,

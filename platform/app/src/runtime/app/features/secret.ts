@@ -1,4 +1,4 @@
-import { RestVersionSelector } from "@langwatch/api";
+import { RestVersionSelector } from "@langwatch/api/rest";
 import type { SecretService } from "@langwatch/secret-contract";
 import {
   PostgresSecretAdapter,
@@ -31,7 +31,6 @@ function buildSecretRestApp(
       ...(options.pathVersion ? { pathVersion: options.pathVersion } : {}),
     },
     maxInputBytes: 16 * 1024,
-    openapiUrl: "/api/openapi.json",
     rateLimitOptOut: "No public REST rate limiter is composed yet.",
     resourceLimitOptOut: "Secret limits are domain invariants enforced by the canonical service.",
   });

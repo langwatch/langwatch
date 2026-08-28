@@ -1,6 +1,5 @@
+import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { OrganizationUserRole } from "~/generated/prisma/client";
-
-export type MemberType = "FullMember" | "LiteMember";
 
 /**
  * Checks if a permission string represents a view-only action.

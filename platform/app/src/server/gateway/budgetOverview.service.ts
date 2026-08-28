@@ -42,11 +42,10 @@ import {
   resolveApplicableBudgetsForTarget,
 } from "./applicableBudgets.service";
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
-import type { GatewayService } from "@langwatch/gateway-contract";
+import { scopeTargetKey, type GatewayService } from "@langwatch/gateway-contract";
 import { spendTargetsForBudgets } from "@langwatch/gateway-server";
 import { nextResetAt } from "@langwatch/gateway-server";
-import { resolveProviderLabels } from "@langwatch/gateway-server";
-import { scopeTargetKey } from "@langwatch/gateway-server";
+import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 
 /**
  * How binding a budget scope is to the person reading, most binding

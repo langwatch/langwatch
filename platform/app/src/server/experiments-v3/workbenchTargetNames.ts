@@ -3,7 +3,7 @@ import type { TargetConfig } from "~/experiments-v3/types";
 import { pickTargetName } from "~/experiments-v3/utils/targetDisplayName";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma as defaultPrisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
+import { AppPromptRuntime } from "~/runtime/app/features/prompt";
 
 const logger = createLogger("langwatch:experiments-v3:target-names");
 
@@ -105,14 +105,14 @@ const loadPrompts = async ({
   targets: TargetConfig[];
   prisma: PrismaClient;
 }): Promise<Map<string, { handle?: string | null }>> => {
-  const service = new PromptService(prisma);
+  const service = AppPromptRuntime.create({ database: prisma }).build();
   // One lookup per distinct prompt, all in flight at once: the agent branch and
   // the evaluator branch beside this one batch their rows, so a serial loop
   // here sets the latency floor for the whole resolution.
   const found = await Promise.all(
     idsOf(targets, "prompt", (t) => t.promptId).map(async (promptId) => ({
       promptId,
-      prompt: await service.getPromptByIdOrHandle({
+      prompt: await service.tryGetPromptByIdOrHandle({
         idOrHandle: promptId,
         projectId,
       }),

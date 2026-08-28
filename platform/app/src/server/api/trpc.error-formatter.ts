@@ -2,7 +2,7 @@ import {
   createTrpcErrorFormatter,
   trpcFailureTraceIds,
   type TrpcErrorCausePayloadPort,
-} from "@langwatch/trpc";
+} from "@langwatch/api/trpc";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";

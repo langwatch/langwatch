@@ -30,7 +30,7 @@ import {
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 export const getOrganizationHandler = async (c: OrganizationContext) =>
-  c.get("organizations").getSettings(organizationOf(c).id);
+  c.get("organizations").getSettings({ organizationId: organizationOf(c).id });
 
 export const updateOrganizationHandler = async (
   c: OrganizationContext,
@@ -53,7 +53,7 @@ export const updateOrganizationHandler = async (
     action: "management.organization.update",
     args: { fields: Object.keys(input) },
   });
-  return c.get("organizations").getSettings(organization.id);
+  return c.get("organizations").getSettings({ organizationId: organization.id });
 };
 
 export const listMembersHandler = async (

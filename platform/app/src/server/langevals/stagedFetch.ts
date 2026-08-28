@@ -37,7 +37,7 @@ export class PayloadTooLargeError extends Error {
   }
 }
 
-interface StagedFetchOptions {
+export interface StagedFetchOptions {
   url: string;
   body: unknown;
   projectId: string;
@@ -52,13 +52,38 @@ interface StagedFetchOptions {
   signal?: AbortSignal;
 }
 
-function maxBytesForKind(kind: LangevalsCallKind): number {
+/**
+ * The staging policy as a value, so a composed transport takes it from the
+ * process configuration rather than reading the application environment.
+ */
+export type LangevalsStagedPayloadConfig = {
+  /** Unset disables staging entirely: every payload goes inline. */
+  stagingThresholdBytes: number | undefined;
+  stagingTtlSeconds: number;
+  evaluationMaxPayloadBytes: number;
+  topicClusteringMaxPayloadBytes: number;
+};
+
+/** Configured transport for callers composed at the application root. */
+export class LangevalsStagedPayloadClient {
+  static create(config: LangevalsStagedPayloadConfig): LangevalsStagedPayloadClient {
+    return new LangevalsStagedPayloadClient(config);
+  }
+
+  private constructor(private readonly config: LangevalsStagedPayloadConfig) {}
+
+  post(opts: StagedFetchOptions): Promise<Response> {
+    return postStagedLangevalsPayload(opts, this.config);
+  }
+}
+
+function maxBytesForKind(kind: LangevalsCallKind, config: LangevalsStagedPayloadConfig): number {
   switch (kind) {
     case "evaluation":
-      return env.EVAL_MAX_PAYLOAD_BYTES;
+      return config.evaluationMaxPayloadBytes;
     case "topic_clustering_batch":
     case "topic_clustering_incremental":
-      return env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES;
+      return config.topicClusteringMaxPayloadBytes;
   }
 }
 
@@ -78,12 +103,24 @@ function maxBytesForKind(kind: LangevalsCallKind): number {
  * handling — same contract as a plain fetch().
  */
 export async function stagedLangevalsFetch(opts: StagedFetchOptions): Promise<Response> {
+  return postStagedLangevalsPayload(opts, {
+    stagingThresholdBytes: env.LANGEVALS_STAGING_THRESHOLD_BYTES,
+    stagingTtlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
+    evaluationMaxPayloadBytes: env.EVAL_MAX_PAYLOAD_BYTES,
+    topicClusteringMaxPayloadBytes: env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+  });
+}
+
+async function postStagedLangevalsPayload(
+  opts: StagedFetchOptions,
+  config: LangevalsStagedPayloadConfig,
+): Promise<Response> {
   const { url, body, projectId, kind, headers = {}, signal } = opts;
 
   const serialized = Buffer.from(JSON.stringify(body), "utf-8");
   const bytes = serialized.byteLength;
-  const limit = maxBytesForKind(kind);
-  const threshold = env.LANGEVALS_STAGING_THRESHOLD_BYTES;
+  const limit = maxBytesForKind(kind, config);
+  const threshold = config.stagingThresholdBytes;
 
   if (bytes > limit) {
     logger.error(
@@ -115,7 +152,7 @@ export async function stagedLangevalsFetch(opts: StagedFetchOptions): Promise<Re
     });
   }
 
-  const ttlSeconds = env.LANGEVALS_STAGING_TTL_SECONDS;
+  const ttlSeconds = config.stagingTtlSeconds;
   const { s3Client, s3Bucket, key, stagedUrl } = await stagePayloadToS3({
     projectId,
     keyPrefix: `${STAGING_PREFIX}/${projectId}/${kind}`,

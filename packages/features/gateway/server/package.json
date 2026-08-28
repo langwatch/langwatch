@@ -29,6 +29,10 @@
     "./composition/gateway-virtual-keys": {
       "types": "./src/repositories/prisma/prisma.virtual-key.repository.ts",
       "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
+    },
+    "./composition/gateway-provider-labels": {
+      "types": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"
     }
   },
   "scripts": {

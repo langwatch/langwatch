@@ -8,13 +8,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { LegacyModelProviderExecution } from "~/server/api/routers/modelProviders.utils";
+import type { LegacyModelProviderExecution } from "@langwatch/model-provider-server";
 import {
   testManagedProviders,
   testModelProviders,
 } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 
-vi.mock("~/server/api/routers/modelProviders.utils", () => ({
+vi.mock("@langwatch/model-provider-server", () => ({
   getProjectModelProviders: vi.fn(),
   prepareLitellmParams: vi
     .fn()
@@ -26,7 +26,7 @@ vi.mock("~/server/modelProviders/resolveMaxTokensCeiling", () => ({
   resolveMaxTokensCeiling: vi.fn().mockReturnValue(null),
 }));
 
-import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { EvaluatorConfigError } from "../errors";
 import { setupModelEnv } from "../evaluation-execution.factories";
 

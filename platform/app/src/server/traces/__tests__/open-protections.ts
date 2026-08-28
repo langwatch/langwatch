@@ -1,4 +1,4 @@
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 
 /**
  * Permissive protections that allow all content categories to be visible, so the

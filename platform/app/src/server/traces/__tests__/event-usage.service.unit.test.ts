@@ -20,7 +20,7 @@ vi.mock("~/server/app-layer/app", () => {
       allInstances: async () => [],
     },
     billingQueries: {
-      queryBillableEventsTotalUniq: mockQueryBillableEventsTotalUniq,
+      tryQueryBillableEventsTotalUniq: mockQueryBillableEventsTotalUniq,
       queryBillableEventsByProjectApprox: mockQueryBillableEventsByProjectApprox,
     },
   });

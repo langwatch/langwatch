@@ -4,7 +4,7 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 import { createHash } from "crypto";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
+import { TRACK_EVENT_SPAN_NAME } from "@langwatch/trace-contract";
 import type { TrackEventRESTParamsValidator } from "@langwatch/trace-contract";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -13,9 +13,9 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  * trace-processing event-sourcing pipeline.
  *
  * Shared between the legacy `POST /api/track_event` handler in misc.ts and
- * the new `POST /api/events/track` Hono module in
- * src/app/api/events/[[...route]]. Keep behaviour identical between the two
- * URLs by routing both through this function.
+ * the `POST /api/events/track` family, which lives in
+ * `@langwatch/platform-api` and reaches this through its recorder port. Keep
+ * behaviour identical between the two URLs by routing both through here.
  */
 export async function recordTrackedEventSpan(params: {
   project: { id: string };

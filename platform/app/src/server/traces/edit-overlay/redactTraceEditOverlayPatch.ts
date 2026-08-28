@@ -1,5 +1,4 @@
-import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
-import type { Protections } from "~/server/traces/protections";
+import { redactHiddenAttributes, type Protections } from "@langwatch/trace-server";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,

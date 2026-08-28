@@ -22,7 +22,7 @@
  */
 
 import type { FieldProtection } from "../../../traces/projection/catalog";
-import type { Protections } from "../../../traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 
 /**
  * What a column's numbers are measured in.

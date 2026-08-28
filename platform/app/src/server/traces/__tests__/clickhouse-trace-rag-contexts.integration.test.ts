@@ -18,7 +18,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RAGSpan, Span } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import {
   startTestContainers,
   stopTestContainers,

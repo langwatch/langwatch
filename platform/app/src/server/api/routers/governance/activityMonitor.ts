@@ -17,10 +17,7 @@
 
 import { z } from "zod";
 
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  requireEnterprisePlan,
-} from "~/server/api/enterprise";
+import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "@langwatch/enterprise-plan-gate";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 

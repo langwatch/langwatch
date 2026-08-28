@@ -7,11 +7,8 @@
  * this application still owns: its tRPC root, its authenticated procedure and
  * its authorization middlewares.
  */
-import {
-  createDashboardTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createDashboardTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,

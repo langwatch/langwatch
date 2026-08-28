@@ -35,7 +35,61 @@ import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceService as LegacyTraceService } from "~/server/traces/trace.service";
-import type { Protections } from "~/server/traces/protections";
+import type {
+  Protections,
+  SharedTraceTrpcPorts,
+  TracesV2ReadPorts,
+  TracesV2TrpcPorts,
+} from "@langwatch/trace-server";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import { Prisma } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
+import { getUserProtectionsForProject, getVisibilityCutoffMsForProject } from "~/server/api/utils";
+import {
+  generateTraceAction,
+  generateTraceQueryFromPrompt,
+} from "~/server/app-layer/traces/ai-query";
+import {
+  enrichCodingAgentSpansFromLogs,
+  enrichSingleSpanWithClaudeLogContent,
+  isCodingAgentShapedSpan,
+  mapSummaryRowsToClaudeRefs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
+import type { ClaudeSpanRef } from "~/server/app-layer/traces/claude-code-span-enrichment";
+import { TraceNotFoundError as AppTraceNotFoundError } from "~/server/app-layer/traces/errors";
+import {
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+} from "~/server/app-layer/traces/log-content-derivation";
+import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
+import {
+  traceMetadataUpdateSchema,
+  updateTraceMetadata,
+  type TraceMetadataUpdate,
+} from "~/server/app-layer/traces/trace-metadata.service";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+} from "~/server/data-privacy/dropKeyCatalog";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { prisma } from "~/server/db";
+import { rateLimit } from "~/server/rateLimit";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "~/server/traces/findPromptReferenceInAncestors";
+import {
+  applyDerivedTraceEventProtections,
+  applySpanProtections,
+  extractRedactionsFromAllSpanInputs,
+  extractRedactionsFromAllSpanOutputs,
+  redactObject,
+} from "~/server/traces/mappers/redaction";
+import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
+import { getClientIp } from "~/utils/getClientIp";
 
 type AppSpanDedup = {
   tryAcquireProcessingLock(
@@ -292,4 +346,208 @@ export class AppTraceRuntime {
       fullIo: AppTraceFullIoAdapter.create(this.options.fullIo),
     }).build();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Trace-view transport ports
+// ---------------------------------------------------------------------------
+
+/**
+ * The capabilities `@langwatch/trace-server`'s two trace-view transports
+ * (`tracesV2.*` and the anonymous `sharedTrace.get`) need that Trace does not
+ * own, assembled once here.
+ *
+ * Every entry belongs to another vertical: the viewer's protections and the
+ * plan window, the AI composer's model providers, Data Privacy's content-key
+ * catalog and per-span markers, the legacy trace read's span display and
+ * redaction passes, the reserved-metadata write, the unmapped-cost rule
+ * lookup, the coding-agent log join and the prompt-ancestor walk. They are
+ * injected rather than imported by the package so the transports could move
+ * without dragging six features' modules with them.
+ *
+ * Assembled here rather than at the mount because both doors need the same
+ * object: `root.ts` mounts the tRPC routers, and the REST transcript route
+ * (`GET /api/traces/:traceId/transcript`) calls the same shared reader. One
+ * definition is what keeps the two from drifting on redaction.
+ */
+export function createTraceViewReadPorts(): TracesV2ReadPorts {
+  return {
+    getVisibilityCutoffMs: (projectId) => getVisibilityCutoffMsForProject(projectId),
+    derivedAttrPrefixes: {
+      input: DERIVED_INPUT_ATTR_PREFIX,
+      output: DERIVED_OUTPUT_ATTR_PREFIX,
+    },
+    mappers: {
+      spanDisplay: { buildDisplayInput, stringifySpanIO },
+      spanProtection: {
+        applySpanProtections,
+        extractRedactionsFromAllSpanInputs,
+        extractRedactionsFromAllSpanOutputs,
+        redactObject,
+        applyDerivedTraceEventProtections,
+      },
+      contentPrivacy: {
+        contentKeyCatalog: CONTENT_KEY_CATALOG,
+        droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
+        piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+        stripRolesFromChatArrayJson,
+        getResolvedPolicyForProject: (input) =>
+          getDataPrivacyPolicyService().getResolvedForProject(input),
+      },
+    },
+    codingAgentEnrichment: {
+      isCodingAgentShapedSpan,
+      enrichSpansFromLogs: (input) => enrichCodingAgentSpansFromLogs(input),
+      enrichSingleSpanWithLogContent: (input) =>
+        enrichSingleSpanWithClaudeLogContent({
+          ...input,
+          modelCallRefs: input.modelCallRefs as ClaudeSpanRef[],
+        }),
+      mapSummaryRowsToRefs: mapSummaryRowsToClaudeRefs,
+    },
+  };
+}
+
+/**
+ * The `tracesV2.*` ports: the shared read ports above, plus the ones only the
+ * authenticated explorer needs — the per-request viewer protections, the AI
+ * composer, the reserved-metadata write, the unmapped-cost suggestion, the
+ * prompt-ancestor walk and the application's `trace_not_found` error.
+ */
+export function createTracesV2TrpcPorts(): TracesV2TrpcPorts<TraceMetadataUpdate, unknown> {
+  return {
+    ...createTraceViewReadPorts(),
+    getViewerProtections: (ctx, input) => getUserProtectionsForProject(ctx as never, input),
+    runAiQuery: (input, ctx) =>
+      generateTraceQueryFromPrompt({
+        ...input,
+        modelProviders: (ctx as TraceAiComposerContext).app.modelProviders,
+        managedProviders: (ctx as TraceAiComposerContext).app.managedProviders,
+        traces: (ctx as TraceAiComposerContext).app.traces.tree,
+      }),
+    runAiAction: (input, ctx) =>
+      generateTraceAction({
+        ...input,
+        modelProviders: (ctx as TraceAiComposerContext).app.modelProviders,
+        managedProviders: (ctx as TraceAiComposerContext).app.managedProviders,
+        traces: (ctx as TraceAiComposerContext).app.traces.tree,
+      }),
+    traceMetadataUpdateSchema,
+    updateTraceMetadata,
+    deriveUnmappedCostSuggestion,
+    resolveAncestorPromptParams: enrichLlmSpanWithAncestorPrompt,
+    hasOwnPromptAttrs,
+    traceNotFound: (id) => new AppTraceNotFoundError(id),
+  };
+}
+
+/** The parts of the request context the AI composer reads. */
+type TraceAiComposerContext = {
+  app: {
+    modelProviders: ModelProviderService;
+    managedProviders: ManagedProviderService;
+    traces: { tree: TraceService };
+  };
+};
+
+const PROMPT_ATTR_KEYS = [
+  "langwatch.prompt.id",
+  "langwatch.prompt.handle",
+  "langwatch.prompt.version.number",
+  "langwatch.prompt.variables",
+] as const;
+
+/** Whether an llm span already carries its own `langwatch.prompt.*`. */
+function hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean {
+  if (!params) return false;
+  const flat = flattenParamsToPromptAttributes(params);
+  return PROMPT_ATTR_KEYS.some((k) => flat[k] !== undefined);
+}
+
+/**
+ * Resolves the closest preceding `langwatch.prompt.*` reference for an llm
+ * span by walking the trace's ancestor / sibling chain — same heuristic
+ * `getSpanForPromptStudio` uses on the legacy path. Returns the llm span's
+ * params merged with the resolved prompt attributes (in nested-object form
+ * matching the rest of `params`), or null when nothing was found so the
+ * caller can skip the assignment.
+ */
+async function enrichLlmSpanWithAncestorPrompt({
+  tenantId,
+  traceId,
+  targetSpanId,
+  occurredAtMs,
+  currentParams,
+}: {
+  tenantId: string;
+  traceId: string;
+  targetSpanId: string;
+  occurredAtMs?: number;
+  currentParams: Record<string, unknown> | null;
+}): Promise<Record<string, unknown> | null> {
+  const app = getApp();
+  const allSpans = await app.traces.spans.getSpansByTraceId({
+    tenantId,
+    traceId,
+    ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+  });
+
+  const lookupSpans: PromptLookupSpan[] = allSpans.map((s) => ({
+    spanId: s.span_id,
+    parentSpanId: s.parent_id ?? null,
+    startTime: s.timestamps.started_at,
+    attributes: flattenParamsToPromptAttributes(s.params as Record<string, unknown> | null),
+  }));
+
+  const ref = findPromptReferenceInAncestors({
+    targetSpanId,
+    spans: lookupSpans,
+  });
+  if (!ref?.promptHandle) return null;
+
+  const promptNode: Record<string, unknown> = {
+    id: ref.promptHandle,
+  };
+  if (ref.promptVersionNumber != null) {
+    promptNode.version = { number: ref.promptVersionNumber };
+  }
+  if (ref.promptVariables) {
+    promptNode.variables = ref.promptVariables;
+  }
+
+  const next: Record<string, unknown> = { ...(currentParams ?? {}) };
+  const langwatch =
+    next.langwatch && typeof next.langwatch === "object"
+      ? (next.langwatch as Record<string, unknown>)
+      : {};
+  next.langwatch = { ...langwatch, prompt: promptNode };
+  return next;
+}
+
+/**
+ * The ports for the anonymous `sharedTrace.get` read: the shared mappers, the
+ * share viewer's protections, the process's rate limiter and client-IP
+ * resolution, and the trace-missing predicate that turns a deleted trace into
+ * the same generic not-found a bad token gets.
+ */
+export function createSharedTraceTrpcPorts(): SharedTraceTrpcPorts {
+  return {
+    mappers: createTraceViewReadPorts().mappers,
+    tryGetShareViewerProtections: async ({ projectId, session }) => {
+      try {
+        return await getUserProtectionsForProject(
+          { prisma, session, publiclyShared: true } as never,
+          { projectId },
+        );
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+          return null;
+        }
+        throw error;
+      }
+    },
+    rateLimit,
+    getClientIp: (req) => getClientIp(req as never),
+    isTraceNotFound: (error) => AppTraceNotFoundError.is(error),
+  };
 }

@@ -8,7 +8,6 @@ import { fireSignupNurturingCalls } from "~/server/app-layer/billing/nurturing/s
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { organizationRouter } from "../organization";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
 
 /**
@@ -45,20 +44,20 @@ export const onboardingRouter = createTRPCRouter({
     })
     .mutation(async ({ input, ctx }) => {
       try {
-        // Create and assign organization
-        const orgRouter = organizationRouter.createCaller(ctx);
-        const orgResult = await orgRouter.createAndAssign({
+        // Create and assign organization. Straight to the service rather than
+        // through `organization.createAndAssign`: that procedure moved to
+        // `@langwatch/organization-server` and is composed in `root.ts`, which
+        // imports this router — calling it from here would close the cycle.
+        // It declares no permission and adds no rule of its own, so the two
+        // paths are the same work.
+        const orgResult = await ctx.app.organizations.createAndAssign({
+          userId: ctx.session.user.id,
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
           signUpData: input.signUpData,
           primaryIntent: input.primaryIntent,
+          userDisplayName: ctx.session.user.name,
         });
-        if (!orgResult.success) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create organization",
-          });
-        }
 
         // Every new org gets the standard AI tool catalog at creation, for
         // every intent: the /me portal must render tiles on its very first

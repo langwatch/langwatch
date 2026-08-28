@@ -52,7 +52,21 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import { readCodingAgentTranscriptWithProtections } from "../tracesV2";
+import { TracesV2TrpcApi } from "@langwatch/trace-server";
+import { createTraceViewReadPorts } from "~/runtime/app/features/trace";
+
+/**
+ * The reader now takes the application it reads through, and the ports the
+ * package does not own. The two stores are the mocked boundaries; everything
+ * downstream of them still runs for real.
+ */
+const transcriptApp = {
+  traces: {
+    spans: { getSpansByTraceId: mockGetSpansByTraceId },
+    logRecords: { getLogsByTraceId: mockGetLogsByTraceId },
+    canonicalisation: undefined,
+  },
+} as never;
 
 /**
  * Anchored to now so the plan visibility window never teases the fixture: the
@@ -150,7 +164,9 @@ describe("transcript captured-content matrix for an API-key caller", () => {
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
-    return readCodingAgentTranscriptWithProtections({
+    return TracesV2TrpcApi.readCodingAgentTranscript({
+      app: { ...(transcriptApp as object), codingAgents } as never,
+      ports: createTraceViewReadPorts(),
       projectId: project.id,
       traceId: TRACE_ID,
       occurredAtMs: NOW,

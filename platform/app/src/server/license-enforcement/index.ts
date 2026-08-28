@@ -5,7 +5,7 @@ import { LicenseEnforcementRepository } from "./license-enforcement.repository";
 import { LicenseEnforcementService } from "./license-enforcement.service";
 
 export type { PlanProvider } from "../app-layer/subscription/plan-provider";
-export { LIMIT_TYPE_DISPLAY_LABELS, LIMIT_TYPE_LABELS } from "./constants";
+export { LIMIT_TYPE_LABELS } from "./constants";
 export { LimitExceededError, ProjectNotFoundError } from "./errors";
 export type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 // Re-export types and errors for consumers

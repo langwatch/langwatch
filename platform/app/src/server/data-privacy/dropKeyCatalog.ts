@@ -2,7 +2,7 @@ import {
   type CompiledAttributeMatcher,
   compileAttributePatterns,
   matchesAnyAttributePattern,
-} from "./attributePatternMatcher";
+} from "@langwatch/data-privacy-contract";
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,

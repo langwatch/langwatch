@@ -28,12 +28,14 @@ import type {
   NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
-  SpanResourceInfo,
   SpanStorageRepository,
-  SpanSummaryRow,
-  TraceEventRollup,
   TraceEventRollupParams,
 } from "./span-storage.repository";
+import type {
+  SpanResourceInfo,
+  SpanSummaryRow,
+  TraceEventRollup,
+} from "@langwatch/trace-contract";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,

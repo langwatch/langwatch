@@ -1,15 +1,61 @@
 import { describe, expect, it } from "vitest";
+import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
-import type { CategoryVisibility } from "~/server/traces/protections";
-import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 import {
   buildContentPrivacy,
   contentSearchTermsForViewer,
   gateTraceLogVisibility as gateTraceLogVisibilityWithService,
   redactTraceLogContent as redactTraceLogContentWithService,
-  redactV2Content,
-  type TraceLogRecordDto,
-} from "../tracesV2";
+  redactV2Content as redactV2ContentWithPorts,
+  type CategoryVisibility,
+  type TraceContentPrivacyPort,
+  type V2Protections,
+} from "@langwatch/trace-server";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+} from "~/server/data-privacy/dropKeyCatalog";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
+
+/**
+ * The data-privacy vocabulary the mappers take as a port, wired to the REAL
+ * catalog and chat-turn stripper so these assertions still cover the keys
+ * ingestion actually classifies. Only the resolved-policy read is absent —
+ * nothing here derives the trace-level DROP banner.
+ */
+const contentPrivacy: TraceContentPrivacyPort = {
+  contentKeyCatalog: CONTENT_KEY_CATALOG,
+  droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
+  piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+  getResolvedPolicyForProject: () => {
+    throw new Error("the resolved data-privacy policy is not read by these cases");
+  },
+};
+
+const DERIVED_ATTR_PREFIXES = {
+  input: "langwatch.gen_ai.input.",
+  output: "langwatch.gen_ai.output.",
+} as const;
+
+function redactV2Content<
+  T extends {
+    input?: string | null;
+    output?: string | null;
+    inputRedacted?: boolean | null;
+    outputRedacted?: boolean | null;
+    inputVisibleTo?: string | null;
+    outputVisibleTo?: string | null;
+    inputMediaRefs?: unknown;
+    outputMediaRefs?: unknown;
+    attributes?: Record<string, string>;
+    params?: Record<string, unknown> | null;
+  },
+>(dto: T, protections: V2Protections) {
+  return redactV2ContentWithPorts(dto, protections, contentPrivacy);
+}
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
 const codingAgents = TestCodingAgentService.create();
@@ -25,7 +71,7 @@ function redactTraceLogContent(
   row: TraceLogRecordDto,
   protections: LogProtections,
 ): TraceLogRecordDto {
-  return redactTraceLogContentWithService(row, protections, codingAgents);
+  return redactTraceLogContentWithService(row, protections, codingAgents, DERIVED_ATTR_PREFIXES);
 }
 
 function gateTraceLogVisibility(
@@ -38,6 +84,7 @@ function gateTraceLogVisibility(
     protections,
     visibilityCutoffMs,
     codingAgents,
+    DERIVED_ATTR_PREFIXES,
   );
 }
 
@@ -105,13 +152,10 @@ describe("redactV2Content", () => {
         protections,
       );
 
-      expect(out.attributes?.["app.billing.card_token"]).toBe(
-        "[REDACTED] (visible to Admins)",
-      );
+      expect(out.attributes?.["app.billing.card_token"]).toBe("[REDACTED] (visible to Admins)");
       expect(out.attributes?.["service.name"]).toBe("x");
       expect(
-        (out.params as { app: { billing: { card_token: string } } }).app.billing
-          .card_token,
+        (out.params as { app: { billing: { card_token: string } } }).app.billing.card_token,
       ).toBe("[REDACTED] (visible to Admins)");
       expect((out.params as { model: string }).model).toBe("gpt-5-mini");
       const event = (
@@ -137,9 +181,7 @@ describe("redactV2Content", () => {
       );
 
       expect(out.attributes?.["langwatch.privacy.dropped"]).toBe("input");
-      expect(out.attributes?.["langwatch.privacy.dropped_attributes"]).toBe(
-        "app.internal.session",
-      );
+      expect(out.attributes?.["langwatch.privacy.dropped_attributes"]).toBe("app.internal.session");
     });
   });
 
@@ -373,9 +415,7 @@ describe("redactV2Content", () => {
       expect(paramsMessages.map((m) => m.role)).toEqual(["user", "assistant"]);
       expect(JSON.stringify(out.params)).not.toContain("SECRET tool result");
       expect(JSON.stringify(out.params)).not.toContain("tool_calls");
-      expect(out.attributes?.["gen_ai.input.messages"]).not.toContain(
-        "SECRET tool result",
-      );
+      expect(out.attributes?.["gen_ai.input.messages"]).not.toContain("SECRET tool result");
     });
   });
 });
@@ -383,10 +423,7 @@ describe("redactV2Content", () => {
 describe("buildContentPrivacy", () => {
   /** @scenario Each dropped category is marked where its content would appear */
   it("marks a dropped category as dropped, distinct from a restriction", () => {
-    const privacy = buildContentPrivacy(
-      { contentCategories: cats() },
-      new Set(["system"]),
-    );
+    const privacy = buildContentPrivacy({ contentCategories: cats() }, new Set(["system"]));
     expect(privacy.system).toEqual({ state: "dropped", visibleTo: null });
   });
 
@@ -570,9 +607,7 @@ describe("redactTraceLogContent", () => {
       expect(out.bodyRedacted).toBeUndefined();
 
       const raw = redactTraceLogContent(apiResponseBody, full);
-      expect(raw.attributes["langwatch.gen_ai.output.text"]).toBe(
-        "Here is the secret summary.",
-      );
+      expect(raw.attributes["langwatch.gen_ai.output.text"]).toBe("Here is the secret summary.");
       expect(raw.bodyRedacted).toBeUndefined();
     });
   });
@@ -636,15 +671,13 @@ describe("redactTraceLogContent", () => {
     });
 
     it("withholds a gemini reply behind captured-output visibility", () => {
-      expect(
-        redactTraceLogContent(geminiResponse, blind).attributes.response_text,
-      ).toBeUndefined();
+      expect(redactTraceLogContent(geminiResponse, blind).attributes.response_text).toBeUndefined();
       expect(
         redactTraceLogContent(geminiResponse, inputOnly).attributes.response_text,
       ).toBeUndefined();
-      expect(
-        redactTraceLogContent(geminiResponse, outputOnly).attributes.response_text,
-      ).toBe('{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}');
+      expect(redactTraceLogContent(geminiResponse, outputOnly).attributes.response_text).toBe(
+        '{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}',
+      );
     });
 
     /**
@@ -759,9 +792,7 @@ describe("gateTraceLogVisibility", () => {
     );
 
     it("falls through to the viewer's captured-content permission", () => {
-      expect(gateTraceLogVisibility(fresh, full, CUTOFF).attributes.response).toBe(
-        "recent answer",
-      );
+      expect(gateTraceLogVisibility(fresh, full, CUTOFF).attributes.response).toBe("recent answer");
       expect(
         gateTraceLogVisibility(
           fresh,

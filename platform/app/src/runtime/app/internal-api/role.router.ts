@@ -2,7 +2,11 @@ import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TeamNotFoundError } from "@langwatch/role-contract";
 import { RoleTrpcApi, roleTrpcInputSchemas } from "@langwatch/role-server";
 import { TRPCError } from "@trpc/server";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "~/server/api/enterprise";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "@langwatch/enterprise-plan-gate";
 import { protectedProcedure } from "~/server/api/trpc.permission-builder";
 import { appTrpcRoot } from "~/server/api/trpc.root";
 import type { App } from "~/server/app-layer/app";

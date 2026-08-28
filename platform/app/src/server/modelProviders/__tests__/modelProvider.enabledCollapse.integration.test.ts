@@ -19,7 +19,7 @@ import {
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getApp } from "~/server/app-layer";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
-import { getProjectModelProvidersForFrontend } from "../../api/routers/modelProviders.utils";
+import { getProjectModelProvidersForFrontend } from "@langwatch/model-provider-server";
 import { prisma } from "../../db";
 
 wireDefaultTestApp();

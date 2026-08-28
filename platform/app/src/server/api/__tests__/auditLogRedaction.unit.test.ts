@@ -3,7 +3,7 @@
  *
  * The audit middlewares, end to end over a real procedure.
  *
- * `redactAuditArgs` is covered on its own in `@langwatch/trpc`. What this pins
+ * `redactAuditArgs` is covered on its own in `@langwatch/api/trpc`. What this pins
  * is that both middlewares call it through this process's composition: the
  * mutation one and the error one, which records the calls the other does not
  * and used to store the input raw.

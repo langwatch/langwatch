@@ -7,6 +7,7 @@ import type {
   TraceRecord,
   TraceService,
 } from "@langwatch/trace-contract";
+import { createOrUpdateQueueItems } from "@langwatch/annotation-server";
 import {
   AutomationDatasetMapperPort,
   AutomationPersistActionService,
@@ -14,8 +15,8 @@ import {
 } from "@langwatch/automation-server";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { traceSchema } from "@langwatch/trace-contract";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { mapTraceToDatasetEntry, TRACE_EXPANSIONS } from "~/server/tracer/tracesMapping";
 
 class AppAutomationDatasetMapper extends AutomationDatasetMapperPort {
@@ -56,9 +57,14 @@ class AppAutomationPersistActionWriter extends AutomationPersistActionWriterPort
   }): Promise<void> {
     await createOrUpdateQueueItems({
       ...input,
-      prisma: this.database,
       annotations: this.annotations,
-      traceCanonicalisation: this.traceCanonicalisation,
+      // Which of the ids sent address a trace this project holds is trace
+      // storage's answer, not Annotation's.
+      findExistingTraceIds: (candidates) =>
+        ClickHouseTraceService.create({
+          prisma: this.database,
+          traceCanonicalisation: this.traceCanonicalisation,
+        }).findExistingTraceIds(candidates),
     });
   }
 

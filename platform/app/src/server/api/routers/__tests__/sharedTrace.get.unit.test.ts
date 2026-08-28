@@ -16,8 +16,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
-import { sharedTraceRouter } from "../sharedTrace";
-import { SHARE_MAX_FULL_SPANS } from "../sharedTrace.schemas";
+import { appRouter } from "../../root";
+import { SHARE_MAX_FULL_SPANS } from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -74,7 +74,10 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-vi.mock("../../utils", () => ({
+// Partial: the trace-view ports factory reads other helpers out of this
+// module, and a whole-module replacement would leave them undefined at import.
+vi.mock("../../utils", async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
   getUserProtectionsForProject: mockGetUserProtectionsForProject,
 }));
 
@@ -181,7 +184,10 @@ function createAnonymousCaller() {
     res: undefined,
   });
   ctx.prisma = {} as unknown as PrismaClient;
-  return sharedTraceRouter.createCaller(ctx);
+  // The transport is package-owned now (`@langwatch/trace-server`), mounted on
+  // the app's own root. Driving it through `appRouter` is what proves the
+  // MOUNT wires the gates, not just the router in isolation.
+  return appRouter.createCaller(ctx).sharedTrace;
 }
 
 beforeEach(() => {
@@ -281,9 +287,7 @@ describe("sharedTrace.get", () => {
         resetAt: 0,
       });
 
-      await expect(createAnonymousCaller().get({ token: TOKEN })).rejects.toThrow(
-        /too often/i,
-      );
+      await expect(createAnonymousCaller().get({ token: TOKEN })).rejects.toThrow(/too often/i);
       // Refused before any work: the point of the limit is that an abusive
       // caller cannot drive the analytics reads at all.
       expect(mockResolveForViewer).not.toHaveBeenCalled();
@@ -350,9 +354,7 @@ describe("sharedTrace.get", () => {
 
   describe("given the token resolves to a THREAD-typed share", () => {
     it("answers with the same generic not-found as a bad token", async () => {
-      mockResolveForViewer.mockResolvedValue(
-        buildResolvedShare({ resourceType: "THREAD" }),
-      );
+      mockResolveForViewer.mockResolvedValue(buildResolvedShare({ resourceType: "THREAD" }));
 
       await expect(createAnonymousCaller().get({ token: TOKEN })).rejects.toMatchObject({
         code: "NOT_FOUND",

@@ -17,7 +17,7 @@ import { prisma as defaultPrisma } from "~/server/db";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { applyOverlayToTrace } from "./edit-overlay/applyTraceEditOverlay";
 import { redactPatchForViewer } from "./edit-overlay/redactTraceEditOverlayPatch";

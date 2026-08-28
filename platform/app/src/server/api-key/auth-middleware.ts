@@ -4,11 +4,11 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
+import { requestTraceIds } from "@langwatch/platform-api/app-rest";
 import {
   type ApiErrorEnvelope,
   authRefusalBody,
   canonicalErrorFor,
-  requestTraceIds,
 } from "~/app/api/shared/canonical-error";
 import type { Organization, PrismaClient, Project } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";

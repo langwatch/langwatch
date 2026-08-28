@@ -37,7 +37,7 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { prisma } from "../../../db";
-import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { grantOrganizationAdmin } from "./helpers/roleBindings";

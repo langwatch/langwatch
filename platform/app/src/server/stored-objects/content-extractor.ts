@@ -19,7 +19,7 @@
  *    `image_url.url = /api/files/<projectId>/<id>`
  *
  * Minted URLs carry the owning `<projectId>` (issue #4947) so the read path
- * (`/api/files/[[...route]]`) resolves the owner directly from the URL and
+ * (`/api/files`) resolves the owner directly from the URL and
  * reads via the project-scoped ClickHouse client — no cross-tenant owner
  * lookup. Legacy id-only URLs (`/api/files/<id>`) minted before #4947 stay
  * resolvable via the retained cross-tenant fallback on the read route.
@@ -41,7 +41,7 @@ import {
 } from "~/shared/content-parts/visit-content-part";
 import { binaryInputPartSchema } from "./binary-part";
 import { coerceContentToArray } from "./coerce-content-to-array";
-import { isReadbackSafe } from "./safe-media-types";
+import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import type { StoredObjectsService } from "./stored-objects.service";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");

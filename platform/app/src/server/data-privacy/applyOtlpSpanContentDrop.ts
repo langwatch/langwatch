@@ -1,7 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { DataPrivacyService } from "@langwatch/data-privacy-contract";
+import {
+  matchesAnyAttributePattern,
+  type DataPrivacyService,
+} from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { matchesAnyAttributePattern } from "./attributePatternMatcher";
 import type { ResolvedDataPrivacy } from "./dataPrivacy.types";
 import {
   CHAT_ARRAY_KEYS,

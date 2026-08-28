@@ -1,6 +1,6 @@
 import { formatReportRowLine } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
+import type { TraceListItem } from "@langwatch/trace-contract";
 import { toReportTraceRow } from "../trace-report-row";
 
 const PROJECT_URL = "https://app.langwatch.ai/my-project";

@@ -3,11 +3,8 @@ import {
   PUBLIC_CREDENTIAL_FIELDS,
   SECRET_CREDENTIAL_MARKERS,
 } from "../../../utils/constants";
-import {
-  getSchemaShape,
-  isSecretCredentialField,
-} from "../../../utils/modelProviderHelpers";
-import { modelProviders } from "@langwatch/model-provider-contract";
+import { isSecretCredentialField } from "../../../utils/modelProviderHelpers";
+import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
 
 /**
  * The classifier decides what every read path masks and what a partial write

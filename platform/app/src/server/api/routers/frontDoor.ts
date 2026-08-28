@@ -9,11 +9,8 @@
  * router, the sign-up ceremony, and the invitation reads a signed-out visitor
  * meets at the door.
  */
-import {
-  createFrontDoorTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createFrontDoorTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import {
   checkDeclaredPermission,
@@ -67,8 +64,7 @@ export const frontDoorRouter = createFrontDoorTrpcRouter({
     rateLimit,
     route: (input) => signInRouter().route(input),
     addressIsRegistered: (ctx: TRPCContext, input) => signUp(ctx).addressIsRegistered(input),
-    requestSignUpVerification: (ctx: TRPCContext, input) =>
-      signUp(ctx).requestVerification(input),
+    requestSignUpVerification: (ctx: TRPCContext, input) => signUp(ctx).requestVerification(input),
     completeSignUpVerification: (ctx: TRPCContext, input) =>
       signUp(ctx).completeVerification(input),
 

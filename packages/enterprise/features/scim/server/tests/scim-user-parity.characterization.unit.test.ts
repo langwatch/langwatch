@@ -86,6 +86,7 @@ class GrantsFake extends AuthzGrantsService {
   readonly updateBinding = vi.fn();
   readonly deleteBinding = vi.fn();
   readonly applyMemberBindings = vi.fn();
+  readonly invalidateOrganization = vi.fn();
 }
 
 class EnterpriseEntitlements extends EntitlementService {

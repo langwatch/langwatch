@@ -1,8 +1,14 @@
+import type { RoleService } from "@langwatch/role-contract";
+import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { LimitExceededError } from "./errors";
-import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
-import type { RoleChangeType } from "./member-classification";
+import {
+  LicenseEnforcementRepository,
+  type ILicenseEnforcementRepository,
+} from "./license-enforcement.repository";
+import { getRoleChangeType, type RoleChangeType } from "./member-classification";
 
 /**
  * Error messages for license limit violations.
@@ -81,4 +87,70 @@ export async function assertMemberTypeLimitNotExceeded(
       throw new LimitExceededError("membersLite", liteCount, limits.maxMembersLite);
     }
   }
+}
+
+/**
+ * Refuses a BUILT-IN team-role change for a Lite Member (`EXTERNAL`) that
+ * would push the organization past the full-member seats its licence covers.
+ *
+ * A Lite Member gaining non-view permissions is a full member for seat
+ * purposes, so the classification reads the role the binding carries today —
+ * a custom role's permissions when it has one — and asks the seat guard about
+ * the transition rather than the label. Only the built-in path reaches here;
+ * assigning a custom role is gated on the Enterprise plan instead.
+ *
+ * Lifted out of `organization.updateTeamMemberRole` when that transport moved
+ * to `@langwatch/organization-server`: the rule is licence enforcement, and it
+ * belongs beside the other seat guards rather than inside a router.
+ *
+ * @throws LimitExceededError if the change would exceed the licence
+ */
+export async function assertExternalTeamRoleChangeWithinSeatLimits({
+  prisma,
+  roles,
+  planProvider,
+  organizationId,
+  teamId,
+  userId,
+  actingUser,
+}: {
+  prisma: PrismaClient;
+  roles: RoleService;
+  planProvider: PlanProvider;
+  organizationId: string;
+  teamId: string;
+  userId: string;
+  actingUser?: { id: string; name?: string | null; email?: string | null };
+}): Promise<void> {
+  const currentBinding = await roles.tryGetUserBinding({
+    userId,
+    organizationId,
+    teamId,
+  });
+
+  const oldPermissions = currentBinding?.customRoleId
+    ? await (async () => {
+        const role = await roles.tryGet({ roleId: currentBinding.customRoleId });
+        return role?.permissions as string[] | undefined;
+      })()
+    : undefined;
+
+  const changeType = getRoleChangeType(
+    OrganizationUserRole.EXTERNAL,
+    oldPermissions,
+    OrganizationUserRole.EXTERNAL,
+    undefined,
+  );
+
+  const subscriptionLimits = await planProvider.getActivePlan({
+    organizationId,
+    user: actingUser,
+  });
+  const licenseRepo = new LicenseEnforcementRepository(prisma);
+  await assertMemberTypeLimitNotExceeded(
+    changeType,
+    organizationId,
+    licenseRepo,
+    subscriptionLimits,
+  );
 }

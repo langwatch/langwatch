@@ -64,10 +64,19 @@ import {
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app as meApp } from "../../../app/api/me/[[...route]]/app";
+import { createMeRestApp } from "@langwatch/platform-api";
+import { getApp } from "~/server/app-layer/app";
+import { appRestSecurity } from "~/server/api/security";
 import { app } from "../auth-cli";
 
 wireDefaultTestApp();
+
+const { hono: meApp } = createMeRestApp({
+  security: appRestSecurity,
+  governance: () => getApp().governance,
+  organizations: () => getApp().organizations,
+  projects: () => getApp().projects,
+});
 
 /** The container's connection, handed to the test App the CLI routes read. */
 let redisConnection: Redis | null = null;

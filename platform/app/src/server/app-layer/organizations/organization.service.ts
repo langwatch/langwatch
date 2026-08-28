@@ -12,6 +12,8 @@ import {
   type CreateOrganizationTeamWithMembersInput,
   type DeleteOrganizationGroupInput,
   type GetOldestTeamInput,
+  type GetOrganizationSettingsInput,
+  type UpdateOrganizationSettingsResult,
   type GetOrganizationGroupInput,
   type GetOrganizationTeamInput,
   type GetOrganizationTeamByIdInput,
@@ -71,8 +73,9 @@ import { slugify } from "~/utils/slugify";
 import {
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
-  isCustomRole,
-} from "../../api/enterprise";
+} from "@langwatch/enterprise-plan-gate";
+import { isCustomRole } from "../../api/enterprise";
+import { getApp } from "../app";
 import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import {
@@ -731,7 +734,8 @@ export class OrganizationService extends OrganizationServiceContract {
    * the SSO fields (staff-backoffice-only). S3 endpoint and access key id are
    * decrypted here so callers never handle ciphertext.
    */
-  async getSettings(organizationId: string): Promise<OrganizationSettings> {
+  async getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings> {
+    const { organizationId } = input;
     const settings = await this.repo.findSettingsById(organizationId);
     if (!settings) {
       // The organization is implied by an authenticated credential, so a
@@ -754,8 +758,16 @@ export class OrganizationService extends OrganizationServiceContract {
    * not just new ones blocked, so re-enabling later never resurrects old
    * links. The transition is detected against the stored value before the
    * write, mirroring the project-level kill switch.
+   *
+   * `traceShareRevocationRequired` reports that transition to callers that
+   * run the cascade themselves (the REST handler composes
+   * `revokeTraceSharesAfterOrganizationSettingsUpdate`). It is answered even
+   * though this service already revoked, so a caller that repeats the pass
+   * is idempotent rather than a second, divergent source of truth.
    */
-  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
+  async updateSettings(
+    input: UpdateOrganizationSettingsInput,
+  ): Promise<UpdateOrganizationSettingsResult> {
     const wasSharingEnabled =
       input.traceSharingEnabled === false
         ? (await this.repo.findSettingsById(input.organizationId))
@@ -787,6 +799,8 @@ export class OrganizationService extends OrganizationServiceContract {
         );
       }
     }
+
+    return { traceShareRevocationRequired: wasSharingEnabled };
   }
 
   /**
@@ -917,7 +931,7 @@ export class OrganizationService extends OrganizationServiceContract {
     // admin who has just revoked someone's access must not have to wait for a
     // cache to age out before it is true, and re-enabling must not leave the
     // person locked out for the same window.
-    await grantsService().invalidateOrganization({ organizationId });
+    await getApp().authzGrants.invalidateOrganization({ organizationId });
   }
 
   /**

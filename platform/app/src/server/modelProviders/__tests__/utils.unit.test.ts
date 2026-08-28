@@ -10,7 +10,7 @@ vi.mock("~/server/db", () => ({
 }));
 
 // Mock getProjectModelProviders to avoid real DB calls
-vi.mock("~/server/api/routers/modelProviders.utils", () => ({
+vi.mock("@langwatch/model-provider-server", () => ({
   getProjectModelProviders: vi.fn(),
   prepareLitellmParams: vi.fn().mockResolvedValue({
     model: "azure/my-gpt4-deployment",
@@ -31,7 +31,7 @@ vi.mock("../codexGatewayModel", () => ({
   getCodexVercelAIModel: vi.fn().mockResolvedValue("codex-model-handle"),
 }));
 
-import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { prisma } from "~/server/db";
 import {
   testManagedProviders,

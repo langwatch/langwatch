@@ -29,7 +29,12 @@ import {
 } from "./runResults";
 import { runStateManager } from "./runStateManager";
 import { getRunUrl } from "./runUrl";
-import { type EvaluationV3Event, type ExecutionScope, UNNAMED_FAILURE } from "./types";
+import {
+  type EvaluationV3Event,
+  type ExecutionScope,
+  type ExecutionSummary,
+  UNNAMED_FAILURE,
+} from "./types";
 
 const logger = createLogger("langwatch:experiments-v3:runner");
 

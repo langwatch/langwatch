@@ -30,6 +30,7 @@ import {
 } from "@langwatch/ops-server";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+import { totalInFlight as computeTotalInFlight } from "./in-flight";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 

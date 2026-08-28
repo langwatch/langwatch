@@ -3,7 +3,7 @@ import type { OpsService } from "@langwatch/ops-contract";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { isEnterpriseTier } from "~/server/api/enterprise";
+import { isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
 import {
   probeOrganizationPermission,

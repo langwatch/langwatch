@@ -4,7 +4,7 @@ import {
   TEASER_MAX_CHARS,
 } from "~/server/app-layer/traces/visibility-window.service";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { applyTraceProtections } from "../redaction";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

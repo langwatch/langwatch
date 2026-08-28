@@ -13,7 +13,7 @@ import type {
   SpanTypes,
 } from "@langwatch/trace-contract";
 import { coerceToNumber } from "~/utils/coerceToNumber";
-import { safeUnflatten } from "~/utils/safeUnflatten";
+import { safeUnflatten } from "@langwatch/trace-contract";
 
 type JsonSerializable =
   | string

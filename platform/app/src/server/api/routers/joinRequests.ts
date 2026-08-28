@@ -10,11 +10,8 @@
  * emits authorization grants, the organization's join settings and the
  * mailer.
  */
-import {
-  createJoinRequestTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createJoinRequestTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import {
   checkDeclaredPermission,

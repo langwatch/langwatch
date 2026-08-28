@@ -24,10 +24,7 @@ import {
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  requireEnterprisePlan,
-} from "~/server/api/enterprise";
+import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "@langwatch/enterprise-plan-gate";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES);

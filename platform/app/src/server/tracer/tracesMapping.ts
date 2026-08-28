@@ -6,10 +6,10 @@ import {
 } from "@langwatch/annotation-contract";
 import type { Annotation, AnnotationScore } from "~/generated/prisma/client";
 import { getSpanNameOrModel } from "../../utils/trace";
-import { datasetSpanSchema } from "@langwatch/dataset-contract";
 import {
   type Trace as BaseTrace,
   type DatasetSpan,
+  datasetSpanSchema,
   type Evaluation,
   reservedTraceMetadataSchema,
   type Span,

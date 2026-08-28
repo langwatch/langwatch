@@ -1,5 +1,5 @@
 import { type ReportTraceRow, reportSnippet } from "@langwatch/automation-contract";
-import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
+import type { TraceListItem } from "@langwatch/trace-contract";
 
 /**
  * Map a trace-list item onto the report template context's typed trace row.

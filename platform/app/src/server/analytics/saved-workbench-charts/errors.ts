@@ -68,10 +68,9 @@ export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
  * Covers both a foreign dashboard's id and one that never existed, and
  * deliberately does not distinguish them — the same reasoning as
  * {@link SavedWorkbenchChartNotFoundError}, applied to the id on the other
- * side of a placement. Derived from
- * {@link import("~/server/analytics/dashboardBelongsToProject").dashboardBelongsToProject},
- * the identical tenancy check `graphs.create` already runs before it places a
- * newly created chart.
+ * side of a placement. Derived from the service's injected
+ * `dashboardBelongsToProject` dependency, the identical tenancy check
+ * `graphs.create` already runs before it places a newly created chart.
  */
 export class SavedWorkbenchChartDashboardNotFoundError extends HandledError {
   declare readonly code: "saved_workbench_chart_dashboard_not_found";

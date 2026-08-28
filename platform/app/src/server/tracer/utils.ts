@@ -1,4 +1,4 @@
-import { safeUnflatten } from "~/utils/safeUnflatten";
+import { safeUnflatten } from "@langwatch/trace-contract";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { Span, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const {

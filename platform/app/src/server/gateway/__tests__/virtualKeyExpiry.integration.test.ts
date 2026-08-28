@@ -17,7 +17,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { loadTraceDestinationFacts, toVirtualKeySnakeDto } from "../virtualKey.dto";
+import { loadTraceDestinationFacts, toVirtualKeySnakeDto } from "@langwatch/gateway-server";
 import { VirtualKeyService } from "../virtualKey.service";
 
 const suffix = nanoid(8);

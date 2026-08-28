@@ -1,7 +1,7 @@
 /**
  * The app process's declaring procedure builders, composed.
  *
- * The builder itself is `@langwatch/trpc`'s: after `.input()` it exposes only
+ * The builder itself is `@langwatch/api/trpc`'s: after `.input()` it exposes only
  * the declaring methods and no `.query` / `.mutation`, so an undeclared
  * procedure does not compile. What is decided here is which concrete
  * middlewares the chain installs and which request context a hand-written
@@ -11,7 +11,7 @@ import {
   createIsPublicProcedure,
   createPermissionProcedureBuilder,
   type TrpcPolicyChainMiddlewares,
-} from "@langwatch/trpc";
+} from "@langwatch/api/trpc";
 import {
   checkDeclaredPermission,
   checkDeclaredPermissionAny,

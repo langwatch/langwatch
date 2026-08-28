@@ -9,7 +9,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { env } from "~/env.mjs";
-import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
+import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { createServiceApp } from "~/server/api/security";
 import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";

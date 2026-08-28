@@ -1,618 +1,269 @@
+/**
+ * Process wiring for the `workflow.*` and `optimization.*` tRPC surfaces.
+ *
+ * Both transports are package-owned — `WorkflowTrpcApi` and
+ * `WorkflowOptimizationTrpcApi` in `@langwatch/workflow-server`, mounted
+ * through `@langwatch/platform-api/app-trpc`. What is left here is the
+ * composition this application still owns: its tRPC root, its authenticated
+ * procedure, its authorization middlewares, the workflow-adjacent rows the
+ * workflow service does not read yet, the model call behind commit-message
+ * generation, and the nurturing signal a new workflow fires.
+ *
+ * `copyWorkflowWithDatasets` and `saveOrCommitWorkflowVersion` stay exported
+ * here: the experiments router and the evaluator workflow replication call
+ * them directly, and both take this application's request context.
+ */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import { pMapLimited } from "@langwatch/eventing";
+import { featureByKey, type ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import {
-  workflowApiEngineModeInputSchema,
-  workflowApiGetByIdInputSchema,
-  workflowApiGetVersionsInputSchema,
-} from "@langwatch/platform-api-contract";
+  createWorkflowOptimizationTrpcRouter,
+  createWorkflowTrpcRouter,
+  declaredCheckFrom,
+} from "@langwatch/platform-api/app-trpc";
+import {
+  mergeLocalConfigsIntoDsl,
+  parseStudioWorkflow,
+  studioWorkflowSchema,
+  type StudioWorkflow,
+  type WorkflowService,
+  type WorkflowVersion,
+} from "@langwatch/workflow-contract";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
-import { z } from "zod";
-import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
+import type { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
+import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import {
-  WorkflowNotFoundError,
-  WorkflowVersionNotFoundError,
-  type WorkflowVersionHistoryEntry,
-  type WorkflowService,
-  type WorkflowVersion,
-  type WorkflowWithVersion,
-} from "@langwatch/workflow-contract";
-import { captureException } from "~/utils/posthogErrorCapture";
-import {
-  parseStudioWorkflow,
-  type StudioWorkflow,
-  studioWorkflowSchema,
-} from "@langwatch/workflow-contract";
-import { migrateDSLVersion } from "@langwatch/workflow-contract";
-import {
-  clearDsl,
-  mergeLocalConfigsIntoDsl,
-  recursiveAlphabeticallySortedKeys,
-} from "@langwatch/workflow-contract";
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "~/server/app-layer/authz/trpc-middleware";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
-import { featureByKey, type ModelProviderService } from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import type { TRPCContext } from "../trpc.context";
+import { appTrpcRoot } from "../trpc.root";
+import {
+  auditLogMutations,
+  authProtectedProcedure,
+  enforcePermissionCheck,
+  handledErrorMiddleware,
+  loggerMiddleware,
+  tracerMiddleware,
+} from "../trpc.runtime-policy";
+import { scopeLineageGuard } from "../trpc.scope-lineage-middleware";
 
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
-export const workflowRouter = createTRPCRouter({
-  // Returns which NLP engine is active for the current project. Used by the
-  // Studio UI reads this to hide the (now-defunct) Optimize button.
-  // Optimization was DSPy-only and the Go engine never included DSPy, so
-  // with nlpgo the only engine the button is always hidden. Kept as a
-  // procedure (rather than a UI constant) so the studio handlers and the
-  // UI agree on one source of truth.
-  engineMode: protectedProcedure
-    .input(workflowApiEngineModeInputSchema)
-    .permission("workflows:view")
-    .query(() => {
-      return {
-        engineMode: "go" as const,
-        optimizeEnabled: false as const,
-      };
-    }),
+/** This process's concrete policy chain, in the order the mounts apply it. */
+const middlewares: AppTrpcPolicyMiddlewares = {
+  tracer: tracerMiddleware,
+  logger: loggerMiddleware,
+  handledError: handledErrorMiddleware,
+  scopeLineageGuard,
+  declaredCheck: declaredCheckFrom({
+    permission: checkDeclaredPermission,
+    permissionAny: checkDeclaredPermissionAny,
+    noPermission: declaredNoPermission,
+    serviceAuthorized: declaredServiceAuthorization,
+  }),
+  enforceCheck: enforcePermissionCheck,
+  auditMutations: auditLogMutations,
+};
 
-  create: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        dsl: studioWorkflowSchema,
-        commitMessage: z.string(),
-        publish: z.boolean().optional(), // Auto-publish the first version (useful for evaluator workflows)
-      }),
-    )
-    .permission("workflows:create")
-    .mutation(async ({ ctx, input }) => {
-      const workflowId = `workflow_${nanoid()}`;
-      const dsl = await prepareWorkflowDsl({
-        projectId: input.projectId,
-        modelProviders: ctx.app.modelProviders,
-        dsl: { ...input.dsl, workflow_id: workflowId },
-      });
-      const { workflow, version } = await ctx.app.workflows.create({
-        id: workflowId,
-        projectId: input.projectId,
-        dsl,
-        commitMessage: input.commitMessage,
-        publish: input.publish,
-        authorId: ctx.session.user.id,
-      });
+/** The feature transports are typed against their own context; this is ours. */
+const appContext = (ctx: unknown) => ctx as TRPCContext;
 
-      void ctx.app.workflows
-        .list({ projectId: input.projectId })
-        .then((workflows) => {
-          fireWorkflowCreatedNurturing({
-            userId: ctx.session.user.id,
-            workflowCount: workflows.length,
-            workflowId: workflow.id,
-            projectId: input.projectId,
-          });
-        })
-        .catch(captureException);
-
-      return { workflow, version };
-    }),
-
-  copy: protectedProcedure
-    .input(
-      z.object({
-        workflowId: z.string(),
-        projectId: z.string(),
-        sourceProjectId: z.string(),
-        copyDatasets: z.boolean().optional(),
-      }),
-    )
-    .permission("workflows:create")
-    .mutation(async ({ ctx, input }) => {
-      // Check that the user has at least workflows:create permission on the source project
-      const hasSourcePermission = await probeProjectPermission(
-        ctx,
-        input.sourceProjectId,
-        "workflows:create",
-      );
-
-      if (!hasSourcePermission) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You do not have permission to create workflows in the source project",
-        });
-      }
-
-      const { workflow, version } = await ctx.app.workflows.copy({
-        sourceWorkflowId: input.workflowId,
-        targetProjectId: input.projectId,
-        sourceProjectId: input.sourceProjectId,
-        copyDatasets: input.copyDatasets,
-        copiedFromWorkflowId: input.workflowId,
-        authorId: ctx.session.user.id,
-      });
-      return { workflow, version };
-    }),
-  getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("workflows:view")
-    .query(async ({ ctx, input }) => {
-      const workflows = await ctx.prisma.workflow.findMany({
-        where: { projectId: input.projectId, archivedAt: null },
-        orderBy: { updatedAt: "desc" },
+/** The copy-lineage selection `workflow.getAll` redacts against permissions. */
+const copyLineageSelect = {
+  id: true,
+  projectId: true,
+  name: true,
+  icon: true,
+  description: true,
+  createdAt: true,
+  updatedAt: true,
+  latestVersionId: true,
+  currentVersionId: true,
+  publishedId: true,
+  publishedById: true,
+  archivedAt: true,
+  isEvaluator: true,
+  isComponent: true,
+  copiedFromWorkflowId: true,
+  copiedFrom: {
+    select: {
+      id: true,
+      name: true,
+      projectId: true,
+      project: {
         select: {
           id: true,
-          projectId: true,
           name: true,
-          icon: true,
-          description: true,
-          createdAt: true,
-          updatedAt: true,
-          latestVersionId: true,
-          currentVersionId: true,
-          publishedId: true,
-          publishedById: true,
-          archivedAt: true,
-          isEvaluator: true,
-          isComponent: true,
-          copiedFromWorkflowId: true,
-          copiedFrom: {
+          team: {
             select: {
               id: true,
               name: true,
-              projectId: true,
-              project: {
+              organization: {
                 select: {
                   id: true,
                   name: true,
-                  team: {
-                    select: {
-                      id: true,
-                      name: true,
-                      organization: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
-                    },
-                  },
                 },
               },
             },
           },
-          copiedWorkflows: {
-            where: { archivedAt: null },
-            select: { projectId: true },
+        },
+      },
+    },
+  },
+  copiedWorkflows: {
+    where: { archivedAt: null },
+    select: { projectId: true },
+  },
+} as const;
+
+/** Where one copy lives, for the "org / team / project" path shown beside it. */
+const copyPathSelect = {
+  id: true,
+  name: true,
+  projectId: true,
+  project: {
+    select: {
+      id: true,
+      name: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      });
+      },
+    },
+  },
+} as const;
 
-      const relatedProjectIds = [
-        ...new Set(
-          workflows.flatMap((workflow) => [
-            ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
-            ...workflow.copiedWorkflows.map((copy) => copy.projectId),
-          ]),
-        ),
-      ];
-      // Each related project needs its own RBAC check; cap concurrency so a
-      // workflow with many copies can't exhaust the DB connection pool.
-      const visibleProjects = new Map<string, boolean>();
+export const workflowRouter = createWorkflowTrpcRouter({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares,
+  ports: {
+    hasProjectPermission: (ctx, input) =>
+      probeProjectPermission(appContext(ctx), input.projectId, input.permission),
+
+    // Each related project needs its own RBAC check; cap concurrency so a
+    // workflow with many copies can't exhaust the DB connection pool.
+    hasProjectPermissions: async (ctx, input) => {
+      const permitted = new Map<string, boolean>();
       await pMapLimited({
-        items: relatedProjectIds,
+        items: [...input.projectIds],
         concurrency: 5,
         fn: async (projectId) => {
-          const isVisible =
-            projectId === input.projectId ||
-            (await probeProjectPermission(ctx, projectId, "workflows:view"));
-          visibleProjects.set(projectId, isVisible);
-        },
-      });
-
-      return workflows.map(({ copiedWorkflows, ...workflow }) => {
-        const canSeeSource =
-          workflow.copiedFrom && visibleProjects.get(workflow.copiedFrom.projectId);
-        return {
-          ...workflow,
-          copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
-          copiedFrom: canSeeSource ? workflow.copiedFrom : null,
-          _count: {
-            copiedWorkflows: copiedWorkflows.filter((copy) => visibleProjects.get(copy.projectId))
-              .length,
-          },
-        };
-      });
-    }),
-
-  getCopies: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-      }),
-    )
-    .permission("workflows:view")
-    .query(async ({ ctx, input }) => {
-      // Find the workflow by ID and projectId (Prisma requires projectId in where clause)
-      const workflow = await ctx.prisma.workflow.findFirst({
-        where: {
-          id: input.workflowId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-      });
-
-      if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
-
-      // Verify the user has view permission on the workflow's project
-      const hasPermission = await probeProjectPermission(ctx, workflow.projectId, "workflows:view");
-
-      if (!hasPermission) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You do not have permission to view this workflow",
-        });
-      }
-
-      // Query copies through the relation to avoid projectId requirement in findMany
-      const workflowWithCopies = await ctx.prisma.workflow.findUnique({
-        where: {
-          id: input.workflowId,
-          projectId: input.projectId,
-        },
-        select: {
-          id: true,
-          copiedWorkflows: {
-            where: {
-              archivedAt: null,
-            },
-            select: {
-              id: true,
-              name: true,
-              projectId: true,
-              project: {
-                select: {
-                  id: true,
-                  name: true,
-                  team: {
-                    select: {
-                      id: true,
-                      name: true,
-                      organization: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-
-      if (!workflowWithCopies) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
-
-      const copies = workflowWithCopies.copiedWorkflows;
-
-      // Filter copies based on user's workflows:update permission
-      const copiesWithPermissions = await Promise.all(
-        copies.map(async (copy) => {
-          const hasPermission = await probeProjectPermission(
-            ctx,
-            copy.projectId,
-            "workflows:update",
+          permitted.set(
+            projectId,
+            await probeProjectPermission(appContext(ctx), projectId, input.permission),
           );
-          return {
-            id: copy.id,
-            name: copy.name,
-            projectId: copy.projectId,
-            projectName: copy.project.name,
-            teamName: copy.project.team.name,
-            organizationName: copy.project.team.organization.name,
-            fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
-            hasPermission,
-          };
-        }),
-      );
-
-      // Only return copies where user has permission
-      const filteredCopies = copiesWithPermissions.filter((copy) => copy.hasPermission);
-
-      // If no copies found but copies exist, it means user doesn't have permission on any of them
-      if (filteredCopies.length === 0 && copies.length > 0) {
-        // Return empty array - the UI will show "No copies found"
-        // This is expected if user doesn't have workflows:update permission on copy projects
-        return [];
-      }
-
-      return filteredCopies;
-    }),
-
-  getById: protectedProcedure
-    .input(workflowApiGetByIdInputSchema)
-    .permission("workflows:view")
-    .query(async ({ ctx, input }): Promise<WorkflowWithVersion> => {
-      let workflow;
-      try {
-        workflow = await ctx.app.workflows.getById({
-          id: input.workflowId,
-          projectId: input.projectId,
-          includeVersion: true,
-        });
-      } catch (error) {
-        if (error instanceof WorkflowNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
-
-      // Handled, like the same failure already is in `runWorkflow.ts`. As a
-      // bare `TRPCError` this crossed the boundary as prose, so the client had
-      // no code to key copy off: the studio's error card fell back to the
-      // caller's generic headline, printed the humanised slug underneath it,
-      // and — because an unrecognised code is not something the reader can be
-      // told how to fix — offered them an error id for a workflow that had
-      // simply been deleted.
-      if (workflow.currentVersion) {
-        workflow.currentVersion.dsl = migrateDSLVersion(workflow.currentVersion.dsl);
-      }
-
-      return workflow;
-    }),
-
-  getVersions: protectedProcedure
-    .input(workflowApiGetVersionsInputSchema)
-    .permission("workflows:view")
-    .query(async ({ ctx, input }): Promise<WorkflowVersionHistoryEntry[]> => {
-      try {
-        return await ctx.app.workflows.getVersionHistory({
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-          mode:
-            input.returnDSL === true
-              ? "allDsl"
-              : input.returnDSL === "previousVersion"
-                ? "previousDsl"
-                : "metadata",
-        });
-      } catch (error) {
-        if (!(error instanceof WorkflowNotFoundError)) throw error;
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
-    }),
-
-  restoreVersion: protectedProcedure
-    .input(z.object({ projectId: z.string(), versionId: z.string() }))
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      try {
-        return await ctx.app.workflows.restoreVersion({
-          versionId: input.versionId,
-          projectId: input.projectId,
-        });
-      } catch (error) {
-        if (
-          !(error instanceof WorkflowVersionNotFoundError) &&
-          !(error instanceof WorkflowNotFoundError)
-        ) {
-          throw error;
-        }
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message:
-            error instanceof WorkflowVersionNotFoundError
-              ? "Workflow version not found"
-              : "Workflow not found",
-        });
-      }
-    }),
-
-  autosave: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        dsl: studioWorkflowSchema,
-        setAsLatestVersion: z.boolean(),
-      }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      const updatedVersion = await saveOrCommitWorkflowVersion({
-        ctx,
-        input,
-        autoSaved: true,
-        commitMessage: "Autosaved",
-        setAsLatestVersion: input.setAsLatestVersion,
-      });
-
-      return updatedVersion;
-    }),
-
-  commitVersion: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        commitMessage: z.string(),
-        dsl: studioWorkflowSchema,
-      }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      const newVersion = await saveOrCommitWorkflowVersion({
-        ctx,
-        input,
-        autoSaved: false,
-        commitMessage: input.commitMessage,
-      });
-
-      return newVersion;
-    }),
-
-  publish: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        versionId: z.string(),
-      }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      return ctx.app.workflows.publish({
-        id: input.workflowId,
-        projectId: input.projectId,
-        versionId: input.versionId,
-        actorId: ctx.session.user.id,
-      });
-    }),
-
-  unpublish: protectedProcedure
-    .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      return ctx.app.workflows.unpublish({
-        id: input.workflowId,
-        projectId: input.projectId,
-      });
-    }),
-
-  syncFromSource: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-      }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      // Get the workflow and check if it has a source
-      const workflow = await ctx.prisma.workflow.findUnique({
-        where: {
-          id: input.workflowId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        include: {
-          latestVersion: true,
-          copiedFrom: {
-            include: {
-              latestVersion: true,
-            },
-          },
         },
       });
+      return permitted;
+    },
 
-      if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
+    prepareDsl: (ctx, input) =>
+      prepareWorkflowDsl({
+        projectId: input.projectId,
+        modelProviders: appContext(ctx).app.modelProviders,
+        dsl: input.dsl,
+      }),
 
-      if (!workflow.copiedFromWorkflowId || !workflow.copiedFrom) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This workflow is not a copy and has no source to sync from",
-        });
-      }
-
-      // Check if source workflow is archived
-      if (workflow.copiedFrom.archivedAt) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source workflow has been archived",
-        });
-      }
-
-      const sourceWorkflow = workflow.copiedFrom;
-
-      if (!sourceWorkflow?.latestVersion?.dsl) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source workflow or its latest version not found",
-        });
-      }
-
-      // Check that the user has at least workflows:view permission on the source project
-      const hasSourcePermission = await probeProjectPermission(
-        ctx,
-        sourceWorkflow.projectId,
-        "workflows:view",
-      );
-
-      if (!hasSourcePermission) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You do not have permission to view workflows in the source project",
-        });
-      }
-
-      // Calculate next version based on THIS copy's latest version (not the source's version)
-      const copyLatestVersion = workflow.latestVersion;
-      const [versionMajor] = (copyLatestVersion?.version ?? "0.0").split(".");
-      const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
-
-      // Deep clone DSL to ensure mutability
-      const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(sourceWorkflow.latestVersion.dsl)));
-
-      // Update the workflow_id to match the copied workflow
-      dsl.workflow_id = workflow.id;
-
-      // Create a new version with the source workflow's latest DSL
-      const version = await saveOrCommitWorkflowVersion({
-        ctx,
+    saveWorkflowVersion: (ctx, input) =>
+      saveOrCommitWorkflowVersion({
+        ctx: appContext(ctx) as unknown as WorkflowSaveContext,
         input: {
           projectId: input.projectId,
           workflowId: input.workflowId,
-          dsl: {
-            ...dsl,
-            version: nextVersion,
+          dsl: input.dsl,
+        },
+        autoSaved: input.autoSaved,
+        commitMessage: input.commitMessage,
+        ...(input.setAsLatestVersion === undefined
+          ? {}
+          : { setAsLatestVersion: input.setAsLatestVersion }),
+      }),
+
+    listWorkflowsWithCopyLineage: async (ctx, input) =>
+      await appContext(ctx).prisma.workflow.findMany({
+        where: { projectId: input.projectId, archivedAt: null },
+        orderBy: { updatedAt: "desc" },
+        select: copyLineageSelect,
+      }),
+
+    tryFindWorkflow: async (ctx, input) =>
+      // Prisma requires projectId in the where clause for a project-level model.
+      await appContext(ctx).prisma.workflow.findFirst({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+      }),
+
+    // Copies are queried through the relation so the findMany's projectId
+    // requirement does not force a single project on a cross-project read.
+    tryFindCopiesWithPath: async (ctx, input) => {
+      const workflowWithCopies = await appContext(ctx).prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+        },
+        select: {
+          id: true,
+          copiedWorkflows: {
+            where: {
+              archivedAt: null,
+            },
+            select: copyPathSelect,
           },
         },
-        autoSaved: false,
-        commitMessage: "Updated from source workflow",
       });
 
-      return { workflow, version };
-    }),
+      return workflowWithCopies ? workflowWithCopies.copiedWorkflows : null;
+    },
 
-  pushToCopies: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
+    tryFindWorkflowWithSource: async (ctx, input) =>
+      await appContext(ctx).prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        include: {
+          latestVersion: true,
+          copiedFrom: {
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
       }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ ctx, input }) => {
-      // Get the workflow (source) and check if it has copies
-      const workflow = await ctx.prisma.workflow.findUnique({
+
+    tryFindWorkflowWithCopies: async (ctx, input) =>
+      await appContext(ctx).prisma.workflow.findUnique({
         where: {
           id: input.workflowId,
           projectId: input.projectId,
@@ -629,185 +280,45 @@ export const workflowRouter = createTRPCRouter({
             },
           },
         },
+      }),
+
+    tryFindLatestVersionNumber: async (ctx, input) => {
+      const workflow = await appContext(ctx).prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+        },
+        include: {
+          latestVersion: true,
+        },
       });
 
-      if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
+      return workflow ? { version: workflow.latestVersion?.version ?? null } : null;
+    },
 
-      if (!workflow.latestVersion?.dsl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This workflow has no latest version to push",
-        });
-      }
-
-      if (workflow.copiedWorkflows.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This workflow has no copies to push to",
-        });
-      }
-
-      // Filter copies if copyIds is provided
-      const copiesToPush = input.copyIds
-        ? workflow.copiedWorkflows.filter((copy) => input.copyIds!.includes(copy.id))
-        : workflow.copiedWorkflows;
-
-      if (copiesToPush.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "No valid copies selected to push to",
-        });
-      }
-
-      // Deep clone DSL to ensure mutability
-      const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(workflow.latestVersion.dsl)));
-
-      const results = [];
-
-      // Push to each copy
-      for (const copy of copiesToPush) {
-        // Check that the user has workflows:update permission on the copy's project
-        const hasCopyPermission = await probeProjectPermission(
-          ctx,
-          copy.projectId,
-          "workflows:update",
-        );
-
-        if (!hasCopyPermission) {
-          // Skip copies where user doesn't have permission
-          continue;
-        }
-
-        // Fetch the copy's latest version to get its current version number
-        // Each copy maintains its own version history independently
-        const copyWithLatestVersion = await ctx.prisma.workflow.findUnique({
-          where: {
-            id: copy.id,
-            projectId: copy.projectId,
-          },
-          include: {
-            latestVersion: true,
-          },
-        });
-
-        if (!copyWithLatestVersion) {
-          continue;
-        }
-
-        // Calculate next version based on THIS copy's latest version (not the source's version)
-        const copyLatestVersion = copyWithLatestVersion.latestVersion;
-        const [versionMajor] = (copyLatestVersion?.version ?? "0.0").split(".");
-        const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
-
-        // Update the workflow_id to match the copy
-        const copyDsl = parseStudioWorkflow(JSON.parse(JSON.stringify(dsl)));
-        copyDsl.workflow_id = copy.id;
-
-        // Create a new version in the copy with the source's latest DSL
-        const version = await saveOrCommitWorkflowVersion({
-          ctx,
-          input: {
-            projectId: copy.projectId,
-            workflowId: copy.id,
-            dsl: {
-              ...copyDsl,
-              version: nextVersion,
-            },
-          },
-          autoSaved: false,
-          commitMessage: "Updated from source workflow",
-        });
-
-        results.push({ copyId: copy.id, copyName: copy.name, version });
-      }
-
-      if (results.length === 0) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You do not have permission to update any of the copied workflows",
-        });
-      }
-
-      return {
-        pushedTo: results.length,
-        totalCopies: workflow.copiedWorkflows.length,
-        selectedCopies: copiesToPush.length,
-        results,
-      };
-    }),
-
-  /**
-   * Gets entities related to a workflow for cascade archive warning.
-   * Returns linked evaluators, agents, and monitors that would be affected.
-   */
-  getRelatedEntities: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-      }),
-    )
-    .permission("workflows:view")
-    .query(async ({ ctx, input }) => {
-      // Find evaluators linked to this workflow
-      const evaluators = (
-        await ctx.app.evaluators.getAll({
-          projectId: input.projectId,
-        })
-      )
-        .filter((evaluator) => evaluator.workflowId === input.workflowId)
-        .map(({ id, name }) => ({ id, name }));
-
-      // Find agents linked to this workflow
-      const agents = await ctx.prisma.agent.findMany({
+    listAgentsForWorkflow: async (ctx, input) =>
+      await appContext(ctx).prisma.agent.findMany({
         where: {
           workflowId: input.workflowId,
           projectId: input.projectId,
           archivedAt: null,
         },
         select: { id: true, name: true },
-      });
-
-      // Find monitors linked to those evaluators
-      const evaluatorIds = evaluators.map((e) => e.id);
-      const monitors =
-        evaluatorIds.length > 0
-          ? await ctx.prisma.monitor.findMany({
-              where: {
-                evaluatorId: { in: evaluatorIds },
-                projectId: input.projectId,
-              },
-              select: { id: true, name: true, evaluatorId: true },
-            })
-          : [];
-
-      return { evaluators, agents, monitors };
-    }),
-
-  /**
-   * Archives a workflow and all related entities in a transaction.
-   * - Archives linked evaluators
-   * - Archives linked agents
-   * - Deletes monitors linked to evaluators (hard delete)
-   */
-  cascadeArchive: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        unarchive: z.boolean().optional(),
       }),
-    )
-    .permission("workflows:delete")
-    .mutation(async ({ ctx, input }) => {
+
+    listMonitorsForEvaluators: async (ctx, input) =>
+      await appContext(ctx).prisma.monitor.findMany({
+        where: {
+          evaluatorId: { in: [...input.evaluatorIds] },
+          projectId: input.projectId,
+        },
+        select: { id: true, name: true, evaluatorId: true },
+      }),
+
+    cascadeArchiveWorkflow: async (ctx, input) => {
       const now = input.unarchive ? null : new Date();
 
-      return ctx.prisma.$transaction(async (tx) => {
+      return appContext(ctx).prisma.$transaction(async (tx) => {
         // 1. Find all evaluators linked to this workflow
         const evaluators = await tx.evaluator.findMany({
           where: {
@@ -861,53 +372,13 @@ export const workflowRouter = createTRPCRouter({
           deletedMonitorsCount: deletedMonitors.count,
         };
       });
-    }),
+    },
 
-  archive: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        unarchive: z.boolean().optional(),
-      }),
-    )
-    .permission("workflows:delete")
-    .mutation(async ({ ctx, input }) => {
-      return ctx.app.workflows.archive({
-        id: input.workflowId,
-        projectId: input.projectId,
-        unarchive: input.unarchive,
-      });
-    }),
-
-  generateCommitMessage: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        prevDsl: studioWorkflowSchema,
-        newDsl: studioWorkflowSchema,
-      }),
-    )
-    .permission("workflows:update")
-    .mutation(async ({ input, ctx }) => {
-      const prevDsl_ = JSON.stringify(
-        recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
-        null,
-        2,
-      );
-      const newDsl_ = JSON.stringify(
-        recursiveAlphabeticallySortedKeys(clearDsl(input.newDsl)),
-        null,
-        2,
-      );
-      if (prevDsl_ === newDsl_) {
-        return "no changes";
-      }
-
+    generateCommitMessage: async (ctx, input) => {
       const diff = createPatch(
         "workflow.json",
-        prevDsl_,
-        newDsl_,
+        input.previousDsl,
+        input.nextDsl,
         "Previous Version",
         "New Version",
       );
@@ -928,8 +399,8 @@ export const workflowRouter = createTRPCRouter({
           model: await getVercelAIModel({
             projectId: input.projectId,
             featureKey: "workflows.commit_message",
-            modelProviders: ctx.app.modelProviders,
-            managedProviders: ctx.app.managedProviders,
+            modelProviders: appContext(ctx).app.modelProviders,
+            managedProviders: appContext(ctx).app.managedProviders,
           }),
           providerOptions: {
             openai: {
@@ -957,7 +428,7 @@ but the actual change that was made inside the fields with as few words as possi
               content: `
 Original File:
 \`\`\`json
-${prevDsl_}
+${input.previousDsl}
 \`\`\`
 
 Diff:
@@ -980,7 +451,79 @@ ${diff}
       // TODO: save call costs to user account
 
       return commitMessage.text.trim();
-    }),
+    },
+
+    workflowCreated: (_ctx, input) => fireWorkflowCreatedNurturing(input),
+    captureException: (error) => captureException(toError(error)),
+  },
+});
+
+/** Process transport mount for `optimization.*`; feature behaviour is package-owned. */
+export const optimizationRouter = createWorkflowOptimizationTrpcRouter({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares,
+  ports: {
+    // The studio's chat panel runs the workflow over the same public run
+    // endpoint an external caller uses, authenticated as the project.
+    runPublishedWorkflow: async (ctx, input) => {
+      const project = await appContext(ctx).prisma.project.findFirst({
+        where: { id: input.projectId },
+      });
+
+      const apiKey = project?.apiKey;
+
+      const response = await fetch(
+        `${process.env.BASE_HOST}/api/workflows/${input.workflowId}/run`,
+        {
+          method: "POST",
+          body: JSON.stringify(input.body),
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey && { "x-auth-token": apiKey }),
+          },
+        },
+      );
+
+      return await response.json();
+    },
+    tryGetWorkflow: async (ctx, input) =>
+      await appContext(ctx).prisma.workflow.findFirst({
+        where: { id: input.workflowId, projectId: input.projectId },
+      }),
+    tryGetWorkflowVersion: async (ctx, input) =>
+      await appContext(ctx).prisma.workflowVersion.findFirst({
+        where: { id: input.versionId, projectId: input.projectId },
+      }),
+    setWorkflowFlags: async (ctx, input) => {
+      await appContext(ctx).prisma.workflow.update({
+        where: { id: input.workflowId, projectId: input.projectId },
+        data: {
+          ...(input.isComponent === undefined ? {} : { isComponent: input.isComponent }),
+          ...(input.isEvaluator === undefined ? {} : { isEvaluator: input.isEvaluator }),
+        },
+      });
+    },
+    listPublishedComponents: async (ctx, input) => {
+      const workflows = await appContext(ctx).prisma.workflow.findMany({
+        where: {
+          projectId: input.projectId,
+          OR: [{ isComponent: true }, { isEvaluator: true }],
+        },
+        include: { versions: true },
+      });
+
+      // Each component carries only the version it publishes; the studio picks
+      // a component by its published shape, never by a draft.
+      workflows.forEach((workflow) => {
+        workflow.versions = workflow.versions.filter(
+          (version) => version.id === workflow.publishedId,
+        );
+      });
+
+      return workflows;
+    },
+  },
 });
 
 /**
@@ -1100,6 +643,13 @@ export const copyWorkflowWithDatasets = async ({
   return { workflowId: newWorkflow.id, dsl };
 };
 
+/** What `saveOrCommitWorkflowVersion` needs from the request context. */
+type WorkflowSaveContext = {
+  prisma: PrismaClient;
+  session: Session;
+  app: { workflows: WorkflowService; modelProviders: ModelProviderService };
+};
+
 export const saveOrCommitWorkflowVersion = async ({
   ctx,
   input,
@@ -1107,11 +657,7 @@ export const saveOrCommitWorkflowVersion = async ({
   commitMessage,
   setAsLatestVersion = true,
 }: {
-  ctx: {
-    prisma: PrismaClient;
-    session: Session;
-    app: { workflows: WorkflowService; modelProviders: ModelProviderService };
-  };
+  ctx: WorkflowSaveContext;
   input: {
     projectId: string;
     workflowId: string;

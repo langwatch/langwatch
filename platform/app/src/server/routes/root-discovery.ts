@@ -24,7 +24,6 @@ import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import {
   API_OPENAPI_PATH,
   LLMS_TXT_PATH,
-  RPC_DISCOVER_PATH,
   WELL_KNOWN_OPENAPI_PATH,
   WHY_DISCOVERY_IS_PUBLIC,
 } from "~/server/openapi/discovery-locations";
@@ -61,11 +60,6 @@ legacy; new integrations should use \`Authorization\`.
 
 - [OpenAPI document](${WELL_KNOWN_OPENAPI_PATH}): the complete machine-readable
   description of the REST API. Also served at \`${API_OPENAPI_PATH}\`.
-- [RPC catalogue](${RPC_DISCOVER_PATH}): POST for the index of API services,
-  each naming the URL of its own rpc.discover — the catalogue of that
-  service's RPC operations and their argument schemas, without reading the
-  whole document.
-
 ## Docs
 
 - [REST API guide](https://docs.langwatch.ai/integration/rest-api): how to get
@@ -85,9 +79,7 @@ const secured = createServiceApp({ basePath: "/" });
 const bothSpellings = (path: string) => [path, `${path}/`];
 
 for (const path of bothSpellings(WELL_KNOWN_OPENAPI_PATH)) {
-  secured
-    .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-    .get(path, respondWithApiDocument);
+  secured.access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC)).get(path, respondWithApiDocument);
 }
 
 for (const path of bothSpellings(LLMS_TXT_PATH)) {

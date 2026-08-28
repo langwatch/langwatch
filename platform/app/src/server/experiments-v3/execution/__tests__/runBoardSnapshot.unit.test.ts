@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import type { BoardResults } from "~/experiments-v3/execution/buildExecutionRequest";
 import { planBoardCarryOver } from "~/experiments-v3/execution/buildExecutionRequest";
 import type { TargetConfig } from "~/experiments-v3/types";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { buildCarriedOverDispatches } from "../orchestrator";
 import type { CarriedOverCell, ExecutionScope } from "../types";
 

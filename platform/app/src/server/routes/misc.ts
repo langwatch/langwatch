@@ -46,10 +46,7 @@ import {
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
 import type { ExperimentDspyStep } from "@langwatch/experiment-contract";
-import {
-  predefinedEventsSchemas,
-  predefinedEventTypes,
-} from "~/server/app-layer/events/predefinedEvents.schema";
+import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
 import {
   generateTrackedEventId,
   recordTrackedEventSpan,
@@ -94,7 +91,7 @@ import {
   experimentInitForbiddenSchema,
   experimentInitResponseSchema,
   handledErrorEnvelopeSchema,
-} from "./experiments-v3.schemas";
+} from "@langwatch/platform-api";
 import {
   acknowledgementSchema,
   analyticsTimeseriesResponseSchema,
@@ -1501,21 +1498,38 @@ const generateHash = (data: object) => {
   return crypto.createHash("md5").update(JSON.stringify(data)).digest("hex");
 };
 
+// A DSPy LLM call's `response` is a JSON dump of an arbitrary Python object,
+// so the contract types it as an opaque record. Cost accounting reads only the
+// OpenAI chat-completion fields below, and reads them through this schema so a
+// malformed dump produces no cost rather than a wrong one. `safeParse` keeps
+// the ingestion route accepting the payload either way.
+const dSPyLLMCallCostFieldsSchema = z.object({
+  model: z.string().optional(),
+  usage: z
+    .object({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+    })
+    .optional(),
+});
+
 const extractLLMCallInfo =
   (llmModelCosts: MaybeStoredLLMModelCost[]) =>
   (call: DSPyLLMCall): DSPyLLMCall => {
     if (call.__class__ === "dsp.modules.gpt3.GPT3" || call.response?.object === "chat.completion") {
-      const model = call.response?.model;
-      const llmModelCost = model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
-      const promptTokens = call.response?.usage?.prompt_tokens;
-      const completionTokens = call.response?.usage?.completion_tokens;
-      const cost =
-        llmModelCost &&
-        estimateCost({
-          llmModelCost,
-          inputTokens: promptTokens ?? 0,
-          outputTokens: completionTokens ?? 0,
-        });
+      const parsedCostFields = dSPyLLMCallCostFieldsSchema.safeParse(call.response);
+      const costFields = parsedCostFields.success ? parsedCostFields.data : undefined;
+      const model = costFields?.model;
+      const llmModelCost = model ? matchModelCostWithFallbacks(model, llmModelCosts) : undefined;
+      const promptTokens = costFields?.usage?.prompt_tokens;
+      const completionTokens = costFields?.usage?.completion_tokens;
+      const cost = llmModelCost
+        ? estimateCost({
+            llmModelCost,
+            inputTokens: promptTokens ?? 0,
+            outputTokens: completionTokens ?? 0,
+          })
+        : undefined;
       return {
         ...call,
         model,

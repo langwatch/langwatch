@@ -15,7 +15,7 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
     billingQueries: {
-      queryTraceSummariesTotalUniq: mockQueryTraceSummariesTotalUniq,
+      tryQueryTraceSummariesTotalUniq: mockQueryTraceSummariesTotalUniq,
     },
   }),
 }));
@@ -72,7 +72,7 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when queryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
+    describe("when tryQueryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
       it("reports the count as unknown, never 0", async () => {
         // Was "fails open with 0". The instinct was right and the mechanism
         // was not: a fabricated zero cannot be told apart from a real one, so
@@ -138,7 +138,7 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when queryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
+    describe("when tryQueryTraceSummariesTotalUniq returns null (ClickHouse unavailable)", () => {
       /** @scenario A partial per-project breakdown is reported as unknown, not as zeros */
       it("reports the whole set as unknown, not a zeroed project", async () => {
         // One unreachable project makes the set untrustworthy: a caller

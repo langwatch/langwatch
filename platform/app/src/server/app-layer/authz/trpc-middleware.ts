@@ -2,7 +2,7 @@
  * ADR-092 §5, delivery-plan decision 25 — the app's four declared authz
  * middlewares, composed.
  *
- * The middlewares themselves are `@langwatch/trpc`'s: the scope resolution,
+ * The middlewares themselves are `@langwatch/api/trpc`'s: the scope resolution,
  * the blank-versus-missing split, the denial shape and the `AUTHZ_DECLARATION`
  * descriptor the router sweep reads are framework policy that no process gets
  * to vary. What is decided here is the three things portable code cannot
@@ -16,7 +16,7 @@
  * migrated one by the engine, chosen by the organization's migration status
  * alone. There is no shadow comparison at request time.
  */
-import { createDeclaredAuthzMiddlewares } from "@langwatch/trpc";
+import { createDeclaredAuthzMiddlewares } from "@langwatch/api/trpc";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
 import type { App } from "../app";

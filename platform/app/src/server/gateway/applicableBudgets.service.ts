@@ -19,13 +19,13 @@ import type {
   GatewayBudgetSpendPort,
 } from "@langwatch/gateway-server";
 import { budgetPeriodFloorMs } from "@langwatch/gateway-server";
-import { resolveProviderLabels } from "@langwatch/gateway-server";
-import { scopeTargetKey } from "@langwatch/gateway-server";
+import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import type { ScopeInput } from "@langwatch/gateway-server";
-import type {
-  GatewayBudgetResolutionTarget,
-  GatewayResolvedBudget,
-  GatewayService,
+import {
+  scopeTargetKey,
+  type GatewayBudgetResolutionTarget,
+  type GatewayResolvedBudget,
+  type GatewayService,
 } from "@langwatch/gateway-contract";
 
 export type DraftVirtualKey = {

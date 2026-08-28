@@ -1,4 +1,4 @@
-import { createScopeLineageGuard } from "@langwatch/trpc";
+import { createScopeLineageGuard } from "@langwatch/api/trpc";
 import type { TRPCContext } from "./trpc.context";
 
 /**

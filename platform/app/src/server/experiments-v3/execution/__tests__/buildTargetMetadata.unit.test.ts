@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { promptLoadKey } from "../dataLoader";
 import { buildTargetMetadata } from "../orchestrator";
 

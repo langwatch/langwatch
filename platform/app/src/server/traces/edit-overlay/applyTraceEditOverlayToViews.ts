@@ -9,7 +9,7 @@
  * reaches here, by `redactPatchForViewer`.
  */
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { stringifySpanIO } from "~/server/tracer/spanIOStringify";
+import { stringifySpanIO } from "@langwatch/trace-contract";
 import {
   countRemovedSpans,
   expandDeletedSpanIds,

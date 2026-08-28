@@ -108,8 +108,23 @@ vi.mock("~/server/metrics", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { app } from "~/app/api/files/[[...route]]/app";
+import { createFilesRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { dualAuth } from "~/app/api/middleware/dual-auth";
+import { requireProjectPermission } from "~/server/auth/permissions";
+import { rateLimit } from "~/server/rateLimit";
 import type { StoredObject } from "~/server/stored-objects/stored-object";
+
+/** The family as the API router mounts it. */
+const app = createFilesRestApp({
+  security: appRestSecurity,
+  storedObjects: () => getApp().storedObjects,
+  storedObjectOwners: () => getApp().storedObjectOwners,
+  dualAuth,
+  requireProjectPermission,
+  rateLimit,
+}).hono;
 
 // ---------------------------------------------------------------------------
 // Helpers

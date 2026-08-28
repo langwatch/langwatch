@@ -1,4 +1,9 @@
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+import type {
+  DerivedTraceEvent,
+  SpanResourceInfo,
+  SpanSummaryRow,
+  TraceEventRollup,
+} from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
 import type { SpanInsertData } from "@langwatch/trace-contract";
@@ -55,27 +60,6 @@ export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
  */
 export const MAX_EVENT_NAMES_PER_TRACE = 12;
 
-/** One event name a trace recorded, with how often and when it first fired. */
-export interface TraceEventNameCount {
-  name: string;
-  count: number;
-  /** Epoch ms of the earliest event under this name — the display order. */
-  firstTimestamp: number;
-}
-
-/** A trace's events as the list renders them: named groups plus true totals. */
-export interface TraceEventRollup {
-  /**
-   * Ordered by first occurrence, at most {@link MAX_EVENT_NAMES_PER_TRACE}
-   * entries. Shorter than `distinctCount` when the trim bit.
-   */
-  names: TraceEventNameCount[];
-  /** Every event the trace recorded, counting names beyond the trim. */
-  totalCount: number;
-  /** Distinct event names the trace recorded, counting those beyond the trim. */
-  distinctCount: number;
-}
-
 export interface TraceEventRollupParams {
   tenantId: string;
   /** The visible page's trace ids. An empty list issues no query. */
@@ -86,44 +70,6 @@ export interface TraceEventRollupParams {
    * partitions rather than scanning every week including the cold tier.
    */
   timeRange: { from: number; to: number };
-}
-
-export interface SpanSummaryRow {
-  spanId: string;
-  parentSpanId: string | null;
-  spanName: string;
-  durationMs: number;
-  statusCode: number | null;
-  spanType: string | null;
-  /** Tool display name (`gen_ai.tool.name` ?? `tool_name`), tool spans only. */
-  toolName: string | null;
-  /** Claude model-call join key (`request_id`), llm_request spans only. */
-  requestId: string | null;
-  /** Claude prompt-pairing scope (`query_source`). */
-  querySource: string | null;
-  /** Tool-call join key (`tool_use_id` ?? `gen_ai.tool.call.id`). */
-  toolUseId: string | null;
-  model: string | null;
-  /**
-   * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise
-   * computed at read time from token counts × model pricing (same
-   * cascade the trace-level fold uses). Null when neither yields a
-   * value — most ingest paths only emit token counts, so without the
-   * computed fallback the waterfall never had a per-span cost to show.
-   */
-  cost: number | null;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  cacheReadTokens: number | null;
-  cacheCreationTokens: number | null;
-  startTimeMs: number;
-  /**
-   * Row version, not span timing: bumped every time a span is re-projected.
-   * The live delta poll keys off this rather than `startTimeMs`, because a
-   * span updated in place (end time, duration, status, cost) keeps its start
-   * time and a start-keyed poll could never see it.
-   */
-  updatedAtMs: number;
 }
 
 /**
@@ -148,20 +94,6 @@ export type LangwatchSignalBucket = (typeof LANGWATCH_SIGNAL_BUCKETS)[number];
 export interface SpanLangwatchSignalsRow {
   spanId: string;
   signals: LangwatchSignalBucket[];
-}
-
-/**
- * Raw OTel resource + scope info per span. The mapping to `Span` drops
- * `resourceAttributes` and `instrumentationScope`, so consumers (drawer
- * metadata, scope chip) need this dedicated read path.
- */
-export interface SpanResourceInfo {
-  spanId: string;
-  parentSpanId: string | null;
-  startTimeMs: number;
-  resourceAttributes: Record<string, string>;
-  scopeName: string | null;
-  scopeVersion: string | null;
 }
 
 /**

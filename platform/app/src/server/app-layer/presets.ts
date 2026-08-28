@@ -12,6 +12,7 @@ import {
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { PostgresAuthAdapter } from "@langwatch/auth-server";
 import { identityEmail, signUpVerification } from "~/server/app-layer/identity/runtime";
+import { PrismaIdentityReservationRepository } from "~/server/app-layer/identity/repositories/identity-reservations.prisma.repository";
 import { createAuth } from "~/server/better-auth";
 import {
   REPORT_SCHEDULER_TARGET_TYPE,
@@ -175,6 +176,7 @@ import { AuthzFeature } from "~/runtime/app/features/authz";
 import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
+import { AppDashboardGraphVisibilityPolicy } from "~/runtime/app/features/dashboard-graph-visibility-policy.adapter";
 import { PostgresScimAdapter } from "@langwatch/enterprise-scim-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
@@ -249,6 +251,7 @@ import {
   GatewayVirtualKeySpendAdapter,
   PrismaGatewayAdapter,
 } from "@langwatch/gateway-server";
+import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
@@ -345,6 +348,7 @@ import { BroadcastService } from "./broadcast/broadcast.service";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { resolveTracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
+import { resolveScenarioChildParentEnvironment } from "~/runtime/worker/scenario-child-parent.config";
 import {
   type AppConfig,
   createAppConfigFromEnv,
@@ -876,7 +880,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     projects,
     managedProviders,
     systemProviderEnvironment: process.env,
-    isSaas: env.IS_SAAS === "true",
+    isSaas: env.IS_SAAS === true,
     permissions: authzFeature.permissions,
   }).build();
 
@@ -888,6 +892,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       resolveClickHouseClient,
       modelProviders,
       langevalsEndpoint: config.langevals.endpoint ?? null,
+      langevalsPayload: config.langevals.payload,
     }),
     metrics: new AppTopicClusteringMetricsAdapter(),
   });
@@ -1211,6 +1216,8 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         });
       },
     },
+    graphVisibility: AppDashboardGraphVisibilityPolicy.create({ featureFlags, projects }),
+    langWatchQL,
   }).build();
   // Suite execution commands are registered after the Suite adapter is built.
   // Deferred dispatchers let the adapter's one run-state repository be shared
@@ -1385,6 +1392,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     analytics: analyticsService,
     resolveClickHouseClient,
     baseHost: config.baseHost,
+    nextauthSecret: env.NEXTAUTH_SECRET,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
@@ -1551,12 +1559,17 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const gatewayBudgetRepository = clickhouseEnabled
     ? GatewayBudgetLedgerAdapter.create(gatewayClickHouseResolver.resolve)
     : undefined;
+  const gatewayChanges = createGatewayChangeEventsPort(prisma);
+  const gatewayAudit = createGatewayAuditPort(prisma);
   const gatewayBudgetDecisions = PrismaGatewayAdapter.create({
     database: prisma,
     projects,
+    evaluators,
+    monitors,
+    changes: gatewayChanges,
+    audit: gatewayAudit,
     budgetSpend: gatewayBudgetRepository,
   }).build();
-  const gatewayChanges = createGatewayChangeEventsPort(prisma);
   const gatewayVirtualKeySpend = clickhouseEnabled
     ? GatewayVirtualKeySpendAdapter.create(gatewayClickHouseResolver.resolve)
     : undefined;
@@ -1661,14 +1674,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     events: governanceOcsfEventsRepository,
   }).build();
 
-  // The /governance activity-monitor read side (spend rollups, per-source
-  // events and health). Org-scoped aggregates, but the queries key on the
-  // hidden governance Project, so it takes the standard per-tenant resolver —
-  // getClickHouseClientForTenant maps a project id to its org's route.
-  const activityMonitorRepository = clickhouseEnabled
-    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
-    : undefined;
-
   // Billing-month usage rollups (billable_events + trace_summaries),
   // read by the billing pipeline and the usage-limit services.
   const billableEventsRepository = clickhouseEnabled
@@ -1760,7 +1765,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     },
     dataset,
     annotations,
+    mailer,
     baseHost: config.baseHost,
+    nextauthSecret: env.NEXTAUTH_SECRET,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
@@ -1978,7 +1985,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     },
     github: githubService,
     langy: {
-      buffer: langyTokenBuffer,
+      // Same non-null precondition as `redis` above: the buffer exists exactly
+      // when the connection does, and the registry demands both.
+      buffer: langyTokenBuffer!,
       handoffStore: langyHandoffStore,
       worker: langyWorker,
       titleGenerator: langyTitleGenerator,
@@ -2184,7 +2193,11 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       sessionKeys: langySessionKeys,
       context: { render: renderLangyTurnContext },
       metrics: {
-        count: ({ outcome }) => getLangyTurnsCounter(outcome).inc(),
+        // The counter's published label for a failed turn is `error`; Langy
+        // names the same outcome `failed`. Translate here rather than rename
+        // the label, which dashboards and alerts already key on.
+        count: ({ outcome }) =>
+          getLangyTurnsCounter(outcome === "failed" ? "error" : outcome).inc(),
       },
       accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
       handoffStore: redis ? langyHandoffStore : null,
@@ -2384,8 +2397,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const opsService = AppOpsRuntime.create({
     database: prisma,
     adminEmails: process.env.ADMIN_EMAILS ?? "",
-    redis,
+    redis: redis ?? undefined,
     users,
+    auth,
     scheduler: {
       repository: new PrismaScheduledJobStore(prisma),
       wake: redis ? RedisSchedulerWakeAdapter.create(redis) : NoopSchedulerWakeService.create(),
@@ -2396,7 +2410,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const replayRepo = redis ? new ReplayRedisRepository(redis) : new NullReplayRepository();
   const snapshots = redis ? RedisOpsSnapshotAdapter.create({ redis }) : null;
   snapshots?.start().catch((error) => {
-    logger.error({ error }, "Failed to start ops snapshot service");
+    createLogger("langwatch:app-layer:ops").error(
+      { error },
+      "Failed to start ops snapshot service",
+    );
   });
   const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
@@ -2643,7 +2660,7 @@ export function createTestApp(
       langwatchEndpoint: "http://localhost:5560",
       nlpServiceUrl: "http://localhost:5561",
       legacyDefaultModel: "openai/gpt-5",
-      childEnvironment: {},
+      childEnvironment: resolveScenarioChildParentEnvironment({}),
     },
     evaluationExecution: { defaultConcurrency: 10 },
     baseHost: "http://localhost:5560",
@@ -2767,16 +2784,64 @@ export function createTestApp(
     deriveBindingId: AuthzFeature.deriveGrantId,
     diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
   }).build();
+  // One adapter for the test app's Langy graph: `createSessionKeys` memoises,
+  // so the credential composition and the service share one session-key store.
+  const testLangyAdapter = PostgresLangyAdapter.create({ database: testPrisma });
+  const testLangySessionKeys = testLangyAdapter.createSessionKeys({
+    apiKeys,
+    authz: testAuthz.permissions,
+    metrics: AppLangySessionKeyMetricsAdapter.create(),
+  });
   const testGovernanceVirtualKeys = VirtualKeyService.create(
     testPrisma,
     testProjects,
     createProcessVirtualKeyCrypto({ virtualKeyPepper: "test-virtual-key-pepper" }),
   );
+  // Workflows, agents, evaluators and monitors are composed here rather than
+  // further down because Gateway's guardrail catalogue takes the evaluator and
+  // monitor services, and the gateway service is what the governance options
+  // below are built from.
+  const testDataset = AppDatasetRuntime.create({
+    database: testPrisma,
+  }).build();
+  const testWorkflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
+  const testWorkflows = AppWorkflowRuntime.create({
+    database: testPrisma,
+    datasets: testDataset,
+    projectEnvironment: AppWorkflowProjectEnvironmentPort.create({
+      database: testPrisma,
+      encryption: AppWorkflowEnvironmentEncryption.create(),
+    }),
+    llmParameters: AppWorkflowLlmParametersPort.create({
+      modelProviders,
+    }),
+    modelProviders,
+    nlpRuntime: testWorkflowNlpRuntime,
+  }).build();
+  const agents = AgentsFeature.create({
+    prisma: testPrisma,
+    session: null,
+    workflows: testWorkflows,
+  });
+  const testEvaluators = EvaluatorFeature.create({
+    prisma: testPrisma,
+    workflows: testWorkflows,
+    nlpRuntime: testWorkflowNlpRuntime,
+  });
+  const testMonitors = PostgresMonitorAdapter.create({
+    database: testPrisma,
+    evaluators: testEvaluators,
+    generateId: () => "monitor_test",
+  });
+  const testGatewayChanges = createGatewayChangeEventsPort(testPrisma);
   const testGatewayBudgetDecisions = PrismaGatewayAdapter.create({
     database: testPrisma,
     projects: testProjects,
+    evaluators: testEvaluators,
+    monitors: testMonitors,
+    changes: testGatewayChanges,
+    audit: createGatewayAuditPort(testPrisma),
   }).build();
-  const testGatewayChanges = createGatewayChangeEventsPort(testPrisma);
   const testGovernanceIngestionPullHost = AppGovernanceIngestionPullHost.create(
     testFeatureFlags,
     testAws,
@@ -2869,33 +2934,6 @@ export function createTestApp(
     projects: testProjects,
     billing: AppCodingAgentBillingPolicy.create(testGovernance),
   }).service;
-  const testDataset = AppDatasetRuntime.create({
-    database: testPrisma,
-  }).build();
-  const testWorkflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
-  const testWorkflows = AppWorkflowRuntime.create({
-    database: testPrisma,
-    datasets: testDataset,
-    projectEnvironment: AppWorkflowProjectEnvironmentPort.create({
-      database: testPrisma,
-      encryption: AppWorkflowEnvironmentEncryption.create(),
-    }),
-    llmParameters: AppWorkflowLlmParametersPort.create({
-      modelProviders,
-    }),
-    modelProviders,
-    nlpRuntime: testWorkflowNlpRuntime,
-  }).build();
-  const agents = AgentsFeature.create({
-    prisma: testPrisma,
-    session: null,
-    workflows: testWorkflows,
-  });
-  const testEvaluators = EvaluatorFeature.create({
-    prisma: testPrisma,
-    workflows: testWorkflows,
-    nlpRuntime: testWorkflowNlpRuntime,
-  });
   const testEvaluationService = AppEvaluationRuntime.create({
     resolveClickHouse: async () => ({
       insert: async () => undefined,
@@ -2910,11 +2948,6 @@ export function createTestApp(
     storedObjects: storedObjectsService,
     inputsOffloadConfig: evaluationInputsOffloadConfig,
   }).build();
-  const testMonitors = PostgresMonitorAdapter.create({
-    database: testPrisma,
-    evaluators: testEvaluators,
-    generateId: () => "monitor_test",
-  });
   const testSimulations = AppSimulationRuntime.create({
     clickhouseEnabled: false,
     resolveClient: async () => {
@@ -2982,6 +3015,7 @@ export function createTestApp(
     database: testPrisma,
     adminEmails: process.env.ADMIN_EMAILS ?? "",
     users: testUsers,
+    auth: testAuth,
     scheduler: {
       repository: new NullScheduledJobStore(),
       wake: NoopSchedulerWakeService.create(),
@@ -3137,6 +3171,11 @@ export function createTestApp(
           });
         },
       },
+      graphVisibility: AppDashboardGraphVisibilityPolicy.create({
+        featureFlags: testFeatureFlags,
+        projects: testProjects,
+      }),
+      langWatchQL: testLangWatchQL,
     }).build(),
     experiments: AppExperimentRuntime.create({
       database: testPrisma,
@@ -3214,7 +3253,7 @@ export function createTestApp(
         new OpsExplainClickHouseRepository(UnavailableOpsExplainClientResolver.create()),
       ),
     },
-    langy: PostgresLangyAdapter.create({ database: testPrisma }).build({
+    langy: testLangyAdapter.build({
       commands: {
         createConversation: noop,
         forkConversation: noop,
@@ -3265,9 +3304,9 @@ export function createTestApp(
         handoffStore: null,
       },
       credentials: createAppLangyCredentialComposition({
+        sessionKeys: testLangySessionKeys,
         prisma: testPrisma,
         virtualKeys: testGovernanceVirtualKeys,
-        apiKeys,
         github: testGithub,
         workerCallbackUrl:
           env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL,
@@ -3343,6 +3382,13 @@ export function createTestApp(
         completeEvaluation: noop,
         reportEvaluation: noop,
       } as AppCommands["evaluations"],
+      experimentRuns: {
+        startExperimentRun: noop,
+        recordTargetResult: noop,
+        recordEvaluatorResult: noop,
+        computeExperimentRunMetrics: noop,
+        completeExperimentRun: noop,
+      } as AppCommands["experimentRuns"],
       simulations: testSimulationCommands,
       suiteRuns: {
         startSuiteRun: noop,

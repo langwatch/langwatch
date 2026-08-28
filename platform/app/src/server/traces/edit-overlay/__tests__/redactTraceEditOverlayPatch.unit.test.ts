@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Span, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { applyOverlayToTrace } from "../applyTraceEditOverlay";
 import { redactPatchForViewer } from "../redactTraceEditOverlayPatch";
 import { restoreWithheldEdits } from "../restoreWithheldTraceEdits";

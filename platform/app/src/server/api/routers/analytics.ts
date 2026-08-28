@@ -13,12 +13,12 @@
  * analytics input schemas, the filter catalogue, the LangWatchQL rollout gate,
  * and the caller resolution the restricted executor runs as.
  */
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import {
   createAnalyticsTrpcRouter,
   createLangWatchQLTrpcRouter,
   createSavedWorkbenchChartTrpcRouter,
   declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
 } from "@langwatch/platform-api/app-trpc";
 import { MAX_LWQL_LENGTH } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";

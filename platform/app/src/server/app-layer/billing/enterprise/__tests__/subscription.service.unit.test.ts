@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../../../src/server/app-layer/app", () => ({
+vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({

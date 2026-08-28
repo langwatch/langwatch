@@ -14,9 +14,11 @@
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { app as publicApp } from "~/app/api/experiments/[[...route]]/app";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 import type { Project } from "~/generated/prisma/client";
+import { createExperimentsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { allRegisteredRoutes } from "@langwatch/platform-api/app-rest";
 import { policyPermissions } from "@langwatch/api";
 import { prisma } from "~/server/db";
@@ -25,6 +27,12 @@ import { getTestProject } from "~/utils/testUtils";
 import { app as workbenchApp } from "../experiments-v3";
 
 wireDefaultTestApp();
+
+/** The experiments family as the API router mounts it. */
+const publicApp = createExperimentsRestApp({
+  security: appRestSecurity,
+  experiments: () => getApp().experiments,
+}).hono;
 
 const stateNamed = (name: string): PersistedEvaluationsV3State =>
   ({

@@ -100,7 +100,7 @@ import {
   createAppAutomationTestGraphPorts,
 } from "~/runtime/app/features/automation";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { automationRouter } from "../automations";
+import { appRouter } from "../../root";
 
 // One mock prisma client shared by the tRPC ctx (per-request service
 // factories) and the app-level AutomationService the router reaches via
@@ -136,12 +136,17 @@ function createTestCaller() {
     req: undefined,
     res: undefined,
     prisma: mockPrismaClient,
+    // The transport is package-owned and reads its services off the request
+    // context, so the composed test App has to be ON the context rather than
+    // only in the global slot.
+    app: globalForApp.__langwatch_app,
+    actor: () => ({ id: "user_test_123" }),
     permissionChecked: false,
     publiclyShared: false,
     organizationRole: undefined,
   } as any;
 
-  return automationRouter.createCaller(ctx);
+  return appRouter.createCaller(ctx).automation;
 }
 
 function persistCapDependencies() {

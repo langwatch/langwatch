@@ -3,7 +3,7 @@
  *
  * Who may probe a stored object. The renderer asks this procedure why a media
  * element failed, so the gate has to match the one the bytes themselves are
- * served behind (`app/api/files/[[...route]]/app.ts` accepts traces:view OR
+ * served behind (the files REST family accepts traces:view OR
  * scenarios:view). When it was narrower, a viewer who could fetch a recording
  * could not find out why its player failed, and the player never left its
  * loading state.

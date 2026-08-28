@@ -1,4 +1,4 @@
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import superjson from "superjson";
 import type { TRPCContext } from "./trpc.context";
 import { errorFormatter } from "./trpc.error-formatter";

@@ -355,7 +355,9 @@ export function buildPreconditionTraceDataFromCommand({
     spanModels:
       data.spanModels ??
       spans
-        .map((span) => span.model)
+        // Only an LLM span carries a model; every other kind contributes
+        // nothing here, which the filter below drops.
+        .map((span) => ("model" in span ? span.model : undefined))
         .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: data.customMetadata ?? null,
     annotationIds: [], // Not available at command time

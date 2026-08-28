@@ -37,7 +37,6 @@ import {
   InvalidExperimentConfigurationError,
 } from "@langwatch/experiment-contract";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
-import { workbenchActorFrom } from "~/server/experiments-v3/workbench-actor";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import { requestAbort, runOrchestrator } from "~/server/experiments-v3/execution/orchestrator";
@@ -69,9 +68,10 @@ import {
   saveWorkbenchStateResponseSchema,
   staleWorkbenchStateErrorSchema,
   startRunResponseSchema,
+  workbenchActorFrom,
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
-} from "./experiments-v3.schemas";
+} from "@langwatch/platform-api";
 
 const logger = createLogger("langwatch:experiments-v3");
 

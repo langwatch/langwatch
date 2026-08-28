@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluationSchema } from "@langwatch/trace-contract";
-import { sharedTraceDtoSchema } from "../sharedTrace.schemas";
+import { sharedTraceDtoSchema } from "@langwatch/trace-contract";
 import {
   spanDetailSchema,
   spanTreeNodeSchema,

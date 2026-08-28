@@ -23,11 +23,8 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import {
-  createUserTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createUserTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import type { Auth0PasswordChangeOutcome } from "@langwatch/user-server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";

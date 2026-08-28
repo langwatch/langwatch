@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRetryAfterMessage } from "../rateLimitMessage";
+import { buildRetryAfterMessage } from "@langwatch/automation-server";
 
 describe("buildRetryAfterMessage", () => {
   describe("given a reset point several seconds in the future", () => {

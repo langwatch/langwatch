@@ -5,6 +5,10 @@ import { getStatePayloadSchema, runPayloadSchema } from "~/experiments-v3/action
 import type { WorkbenchState } from "~/experiments-v3/actions/transforms/types";
 import { isTransformError } from "~/experiments-v3/actions/transforms/types";
 import type { EvaluationResults } from "~/experiments-v3/types";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import { StaleWorkbenchStateError, type ExperimentService } from "@langwatch/experiment-contract";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import {
@@ -34,14 +38,28 @@ export interface BackendActionContext {
   experimentSlug?: string;
 }
 
+/**
+ * What a `run` action needs beyond the workbench itself. The browser path gets
+ * these from the request's App; the away path is handed them by its route, so
+ * nothing here reaches for a process global.
+ */
+export interface BackendRunServices {
+  evaluators: EvaluatorService;
+  modelProviders: ModelProviderService;
+  nlpLambda: NlpLambdaRuntime;
+  workflows: WorkflowService;
+}
+
 export async function executeBackendAction({
   experiments,
+  runServices,
   context,
   kind,
   definition,
   payload,
 }: {
   experiments: ExperimentService;
+  runServices: BackendRunServices;
   context: BackendActionContext;
   kind: string;
   definition: PageActionDefinition;
@@ -65,6 +83,7 @@ export async function executeBackendAction({
     case "run":
       return await startSavedStateRun({
         experiments,
+        runServices,
         context,
         slug,
         kind,
@@ -187,12 +206,14 @@ async function applyTransform({
 
 async function startSavedStateRun({
   experiments,
+  runServices,
   context,
   slug,
   kind,
   payload,
 }: {
   experiments: ExperimentService;
+  runServices: BackendRunServices;
   context: BackendActionContext;
   slug: string;
   kind: string;
@@ -201,6 +222,8 @@ async function startSavedStateRun({
   const parsed = runPayloadSchema.parse(payload);
 
   const prepared = await prepareSavedStateExecution({
+    experiments,
+    evaluators: runServices.evaluators,
     projectId: context.projectId,
     slug,
   });
@@ -225,6 +248,9 @@ async function startSavedStateRun({
     loadedAgents: prepared.loadedAgents,
     loadedEvaluators: prepared.loadedEvaluators,
     loadedWorkflows: prepared.loadedWorkflows,
+    modelProviders: runServices.modelProviders,
+    nlpLambda: runServices.nlpLambda,
+    workflows: runServices.workflows,
     defaultConcurrency: context.evaluationDefaultConcurrency,
     // The saved cells the run reuses rather than recomputes. A comparison
     // judging this column against another one reads the other one from here.

@@ -1,10 +1,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { TeamTrpcApi } from "@langwatch/organization-server";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-  isCustomRole,
-} from "~/server/api/enterprise";
+import { isCustomRole } from "~/server/api/enterprise";
 import type { TRPCContext } from "~/server/api/trpc.context";
 import { appTrpcRoot } from "~/server/api/trpc.root";
 import {

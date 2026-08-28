@@ -16,7 +16,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { Protections } from "../../../traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   applyLangWatchQLResultLimits,

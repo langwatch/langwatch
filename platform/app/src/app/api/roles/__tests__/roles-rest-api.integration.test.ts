@@ -26,12 +26,14 @@ import {
 } from "~/test-utils/managementApiOrg";
 import { getApp } from "~/server/app-layer/app";
 import { createRolesRestApp } from "@langwatch/platform-api";
-import { appRestManagement } from "~/server/api/management/managed-service";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { appRestSecurity } from "~/server/api/security";
 import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 
 const app = createRolesRestApp({
-  management: appRestManagement,
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("RBAC"),
   roles: () => getApp().roles,
   vocabulary: appRestRbacVocabulary,
   ledgerActor: orgRequestLedgerActor,

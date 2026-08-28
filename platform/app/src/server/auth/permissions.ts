@@ -26,7 +26,7 @@ export async function requireProjectPermission({
   projectId: string;
   permission: Permission;
 }): Promise<void> {
-  return getApp().permissions.requireProjectPermission({
+  return getApp().permissions.authorizeProjectPermission({
     userId,
     projectId,
     permission,

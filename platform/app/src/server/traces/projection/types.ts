@@ -15,7 +15,7 @@
 
 import { z } from "zod";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 
 /**
  * Entity roots the DSL can read `from`. Only "traces" ships in M1; the RFC

@@ -15,12 +15,6 @@ vi.mock("~/app/api/workflows/post_event/post-event", async () => ({
     (await import("./dispatchBoundary")).postEventToScript,
   ),
 }));
-vi.mock("~/optimization_studio/server/addEnvs", async () => ({
-  addEnvs: vi.fn((await import("./dispatchBoundary")).leaveEventAsItIs),
-}));
-vi.mock("~/optimization_studio/server/loadDatasets", async () => ({
-  loadDatasets: vi.fn((await import("./dispatchBoundary")).leaveEventAsItIs),
-}));
 
 import { executeCell, generateCells } from "../orchestrator";
 import type { EvaluationV3Event, ExecutionCell } from "../types";

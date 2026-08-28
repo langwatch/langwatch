@@ -18,7 +18,7 @@ const { getProjectModelProvidersMock } = vi.hoisted(() => ({
   getProjectModelProvidersMock: vi.fn(),
 }));
 
-vi.mock("../../../api/routers/modelProviders.utils", () => ({
+vi.mock("@langwatch/model-provider-server", () => ({
   getProjectModelProviders: getProjectModelProvidersMock,
 }));
 

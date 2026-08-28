@@ -8,10 +8,11 @@ import {
   type ReportTraceRow,
   type ReportSource,
   extractReportFromTriggerRow,
+  type Trigger,
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
-import type { Project, Trigger } from "~/generated/prisma/client";
+import type { Project } from "~/generated/prisma/client";
 import type { sendRenderedSlackMessage } from "~/runtime/app/features/automation-adapters/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
@@ -251,8 +252,8 @@ export async function dispatchScheduledReport({
       });
       if (allowed.length === 0) return false;
       const rendered = await renderTriggerEmail({
-        subjectTemplate: trigger.emailSubjectTemplate,
-        bodyTemplate: trigger.emailBodyTemplate,
+        subjectTemplate: trigger.templates.emailSubjectTemplate,
+        bodyTemplate: trigger.templates.emailBodyTemplate,
         context,
         defaults: REPORT_TRIGGER_DEFAULTS,
       });
@@ -269,7 +270,7 @@ export async function dispatchScheduledReport({
 
     if (trigger.action === "SEND_SLACK_MESSAGE") {
       const templateType: SlackTemplateType | null =
-        trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+        trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
 
       // ADR-041: a bot connection posts via the Web API with the gate open.
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
@@ -279,7 +280,7 @@ export async function dispatchScheduledReport({
         if (!token || !channel) return false;
         const rendered = await renderTriggerSlack({
           templateType,
-          template: trigger.slackTemplate,
+          template: trigger.templates.slackTemplate,
           context,
           defaults: REPORT_TRIGGER_DEFAULTS,
           allowGatedBlocks: true,
@@ -297,7 +298,7 @@ export async function dispatchScheduledReport({
       if (!webhook) return false;
       const rendered = await renderTriggerSlack({
         templateType,
-        template: trigger.slackTemplate,
+        template: trigger.templates.slackTemplate,
         context,
         defaults: REPORT_TRIGGER_DEFAULTS,
       });

@@ -9,7 +9,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import type { GetAllTracesForProjectOptions } from "~/server/traces/types";

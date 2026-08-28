@@ -31,11 +31,27 @@ vi.mock("~/server/api/utils", async (importOriginal) => ({
   getVisibilityCutoffMsForProject: vi.fn(async () => 0),
 }));
 
-import { readCodingAgentTranscriptWithProtections } from "../tracesV2";
+import { TracesV2TrpcApi } from "@langwatch/trace-server";
+import { createTraceViewReadPorts } from "~/runtime/app/features/trace";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const codingAgents = TestCodingAgentService.create();
+
+/**
+ * The reader now takes the application it reads through, and the ports the
+ * package does not own. The stores below are the mocked boundaries; the log
+ * visibility gate and the transcript derivation still run for real.
+ */
+const app = {
+  traces: {
+    spans: { getSpansByTraceId: mockGetSpansByTraceId },
+    logRecords: { getLogsByTraceId: mockGetLogsByTraceId },
+    canonicalisation: undefined,
+  },
+  codingAgents,
+} as never;
+const ports = createTraceViewReadPorts();
 
 function claudeLogRow(attributes: Record<string, string>, timeUnixMs: number) {
   return {
@@ -77,7 +93,9 @@ describe("readCodingAgentTranscriptWithProtections", () => {
         ),
       ]);
 
-      const transcript = await readCodingAgentTranscriptWithProtections({
+      const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
+        app,
+        ports,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
@@ -109,7 +127,9 @@ describe("readCodingAgentTranscriptWithProtections", () => {
         },
       ]);
 
-      const transcript = await readCodingAgentTranscriptWithProtections({
+      const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
+        app,
+        ports,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,

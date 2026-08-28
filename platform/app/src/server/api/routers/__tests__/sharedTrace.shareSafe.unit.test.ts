@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { Evaluation } from "@langwatch/trace-contract";
 import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redaction";
-import type { Protections } from "~/server/traces/protections";
 import {
   gateEvaluations,
   gateHeaderCost,
@@ -10,7 +9,8 @@ import {
   gateSessionCost,
   gateSessionTitle,
   gateTreeCost,
-} from "../tracesV2.gates";
+  type Protections,
+} from "@langwatch/trace-server";
 import type {
   SpanTreeNode,
   TraceHeader,

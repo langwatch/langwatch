@@ -34,7 +34,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "~/server/traces/protections";
+import type { Protections } from "@langwatch/trace-server";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
   applyEventProtections,

@@ -30,11 +30,13 @@ import {
 import { seedSsoConnection } from "~/test-utils/ssoConnection";
 import { getApp } from "~/server/app-layer/app";
 import { createScimTokensRestApp } from "@langwatch/platform-api";
-import { appRestManagement } from "~/server/api/management/managed-service";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { appRestSecurity } from "~/server/api/security";
 import { managementAuditPort } from "~/server/api/management/audit";
 
 const app = createScimTokensRestApp({
-  management: appRestManagement,
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("SCIM"),
   scim: () => getApp().scim,
   audit: managementAuditPort,
 });

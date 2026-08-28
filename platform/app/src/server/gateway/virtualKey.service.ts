@@ -24,7 +24,11 @@ import type {
   VirtualKeyRoutingMode,
 } from "~/generated/prisma/client";
 import type { GatewayAuditPort } from "@langwatch/gateway-server";
-import { serializeRowForAudit } from "@langwatch/gateway-server";
+import {
+  gatewayRoutingPolicySelect,
+  serializeRowForAudit,
+  type GatewayAuditJson,
+} from "@langwatch/gateway-server";
 import { nextResetAt } from "@langwatch/gateway-server";
 import type { GatewayChangeEventsPort } from "@langwatch/gateway-server";
 import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
@@ -496,7 +500,15 @@ export class VirtualKeyService {
             routingMode,
             revision: { increment: 1n },
           },
-          include: { scopes: true },
+          // The same projection the virtual-key port materialises. Without
+          // the two relations the row is not a `VirtualKeyWithScopes`: the
+          // update would answer a key whose principal and routing policy
+          // read as absent to everything downstream of it.
+          include: {
+            scopes: true,
+            principalUser: { select: { id: true, name: true, email: true } },
+            routingPolicy: { select: gatewayRoutingPolicySelect },
+          },
         });
 
         await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
@@ -850,7 +862,7 @@ export class VirtualKeyService {
    */
   private async upsertKeyBudget(
     args: {
-      virtualKey: VirtualKey;
+      virtualKey: VirtualKeyWithScopes;
       budget: VirtualKeyBudgetInput;
       actorUserId: string;
     },
@@ -957,7 +969,7 @@ export class VirtualKeyService {
     tx,
     include,
   }: {
-    vk: VirtualKey;
+    vk: VirtualKeyWithScopes;
     actorUserId: string;
     tx: Prisma.TransactionClient;
     include: "drawerManaged" | "scopedToKey";
@@ -1252,12 +1264,9 @@ function diffGuardrailAttachments(
   return { attached, detached };
 }
 
-function serialiseForAudit(vk: VirtualKey): Prisma.InputJsonValue {
+function serialiseForAudit(vk: VirtualKeyWithScopes): GatewayAuditJson {
   // Strip secret material. The base serializer already handles BigInt
   // (revision) safely — see auditSerializer.ts.
-  const { hashedSecret, previousHashedSecret, ...safe } = vk as VirtualKey & {
-    hashedSecret: string;
-    previousHashedSecret: string | null;
-  };
+  const { hashedSecret, previousHashedSecret, ...safe } = vk;
   return serializeRowForAudit(safe as unknown as Record<string, unknown>);
 }

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { TopicService } from "@langwatch/topic-contract";
-import type { EvaluationService, EvaluationSummary } from "@langwatch/evaluation-contract";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { resolveNonBilledCost } from "@langwatch/trace-contract";
 import {
   deriveTraceOrigin,
@@ -9,23 +9,30 @@ import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "@langwatch/trace-contract";
-import type {
-  BatchedFacetResult,
-  CategoricalFacetResult,
-  DiscreteFacetResult,
-  TraceListCursor,
-  TraceListReadPort,
-  TraceListSort,
-  TraceListSortColumn,
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+  type BatchedFacetResult,
+  type CategoricalFacetDescriptor,
+  type CategoricalFacetResult,
+  type DiscoverResult,
+  type DiscreteFacetResult,
+  type DynamicKeysFacetDescriptor,
+  type FacetDescriptor,
+  type FacetValuesResult,
+  type RangeFacetDescriptor,
+  type TraceListCursor,
+  type TraceListFacetCounts,
+  type TraceListItem,
+  type TraceListPage,
+  type TraceListReadPort,
+  type TraceListSort,
+  type TraceListSortColumn,
+  type TraceMediaRef,
 } from "@langwatch/trace-contract";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
-import {
-  parseMediaRefs,
-  RESERVED_INPUT_MEDIA_REFS,
-  RESERVED_OUTPUT_MEDIA_REFS,
-  type TraceMediaRef,
-} from "~/shared/traces/media-refs";
+import { parseMediaRefs } from "~/shared/traces/media-refs";
 import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
@@ -36,88 +43,6 @@ import type {
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { teaserOf } from "./visibility-window.service";
-
-export interface TraceListItem {
-  traceId: string;
-  timestamp: number;
-  name: string;
-  serviceName: string;
-  durationMs: number;
-  /** Grand list-price cost. `nonBilledCost` is the bundled (theoretical)
-   *  portion; billed = totalCost - nonBilledCost. */
-  totalCost: number;
-  nonBilledCost: number;
-  totalTokens: number;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  /**
-   * Cache + reasoning token sums folded onto the trace summary's reserved
-   * attribute keys. Null when the trace's model never reported them (no prompt
-   * caching, or a provider like Anthropic that emits no reasoning count). The
-   * list cell keeps showing the input+output delta; these drive the hover
-   * breakdown so a cached turn's true processed-token count is one hover away.
-   */
-  cacheReadTokens: number | null;
-  cacheCreationTokens: number | null;
-  reasoningTokens: number | null;
-  /**
-   * How full the context window already was when the trace's first model call
-   * ran. Deliberately not a sum: an agent turn re-sends its conversation on
-   * every call, so the summed cache reads above run into the millions while
-   * this stays the one number a reader means by "how big was my context".
-   */
-  contextSizeTokens: number | null;
-  models: string[];
-  /** Trace-level labels (the `langwatch.labels` attribute), decoded from
-   *  the JSON-encoded array stored on the summary. Empty when unset. */
-  labels: string[];
-  /** The managed prompt last used in the trace, for the Prompt column.
-   *  `promptId` filters by `lastUsedPrompt`; `promptVersionNumber` is the
-   *  displayed "v{N}". Both null when the trace used no managed prompt. */
-  promptId: string | null;
-  promptVersionNumber: number | null;
-  status: "ok" | "error" | "warning";
-  spanCount: number;
-  /**
-   * Stored payload size of the trace in bytes — the MATERIALIZED
-   * `_size_bytes` column on `trace_summaries` (see migration 00032). Drives
-   * the optional Size column and is sortable. 0 when the column is absent on
-   * older rows that have not yet had the value drift onto disk.
-   */
-  sizeBytes: number;
-  input: string | null;
-  output: string | null;
-  /** Compact fold-derived media refs for the winning IO; absent when media-free. */
-  inputMediaRefs?: TraceMediaRef[];
-  outputMediaRefs?: TraceMediaRef[];
-  error: string | null;
-  conversationId: string | null;
-  userId: string | null;
-  origin: string;
-  tokensEstimated: boolean;
-  ttft: number | null;
-  traceName: string;
-  rootSpanType: string | null;
-}
-
-export interface TraceListPage {
-  items: TraceListItem[];
-  totalHits: number;
-  evaluations: Record<string, EvaluationSummary[]>;
-  nextCursor: TraceListCursor | null;
-}
-
-interface FacetCounts {
-  origin: Record<string, number>;
-  status: Record<string, number>;
-  service: Record<string, number>;
-  model: Record<string, number>;
-  ranges: {
-    tokens: { min: number; max: number };
-    cost: { min: number; max: number };
-    latency: { min: number; max: number };
-  };
-}
 
 interface ListParams {
   tenantId: string;
@@ -158,19 +83,6 @@ interface SuggestParams {
 interface DiscoverParams {
   tenantId: string;
   timeRange: { from: number; to: number };
-}
-
-export interface DiscoverResult {
-  facets: FacetDescriptor[];
-  /**
-   * True when the cache was cold and a background compute was kicked
-   * off. Callers should treat this as a loading signal — the SSE
-   * `discover_updated` push will land the real values shortly. False
-   * means `facets` is the latest committed payload (possibly stale
-   * within the SWR window, with a background refresh already in
-   * flight).
-   */
-  pending: boolean;
 }
 
 interface FacetValuesParams {
@@ -366,79 +278,6 @@ function discoverCacheKey(
   return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
 }
 
-/**
- * Per-value result aggregates carried by the evaluator facet so the
- * sidebar inline-drilldown can render verdict pills, score-range
- * sliders, and hasLabel discriminators without firing a second query
- * per evaluator. Absent on other facets where it's not meaningful.
- */
-export interface EvaluatorValueAggregates {
-  passedCount: number;
-  failedCount: number;
-  erroredCount: number;
-  scoreMin: number | null;
-  scoreMax: number | null;
-  hasScore: boolean;
-  /** Count of distinct non-null score values. Lets the drilldown hide a
-   *  pointless score slider when the score is constant (1 distinct) or a
-   *  binary 0/1 that just mirrors the pass/fail verdict (2 distinct, ≤1). */
-  distinctScores: number;
-  hasLabel: boolean;
-  /** Top distinct emitted-label values + counts (capped to a small top-N).
-   *  The sidebar drilldown renders these as clickable `evaluatorLabel` filter
-   *  rows. Absent / empty when the evaluator emits no labels. */
-  labelValues?: { value: string; count: number }[];
-}
-
-interface CategoricalFacetDescriptor {
-  key: string;
-  kind: "categorical";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topValues: {
-    value: string;
-    label?: string;
-    count: number;
-    aggregates?: EvaluatorValueAggregates;
-  }[];
-  totalDistinct: number;
-}
-
-interface RangeFacetDescriptor {
-  key: string;
-  kind: "range";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  min: number;
-  max: number;
-  /** Present only for `isDiscrete`-flagged integer facets: the distinct values
-   *  + counts for the tick-list presentation, plus the true distinct count
-   *  (the sidebar shows the slider instead above its threshold). */
-  discrete?: {
-    values: { value: number; count: number }[];
-    distinctCount: number;
-  };
-}
-
-interface DynamicKeysFacetDescriptor {
-  key: string;
-  kind: "dynamic_keys";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topKeys: { value: string; count: number }[];
-  totalDistinct: number;
-}
-
-type FacetDescriptor =
-  | CategoricalFacetDescriptor
-  | RangeFacetDescriptor
-  | DynamicKeysFacetDescriptor;
-
-interface FacetValuesResult {
-  values: { value: string; label?: string; count: number }[];
-  totalDistinct: number;
-}
-
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
 function isExpressionCategorical(def: FacetDefinition): def is ExpressionCategoricalDef {
@@ -563,7 +402,7 @@ export class TraceListService {
     };
   }
 
-  async getFacets(params: FacetParams): Promise<FacetCounts> {
+  async getFacets(params: FacetParams): Promise<TraceListFacetCounts> {
     const facetPromises = Object.entries(FACET_EXPRESSIONS).map(async ([name, expression]) => {
       const result = await this.repository.findFacetCounts({
         tenantId: params.tenantId,

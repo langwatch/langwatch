@@ -14,11 +14,8 @@
  * records it — which is what keeps the surface declared rather than merely
  * unchecked.
  */
-import {
-  createApiKeyTrpcRouter,
-  declaredCheckFrom,
-  type AppTrpcPolicyMiddlewares,
-} from "@langwatch/platform-api/app-trpc";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createApiKeyTrpcRouter, declaredCheckFrom } from "@langwatch/platform-api/app-trpc";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import {
   checkDeclaredPermission,
