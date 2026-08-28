@@ -1,6 +1,10 @@
 [
   ".env.example",
   "apps/server/dist/",
+  "apps/server/src/",
+  "apps/api/",
+  "apps/ui/",
+  "apps/worker/",
   "packages/",
   "platform/app/",
   "services/langevals/",

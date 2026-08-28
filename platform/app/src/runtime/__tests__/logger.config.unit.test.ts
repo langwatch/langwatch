@@ -122,12 +122,12 @@ describe("legacy executable logger bootstrap order", () => {
     [
       "../../workers.ts",
       ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
-      ["./runtime/app/boot", "./instrumentation.node", "./server/handled-error-wiring"],
-    ],
-    [
-      "../../task.ts",
-      ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
-      ["./server/app-layer/app", "./tasks.generated"],
+      [
+        "./instrumentation.node",
+        "./server/handled-error-wiring",
+        "@langwatch/worker",
+        "./runtime/worker/legacy-worker.executable.adapter",
+      ],
     ],
     [
       "../../instrumentation.ts",
@@ -158,6 +158,28 @@ describe("legacy executable logger bootstrap order", () => {
       }
     },
   );
+
+  // `task.ts` no longer configures the logger itself, so it cannot carry an
+  // ordering row: the physical executable owns that and configures logging
+  // before it calls the injected executor. What the ordering row used to buy
+  // is now bought by the executor keeping the graph lazy — it is constructed
+  // in `task.ts` BEFORE the executable runs, so a module-scope import here
+  // would load the application graph before any logger exists.
+  describe("when the legacy task executor is constructed ahead of the executable", () => {
+    it("keeps every application graph module behind a call-time import", async () => {
+      const source = await readEntry("../task/legacy-platform-task.executor.ts");
+      const moduleScope = source.slice(0, source.indexOf("export class"));
+
+      for (const specifier of [
+        "~/server/app-layer/app",
+        "~/server/app-layer/presets",
+        "~/tasks.generated",
+      ]) {
+        expect(moduleScope).not.toContain(specifier);
+        expect(source).toContain(`await import("${specifier}")`);
+      }
+    });
+  });
 });
 
 async function readEntry(relativePath: string): Promise<string> {

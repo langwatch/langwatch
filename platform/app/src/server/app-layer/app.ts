@@ -398,6 +398,11 @@ export function tryGetApp(): App | null {
   return globalForApp.__langwatch_app;
 }
 
+/** Closes the optional legacy App from a process compatibility boundary. */
+export async function closeInitializedApp(): Promise<void> {
+  await tryGetApp()?.close();
+}
+
 export async function resetApp(): Promise<void> {
   // Close the previous App before dropping the singleton so its EventSourcing
   // and shutdown resources (Redis, queue workers, etc.) don't leak

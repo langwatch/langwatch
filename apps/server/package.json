@@ -25,12 +25,17 @@
     "langwatch-server": "dist/cli.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "type": "module",
   "main": "dist/cli.cjs",
   "exports": {
-    ".": "./dist/cli.cjs"
+    ".": "./dist/cli.cjs",
+    "./task": {
+      "types": "./src/task/task.executable.ts",
+      "default": "./src/task/task.executable.ts"
+    }
   },
   "scripts": {
     "build": "tsx scripts/build.ts",

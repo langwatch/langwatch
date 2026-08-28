@@ -15,6 +15,16 @@ describe("executable import boundaries", () => {
     }
   });
 
+  it("keeps task process boot in the physical local-orchestrator executable", () => {
+    const task = source("task.ts");
+
+    expect(task).toContain('await import("@langwatch/server/task")');
+    expect(task).toContain('await import("./runtime/task/legacy-platform-task.executor")');
+    expect(task).not.toContain("resolveProcessBootstrapConfig");
+    expect(task).not.toContain("configureLogger(");
+    expect(task).not.toContain("runStandaloneTaskWithPrisma");
+  });
+
   it("does not expose a resolved env singleton from the new boot seam", () => {
     const config = source("runtime/config.ts");
     const boot = source("runtime/app/boot.ts");
@@ -36,40 +46,38 @@ describe("executable import boundaries", () => {
   });
 
   it("configures process-wide setup before HTTP boot validation", () => {
-    for (const file of ["server.mts", "workers.ts"]) {
-      const code = source(file);
-      const bootConfig = code.indexOf("new AppBootConfigService().resolve(process.env)");
+    const server = source("server.mts");
+    const bootConfig = server.indexOf("new AppBootConfigService().resolve(process.env)");
 
-      expect(bootConfig).toBeGreaterThan(-1);
-      for (const setup of [
-        "configureLogger(bootstrap.logger)",
-        "setEnvironment(bootstrap.environment)",
-        "initializeInstrumentation(bootstrap.telemetry)",
-      ]) {
-        expect(code.indexOf(setup)).toBeGreaterThan(-1);
-        expect(code.indexOf(setup)).toBeLessThan(bootConfig);
-      }
+    expect(bootConfig).toBeGreaterThan(-1);
+    for (const setup of [
+      "configureLogger(bootstrap.logger)",
+      "setEnvironment(bootstrap.environment)",
+      "initializeInstrumentation(bootstrap.telemetry)",
+    ]) {
+      expect(server.indexOf(setup)).toBeGreaterThan(-1);
+      expect(server.indexOf(setup)).toBeLessThan(bootConfig);
     }
   });
 
-  it("keeps worker boot validation inside its structured startup error path", () => {
+  it("keeps worker composition inside its structured startup error path", () => {
     const workers = source("workers.ts");
-    const startupTry = workers.indexOf("try {\n    // Keep process-wide observability");
-    const bootConfig = workers.indexOf("new AppBootConfigService().resolve(process.env)");
+    const startupTry = workers.indexOf("try {");
+    const boot = workers.indexOf("await WorkerExecutable.boot({");
     const structuredFailureLog = workers.indexOf(
       'logger.error({ error }, "failed to start background workers")',
     );
 
     expect(startupTry).toBeGreaterThan(-1);
-    expect(bootConfig).toBeGreaterThan(startupTry);
-    expect(structuredFailureLog).toBeGreaterThan(bootConfig);
+    expect(boot).toBeGreaterThan(startupTry);
+    expect(structuredFailureLog).toBeGreaterThan(boot);
   });
 
   it("constructs workers through the external runtime seam", () => {
     const workers = source("workers.ts");
 
-    expect(workers).toContain('await import("@langwatch/worker/runtime")');
-    expect(workers).toContain('await import("./runtime/worker/legacy-worker.adapter")');
+    expect(workers).toContain('await import("@langwatch/worker")');
+    expect(workers).toContain('await import("./runtime/worker/legacy-worker.executable.adapter")');
     expect(workers).not.toContain('await import("./runtime/worker")');
   });
 });

@@ -1084,8 +1084,6 @@
     ["platform/app/src/server/traces/trace.service.ts", "getApp", "reference", "d5019885f6c28dc9"],
     ["platform/app/src/server/utils/ttlCache.ts", "tryGetApp", "import", "4bcd0b232144f4a7"],
     ["platform/app/src/server/utils/ttlCache.ts", "tryGetApp", "reference", "31b4d4aec17ba4b1"],
-    ["platform/app/src/task.ts", "tryGetApp", "import", "115ed12424f3a267"],
-    ["platform/app/src/task.ts", "tryGetApp", "reference", "2745a51f01daacc5"],
     [
       "platform/app/src/tasks/backfillAnnotationsToClickhouse.ts",
       "getApp",
