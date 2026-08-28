@@ -43,6 +43,31 @@ function sessionFor(userId: string | undefined): Session | null {
 }
 
 /**
+ * The calling API key, for the second half of the write ceiling.
+ *
+ * `assertCanWriteScope` resolved the OWNER's permissions and nothing else, so
+ * a narrowly-scoped key belonging to an admin wrote organization-wide model
+ * defaults: the admin held `organization:manage`, and no one asked what the
+ * key held. Passing the credential makes the guard demand it of both.
+ *
+ * Null for a legacy project key, which sets no `apiKeyId` — that class
+ * carries full project access by design and has no per-permission ceiling
+ * anywhere else either (`enforceApiKeyCeiling` returns immediately for it).
+ */
+function credentialFor(c: {
+  get: (key: string) => unknown;
+}): { apiKeyId: string; userId: string | null; organizationId: string } | null {
+  const apiKeyId = c.get("apiKeyId") as string | undefined;
+  const organizationId = c.get("apiKeyOrganizationId") as string | undefined;
+  if (!apiKeyId || !organizationId) return null;
+  return {
+    apiKeyId,
+    userId: (c.get("apiKeyUserId") as string | undefined) ?? null,
+    organizationId,
+  };
+}
+
+/**
  * Uniform error mapping for the default-model write handlers: a typed
  * HTTPException (e.g. the 404 orphan-config ownership backstop) and any
  * HandledError (the app's onError serialises those with their own status
@@ -140,7 +165,11 @@ export function registerModelDefaultsRoutes(
         // Authz: every target scope must pass the caller's manage check.
         for (const s of body.scopes) {
           await assertCanWriteScope(
-            { prisma, session: sessionFor(userId) },
+            {
+              prisma,
+              session: sessionFor(userId),
+              credential: credentialFor(c),
+            },
             s.scopeType,
             s.scopeId,
           );
@@ -184,7 +213,11 @@ export function registerModelDefaultsRoutes(
       const body = c.req.valid("json");
 
       try {
-        const ctx = { prisma, session: sessionFor(userId) };
+        const ctx = {
+          prisma,
+          session: sessionFor(userId),
+          credential: credentialFor(c),
+        };
         // Authz: caller must be able to write every scope this config
         // is currently attached to AND every scope they're newly
         // attaching. Mirrors the tRPC save mutation's gate.
@@ -240,7 +273,11 @@ export function registerModelDefaultsRoutes(
       const { id } = c.req.param();
 
       try {
-        const ctx = { prisma, session: sessionFor(userId) };
+        const ctx = {
+          prisma,
+          session: sessionFor(userId),
+          credential: credentialFor(c),
+        };
         const current = await getScopeAttachmentsForConfig({ prisma }, id);
         // Same ownership backstop as PUT: an orphan config (no scope
         // attachments) must not be deletable by any authenticated caller.

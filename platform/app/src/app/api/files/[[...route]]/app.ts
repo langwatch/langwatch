@@ -2,7 +2,10 @@ import { Readable } from "node:stream";
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { Permission } from "~/server/api/rbac";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
+import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { rateLimit } from "~/server/rateLimit";
 import {
@@ -62,6 +65,11 @@ const DENIAL_CODES: ReadonlySet<string> = new Set([
   // `authz.authorize()` throws this instead of the legacy pair, and without
   // it here the engine's 403 would surface as a 500.
   "permission_denied",
+  // The API-key ceiling's two denials, for the same reason: this route
+  // enforces the key's permissions itself (see `apiKeyHoldsAny`), and a
+  // ceiling refusal is a 403 here, not an unhandled 500.
+  "api_key_permission_denied",
+  "api_key_permission_not_delegable",
 ]);
 
 /**
@@ -81,6 +89,38 @@ export function isPermissionDenial(err: unknown): boolean {
 }
 
 /**
+ * Whether the resolved credential holds ANY of `permissions`, through the
+ * same ceiling every other API-key surface is gated by.
+ *
+ * A legacy project key passes every permission by design (it predates RBAC
+ * and carries full project access), so this changes nothing for the callers
+ * the exemption was originally written for — `enforceApiKeyCeiling` returns
+ * immediately for that credential class. It is the scoped key, which arrived
+ * later, that is now held to its bindings.
+ *
+ * A missing credential is not a pass: reaching here with no resolved token
+ * means the caller authenticated by session, and the session branch does its
+ * own check.
+ */
+async function apiKeyHoldsAny(
+  resolvedToken: ResolvedToken | undefined,
+  permissions: readonly Permission[],
+): Promise<boolean> {
+  if (!resolvedToken) return false;
+
+  for (const permission of permissions) {
+    try {
+      await enforceApiKeyCeiling({ resolved: resolvedToken, permission });
+      return true;
+    } catch (err) {
+      if (!isPermissionDenial(err)) throw err;
+      // denied this category — try the next one
+    }
+  }
+  return false;
+}
+
+/**
  * Checks that the caller (API key or session user) is allowed to read files
  * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
  * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
@@ -89,17 +129,26 @@ export function isPermissionDenial(err: unknown): boolean {
  * the read (`authorizeFilePurpose`). Throws HTTPException(403)/(401) on
  * failure; returns void on success.
  */
-async function authorizeFileRead({
+export async function authorizeFileRead({
   apiKeyProjectId,
+  resolvedToken,
   userId,
   ownerProjectId,
 }: {
   apiKeyProjectId: string | undefined;
+  resolvedToken: ResolvedToken | undefined;
   userId: string | undefined;
   ownerProjectId: string;
 }): Promise<void> {
   if (apiKeyProjectId) {
     if (apiKeyProjectId !== ownerProjectId) {
+      throw new HTTPException(403, { message: "forbidden" });
+    }
+    // Tenancy is not authorization. Pinning the key to the owning project
+    // says only that it is in the right tenant; a key scoped to this project
+    // but granted, say, only `prompts:view` was still served trace bytes.
+    // The session branch below has always had to hold one of these.
+    if (!(await apiKeyHoldsAny(resolvedToken, FILE_VIEW_PERMISSIONS))) {
       throw new HTTPException(403, { message: "forbidden" });
     }
   } else if (userId) {
@@ -125,20 +174,34 @@ async function authorizeFileRead({
 /**
  * Purpose-specific authorization, applied once the row (and so its purpose)
  * is known: `trace_content` objects require `traces:view`, everything else
- * (the scenario purposes) requires `scenarios:view`. API-key callers are
- * project-scoped full readers on this legacy-key surface and were already
- * pinned to the owning project in `authorizeFileRead`.
+ * (the scenario purposes) requires `scenarios:view`.
+ *
+ * Both credential kinds are held to it. An API key used to be exempt — the
+ * comment here called it a "project-scoped full reader on this legacy-key
+ * surface", which was true when the only key that reached this route was a
+ * legacy project key carrying full project access. A scoped key does not,
+ * so the exemption handed one the whole purpose range its bindings never
+ * granted.
  */
-async function authorizeFilePurpose({
+export async function authorizeFilePurpose({
+  resolvedToken,
   userId,
   ownerProjectId,
   purpose,
 }: {
+  resolvedToken: ResolvedToken | undefined;
   userId: string | undefined;
   ownerProjectId: string;
   purpose: string;
 }): Promise<void> {
-  if (!userId) return;
+  const required = requiredPermissionForPurpose(purpose);
+
+  if (!userId) {
+    if (!(await apiKeyHoldsAny(resolvedToken, [required]))) {
+      throw new HTTPException(403, { message: "forbidden" });
+    }
+    return;
+  }
   try {
     await requireProjectPermission({
       userId,
@@ -251,6 +314,7 @@ async function handleFileRead(
   // lets an authenticated user fan out id probes against other tenants
   // before hitting any throttle.
   const apiKeyProjectId = c.get("apiKeyProjectId");
+  const resolvedToken = c.get("resolvedToken") as ResolvedToken | undefined;
   const userId = c.get("userId");
   const callerKey = apiKeyProjectId ?? userId;
   if (!callerKey) {
@@ -314,6 +378,7 @@ async function handleFileRead(
   // Step 3: project-membership gate.
   await authorizeFileRead({
     apiKeyProjectId,
+    resolvedToken,
     userId,
     ownerProjectId: authorizedProjectId,
   });
@@ -337,6 +402,7 @@ async function handleFileRead(
   // Step 4.5: purpose gate — now that the row is known, enforce the
   // permission category the object's purpose maps to.
   await authorizeFilePurpose({
+    resolvedToken,
     userId,
     ownerProjectId: authorizedProjectId,
     purpose: result.row.purpose,

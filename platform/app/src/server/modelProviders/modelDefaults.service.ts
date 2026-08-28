@@ -3,12 +3,12 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
   probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
-
 import type { Session } from "~/server/auth";
 import { isRootPrismaClient } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
@@ -41,6 +41,21 @@ interface Ctx {
 export type AuthCtx = {
   prisma: PrismaClient;
   session: Session | null;
+  /**
+   * Set when an API key is making the call, so the key's own grants cap the
+   * write as well as its owner's.
+   *
+   * Without it this guard resolved the OWNER only, which is half of the
+   * contract every other key surface keeps: effective(key) = grants(key) ∩
+   * grants(owner). A read-only key belonging to an admin passed every check
+   * here, because the admin held the permission and nothing asked what the
+   * key held. Absent means a browser session, which has no second half.
+   */
+  credential?: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+  } | null;
 };
 
 /**
@@ -49,6 +64,12 @@ export type AuthCtx = {
  * default up to the organization scope. Mirrors the model-providers
  * update mutation's scope-aware authz, and is the single gate both
  * the tRPC router and the Hono /api/model-defaults route call.
+ *
+ * An API key is held to the SAME permission at the SAME target scope its
+ * owner is, rather than to a blanket route-level gate, because that is what
+ * makes the ceiling exact: an organization-scoped write demands
+ * `organization:manage` of the key too, and a key holding only
+ * `project:update` cannot push a project default up to the organization.
  */
 export async function assertCanWriteScope(
   ctx: AuthCtx,
@@ -58,6 +79,7 @@ export async function assertCanWriteScope(
   if (!ctx.session?.user?.id) {
     throw new ModelDefaultUserKeyRequiredError();
   }
+  await assertCredentialCanWriteScope(ctx, scopeType, scopeId);
   if (scopeType === "ORGANIZATION") {
     if (
       !(await probeOrganizationPermission(
@@ -86,6 +108,68 @@ export async function assertCanWriteScope(
     throw new ModelDefaultScopeForbiddenError({
       scopeType,
       requiredPermission: "project:update",
+    });
+  }
+}
+
+/** The permission each scope tier demands — the owner's gate above and the
+ *  key's gate below must never drift apart, so both read it from here. */
+function requiredPermissionForScope(
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+): "organization:manage" | "team:manage" | "project:update" {
+  if (scopeType === "ORGANIZATION") return "organization:manage";
+  if (scopeType === "TEAM") return "team:manage";
+  return "project:update";
+}
+
+/**
+ * The key half of the ceiling, asked at the scope the write targets. A
+ * session caller has no credential and is unaffected; a key is refused with
+ * the same error its owner would have been, since "your key is too narrow"
+ * and "you are too narrow" send the caller to the same place — the scope and
+ * the permission it needs.
+ */
+async function assertCredentialCanWriteScope(
+  ctx: AuthCtx,
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+  scopeId: string,
+): Promise<void> {
+  const credential = ctx.credential;
+  if (!credential) return;
+
+  const requiredPermission = requiredPermissionForScope(scopeType);
+  const permissions = getApp().permissions;
+
+  // A project scope needs its team to walk the tier chain, and only the
+  // engine can resolve that from an id — so the project case goes through
+  // the decision helper that does the lookup rather than assembling a scope
+  // ref here from data this module does not have.
+  const allowed =
+    scopeType === "PROJECT"
+      ? (
+          await permissions.getApiKeyProjectDecision({
+            apiKeyId: credential.apiKeyId,
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+            projectId: scopeId,
+            permission: requiredPermission,
+          })
+        ).outcome === "allowed"
+      : await permissions.hasApiKeyPermission({
+          apiKeyId: credential.apiKeyId,
+          userId: credential.userId,
+          organizationId: credential.organizationId,
+          scope:
+            scopeType === "ORGANIZATION"
+              ? { type: "org", id: scopeId }
+              : { type: "team", id: scopeId },
+          permission: requiredPermission,
+        });
+
+  if (!allowed) {
+    throw new ModelDefaultScopeForbiddenError({
+      scopeType,
+      requiredPermission,
     });
   }
 }
