@@ -3,8 +3,8 @@
  *
  * @see specs/licensing/management-apis-enterprise-gate.feature
  *
- * The plan gate on the four management families built through
- * `createManagementService`: a fully-permissioned credential on a plan below
+ * The plan gate on the four management families built as versioned families
+ * on the process's REST service: a fully-permissioned credential on a plan below
  * Enterprise is refused with the stable 402 code and upgrade guidance, the
  * same credential passes on Enterprise, and the RBAC denial always beats the
  * plan denial (403 before 402), because "you don't have access" must never be
@@ -14,12 +14,19 @@
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  createRoleBindingsRestApp,
+  createRolesRestApp,
+  createScimTokensRestApp,
+} from "@langwatch/platform-api";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
-import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
-import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
-import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
+import { managementAuditPort } from "~/server/api/management/audit";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { appRestSecurity } from "~/server/api/security";
+import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
 import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -34,6 +41,29 @@ import {
   seedManagementOrg,
   seedOrgMember,
 } from "~/test-utils/managementApiOrg";
+
+const roleBindingsApp = createRoleBindingsRestApp({
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("MANAGEMENT_API"),
+  permissions: () => getApp().permissions,
+  grants: () => getApp().authzGrants,
+  ledgerActor: orgRequestLedgerActor,
+});
+
+const rolesApp = createRolesRestApp({
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("RBAC"),
+  roles: () => getApp().roles,
+  vocabulary: appRestRbacVocabulary,
+  ledgerActor: orgRequestLedgerActor,
+});
+
+const scimTokensApp = createScimTokensRestApp({
+  security: appRestSecurity,
+  enterpriseGate: requireEnterprisePlanRest("SCIM"),
+  scim: () => getApp().scim,
+  audit: managementAuditPort,
+});
 
 describe("Feature: Management APIs require an Enterprise plan", () => {
   const ns = `mgmt-gate-${nanoid(8)}`;

@@ -1,4 +1,5 @@
 import { resolver } from "hono-openapi";
+import type { ZodType } from "zod";
 import {
   apiErrorSchema,
   badRequestSchema,
@@ -97,4 +98,21 @@ export const canonicalUnprocessableResponses: Record<422, RouteResponse> = {
 /** The canonical 409, for families that publish the canonical envelope. */
 export const canonicalConflictResponses: Record<409, RouteResponse> = {
   409: canonicalResponse("Conflict"),
+};
+
+/**
+ * The documented 200 for a route that answers with one schema.
+ *
+ * Every family spelled this out itself, which is three lines of ceremony per
+ * route and a shape that has to stay identical for the generated clients to
+ * agree. One definition here so a change to the success envelope reaches every
+ * family that publishes one.
+ */
+export const buildStandardSuccessResponse = (zodSchema: ZodType): RouteResponse => {
+  return {
+    description: "Success",
+    content: {
+      "application/json": { schema: resolver(zodSchema) },
+    },
+  };
 };

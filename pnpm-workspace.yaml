@@ -17,6 +17,7 @@ packages:
   - "packages/features/*/*"
   - "packages/enterprise"
   - "packages/enterprise/composition/*"
+  - "packages/enterprise/plan-gate"
   - "packages/enterprise/features/*/*"
   - "mcp/typescript"
   - "plugins/*"

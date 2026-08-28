@@ -17,10 +17,12 @@ import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
-import { app as copilotkitApp } from "~/app/api/copilotkit/[[...route]]/app";
-import { app as experimentsApp } from "~/app/api/experiments/[[...route]]/app";
-import { createModelDefaultsRestApp } from "@langwatch/platform-api";
-import { app as modelProvidersApp } from "~/app/api/model-providers/[[...route]]/app";
+import {
+  createCopilotKitRestApp,
+  createExperimentsRestApp,
+  createModelDefaultsRestApp,
+  createModelProvidersRestApp,
+} from "@langwatch/platform-api";
 import {
   type Organization,
   OrganizationUserRole,
@@ -37,9 +39,32 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 
 wireDefaultTestApp();
 
+/** The experiments family as the API router mounts it. */
+const experimentsApp = createExperimentsRestApp({
+  security: appRestSecurity,
+  experiments: () => getApp().experiments,
+}).hono;
+
+/**
+ * Only the gate is under test here, and it runs before the handler, so the
+ * adapter this family would dispatch through is never built.
+ */
+const { hono: copilotkitApp } = createCopilotKitRestApp({
+  security: appRestSecurity,
+  serviceAdapterFor: () => {
+    throw new Error("The prompt studio adapter is not available in this suite");
+  },
+});
+
 const { hono: modelDefaultsApp } = createModelDefaultsRestApp({
   security: appRestSecurity,
   modelProviders: () => getApp().modelProviders,
+});
+
+const { hono: modelProvidersApp } = createModelProvidersRestApp({
+  security: appRestSecurity,
+  modelProviders: () => getApp().modelProviders,
+  organizations: () => getApp().organizations,
 });
 
 const ns = `secured-rbac-${nanoid(8)}`;

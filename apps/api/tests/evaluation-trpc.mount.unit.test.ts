@@ -20,7 +20,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { AppTrpcPolicyMiddlewares } from "../src/app-trpc/app-trpc.policy";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import { createEvaluationTrpcRouter } from "../src/features/evaluation/evaluation-trpc.mount";
 
 const PROJECT_ID = "project_evaluation_mount";

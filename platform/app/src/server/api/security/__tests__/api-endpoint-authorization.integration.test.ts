@@ -24,7 +24,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "~/server/api/rbac";
-import { allRegisteredRoutes } from "@langwatch/api";
+import { allRegisteredRoutes } from "@langwatch/api/rest";
 
 /**
  * The registry is populated as a side effect of the router being COMPOSED, so
@@ -62,8 +62,7 @@ const liveEndpoints = async (): Promise<Set<string>> => {
   const { createTestApp } = await import("~/server/app-layer/presets");
   const router = createApiRouter(createTestApp());
   const set = new Set<string>();
-  for (const r of (router as unknown as { routes: { method: string; path: string }[] })
-    .routes) {
+  for (const r of (router as unknown as { routes: { method: string; path: string }[] }).routes) {
     if (isUnenumerableMount(r.method, r.path)) continue;
     set.add(`${r.method.toUpperCase()} ${r.path}`);
   }
@@ -75,9 +74,7 @@ describe("API router endpoint authorization guarantee", () => {
     /** @scenario "The composed router has no route without a registered policy" */
     it("registers a policy for every concrete endpoint through SecuredApp", async () => {
       const live = await liveEndpoints();
-      const registered = new Set(
-        allRegisteredRoutes().map((r) => `${r.method} ${r.path}`),
-      );
+      const registered = new Set(allRegisteredRoutes().map((r) => `${r.method} ${r.path}`));
 
       const unclassified = [...live].filter((key) => !registered.has(key));
 
@@ -131,9 +128,7 @@ describe("API router endpoint authorization guarantee", () => {
   describe("when the GitHub connection endpoints are registered", () => {
     it("treats /github/install as handler-managed and /github/setup as public", async () => {
       await loadRouter();
-      const byPath = new Map(
-        allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
-      );
+      const byPath = new Map(allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]));
       const install = byPath.get("GET /api/github/install");
       const setup = byPath.get("GET /api/github/setup");
       expect(install, "/install must be registered").toBeDefined();
@@ -226,10 +221,7 @@ describe("API router endpoint authorization guarantee", () => {
       const unreachable = permissionRoutes().filter(
         ({ permission }) =>
           !teamRoleHasPermission(TeamUserRole.ADMIN, permission as Permission) &&
-          !organizationRoleHasPermission(
-            OrganizationUserRole.ADMIN,
-            permission as Permission,
-          ),
+          !organizationRoleHasPermission(OrganizationUserRole.ADMIN, permission as Permission),
       );
 
       expect(

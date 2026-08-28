@@ -98,7 +98,6 @@ import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { withIdempotency } from "~/server/api/idempotency";
 import { managementAuditPort } from "~/server/api/management/audit";
 import { instanceAdminApiKey } from "~/server/api/management/instance-admin-key";
-import { appRestManagement } from "~/server/api/management/managed-service";
 import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
 import type { Permission } from "~/server/api/rbac";
 import { getUserProtectionsForProject } from "~/server/api/utils";
@@ -405,7 +404,6 @@ export function createApiRouter(app: App) {
   // family cannot be served while being invisible to the authorization audit.
   for (const packagedRestApp of createAppRestFeatures({
     security: appRestSecurity,
-    management: appRestManagement,
     services: {
       agentCache: () => agentCacheStore,
       agents: () => LegacyAgentsRestFeature.create({ prisma, session: null }),

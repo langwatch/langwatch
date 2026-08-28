@@ -1,43 +1,58 @@
 import { SCIM_SPEC_OPTIONS } from "@langwatch/enterprise-scim-server";
 import { app as scimApp } from "~/server/enterprise/scim/routes";
-import { generateApiSpecs } from "@langwatch/api";
+import { generateApiSpecs } from "@langwatch/api/rest";
 import {
+  createAgentCacheRestApp,
+  createAgentLegacyRestApp,
+  createApiKeysRestApp,
+  createCodingAgentRestApp,
+  createDashboardsRestApp,
+  createDatasetRestApp,
+  createEvaluatorsRestApp,
+  createEventsRestApp,
+  createExperimentsRestApp,
+  createGatewayPlatformRestApp,
+  createGatewaySpendRestApp,
   createGovernanceRestApp,
   createGraphsRestApp,
+  createGroupRestApp,
+  createMeRestApp,
+  createMonitorRestApp,
   createModelDefaultsRestApp,
+  createOrganizationsRestApp,
+  createModelProvidersRestApp,
+  createProjectRestApp,
+  createRoleBindingsRestApp,
+  createRolesRestApp,
+  createScenarioEventsRestApp,
+  createScenariosRestApp,
+  createScimTokensRestApp,
+  createSecretLegacyRestApp,
+  createSimulationRunsRestApp,
+  createSuiteRestApp,
+  createTeamsRestApp,
+  createTriggerRestApp,
+  createWebhookRestApp,
+  createWorkflowsRestApp,
+  ORGANIZATIONS_SPEC_OPTIONS,
 } from "@langwatch/platform-api";
-import { servicesUnavailableOffRequestPath } from "@langwatch/platform-api/app-rest";
+import {
+  portsUnavailableOffRequestPath,
+  servicesUnavailableOffRequestPath,
+} from "@langwatch/platform-api/app-rest";
+import { requireEnterprisePlanRest } from "../app/api/middleware/enterprise-gate";
+import { appRestRbacVocabulary } from "../server/api/management/rbac-vocabulary";
 import { appRestSecurity } from "../server/api/security";
 import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
-import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
-import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
-import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
-import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
-import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
-import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
-import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
-import { app as eventsApp } from "../app/api/events/[[...route]]/app";
-import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
-import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
-import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
-import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
-import { app as meApp } from "../app/api/me/[[...route]]/app";
-import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
-import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
-import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
-import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
-import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
-import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
-import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
-import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
+import { monitorMappingsSchema as realMonitorMappingsSchema } from "../server/tracer/tracesMapping";
 import {
   allRegisteredRoutes,
   type CredentialClass,
@@ -171,26 +186,52 @@ const currentSpec = {
 };
 
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
-import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
-import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
-import { app as legacySecretsApp } from "../app/api/secrets/[[...route]]/app";
 import { secretPublicRestApp } from "../runtime/app/features/secret";
-import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
-import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
-import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
-import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
-import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 /**
  * Spec generation walks each route's `describeRoute` metadata and never invokes
  * a handler, so the families taking their services as per-request providers are
  * built with providers that refuse.
  */
-const specOnlyServices = servicesUnavailableOffRequestPath(
-  "while generating the OpenAPI document",
-);
+const specOnlyServices = servicesUnavailableOffRequestPath("while generating the OpenAPI document");
+
+/** The same refusal for the non-service capabilities, for the same reason. */
+const specOnlyPorts = portsUnavailableOffRequestPath("while generating the OpenAPI document");
+
+/**
+ * The one exception to "everything off the request path refuses": the monitor
+ * `mappings` body is a SHAPE the document publishes, so the placeholder the
+ * refusing ports carry would silently loosen the published schema. The real
+ * vocabulary comes from the trace vertical that owns it.
+ */
+const monitorMappingsSchema = realMonitorMappingsSchema;
+
+/**
+ * The identity and access families' remaining capabilities, refusing for the
+ * same reason: spec generation walks route metadata and never invokes a
+ * handler, so reaching one of these is a bug in this task rather than a
+ * missing wire.
+ */
+const specOnly = <T>(what: string): (() => T) => {
+  return () => {
+    throw new Error(`${what} is not available while generating the OpenAPI document`);
+  };
+};
+const specOnlyIdentity = {
+  permissions: specOnly<any>("Authorization"),
+  grants: specOnly<any>("Grants"),
+  roles: specOnly<any>("Roles"),
+  scim: specOnly<any>("SCIM"),
+  organizationProvisioning: specOnly<any>("Organization provisioning"),
+  organizationsWithTeamLookup: specOnly<any>("Organizations"),
+  managementAudit: () => {
+    throw new Error("Management audit is not available while generating the OpenAPI document");
+  },
+  ledgerActor: () => {
+    throw new Error("Ledger attribution is not available while generating the OpenAPI document");
+  },
+};
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) => sourceArray;
 
@@ -213,27 +254,81 @@ const langwatchSpec = {
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
   console.log("Building agent cache spec...");
-  const agentCacheSpec = await generateSpecs(agentCacheApp);
+  const agentCacheSpec = await generateSpecs(
+    createAgentCacheRestApp({
+      security: appRestSecurity,
+      agentCache: specOnlyServices.agentCache,
+    }).hono,
+  );
   console.log("Building agents spec...");
-  const agentsSpec = await generateSpecs(agentsApp);
+  const agentsSpec = await generateSpecs(
+    createAgentLegacyRestApp({
+      security: appRestSecurity,
+      agents: specOnlyServices.agents,
+      agentPlatformUrl: specOnlyPorts.agentPlatformUrl,
+    }).hono,
+  );
   console.log("Building api keys spec...");
-  const apiKeysSpec = await generateSpecs(apiKeysApp);
+  const apiKeysSpec = await generateSpecs(
+    createApiKeysRestApp({
+      security: appRestSecurity,
+      apiKeys: specOnlyServices.apiKeys,
+      permissions: specOnlyIdentity.permissions,
+      audit: specOnlyIdentity.managementAudit,
+    }).hono,
+  );
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building governed analytics SQL spec...");
   const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
   console.log("Building coding agent spec...");
-  const codingAgentSpec = await generateSpecs(codingAgentApp);
+  const codingAgentSpec = await generateSpecs(
+    createCodingAgentRestApp({
+      security: appRestSecurity,
+      codingAgents: specOnlyServices.codingAgents,
+    }).hono,
+  );
   console.log("Building dashboards spec...");
-  const dashboardsSpec = await generateSpecs(dashboardsApp);
+  const dashboardsSpec = await generateSpecs(
+    createDashboardsRestApp({
+      security: appRestSecurity,
+      dashboard: specOnlyServices.dashboard,
+      platformUrl: specOnlyPorts.platformUrl,
+    }).hono,
+  );
   console.log("Building dataset spec...");
-  const datasetSpec = await generateSpecs(datasetApp);
+  const datasetSpec = await generateSpecs(
+    createDatasetRestApp({
+      security: appRestSecurity,
+      dataset: specOnlyServices.datasets,
+      platformUrl: specOnlyPorts.platformUrl,
+      authorizeDirectUpload: specOnlyPorts.authorizeDatasetDirectUpload,
+    }).hono,
+  );
   console.log("Building evaluators spec...");
-  const evaluatorsSpec = await generateSpecs(evaluatorsApp);
+  const evaluatorsSpec = await generateSpecs(
+    createEvaluatorsRestApp({
+      security: appRestSecurity,
+      evaluators: specOnlyServices.evaluators,
+      modelProviders: specOnlyServices.modelProviders,
+      platformUrl: specOnlyPorts.platformUrl,
+      organizationMiddleware: specOnlyPorts.organizationMiddleware,
+    }).hono,
+  );
   console.log("Building events spec...");
-  const eventsSpec = await generateSpecs(eventsApp);
+  const eventsSpec = await generateSpecs(
+    createEventsRestApp({
+      security: appRestSecurity,
+      ports: specOnlyPorts.trackedEvents,
+    }).hono,
+  );
   console.log("Building experiments spec...");
-  const experimentsSpec = await generateSpecs(experimentsApp);
+  const experimentsSpec = await generateSpecs(
+    createExperimentsRestApp({
+      security: appRestSecurity,
+      experiments: specOnlyServices.experiments,
+    }).hono,
+  );
   console.log("Building legacy evaluations spec...");
   const evaluationsLegacySpec = await generateSpecs(evaluationsLegacyApp);
   console.log("Building experiment runs spec...");
@@ -241,7 +336,12 @@ export default async function execute() {
   console.log("Building experiment init spec...");
   const miscSpec = await generateSpecs(miscApp);
   console.log("Building gateway-platform spec...");
-  const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
+  const gatewayPlatformSpec = await generateSpecs(
+    createGatewayPlatformRestApp({
+      security: appRestSecurity,
+      gateway: specOnlyServices.gatewayPlatform,
+    }).hono,
+  );
   console.log("Building governance spec...");
   const governanceSpec = await generateSpecs(
     createGovernanceRestApp({
@@ -258,13 +358,37 @@ export default async function execute() {
     }).hono,
   );
   console.log("Building me spec...");
-  const meSpec = await generateSpecs(meApp);
+  const meSpec = await generateSpecs(
+    createMeRestApp({
+      security: appRestSecurity,
+      governance: specOnlyServices.governance,
+      organizations: specOnlyIdentity.organizationsWithTeamLookup,
+      projects: specOnlyServices.projects,
+    }).hono,
+  );
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
-  const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  const scenarioEventsSpec = await generateSpecs(
+    createScenarioEventsRestApp({
+      security: appRestSecurity,
+      simulations: specOnlyServices.simulations,
+      scenarioTabs: specOnlyServices.scenarioTabs,
+      broadcast: specOnlyServices.broadcast,
+      extractInlineMedia: specOnlyPorts.extractInlineMedia,
+      traceUsageGuard: specOnlyPorts.traceUsageGuard,
+      bodyLimit: specOnlyPorts.bodyLimit,
+    }).hono,
+  );
   console.log("Building monitors spec...");
-  const monitorsSpec = await generateSpecs(monitorsApp);
+  const monitorsSpec = await generateSpecs(
+    createMonitorRestApp({
+      security: appRestSecurity,
+      monitors: specOnlyServices.monitors,
+      platformUrl: specOnlyPorts.platformUrl,
+      mappingsSchema: monitorMappingsSchema,
+    }).hono,
+  );
   console.log("Building model defaults spec...");
   const modelDefaultsSpec = await generateSpecs(
     createModelDefaultsRestApp({
@@ -273,19 +397,68 @@ export default async function execute() {
     }).hono,
   );
   console.log("Building model providers spec...");
-  const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  const modelProvidersSpec = await generateSpecs(
+    createModelProvidersRestApp({
+      security: appRestSecurity,
+      modelProviders: specOnlyServices.modelProviders,
+      organizations: specOnlyServices.organizations,
+    }).hono,
+  );
   console.log("Building organization spec...");
   const organizationSpec = await generateFrameworkSpecs(organizationApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building organizations (instance provisioning) spec...");
-  const organizationsSpec = await generateSpecs(organizationsApp, ORGANIZATIONS_SPEC_OPTIONS);
+  const organizationsSpec = await generateSpecs(
+    createOrganizationsRestApp({
+      security: appRestSecurity,
+      organizations: specOnlyIdentity.organizationProvisioning,
+      apiKeys: specOnlyServices.apiKeys,
+      instanceAdminKey: () => void 0,
+      isSaas: () => false,
+      audit: specOnlyIdentity.managementAudit,
+      reportError: () => void 0,
+    }).hono,
+    ORGANIZATIONS_SPEC_OPTIONS,
+  );
   console.log("Building projects spec...");
-  const projectsSpec = await generateSpecs(projectsApp);
+  const projectsSpec = await generateSpecs(
+    createProjectRestApp({
+      security: appRestSecurity,
+      projects: specOnlyServices.projects,
+      apiKeys: specOnlyServices.apiKeys,
+    }).hono,
+  );
   console.log("Building roles spec...");
-  const rolesSpec = await generateFrameworkSpecs(rolesApp, FRAMEWORK_SPEC_OPTIONS);
+  const rolesSpec = await generateFrameworkSpecs(
+    createRolesRestApp({
+      security: appRestSecurity,
+      enterpriseGate: requireEnterprisePlanRest("RBAC"),
+      roles: specOnlyIdentity.roles,
+      vocabulary: appRestRbacVocabulary,
+      ledgerActor: specOnlyIdentity.ledgerActor,
+    }),
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building role bindings spec...");
-  const roleBindingsSpec = await generateFrameworkSpecs(roleBindingsApp, FRAMEWORK_SPEC_OPTIONS);
+  const roleBindingsSpec = await generateFrameworkSpecs(
+    createRoleBindingsRestApp({
+      security: appRestSecurity,
+      enterpriseGate: requireEnterprisePlanRest("MANAGEMENT_API"),
+      permissions: specOnlyIdentity.permissions,
+      grants: specOnlyIdentity.grants,
+      ledgerActor: specOnlyIdentity.ledgerActor,
+    }),
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building scim tokens spec...");
-  const scimTokensSpec = await generateFrameworkSpecs(scimTokensApp, FRAMEWORK_SPEC_OPTIONS);
+  const scimTokensSpec = await generateFrameworkSpecs(
+    createScimTokensRestApp({
+      security: appRestSecurity,
+      enterpriseGate: requireEnterprisePlanRest("SCIM"),
+      scim: specOnlyIdentity.scim,
+      audit: specOnlyIdentity.managementAudit,
+    }),
+    FRAMEWORK_SPEC_OPTIONS,
+  );
   console.log("Building scim spec...");
   // A family that authenticates with its own credential declares the scheme
   // next to the operations that name it, and `documentation` is how a
@@ -293,26 +466,95 @@ export default async function execute() {
   // the document.
   const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
-  const legacySecretsSpec = await generateSpecs(legacySecretsApp);
+  const legacySecretsSpec = await generateSpecs(
+    createSecretLegacyRestApp({
+      security: appRestSecurity,
+      secrets: specOnlyServices.secrets,
+    }).hono,
+  );
   const secretsSpec = await generateFrameworkSpecs(secretPublicRestApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building scenarios spec...");
-  const scenariosSpec = await generateSpecs(scenariosApp);
+  const scenariosSpec = await generateSpecs(
+    createScenariosRestApp({
+      security: appRestSecurity,
+      scenarios: specOnlyServices.scenarios,
+      platformUrl: specOnlyPorts.platformUrl,
+    }).hono,
+  );
   console.log("Building simulation runs spec...");
-  const simulationRunsSpec = await generateSpecs(simulationRunsApp);
+  const simulationRunsSpec = await generateSpecs(
+    createSimulationRunsRestApp({
+      security: appRestSecurity,
+      simulations: specOnlyServices.simulations,
+      scenarioRunPlatformUrl: specOnlyPorts.scenarioRunPlatformUrl,
+    }).hono,
+  );
   console.log("Building suites spec...");
-  const suitesSpec = await generateSpecs(suitesApp);
+  const suitesSpec = await generateSpecs(
+    createSuiteRestApp({
+      security: appRestSecurity,
+      suites: specOnlyServices.suites,
+      scenarios: specOnlyServices.scenarios,
+      projects: specOnlyServices.projects,
+      platformUrl: specOnlyPorts.platformUrl,
+    }).hono,
+  );
   console.log("Building teams spec...");
-  const teamsSpec = await generateSpecs(teamsApp);
+  const teamsSpec = await generateSpecs(
+    createTeamsRestApp({
+      security: appRestSecurity,
+      organizations: specOnlyServices.organizations,
+      permissions: specOnlyIdentity.permissions,
+      projects: specOnlyServices.projects,
+      ledgerActor: specOnlyIdentity.ledgerActor,
+    }).hono,
+  );
   console.log("Building groups spec...");
-  const groupsSpec = await generateSpecs(groupsApp);
+  const groupsSpec = await generateSpecs(
+    createGroupRestApp({
+      security: appRestSecurity,
+      organizations: specOnlyServices.organizations,
+      enterpriseGate: specOnlyPorts.groupsEnterpriseGate,
+      ledgerActor: specOnlyPorts.organizationLedgerActor,
+    }).hono,
+  );
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Building triggers spec...");
-  const triggersSpec = await generateSpecs(triggersApp);
+  const triggersSpec = await generateSpecs(
+    createTriggerRestApp({
+      security: appRestSecurity,
+      automation: specOnlyServices.automation,
+      platformUrl: specOnlyPorts.platformUrl,
+    }).hono,
+  );
   console.log("Building workflows spec...");
-  const workflowsSpec = await generateSpecs(workflowsApp);
-  const webhooksSpec = await generateSpecs(webhooksApp);
-  const gatewaySpendSpec = await generateSpecs(gatewaySpendApp);
+  const workflowsSpec = await generateSpecs(
+    createWorkflowsRestApp({
+      security: appRestSecurity,
+      workflows: specOnlyServices.workflows,
+      ports: {
+        platformUrl: specOnlyPorts.platformUrl,
+        requireApiKeyPermission: specOnlyPorts.requireApiKeyPermission,
+        triggerEvaluation: specOnlyPorts.triggerWorkflowEvaluation,
+      },
+    }).hono,
+  );
+  const webhooksSpec = await generateSpecs(
+    createWebhookRestApp({
+      security: appRestSecurity,
+      webhooks: specOnlyServices.webhooks,
+      canonicalError: specOnlyPorts.canonicalError,
+    }).hono,
+  );
+  const gatewaySpendSpec = await generateSpecs(
+    createGatewaySpendRestApp({
+      security: appRestSecurity,
+      billingPlanGate: specOnlyPorts.gatewaySpendBillingGate,
+      canonicalError: specOnlyPorts.canonicalError,
+      spend: specOnlyServices.gatewaySpend,
+    }).hono,
+  );
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>

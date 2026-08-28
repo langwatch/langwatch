@@ -38,6 +38,12 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a developer tries to register a verb route without calling access(policy) first
       Then the verb method does not exist on the bare app and the code fails to compile
 
+    @unit
+    Scenario: A versioned endpoint without an access policy fails the build
+      Given a versioned route family built through the same REST service
+      When an endpoint is registered without declaring a permission policy
+      Then building the family raises rather than mounting an unclassified route
+
     @integration
     Scenario: The composed router has no route without a registered policy
       Given the fully composed API router from createApiRouter

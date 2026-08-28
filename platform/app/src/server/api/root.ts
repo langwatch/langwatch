@@ -135,8 +135,10 @@ import {
   assertEnterprisePlan,
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
-  isCustomRole,
-} from "./enterprise";
+} from "@langwatch/enterprise-plan-gate";
+// `isCustomRole` is a role-NAMING convention, not an entitlement, which is why
+// it stays behind when the plan gate leaves.
+import { isCustomRole } from "./enterprise";
 import {
   batchScopePermissions,
   checkOpsPermission,

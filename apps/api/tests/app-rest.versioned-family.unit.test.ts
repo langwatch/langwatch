@@ -1,76 +1,70 @@
 /**
- * @vitest-environment node
- *
- * The factory's whole job is that one declaration per endpoint feeds two
+ * The REST service's whole job is that one declaration per endpoint feeds two
  * consumers that must never disagree: the route-policy registry the
  * authorization audit reads, and the enforcement chain that refuses requests.
- * These tests pin both halves structurally: every mount shape lands in the
- * registry (dated, latest, both version-namespace guards, and the rpc.discover
- * catalogue mounts), the enforcement chain runs auth, then the permission
- * check, then the plan gate, and an endpoint that never declared a policy
- * cannot build at all.
+ * These tests pin both halves structurally for a versioned family: every mount
+ * shape lands in the registry (dated, latest and both version-namespace
+ * guards), the enforcement chain runs auth, then the permission check, then
+ * the family's route middleware — the Enterprise plan gate in production —
+ * and an endpoint that never declared a policy cannot build at all.
+ *
+ * No module mocking: every check is a port, so the fakes below ARE the process
+ * the service is bound to.
  */
 import type { MiddlewareHandler } from "hono";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { getRoutePolicy } from "@langwatch/platform-api/app-rest";
+import { getRoutePolicy } from "../src/app-rest";
+import { MANAGEMENT_API_VERSION } from "../src/app-rest/app-rest.management-version";
+import { createAppRestSecurity } from "../src/app-rest/app-rest.security";
 
 const executionOrder: string[] = [];
 
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
-  return {
-    ...actual,
-    createOrgAuthMiddleware: (): MiddlewareHandler => async (_c, next) => {
-      executionOrder.push("auth");
-      await next();
-    },
+const recording =
+  (label: string): MiddlewareHandler =>
+  async (_c, next) => {
+    executionOrder.push(label);
+    await next();
   };
+
+const passthrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
+
+/**
+ * The plan gate as a versioned family really receives it: an ordinary
+ * middleware the mount hands over, which the service knows nothing about.
+ */
+const enterpriseGate = recording("plan:MANAGEMENT_API");
+
+const security = createAppRestSecurity({
+  appContext: passthrough,
+  requestLogger: () => passthrough,
+  requestTracer: () => passthrough,
+  legacyErrorHandler: (error, c) => c.json({ error: error.message }, 500),
+  canonicalErrorHandler: (error, c) => c.json({ error: { message: error.message } }, 500),
+
+  authenticateProject: () => passthrough,
+  authorizeProjectPermission: () => passthrough,
+  authorizeApiKeyCeiling: () => passthrough,
+  authenticateOrganization: () => passthrough,
+  authorizeOrganizationPermission: () => passthrough,
+  authorizeRouteProjectPermission: () => passthrough,
+
+  authenticateOrganizationThrowing: recording("auth"),
+  authorizeOrganizationPermissionThrowing: (permission) => recording(`permission:${permission}`),
 });
 
-vi.mock("~/app/api/middleware/org-auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/app/api/middleware/org-auth")>();
-  return {
-    ...actual,
-    requireOrgPermissionOrThrow:
-      (permission: string): MiddlewareHandler =>
-      async (_c, next) => {
-        executionOrder.push(`permission:${permission}`);
-        await next();
-      },
-  };
-});
-
-vi.mock("~/app/api/middleware/enterprise-gate", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/enterprise-gate")>();
-  return {
-    ...actual,
-    requireEnterprisePlanRest:
-      (feature: string): MiddlewareHandler =>
-      async (_c, next) => {
-        executionOrder.push(`plan:${feature}`);
-        await next();
-      },
-  };
-});
-
-import { z } from "zod";
-import { createManagementService } from "../managed-service";
-import { MANAGEMENT_API_VERSION } from "../version";
-
-describe("createManagementService", () => {
-  describe("given a service with one guarded endpoint", () => {
+describe("createVersionedApp", () => {
+  describe("given a family with one guarded endpoint", () => {
     let app: import("hono").Hono;
 
     beforeAll(() => {
-      const { service, guard } = createManagementService({
+      const { service, policy } = security.createVersionedApp({
         name: "toy-management",
         basePath: "/api/toy-management",
-        feature: "MANAGEMENT_API",
+        routeMiddleware: [enterpriseGate],
       });
       app = service
         .registerRoute(
@@ -79,14 +73,14 @@ describe("createManagementService", () => {
           MANAGEMENT_API_VERSION,
           async () => ({ ok: true }),
           (b) =>
-            guard("organization:manage")(b)
+            policy("organization:manage")(b)
               .withOutput(z.object({ ok: z.boolean() }))
               .withDocs({ operationId: "listToyThings", description: "toy" }),
         )
         .build();
     });
 
-    describe("when the service builds", () => {
+    describe("when the family builds", () => {
       it("registers the declared policy for the dated and latest mounts", () => {
         for (const path of [
           `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
@@ -103,8 +97,7 @@ describe("createManagementService", () => {
       });
 
       it("registers both version-namespace guards as reasoned public endpoints", () => {
-        const namespace =
-          "/api/toy-management/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+        const namespace = "/api/toy-management/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
         for (const path of [namespace, `${namespace}/*`]) {
           const registered = getRoutePolicy("ALL", path);
           expect(registered, path).toBeDefined();
@@ -114,29 +107,13 @@ describe("createManagementService", () => {
           }
         }
       });
-
-      it("registers the rpc.discover catalogue mounts as reasoned public endpoints", () => {
-        for (const path of [
-          `/api/toy-management/${MANAGEMENT_API_VERSION}/rpc.discover`,
-          "/api/toy-management/latest/rpc.discover",
-        ]) {
-          const registered = getRoutePolicy("POST", path);
-          expect(registered, path).toBeDefined();
-          expect(registered?.policy.kind).toBe("public");
-          if (registered?.policy.kind === "public") {
-            expect(registered.policy.reason).toContain("rpc.discover");
-          }
-        }
-      });
     });
 
     describe("when a request reaches a guarded endpoint", () => {
       it("runs auth, then the permission check, then the plan gate, then the handler", async () => {
         executionOrder.length = 0;
 
-        const response = await app.request(
-          `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
-        );
+        const response = await app.request(`/api/toy-management/${MANAGEMENT_API_VERSION}/things`);
 
         expect(response.status).toBe(200);
         expect(executionOrder).toEqual([
@@ -148,12 +125,12 @@ describe("createManagementService", () => {
     });
   });
 
-  describe("given a guarded endpoint adds its own middleware", () => {
+  describe("given a policy-bearing endpoint adds its own middleware", () => {
     it("keeps the declared permission check in the framework-owned chain", async () => {
-      const { service, guard } = createManagementService({
+      const { service, policy } = security.createVersionedApp({
         name: "toy-additive",
         basePath: "/api/toy-additive",
-        feature: "MANAGEMENT_API",
+        routeMiddleware: [enterpriseGate],
       });
       const app = service
         .registerRoute(
@@ -162,7 +139,7 @@ describe("createManagementService", () => {
           MANAGEMENT_API_VERSION,
           async () => ({ ok: true }),
           (builder) =>
-            guard("organization:manage")(builder)
+            policy("organization:manage")(builder)
               .withMiddleware(async (_context, next) => {
                 executionOrder.push("endpoint-middleware");
                 await next();
@@ -172,9 +149,7 @@ describe("createManagementService", () => {
         .build();
 
       executionOrder.length = 0;
-      const response = await app.request(
-        `/api/toy-additive/${MANAGEMENT_API_VERSION}/things`,
-      );
+      const response = await app.request(`/api/toy-additive/${MANAGEMENT_API_VERSION}/things`);
 
       expect(response.status).toBe(200);
       expect(executionOrder).toEqual([
@@ -188,10 +163,10 @@ describe("createManagementService", () => {
 
   describe("given policy metadata and enforcement disagree", () => {
     it("refuses the route at build time", () => {
-      const { service, guard } = createManagementService({
+      const { service, policy } = security.createVersionedApp({
         name: "toy-mismatch",
         basePath: "/api/toy-mismatch",
-        feature: "MANAGEMENT_API",
+        routeMiddleware: [enterpriseGate],
       });
 
       expect(() =>
@@ -202,7 +177,7 @@ describe("createManagementService", () => {
             MANAGEMENT_API_VERSION,
             async () => ({ ok: true }),
             (builder) =>
-              guard("organization:manage")(builder)
+              policy("organization:manage")(builder)
                 .withoutPermission("policy mismatch probe")
                 .withOutput(z.object({ ok: z.boolean() })),
           )
@@ -211,12 +186,12 @@ describe("createManagementService", () => {
     });
   });
 
-  describe("given an endpoint declares no guard", () => {
+  describe("given an endpoint declares no policy", () => {
     it("refuses to build rather than mounting an unclassified route", () => {
-      const { service } = createManagementService({
+      const { service } = security.createVersionedApp({
         name: "toy-unguarded",
         basePath: "/api/toy-unguarded",
-        feature: "MANAGEMENT_API",
+        routeMiddleware: [enterpriseGate],
       });
 
       expect(() =>
@@ -232,11 +207,11 @@ describe("createManagementService", () => {
       ).toThrow(/must declare exactly one of/);
     });
 
-    it("refuses an explicit opt-out with no registered management policy", () => {
-      const { service } = createManagementService({
+    it("refuses an explicit opt-out with no registered access policy", () => {
+      const { service } = security.createVersionedApp({
         name: "toy-policyless",
         basePath: "/api/toy-policyless",
-        feature: "MANAGEMENT_API",
+        routeMiddleware: [enterpriseGate],
       });
 
       expect(() =>
@@ -248,7 +223,7 @@ describe("createManagementService", () => {
             async () => ({ ok: true }),
             (builder) =>
               builder
-                .withoutPermission("management routes always guard")
+                .withoutPermission("versioned routes always declare a policy")
                 .withOutput(z.object({ ok: z.boolean() })),
           )
           .build(),

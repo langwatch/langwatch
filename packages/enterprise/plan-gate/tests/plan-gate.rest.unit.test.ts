@@ -1,8 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The REST enterprise gate: reads the organization org auth resolved, asks
- * the plan provider, and throws `enterprise_plan_required` (402) with the
+ * the plan lookup, and throws `enterprise_plan_required` (402) with the
  * feature and the remediation channel when the plan is not entitled. The
  * response body itself is the family error handler's job, covered by the
  * groups gate integration test.
@@ -11,20 +9,20 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({ planProvider: { getActivePlan } }),
-}));
+import { createEnterprisePlanGate } from "../src";
 
-import { requireEnterprisePlanRest } from "../enterprise-gate";
+const getActivePlan = vi.fn();
 
 type TestEnv = {
   Variables: {
     organization: { id: string };
   };
 };
+
+const enterprisePlanGate = createEnterprisePlanGate({
+  organization: (context) => context.get("organization") as { id: string } | undefined,
+  plans: () => ({ getActivePlan }) as never,
+});
 
 function buildApp(options: { organization?: { id: string } } = {}) {
   const caught: unknown[] = [];
@@ -37,7 +35,7 @@ function buildApp(options: { organization?: { id: string } } = {}) {
     if (options.organization) c.set("organization", options.organization);
     await next();
   });
-  app.use(requireEnterprisePlanRest("GROUPS"));
+  app.use(enterprisePlanGate("GROUPS"));
   app.get("/probe", (c) => c.json({ ok: true }));
   return { app, caught };
 }
@@ -46,7 +44,7 @@ beforeEach(() => {
   getActivePlan.mockReset();
 });
 
-describe("requireEnterprisePlanRest", () => {
+describe("the REST Enterprise plan gate", () => {
   describe("when the organization's plan is below Enterprise", () => {
     it("throws enterprise_plan_required with the feature and upgrade guidance", async () => {
       getActivePlan.mockResolvedValue({ type: "FREE" });
@@ -79,6 +77,20 @@ describe("requireEnterprisePlanRest", () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ ok: true });
       expect(caught).toEqual([]);
+    });
+  });
+
+  describe("when the plan lookup fails", () => {
+    /** @scenario Guard fails closed when plan lookup fails */
+    it("refuses the request rather than letting it through", async () => {
+      getActivePlan.mockRejectedValue(new Error("Plan provider unavailable"));
+      const { app, caught } = buildApp({ organization: { id: "org_1" } });
+
+      const res = await app.request("/probe");
+
+      expect(res.status).toBe(500);
+      expect(caught).toHaveLength(1);
+      expect(HandledError.isHandled(caught[0])).toBe(false);
     });
   });
 

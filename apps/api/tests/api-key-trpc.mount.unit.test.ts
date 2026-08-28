@@ -21,7 +21,7 @@ import {
 } from "@langwatch/authz-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { AppTrpcPolicyMiddlewares } from "../src/app-trpc/app-trpc.policy";
+import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import { createApiKeyTrpcRouter } from "../src/features/api-key/api-key-trpc.mount";
 
 const ORG_ID = "org_api_key_mount";

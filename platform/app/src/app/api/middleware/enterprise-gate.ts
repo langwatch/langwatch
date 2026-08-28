@@ -1,45 +1,26 @@
+import { createEnterprisePlanGate, type EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
 import type { MiddlewareHandler } from "hono";
 import type { Organization } from "~/generated/prisma/client";
-import {
-  type EnterpriseFeature,
-  EnterprisePlanRequiredError,
-  isEnterpriseTier,
-} from "~/server/api/enterprise";
 
 /**
- * Refuses the route with `enterprise_plan_required` (402) unless the caller's
- * organization is on an Enterprise plan.
+ * This process's REST Enterprise plan gate.
  *
- * Reads the organization the org auth middleware already resolved onto the
- * context, so it MUST run after that middleware. On a SecuredApp that means
- * per-route, after `.access(...)`: an app-level `.use` would run before org
- * auth and find no organization (see the tRPC twin `requireEnterprisePlan`,
- * which composes after `checkOrganizationPermission` for the same reason:
- * "you don't have access" trumps "your plan doesn't include this").
+ * The refusal, the capability vocabulary and the check itself belong to
+ * `@langwatch/enterprise-plan-gate`; what cannot live there is where this
+ * process keeps the resolved organization and its plan lookup. Those are
+ * bound here, once.
  *
- * Throws rather than responding: the family's error handler owns the response
- * shape, and the error carries meta.feature plus the remediation channel so a
- * CLI or agent can render upgrade guidance.
+ * Mount it per route, after organization authentication and after the RBAC
+ * check: it reads the organization that authentication resolved, so an
+ * app-level `.use` would run first and find none, and "you don't have access"
+ * must beat "your plan doesn't include this".
  */
+const enterprisePlanGate = createEnterprisePlanGate({
+  organization: (context) => context.get("organization") as Organization | undefined,
+  plans: (context) => context.app.planProvider,
+});
+
+/** Refuses the route with `enterprise_plan_required` (402) off an unentitled plan. */
 export function requireEnterprisePlanRest(feature: EnterpriseFeature): MiddlewareHandler {
-  return async (c, next) => {
-    const organization = c.get("organization") as Organization | undefined;
-    if (!organization) {
-      // A route wired with this gate but without org auth is a programming
-      // error, not a customer refusal, so degrade to the generic unknown path.
-      throw new Error(
-        "requireEnterprisePlanRest ran without an organization on context; mount it after the org auth middleware",
-      );
-    }
-
-    const plan = await c.app.planProvider.getActivePlan({
-      organizationId: organization.id,
-    });
-
-    if (!isEnterpriseTier(plan.type)) {
-      throw new EnterprisePlanRequiredError(feature);
-    }
-
-    await next();
-  };
+  return enterprisePlanGate(feature);
 }
