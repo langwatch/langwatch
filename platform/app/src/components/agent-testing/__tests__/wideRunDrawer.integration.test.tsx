@@ -603,8 +603,8 @@ describe("the wide run detail drawer", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "The verdict line reads under the criteria" */
-  it("reads a Verdict line under the criteria and repeats nothing from the chip strip", () => {
+  /** @scenario "The verdict line reads over the criteria" */
+  it("reads a Verdict line over the criteria and repeats nothing from the chip strip", () => {
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
@@ -613,18 +613,13 @@ describe("the wide run detail drawer", () => {
     expect(
       within(statusLine).getByTestId("run-verdict-status-passed"),
     ).toHaveTextContent("PASSED");
-    // The verdict is what the criteria add up to, so it reads after them,
-    // and before the reasoning that explains it.
+    // The verdict is the answer, so it reads first; the criteria under it
+    // are how the judge got there.
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Passed criteria")).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf("Passed criteria")).toBeLessThan(
-      text.indexOf("Verdict:"),
+    expect(text.indexOf("Verdict:")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Verdict:")).toBeLessThan(
+      text.indexOf("Passed criteria"),
     );
-    if (text.includes("Judge reasoning")) {
-      expect(text.indexOf("Verdict:")).toBeLessThan(
-        text.indexOf("Judge reasoning"),
-      );
-    }
     expect(panel).not.toHaveTextContent(/LLM judge/i);
     expect(panel).not.toHaveTextContent(/success rate/i);
     expect(panel).not.toHaveTextContent("6.3s");

@@ -1,7 +1,7 @@
 /**
- * What the judge decided about one run: a labelled status line, the criteria
- * that passed in one section, the criteria that failed in another, and
- * whatever the judge said about the run as a whole.
+ * What the judge decided about one run: a labelled verdict line, then the
+ * criteria that passed in one section, the criteria that failed in another,
+ * and whatever the judge said about the run as a whole.
  *
  * The panel carries no status pill, no success rate, no criteria count and no
  * duration: the chip strip at the top of the drawer already reads all four.
@@ -58,7 +58,7 @@ const HEADING_LINE_HEIGHT = "14px";
  * space over its heading is the widest of the panel and the space under its
  * paragraph is narrower than that.
  */
-const SPACE_ABOVE_VERDICT = 5;
+const SPACE_BELOW_VERDICT = 4;
 const SPACE_BELOW_CRITERIA = 6;
 const SPACE_BELOW_REASONING = 3.5;
 
@@ -111,11 +111,10 @@ function PanelHeading({
 }
 
 /**
- * The labelled verdict line under the criteria. It reads the run status as a
- * single word: PASSED in green when the run met every criterion, FAILED in
- * red when the judge missed one. It sits under the criteria because it is
- * what they add up to, and over the reasoning because that is what explains
- * it.
+ * The labelled verdict line at the top of the panel. It reads the run status
+ * as a single word: PASSED in green when the run met every criterion, FAILED
+ * in red when the judge missed one. It reads first because it is the answer;
+ * the criteria under it are how the judge got there.
  */
 function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
   const word =
@@ -130,7 +129,7 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
     <HStack
       gap={2}
       alignItems="baseline"
-      marginTop={SPACE_ABOVE_VERDICT}
+      marginBottom={SPACE_BELOW_VERDICT}
       data-testid="run-verdict-status-line"
     >
       <Text fontSize="12px" color={FG_MUTED}>
@@ -310,6 +309,7 @@ export function RunVerdictPanel({
       paddingBottom={SPACE_BELOW_REASONING}
       data-testid="run-verdict-panel"
     >
+      <VerdictStatusLine status={status} />
       <VStack align="stretch" gap={SPACE_BETWEEN_SECTIONS}>
         {error ? (
           <Text
@@ -341,7 +341,6 @@ export function RunVerdictPanel({
           </Text>
         ) : null}
       </VStack>
-      <VerdictStatusLine status={status} />
       {reasoningError ? (
         <JudgeErrorPanel pretty={reasoningError.pretty} />
       ) : reasoning ? (

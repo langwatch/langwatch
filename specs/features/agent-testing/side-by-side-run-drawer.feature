@@ -9,9 +9,9 @@ Feature: The wide run detail drawer
     sit side by side when the width allows. When it does not, the results stay
     stacked under the conversation, exactly as they are today.
 
-    The results read as the criteria split into a "Passed criteria" section
-    over a "Failed criteria" section, then a labelled "Verdict:" line under
-    them, then what the judge said. Each section is drawn only when it has
+    The results read as a labelled "Verdict:" line, then the criteria split
+    into a "Passed criteria" section over a "Failed criteria" section, then
+    what the judge said. Each section is drawn only when it has
     rows. Within a section the criteria keep the order the case declares them.
     Nothing there repeats the chips at the top of the drawer: no success rate,
     no criteria count and no duration.
@@ -92,11 +92,11 @@ Feature: The wide run detail drawer
     And no line is drawn between the messages and the results
 
   @integration
-  Scenario: The verdict line reads under the criteria
+  Scenario: The verdict line reads over the criteria
     Given a finished run open in the drawer
     When the results panel is read
     Then a "Verdict:" label is followed by "PASSED" in green or "FAILED" in red
-    And it sits under the criteria and over the judge reasoning
+    And it sits over the criteria and the judge reasoning
     And it shows no success rate, no criteria count and no duration
     And there is no terminal log box
 
