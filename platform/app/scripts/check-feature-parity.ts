@@ -449,7 +449,6 @@ const LEGACY_INERT: string[] = [
   // ADR-128 wave 1 (PR #7650) specs, every scenario @unimplemented on purpose:
   // the specs shipped ahead of the code, and each rung of the same PR binds
   // its file as it lands. Remove each entry with its first binding.
-  "specs/governance/governance-cost-screen.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
