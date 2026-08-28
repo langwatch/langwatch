@@ -1,5 +1,5 @@
 ---
-title: Run Suites from CI
+title: Run Test Suites from CI
 sidebarTitle: Run from CI
 keywords: langwatch, agent simulations, ci, test suite, run plan, batch, batchRunId, isComplete, poll, wait
 description: Start a test suite from a CI job and wait for every run of the batch to finish.
@@ -12,14 +12,14 @@ A CI job starts a test suite, keeps the batch id from the response, then polls t
 ## From the CLI
 
 ```bash
-langwatch suite run "Checkout regression" --target http:agent_abc123 --wait
+langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 ```
 
-`--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The suite is named by its id or by its name.
+`--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
 
 ## From the REST API
 
-`POST /api/v1/test-suites/{id}/run` schedules one run for each scenario of the suite, against each target you name:
+`POST /api/v1/test-suites/{id}/run` schedules one run for each scenario of the test suite, against each target you name:
 
 ```bash
 curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
@@ -31,7 +31,7 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
   }'
 ```
 
-The body takes `targets` and, when you want them, `name`, `repeatCount`, `simulatorModel`, `judgeModel`, `parameters`, `note` and `idempotencyKey`. Without `name`, the run goes under the run plan named after the suite and the target, so every run of the same suite against the same agent joins one history. Repeat the same `idempotencyKey` to make a retried job join the first run instead of starting a second one.
+The body takes `targets` and, when you want them, `name`, `repeatCount`, `simulatorModel`, `judgeModel`, `parameters`, `note` and `idempotencyKey`. Without `name`, the run goes under the run plan named after the test suite and the target, so every run of the same test suite against the same agent joins one history. Repeat the same `idempotencyKey` to make a retried job join the first run instead of starting a second one.
 
 The response carries the values the CI job needs:
 
@@ -65,7 +65,7 @@ The response carries the values the CI job needs:
 
 `batchRunId` addresses the batch. `jobCount` is the number of runs the batch gets. `created` says whether this run created the plan or joined one that already carried the name.
 
-To run a configuration of your own instead of a whole suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with the configuration it holds.
+To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with the configuration it holds.
 
 <Note>
   The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites` and `/api/v1/run-plans`.
@@ -86,7 +86,7 @@ result = langwatch.test_suites.run(
 print(result["batchRunId"])
 ```
 
-`langwatch.run_plans.run(...)` starts a plan of your own, with `scope`, `targets`, `repeat_count`, `simulator_model` and `judge_model`.
+`langwatch.run_plans.run(...)` starts a plan of your own, with `scope`, `targets`, `repeat_count`, `simulator_model` and `judge_model`. `scope="test_suites"` takes `test_suite_ids=[...]`, and `scope="scenarios"` takes `scenario_ids=[...]`.
 
 ## From TypeScript
 
@@ -180,14 +180,14 @@ exit 1
 
 The request carries its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
 
-`langwatch suite run ... --wait` does the same poll, and its exit code follows the results.
+`langwatch test-suite run ... --wait` does the same poll, and its exit code follows the results.
 
 ## Give the batch a note
 
 `--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch carries it, and the platform shows it beside the run.
 
 ```bash
-langwatch suite run suite_abc123 --target http:agent_abc123 \
+langwatch test-suite run suite_abc123 --target http:agent_abc123 \
   --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
 ```
 

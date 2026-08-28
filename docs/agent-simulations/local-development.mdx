@@ -27,8 +27,8 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 ## The loop
 
 1. Start the agent process on your machine, then start the tunnel: `langwatch agent dev --port 8010`.
-2. Run the test suite, from **Agent Testing > Scenarios** or with `langwatch suite run <suite-id> --target http:<agent-id> --wait`.
-3. Read the results, change your code, and run the suite again. The tunnel keeps forwarding to the port, so a restarted or hot-reloaded server needs no new tunnel.
+2. Run the test suite, from **Agent Testing > Scenarios** or with `langwatch test-suite run <test-suite-id> --target http:<agent-id> --wait`.
+3. Read the results, change your code, and run the test suite again. The tunnel keeps forwarding to the port, so a restarted or hot-reloaded server needs no new tunnel.
 4. Press Ctrl-C when you are done. The agent's previous URL comes back.
 
 ## Flags
@@ -56,7 +56,7 @@ The agents list and the run target selector show a **local tunnel** badge on the
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the suites you rely on against a deployed URL.
+- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 

@@ -26,7 +26,7 @@ Write criteria about outcomes, not wording. "The agent looks up the order before
 
 ## Where your scenarios live
 
-Open **Agent Testing > Scenarios** in the sidebar. The rail on the left lists the test suites of the project, and the table lists the scenarios of the open suite. A test suite is a folder with a name and the scenarios you file under it. Every project has a **Default** suite, so a new scenario always has a place. Labels organize the scenarios inside a suite:
+Open **Agent Testing > Scenarios** in the sidebar. The rail on the left lists the test suites of the project, and the table lists the scenarios of the open test suite. A test suite groups scenarios: it has a name and the scenarios you file under it. Every project has a **Default** test suite, so a new scenario always has a place. Labels organize the scenarios inside a test suite:
 
 <Frame>
 <img className="block" src="/images/agent-simulations/scenario-library.png" alt="The Scenario Library with scenarios and their labels" />
@@ -95,7 +95,7 @@ The run of one scenario is recorded like every other run. It goes under the run 
 
 ### Run a test suite
 
-A test suite runs every scenario in it against the agent you pick. This is what you run before a release, or after every change. Open the suite in **Agent Testing > Scenarios** and press **Run**.
+A test suite runs every scenario in it against the agent you pick. This is what you run before a release, or after every change. Open the test suite in **Agent Testing > Scenarios** and press **Run**.
 
 The confirmation shows what is about to run, including any parameters the scenarios declare, such as which test account to act as:
 
@@ -105,7 +105,7 @@ The confirmation shows what is about to run, including any parameters the scenar
 
 ### What a run plan is
 
-Every run belongs to a **run plan**, and the name of the plan is its identity. A suite run uses the plan named after the suite and the target, so each run of the same suite against the same agent joins one history and you see the pass rate over time. Give the run a different name to keep it apart, or the name of a plan that exists to run under that plan again.
+Every run belongs to a **run plan**, and the name of the plan is its identity. A test suite run uses the plan named after the test suite and the target, so each run of the same test suite against the same agent joins one history and you see the pass rate over time. Give the run a different name to keep it apart, or the name of a plan that exists to run under that plan again.
 
 The plan holds the configuration of the run:
 

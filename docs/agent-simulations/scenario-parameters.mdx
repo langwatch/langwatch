@@ -22,8 +22,8 @@ Agent follows the cancellation policy of the {{ params.plan }} plan
 Start one run per plan:
 
 ```bash
-langwatch suite run <suite-id> --target http:<agent-id> --param plan=free
-langwatch suite run <suite-id> --target http:<agent-id> --param plan=enterprise
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=free
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise
 ```
 
 Each run records the values it used, so every result shows which plan it tested. The run dialog in the platform, the API and the SDKs set values the same way; see [Set the values when you start a run](#set-the-values-when-you-start-a-run).
@@ -138,7 +138,7 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 Running a test suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
 
-<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
 
 The **Save and Run** button in the scenario editor skips the dialog and runs with the defaults. To change a value, start the run from the test suite in **Agent Testing > Scenarios**.
 
@@ -147,7 +147,7 @@ The **Save and Run** button in the scenario editor skips the dialog and runs wit
 `--param key=value` repeats once per parameter:
 
 ```bash
-langwatch suite run <suite-id> --target http:<agent-id> --param plan=enterprise --param region=eu-central
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param plan=enterprise --param region=eu-central
 langwatch scenario run <scenario-id> --target http:<agent-id> --param plan=free
 langwatch run-plan run --target http:<agent-id> --all --param plan=free
 ```
@@ -241,7 +241,7 @@ Bearer {{ secrets.api_token }}
 ```
 
 ```bash
-langwatch suite run <suite-id> --target http:<agent-id> --param api_token="$TENANT_API_TOKEN"
+langwatch test-suite run <test-suite-id> --target http:<agent-id> --param api_token="$TENANT_API_TOKEN"
 ```
 
 Read the value from a CI secret variable, as above. A value typed in full on the command line stays in the shell history and in the process list of the machine that runs it, which is outside what the platform can protect.
