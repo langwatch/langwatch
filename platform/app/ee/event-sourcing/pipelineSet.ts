@@ -2,6 +2,7 @@ import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipeli
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
+import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   type PulledUsageDispatcher,
@@ -12,6 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { mapCommands } from "~/server/event-sourcing/mapCommands";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 
@@ -24,6 +26,11 @@ export interface EnterprisePipelineSetConfig {
    * still records every observation, only the ledger row is skipped.
    */
   pulledUsageLedger?: PulledUsageLedgerProcessDeps;
+  /**
+   * ADR-128's daily cost rollup store. Absent without ClickHouse — the
+   * pipeline still records every observation, only the summary is skipped.
+   */
+  governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -102,7 +109,10 @@ function registerIngestionPullPipeline(
  */
 function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
   const pipeline = deps.eventSourcing.register(
-    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
+    createPulledUsageProcessingPipeline({
+      ledger: deps.pulledUsageLedger,
+      costRollupStore: deps.governanceCostRollupStore,
+    }),
   );
   return { commands: mapCommands(pipeline.commands) };
 }
