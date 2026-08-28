@@ -8,6 +8,25 @@
 
 **Current execution waves:** Wave 3 internal tRPC + strict-layout hygiene
 
+**State as of `5343bdee6e`.** 64 package-owned tRPC APIs are written across
+`packages/**/server/src/api/app-trpc/`. Nineteen verticals are wired and
+committed, mounted from `platform/app/src/runtime/app/internal-api/`. Fifteen
+`apps/api` mount files exist for the rest and are not yet wired into the
+universal root.
+
+The gap between 64 written and 19 wired is not lost work — it is on disk,
+uncommitted, and it is the next thing to finish. The old routers were restored
+from `HEAD` for every unwired vertical so that `server/api/root.ts` resolves and
+the branch is not left broken; each restored router is deleted again as its
+mount lands.
+
+The `apps/api` mount shape is the one to copy, and it is deliberately different
+from the `platform/app` one it replaces:
+`create<Feature>TrpcRouter({ root, protectedProcedure, middlewares })` takes the
+process's tRPC root and authenticated procedure as parameters and imports
+nothing from `platform/app`. That is what lets a mount live in `apps/api`
+without inverting the dependency direction.
+
 Waves 1 and 2 are closed. Wave 3's internal-tRPC column is now the active
 front, running beside the architecture-lint hygiene the strict layout needs in
 order to mean anything. Parallel work still requires independent file
