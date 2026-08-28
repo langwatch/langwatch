@@ -11,8 +11,9 @@ const StyledButton = chakra("button");
 
 /**
  * How a pill is coloured. `neutral` is one muted grey for every label.
- * `pastel` gives each label a soft colour of its own, so a row of labels can
- * be told apart at a glance.
+ * `pastel` gives each label a colour of its own, so a row of labels can be
+ * told apart at a glance. A pastel pill is drawn in the monospace face, which
+ * is what tells a label from the words of the row it sits in.
  */
 export type TagPillTone = "neutral" | "pastel";
 
@@ -55,15 +56,21 @@ export function TagPill({ label, onRemove, tone = "neutral" }: TagPillProps) {
   return (
     <HStack
       gap={1}
-      bg={palette ? `${palette}.subtle` : "bg.muted"}
+      bg={palette ? `${palette}.muted` : "bg.muted"}
       color={palette ? `${palette}.fg` : undefined}
       px={2}
       py={0.5}
       borderRadius="full"
       fontSize="xs"
+      fontFamily={palette ? "mono" : undefined}
       data-testid={`tag-pill-${label}`}
     >
-      <Text fontSize="xs">{label}</Text>
+      <Text
+        fontSize={palette ? "10.5px" : "xs"}
+        fontWeight={palette ? "medium" : undefined}
+      >
+        {label}
+      </Text>
       {onRemove && (
         <StyledButton
           type="button"

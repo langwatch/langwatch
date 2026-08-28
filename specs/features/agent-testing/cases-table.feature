@@ -83,6 +83,8 @@ Feature: The scenarios table
     Then each label is drawn as a small pill beside the name
     And each pill carries a colour of its own, so two labels never read alike
     And the pills stay quieter than the name of the scenario
+    And a label reads in the monospace face, which tells it from the words
+      of the row it sits beside
 
   @integration
   Scenario: The cases table shows the scenario column and the row actions, and no last result
