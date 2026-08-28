@@ -28,6 +28,7 @@ import {
 import {
   type OrgResolution,
   type OrgResolvedToken,
+  type ProjectResolution,
   type ResolvedToken,
   TokenResolver,
 } from "./token-resolver";
@@ -142,7 +143,7 @@ export function createUnifiedAuthMiddleware({
     if (!outcome.ok) {
       return c.json(
         refusal(outcome.refusal),
-        outcome.refusal.status as 401 | 500,
+        outcome.refusal.status as ContentfulStatusCode,
       );
     }
 
@@ -209,9 +210,9 @@ async function resolveProjectPrincipal({
     };
   }
 
-  let resolved: ResolvedToken | null;
+  let outcome: ProjectResolution;
   try {
-    resolved = await resolver.resolve({
+    outcome = await resolver.resolveProject({
       token: credentials.token,
       projectId: credentials.projectId,
     });
@@ -228,28 +229,61 @@ async function resolveProjectPrincipal({
     };
   }
 
-  if (!resolved) {
+  if (!outcome.ok) {
     logger.warn(
       {
         ...diag,
         hasToken: true,
         tokenType: getTokenType(credentials.token),
         hasProjectId: !!credentials.projectId,
+        reason: outcome.reason,
       },
-      "Authentication failed: invalid credentials",
+      "Authentication failed",
     );
-    return {
-      ok: false,
-      refusal: {
-        status: 401,
-        code: "invalid_credentials",
-        legacyError: "Unauthorized",
-        message: "Invalid credentials",
-      },
-    };
+    return { ok: false, refusal: refusalForUnresolvedProject(outcome.reason) };
   }
 
-  return { ok: true, resolved };
+  return { ok: true, resolved: outcome.resolved };
+}
+
+/**
+ * What to tell a caller whose token resolved to no project.
+ *
+ * The three reasons are three different next actions, and one message for
+ * all of them sent people to check a secret that was never the problem. A
+ * key that verified but does not reach the project it named is a permission
+ * answer, not an authentication one, so it is refused as one — and the
+ * generic 401 stays for the credential we will not describe.
+ */
+function refusalForUnresolvedProject(
+  reason: Extract<ProjectResolution, { ok: false }>["reason"],
+): AuthRefusal {
+  if (reason === "project_not_covered") {
+    return {
+      status: 403,
+      code: "project_not_covered",
+      legacyError: "Forbidden",
+      message:
+        "This API key has no access to the project named in X-Project-Id.",
+      meta: { required: "binding_covering_the_named_project" },
+    };
+  }
+  if (reason === "project_ambiguous") {
+    return {
+      status: 400,
+      code: "project_required",
+      legacyError: "Bad Request",
+      message:
+        "This API key covers more than one project. Name the project to act on with the X-Project-Id header.",
+      meta: { required: "x_project_id_header" },
+    };
+  }
+  return {
+    status: 401,
+    code: "invalid_credentials",
+    legacyError: "Unauthorized",
+    message: "Invalid credentials",
+  };
 }
 
 export { extractCredentials };
