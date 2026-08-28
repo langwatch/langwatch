@@ -290,3 +290,40 @@ Feature: The agent cache
       When the agent reads the exception
       Then nothing in it quotes the value the agent sent
       # A run shows what it printed, and an exception text is printed often.
+
+    # The route stores text. A session is a dict more often than not, and an
+    # agent that hands one over should not have to know that: the SDK stores
+    # it as JSON and reads it back parsed. What JSON carries is what comes
+    # back, so a tuple reads back as a list and a key that is not a string
+    # reads back as one.
+    @unit
+    Scenario: The SDK stores a dict or list as JSON and reads it back parsed
+      When the agent stores a dict under ACME_SESSION
+      Then the write carries the dict as JSON text
+      And reading ACME_SESSION gives the agent the dict back
+
+    # An entry holds text and nothing else, so text that is itself a JSON
+    # object or array cannot be told apart from a dict the SDK stored. Type
+    # metadata would tell them apart, but only for the entries this SDK
+    # wrote; the route, the REST callers and the other SDKs read plain text.
+    @unit
+    Scenario: JSON text an older writer stored reads back parsed
+      Given an entry written over REST holds the text of a JSON object
+      When the agent reads the entry
+      Then it gets the object parsed
+
+    @unit
+    Scenario: The SDK refuses a value it cannot store before calling the platform
+      When the agent stores a number
+      Then the agent is told which types a value can be
+      And no call reaches the platform
+
+    # A customer report: every write refused with "400 (validation_error)" and
+    # nothing more, because the message stopped at the code. The platform
+    # names the rejected field and what it expected, and that is what the
+    # caller needs. The platform's wording never quotes a value.
+    @unit
+    Scenario: A refused write names the field the platform rejected
+      Given the platform refuses a write because the value is not text
+      When the agent reads the exception
+      Then it names the field and what was expected of it

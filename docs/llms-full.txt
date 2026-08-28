@@ -35936,6 +35936,7 @@ The agent also treats a `401` as an expired session: it logs in again and retrie
 | Rule | Value |
 |---|---|
 | Entry name | `UPPER_SNAKE_CASE`, up to 64 characters |
+| Value type | `str`, `dict` or `list`. The SDK stores a `dict` or `list` as JSON and `get` returns it parsed. Over REST the value is always a string |
 | Value size | Up to 32 KB |
 | Lifetime | 5 seconds to 24 hours, 15 minutes by default |
 
@@ -35969,7 +35970,11 @@ langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)
 langwatch.cache.delete("ACME_SESSION")
 ```
 
-`get` returns the default on a miss, so no `try`/`except` is needed for that case. `claim` returns `True` when it stored the value and `False` when the name was already held, and does not raise for a name it could not take. Other errors raise.
+`get` returns `default` on a miss. `claim` returns `True` when it stored the value and `False` when another row already holds the name. Every other failure raises, with the rejected field in the message: `400 (validation_error: ttl_seconds: ttl_seconds must be at least 5)`.
+
+Pass a `str`, a `dict` or a `list` as the value. The SDK stores a `dict` or `list` as JSON and `get` returns it parsed, so JSON types apply: a tuple comes back as a `list`, a non-string key as a string, and a value JSON cannot encode (`nan`, `inf`, a set, a datetime) raises `TypeError` before the call.
+
+Text that is a JSON object or array also comes back parsed, including an entry written over REST or by an older SDK. Any other text comes back unchanged.
 
 Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
 
@@ -35979,6 +35984,7 @@ Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cac
 |---|---|
 | Agent answers are empty | The token exchange or API call raised. Check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
 | `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
+| `langwatch.cache.set` raises `400 (validation_error: value: Expected string, received object)` | The SDK in the sandbox predates dict values; it sends the object as is and the route takes a string. Pass `json.dumps(session)` and `json.loads` it after `get`, or update the SDK. |
 | Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
 
