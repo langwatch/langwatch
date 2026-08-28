@@ -88,10 +88,35 @@ good the code is.
 
 ### oxlint and oxfmt are the toolchain
 
-**Decided 2026-08-28.** Biome is removed. oxlint is the only linter and oxfmt
-the only formatter. The rules Biome carried move to oxlint rather than
-disappearing with it; a rule that cannot be expressed there is recorded as lost
-rather than quietly dropped.
+**Done 2026-08-28 (`102e74a6c6`).** Biome is removed. oxlint is the only linter
+and oxfmt the only formatter. Twenty-four rules were measured one by one against
+oxlint over `platform/app/{src,scripts,e2e,prisma,vite}` rather than assumed
+equivalent; twenty carried at `error` full-tree with an enumerated file register
+for the existing backlog. There is no warn tier, which is what makes the
+reviewdog delta gate unnecessary rather than merely absent.
+
+`apps/**` joined the lint scope in the same change. It had been linted by
+nothing — the three directories this extraction moves code *into* were the only
+unchecked ones in the repository. Its five `package-boundaries` errors were all
+tests of a composition root importing what that root imports, so the rule was
+widened to recognise `apps/{api,worker}/tests/**` rather than baselined.
+
+**Four rules were lost, and two of them are recoverable.** `noFloatingPromises`
+(39 findings) and `noMisusedPromises` (19) exist in oxlint but need
+`--type-aware` and the `oxlint-tsgolint` binary, which is not a dependency here;
+`useOptionalChain` (2) and `useLiteralKeys` are type-aware-only for the same
+reason. `noImplicitAnyLet` (35) and `noEvolvingTypes` (46) have no oxlint
+equivalent at all and need TypeScript semantics.
+
+`F-LINT-02`: **wire `oxlint-tsgolint`.** It restores all four type-aware rules
+in one move and is the highest-value lint follow-up. It needs a machine that can
+run a type-aware lint over the tree, so it is deliberately not attempted here.
+
+Two whole-tree checks are red for reasons unrelated to any current change, and
+neither should be read as a verdict on a diff: `pnpm format:check` fails on
+5,939 of 14,007 files, and `pnpm lint:oxlint` exits 1 on ~2,919 findings, all
+pre-existing `langwatch/*` architecture rules plus `eslint/curly`. The reformat
+wants one deliberate commit of its own.
 
 
 - `packages/features/catalogue.json` is the authority for the 49 singular
@@ -1232,7 +1257,7 @@ boots `platform/app`.
       Stripe and MCP test configuration by physical app/package.
 - [ ] Move test fixtures/helpers with their owner and delete duplicate bodies.
 - [ ] Update local start/dev orchestration, Vite, TS configs and package scripts.
-- [ ] Remove legacy Biome/Prettier assumptions; retain Oxfmt/Oxc.
+- [x] Remove legacy Biome/Prettier assumptions; retain Oxfmt/Oxc.
 
 Gate: all canonical tests run without setting `platform/app` as a package or
 working directory.
