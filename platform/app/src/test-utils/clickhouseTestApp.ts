@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -31,7 +32,8 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
  * right for a unit test and useless for one that asserts on rows.
  *
  * Wires the ClickHouse-backed slots a route or worker test reaches today:
- * `clickhouse`, `gateway`, `governance` and `billableEvents`. The rest keep
+ * `clickhouse`, `gateway`, `governance` (including ADR-128's cost rollup) and
+ * `billableEvents`. The rest keep
  * their `createTestApp` defaults - a throwing analytics resolver, a null
  * filter repository, an empty cross-tenant stored-object lookup, no orphan
  * reconciliation. A test whose route reaches one of those adds it here rather
@@ -103,6 +105,7 @@ export function installClickHouseTestApp({
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
       activityMonitor: new ActivityMonitorClickHouseRepository(required),
+      costRollup: new GovernanceCostRollupClickHouseRepository(required),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,

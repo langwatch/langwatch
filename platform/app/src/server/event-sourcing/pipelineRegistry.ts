@@ -3,6 +3,7 @@ import {
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
+import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import {
   createGovernanceKpisSyncHandler,
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
@@ -468,6 +469,12 @@ export interface PipelineRegistryDeps {
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
   gatewayDebits?: GatewayDebitsProcessDeps;
+  /**
+   * ADR-128's daily cost rollup store, shared by the gateway-spend pipeline
+   * here and the pulled-usage pipeline in the enterprise set. Absent without
+   * ClickHouse.
+   */
+  governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -1076,6 +1083,7 @@ export class PipelineRegistry {
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
         gatewayDebits: this.deps.gatewayDebits,
+        costRollupStore: this.deps.governanceCostRollupStore,
         settlement: {
           // Lazy: the pipeline is being built by this very call, so the
           // sweeper resolves the command sender at execution time.
