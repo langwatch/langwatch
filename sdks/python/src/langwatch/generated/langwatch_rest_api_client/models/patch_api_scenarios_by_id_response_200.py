@@ -9,16 +9,16 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_scenarios_by_id_response_200_parameters_item import (
-        GetApiScenariosByIdResponse200ParametersItem,
+    from ..models.patch_api_scenarios_by_id_response_200_parameters_item import (
+        PatchApiScenariosByIdResponse200ParametersItem,
     )
 
 
-T = TypeVar("T", bound="GetApiScenariosByIdResponse200")
+T = TypeVar("T", bound="PatchApiScenariosByIdResponse200")
 
 
 @_attrs_define
-class GetApiScenariosByIdResponse200:
+class PatchApiScenariosByIdResponse200:
     """
     Attributes:
         id (str):
@@ -26,7 +26,7 @@ class GetApiScenariosByIdResponse200:
         situation (str):
         criteria (list[str]):
         labels (list[str]):
-        parameters (list[GetApiScenariosByIdResponse200ParametersItem]):
+        parameters (list[PatchApiScenariosByIdResponse200ParametersItem]):
         platform_url (str):
         simulator_model (None | str | Unset): The model that plays the user, or null for the project default. Absent on
             servers that predate model overrides on this family.
@@ -45,7 +45,7 @@ class GetApiScenariosByIdResponse200:
     situation: str
     criteria: list[str]
     labels: list[str]
-    parameters: list[GetApiScenariosByIdResponse200ParametersItem]
+    parameters: list[PatchApiScenariosByIdResponse200ParametersItem]
     platform_url: str
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
@@ -130,8 +130,8 @@ class GetApiScenariosByIdResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_scenarios_by_id_response_200_parameters_item import (
-            GetApiScenariosByIdResponse200ParametersItem,
+        from ..models.patch_api_scenarios_by_id_response_200_parameters_item import (
+            PatchApiScenariosByIdResponse200ParametersItem,
         )
 
         d = dict(src_dict)
@@ -148,7 +148,7 @@ class GetApiScenariosByIdResponse200:
         parameters = []
         _parameters = d.pop("parameters")
         for parameters_item_data in _parameters:
-            parameters_item = GetApiScenariosByIdResponse200ParametersItem.from_dict(parameters_item_data)
+            parameters_item = PatchApiScenariosByIdResponse200ParametersItem.from_dict(parameters_item_data)
 
             parameters.append(parameters_item)
 
@@ -199,7 +199,7 @@ class GetApiScenariosByIdResponse200:
 
         test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
-        get_api_scenarios_by_id_response_200 = cls(
+        patch_api_scenarios_by_id_response_200 = cls(
             id=id,
             name=name,
             situation=situation,
@@ -214,8 +214,8 @@ class GetApiScenariosByIdResponse200:
             test_suite_id=test_suite_id,
         )
 
-        get_api_scenarios_by_id_response_200.additional_properties = d
-        return get_api_scenarios_by_id_response_200
+        patch_api_scenarios_by_id_response_200.additional_properties = d
+        return patch_api_scenarios_by_id_response_200
 
     @property
     def additional_keys(self) -> list[str]:

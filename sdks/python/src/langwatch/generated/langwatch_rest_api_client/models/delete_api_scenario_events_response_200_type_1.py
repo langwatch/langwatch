@@ -6,54 +6,59 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="DeleteApiScenarioEventsResponse400")
+T = TypeVar("T", bound="DeleteApiScenarioEventsResponse200Type1")
 
 
 @_attrs_define
-class DeleteApiScenarioEventsResponse400:
+class DeleteApiScenarioEventsResponse200Type1:
     """
     Attributes:
-        error (str):
-        message (str | Unset):
+        archived (int):
+        failed (int):
+        scenario_run_id (str):
     """
 
-    error: str
-    message: str | Unset = UNSET
+    archived: int
+    failed: int
+    scenario_run_id: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error
+        archived = self.archived
 
-        message = self.message
+        failed = self.failed
+
+        scenario_run_id = self.scenario_run_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "error": error,
+                "archived": archived,
+                "failed": failed,
+                "scenarioRunId": scenario_run_id,
             }
         )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = d.pop("error")
+        archived = d.pop("archived")
 
-        message = d.pop("message", UNSET)
+        failed = d.pop("failed")
 
-        delete_api_scenario_events_response_400 = cls(
-            error=error,
-            message=message,
+        scenario_run_id = d.pop("scenarioRunId")
+
+        delete_api_scenario_events_response_200_type_1 = cls(
+            archived=archived,
+            failed=failed,
+            scenario_run_id=scenario_run_id,
         )
 
-        delete_api_scenario_events_response_400.additional_properties = d
-        return delete_api_scenario_events_response_400
+        delete_api_scenario_events_response_200_type_1.additional_properties = d
+        return delete_api_scenario_events_response_200_type_1
 
     @property
     def additional_keys(self) -> list[str]:

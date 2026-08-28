@@ -6,54 +6,29 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="DeleteApiScenarioEventsResponse400")
+T = TypeVar("T", bound="PatchApiAgentsByIdResponse200ConfigType0")
 
 
 @_attrs_define
-class DeleteApiScenarioEventsResponse400:
-    """
-    Attributes:
-        error (str):
-        message (str | Unset):
-    """
+class PatchApiAgentsByIdResponse200ConfigType0:
+    """ """
 
-    error: str
-    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error
-
-        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "error": error,
-            }
-        )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = d.pop("error")
+        patch_api_agents_by_id_response_200_config_type_0 = cls()
 
-        message = d.pop("message", UNSET)
-
-        delete_api_scenario_events_response_400 = cls(
-            error=error,
-            message=message,
-        )
-
-        delete_api_scenario_events_response_400.additional_properties = d
-        return delete_api_scenario_events_response_400
+        patch_api_agents_by_id_response_200_config_type_0.additional_properties = d
+        return patch_api_agents_by_id_response_200_config_type_0
 
     @property
     def additional_keys(self) -> list[str]:

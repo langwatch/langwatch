@@ -713,7 +713,8 @@ export interface paths {
         };
         /** @description Get an agent by its id */
         get: operations["getApiAgentsById"];
-        put?: never;
+        /** @description Update an agent by its id */
+        put: operations["putApiAgentsById"];
         post?: never;
         /** @description Archive an agent (soft-delete) */
         delete: operations["deleteApiAgentsById"];
@@ -2968,7 +2969,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenarioEvents"];
-        /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
+        /** @description Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run). */
         delete: operations["deleteApiScenarioEvents"];
         options?: never;
         head?: never;
@@ -3026,7 +3027,8 @@ export interface paths {
         delete: operations["deleteApiScenariosById"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** @description Update an existing scenario */
+        patch: operations["patchApiScenariosById"];
         trace?: never;
     };
     "/api/scenarios/{id}/versions": {
@@ -3199,7 +3201,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations. */
         get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
@@ -4972,6 +4974,76 @@ export interface operations {
         requestBody?: never;
         responses: never;
     };
+    putApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /** @enum {string} */
+                    type?: "signature" | "code" | "workflow" | "http";
+                    config?: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     deleteApiAgentsById: {
         parameters: {
             query?: never;
@@ -5006,7 +5078,53 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Agent updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        type: "signature" | "code" | "workflow" | "http";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Agent not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body does not match the expected shape */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
     };
     listApiKeys: {
         parameters: {
@@ -22858,8 +22976,9 @@ export interface operations {
     };
     deleteApiScenarioEvents: {
         parameters: {
-            query: {
-                scenarioSetId: string;
+            query?: {
+                scenarioSetId?: string;
+                scenarioRunId?: string;
             };
             header?: never;
             path?: never;
@@ -22878,10 +22997,14 @@ export interface operations {
                         failed: number;
                         scenarioSetId: string;
                         hasMore: boolean;
+                    } | {
+                        archived: number;
+                        failed: number;
+                        scenarioRunId: string;
                     };
                 };
             };
-            /** @description Missing or invalid scenarioSetId */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -22889,6 +23012,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
+                        message?: string;
                     };
                 };
             };
@@ -22904,7 +23028,18 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Scenario run not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid scope parameter */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -22912,7 +23047,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };
@@ -23036,6 +23170,14 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
                         /** Format: uri */
@@ -23116,6 +23258,14 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
                 };
@@ -23140,6 +23290,14 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
                         /** Format: uri */
@@ -23226,6 +23384,14 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
                         /** Format: uri */
@@ -23318,6 +23484,14 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
                 };
@@ -23342,6 +23516,14 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
                         /** Format: uri */
@@ -23431,6 +23613,138 @@ export interface operations {
                     "application/json": {
                         id: string;
                         archived: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiScenariosById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    situation?: string;
+                    criteria?: string[];
+                    labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                        secret?: boolean;
+                    }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Scenario updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        situation: string;
+                        criteria: string[];
+                        labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                        }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -24513,6 +24827,8 @@ export interface operations {
                 batchRunId?: string;
                 limit?: number;
                 cursor?: string;
+                /** @description Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary. */
+                include?: "messages";
             };
             header?: never;
             path?: never;
@@ -24545,6 +24861,8 @@ export interface operations {
                                 role: string;
                                 content: string;
                             }[];
+                            /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                            messagesTruncated?: boolean;
                             timestamp: number;
                             updatedAt: number;
                             durationInMs: number;
@@ -24646,6 +24964,8 @@ export interface operations {
                             role: string;
                             content: string;
                         }[];
+                        /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                        messagesTruncated?: boolean;
                         timestamp: number;
                         updatedAt: number;
                         durationInMs: number;

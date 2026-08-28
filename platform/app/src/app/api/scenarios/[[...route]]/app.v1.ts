@@ -30,17 +30,44 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
-  simulatorModel: z.string().nullable(),
-  judgeModel: z.string().nullable(),
-  maxTurns: z.number().int().nullable(),
-  minTurns: z.number().int().nullable(),
   /**
-   * Optional in the document, not in the answer: every server sends it. The
-   * field arrived after clients were generated from this family, and a client
-   * that reads it as required fails against a server that predates it.
+   * The five fields below are optional in the document, not in the answer:
+   * every server sends them. They arrived after clients were generated from
+   * this family, and a client that reads one as required fails against a
+   * server that predates it.
    *
    * @see specs/api-reference/legacy-response-fields-optional.feature
    */
+  simulatorModel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  judgeModel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  maxTurns: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
+    ),
+  minTurns: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family.",
+    ),
   testSuiteId: z
     .string()
     .nullable()

@@ -9,44 +9,39 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_scenarios_by_id_response_200_parameters_item import (
-        GetApiScenariosByIdResponse200ParametersItem,
-    )
+    from ..models.patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
 
 
-T = TypeVar("T", bound="GetApiScenariosByIdResponse200")
+T = TypeVar("T", bound="PatchApiScenariosByIdBody")
 
 
 @_attrs_define
-class GetApiScenariosByIdResponse200:
+class PatchApiScenariosByIdBody:
     """
     Attributes:
-        id (str):
-        name (str):
-        situation (str):
-        criteria (list[str]):
-        labels (list[str]):
-        parameters (list[GetApiScenariosByIdResponse200ParametersItem]):
-        platform_url (str):
-        simulator_model (None | str | Unset): The model that plays the user, or null for the project default. Absent on
-            servers that predate model overrides on this family.
-        judge_model (None | str | Unset): The model that judges the run, or null for the project default. Absent on
-            servers that predate model overrides on this family.
-        max_turns (int | None | Unset): The most conversation turns a run of this scenario takes, or null for the
-            default. Absent on servers that predate turn limits on this family.
-        min_turns (int | None | Unset): The fewest conversation turns before the judge may end a run, or null for the
-            default. Absent on servers that predate turn limits on this family.
-        test_suite_id (None | str | Unset): The test suite this scenario is filed in, or null when unfiled. Absent on
-            servers that predate test suites.
+        name (str | Unset):
+        situation (str | Unset):
+        criteria (list[str] | Unset):
+        labels (list[str] | Unset):
+        parameters (list[PatchApiScenariosByIdBodyParametersItem] | Unset): The parameters this scenario declares by
+            name, each with an optional description and default. A run supplies values for these names, readable from the
+            scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
+            encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
+        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the
+            project default.
+        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+        max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
+        min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
+            default.
+        test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
+            suite of the same project. null files the scenario into the project's Default test suite.
     """
 
-    id: str
-    name: str
-    situation: str
-    criteria: list[str]
-    labels: list[str]
-    parameters: list[GetApiScenariosByIdResponse200ParametersItem]
-    platform_url: str
+    name: str | Unset = UNSET
+    situation: str | Unset = UNSET
+    criteria: list[str] | Unset = UNSET
+    labels: list[str] | Unset = UNSET
+    parameters: list[PatchApiScenariosByIdBodyParametersItem] | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
     max_turns: int | None | Unset = UNSET
@@ -55,22 +50,24 @@ class GetApiScenariosByIdResponse200:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        id = self.id
-
         name = self.name
 
         situation = self.situation
 
-        criteria = self.criteria
+        criteria: list[str] | Unset = UNSET
+        if not isinstance(self.criteria, Unset):
+            criteria = self.criteria
 
-        labels = self.labels
+        labels: list[str] | Unset = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = self.labels
 
-        parameters = []
-        for parameters_item_data in self.parameters:
-            parameters_item = parameters_item_data.to_dict()
-            parameters.append(parameters_item)
-
-        platform_url = self.platform_url
+        parameters: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.parameters, Unset):
+            parameters = []
+            for parameters_item_data in self.parameters:
+                parameters_item = parameters_item_data.to_dict()
+                parameters.append(parameters_item)
 
         simulator_model: None | str | Unset
         if isinstance(self.simulator_model, Unset):
@@ -104,17 +101,17 @@ class GetApiScenariosByIdResponse200:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "id": id,
-                "name": name,
-                "situation": situation,
-                "criteria": criteria,
-                "labels": labels,
-                "parameters": parameters,
-                "platformUrl": platform_url,
-            }
-        )
+        field_dict.update({})
+        if name is not UNSET:
+            field_dict["name"] = name
+        if situation is not UNSET:
+            field_dict["situation"] = situation
+        if criteria is not UNSET:
+            field_dict["criteria"] = criteria
+        if labels is not UNSET:
+            field_dict["labels"] = labels
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
         if simulator_model is not UNSET:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
@@ -130,29 +127,25 @@ class GetApiScenariosByIdResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_scenarios_by_id_response_200_parameters_item import (
-            GetApiScenariosByIdResponse200ParametersItem,
-        )
+        from ..models.patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
 
         d = dict(src_dict)
-        id = d.pop("id")
+        name = d.pop("name", UNSET)
 
-        name = d.pop("name")
+        situation = d.pop("situation", UNSET)
 
-        situation = d.pop("situation")
+        criteria = cast(list[str], d.pop("criteria", UNSET))
 
-        criteria = cast(list[str], d.pop("criteria"))
+        labels = cast(list[str], d.pop("labels", UNSET))
 
-        labels = cast(list[str], d.pop("labels"))
+        _parameters = d.pop("parameters", UNSET)
+        parameters: list[PatchApiScenariosByIdBodyParametersItem] | Unset = UNSET
+        if _parameters is not UNSET:
+            parameters = []
+            for parameters_item_data in _parameters:
+                parameters_item = PatchApiScenariosByIdBodyParametersItem.from_dict(parameters_item_data)
 
-        parameters = []
-        _parameters = d.pop("parameters")
-        for parameters_item_data in _parameters:
-            parameters_item = GetApiScenariosByIdResponse200ParametersItem.from_dict(parameters_item_data)
-
-            parameters.append(parameters_item)
-
-        platform_url = d.pop("platformUrl")
+                parameters.append(parameters_item)
 
         def _parse_simulator_model(data: object) -> None | str | Unset:
             if data is None:
@@ -199,14 +192,12 @@ class GetApiScenariosByIdResponse200:
 
         test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
-        get_api_scenarios_by_id_response_200 = cls(
-            id=id,
+        patch_api_scenarios_by_id_body = cls(
             name=name,
             situation=situation,
             criteria=criteria,
             labels=labels,
             parameters=parameters,
-            platform_url=platform_url,
             simulator_model=simulator_model,
             judge_model=judge_model,
             max_turns=max_turns,
@@ -214,8 +205,8 @@ class GetApiScenariosByIdResponse200:
             test_suite_id=test_suite_id,
         )
 
-        get_api_scenarios_by_id_response_200.additional_properties = d
-        return get_api_scenarios_by_id_response_200
+        patch_api_scenarios_by_id_body.additional_properties = d
+        return patch_api_scenarios_by_id_body
 
     @property
     def additional_keys(self) -> list[str]:

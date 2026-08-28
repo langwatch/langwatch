@@ -8,11 +8,11 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="DeleteApiScenarioEventsResponse400")
+T = TypeVar("T", bound="PutApiAgentsByIdResponse422")
 
 
 @_attrs_define
-class DeleteApiScenarioEventsResponse400:
+class PutApiAgentsByIdResponse422:
     """
     Attributes:
         error (str):
@@ -47,13 +47,13 @@ class DeleteApiScenarioEventsResponse400:
 
         message = d.pop("message", UNSET)
 
-        delete_api_scenario_events_response_400 = cls(
+        put_api_agents_by_id_response_422 = cls(
             error=error,
             message=message,
         )
 
-        delete_api_scenario_events_response_400.additional_properties = d
-        return delete_api_scenario_events_response_400
+        put_api_agents_by_id_response_422.additional_properties = d
+        return put_api_agents_by_id_response_422
 
     @property
     def additional_keys(self) -> list[str]:
