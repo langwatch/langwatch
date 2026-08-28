@@ -4,15 +4,12 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
-import { waitForBatchRun } from "../../utils/waitForBatchRun";
+import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
 import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
-import {
-  reportScheduledRun,
-  reportSkippedArchived,
-} from "../run-plans/reportRun";
+import { emitRunResult } from "../run-plans/reportRun";
 
-export interface RunScenarioOptions {
+export interface RunScenarioOptions extends RawOutputFlags {
   target?: string[];
   name?: string;
   repeat?: string;
@@ -20,7 +17,6 @@ export interface RunScenarioOptions {
   note?: string;
   idempotencyKey?: string;
   wait?: boolean;
-  format?: string;
 }
 
 /**
@@ -69,24 +65,7 @@ export const runScenarioCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    reportSkippedArchived(result);
-
-    if (!options.wait) {
-      reportScheduledRun({ result, note });
-      return;
-    }
-
-    await waitForBatchRun({
-      batchRunId: result.batchRunId,
-      jobCount: result.jobCount,
-      action: "run the scenario",
-      subject: "scenario run",
-    });
+    await emitRunResult({ result, note, options, subject: "scenario run" });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the scenario" });
     process.exit(1);

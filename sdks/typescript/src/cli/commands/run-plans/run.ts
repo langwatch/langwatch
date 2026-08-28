@@ -4,7 +4,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
-import { waitForBatchRun } from "../../utils/waitForBatchRun";
+import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import {
@@ -13,9 +13,9 @@ import {
   parseTargets,
   type ScopeOptions,
 } from "./scopeFlags";
-import { reportScheduledRun, reportSkippedArchived } from "./reportRun";
+import { emitRunResult } from "./reportRun";
 
-export interface RunPlanRunOptions extends ScopeOptions {
+export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   target?: string[];
   name?: string;
   repeat?: string;
@@ -25,7 +25,6 @@ export interface RunPlanRunOptions extends ScopeOptions {
   note?: string;
   idempotencyKey?: string;
   wait?: boolean;
-  format?: string;
 }
 
 /**
@@ -82,26 +81,7 @@ export const runRunPlanCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    // JSON first: the skipped-archived details are already inside the document,
-    // and prose printed before it would corrupt the parser's stdout.
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    reportSkippedArchived(result);
-
-    if (!options.wait) {
-      reportScheduledRun({ result, note });
-      return;
-    }
-
-    await waitForBatchRun({
-      batchRunId: result.batchRunId,
-      jobCount: result.jobCount,
-      action: "run the plan",
-      subject: "run",
-    });
+    await emitRunResult({ result, note, options, subject: "run" });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the plan" });
     process.exit(1);

@@ -4,16 +4,13 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
-import { waitForBatchRun } from "../../utils/waitForBatchRun";
+import type { RawOutputFlags } from "../../utils/output";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { resolveSuiteId } from "./resolveSuite";
 import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
-import {
-  reportScheduledRun,
-  reportSkippedArchived,
-} from "../run-plans/reportRun";
+import { emitRunResult } from "../run-plans/reportRun";
 
-export interface RunTestSuiteOptions {
+export interface RunTestSuiteOptions extends RawOutputFlags {
   target?: string[];
   name?: string;
   repeat?: string;
@@ -23,7 +20,6 @@ export interface RunTestSuiteOptions {
   note?: string;
   idempotencyKey?: string;
   wait?: boolean;
-  format?: string;
 }
 
 /**
@@ -75,26 +71,7 @@ export const runTestSuiteCommand = async ({
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    // JSON first: the skipped-archived details are already inside the document,
-    // and prose printed before it would corrupt the parser's stdout.
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    reportSkippedArchived(result);
-
-    if (!options.wait) {
-      reportScheduledRun({ result, note });
-      return;
-    }
-
-    await waitForBatchRun({
-      batchRunId: result.batchRunId,
-      jobCount: result.jobCount,
-      action: "run the test suite",
-      subject: "test suite run",
-    });
+    await emitRunResult({ result, note, options, subject: "test suite run" });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the test suite" });
     process.exit(1);
