@@ -10,13 +10,13 @@ import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { inferAllTargetMappings } from "~/experiments-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Field } from "@langwatch/workflow-contract";
-import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
+import { areFormValuesEqual } from "@langwatch/prompt-web/forms";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import type { TabData } from "../../prompt-playground-store/DraggableTabsBrowserStore";
+import type { TabData } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**

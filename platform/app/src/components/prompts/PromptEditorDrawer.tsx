@@ -27,12 +27,12 @@ import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { type SaveDialogFormValues, SaveVersionDialog } from "~/prompts/forms/SaveVersionDialog";
-import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import {
   areFormValuesEqual,
   buildDefaultFormValues,
+  type ChangeHandleFormValues,
   getSaveBlockerMessage,
   hasNonEmptySystemMessage,
   type PromptConfigFormValues,

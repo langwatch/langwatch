@@ -8,7 +8,7 @@ import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";

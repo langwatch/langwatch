@@ -2,16 +2,18 @@ import { Skeleton } from "@chakra-ui/react";
 import { groupBy } from "lodash-es";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { promptContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { promptContextChip } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PublishedPromptContent } from "./PublishedPromptContent";
-import { Sidebar } from "./ui/Sidebar";
-import { SidebarEmptyState } from "./ui/SidebarEmptyState";
+import {
+  Sidebar,
+  SidebarEmptyState,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 
 /**
  * Displays a list of published prompts grouped by folder.

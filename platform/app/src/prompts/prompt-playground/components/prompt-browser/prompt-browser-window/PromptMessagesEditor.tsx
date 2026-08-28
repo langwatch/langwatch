@@ -1,5 +1,5 @@
 import { useFieldArray, useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 
 /**

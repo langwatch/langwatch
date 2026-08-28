@@ -1,4 +1,4 @@
-import type { Snippet } from "../../types";
+import type { Snippet } from "./openapi-snippet.types";
 
 /**
  * Returns code snippets for getting prompts from the LangWatch API

@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { PromptScope } from "~/generated/prisma/client";
 
-import { isValidHandle } from "@langwatch/prompt-contract";
+import {
+  isValidHandle,
+  type PromptScope,
+  scopeSchema,
+} from "@langwatch/prompt-contract";
 
 export const changeHandleFormSchema = z.object({
   handle: z
@@ -12,7 +15,7 @@ export const changeHandleFormSchema = z.object({
       message:
         "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
     }),
-  scope: z.nativeEnum(PromptScope),
+  scope: scopeSchema,
 });
 
 export type ChangeHandleFormValues = z.infer<typeof changeHandleFormSchema>;

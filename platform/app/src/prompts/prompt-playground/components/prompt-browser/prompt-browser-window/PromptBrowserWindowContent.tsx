@@ -3,16 +3,16 @@ import {
   type LayoutMode,
   LayoutModeContext,
 } from "@langwatch/prompt-web/surfaces/prompt-layout";
-import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
+import {
+  type TabData,
+  useTabId,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { cloneDeep, debounce } from "lodash-es";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "~/prompts/hooks";
-import {
-  type TabData,
-  useDraggableTabsBrowserStore,
-} from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";

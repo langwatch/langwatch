@@ -1,5 +1,5 @@
 import { PublishedPromptsList } from "./PublishedPromptsList";
-import { Sidebar } from "./ui/Sidebar";
+import { Sidebar } from "@langwatch/prompt-web/screens/prompt-studio";
 
 /**
  * The Prompt Playground sidebar component.

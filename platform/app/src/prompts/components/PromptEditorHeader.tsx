@@ -3,7 +3,7 @@ import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { DeployPromptDialog } from "~/prompts/components/DeployPromptDialog";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { SavePromptButton } from "~/prompts/components/SavePromptButton";

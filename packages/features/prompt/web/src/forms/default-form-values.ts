@@ -1,10 +1,16 @@
 import { merge } from "lodash-es";
-import { PromptScope } from "~/generated/prisma/client";
 
-import { DEFAULT_MODEL, FALLBACK_MAX_TOKENS } from "~/utils/constants";
-import type { DeepPartial } from "~/utils/types";
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 
-import type { PromptConfigFormValues } from "../types";
+import { FALLBACK_MAX_TOKENS } from "../surfaces/llm-parameters/token-limits";
+import type { PromptConfigFormValues } from "./prompt-form.schemas";
+
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+
+// Auto-derived from the model registry — always the newest plain
+// `openai/gpt-<major>.<minor>` flagship. Hard fallback only for the
+// unreachable case where the registry has no plain flagship.
+const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
 /**
  * Single source of truth for default prompt configuration.
@@ -12,7 +18,7 @@ import type { PromptConfigFormValues } from "../types";
  */
 export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   handle: null,
-  scope: PromptScope.PROJECT,
+  scope: "PROJECT",
   version: {
     parameters: {},
     configData: {

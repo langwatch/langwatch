@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
+import { areFormValuesEqual } from "@langwatch/prompt-web/forms";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { api } from "~/utils/api";
 import { useTabById } from "../prompt-playground-store/useTabById";

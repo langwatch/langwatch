@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import type { Output, OutputType } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import type { LlmConfigOutputType } from "~/types";
 import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
 

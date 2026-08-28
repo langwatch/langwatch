@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDefaultFormValues } from "../buildDefaultFormValues";
+import { buildDefaultFormValues } from "../../src/forms/default-form-values";
 
 describe("buildDefaultFormValues", () => {
   describe("unified defaults", () => {

@@ -3,10 +3,8 @@ import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import {
-  isNodeDataEqual,
-  versionedPromptToOptimizationStudioNodeData,
-} from "~/prompts/utils/llmPromptConfigUtils";
+import { isNodeDataEqual } from "@langwatch/prompt-web/forms";
+import { versionedPromptToOptimizationStudioNodeData } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 /**

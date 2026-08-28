@@ -1,13 +1,16 @@
 import { z } from "zod";
 
-import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
-import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import {
+  getLatestConfigVersionSchema,
   handleSchema,
   runtimeParametersSchema,
   scopeSchema,
 } from "@langwatch/prompt-contract";
-import { versionMetadataSchema } from "./version-metadata-schema";
+import {
+  FALLBACK_MAX_TOKENS,
+  MIN_MAX_TOKENS,
+} from "../surfaces/llm-parameters/token-limits";
+import { versionMetadataSchema } from "./version-metadata.schemas";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
@@ -195,3 +198,21 @@ export const formSchema = baseFormSchema;
  * legacy / pre-#3196 prompts still hydrate.
  */
 export const formSchemaForSave = withSystemPromptRequired(baseFormSchema);
+
+/**
+ * Form values for prompt configuration management, inferred from formSchema.
+ *
+ * Represents the complete shape of a prompt config form including:
+ * - handle, scope, and version metadata
+ * - prompt/messages content
+ * - inputs/outputs definitions
+ * - LLM settings (model, temperature, max_tokens, litellm_params)
+ * - demonstrations and prompting_technique
+ *
+ * Used throughout the prompt-configs module for form handling, validation,
+ * and state management in usePromptConfigForm, PromptConfigForm, and related
+ * components.
+ *
+ * @see formSchema - Source schema definition
+ */
+export type PromptConfigFormValues = z.infer<typeof formSchema>;

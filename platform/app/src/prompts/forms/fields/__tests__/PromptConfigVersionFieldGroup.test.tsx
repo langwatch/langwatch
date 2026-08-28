@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 
 // Mock the optimization studio hooks that have complex dependencies
 vi.mock("@langwatch/workflow-web", () => ({

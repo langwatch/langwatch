@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 
-import { isNodeDataEqual } from "../nodeDataComparison";
+import { isNodeDataEqual } from "../../src/forms/node-data-comparison";
 
 type NodeData = Node<LlmPromptConfigComponent>["data"];
 

@@ -1,5 +1,5 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { Checkbox } from "~/components/ui/checkbox";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 
 /**
  * Sync checkbox for enabling/disabling chat sync across tabs.

@@ -11,14 +11,15 @@ import type {
   NodeDataset,
   Signature,
 } from "@langwatch/workflow-contract";
-import { formSchema, handleSchema, type PromptConfigFormValues } from "~/prompts";
-import type { SaveVersionParams } from "~/prompts/providers/types";
 import {
+  formSchema,
+  type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
-} from "~/prompts/schemas/version-metadata-schema";
+} from "@langwatch/prompt-web/forms";
+import type { SaveVersionParams } from "~/prompts/providers/types";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import { handleSchema, type VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,
@@ -754,5 +755,3 @@ export function versionedPromptToOptimizationStudioNodeData(
     ],
   };
 }
-
-export { isNodeDataEqual } from "./nodeDataComparison";

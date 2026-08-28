@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ResizableDivider } from "../ResizableDivider";
+import { ResizableDivider } from "../../../src/screens/prompt-studio/resizable-divider";
 
 const renderDivider = (props: {
   isExpanded?: boolean;

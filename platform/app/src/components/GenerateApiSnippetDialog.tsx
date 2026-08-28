@@ -3,7 +3,7 @@ import type { PrismLanguage } from "@react-email/components";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import type { Snippet, Target } from "~/prompts/types";
+import type { Snippet, Target } from "@langwatch/prompt-web/surfaces/api-snippet";
 import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";

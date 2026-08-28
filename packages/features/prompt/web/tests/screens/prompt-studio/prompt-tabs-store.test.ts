@@ -3,7 +3,7 @@ import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
-} from "../DraggableTabsBrowserStore";
+} from "../../../src/screens/prompt-studio/prompt-tabs-store";
 
 // Mock localStorage
 const localStorageMock = (() => {

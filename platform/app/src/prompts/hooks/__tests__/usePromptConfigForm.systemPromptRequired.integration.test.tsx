@@ -25,8 +25,10 @@ vi.mock("~/hooks/useModelLimits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
-import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
-import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import {
+  buildDefaultFormValues,
+  hasNonEmptySystemMessage,
+} from "@langwatch/prompt-web/forms";
 import { usePromptConfigForm } from "../usePromptConfigForm";
 
 interface MutationCall {

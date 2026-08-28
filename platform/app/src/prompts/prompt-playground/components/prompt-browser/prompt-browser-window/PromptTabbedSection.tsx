@@ -1,5 +1,8 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
+import {
+  ResizableDivider,
+  useTabId,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
@@ -8,7 +11,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { RuntimeParametersField } from "~/prompts/forms/fields/RuntimeParametersField";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import type { LlmConfigInputType } from "~/types";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import {
@@ -17,7 +20,6 @@ import {
 } from "../../chat/PromptPlaygroundChat";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
 import type { LayoutMode } from "@langwatch/prompt-web/surfaces/prompt-layout";
-import { ResizableDivider } from "./ResizableDivider";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

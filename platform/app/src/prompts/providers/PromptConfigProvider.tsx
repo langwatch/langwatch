@@ -12,7 +12,7 @@ import {
 } from "~/utils/trpcError";
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import { type SaveDialogFormValues, SaveVersionDialog } from "../forms/SaveVersionDialog";
-import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
+import type { ChangeHandleFormValues } from "@langwatch/prompt-web/forms";
 import { usePrompts } from "../hooks/usePrompts";
 import type { PromptConfigContextType } from "./types";
 

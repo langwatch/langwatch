@@ -3,10 +3,12 @@ import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import type { PromptConfigFormValues } from "~/prompts";
+import {
+  getSaveBlockerMessage,
+  type PromptConfigFormValues,
+} from "@langwatch/prompt-web/forms";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -14,10 +16,8 @@ import {
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
-import {
-  type TabData,
-  useDraggableTabsBrowserStore,
-} from "../prompt-playground-store/DraggableTabsBrowserStore";
+import type { TabData } from "@langwatch/prompt-web/screens/prompt-studio";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
  * Hook to handle the saving of a prompt in the prompt studio.

@@ -13,12 +13,12 @@ import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
-} from "../../../../prompt-playground-store/DraggableTabsBrowserStore";
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { PromptTabbedSection } from "../PromptTabbedSection";
 
 // Mock localStorage

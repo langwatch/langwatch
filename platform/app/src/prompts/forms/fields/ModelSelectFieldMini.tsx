@@ -12,7 +12,7 @@ import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSel
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import type { LlmConfigOutputType } from "~/types";
 
 type ModelSelectFieldMiniProps = {

@@ -19,8 +19,10 @@ import {
 } from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
-import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import {
+  type PromptConfigFormValues,
+  versionMetadataToNodeFormat,
+} from "@langwatch/prompt-web/forms";
 import type { ChatMessage } from "@langwatch/trace-contract";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";

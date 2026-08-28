@@ -13,13 +13,13 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  type Tab,
   TabIdProvider,
   useIsOverflowing,
   useTabId,
 } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Tab } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptTabStrip } from "../PromptTabStrip";
 import { usePromptBrowserTabController } from "../tab/usePromptBrowserTabController";
 import { DraggableTabsBrowser } from "../ui/DraggableTabsBrowser";

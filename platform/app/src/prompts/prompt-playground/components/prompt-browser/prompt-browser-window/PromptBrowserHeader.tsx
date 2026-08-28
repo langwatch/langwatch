@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";

@@ -1,7 +1,10 @@
 import { HStack } from "@chakra-ui/react";
-import { TabIdProvider, useIsOverflowing } from "@langwatch/prompt-web/screens/prompt-studio";
+import {
+  type Tab,
+  TabIdProvider,
+  useIsOverflowing,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { useRef } from "react";
-import type { Tab } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptTabSwitcher } from "./switcher/PromptTabSwitcher";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";

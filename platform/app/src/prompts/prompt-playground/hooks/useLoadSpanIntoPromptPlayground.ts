@@ -4,8 +4,10 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LLM_PARAMETER_MAP } from "@langwatch/prompt-contract";
-import { formSchema } from "~/prompts/schemas";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import {
+  formSchema,
+  type PromptConfigFormValues,
+} from "@langwatch/prompt-web/forms";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import type { ChatMessage } from "@langwatch/trace-contract";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -13,10 +15,8 @@ import { useSearchParams } from "~/utils/compat/next-navigation";
 import { useRouter } from "~/utils/compat/next-router";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getRoutePath } from "~/utils/routes";
-import {
-  TabDataSchema,
-  useDraggableTabsBrowserStore,
-} from "../prompt-playground-store/DraggableTabsBrowserStore";
+import { TabDataSchema } from "@langwatch/prompt-web/screens/prompt-studio";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 const logger = createLogger("useLoadSpanIntoPromptPlayground");
 

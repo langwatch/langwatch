@@ -10,7 +10,7 @@ import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 import {
   type ChangeHandleFormValues,
   createChangeHandleFormSchema,
-} from "./schemas/change-handle-form.schema";
+} from "@langwatch/prompt-web/forms";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;

@@ -2,15 +2,15 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TabIdProvider } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
   getStoreForTesting,
+  PromptPlaygroundChatProvider,
+  TabIdProvider,
   type TabData,
-} from "../../../prompt-playground-store/DraggableTabsBrowserStore";
-import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { SyncedChatInput } from "../SyncedChatInput";
 
 // Mock localStorage

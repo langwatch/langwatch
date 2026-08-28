@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef } from "react";
 import { type DeepPartial, useForm } from "react-hook-form";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
+  buildDefaultFormValues,
   formSchema,
   formSchemaForSave,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
-} from "~/prompts";
+} from "@langwatch/prompt-web/forms";
 import { salvageValidData } from "~/utils/zodSalvage";
-import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 
 interface UsePromptConfigFormProps {

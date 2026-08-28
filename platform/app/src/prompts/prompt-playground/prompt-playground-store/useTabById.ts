@@ -1,4 +1,5 @@
-import { type Tab, useDraggableTabsBrowserStore } from "./DraggableTabsBrowserStore";
+import type { Tab } from "@langwatch/prompt-web/screens/prompt-studio";
+import { useDraggableTabsBrowserStore } from "./DraggableTabsBrowserStore";
 
 /**
  * useTabById

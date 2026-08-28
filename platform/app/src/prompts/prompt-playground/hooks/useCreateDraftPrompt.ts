@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { getMaxTokenLimit } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { buildDefaultFormValues } from "@langwatch/prompt-web/forms";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 

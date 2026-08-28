@@ -8,8 +8,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { formSchemaForSave } from "../form-schema";
+import { DEFAULT_FORM_VALUES } from "../../src/forms/default-form-values";
+import { formSchemaForSave } from "../../src/forms/prompt-form.schemas";
 
 describe("formSchemaForSave — system prompt required refinement (Issue #3196)", () => {
   function valuesWithMessages(

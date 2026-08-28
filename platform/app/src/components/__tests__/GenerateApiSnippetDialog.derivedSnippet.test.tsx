@@ -21,7 +21,7 @@ import type React from "react";
 import { Profiler } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { Snippet, Target } from "~/prompts/types";
+import type { Snippet, Target } from "@langwatch/prompt-web/surfaces/api-snippet";
 import { GenerateApiSnippetDialog } from "../GenerateApiSnippetDialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

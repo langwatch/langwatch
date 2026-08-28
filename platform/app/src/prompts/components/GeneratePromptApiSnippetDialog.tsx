@@ -3,7 +3,7 @@ import type React from "react";
 import { useMemo } from "react";
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import { Link } from "~/components/ui/link";
-import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
+import { getGetPromptSnippets } from "@langwatch/prompt-web/surfaces/api-snippet";
 
 interface GeneratePromptApiSnippetButtonProps {
   promptHandle?: string | null;

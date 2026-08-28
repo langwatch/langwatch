@@ -15,12 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DeepPartial } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
-} from "../../../prompt-playground-store/DraggableTabsBrowserStore";
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { ExperimentFromPlaygroundButton } from "../ExperimentFromPlaygroundButton";
 
 // Mock localStorage

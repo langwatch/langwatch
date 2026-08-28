@@ -2,7 +2,7 @@ import { HStack, type StackProps, Text } from "@chakra-ui/react";
 import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import { CopyButton } from "../../../components/CopyButton";
 import { EditPromptHandleButton } from "./EditPromptHandleButton";
 

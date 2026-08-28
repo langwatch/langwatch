@@ -1,5 +1,8 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
+import {
+  DeletableMessage,
+  useTabId,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { AssistantMessage, CopilotChat, UserMessage } from "@copilotkit/react-ui";
 import clsx from "clsx";
@@ -9,11 +12,10 @@ import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
-import type { PromptConfigFormValues } from "~/prompts/types";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import type { ChatMessage } from "@langwatch/trace-contract";
 import { isLLMErrorType } from "~/utils/formatLLMError";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import { DeletableMessage } from "./DeletableMessage";
 import { ErrorMessage } from "./ErrorMessage";
 import { StructuredOutputDisplay } from "./StructuredOutputDisplay";
 import { SyncedChatInput } from "./SyncedChatInput";
