@@ -1375,21 +1375,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         eventingRetention,
       )
     : undefined;
-  const configuredGlobalConcurrency = Number(process.env.GLOBAL_QUEUE_CONCURRENCY);
   const queueFactory = redis
     ? createEventingGroupQueueFactory({
         consumersEnabled: roleRunsWorkers(config.processRole),
         dependencies: {
           redis,
-          policy: {
-            globalConcurrency:
-              Number.isSafeInteger(configuredGlobalConcurrency) && configuredGlobalConcurrency > 0
-                ? configuredGlobalConcurrency
-                : undefined,
-            compression: process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true" ? "zstd" : "gzip",
-            payloadCodec:
-              process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true" ? "msgpack" : "json",
-          },
+          policy: config.groupQueue,
           objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
           resolveStorageDestination: resolveProjectStorageDestination,
         },
@@ -2277,6 +2268,10 @@ export function createTestApp(
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
+    groupQueue: {
+      compression: "gzip",
+      payloadCodec: "json",
+    },
     nlpLambda: resolveNlpLambdaRuntimeConfig({}),
     featureFlags: resolveFeatureFlagConfig({}),
     scenarioExecution: {

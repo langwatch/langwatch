@@ -235,6 +235,11 @@ export function createEnvConfig(source) {
           .regex(/^(?:[0-9]|1[0-5])$/, "REDIS_DB_INDEX must be 0-15")
           .optional(),
       ),
+      // Queue policy remains permissive at this boundary so composition can
+      // preserve the established fallback behaviour for malformed values.
+      GLOBAL_QUEUE_CONCURRENCY: z.string().optional(),
+      GROUP_QUEUE_ZSTD_WRITES_ENABLED: z.string().optional(),
+      GROUP_QUEUE_MSGPACK_WRITES_ENABLED: z.string().optional(),
       LANGWATCH_FOLD_CACHE_TTL_SECONDS: z.string().optional(),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
       // Opt out of Google Cloud DLP entirely. When set, the google_dlp PII
@@ -616,6 +621,9 @@ export function createEnvConfig(source) {
       SKIP_REDIS:
         source.SKIP_REDIS === "1" || source.SKIP_REDIS?.toLowerCase() === "true",
       REDIS_DB_INDEX: source.REDIS_DB_INDEX,
+      GLOBAL_QUEUE_CONCURRENCY: source.GLOBAL_QUEUE_CONCURRENCY,
+      GROUP_QUEUE_ZSTD_WRITES_ENABLED: source.GROUP_QUEUE_ZSTD_WRITES_ENABLED,
+      GROUP_QUEUE_MSGPACK_WRITES_ENABLED: source.GROUP_QUEUE_MSGPACK_WRITES_ENABLED,
       LANGWATCH_FOLD_CACHE_TTL_SECONDS: source.LANGWATCH_FOLD_CACHE_TTL_SECONDS,
       GOOGLE_APPLICATION_CREDENTIALS: source.GOOGLE_APPLICATION_CREDENTIALS,
       LANGWATCH_DISABLE_GOOGLE_DLP:

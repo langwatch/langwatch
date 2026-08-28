@@ -1,8 +1,10 @@
+import { RedisConfigService } from "@langwatch/redis-client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { initializeEnvironmentConfig, resetEnvironmentConfigForTests } from "../../../env.mjs";
 import {
   createAppConfigFromEnv,
   type ProcessRole,
+  resolveGroupQueueProcessConfig,
   resolveLangyWorkerConfig,
   roleRunsWorkers,
   roleSatisfiesRunIn,
@@ -31,6 +33,76 @@ describe("Gateway virtual-key process configuration", () => {
     expect(createAppConfigFromEnv().virtualKeyPepper).toBe(
       "configured-virtual-key-pepper-32-bytes",
     );
+  });
+});
+
+describe("Group Queue process configuration", () => {
+  it("keeps malformed and absent values on the established queue defaults", () => {
+    expect(
+      resolveGroupQueueProcessConfig({
+        globalConcurrency: "0",
+        zstdWritesEnabled: "TRUE",
+        msgpackWritesEnabled: "1",
+        tenantConcurrencyCap: "-1",
+        globalConcurrencyBudget: "not-a-number",
+      }),
+    ).toEqual({
+      globalConcurrency: undefined,
+      tenantConcurrencyCap: undefined,
+      globalConcurrencyBudget: undefined,
+      compression: "gzip",
+      payloadCodec: "json",
+    });
+  });
+
+  it("maps queue concurrency, codecs, and dispatch caps once into AppConfig", () => {
+    initializeEnvironmentConfig({
+      NODE_ENV: "test",
+      BUILD_TIME: "1",
+      SKIP_ENV_VALIDATION: "1",
+      BASE_HOST: "http://localhost:5560",
+      GLOBAL_QUEUE_CONCURRENCY: "64",
+      GROUP_QUEUE_ZSTD_WRITES_ENABLED: "true",
+      GROUP_QUEUE_MSGPACK_WRITES_ENABLED: "true",
+      LANGWATCH_DISPATCH_TENANT_CAP: "0",
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: "320",
+    });
+
+    expect(createAppConfigFromEnv().groupQueue).toEqual({
+      globalConcurrency: 64,
+      tenantConcurrencyCap: 0,
+      globalConcurrencyBudget: 320,
+      compression: "zstd",
+      payloadCodec: "msgpack",
+    });
+  });
+
+  it("passes cluster configuration through while Redis pins its database to zero", () => {
+    initializeEnvironmentConfig({
+      NODE_ENV: "test",
+      BUILD_TIME: "1",
+      SKIP_ENV_VALIDATION: "1",
+      BASE_HOST: "http://localhost:5560",
+      REDIS_CLUSTER_ENDPOINTS: "one:6379,two:6380",
+      REDIS_DB_INDEX: "3",
+    });
+
+    const config = createAppConfigFromEnv();
+    const resolution = new RedisConfigService().resolve({
+      clusterEndpoints: config.redisClusterEndpoints,
+      dbIndex: config.redisDbIndex,
+    });
+
+    expect(resolution).toMatchObject({
+      configured: true,
+      mode: "cluster",
+      db: 0,
+      endpoints: [
+        { host: "one", port: 6379 },
+        { host: "two", port: 6380 },
+      ],
+    });
+    expect(resolution.warnings).toHaveLength(1);
   });
 });
 

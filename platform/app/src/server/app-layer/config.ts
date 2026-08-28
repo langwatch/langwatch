@@ -14,6 +14,7 @@ import {
 } from "@langwatch/evaluation-server";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { z } from "zod";
+import type { GroupQueuePolicy } from "@langwatch/group-queue";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -78,6 +79,37 @@ export function roleSatisfiesRunIn({
   return runIn.includes(processRole);
 }
 
+/**
+ * The queue's operational policy after the executable has selected its
+ * environment source. `undefined` deliberately lets Group Queue apply its
+ * established defaults; zero remains meaningful for the two dispatch caps.
+ */
+export type GroupQueueProcessConfig = GroupQueuePolicy;
+
+/**
+ * Maps the legacy queue environment names once, at process composition.
+ *
+ * This preserves the former `Number(...)` handling for global concurrency:
+ * only a positive safe integer overrides the queue default. Dispatch caps are
+ * non-negative so `0` remains the documented kill switch / disabled dynamic
+ * budget. Codec flags retain their exact true-only opt-in semantics.
+ */
+export function resolveGroupQueueProcessConfig(source: {
+  globalConcurrency?: string | undefined;
+  zstdWritesEnabled?: string | undefined;
+  msgpackWritesEnabled?: string | undefined;
+  tenantConcurrencyCap?: string | undefined;
+  globalConcurrencyBudget?: string | undefined;
+}): GroupQueueProcessConfig {
+  return {
+    globalConcurrency: positiveSafeIntegerOrUndefined(source.globalConcurrency),
+    tenantConcurrencyCap: nonNegativeSafeIntegerOrUndefined(source.tenantConcurrencyCap),
+    globalConcurrencyBudget: nonNegativeSafeIntegerOrUndefined(source.globalConcurrencyBudget),
+    compression: source.zstdWritesEnabled === "true" ? "zstd" : "gzip",
+    payloadCodec: source.msgpackWritesEnabled === "true" ? "msgpack" : "json",
+  };
+}
+
 export interface AppConfig {
   nodeEnv: string;
 
@@ -96,6 +128,8 @@ export interface AppConfig {
   redisClusterEndpoints?: string;
   /** Raw `REDIS_DB_INDEX`; `@langwatch/redis-client` validates and applies it. */
   redisDbIndex?: string;
+  /** Validated policy supplied to Group Queue at process composition. */
+  groupQueue: GroupQueueProcessConfig;
 
   // Services
   langevalsEndpoint?: string;
@@ -186,6 +220,13 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
   const eventing = resolveLegacyEventingConfig({
     LANGWATCH_FOLD_CACHE_TTL_SECONDS: env.LANGWATCH_FOLD_CACHE_TTL_SECONDS,
   });
+  const groupQueue = resolveGroupQueueProcessConfig({
+    globalConcurrency: env.GLOBAL_QUEUE_CONCURRENCY,
+    zstdWritesEnabled: env.GROUP_QUEUE_ZSTD_WRITES_ENABLED,
+    msgpackWritesEnabled: env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED,
+    tenantConcurrencyCap: env.LANGWATCH_DISPATCH_TENANT_CAP,
+    globalConcurrencyBudget: env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
+  });
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -197,6 +238,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     redisDbIndex: env.REDIS_DB_INDEX,
+    groupQueue,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     scenarioExecution: {
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
@@ -240,6 +282,16 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     evaluationInputsOffload,
     eventingFoldCacheTtlSeconds: eventing.foldCacheTtlSeconds,
   };
+}
+
+function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function readEvaluationByteEnv(raw: string | undefined, fallback: number): number {
