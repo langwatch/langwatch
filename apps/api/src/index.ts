@@ -7,6 +7,14 @@ export {
 } from "./api-rest.security";
 export { ApiProductionComposition } from "./app/api-production.composition";
 export {
+  ApiAuthSessionCompositionPort,
+  ApiBrowserSessionTransportPort,
+  AuthSessionApiAuthenticationAdapter,
+  BetterAuthBrowserSessionTransportAdapter,
+  type ApiAuthSessionDependencies,
+  type BetterAuthSessionLookup,
+} from "./app/api-auth.composition";
+export {
   ApiHttpListener,
   type ApiHttpListenerOptions,
   type ApiListenerAddress,

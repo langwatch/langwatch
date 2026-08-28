@@ -122,6 +122,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/auth/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract

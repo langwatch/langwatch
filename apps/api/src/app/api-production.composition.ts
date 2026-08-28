@@ -1,11 +1,6 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import {
-  ApiAuditPort,
-  ApiAuthenticationPort,
-  ApiAuthorizationPort,
-  ApiRequestPolicy,
-} from "../api-request.policy";
+import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../api-request.policy";
 import { ApiProcess } from "../api.process";
 import {
   ApiRuntimeCompositionPort,
@@ -14,19 +9,23 @@ import {
 } from "../api.main";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
 import type { ApiRestSecurityPort } from "../api-rest.security";
+import {
+  ApiAuthSessionCompositionPort,
+  AuthSessionApiAuthenticationAdapter,
+} from "./api-auth.composition";
 
 /** The concrete composition port for the migrated API transports. */
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   static create(options: {
     agents: AgentService;
     secrets: SecretService;
-    authentication: ApiAuthenticationPort;
+    auth: ApiAuthSessionCompositionPort;
     authorization: ApiAuthorizationPort;
     restSecurity: ApiRestSecurityPort;
     audit?: ApiAuditPort;
   }): ApiProductionComposition {
     const policy = ApiRequestPolicy.create({
-      authentication: options.authentication,
+      authentication: AuthSessionApiAuthenticationAdapter.create(options.auth.compose()),
       authorization: options.authorization,
       audit: options.audit,
     });
