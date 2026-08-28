@@ -151,6 +151,31 @@ export async function assertRetentionPlan(
 }
 
 /**
+ * Plan-gate the retention mutations via the project's owning organization.
+ * Throws FORBIDDEN if the org is on a free plan. Centralised so every
+ * write endpoint stays consistent — overrides, retroactive updates, and
+ * mutation kills all need a paid plan.
+ */
+export async function assertRetentionPlanForProject(
+  ctx: RBACContext,
+  projectId: string,
+  planProvider: PlanProvider,
+): Promise<void> {
+  const project = await ctx.prisma.project.findFirst({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  const organizationId = project?.team?.organizationId;
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Project does not belong to any organization.",
+    });
+  }
+  await assertRetentionPlan(ctx, organizationId, planProvider);
+}
+
+/**
  * Resolves the organization that owns a scope target (org/team/project).
  * Returns null if the scope does not exist or doesn't resolve to an org —
  * callers should treat that as NOT_FOUND.

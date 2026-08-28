@@ -314,7 +314,8 @@ lingers as a stale reference. Acceptable given expected pin volume.
 - Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `platform/app/src/server/data-retention/`,
   `platform/app/src/server/clickhouse/ttlReconciler.ts`,
-  `platform/app/src/server/api/routers/dataRetention.ts`,
+  `packages/features/data-retention/server/src/api/app-trpc/data-retention.api.ts`,
+  `platform/app/src/runtime/app/internal-api/data-retention.router.ts`,
   `platform/app/src/pages/settings/data-retention.tsx`
 - Specs: `specs/data-retention/`
 - PR: #4147

@@ -493,16 +493,6 @@
     },
     {
       "feature": "data-retention",
-      "file": "platform/app/src/server/api/routers/dataRetention.ts",
-      "kind": "transport"
-    },
-    {
-      "feature": "data-retention",
-      "file": "platform/app/src/server/data-retention/index.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "data-retention",
       "file": "platform/app/src/server/data-retention/metering/storage-meter.read.ts",
       "kind": "legacy-implementation"
     },

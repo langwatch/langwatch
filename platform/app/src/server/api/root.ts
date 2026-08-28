@@ -23,7 +23,7 @@ import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
-import { dataRetentionRouter } from "./routers/dataRetention";
+import { dataRetentionRouter } from "~/runtime/app/internal-api/data-retention.router";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { emailSuppressionRouter } from "./routers/emailSuppression";
