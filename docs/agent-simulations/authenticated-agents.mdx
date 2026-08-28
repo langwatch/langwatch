@@ -333,7 +333,7 @@ langwatch.cache.delete("ACME_SESSION")
 
 `get` returns the default on a miss, so no `try`/`except` is needed for that case. `claim` returns `True` when it stored the value and `False` when the name was already held, and does not raise for a name it could not take. Other errors raise, and a refused write names the field the platform rejected, for example `400 (validation_error: ttl_seconds: ttl_seconds must be at least 5)`.
 
-A value can be text, or a `dict` or `list`: the SDK stores those as JSON and `get` returns the JSON-parsed equivalent, so a session object goes in and comes back as a `dict`. The members must be what JSON can carry, a member of another type raises a `TypeError`, and a key that is not a string is stored as one. A value of another type raises a `TypeError` before the call is made.
+A value can be text, or a `dict` or `list`: the SDK stores those as JSON and `get` returns the JSON-parsed equivalent, so a session object goes in and comes back as a `dict`. The members must be what JSON can carry: a member of another type raises a `TypeError`, `nan` and `inf` are refused with it, and a key that is not a string is stored as one. A value of another type raises a `TypeError` before the call is made.
 
 An entry holds only text, so text that is itself a JSON object or array reads back parsed as well: store `"{\"mode\":\"legacy\"}"` and `get` answers a `dict`. This holds for an entry written over REST or by an older SDK too. Any other text comes back as it was stored, JSON that is not an object or an array included.
 

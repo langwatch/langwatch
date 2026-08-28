@@ -78,11 +78,19 @@ def _encode(value: CacheValue) -> str:
 
     A dict or list must hold what JSON can carry, so a member of another type
     raises a TypeError here, and a key that is not a string is stored as one.
+    nan and inf are refused with it: Python writes them as NaN and Infinity,
+    which the REST callers and the other SDKs read as broken JSON.
     """
     if isinstance(value, str):
         return value
     if isinstance(value, (dict, list)):
-        return json.dumps(value)
+        try:
+            return json.dumps(value, allow_nan=False)
+        except ValueError as refused:
+            raise TypeError(
+                "A cache value must hold what JSON can carry; "
+                f"{refused}"
+            ) from refused
     raise TypeError(
         "A cache value must be a str, a dict or a list; "
         f"got {type(value).__name__}"

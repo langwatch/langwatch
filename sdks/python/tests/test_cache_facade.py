@@ -236,6 +236,17 @@ class TestValuesThatAreNotText:
         assert "int" in str(raised.value)
         assert stub.calls == []
 
+    @pytest.mark.parametrize(
+        "number", [float("nan"), float("inf"), float("-inf")]
+    )
+    def test_a_number_json_cannot_carry_is_refused_before_any_call(self, number):
+        stub = CacheStub()
+
+        with pytest.raises(TypeError):
+            facade_over(stub).set("ACME_READING", {"value": number})
+
+        assert stub.calls == []
+
 
 class TestMessages:
     # @scenario "No message from the SDK quotes a cached value"
