@@ -110,4 +110,24 @@ describe("ApiRuntimeBootstrap", () => {
     await main.close();
     expect(process.close).toHaveBeenCalledOnce();
   });
+
+  it("retains a composition failure when its resource cleanup also fails", async () => {
+    const process = new TestProcess();
+    const composition = new TestComposition(process);
+    const bootFailure = new Error("composition failed");
+    composition.compose.mockImplementationOnce(async ({ resources }) => {
+      resources.own("database", async () => {
+        throw new Error("database close failed");
+      });
+      throw bootFailure;
+    });
+
+    await expect(
+      ApiRuntimeBootstrap.create({
+        source: { NODE_ENV: "test" },
+        composition,
+        signals: false,
+      }),
+    ).rejects.toBe(bootFailure);
+  });
 });

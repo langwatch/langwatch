@@ -30,6 +30,7 @@ class TestRestSecurity extends ApiRestSecurityPort {
     actor: { id: "user-1" },
   }));
   readonly authorize = vi.fn(async () => undefined);
+  readonly complete = vi.fn(async () => undefined);
 }
 
 const running: ApiHttpListener[] = [];
@@ -142,6 +143,22 @@ describe("standalone Secret REST listener", () => {
       value: "secret-value",
       actorId: "user-1",
     });
+    expect(api.security.complete).toHaveBeenCalledOnce();
+    expect(api.security.complete).toHaveBeenCalledWith({
+      request: { projectId: "project-1", actor: { id: "user-1" } },
+      method: "POST",
+      path: "/api/v1/secret",
+      status: 201,
+    });
+  });
+
+  it("does not complete a failed REST response", async () => {
+    const api = await startApi();
+
+    const response = await api.fetch("/api/secret?projectId=other-project");
+
+    expect(response.status).toBe(403);
+    expect(api.security.complete).not.toHaveBeenCalled();
   });
 });
 

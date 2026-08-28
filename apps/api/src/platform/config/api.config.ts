@@ -7,7 +7,11 @@ import {
 } from "@langwatch/config";
 import type { LoggerConfiguration } from "@langwatch/observability";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
+import type { GroupQueuePolicy } from "@langwatch/group-queue";
+import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
+
+const optionalEnvironmentString = z.string().optional();
 
 /**
  * A standalone API bootstrap accepts these deterministic aliases. Existing
@@ -50,13 +54,50 @@ export const apiConfigDefinition = RuntimeConfig.define({
       env: "LANGWATCH_PROCESSOR_TYPE",
     }),
   },
+  infrastructure: {
+    redis: {
+      url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
+      clusterEndpoints: Config.value(optionalEnvironmentString, {
+        env: "REDIS_CLUSTER_ENDPOINTS",
+      }),
+      dbIndex: Config.value(optionalEnvironmentString, { env: "REDIS_DB_INDEX" }),
+    },
+    groupQueue: {
+      globalConcurrency: Config.value(optionalEnvironmentString, {
+        env: "GLOBAL_QUEUE_CONCURRENCY",
+      }),
+      zstdWritesEnabled: Config.value(optionalEnvironmentString, {
+        env: "GROUP_QUEUE_ZSTD_WRITES_ENABLED",
+      }),
+      msgpackWritesEnabled: Config.value(optionalEnvironmentString, {
+        env: "GROUP_QUEUE_MSGPACK_WRITES_ENABLED",
+      }),
+      tenantConcurrencyCap: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_DISPATCH_TENANT_CAP",
+      }),
+      globalConcurrencyBudget: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_DISPATCH_GLOBAL_BUDGET",
+      }),
+    },
+  },
 });
 
-export type ApiConfig = ConfigValue<typeof apiConfigDefinition>;
+type ApiConfigProjection = ConfigValue<typeof apiConfigDefinition>;
+
+export type ApiInfrastructureConfig = Readonly<{
+  redis: RedisConfigResolution;
+  groupQueue: GroupQueuePolicy;
+}>;
+
+export type ApiConfig = Readonly<
+  Omit<ApiConfigProjection, "infrastructure"> & {
+    infrastructure: ApiInfrastructureConfig;
+  }
+>;
 
 /** Parses executable configuration once, before API services are composed. */
 export function resolveApiConfig(source: Readonly<Record<string, unknown>>): ApiConfig {
-  return RuntimeConfig.create({
+  const value = RuntimeConfig.create({
     name: "api",
     definition: apiConfigDefinition,
     source: {
@@ -64,6 +105,13 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       API_PORT: firstDefined(source, API_PORT_ENV_PRECEDENCE),
     },
   }).value;
+  return {
+    ...value,
+    infrastructure: {
+      redis: new RedisConfigService().resolve(value.infrastructure.redis),
+      groupQueue: resolveGroupQueuePolicy(value.infrastructure.groupQueue),
+    },
+  };
 }
 
 /** The logger receives semantic process values, never a raw environment source. */
@@ -112,4 +160,26 @@ function firstDefined(
     if (value !== undefined) return value;
   }
   return undefined;
+}
+
+function resolveGroupQueuePolicy(
+  input: ApiConfigProjection["infrastructure"]["groupQueue"],
+): GroupQueuePolicy {
+  return {
+    globalConcurrency: positiveSafeIntegerOrUndefined(input.globalConcurrency),
+    tenantConcurrencyCap: nonNegativeSafeIntegerOrUndefined(input.tenantConcurrencyCap),
+    globalConcurrencyBudget: nonNegativeSafeIntegerOrUndefined(input.globalConcurrencyBudget),
+    compression: input.zstdWritesEnabled === "true" ? "zstd" : "gzip",
+    payloadCodec: input.msgpackWritesEnabled === "true" ? "msgpack" : "json",
+  };
+}
+
+function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }

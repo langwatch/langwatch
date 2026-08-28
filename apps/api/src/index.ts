@@ -4,6 +4,7 @@ export {
   ApiRestSecurityPolicy,
   ApiRestSecurityPort,
   type ApiRestAuthenticatedRequest,
+  type ApiRestSuccessfulResponse,
 } from "./api-rest.security";
 export { ApiProductionComposition } from "./app/api-production.composition";
 export {
@@ -23,8 +24,7 @@ export {
   type ApiHttpListenerOptions,
   type ApiListenerAddress,
 } from "./api-http.listener";
-export { ApiProcess } from "./api.process";
-export { ApiProcessGraphPort } from "./api.process";
+export { ApiFeatureDrainPort, ApiProcess, ApiProcessGraphPort } from "./api.process";
 export {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -40,6 +40,11 @@ export {
   type ApiRuntimeCompositionOptions,
   type ApiRuntimeBootstrapOptions,
 } from "./api.main";
+export {
+  ApiBootFailurePort,
+  startApiExecutable,
+  type ApiExecutableOptions,
+} from "./api.executable";
 export {
   installApiSignalHandlers,
   type ApiSignalHandlerOptions,
@@ -60,7 +65,13 @@ export {
   resolveApiConfig,
   API_PORT_ENV_PRECEDENCE,
   type ApiConfig,
+  type ApiInfrastructureConfig,
 } from "./platform/config/api.config";
+export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter";
+export {
+  ApiQueueInfrastructure,
+  type ApiQueueInfrastructureOptions,
+} from "./platform/infrastructure/api-queue.infrastructure";
 export {
   ApiApplicationPort,
   ApiLifecyclePort,

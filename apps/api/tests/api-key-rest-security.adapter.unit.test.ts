@@ -5,6 +5,7 @@ import {
   ApiKeyRestSecurityAdapter,
   ApiRestAuthenticationError,
 } from "../src/app/api-key-rest-security.adapter";
+import { ApiAuditPort } from "../src/api-request.policy";
 
 const currentKey: ResolvedApiKeyToken = {
   type: "apiKey",
@@ -181,6 +182,54 @@ describe("ApiKeyRestSecurityAdapter", () => {
     });
   });
 
+  it("marks a current key as used and audits a successful attributed mutation", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+    const audit = new TestAudit();
+    const security = ApiKeyRestSecurityAdapter.create({
+      apiKeys,
+      authz: new TestAuthz(),
+      audit,
+    });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", {
+        headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+      }),
+    );
+
+    await security.complete({ request, method: "POST", path: "/api/secret", status: 201 });
+
+    expect(apiKeys.markUsed).toHaveBeenCalledWith({ id: "key-1" });
+    expect(audit.record).toHaveBeenCalledWith({
+      actorId: "user-1",
+      path: "/api/secret",
+      input: { method: "POST", projectId: "project-1", status: 201 },
+      error: null,
+    });
+  });
+
+  it("does not mark or audit a legacy project key after a successful response", async () => {
+    const apiKeys = new TestApiKeys();
+    apiKeys.tryResolveToken.mockResolvedValue({
+      type: "legacyProjectKey",
+      project: currentKey.project,
+    });
+    const audit = new TestAudit();
+    const security = ApiKeyRestSecurityAdapter.create({
+      apiKeys,
+      authz: new TestAuthz(),
+      audit,
+    });
+    const request = await security.authenticate(
+      new Request("http://api.test/api/secret", { headers: { "X-Auth-Token": "legacy-token" } }),
+    );
+
+    await security.complete({ request, method: "DELETE", path: "/api/secret/1", status: 200 });
+
+    expect(apiKeys.markUsed).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it("distinguishes missing from invalid credentials", async () => {
     const apiKeys = new TestApiKeys();
     const security = ApiKeyRestSecurityAdapter.create({ apiKeys, authz: new TestAuthz() });
@@ -199,6 +248,7 @@ describe("ApiKeyRestSecurityAdapter", () => {
 
 class TestApiKeys extends ApiKeyService {
   readonly tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>();
+  readonly markUsed = vi.fn();
 
   private unavailable(): never {
     throw new Error("Unexpected API-key service call");
@@ -220,9 +270,6 @@ class TestApiKeys extends ApiKeyService {
     return this.unavailable();
   }
   resolveVisibleProjects() {
-    return this.unavailable();
-  }
-  markUsed() {
     return this.unavailable();
   }
   list() {
@@ -294,6 +341,10 @@ class TestApiKeys extends ApiKeyService {
   enrichApiKeyList() {
     return this.unavailable();
   }
+}
+
+class TestAudit extends ApiAuditPort {
+  readonly record = vi.fn(async () => undefined);
 }
 
 class TestAuthz extends AuthzService {

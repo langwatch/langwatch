@@ -44,9 +44,9 @@ export type ApiRuntimeBootstrapOptions = {
  * Injectable API runtime foundation: parse once, configure logging, compose
  * one graph, and retain its ResourceScope until process shutdown completes.
  *
- * This is intentionally not a physical launcher. The production feature and
- * authentication graph has not migrated from platform/app, so a launcher here
- * would start an incomplete second API process.
+ * A physical executable supplies the complete composition port and calls
+ * `startApiExecutable`. This foundation does not import legacy feature graph
+ * construction, so it cannot accidentally launch a partial second process.
  */
 export class ApiRuntimeBootstrap {
   static async create(options: ApiRuntimeBootstrapOptions): Promise<ApiRuntimeBootstrap> {
@@ -80,7 +80,7 @@ export class ApiRuntimeBootstrap {
       }
       return main;
     } catch (error) {
-      await graph.close();
+      await closeGraphAfterCompositionFailure(graph, error, createLogger(config.serviceName));
       throw error;
     }
   }
@@ -109,6 +109,21 @@ export class ApiRuntimeBootstrap {
     } finally {
       this.disposeSignals?.();
     }
+  }
+}
+
+async function closeGraphAfterCompositionFailure(
+  graph: ApiProcessGraphPort,
+  bootError: unknown,
+  logger: Pick<Logger, "error">,
+): Promise<void> {
+  try {
+    await graph.close();
+  } catch (closeError) {
+    logger.error(
+      { error: closeError, bootError },
+      "API resource cleanup failed after composition failure",
+    );
   }
 }
 

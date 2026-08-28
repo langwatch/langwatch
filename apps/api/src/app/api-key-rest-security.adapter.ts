@@ -7,7 +7,13 @@ import {
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
-import { ApiRestSecurityPort, type ApiRestAuthenticatedRequest } from "../api-rest.security";
+import { createLogger, type Logger } from "@langwatch/observability";
+import {
+  ApiRestSecurityPort,
+  type ApiRestAuthenticatedRequest,
+  type ApiRestSuccessfulResponse,
+} from "../api-rest.security";
+import type { ApiAuditPort } from "../api-request.policy";
 
 type RequestCredentials = Readonly<{
   token: string;
@@ -41,13 +47,22 @@ export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
   static create(options: {
     apiKeys: ApiKeyService;
     authz: AuthzService;
+    audit?: ApiAuditPort;
+    logger?: Pick<Logger, "error">;
   }): ApiKeyRestSecurityAdapter {
-    return new ApiKeyRestSecurityAdapter(options.apiKeys, options.authz);
+    return new ApiKeyRestSecurityAdapter(
+      options.apiKeys,
+      options.authz,
+      options.audit,
+      options.logger ?? createLogger("langwatch:api:rest-security"),
+    );
   }
 
   private constructor(
     private readonly apiKeys: ApiKeyService,
     private readonly authz: AuthzService,
+    private readonly audit: ApiAuditPort | undefined,
+    private readonly logger: Pick<Logger, "error">,
   ) {
     super();
   }
@@ -87,6 +102,35 @@ export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
     });
     if (!allowed) {
       refuseApiKeyCeiling(input.request, input.permission);
+    }
+  }
+
+  async complete(input: ApiRestSuccessfulResponse): Promise<void> {
+    if (!isCurrentApiKeyRequest(input.request)) {
+      return;
+    }
+
+    this.apiKeys.markUsed({ id: input.request.apiKeyId });
+    if (!isMutation(input.method) || !input.request.actor) {
+      return;
+    }
+
+    try {
+      await this.audit?.record({
+        actorId: input.request.actor.id,
+        path: input.path,
+        input: {
+          method: input.method,
+          projectId: input.request.projectId,
+          status: input.status,
+        },
+        error: null,
+      });
+    } catch (error) {
+      this.logger.error(
+        { error, method: input.method, path: input.path, projectId: input.request.projectId },
+        "REST request audit failed after a successful response",
+      );
     }
   }
 }
@@ -174,4 +218,8 @@ function parseBasicCredentials(value: string): RequestCredentials | null {
   } catch {
     return null;
   }
+}
+
+function isMutation(method: string): boolean {
+  return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
 }

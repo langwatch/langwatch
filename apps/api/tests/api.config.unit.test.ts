@@ -34,6 +34,16 @@ describe("API process configuration", () => {
         endpoint: undefined,
         processorType: "batch",
       },
+      infrastructure: {
+        redis: { configured: false, reason: "unconfigured", warnings: [] },
+        groupQueue: {
+          globalConcurrency: undefined,
+          tenantConcurrencyCap: undefined,
+          globalConcurrencyBudget: undefined,
+          compression: "gzip",
+          payloadCodec: "json",
+        },
+      },
     });
   });
 
@@ -93,6 +103,36 @@ describe("API process configuration", () => {
           "deployment.environment.name": "eu-west",
           "service.version": "build-42",
         },
+      },
+    });
+  });
+
+  it("resolves Redis and Group Queue settings before API composition", () => {
+    const config = resolveApiConfig({
+      REDIS_URL: "redis://redis.example.test:6379",
+      REDIS_DB_INDEX: "4",
+      GLOBAL_QUEUE_CONCURRENCY: "12",
+      GROUP_QUEUE_ZSTD_WRITES_ENABLED: "true",
+      GROUP_QUEUE_MSGPACK_WRITES_ENABLED: "true",
+      LANGWATCH_DISPATCH_TENANT_CAP: "0",
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: "48",
+    });
+
+    expect(config.infrastructure).toEqual({
+      redis: {
+        configured: true,
+        mode: "standalone",
+        url: "redis://redis.example.test:6379",
+        db: 4,
+        tls: undefined,
+        warnings: [],
+      },
+      groupQueue: {
+        globalConcurrency: 12,
+        tenantConcurrencyCap: 0,
+        globalConcurrencyBudget: 48,
+        compression: "zstd",
+        payloadCodec: "msgpack",
       },
     });
   });

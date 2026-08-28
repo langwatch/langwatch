@@ -1,0 +1,234 @@
+import { AgentService } from "@langwatch/agent-contract";
+import { ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import { AuthService } from "@langwatch/auth-contract";
+import { AuthzService } from "@langwatch/authz-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { SecretService, type Secret } from "@langwatch/secret-contract";
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+
+const processMocks = vi.hoisted(() => {
+  const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
+  let rest: Hono | undefined;
+  const create = vi.fn((options: { rest?: Hono }) => {
+    rest = options.rest;
+    return process;
+  });
+  return { create, process, rest: () => rest };
+});
+
+vi.mock("../src/api.process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/api.process")>();
+  return { ...actual, ApiProcess: { create: processMocks.create } };
+});
+
+vi.mock("../src/platform/infrastructure/api-queue.infrastructure", () => ({
+  ApiQueueInfrastructure: {
+    create: () => ({ readiness: { assertReady: async () => undefined } }),
+  },
+}));
+
+import { ApiProcessGraphPort } from "../src/api.process";
+import {
+  ApiAuthSessionCompositionPort,
+  ApiBrowserSessionTransportPort,
+} from "../src/app/api-auth.composition";
+import { ApiProductionComposition } from "../src/app/api-production.composition";
+import { ApiAuditPort } from "../src/api-request.policy";
+import { resolveApiConfig } from "../src/platform/config/api.config";
+
+const resolvedKey: ResolvedApiKeyToken = {
+  type: "apiKey",
+  apiKeyId: "key-1",
+  userId: "user-1",
+  organizationId: "org-1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: "project-1",
+    name: "Project one",
+    slug: "project-one",
+    apiKey: "legacy-project-key",
+    lwqlKey: "lwql-key",
+    teamId: "team-1",
+    language: "typescript",
+    framework: "nextjs",
+    kind: "APPLICATION",
+    firstMessage: false,
+    integrated: false,
+    createdAt: new Date("2026-08-28T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: null,
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Team one",
+      slug: "team-one",
+      organizationId: "org-1",
+      createdAt: new Date("2026-08-28T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  },
+};
+
+const secret: Secret = {
+  id: "secret-1",
+  projectId: "project-1",
+  name: "OPENAI_API_KEY",
+  createdAt: new Date("2026-08-28T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+  createdBy: { name: "Alex" },
+  updatedBy: { name: "Alex" },
+};
+
+describe("ApiProductionComposition", () => {
+  it("constructs one API-key REST adapter in process composition and propagates its actor and ceiling", async () => {
+    const apiKeys = apiKeyService(resolvedKey);
+    const authz = authzService(true);
+    const secrets = secretService();
+    const audit = new TestAudit();
+    const composition = ApiProductionComposition.create({
+      agents: new Proxy(AgentService.prototype, {}),
+      secrets: secrets.service,
+      apiKeys: apiKeys.service,
+      authz: authz.service,
+      auth: new TestAuthComposition(),
+      audit,
+    });
+
+    await composition.compose({
+      config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560" }),
+      graph: new TestGraph(),
+      observability: { serviceName: "langwatch-api-test" },
+      resources: new ResourceScope(),
+    });
+
+    const rest = processMocks.rest();
+    if (!rest) {
+      throw new Error("API production composition did not install REST routes.");
+    }
+    const response = await rest.request("/api/secret", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer current-token",
+        "X-Project-Id": "project-1",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        projectId: "project-1",
+        name: "OPENAI_API_KEY",
+        value: "secret-value",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(apiKeys.tryResolveToken).toHaveBeenCalledWith({
+      token: "current-token",
+      projectId: "project-1",
+    });
+    expect(authz.hasApiKeyPermission).toHaveBeenCalledWith({
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      scope: { type: "project", id: "project-1", teamId: "team-1" },
+      permission: "secrets:manage",
+    });
+    expect(secrets.create).toHaveBeenCalledWith({
+      projectId: "project-1",
+      name: "OPENAI_API_KEY",
+      value: "secret-value",
+      actorId: "user-1",
+    });
+    expect(apiKeys.markUsed).toHaveBeenCalledWith({ id: "key-1" });
+    expect(audit.record).toHaveBeenCalledWith({
+      actorId: "user-1",
+      path: "/api/secret",
+      input: { method: "POST", projectId: "project-1", status: 201 },
+      error: null,
+    });
+  });
+});
+
+class TestGraph extends ApiProcessGraphPort {
+  async close(): Promise<void> {}
+}
+
+class TestAuthComposition extends ApiAuthSessionCompositionPort {
+  compose() {
+    return { auth: new TestAuthService(), sessions: new TestSessionTransport() };
+  }
+}
+
+class TestAuthService extends AuthService {
+  async tryResolveBrowserSession() {
+    return null;
+  }
+
+  async revokeAllBrowserSessions(): Promise<void> {}
+  async revokeBrowserSession(): Promise<void> {}
+  async revokeOtherBrowserSessions(): Promise<void> {}
+}
+
+class TestSessionTransport extends ApiBrowserSessionTransportPort {
+  async tryResolveVerifiedSession() {
+    return null;
+  }
+}
+
+class TestAudit extends ApiAuditPort {
+  readonly record = vi.fn(async () => undefined);
+}
+
+function apiKeyService(resolved: ResolvedApiKeyToken) {
+  const tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>().mockResolvedValue(resolved);
+  const markUsed = vi.fn();
+  const service = new Proxy(ApiKeyService.prototype, {
+    get(target, property, receiver) {
+      if (property === "tryResolveToken") return tryResolveToken;
+      if (property === "markUsed") return markUsed;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  return { service, tryResolveToken, markUsed };
+}
+
+function authzService(allowed: boolean) {
+  const hasApiKeyPermission = vi
+    .fn<AuthzService["hasApiKeyPermission"]>()
+    .mockResolvedValue(allowed);
+  const service = new Proxy(AuthzService.prototype, {
+    get(target, property, receiver) {
+      return property === "hasApiKeyPermission"
+        ? hasApiKeyPermission
+        : Reflect.get(target, property, receiver);
+    },
+  });
+  return { service, hasApiKeyPermission };
+}
+
+function secretService() {
+  const create = vi.fn<SecretService["create"]>().mockResolvedValue(secret);
+  const service = new Proxy(SecretService.prototype, {
+    get(target, property, receiver) {
+      return property === "create" ? create : Reflect.get(target, property, receiver);
+    },
+  });
+  return { service, create };
+}

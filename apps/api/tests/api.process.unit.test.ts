@@ -31,7 +31,7 @@ vi.mock("../src/api-http.listener", () => ({
 }));
 
 import { ApiProcess } from "../src/api.process";
-import { ApiProcessGraphPort } from "../src/api.process";
+import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../src/api.process";
 import { ApiReadinessPort } from "../src/api-process.lifecycle";
 
 class TestAgentService extends AgentService {
@@ -164,7 +164,7 @@ describe("ApiProcess", () => {
     expect(mocks.observabilityShutdown).toHaveBeenCalledOnce();
   });
 
-  it("closes listener, telemetry, then composed graph in that order", async () => {
+  it("drains HTTP and features before telemetry and composed resources", async () => {
     const phases: string[] = [];
     mocks.listenerClose.mockImplementation(async () => {
       phases.push("listener");
@@ -175,12 +175,48 @@ describe("ApiProcess", () => {
     const graph = new TestGraph(async () => {
       phases.push("graph");
     });
-    const process = createProcess(graph);
+    graph.drain.mockImplementationOnce(async () => {
+      phases.push("graph-drain");
+    });
+    const featureDrain = new TestFeatureDrain(async () => {
+      phases.push("feature-drain");
+    });
+    const process = createProcess(graph, undefined, featureDrain);
 
     await Promise.all([process.close(), process.close()]);
 
-    expect(phases).toEqual(["listener", "telemetry", "graph"]);
+    expect(phases).toEqual(["listener", "feature-drain", "graph-drain", "telemetry", "graph"]);
     expect(graph.close).toHaveBeenCalledOnce();
+  });
+
+  it("continues every cleanup phase and retains the first shutdown failure", async () => {
+    const phases: string[] = [];
+    const listenerFailure = new Error("listener close failed");
+    mocks.listenerClose.mockImplementation(async () => {
+      phases.push("listener");
+      throw listenerFailure;
+    });
+    const graph = new TestGraph(async () => {
+      phases.push("graph");
+      throw new Error("graph close failed");
+    });
+    graph.drain.mockImplementationOnce(async () => {
+      phases.push("graph-drain");
+      throw new Error("graph drain failed");
+    });
+    const featureDrain = new TestFeatureDrain(async () => {
+      phases.push("feature-drain");
+      throw new Error("feature drain failed");
+    });
+    mocks.observabilityShutdown.mockImplementation(async () => {
+      phases.push("telemetry");
+      throw new Error("telemetry shutdown failed");
+    });
+    const process = createProcess(graph, undefined, featureDrain);
+
+    await expect(process.close()).rejects.toBe(listenerFailure);
+
+    expect(phases).toEqual(["listener", "feature-drain", "graph-drain", "telemetry", "graph"]);
   });
 
   it("runs the boot readiness gate before opening HTTP intake", async () => {
@@ -217,9 +253,26 @@ class TestGraph extends ApiProcessGraphPort {
   }
 
   readonly close = vi.fn(async () => this.closeImpl());
+
+  readonly drain = vi.fn(async () => undefined);
 }
 
-function createProcess(graph?: ApiProcessGraphPort, readiness?: ApiReadinessPort): ApiProcess {
+class TestFeatureDrain extends ApiFeatureDrainPort {
+  private readonly drainImpl: () => Promise<void>;
+
+  constructor(drainImpl: () => Promise<void>) {
+    super();
+    this.drainImpl = drainImpl;
+  }
+
+  readonly drain = vi.fn(async () => this.drainImpl());
+}
+
+function createProcess(
+  graph?: ApiProcessGraphPort,
+  readiness?: ApiReadinessPort,
+  featureDrain?: ApiFeatureDrainPort,
+): ApiProcess {
   return ApiProcess.create({
     agents: new TestAgentService(),
     secrets: new TestSecretService(),
@@ -233,5 +286,6 @@ function createProcess(graph?: ApiProcessGraphPort, readiness?: ApiReadinessPort
     listener: { port: 0 },
     graph,
     readiness,
+    featureDrain,
   });
 }

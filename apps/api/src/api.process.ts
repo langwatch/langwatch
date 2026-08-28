@@ -19,6 +19,12 @@ import { trace } from "@opentelemetry/api";
 
 /** Resources backing the composed service graph, closed after telemetry flushes. */
 export abstract class ApiProcessGraphPort {
+  /**
+   * Stops feature-owned intake and drains work that still needs infrastructure.
+   * Implementations without feature work intentionally inherit the no-op.
+   */
+  async drain(): Promise<void> {}
+
   abstract close(): Promise<void>;
 }
 
@@ -38,6 +44,7 @@ export class ApiProcess {
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
     graph?: ApiProcessGraphPort;
+    featureDrain?: ApiFeatureDrainPort;
     readiness?: ApiReadinessPort;
     metrics?: ApiMetricsPort;
   }): ApiProcess {
@@ -73,7 +80,14 @@ export class ApiProcess {
           logger: observability.logger,
         })
       : undefined;
-    return new ApiProcess(application, observability, listener, options.graph, options.readiness);
+    return new ApiProcess(
+      application,
+      observability,
+      listener,
+      options.graph,
+      options.featureDrain,
+      options.readiness,
+    );
   }
 
   private closing: Promise<void> | undefined;
@@ -83,6 +97,7 @@ export class ApiProcess {
     private readonly observability: ProcessObservability,
     private readonly listener: ApiHttpListener | undefined,
     private readonly graph: ApiProcessGraphPort | undefined,
+    private readonly featureDrain: ApiFeatureDrainPort | undefined,
     private readonly readiness: ApiReadinessPort | undefined,
   ) {}
 
@@ -104,6 +119,16 @@ export class ApiProcess {
       firstError = error;
     }
     try {
+      await this.featureDrain?.drain();
+    } catch (error) {
+      firstError ??= error;
+    }
+    try {
+      await this.graph?.drain();
+    } catch (error) {
+      firstError ??= error;
+    }
+    try {
       await this.observability.shutdown();
     } catch (error) {
       firstError ??= error;
@@ -115,6 +140,11 @@ export class ApiProcess {
     }
     if (firstError) throw firstError;
   }
+}
+
+/** Feature-owned shutdown work that must finish before telemetry and infrastructure close. */
+export abstract class ApiFeatureDrainPort {
+  abstract drain(): Promise<void>;
 }
 
 function requireHono(hono: ApiApplication["hono"]) {

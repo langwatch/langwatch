@@ -9,6 +9,14 @@ export type ApiRestAuthenticatedRequest = Readonly<{
   actor: ApiActor | null;
 }>;
 
+/** One successful REST response observed after all route middleware completes. */
+export type ApiRestSuccessfulResponse = Readonly<{
+  request: ApiRestAuthenticatedRequest;
+  method: string;
+  path: string;
+  status: number;
+}>;
+
 /**
  * Process-owned REST authentication and permission enforcement.
  *
@@ -23,6 +31,8 @@ export abstract class ApiRestSecurityPort {
     request: ApiRestAuthenticatedRequest;
     permission: AuthzPermission;
   }): Promise<void>;
+
+  abstract complete(input: ApiRestSuccessfulResponse): Promise<void>;
 }
 
 /** Bridges the process REST security port into the package REST pipeline. */
@@ -32,6 +42,7 @@ export class ApiRestSecurityPolicy {
   }
 
   private readonly requests = new WeakMap<Context, ApiRestAuthenticatedRequest>();
+  private readonly completed = new WeakSet<Context>();
 
   private constructor(private readonly port: ApiRestSecurityPort) {}
 
@@ -41,6 +52,9 @@ export class ApiRestSecurityPolicy {
       this.requests.set(context, request);
       context.set("project", { id: request.projectId });
       await next();
+      if (context.res.status >= 200 && context.res.status < 300) {
+        await this.complete(context, request);
+      }
     };
   }
 
@@ -69,5 +83,18 @@ export class ApiRestSecurityPolicy {
       throw new Error("REST authentication must run before API request security is used.");
     }
     return request;
+  }
+
+  private async complete(context: Context, request: ApiRestAuthenticatedRequest): Promise<void> {
+    if (this.completed.has(context)) {
+      return;
+    }
+    this.completed.add(context);
+    await this.port.complete({
+      request,
+      method: context.req.method,
+      path: context.req.path,
+      status: context.res.status,
+    });
   }
 }
