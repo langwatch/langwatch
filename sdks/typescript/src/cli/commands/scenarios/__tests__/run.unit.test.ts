@@ -1,5 +1,5 @@
 /**
- * `scenario run` is a run plan scoped to one case.
+ * `scenario run` is a run plan scoped to one scenario.
  *
  * It sends ONE request. No suite is created for it and none is deleted
  * afterwards, which is what the first assertions here pin: the old command
@@ -73,13 +73,13 @@ describe("runScenarioCommand()", () => {
 
   describe("when a target is given", () => {
     /** @scenario "Run a scenario against a target" */
-    it("posts one run scoped to that one case", async () => {
+    it("posts one run scoped to that one scenario", async () => {
       await runScenarioCommand("scenario_1", { target: ["http:agent_abc123"] });
 
       expect(runSpy).toHaveBeenCalledTimes(1);
       expect(runSpy).toHaveBeenCalledWith({
         config: {
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           scenarioIds: ["scenario_1"],
           targets: [{ type: "http", referenceId: "agent_abc123" }],
         },

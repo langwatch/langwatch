@@ -50,7 +50,7 @@ export const runScenarioCommand = async (
     const body: RunPlanRunBody = {
       ...(options.name ? { name: options.name } : {}),
       config: {
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [id],
         targets,
         ...(repeatCount !== undefined ? { repeatCount } : {}),

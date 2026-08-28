@@ -17,28 +17,32 @@ export const updateScenarioCommand = async (
     situation?: string;
     criteria?: string;
     labels?: string;
-    folder?: string;
-    noFolder?: boolean;
+    testSuite?: string;
+    noTestSuite?: boolean;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  // One of the two says where the case goes, so a line carrying both says two
-  // different things. It is refused before the scenario is touched.
-  if (options.folder !== undefined && options.noFolder) {
+  // One of the two says where the scenario goes, so a line carrying both says
+  // two different things. It is refused before the scenario is touched.
+  if (options.testSuite !== undefined && options.noTestSuite) {
     console.error(
-      chalk.red("Error: --folder and --no-folder cannot be used together."),
+      chalk.red(
+        "Error: --test-suite and --no-test-suite cannot be used together.",
+      ),
     );
     process.exit(1);
   }
 
-  let folderId: string | null | undefined;
-  let folderName: string | undefined;
-  if (options.folder !== undefined) {
+  let testSuiteId: string | null | undefined;
+  let testSuiteName: string | undefined;
+  if (options.testSuite !== undefined) {
     try {
-      const folder = await resolveSuiteReference({ reference: options.folder });
-      folderId = folder.id;
-      folderName = folder.name;
+      const testSuite = await resolveSuiteReference({
+        reference: options.testSuite,
+      });
+      testSuiteId = testSuite.id;
+      testSuiteName = testSuite.name;
     } catch (error) {
       if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
@@ -46,8 +50,8 @@ export const updateScenarioCommand = async (
       }
       throw error;
     }
-  } else if (options.noFolder) {
-    folderId = null;
+  } else if (options.noTestSuite) {
+    testSuiteId = null;
   }
 
   const service = createCliScenariosService();
@@ -61,15 +65,15 @@ export const updateScenarioCommand = async (
       body.criteria = options.criteria.split(",").map((c) => c.trim());
     if (options.labels !== undefined)
       body.labels = options.labels.split(",").map((l) => l.trim());
-    if (folderId !== undefined) body.folderId = folderId;
+    if (testSuiteId !== undefined) body.testSuiteId = testSuiteId;
 
     const scenario = await service.update(id, body);
 
     const movement =
-      folderId === null
-        ? " (no folder)"
-        : folderName
-          ? ` (folder: ${folderName})`
+      testSuiteId === null
+        ? " (no test suite)"
+        : testSuiteName
+          ? ` (test suite: ${testSuiteName})`
           : "";
     spinner.succeed(
       `Updated scenario "${chalk.cyan(scenario.name)}"${movement} ${chalk.gray(`(id: ${scenario.id})`)}`,

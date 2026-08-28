@@ -10,7 +10,7 @@ import {
  * every request, so a suite written or run from the command line is recorded
  * with the command line as its author.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export function createCliTestSuitesService(): TestSuitesApiService {
   const apiClient = createLangWatchApiClient();

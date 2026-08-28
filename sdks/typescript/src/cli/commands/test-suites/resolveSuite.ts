@@ -25,7 +25,7 @@ export class SuiteReferenceError extends Error {
  * A name two suites share is refused with both ids, because picking one for
  * the caller would file the case somewhere they did not ask for.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  * @see specs/features/scenario-cli.feature
  */
 export async function resolveSuiteReference({
@@ -61,7 +61,7 @@ export async function resolveSuiteReference({
   }
 
   throw new SuiteReferenceError(
-    `Test suite "${reference}" not found. List the test suites with: langwatch suite list`,
+    `Test suite "${reference}" not found. List the test suites with: langwatch test-suite list`,
   );
 }
 

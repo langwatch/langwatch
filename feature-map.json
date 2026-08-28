@@ -322,8 +322,8 @@
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --folder \"Billing\"",
-                "scenario update": "langwatch scenario update <id> --folder \"Billing\"",
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Billing\"",
+                "scenario update": "langwatch scenario update <id> --test-suite \"Billing\"",
                 "scenario run": "langwatch scenario run <id> --target http:<agent-id> --note \"after the timeout fix\"",
                 "scenario delete": "langwatch scenario delete <id>",
                 "scenario version list": "langwatch scenario version list <id> -o json",
@@ -402,7 +402,7 @@
         {
           "id": "agent-simulations.test-suites",
           "name": "Test Suites",
-          "description": "Folders of scenarios: a name and the cases filed in it",
+          "description": "Groups of scenarios: a name and the scenarios filed in it",
           "surfaces": {
             "code": {
               "sdk": {
@@ -410,20 +410,20 @@
                 "typescript": "client.testSuites"
               },
               "cli": [
-                "suite list",
-                "suite create",
-                "suite get",
-                "suite rename",
-                "suite archive",
-                "suite run"
+                "test-suite list",
+                "test-suite create",
+                "test-suite get",
+                "test-suite rename",
+                "test-suite archive",
+                "test-suite run"
               ],
               "hints": {
-                "suite list": "langwatch suite list -o json",
-                "suite create": "langwatch suite create \"Refunds\"",
-                "suite get": "langwatch suite get <id-or-name> -o json",
-                "suite rename": "langwatch suite rename <id-or-name> \"Refunds and credits\"",
-                "suite archive": "langwatch suite archive <id-or-name>",
-                "suite run": "langwatch suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
+                "test-suite list": "langwatch test-suite list -o json",
+                "test-suite create": "langwatch test-suite create \"Refunds\"",
+                "test-suite get": "langwatch test-suite get <id-or-name> -o json",
+                "test-suite rename": "langwatch test-suite rename <id-or-name> \"Refunds and credits\"",
+                "test-suite archive": "langwatch test-suite archive <id-or-name>",
+                "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
               },
               "skill": null,
               "docs": null

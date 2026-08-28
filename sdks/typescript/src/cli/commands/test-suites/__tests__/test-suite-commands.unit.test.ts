@@ -5,7 +5,7 @@
  * holds no targets, so running one sends them with the request and the
  * platform files the run under a run plan.
  *
- * Spec: specs/features/suite-cli.feature
+ * Spec: specs/features/test-suite-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";

@@ -33,7 +33,7 @@ export interface RunTestSuiteOptions {
  * request. The platform files the run under a run plan named after the suite
  * and its target unless `--name` says otherwise.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const runTestSuiteCommand = async ({
   reference,

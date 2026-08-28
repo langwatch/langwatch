@@ -143,23 +143,23 @@ describe("runRunPlanCommand()", () => {
         { id: "suite_1", name: "Refunds", slug: "refunds", scenarioIds: [], scenarioCount: 0 },
       ]);
 
-      await runRunPlanCommand({ suite: ["Refunds"], target: ["http:agent_abc"] });
+      await runRunPlanCommand({ testSuite: ["Refunds"], target: ["http:agent_abc"] });
 
       expect(runSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            scope: { mode: "folders", folderIds: ["suite_1"] },
+            scope: { mode: "test_suites", testSuiteIds: ["suite_1"] },
           }),
         }),
       );
     });
 
-    /** @scenario "Run a suite name that names nothing" */
-    it("refuses a name that matches no suite, scheduling nothing", async () => {
+    /** @scenario "Run a test suite name that names nothing" */
+    it("refuses a name that matches no test suite, scheduling nothing", async () => {
       listSuitesSpy.mockResolvedValue([]);
 
       await expect(
-        runRunPlanCommand({ suite: ["Refunds"], target: ["http:agent_abc"] }),
+        runRunPlanCommand({ testSuite: ["Refunds"], target: ["http:agent_abc"] }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(runSpy).not.toHaveBeenCalled();
@@ -186,7 +186,7 @@ describe("runRunPlanCommand()", () => {
 
   describe("when the scope names scenarios", () => {
     /** @scenario "Run named scenarios" */
-    it("sends a cases scope and the scenario IDs", async () => {
+    it("sends a scenarios scope and the scenario IDs", async () => {
       await runRunPlanCommand({
         scenario: ["scenario_1", "scenario_2"],
         target: ["http:agent_abc"],
@@ -195,7 +195,7 @@ describe("runRunPlanCommand()", () => {
       expect(runSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            scope: { mode: "cases" },
+            scope: { mode: "scenarios" },
             scenarioIds: ["scenario_1", "scenario_2"],
           }),
         }),

@@ -73,7 +73,7 @@ describe("the real command tree", () => {
     const unmigrated = [
       ["dataset", "download"],
       ["run-plan", "run"],
-      ["suite", "run"],
+      ["test-suite", "run"],
       ["scenario", "run"],
     ];
 
@@ -155,7 +155,7 @@ describe("the real command tree", () => {
 
       // Human-interactive `--wait` polls: no structured completion payload.
       ["run-plan run", "human-interactive --wait poll"],
-      ["suite run", "human-interactive --wait poll"],
+      ["test-suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 
       // A live session that runs until Ctrl-C: it produces status prose and

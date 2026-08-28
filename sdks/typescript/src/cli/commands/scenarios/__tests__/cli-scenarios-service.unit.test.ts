@@ -70,7 +70,7 @@ describe("the scenarios service the command line writes through", () => {
         criteria: [],
         labels: [],
         parameters: [],
-        folderId: null,
+        testSuiteId: null,
       },
     });
     vi.spyOn(console, "log").mockImplementation(noop);
