@@ -122,6 +122,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/api-key/contract
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../packages/features/auth/contract
@@ -137,6 +140,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../packages/handled-error
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/langy/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability

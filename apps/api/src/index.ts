@@ -7,6 +7,10 @@ export {
 } from "./api-rest.security";
 export { ApiProductionComposition } from "./app/api-production.composition";
 export {
+  ApiKeyRestSecurityAdapter,
+  ApiRestAuthenticationError,
+} from "./app/api-key-rest-security.adapter";
+export {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
