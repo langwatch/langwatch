@@ -1,14 +1,21 @@
 import {
   AuthenticatedActorRequiredError,
+  createRestService,
   createService,
   type MountedRoute,
   type RequestActor,
+  type StaticRestVersioning,
 } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import type { Project } from "~/generated/prisma/client";
 import { appContextMiddleware, appFromContext } from "~/app/api/middleware/app-context";
-import { canonicalAuthMiddleware, requirePermission } from "~/app/api/middleware/auth";
+import {
+  canonicalAuthMiddleware,
+  modernRestAuthMiddleware,
+  requirePermission,
+  requirePermissionOrThrow,
+} from "~/app/api/middleware/auth";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
 import {
@@ -43,10 +50,47 @@ export function createProjectApiService(options: {
     authorize: authorizeRequestPermission,
     projectIdInput: true,
     auth: canonicalAuthMiddleware,
-    permissionEnforcer: (permission: AuthzPermission) =>
-      requirePermission(permission, "canonical"),
+    permissionEnforcer: (permission: AuthzPermission) => requirePermission(permission, "canonical"),
     onRouteMounted: (route) => registerProjectApiRoute({ route, family }),
   });
+}
+
+/**
+ * Project-scoped composition for the validated public REST surface.
+ *
+ * It deliberately shares the auth, input-target, API-key ceiling and route
+ * policy seams with RPC. A feature only declares its REST schemas and maps a
+ * validated request to its composed service.
+ */
+export function createProjectRestApiService(options: {
+  name: string;
+  basePath?: string;
+  staticVersioning?: StaticRestVersioning;
+  maxInputBytes: number;
+  openapiUrl?: string;
+  rateLimitOptOut: string;
+  resourceLimitOptOut: string;
+}) {
+  const basePath = options.basePath ?? `/api/v1/${options.name}`;
+  const family = familyFromBasePath(basePath);
+  return createRestService<App>({
+    name: options.name,
+    basePath,
+    staticVersioning: options.staticVersioning,
+    maxInputBytes: options.maxInputBytes,
+    openapiUrl: options.openapiUrl,
+    middleware: [appContextMiddleware],
+    app: appFromContext,
+    actor: resolveRequestActor,
+    authorize: authorizeRequestPermission,
+    projectIdInput: true,
+    auth: modernRestAuthMiddleware,
+    permissionEnforcer: requirePermissionOrThrow,
+    onRouteMounted: (route) => registerProjectApiRoute({ route, family }),
+    openapiSecurity: [{ project_api_key: [] }],
+  })
+    .withoutRateLimit(options.rateLimitOptOut)
+    .withoutResourceLimit(options.resourceLimitOptOut);
 }
 
 async function authorizeRequestPermission(
@@ -72,13 +116,7 @@ function resolveRequestActor(context: Context): RequestActor {
   throw new AuthenticatedActorRequiredError();
 }
 
-function registerProjectApiRoute({
-  route,
-  family,
-}: {
-  route: MountedRoute;
-  family: string;
-}): void {
+function registerProjectApiRoute({ route, family }: { route: MountedRoute; family: string }): void {
   let policy = null;
   if (route.isNamespaceGuard || route.isDiscoverEndpoint) {
     policy = publicEndpoint(

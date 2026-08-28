@@ -24,13 +24,13 @@ export const deleteSecretCommand = async (id: string): Promise<CommandResult | v
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.delete`, {
-      method: "POST",
+    const response = await fetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
-      body: JSON.stringify({ projectId: credentials.projectId, id }),
+      body: JSON.stringify({ projectId: credentials.projectId }),
     });
 
     if (!response.ok) {

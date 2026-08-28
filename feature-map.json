@@ -1401,7 +1401,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/secrets",
+            "api": "/api/v1/secret",
             "docs": null
           },
           "sync": null,

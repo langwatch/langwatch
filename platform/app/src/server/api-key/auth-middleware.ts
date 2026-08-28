@@ -27,10 +27,7 @@ import {
 
 export type ResolvedToken = ResolvedApiKeyToken;
 export type OrgResolution = OrganizationApiKeyResolution;
-export type OrgResolvedToken = Extract<
-  OrganizationApiKeyResolution,
-  { ok: true }
->["resolved"];
+export type OrgResolvedToken = Extract<OrganizationApiKeyResolution, { ok: true }>["resolved"];
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
@@ -115,6 +112,7 @@ function extractCredentials(
  */
 export function createUnifiedAuthMiddleware({
   errorEnvelope = "legacy",
+  refusals = "respond",
 }: {
   /**
    * The shape refusals answer with. Authentication runs beneath the family's
@@ -122,6 +120,12 @@ export function createUnifiedAuthMiddleware({
    * answer a flat body when the request fails one layer earlier.
    */
   errorEnvelope?: ApiErrorEnvelope;
+  /**
+   * Modern transport roots own their error envelope. They ask this middleware
+   * to throw the same concrete credential refusal that older routes render
+   * here, so authentication cannot create a nested error body.
+   */
+  refusals?: "respond" | "throw";
 }): MiddlewareHandler {
   const refusal = authRefusalBody(errorEnvelope);
 
@@ -138,6 +142,7 @@ export function createUnifiedAuthMiddleware({
     });
 
     if (!outcome.ok) {
+      if (refusals === "throw") raiseProjectAuthRefusal(outcome.refusal);
       return c.json(refusal(outcome.refusal), outcome.refusal.status as 401 | 500);
     }
 
@@ -213,6 +218,8 @@ async function resolveProjectPrincipal({
         code: "internal_error",
         legacyError: "Internal Server Error",
         message: "Authentication service error",
+        isInfrastructureFailure: true,
+        cause: error,
       },
     };
   }
@@ -378,6 +385,26 @@ type AuthRefusal = {
   meta?: Record<string, string>;
 };
 
+/** A project credential refusal raised to a modern transport error boundary. */
+export class ProjectAuthRefusedError extends HandledError {
+  constructor(refusal: AuthRefusal) {
+    super(refusal.code, refusal.message, {
+      httpStatus: refusal.status,
+      fault: refusal.status >= 500 ? "platform" : "customer",
+      ...(refusal.meta ? { meta: refusal.meta } : {}),
+    });
+    this.name = "ProjectAuthRefusedError";
+  }
+}
+
+function raiseProjectAuthRefusal(refusal: AuthRefusal): never {
+  if (refusal.isInfrastructureFailure) {
+    if (refusal.cause instanceof Error) throw refusal.cause;
+    throw new Error(refusal.message, { cause: refusal.cause });
+  }
+  throw new ProjectAuthRefusedError(refusal);
+}
+
 /**
  * Turns a refusal into the exception the throwing mode raises. An
  * infrastructure failure is rethrown plain so it stays an unhandled 500, not a
@@ -410,8 +437,7 @@ function refusalForUnresolvedOrg(
       status: 401,
       code: "credential_class_mismatch",
       legacyError: "Unauthorized",
-      message:
-        "This endpoint needs an organization API key. The key sent is a project API key.",
+      message: "This endpoint needs an organization API key. The key sent is a project API key.",
       meta: {
         required: "organization_api_key",
         presented: "project_api_key",
@@ -483,10 +509,7 @@ async function resolveOrgPrincipal({
   }
 
   if (!resolution.ok) {
-    orgLogger.warn(
-      { ...diag, hasToken: true, reason: resolution.reason },
-      "Org auth failed",
-    );
+    orgLogger.warn({ ...diag, hasToken: true, reason: resolution.reason }, "Org auth failed");
     return { ok: false, refusal: refusalForUnresolvedOrg(resolution.reason) };
   }
 
@@ -523,9 +546,7 @@ async function loadOrganization({
   organizationId: string;
   orgLogger: ReturnType<typeof createLogger>;
   diag: AuthDiagnostics;
-}): Promise<
-  { ok: true; organization: Organization } | { ok: false; refusal: AuthRefusal }
-> {
+}): Promise<{ ok: true; organization: Organization } | { ok: false; refusal: AuthRefusal }> {
   let organization: Organization | null;
   try {
     organization = await prisma.organization.findUnique({
@@ -547,10 +568,7 @@ async function loadOrganization({
   }
 
   if (!organization) {
-    orgLogger.warn(
-      { ...diag, organizationId },
-      "Org auth failed: organization not found",
-    );
+    orgLogger.warn({ ...diag, organizationId }, "Org auth failed: organization not found");
     return {
       ok: false,
       refusal: {
@@ -762,9 +780,11 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
 export function requireApiKeyPermission({
   permission,
   errorEnvelope = "legacy",
+  refusals = "respond",
 }: {
   permission: Permission;
   errorEnvelope?: ApiErrorEnvelope;
+  refusals?: "respond" | "throw";
 }): MiddlewareHandler {
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
@@ -789,6 +809,7 @@ export function requireApiKeyPermission({
       });
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
+      if (refusals === "throw") throw error;
       // The ceiling refuses BENEATH the family's own error handler, so it has
       // to render whichever shape the family publishes. On `canonical` that is
       // the same envelope `canonicalErrorResponse` would have produced; on

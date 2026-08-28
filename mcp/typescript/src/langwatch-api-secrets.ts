@@ -18,45 +18,38 @@ function projectId(): string {
 }
 
 export async function listSecrets(): Promise<SecretSummary[]> {
-  return makeRequest("POST", "/api/secrets/latest/secrets.list", {
-    projectId: projectId(),
-  }) as Promise<SecretSummary[]>;
+  const targetProjectId = projectId();
+  return makeRequest(
+    "GET",
+    `/api/v1/secret?projectId=${encodeURIComponent(targetProjectId)}`,
+  ) as Promise<SecretSummary[]>;
 }
 
 export async function getSecret(id: string): Promise<SecretSummary> {
-  return makeRequest("POST", "/api/secrets/latest/secrets.get", {
-    projectId: projectId(),
-    id,
-  }) as Promise<SecretSummary>;
+  const targetProjectId = projectId();
+  return makeRequest(
+    "GET",
+    `/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(targetProjectId)}`,
+  ) as Promise<SecretSummary>;
 }
 
-export async function createSecret(data: {
-  name: string;
-  value: string;
-}): Promise<SecretSummary> {
-  return makeRequest("POST", "/api/secrets/latest/secrets.create", {
+export async function createSecret(data: { name: string; value: string }): Promise<SecretSummary> {
+  return makeRequest("POST", "/api/v1/secret", {
     projectId: projectId(),
     ...data,
   }) as Promise<SecretSummary>;
 }
 
-export async function updateSecret(params: {
-  id: string;
-  value: string;
-}): Promise<SecretSummary> {
+export async function updateSecret(params: { id: string; value: string }): Promise<SecretSummary> {
   const { id, value } = params;
-  return makeRequest("POST", "/api/secrets/latest/secrets.update", {
+  return makeRequest("PUT", `/api/v1/secret/${encodeURIComponent(id)}`, {
     projectId: projectId(),
-    id,
     value,
   }) as Promise<SecretSummary>;
 }
 
-export async function deleteSecret(
-  id: string,
-): Promise<{ id: string; deleted: boolean }> {
-  return makeRequest("POST", "/api/secrets/latest/secrets.delete", {
+export async function deleteSecret(id: string): Promise<{ id: string; deleted: boolean }> {
+  return makeRequest("DELETE", `/api/v1/secret/${encodeURIComponent(id)}`, {
     projectId: projectId(),
-    id,
   }) as Promise<{ id: string; deleted: boolean }>;
 }

@@ -27,14 +27,16 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   const spinner = createSpinner("Fetching secrets...").start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.list`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await fetch(
+      `${endpoint}/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
       },
-      body: JSON.stringify({ projectId: credentials.projectId }),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -58,9 +60,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
           console.log();
           console.log(chalk.gray("No secrets found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(
-            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."'),
-          );
+          console.log(chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."'));
           return;
         }
 

@@ -129,7 +129,12 @@ const APP_DERIVED_PREFIXES = [
   "/api/monitors",
   "/api/scenario-events",
   "/api/scenarios",
+  // Secret's legacy REST surface and modern aliases are generated from their
+  // current mounts, so stale checked-in variants cannot survive.
+  "/api/secret",
   "/api/secrets",
+  "/api/v1/secret",
+  "/api/v1/secrets",
   "/api/simulation-runs",
   "/api/suites",
   "/api/teams",
@@ -155,16 +160,17 @@ const isAppDerivedPath = (key: string): boolean =>
 const currentSpec = {
   ...rawCurrentSpec,
   paths: Object.fromEntries(
-    Object.entries(
-      (rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {},
-    ).filter(([route]) => !isAppDerivedPath(route)),
+    Object.entries((rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {}).filter(
+      ([route]) => !isAppDerivedPath(route),
+    ),
   ),
 };
 
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
-import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
+import { app as legacySecretsApp } from "../app/api/secrets/[[...route]]/app";
+import { secretPublicRestApp } from "../runtime/app/features/secret";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
@@ -240,29 +246,17 @@ export default async function execute() {
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building organization spec...");
-  const organizationSpec = await generateFrameworkSpecs(
-    organizationApp,
-    FRAMEWORK_SPEC_OPTIONS,
-  );
+  const organizationSpec = await generateFrameworkSpecs(organizationApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building organizations (instance provisioning) spec...");
-  const organizationsSpec = await generateSpecs(
-    organizationsApp,
-    ORGANIZATIONS_SPEC_OPTIONS,
-  );
+  const organizationsSpec = await generateSpecs(organizationsApp, ORGANIZATIONS_SPEC_OPTIONS);
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
   console.log("Building roles spec...");
   const rolesSpec = await generateFrameworkSpecs(rolesApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building role bindings spec...");
-  const roleBindingsSpec = await generateFrameworkSpecs(
-    roleBindingsApp,
-    FRAMEWORK_SPEC_OPTIONS,
-  );
+  const roleBindingsSpec = await generateFrameworkSpecs(roleBindingsApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building scim tokens spec...");
-  const scimTokensSpec = await generateFrameworkSpecs(
-    scimTokensApp,
-    FRAMEWORK_SPEC_OPTIONS,
-  );
+  const scimTokensSpec = await generateFrameworkSpecs(scimTokensApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building scim spec...");
   // A family that authenticates with its own credential declares the scheme
   // next to the operations that name it, and `documentation` is how a
@@ -270,7 +264,8 @@ export default async function execute() {
   // the document.
   const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
-  const secretsSpec = await generateFrameworkSpecs(secretsApp, FRAMEWORK_SPEC_OPTIONS);
+  const legacySecretsSpec = await generateSpecs(legacySecretsApp);
+  const secretsSpec = await generateFrameworkSpecs(secretPublicRestApp, FRAMEWORK_SPEC_OPTIONS);
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building simulation runs spec...");
@@ -325,6 +320,7 @@ export default async function execute() {
       scenarioEventsSpec,
       scenariosSpec,
       projectsSpec,
+      legacySecretsSpec,
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
@@ -357,11 +353,7 @@ export default async function execute() {
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
-    JSON.stringify(
-      withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(mergedSpec)),
-      null,
-      2,
-    ),
+    JSON.stringify(withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(mergedSpec)), null, 2),
   );
 }
 
@@ -448,9 +440,7 @@ function* documentedOperations(spec: SpecShape): Generator<{
  * `typeof`. Stamping `security` onto `servers` produces a document that no
  * longer validates.
  */
-function operationsOf(
-  item: Record<string, unknown>,
-): Array<[string, { security?: unknown }]> {
+function operationsOf(item: Record<string, unknown>): Array<[string, { security?: unknown }]> {
   return Object.entries(item).filter(
     (entry): entry is [string, { security?: unknown }] =>
       isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
@@ -510,9 +500,7 @@ function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(spec: 
     ...spec,
     paths: Object.fromEntries(
       Object.entries(paths).filter(([, item]) =>
-        OPENAPI_METHODS.some(
-          (method) => (item as Record<string, unknown>)?.[method] !== undefined,
-        ),
+        OPENAPI_METHODS.some((method) => (item as Record<string, unknown>)?.[method] !== undefined),
       ),
     ),
   };

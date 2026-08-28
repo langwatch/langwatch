@@ -731,7 +731,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify({ id: monitorId, deleted: true }));
       }
       // --- Secret endpoints ---
-      else if (url === "/api/secrets/latest/secrets.list" && method === "POST") {
+      else if (url?.startsWith("/api/v1/secret?") && method === "GET") {
         res.writeHead(200);
         res.end(
           JSON.stringify([
@@ -751,7 +751,7 @@ function createMockServer(): Server {
             },
           ]),
         );
-      } else if (url === "/api/secrets/latest/secrets.get" && method === "POST") {
+      } else if (url?.match(/^\/api\/v1\/secret\/[^?]+\?/) && method === "GET") {
         res.writeHead(200);
         res.end(
           JSON.stringify({
@@ -762,7 +762,7 @@ function createMockServer(): Server {
             updatedAt: "2026-01-01T00:00:00Z",
           }),
         );
-      } else if (url === "/api/secrets/latest/secrets.create" && method === "POST") {
+      } else if (url === "/api/v1/secret" && method === "POST") {
         res.writeHead(201);
         res.end(
           JSON.stringify({
@@ -773,7 +773,7 @@ function createMockServer(): Server {
             updatedAt: "2026-01-03T00:00:00Z",
           }),
         );
-      } else if (url === "/api/secrets/latest/secrets.update" && method === "POST") {
+      } else if (url === "/api/v1/secret/secret_abc" && method === "PUT") {
         res.writeHead(200);
         res.end(
           JSON.stringify({
@@ -784,7 +784,7 @@ function createMockServer(): Server {
             updatedAt: "2026-01-03T00:00:00Z",
           }),
         );
-      } else if (url === "/api/secrets/latest/secrets.delete" && method === "POST") {
+      } else if (url === "/api/v1/secret/secret_abc" && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "secret_abc", deleted: true }));
       }

@@ -8,19 +8,18 @@ import {
 
 describe("Secret contract", () => {
   it("accepts upper-snake-case names only", () => {
-    expect(secretNameSchema.parse("OPENAI_API_KEY")).toBe("OPENAI_API_KEY");
+    expect(secretNameSchema.safeParse("OPENAI_API_KEY").success).toBe(true);
     expect(secretNameSchema.safeParse("openai-key").success).toBe(false);
   });
 
   it("enforces the value ceiling", () => {
-    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH)).success).toBe(
-      true,
+    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH)).success).toBe(true);
+    expect(secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH + 1)).success).toBe(
+      false,
     );
-    expect(
-      secretValueSchema.safeParse("x".repeat(MAX_SECRET_VALUE_LENGTH + 1)).success,
-    ).toBe(false);
   });
 
+  /** @scenario "Secret values never leave the boundary" */
   it("publishes metadata without a value field", () => {
     const parsed = secretPublicSchema.parse({
       id: "secret-1",

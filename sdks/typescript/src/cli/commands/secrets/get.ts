@@ -27,14 +27,16 @@ export const getSecretCommand = async (id: string): Promise<CommandResult | void
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.get`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+    const response = await fetch(
+      `${endpoint}/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(credentials.projectId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
       },
-      body: JSON.stringify({ projectId: credentials.projectId, id }),
-    });
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -58,12 +60,8 @@ export const getSecretCommand = async (id: string): Promise<CommandResult | void
         console.log();
         console.log(`  ${chalk.gray("ID:")}      ${chalk.green(secret.id)}`);
         console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(secret.name)}`);
-        console.log(
-          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`,
-        );
-        console.log(
-          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`,
-        );
+        console.log(`  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`);
+        console.log(`  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`);
         console.log();
         console.log(chalk.gray("  (Secret values are never returned for security)"));
         console.log();

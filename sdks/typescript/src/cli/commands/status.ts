@@ -422,10 +422,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     {
       key: "secrets",
       fn: () =>
-        fetchCount("/api/secrets/latest/secrets.list", {
-          method: "POST",
-          body: { projectId: credentials.projectId },
-        }),
+        fetchCount(`/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`),
     },
   ];
 

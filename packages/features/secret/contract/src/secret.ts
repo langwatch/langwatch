@@ -39,9 +39,7 @@ export const secretSchema = z
   .strict();
 export type Secret = z.infer<typeof secretSchema>;
 
-export const listSecretsInputSchema = z
-  .object({ projectId: secretProjectIdSchema })
-  .strict();
+export const listSecretsInputSchema = z.object({ projectId: secretProjectIdSchema }).strict();
 export type ListSecretsInput = z.infer<typeof listSecretsInputSchema>;
 
 export const getSecretInputSchema = z

@@ -15,14 +15,7 @@
  * not a hypothetical one.
  */
 
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,12 +102,8 @@ describe("excludes", () => {
         why: "session authenticated",
       };
 
-      expect(excludes({ exclusion: entry, key: "POST /api/experiments/execute" })).toBe(
-        true,
-      );
-      expect(excludes({ exclusion: entry, key: "GET /api/experiments/execute" })).toBe(
-        false,
-      );
+      expect(excludes({ exclusion: entry, key: "POST /api/experiments/execute" })).toBe(true);
+      expect(excludes({ exclusion: entry, key: "GET /api/experiments/execute" })).toBe(false);
     });
   });
 
@@ -127,9 +116,7 @@ describe("excludes", () => {
       };
 
       expect(excludes({ exclusion: entry, key: "GET /api/trpc" })).toBe(true);
-      expect(
-        excludes({ exclusion: entry, key: "POST /api/trpc/experiment.create" }),
-      ).toBe(true);
+      expect(excludes({ exclusion: entry, key: "POST /api/trpc/experiment.create" })).toBe(true);
     });
 
     it("does not match a sibling path that merely shares a word start", () => {
@@ -224,10 +211,7 @@ describe("auditCoverage", () => {
   describe("when the same route is registered from two basePaths", () => {
     it("counts each spelling once", () => {
       const result = audit({
-        routes: [
-          route({ key: "GET /api/experiments" }),
-          route({ key: "GET /api/experiments" }),
-        ],
+        routes: [route({ key: "GET /api/experiments" }), route({ key: "GET /api/experiments" })],
         documented: ["GET /api/experiments"],
       });
 
@@ -337,9 +321,7 @@ describe("auditCoverage", () => {
       routes: [route({ key: "GET /api/projects/{id}/api-key", described: true })],
     });
 
-    expect(result.unexplained.map((r) => r.key)).toEqual([
-      "GET /api/projects/{id}/api-key",
-    ]);
+    expect(result.unexplained.map((r) => r.key)).toEqual(["GET /api/projects/{id}/api-key"]);
     // The flag is what lets the report say which of the three publishing steps
     // was skipped, rather than leaving the reader to guess.
     expect(result.unexplained[0]?.described).toBe(true);
@@ -363,9 +345,7 @@ describe("collectRegisteredRoutes", () => {
     });
 
     it("gives the prompts v1 surface its real paths", () => {
-      const keys = new Set(
-        collectRegisteredRoutes(HANDLER_ROOTS).map((route) => route.key),
-      );
+      const keys = new Set(collectRegisteredRoutes(HANDLER_ROOTS).map((route) => route.key));
 
       expect(keys).toContain("GET /api/prompts");
       // `:id{.+?}` in the source — the constraint has to come off, or this
@@ -394,6 +374,18 @@ describe("collectRegisteredRoutes", () => {
       mkdirSync(dirname(full), { recursive: true });
       writeFileSync(full, lines.join("\n"), "utf8");
     };
+
+    it("keeps direct Hono routes direct when they use a framework helper", () => {
+      write("secrets/app.ts", [
+        'import { RestVersionSelector } from "@langwatch/api";',
+        'const app = createProjectApp({ basePath: "/api/secrets" });',
+        'app.get("/", describeRoute({}), listSecrets);',
+      ]);
+
+      expect(collectRegisteredRoutes([root]).map((route) => route.key)).toEqual([
+        "GET /api/secrets",
+      ]);
+    });
 
     /** @scenario "A service declaring only its name is counted under its derived prefix" */
     it("counts its routes under the prefix the framework derives", () => {
@@ -472,9 +464,7 @@ describe("collectRegisteredRoutes", () => {
 
       const routes = collectRegisteredRoutes([root]);
 
-      expect(
-        routes.map((route) => [route.key, route.described, route.usesApiFramework]),
-      ).toEqual([
+      expect(routes.map((route) => [route.key, route.described, route.usesApiFramework])).toEqual([
         ["GET /api/roles/2026-08-07", true, true],
         ["GET /api/roles/latest", true, true],
         ["POST /api/roles/2026-08-07", false, true],
@@ -493,10 +483,7 @@ describe("collectRegisteredRoutes", () => {
       ]);
 
       expect(
-        collectRegisteredRoutes([root]).map((route) => [
-          route.key,
-          route.withdrawn ?? false,
-        ]),
+        collectRegisteredRoutes([root]).map((route) => [route.key, route.withdrawn ?? false]),
       ).toEqual([
         // Still live where it is still served...
         ["GET /api/roles/2026-01-01/{id}/legacy", false],
@@ -544,9 +531,7 @@ const GENERATOR_PATH = resolve(
 const generatorSource = (): string => readFileSync(GENERATOR_PATH, "utf8");
 
 const appDerivedPrefixes = (source: string): string[] => {
-  const block = source.match(
-    /APP_DERIVED_PREFIXES = \[([\s\S]*?)\n\](?: as const)?;/,
-  )?.[1];
+  const block = source.match(/APP_DERIVED_PREFIXES = \[([\s\S]*?)\n\](?: as const)?;/)?.[1];
   return [...(block ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
 };
 
@@ -560,9 +545,7 @@ const appDerivedPrefixes = (source: string): string[] => {
 const mergedApps = (source: string): string[] =>
   [
     ...new Set(
-      [...source.matchAll(/generateSpecs\(\s*([A-Za-z0-9_]+)\s*[,)]/g)].map(
-        (match) => match[1]!,
-      ),
+      [...source.matchAll(/generateSpecs\(\s*([A-Za-z0-9_]+)\s*[,)]/g)].map((match) => match[1]!),
     ),
   ].sort();
 
@@ -634,9 +617,7 @@ const documentedPathsOf = (file: string): string[] => {
     for (const registration of collectRouteRegistrations(registeringSource)) {
       if (!registration.described) continue;
       for (const basePath of basePaths) {
-        paths.add(
-          honoPathToTemplate(joinRoutePath({ basePath, routePath: registration.path })),
-        );
+        paths.add(honoPathToTemplate(joinRoutePath({ basePath, routePath: registration.path })));
       }
     }
   }
@@ -659,9 +640,7 @@ describe("APP_DERIVED_PREFIXES", () => {
     // A call form the pattern cannot read is worse than an empty list: it
     // drops one family and leaves the rest passing, which is silent. Every
     // call site has to yield an identifier.
-    expect(mergedApps(source)).toHaveLength(
-      [...source.matchAll(/generateSpecs\(/g)].length,
-    );
+    expect(mergedApps(source)).toHaveLength([...source.matchAll(/generateSpecs\(/g)].length);
 
     expect(mergedApps(source).filter((identifier) => !files.has(identifier))).toEqual([]);
   });
@@ -757,9 +736,7 @@ describe("isEntryModule", () => {
   });
 
   it("is false for a different file", () => {
-    expect(isEntryModule({ invokedPath: "/a/other.ts", modulePath: "/a/b.ts" })).toBe(
-      false,
-    );
+    expect(isEntryModule({ invokedPath: "/a/other.ts", modulePath: "/a/b.ts" })).toBe(false);
   });
 
   it("is true for the same file", () => {

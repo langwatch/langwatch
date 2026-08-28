@@ -43,10 +43,7 @@ export class SecretsApiService {
     const projectId =
       this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
     if (!projectId) {
-      throw new SecretsApiError(
-        "A projectId is required for secret operations",
-        "configuration",
-      );
+      throw new SecretsApiError("A projectId is required for secret operations", "configuration");
     }
     return projectId;
   }
@@ -90,37 +87,37 @@ export class SecretsApiService {
   }
 
   async getAll(): Promise<SecretResponse[]> {
-    return this.request<SecretResponse[]>("/api/secrets/latest/secrets.list", {
-      method: "POST",
-      body: JSON.stringify({ projectId: this.projectId() }),
-    });
+    const projectId = this.projectId();
+    return this.request<SecretResponse[]>(
+      `/api/v1/secret?projectId=${encodeURIComponent(projectId)}`,
+    );
   }
 
   async get(id: string): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/secrets/latest/secrets.get", {
-      method: "POST",
-      body: JSON.stringify({ projectId: this.projectId(), id }),
-    });
+    const projectId = this.projectId();
+    return this.request<SecretResponse>(
+      `/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
+    );
   }
 
   async create(body: { name: string; value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/secrets/latest/secrets.create", {
+    return this.request<SecretResponse>("/api/v1/secret", {
       method: "POST",
       body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async update(id: string, body: { value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/secrets/latest/secrets.update", {
-      method: "POST",
-      body: JSON.stringify({ projectId: this.projectId(), id, ...body }),
+    return this.request<SecretResponse>(`/api/v1/secret/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify({ projectId: this.projectId(), ...body }),
     });
   }
 
   async delete(id: string): Promise<SecretDeleteResponse> {
-    return this.request<SecretDeleteResponse>("/api/secrets/latest/secrets.delete", {
-      method: "POST",
-      body: JSON.stringify({ projectId: this.projectId(), id }),
+    return this.request<SecretDeleteResponse>(`/api/v1/secret/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ projectId: this.projectId() }),
     });
   }
 }

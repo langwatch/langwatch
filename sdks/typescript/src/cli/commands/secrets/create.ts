@@ -44,7 +44,7 @@ export const createSecretCommand = async (
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.create`, {
+    const response = await fetch(`${endpoint}/api/v1/secret`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

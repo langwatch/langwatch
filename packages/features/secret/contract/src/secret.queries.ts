@@ -19,9 +19,7 @@ export const secretPublicSchema = z
   .strict();
 export type SecretPublic = z.infer<typeof secretPublicSchema>;
 
-export const secretPublicListInputSchema = z
-  .object({ projectId: z.string().min(1) })
-  .strict();
+export const secretPublicListInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 
 export const secretPublicGetInputSchema = secretPublicListInputSchema.extend({
@@ -49,13 +47,13 @@ export const secretPublicDeleteOutputSchema = z
   .strict();
 export type SecretPublicDeleteOutput = z.infer<typeof secretPublicDeleteOutputSchema>;
 
-interface SecretRpcProcedure<Input extends ZodType, Output extends ZodType> {
+interface SecretRestOperation<Input extends ZodType, Output extends ZodType> {
   readonly input: Input;
   readonly output: Output;
   readonly permission: AuthzPermission;
 }
 
-export const secretPublicRpc = {
+export const secretPublicRest = {
   list: {
     input: secretPublicListInputSchema,
     output: z.array(secretPublicSchema),
@@ -81,7 +79,7 @@ export const secretPublicRpc = {
     output: secretPublicDeleteOutputSchema,
     permission: "secrets:manage",
   },
-} as const satisfies Record<string, SecretRpcProcedure<ZodType, ZodType>>;
+} as const satisfies Record<string, SecretRestOperation<ZodType, ZodType>>;
 
 export function toSecretPublic(secret: Secret): SecretPublic {
   return secretPublicSchema.parse({

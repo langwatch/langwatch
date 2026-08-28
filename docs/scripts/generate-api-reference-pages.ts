@@ -279,13 +279,12 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     name: "Analytics",
     dirName: "analytics",
     pathPrefixes: ["/api/analytics"],
-    overviewDescription:
-      "Query analytics timeseries data with metrics, aggregations, and filters.",
+    overviewDescription: "Query analytics timeseries data with metrics, aggregations, and filters.",
   },
   {
     name: "Secrets",
     dirName: "secrets",
-    pathPrefixes: ["/api/secrets"],
+    pathPrefixes: ["/api/v1/secret"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
   },

@@ -31,15 +31,14 @@ export const updateSecretCommand = async (
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.update`, {
-      method: "POST",
+    const response = await fetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
       body: JSON.stringify({
         projectId: credentials.projectId,
-        id,
         value: options.value,
       }),
     });

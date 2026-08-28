@@ -191,23 +191,32 @@ function routesRegisteredIn({
     : file;
   const framework = importsApiFramework(source);
 
-  return basePaths.flatMap((basePath) =>
-    framework
+  const registrations = collectRouteRegistrations(source);
+  const versionedRegistrations = registrations.filter(
+    (registration) => registration.version !== undefined || registration.versionRef !== undefined,
+  );
+  const directRegistrations = registrations.filter(
+    (registration) => registration.version === undefined && registration.versionRef === undefined,
+  );
+
+  return basePaths.flatMap((basePath) => [
+    ...(framework
       ? expandServiceRegistrations({
-          registrations: collectRouteRegistrations(source),
+          registrations: versionedRegistrations,
           basePath,
           file: relative,
           constants,
         })
-      : collectRouteRegistrations(source).map((registration) => ({
-          key: `${registration.method.toUpperCase()} ${honoPathToTemplate(
-            joinRoutePath({ basePath, routePath: registration.path }),
-          )}`,
-          file: relative,
-          described: registration.described,
-          ...(registration.withdrawn ? { withdrawn: true as const } : {}),
-        })),
-  );
+      : []),
+    ...directRegistrations.map((registration) => ({
+      key: `${registration.method.toUpperCase()} ${honoPathToTemplate(
+        joinRoutePath({ basePath, routePath: registration.path }),
+      )}`,
+      file: relative,
+      described: registration.described,
+      ...(registration.withdrawn ? { withdrawn: true as const } : {}),
+    })),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,9 +244,7 @@ function resolveVersionNamespace({
   if (registration.version !== undefined) return registration.version;
 
   const resolved =
-    registration.versionRef !== undefined
-      ? constants.get(registration.versionRef)
-      : undefined;
+    registration.versionRef !== undefined ? constants.get(registration.versionRef) : undefined;
   if (resolved !== undefined) return resolved;
 
   throw new Error(
@@ -296,11 +303,7 @@ function expandServiceRegistrations({
   }
 
   /** The state one endpoint is in at one namespace, or null when it does not exist there. */
-  const stateAt = (
-    method: string,
-    path: string,
-    namespace: string,
-  ): RouteRegistration | null => {
+  const stateAt = (method: string, path: string, namespace: string): RouteRegistration | null => {
     let state: RouteRegistration | null = null;
     for (const event of events) {
       if (event.namespace === "preview" || event.namespace > namespace) {
@@ -381,13 +384,7 @@ export function documentedOperations(document: OpenApiDocument): Set<string> {
 }
 
 /** Does this exclusion cover that operation key? */
-export function excludes({
-  exclusion,
-  key,
-}: {
-  exclusion: Exclusion;
-  key: string;
-}): boolean {
+export function excludes({ exclusion, key }: { exclusion: Exclusion; key: string }): boolean {
   if (!exclusion.match.startsWith("/")) return exclusion.match === key;
   const path = key.slice(key.indexOf(" ") + 1);
   return path === exclusion.match || path.startsWith(`${exclusion.match}/`);
@@ -445,15 +442,12 @@ export function auditCoverage({
 
   const used = new Set<Exclusion>();
   const unexcused = publishable.filter((route) => {
-    const excusing = exclusions.filter((exclusion) =>
-      excludes({ exclusion, key: route.key }),
-    );
+    const excusing = exclusions.filter((exclusion) => excludes({ exclusion, key: route.key }));
     for (const exclusion of excusing) used.add(exclusion);
     return excusing.length === 0;
   });
 
-  const byKeyOrder = (a: RegisteredRoute, b: RegisteredRoute) =>
-    a.key.localeCompare(b.key);
+  const byKeyOrder = (a: RegisteredRoute, b: RegisteredRoute) => a.key.localeCompare(b.key);
 
   return {
     unexplained: unexcused.sort(byKeyOrder),

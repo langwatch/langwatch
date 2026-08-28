@@ -208,11 +208,6 @@ export const UNPUBLISHED = [
     why: "deprecated alias that rewrites onto /api/experiments/...; documenting it would publish the path we are moving clients off",
   },
   {
-    match: "/api/secrets",
-    category: "alias",
-    why: "deprecated unversioned REST compatibility family; new clients use the documented /api/secrets/{version}/secrets.* RPC operations",
-  },
-  {
     match: "GET /api/thread/{id}",
     category: "alias",
     why: "superseded by the trace endpoints under /api/traces",

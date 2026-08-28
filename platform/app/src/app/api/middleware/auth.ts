@@ -46,6 +46,11 @@ export const canonicalAuthMiddleware: MiddlewareHandler = createUnifiedAuthMiddl
   errorEnvelope: "canonical",
 });
 
+/** Auth for fluent public REST, whose framework owns the one flat error body. */
+export const modernRestAuthMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
+  refusals: "throw",
+});
+
 /**
  * Per-endpoint RBAC middleware. Legacy project keys always pass through;
  * service/user API keys are checked against their role bindings.
@@ -55,4 +60,9 @@ export function requirePermission(
   errorEnvelope: ApiErrorEnvelope = "legacy",
 ): MiddlewareHandler {
   return createRequireApiKeyPermission({ permission, errorEnvelope });
+}
+
+/** Permission ceiling for fluent public REST error handling. */
+export function requirePermissionOrThrow(permission: AuthzPermission): MiddlewareHandler {
+  return createRequireApiKeyPermission({ permission, refusals: "throw" });
 }
