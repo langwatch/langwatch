@@ -30,6 +30,16 @@ export interface IngestionPullRunStatusData {
   LastRunErrorCode: string | null;
   ConsecutiveErrors: number;
   /**
+   * When a run last reached the provider and came back without an error.
+   *
+   * Distinct from `LastRunAt`, which moves on failures too, and from
+   * `IngestionSource.lastEventAt`, which moves only when data arrives. Health
+   * needs the third question -- when did the pull itself last work -- and
+   * neither of the other two answers it, so a source whose provider had gone
+   * dark looked identical to one that was merely quiet (ADR-128).
+   */
+  LastSuccessAt: number | null;
+  /**
    * Which run this row's outcome fields describe, as the run's `scheduledFor`.
    *
    * The process manager fences late outcomes by comparing `runId` against the
@@ -92,6 +102,7 @@ export class IngestionPullRunStatusFoldProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
       LastRunScheduledFor: null,
+      LastSuccessAt: null,
     };
   }
 
@@ -164,6 +175,9 @@ export class IngestionPullRunStatusFoldProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
       LastRunScheduledFor: event.data.scheduledFor,
+      // Stamped on every completion, including one that found nothing new:
+      // reaching the provider and being told "no usage" is a working puller.
+      LastSuccessAt: event.occurredAt,
     };
   }
 
