@@ -169,6 +169,12 @@ Feature: Scenario CLI Commands
     When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
     Then the request carries the header "X-LangWatch-Surface: cli"
 
+  @unit
+  Scenario: Wait for a scenario run with machine-readable output
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --wait" asking for JSON output
+    Then exactly one final document carries the per-run results, the tallies and the outcome
+    And no other line is printed on stdout
+
   # ============================================================================
   # Versions (Agent Testing v2)
   # ============================================================================

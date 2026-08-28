@@ -152,6 +152,46 @@ Feature: Run Plan CLI Commands
     And I see that nothing was scheduled
 
   # ==========================================================================
+  # run-plan run machine-readable output
+  #
+  # A machine caller reads stdout. Whichever way the run ends, it must find one
+  # document there and nothing else. Human output stays as it is.
+  # ==========================================================================
+
+  @unit
+  Scenario: Run with machine-readable output
+    When I run "langwatch run-plan run --all --target http:agent_abc" asking for JSON output
+    Then exactly one machine-readable document is printed on stdout
+    And it carries the batch run ID, the job count and a scheduled outcome
+
+  @unit
+  Scenario: Wait with machine-readable output
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait" asking for JSON output
+    Then the CLI polls until every run of the batch has stopped
+    And exactly one final document carries the per-run results, the tallies and the outcome
+    And the exit code is nonzero when any run failed
+
+  @unit
+  Scenario: A timed-out wait still emits the machine-readable document
+    Given a run whose jobs never complete
+    When the wait times out
+    Then the final document names the timeout outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: A dead status endpoint still emits the machine-readable document
+    Given a run whose status endpoint keeps failing
+    When the wait gives up
+    Then the final document names the poll failure outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Waiting in human mode prints no machine document
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait" with the default output
+    Then the progress and completion lines stay human-readable
+    And no JSON document is printed
+
+  # ==========================================================================
   # run-plan list, get, archive
   # ==========================================================================
 
