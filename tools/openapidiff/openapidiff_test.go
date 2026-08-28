@@ -77,9 +77,31 @@ func TestRunFiltersAndExitCodes(t *testing.T) {
 	}
 }
 
+func TestPathPrefixMatchesWholeSegments(t *testing.T) {
+	base := writeDoc(t, d(map[string]any{
+		"/api/secretary": map[string]any{"get": op("old")},
+	}, nil))
+	candidate := writeDoc(t, d(map[string]any{
+		"/api/secretary": map[string]any{"get": op("new")},
+	}, nil))
+	var output, errors bytes.Buffer
+	if code := Run([]string{"-path-prefix", "/api/secret", base, candidate}, &output, &errors); code != 0 {
+		t.Fatalf("sibling path was incorrectly selected: code=%d output=%q stderr=%q", code, output.String(), errors.String())
+	}
+}
+
 func TestIsHTTPMethod(t *testing.T) {
 	if !IsHTTPMethod("GET") || IsHTTPMethod("parameters") {
 		t.Fatal("method classification is incorrect")
+	}
+}
+
+func TestUppercaseOperationKeysAreRejected(t *testing.T) {
+	document := d(map[string]any{
+		"/x": map[string]any{"GET": op("x")},
+	}, nil)
+	if _, err := Load(writeDoc(t, document)); err == nil {
+		t.Fatal("uppercase operation key was accepted")
 	}
 }
 
@@ -183,8 +205,10 @@ func TestValidationAndWriterErrors(t *testing.T) {
 		{"openapi": "3.1.0", "paths": []any{}},
 		{"openapi": "3.1.0", "paths": map[string]any{"x": map[string]any{}}},
 		{"openapi": "3.1.0", "paths": map[string]any{"/x": map[string]any{"get": map[string]any{}}}},
+		{"openapi": "3.1.0", "paths": map[string]any{"/x": map[string]any{"GET": op("x")}}},
 		{"openapi": "3.1.0", "paths": map[string]any{}, "components": map[string]any{"unknown": map[string]any{}}},
 		{"openapi": "3.1.0", "paths": map[string]any{"/x": map[string]any{"$ref": "#/components/pathItems/Missing"}}, "components": map[string]any{"pathItems": map[string]any{}}},
+		{"openapi": "3.1.0", "paths": map[string]any{"/x": map[string]any{"get": map[string]any{"responses": map[string]any{"200": map[string]any{"content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/Thing/extra"}}}}}}}}, "components": map[string]any{"schemas": map[string]any{"Thing": map[string]any{"type": "string"}}}},
 	}
 	for index, value := range invalidValues {
 		if _, err := Load(writeDoc(t, value)); err == nil {

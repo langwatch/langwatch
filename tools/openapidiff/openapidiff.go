@@ -197,7 +197,7 @@ func validatePathItem(path string, item map[string]any) error {
 				return err
 			}
 		default:
-			if !IsHTTPMethod(key) {
+			if !IsHTTPMethod(key) || key != strings.ToLower(key) {
 				return fmt.Errorf("path %s: unknown path-item field %q", path, key)
 			}
 			operation, err := obj(value)
@@ -729,7 +729,7 @@ func componentID(reference string) (string, bool) {
 		return "", false
 	}
 	parts := strings.Split(strings.TrimPrefix(reference, "#/components/"), "/")
-	if len(parts) < 2 {
+	if len(parts) != 2 {
 		return "", false
 	}
 	kind, ok := decodePointer(parts[0])
@@ -901,6 +901,10 @@ func reachableComponents(base, candidate map[string]any, roots map[string]bool) 
 	return result
 }
 
+func pathMatchesPrefix(path, prefix string) bool {
+	return prefix == "" || path == prefix || strings.HasPrefix(path, prefix+"/")
+}
+
 func snapshotSecurity(value any) any {
 	snapshot, ok := value.(map[string]any)
 	if !ok {
@@ -935,7 +939,7 @@ func Diff(base, candidate map[string]any, prefix, method string) ([]Change, erro
 	changes := make([]Change, 0)
 
 	for _, path := range mapKeys(basePaths, candidatePaths) {
-		if prefix != "" && !strings.HasPrefix(path, prefix) {
+		if !pathMatchesPrefix(path, prefix) {
 			continue
 		}
 		baseValue, basePresent := basePaths[path]
