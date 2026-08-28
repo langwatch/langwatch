@@ -18,30 +18,50 @@ const StyledButton = chakra("button");
 export type TagPillTone = "neutral" | "pastel";
 
 /**
- * The colours a pastel pill can take. Every entry is a Chakra palette, so the
- * pill follows the light and the dark theme without a second definition.
+ * The hues a pastel pill can take, as oklch hue angles: blue, green, orange,
+ * purple, pink, cyan and olive.
  */
-const PASTEL_PALETTES = [
-  "blue",
-  "purple",
-  "teal",
-  "pink",
-  "orange",
-  "cyan",
-  "green",
-  "yellow",
-] as const;
+const PASTEL_HUES = [230, 160, 20, 280, 330, 200, 60] as const;
 
 /**
- * The palette a label always takes. The same label keeps its colour across
- * rows, pages and reloads because the colour is read from the text itself.
+ * The hue a label always takes. The same label keeps its colour across rows,
+ * pages and reloads because the colour is read from the text itself.
  */
-export function pastelPaletteForLabel(label: string): string {
+export function pastelHueForLabel(label: string): number {
   let hash = 0;
   for (let index = 0; index < label.length; index++) {
     hash = (hash * 31 + label.charCodeAt(index)) >>> 0;
   }
-  return PASTEL_PALETTES[hash % PASTEL_PALETTES.length]!;
+  return PASTEL_HUES[hash % PASTEL_HUES.length]!;
+}
+
+/**
+ * The colour of the dot that stands for a label where no pill is drawn, in the
+ * label filter. One step stronger than the pill's ground, so a 10px dot still
+ * carries its hue.
+ */
+/**
+ * The two colours of a pill, at one hue.
+ *
+ * Lightness and chroma are fixed and only the hue moves, so every label reads
+ * at the same strength and the same contrast: a pale ground and text dark
+ * enough to read on it. On a dark page the two swap roles.
+ */
+export function pastelSwatchColor(label: string): string {
+  return `oklch(0.62 0.14 ${pastelHueForLabel(label)})`;
+}
+
+function pastelColors(hue: number) {
+  return {
+    background: {
+      base: `oklch(0.95 0.035 ${hue})`,
+      _dark: `oklch(0.28 0.05 ${hue})`,
+    },
+    foreground: {
+      base: `oklch(0.42 0.09 ${hue})`,
+      _dark: `oklch(0.86 0.07 ${hue})`,
+    },
+  };
 }
 
 type TagPillProps = {
@@ -51,23 +71,24 @@ type TagPillProps = {
 };
 
 export function TagPill({ label, onRemove, tone = "neutral" }: TagPillProps) {
-  const palette = tone === "pastel" ? pastelPaletteForLabel(label) : null;
+  const colors =
+    tone === "pastel" ? pastelColors(pastelHueForLabel(label)) : null;
 
   return (
     <HStack
       gap={1}
-      bg={palette ? `${palette}.muted` : "bg.muted"}
-      color={palette ? `${palette}.fg` : undefined}
+      bg={colors ? colors.background : "bg.muted"}
+      color={colors ? colors.foreground : undefined}
       px={2}
-      py={0.5}
+      py={colors ? "1px" : 0.5}
       borderRadius="full"
       fontSize="xs"
-      fontFamily={palette ? "mono" : undefined}
+      fontFamily={colors ? "mono" : undefined}
       data-testid={`tag-pill-${label}`}
     >
       <Text
-        fontSize={palette ? "10.5px" : "xs"}
-        fontWeight={palette ? "medium" : undefined}
+        fontSize={colors ? "10px" : "xs"}
+        fontWeight={colors ? "medium" : undefined}
       >
         {label}
       </Text>

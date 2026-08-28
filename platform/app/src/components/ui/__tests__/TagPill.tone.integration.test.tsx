@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { TagList } from "../TagList";
-import { pastelPaletteForLabel, TagPill } from "../TagPill";
+import { pastelHueForLabel, TagPill } from "../TagPill";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -84,15 +84,13 @@ describe("<TagPill/> tone", () => {
     });
 
     it("gives the same label the same colour every time", () => {
-      expect(pastelPaletteForLabel("billing")).toBe(
-        pastelPaletteForLabel("billing"),
-      );
+      expect(pastelHueForLabel("billing")).toBe(pastelHueForLabel("billing"));
     });
 
     it("tells labels apart", () => {
       const palettes = new Set(
         ["billing", "refunds", "onboarding", "escalation"].map(
-          pastelPaletteForLabel,
+          pastelHueForLabel,
         ),
       );
 

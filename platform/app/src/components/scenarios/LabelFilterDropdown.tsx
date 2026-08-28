@@ -8,7 +8,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { pastelPaletteForLabel } from "~/components/ui/TagPill";
+import { pastelSwatchColor } from "~/components/ui/TagPill";
 
 type LabelFilterDropdownProps = {
   allLabels: string[];
@@ -48,7 +48,7 @@ export function LabelFilterDropdown({
           ) : (
             <VStack align="stretch" gap={2}>
               {allLabels.map((label) => {
-                const palette = pastelPaletteForLabel(label);
+                const swatch = pastelSwatchColor(label);
                 return (
                   <HStack
                     key={label}
@@ -61,7 +61,7 @@ export function LabelFilterDropdown({
                       width="10px"
                       height="10px"
                       borderRadius="full"
-                      bg={`${palette}.solid`}
+                      bg={swatch}
                       flexShrink={0}
                     />
                     <Text fontSize="sm">{label}</Text>
