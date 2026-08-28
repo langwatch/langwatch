@@ -1,4 +1,4 @@
-import type { LimitType } from "./types";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 /**
  * Human-readable labels for each limit type (lowercase, for use in sentences).

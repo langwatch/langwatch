@@ -19,10 +19,11 @@ import type {
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
-import type { CollectorRESTParams } from "~/server/tracer/types";
+import type { CollectorRESTParams } from "@langwatch/trace-contract";
 import type { DeepPartial } from "~/utils/types";
 
 const logger = createLogger("langwatch:health-checks");

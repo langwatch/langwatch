@@ -13,7 +13,7 @@ import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { csvFileName, downloadCsv } from "~/utils/downloadCsv";

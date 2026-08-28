@@ -8,6 +8,8 @@ import {
   type DatasetStorageResolver,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
+import type { AzureIdentityConfig } from "~/runtime/azure-identity.config";
 import { AppDatasetStorageResolver } from "./dataset-storage";
 
 /**
@@ -28,6 +30,8 @@ export class AppDatasetRuntime {
       /** Object-backed dataset reads/mutations; selected by the composition root. */
       content?: DatasetContentPort;
       storageResolver?: DatasetStorageResolver;
+      aws?: Pick<AppAwsClientConfiguration, "build">;
+      azureIdentity?: AzureIdentityConfig;
       generateId?: () => string;
     },
     ownedStorageResolver: AppDatasetStorageResolver | undefined,
@@ -44,11 +48,18 @@ export class AppDatasetRuntime {
     /** Object-backed dataset reads/mutations; selected by the composition root. */
     content?: DatasetContentPort;
     storageResolver?: DatasetStorageResolver;
+    /** Process-owned AWS transport graph for the dataset object's S3 clients. */
+    aws?: Pick<AppAwsClientConfiguration, "build">;
+    /** Parsed platform identity used by Azure-backed dataset storage. */
+    azureIdentity?: AzureIdentityConfig;
     generateId?: () => string;
   }): AppDatasetRuntime {
     const ownedStorageResolver = options.storageResolver
       ? undefined
-      : new AppDatasetStorageResolver();
+      : new AppDatasetStorageResolver({
+          aws: options.aws,
+          azureIdentity: options.azureIdentity,
+        });
     return new AppDatasetRuntime(
       {
         ...options,

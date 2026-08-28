@@ -33,7 +33,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
 import { GithubInstallationConflictError } from "@langwatch/github-contract";
-import { createServiceApp, handlerManagedAuth, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth, publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 

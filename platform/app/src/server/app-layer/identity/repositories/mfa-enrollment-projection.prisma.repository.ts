@@ -6,11 +6,11 @@ import type {
 } from "@langwatch/identity";
 import type { MfaEnrollment, PrismaClient } from "~/generated/prisma/client";
 import type { MfaFoldState } from "~/server/event-sourcing/pipelines/identity/projections/mfaEnrollmentState.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
 
 /**
  * The two-step verification pipeline's projection store (D06): the Postgres

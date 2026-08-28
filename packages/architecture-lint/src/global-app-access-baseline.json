@@ -128,24 +128,6 @@
       "52532633615cbe18"
     ],
     [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "reference",
-      "18afcc36d5b6485d"
-    ],
-    [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "reference",
-      "42e352296e2cb144"
-    ],
-    [
       "platform/app/src/server/api/routers/tracesV2.ts",
       "getApp",
       "import",

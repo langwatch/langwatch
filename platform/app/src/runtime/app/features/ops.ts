@@ -14,6 +14,7 @@ import {
 } from "@langwatch/group-queue/operational";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { Cluster, Redis } from "ioredis";
 import type { UserService } from "@langwatch/user-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -92,6 +93,7 @@ export interface AppOpsRuntimeOptions {
   adminEmails: string | readonly string[];
   redis?: Redis | Cluster | undefined;
   users: UserService;
+  auth: AuthService;
   scheduler: {
     repository: SchedulerOpsRepository;
     wake: SchedulerWakeService;

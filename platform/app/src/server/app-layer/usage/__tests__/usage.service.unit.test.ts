@@ -12,9 +12,9 @@ import { type UsageLimitResult, UsageService } from "../usage.service";
 /**
  * Narrows a UsageLimitResult to its exceeded branch. An `expect().toBe(true)`
  * here would assert but not narrow the discriminated union for callers, and
- * biome's noMisplacedAssertion rejects an `expect()` outside an `it()` body
- * anyway, so this throws instead - still fails the test loudly if the
- * invariant doesn't hold.
+ * an `expect()` outside an `it()` body is a misplaced assertion anyway, so
+ * this throws instead - still fails the test loudly if the invariant
+ * doesn't hold.
  */
 function assertExceeded(
   result: UsageLimitResult,

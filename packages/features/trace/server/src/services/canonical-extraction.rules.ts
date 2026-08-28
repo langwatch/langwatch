@@ -109,12 +109,17 @@ export const extractOutputMessages = (
     extractSystemInstructions: false,
   });
 
-export const extractModelToBoth = (
-  ctx: ExtractorContext,
-  sourceKey: string,
-  transform: (raw: unknown) => string | null = (raw) => (typeof raw === "string" ? raw : null),
-  ruleId: string,
-): boolean => {
+export const extractModelToBoth = ({
+  ctx,
+  sourceKey,
+  ruleId,
+  transform = (raw) => (typeof raw === "string" ? raw : null),
+}: {
+  ctx: ExtractorContext;
+  sourceKey: string;
+  ruleId: string;
+  transform?: (raw: unknown) => string | null;
+}): boolean => {
   if (
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 // Capture at module scope so assertions can reach them from every it() block.
 const mockGetById = vi.fn();

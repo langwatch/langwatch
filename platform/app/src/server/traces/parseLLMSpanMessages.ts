@@ -1,4 +1,4 @@
-import type { PromptStudioSpanResult } from "./types";
+import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
 
 type ChatMessage = PromptStudioSpanResult["messages"][number];
 

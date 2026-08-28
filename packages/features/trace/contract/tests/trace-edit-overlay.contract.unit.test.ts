@@ -13,7 +13,7 @@ import {
   patchHasAnyEdit,
   TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES,
   traceEditOverlayPatchSchema,
-} from "../traceEditOverlay.schemas";
+} from "@langwatch/trace-contract";
 
 describe("trace edit overlay patch contract", () => {
   describe("given a patch written by this build", () => {

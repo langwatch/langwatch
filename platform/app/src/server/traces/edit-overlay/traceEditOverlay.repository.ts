@@ -1,17 +1,14 @@
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient, TraceEditOverlay } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type { TraceEditOverlayPatch } from "./traceEditOverlay.schemas";
+import type {
+  TraceEditOverlayAuthor,
+  TraceEditOverlayPatch,
+} from "@langwatch/trace-contract";
 
 /** Only what an attribution line renders. The row is read on every corrected
  *  trace, so it never carries the rest of the User record. */
 const AUTHOR_SELECT = { id: true, name: true, image: true } as const;
-
-export interface TraceEditOverlayAuthor {
-  id: string;
-  name: string | null;
-  image: string | null;
-}
 
 export type TraceEditOverlayRow = TraceEditOverlay & {
   createdBy: TraceEditOverlayAuthor | null;

@@ -12,10 +12,9 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import type { VegaValidationError } from "@langwatch/analytics-web/validation";
-import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
  * No chart with that id in this project.

@@ -6,7 +6,7 @@ import {
   type SpanInputOutput,
   spanInputOutputSchema,
   spanTypesSchema,
-} from "~/server/tracer/types";
+} from "./trace-format.schemas";
 
 /**
  * The only patch version this build understands. A row stored under any other
@@ -167,8 +167,7 @@ export function patchHasAnyEdit(patch: TraceEditOverlayPatch): boolean {
 function asChatMessages(value: unknown): ChatMessage[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   const looksLikeTranscript = value.every(
-    (entry) =>
-      !!entry && typeof entry === "object" && !Array.isArray(entry) && "role" in entry,
+    (entry) => !!entry && typeof entry === "object" && !Array.isArray(entry) && "role" in entry,
   );
   if (!looksLikeTranscript) return null;
   const parsed = z.array(chatMessageSchema).safeParse(value);
@@ -210,4 +209,24 @@ export function encodeSpanIOFromEditedText({
   const json = spanInputOutputSchema.safeParse({ type: "json", value: parsed });
   if (json.success) return json.data;
   return { type: "text", value: text };
+}
+
+/**
+ * Only what an attribution line renders. The row is read on every corrected
+ * trace, so it never carries the rest of the User record.
+ */
+export interface TraceEditOverlayAuthor {
+  id: string;
+  name: string | null;
+  image: string | null;
+}
+
+/** One trace's stored correction, as every reader of it receives it. */
+export interface TraceEditOverlayDto {
+  traceId: string;
+  patch: TraceEditOverlayPatch;
+  createdBy: TraceEditOverlayAuthor | null;
+  updatedBy: TraceEditOverlayAuthor | null;
+  createdAt: Date;
+  updatedAt: Date;
 }

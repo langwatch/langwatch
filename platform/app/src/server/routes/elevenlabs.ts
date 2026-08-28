@@ -45,7 +45,8 @@ import { createLogger } from "@langwatch/observability";
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import { z } from "zod";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { getElevenLabsWebhookSecret } from "~/server/gateway/elevenLabsCredential.service";
 import {
   closeAndConfirmRealtimeSession,

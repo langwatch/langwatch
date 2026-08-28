@@ -1,5 +1,4 @@
-import type { Event } from "../../domain/types";
-import { definePipeline } from "../../pipeline/staticBuilder";
+import { definePipeline, type Event } from "@langwatch/eventing";
 import {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,

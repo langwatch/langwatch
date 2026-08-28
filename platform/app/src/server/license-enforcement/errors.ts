@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { LIMIT_TYPE_LABELS } from "./constants";
-import type { LimitType } from "./types";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 /**
  * Domain error thrown when an organization has reached its limit for a resource type.

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { LimitType } from "../server/license-enforcement/types";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 /** Modal opened by license enforcement when a limit is reached. */
 type LimitVariant = {

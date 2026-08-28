@@ -1,6 +1,6 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
 import type { AppRouter } from "../server/api/root";
-import type { LimitType } from "../server/license-enforcement";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {

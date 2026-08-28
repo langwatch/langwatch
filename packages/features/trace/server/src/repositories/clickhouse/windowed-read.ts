@@ -1,7 +1,5 @@
-import {
-  NullTraceWindowedReadMetricsPort,
-  type TraceWindowedReadMetricsPort,
-} from "../../ports/trace-windowed-read-metrics.port";
+import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port";
+import { NullTraceWindowedReadMetricsAdapter } from "../../adapters/null-trace-windowed-read-metrics.adapter";
 
 export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -21,7 +19,7 @@ type QueryWindowedOptions<T> = {
 };
 
 export async function queryWindowed<T>(options: QueryWindowedOptions<T>): Promise<T> {
-  const metrics = options.metrics ?? new NullTraceWindowedReadMetricsPort();
+  const metrics = options.metrics ?? new NullTraceWindowedReadMetricsAdapter();
   const windowMs = options.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
 
   try {

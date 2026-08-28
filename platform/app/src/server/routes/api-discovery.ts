@@ -38,7 +38,8 @@ import { app as organizationApp } from "~/app/api/organization/[[...route]]/app"
 import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import {
   WELL_KNOWN_OPENAPI_PATH,
   WHY_DISCOVERY_IS_PUBLIC,

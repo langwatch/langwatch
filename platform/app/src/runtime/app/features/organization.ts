@@ -3,6 +3,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
+  OrganizationSettingsSecretPort,
   PostgresOrganizationAdapter,
   GroupIdentityPort,
   TeamIdentityPort,
@@ -14,14 +15,12 @@ import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+import { decrypt, encrypt } from "~/utils/encryption";
 
 const logger = createLogger("langwatch:organization");
 
 class AppPersonalWorkspaceIdentityPort extends PersonalWorkspaceIdentityPort {
-  create(input: {
-    userId: string;
-    organizationId: string;
-  }): PersonalWorkspaceResourceIds {
+  create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds {
     const slugPrefix = input.userId.toLowerCase().slice(0, 12);
     return {
       teamId: generate(KSUID_RESOURCES.TEAM).toString(),
@@ -71,6 +70,16 @@ class AppGroupIdentityPort extends GroupIdentityPort {
   }
 }
 
+class AppOrganizationSettingsSecretPort extends OrganizationSettingsSecretPort {
+  encrypt(value: string): string {
+    return encrypt(value);
+  }
+
+  decrypt(value: string): string {
+    return decrypt(value);
+  }
+}
+
 export class AppOrganizationRuntime {
   private constructor(
     private readonly database: PrismaClient,
@@ -94,6 +103,7 @@ export class AppOrganizationRuntime {
       groupIdentities: new AppGroupIdentityPort(),
       authz: this.authz,
       grants: this.grants,
+      settingsSecrets: new AppOrganizationSettingsSecretPort(),
       diagnostics: new AppPersonalWorkspaceDiagnosticsPort(),
     }).build();
   }

@@ -12,7 +12,8 @@
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Context } from "hono";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import type { App } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";

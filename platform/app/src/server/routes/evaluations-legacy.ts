@@ -29,8 +29,13 @@ import { CostReferenceType, CostType, ExperimentType } from "~/generated/prisma/
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
-import { getCustomEvaluators } from "~/server/api/routers/evaluations";
-import { createServiceApp, handlerManagedAuth, publicEndpoint } from "~/server/api/security";
+import { listCustomEvaluators } from "@langwatch/platform-api/app-trpc";
+import { createServiceApp } from "~/server/api/security";
+import {
+  handlerManagedAuth,
+  patchZodOpenapi,
+  publicEndpoint,
+} from "@langwatch/platform-api/app-rest";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -80,9 +85,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
-import { rAGChunkSchema } from "~/server/tracer/types";
+import { rAGChunkSchema } from "@langwatch/trace-contract";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL, KSUID_RESOURCES } from "~/utils/constants";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { RequestAppServices } from "~/runtime/app/requestApp";
@@ -940,7 +944,8 @@ export const getEvaluatorIncludingCustom = async (
 ): Promise<
   EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | CustomEvaluatorDefinition | undefined
 > => {
-  const availableCustomEvaluators = await getCustomEvaluators({
+  const availableCustomEvaluators = await listCustomEvaluators({
+    prisma,
     projectId,
   });
 

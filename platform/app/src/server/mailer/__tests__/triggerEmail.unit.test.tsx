@@ -2,7 +2,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AlertType } from "~/generated/prisma/client";
 import type { TriggerData } from "~/runtime/app/features/automation-adapters/trigger.types";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 const { sendEmailMock, computeDefaultFromMock } = vi.hoisted(() => ({
   sendEmailMock: vi.fn(),

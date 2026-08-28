@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/trace-contract";
 import type { ClickHouseEvaluationRunRow } from "../evaluation-run.mappers";
 import {
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,

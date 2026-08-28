@@ -8,7 +8,7 @@ import type {
   TraceInput,
   TraceMetadata,
   TraceOutput,
-} from "~/server/tracer/types";
+} from "@langwatch/trace-contract";
 
 /**
  * Known attribute keys that map to reserved TraceMetadata fields.

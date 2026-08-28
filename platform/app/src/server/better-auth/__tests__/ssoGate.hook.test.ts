@@ -41,7 +41,8 @@ import { auth } from "../index";
 const envMock = env as unknown as { NEXTAUTH_PROVIDER: string };
 
 // Named `runBeforeHook` rather than `before`: a bare `before` reads as a
-// test lifecycle hook, both to a human and to biome's noDuplicateTestHooks.
+// test lifecycle hook, both to a human and to a linter looking for
+// duplicated hooks.
 const runBeforeHook = (auth as any).options.hooks.before as (ctx: {
   request?: { url: string };
 }) => Promise<void>;

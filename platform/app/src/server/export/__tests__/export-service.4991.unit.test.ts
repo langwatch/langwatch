@@ -11,10 +11,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
-import type {
-  GetAllTracesForProjectOptions,
-  TracesForProjectResult,
-} from "~/server/traces/types";
+import type { TracesForProjectResult } from "@langwatch/trace-contract";
+import type { GetAllTracesForProjectOptions } from "~/server/traces/types";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
 

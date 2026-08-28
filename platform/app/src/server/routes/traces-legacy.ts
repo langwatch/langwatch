@@ -13,7 +13,8 @@ import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import type { Permission } from "~/server/api/rbac";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
   apiKeyCeilingDenialResponse,
@@ -22,7 +23,7 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "@langwatch/trace-contract";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import {
   formatTraceSummaryDigest,

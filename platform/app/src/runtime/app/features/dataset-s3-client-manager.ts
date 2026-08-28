@@ -1,6 +1,6 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { DatasetS3ClientResolver, type DatasetS3ClientLease } from "@langwatch/dataset-server";
-import { buildAwsClientConfig } from "~/runtime/app/aws-client.composition";
+import type { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
 import { resolveS3ClientTarget, type ResolvedS3ClientTarget } from "~/server/storage";
 
 type ManagedClient = {
@@ -11,10 +11,13 @@ type ManagedClient = {
   superseded: boolean;
 };
 
-export type DatasetS3ClientConfigBuilder = typeof buildAwsClientConfig;
+export type DatasetS3ClientConfigBuilder = AppAwsClientConfiguration["build"];
 
 export type AppDatasetS3ClientManagerOptions = {
   resolveTarget?: (projectId: string) => Promise<ResolvedS3ClientTarget>;
+  /** Process-owned AWS transport graph composed from validated proxy policy. */
+  aws?: Pick<AppAwsClientConfiguration, "build">;
+  /** Compatibility seam for isolated tasks and unit tests. */
   buildClientConfig?: DatasetS3ClientConfigBuilder;
 };
 
@@ -25,9 +28,16 @@ export type AppDatasetS3ClientManagerOptions = {
  */
 export class AppDatasetS3ClientManager extends DatasetS3ClientResolver {
   static create(options: AppDatasetS3ClientManagerOptions = {}): AppDatasetS3ClientManager {
+    const aws = options.aws;
+    const buildClientConfig = aws
+      ? (input: Parameters<DatasetS3ClientConfigBuilder>[0]) => aws.build(input)
+      : options.buildClientConfig;
+    if (!buildClientConfig) {
+      throw new Error("Dataset S3 clients require a process-owned AWS configuration.");
+    }
     return new AppDatasetS3ClientManager(
       options.resolveTarget ?? resolveS3ClientTarget,
-      options.buildClientConfig ?? buildAwsClientConfig,
+      buildClientConfig,
     );
   }
 

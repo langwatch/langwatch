@@ -11,7 +11,7 @@ import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "@langwatch/evaluator-contract";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";

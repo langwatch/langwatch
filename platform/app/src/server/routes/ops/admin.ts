@@ -11,17 +11,18 @@
  */
 
 import {
-  type AdminAuditRequest,
+  AdminSurfaceHiddenError,
   adminOperationRequestSchema,
   adminResourceNameSchema,
+  type AdminAuditRequest,
 } from "@langwatch/ops-contract";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { Context } from "hono";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { getServerAuthSession } from "~/server/auth";
 
 import type { AppContextBindings, AppContextVariables } from "~/app/api/middleware/app-context";
-import { AdminSurfaceHiddenError } from "~/server/ops/adminSurfaceHidden";
 
 type AdminEnv = {
   Bindings: AppContextBindings;

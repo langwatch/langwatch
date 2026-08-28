@@ -15,7 +15,7 @@ import {
   mfaVerificationFailedPayloadSchema,
 } from "@langwatch/identity";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
+import { EventSchema } from "@langwatch/eventing";
 
 /**
  * The two-step verification pipeline's wire schemas: the framework envelope

@@ -19,7 +19,8 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { Permission } from "~/server/api/rbac";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,

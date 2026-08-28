@@ -39,12 +39,11 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
  * constant. Production callers omit both and the helper reads
  * `window.location.hostname` / `import.meta.env.DEV` itself.
  *
- * This module is also imported server-side (error-remediation.ts), which
- * runs under `tsx`, not Vite: `import.meta.env` is a Vite-only construct
- * and is `undefined` there, so reading `.DEV` off it unconditionally would
- * throw on every server-rendered docs link. `import.meta.env.DEV` is only
- * ever evaluated inside the same `typeof window !== "undefined"` branch as
- * `window.location`, so the server path never touches it.
+ * `import.meta.env` is a Vite-only construct and is `undefined` outside a Vite
+ * build, so reading `.DEV` off it unconditionally would throw anywhere this
+ * module is loaded by `tsx`. `import.meta.env.DEV` is only ever evaluated
+ * inside the same `typeof window !== "undefined"` branch as `window.location`,
+ * so a non-browser caller never touches it.
  */
 export function getDocsBaseUrl({
   hostname,

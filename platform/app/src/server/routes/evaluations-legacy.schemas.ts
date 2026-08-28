@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { patchZodOpenapi } from "@langwatch/platform-api/app-rest";
 
 patchZodOpenapi();
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 
 const PAGE_SIZE = 200;

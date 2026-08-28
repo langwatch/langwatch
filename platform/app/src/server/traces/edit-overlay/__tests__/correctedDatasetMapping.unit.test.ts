@@ -12,9 +12,9 @@ import {
   extractTracesFields,
   mapTraceToDatasetEntry,
 } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "../applyTraceEditOverlay";
-import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const capturedTrace = {
   trace_id: "trace-1",

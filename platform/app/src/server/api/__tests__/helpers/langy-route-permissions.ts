@@ -8,18 +8,32 @@
  *
  * Not a `*.test.ts` file on purpose — it holds no assertions, only the reads.
  *
- * The `~/server/api-router` import is what POPULATES the registry: each app
- * module registers its routes at module-load time. It is a top-level import
- * (the repo bans inline `import()`), so simply importing this helper is enough
- * for the reads below to see every mounted route.
+ * Importing this helper is what POPULATES the registry, so the reads below see
+ * every mounted route. Two things populate it, because routes reach it two
+ * ways: the families that still live in this application register at
+ * module-load time (the `~/server/api-router` import), and the families that
+ * live in `@langwatch/platform-api` register when they are BUILT, which
+ * `createAppRestFeatures` does here with providers that never have to resolve.
+ * Both are top-level (the repo bans inline `import()`).
+ *
+ * `createAppRestFeatures` is the packaged families' single enumeration — the
+ * same one the API router mounts — so a family cannot be served while being
+ * invisible to this audit.
  */
 import "~/server/api-router";
 
+import { allRegisteredRoutes, isApiKeyReachable, policyPermissions } from "@langwatch/api";
 import {
-  isApiKeyReachable,
-  policyPermissions,
-} from "@langwatch/api";
-import { allRegisteredRoutes } from "@langwatch/api";
+  createAppRestFeatures,
+  servicesUnavailableOffRequestPath,
+} from "@langwatch/platform-api/app-rest";
+
+import { appRestSecurity } from "~/server/api/security";
+
+createAppRestFeatures({
+  security: appRestSecurity,
+  services: servicesUnavailableOffRequestPath("while auditing the route registry"),
+});
 
 /**
  * Every RBAC permission the mounted API demands, mapped to the routes demanding

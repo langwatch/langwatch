@@ -1,6 +1,13 @@
 import { SCIM_SPEC_OPTIONS } from "@langwatch/enterprise-scim-server";
 import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { generateApiSpecs } from "@langwatch/api";
+import {
+  createGovernanceRestApp,
+  createGraphsRestApp,
+  createModelDefaultsRestApp,
+} from "@langwatch/platform-api";
+import { servicesUnavailableOffRequestPath } from "@langwatch/platform-api/app-rest";
+import { appRestSecurity } from "../server/api/security";
 import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
@@ -18,11 +25,8 @@ import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
-import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
-import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
-import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
@@ -40,7 +44,7 @@ import {
   documentedPathOf,
   isHttpMethod,
   securityForCredentialClass,
-} from "../server/api/security";
+} from "@langwatch/platform-api/app-rest";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
@@ -179,6 +183,15 @@ import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
+/**
+ * Spec generation walks each route's `describeRoute` metadata and never invokes
+ * a handler, so the families taking their services as per-request providers are
+ * built with providers that refuse.
+ */
+const specOnlyServices = servicesUnavailableOffRequestPath(
+  "while generating the OpenAPI document",
+);
+
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) => sourceArray;
 
 const langwatchSpec = {
@@ -230,9 +243,20 @@ export default async function execute() {
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
-  const governanceSpec = await generateSpecs(governanceApp);
+  const governanceSpec = await generateSpecs(
+    createGovernanceRestApp({
+      security: appRestSecurity,
+      governance: specOnlyServices.governance,
+      projects: specOnlyServices.projects,
+    }).hono,
+  );
   console.log("Building graphs spec...");
-  const graphsSpec = await generateSpecs(graphsApp);
+  const graphsSpec = await generateSpecs(
+    createGraphsRestApp({
+      security: appRestSecurity,
+      dashboard: specOnlyServices.dashboard,
+    }).hono,
+  );
   console.log("Building me spec...");
   const meSpec = await generateSpecs(meApp);
   console.log("Building llm configs spec...");
@@ -242,7 +266,12 @@ export default async function execute() {
   console.log("Building monitors spec...");
   const monitorsSpec = await generateSpecs(monitorsApp);
   console.log("Building model defaults spec...");
-  const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
+  const modelDefaultsSpec = await generateSpecs(
+    createModelDefaultsRestApp({
+      security: appRestSecurity,
+      modelProviders: specOnlyServices.modelProviders,
+    }).hono,
+  );
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building organization spec...");

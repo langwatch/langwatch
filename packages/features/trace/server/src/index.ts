@@ -47,7 +47,6 @@ export type {
   TraceClickHouseWriteResolver,
 } from "./ports/clickhouse.port";
 export {
-  NullTraceWindowedReadMetricsPort,
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
 } from "./ports/trace-windowed-read-metrics.port";
@@ -209,3 +208,18 @@ export {
   type ScenarioRoleMetrics,
   type ScenarioRoleSpanInput,
 } from "./services/scenario-role-metrics.rules";
+
+export { TraceLegacyReadPort } from "./ports/trace-legacy-read.port";
+export { SpansTrpcApi, type SpansTrpcContext, type SpansTrpcPorts } from "./api/app-trpc/spans.api";
+export {
+  TraceEditOverlayTrpcApi,
+  type TraceEditOverlayTrpcContext,
+  type TraceEditOverlayTrpcPorts,
+  type TraceEditOverlayVisibilityWindow,
+} from "./api/app-trpc/trace-edit-overlay.api";
+export {
+  TracesTrpcApi,
+  type TracesTrpcContext,
+  type TracesTrpcEmitters,
+  type TracesTrpcPorts,
+} from "./api/app-trpc/traces.api";

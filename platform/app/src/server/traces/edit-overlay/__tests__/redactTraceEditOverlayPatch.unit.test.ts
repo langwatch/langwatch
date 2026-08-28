@@ -8,12 +8,12 @@
  * and the one place that keeps a reader from deleting what it hid from them.
  */
 import { describe, expect, it } from "vitest";
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import { applyOverlayToTrace } from "../applyTraceEditOverlay";
 import { redactPatchForViewer } from "../redactTraceEditOverlayPatch";
 import { restoreWithheldEdits } from "../restoreWithheldTraceEdits";
-import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const openProtections: Protections = {
   canSeeCosts: true,

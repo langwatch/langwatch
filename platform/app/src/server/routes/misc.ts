@@ -34,12 +34,12 @@ import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import { type TimeseriesInputType, timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { isDemoProject } from "~/server/api/rbac";
+import { createServiceApp } from "~/server/api/security";
 import {
-  createServiceApp,
   handlerManagedAuth,
   internalSecret,
   publicEndpoint,
-} from "~/server/api/security";
+} from "@langwatch/platform-api/app-rest";
 import {
   createUnifiedAuthMiddleware,
   requireApiKeyPermission,
@@ -76,7 +76,7 @@ import { estimateCost, matchModelCostWithFallbacks } from "~/server/tracer/colle
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
-} from "~/server/tracer/types";
+} from "@langwatch/trace-contract";
 import {
   WorkflowNotFoundError,
   WorkflowNotPublishedError,

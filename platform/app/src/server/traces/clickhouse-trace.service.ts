@@ -33,7 +33,7 @@ import type {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
-import type { Event, Span, Trace } from "~/server/tracer/types";
+import type { Event, Span, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
@@ -48,16 +48,18 @@ import { type EventSpanRow, mapEventAttrsToEvent } from "./projection/event-attr
 import type { ProjectableTrace, ProjectedAnnotation } from "./projection/types";
 import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
 import type {
-  AggregationFiltersInput,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
-  GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
   PromptStudioSpanResult,
   TopicCountsResult,
-  TraceDateField,
   TracesForProjectResult,
   TraceWithGuardrail,
+} from "@langwatch/trace-contract";
+import type {
+  AggregationFiltersInput,
+  GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
+  TraceDateField,
 } from "./types";
 
 /**

@@ -17,7 +17,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { RAGSpan, Span } from "~/server/tracer/types";
+import type { RAGSpan, Span } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import {
   startTestContainers,

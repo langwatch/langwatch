@@ -19,7 +19,8 @@
  * See packages/api/specs/api-discovery.feature.
  */
 
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import {
   API_OPENAPI_PATH,
   LLMS_TXT_PATH,

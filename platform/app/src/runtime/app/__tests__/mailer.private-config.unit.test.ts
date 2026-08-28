@@ -1,6 +1,10 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { resolveAppMailerConfiguration, resolveMailerDefaultFrom } from "../mailer.private-config";
+import {
+  resolveAppMailConfiguration,
+  resolveAppMailerConfiguration,
+  resolveMailerDefaultFrom,
+} from "../mailer.private-config";
 
 describe("application mailer private configuration", () => {
   it("projects every private delivery setting and derives the established sender", () => {
@@ -84,5 +88,19 @@ describe("application mailer private configuration", () => {
     expect(resolveMailerDefaultFrom({ baseHost: "not-a-url" })).toBe(
       "LangWatch <mailer@not-a-url>",
     );
+  });
+
+  it("projects the private signing secret without exposing it in the mailer provider shape", () => {
+    expect(
+      resolveAppMailConfiguration({
+        BASE_HOST: "https://tenant.example.com",
+        NEXTAUTH_SECRET: "session-secret",
+      }).runtime,
+    ).toEqual({ baseHost: "https://tenant.example.com", nextauthSecret: "session-secret" });
+
+    expect(
+      resolveAppMailConfiguration({ BASE_HOST: "https://tenant.example.com", NEXTAUTH_SECRET: "" })
+        .runtime.nextauthSecret,
+    ).toBe("");
   });
 });

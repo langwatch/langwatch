@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { reservedTraceMetadataSchema } from "../server/tracer/types";
+import { reservedTraceMetadataSchema } from "@langwatch/trace-contract";
 import { api } from "../utils/api";
 
 /**

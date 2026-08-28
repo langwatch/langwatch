@@ -2,11 +2,10 @@
 // managedClient.ts`), which translates raw driver errors into these typed
 // errors after retries are exhausted.
 //
-// Tips/docs links come from the central registry (`../error-remediation`) —
+// Tips/docs links come from the central registry (`@langwatch/handled-error`) —
 // add copy there, not inline.
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "../error-remediation";
 
 export class TraceNotFoundError extends NotFoundError {
   declare readonly code: "trace_not_found";

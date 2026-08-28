@@ -1,6 +1,5 @@
 import type { IdentityGuards, MfaGuards } from "@langwatch/identity-server";
-import { definePipeline } from "../..";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
+import { definePipeline, type StateProjectionStore } from "@langwatch/eventing";
 import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";

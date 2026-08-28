@@ -15,7 +15,7 @@ import {
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { traceSchema } from "~/server/tracer/types";
+import { traceSchema } from "@langwatch/trace-contract";
 import { mapTraceToDatasetEntry, TRACE_EXPANSIONS } from "~/server/tracer/tracesMapping";
 
 class AppAutomationDatasetMapper extends AutomationDatasetMapperPort {

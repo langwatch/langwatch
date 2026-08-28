@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 
-import { apiErrorSchema } from "~/app/api/shared/schemas";
+import { apiErrorSchema } from "@langwatch/platform-api/app-rest";
 
 /**
  * Asserts a response carries the canonical error envelope, and returns it.

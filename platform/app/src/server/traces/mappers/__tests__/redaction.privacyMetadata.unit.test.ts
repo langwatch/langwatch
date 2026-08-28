@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { applyTraceProtections } from "../redaction";
 
 function traceWithIO(): Trace {

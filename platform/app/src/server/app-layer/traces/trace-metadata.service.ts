@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import type { CustomMetadata, ReservedTraceMetadata } from "~/server/tracer/types";
+import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 
 /**

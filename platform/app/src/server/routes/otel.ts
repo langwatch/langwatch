@@ -23,7 +23,8 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import {
   apiKeyCeilingDenialResponse,
   collectAuthDiagnostics,

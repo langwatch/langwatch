@@ -20,21 +20,30 @@ export class AppAutomationTestFireAdapter extends AutomationTestFirePort {
   private constructor(
     private readonly mailer: EmailDeliveryPort,
     private readonly slackWebhook: AppSlackWebhookClientAdapter,
+    private readonly nextauthSecret: string | undefined,
   ) {
     super();
   }
 
   static create(
     mailer: EmailDeliveryPort,
-    slackWebhook = AppSlackWebhookClientAdapter.create(),
+    input: {
+      slackWebhook?: AppSlackWebhookClientAdapter;
+      nextauthSecret?: string;
+    } = {},
   ): AppAutomationTestFireAdapter {
-    return new AppAutomationTestFireAdapter(mailer, slackWebhook);
+    return new AppAutomationTestFireAdapter(
+      mailer,
+      input.slackWebhook ?? AppSlackWebhookClientAdapter.create(),
+      input.nextauthSecret,
+    );
   }
 
   async sendEmail(input: TestFireEmail): Promise<void> {
     const to = buildTriggerNoReplyAddress({
       defaultFrom: computeDefaultFrom(this.mailer),
       triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+      nextauthSecret: this.nextauthSecret,
     });
 
     await sendEmail({

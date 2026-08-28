@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import {
   enrichCodingAgentSpansFromLogs,
   enrichSingleSpanWithClaudeLogContent,

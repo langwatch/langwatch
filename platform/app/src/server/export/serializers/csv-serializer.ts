@@ -16,7 +16,7 @@ import type {
   Span,
   SpanInputOutput,
   Trace,
-} from "~/server/tracer/types";
+} from "@langwatch/trace-contract";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
 /**

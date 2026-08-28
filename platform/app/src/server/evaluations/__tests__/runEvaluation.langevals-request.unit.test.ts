@@ -51,7 +51,7 @@ vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
 });
 
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { runEvaluation } from "../runEvaluation";
 
 // Registered above in the mocked AVAILABLE_EVALUATORS; cast past the real

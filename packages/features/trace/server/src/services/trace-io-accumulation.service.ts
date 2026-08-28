@@ -167,12 +167,14 @@ export function extractIOFromLogRecord(
   // happens here so the fold can pair it with the model/token lift
   // from extractCodexSseEventMetrics on the same trace.
   const codexEventName = data.attributes["event.name"];
-  if (typeof codexEventName === "string" && codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
-    if (codexEventName === "codex.user_prompt") {
-      const prompt = data.attributes.prompt;
-      if (typeof prompt === "string" && prompt.length > 0) {
-        return { input: prompt, output: null };
-      }
+  if (
+    typeof codexEventName === "string" &&
+    codexEventName.startsWith(CODEX_EVENT_NAME_PREFIX) &&
+    codexEventName === "codex.user_prompt"
+  ) {
+    const prompt = data.attributes.prompt;
+    if (typeof prompt === "string" && prompt.length > 0) {
+      return { input: prompt, output: null };
     }
   }
 
@@ -303,10 +305,13 @@ export class TraceIOAccumulationService {
 
     if (spanType === "guardrail") {
       const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
-        if ((rawOutput as Record<string, unknown>).passed === false) {
-          blockedByGuardrail = true;
-        }
+      if (
+        rawOutput &&
+        typeof rawOutput === "object" &&
+        !Array.isArray(rawOutput) &&
+        (rawOutput as Record<string, unknown>).passed === false
+      ) {
+        blockedByGuardrail = true;
       }
     }
 

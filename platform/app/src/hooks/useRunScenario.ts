@@ -76,8 +76,11 @@ function buildViewRunAction({
  *
  * Note this is the only one of ~411 `toaster.create` call sites in the app that
  * passes a built config rather than an inline literal. That is not style: three
- * inline toasts put `runScenario` over `noExcessiveLinesPerFunction` (max 60)
- * and CI's Biome gate rejects it. Inlining these back will fail lint.
+ * inline toasts put `runScenario` over a 60-line function limit that the
+ * lint gate enforced when this was written. That rule is not currently
+ * carried (oxlint has no cognitive-complexity rule and the line-count
+ * backlog was four figures), so inlining them back would lint clean and
+ * still be worse to read.
  */
 function buildRunOutcomeToast({
   result,

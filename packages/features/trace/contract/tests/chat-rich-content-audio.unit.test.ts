@@ -4,8 +4,8 @@
  * Unit tests for the audio members of `chatRichContentSchema` (#5304).
  * Feature: specs/trace-processing/audio-player-in-traces.feature
  */
+import { chatRichContentSchema } from "../src";
 import { describe, expect, it } from "vitest";
-import { chatRichContentSchema } from "../types";
 
 describe("chatRichContentSchema", () => {
   describe("given an OpenAI input_audio part", () => {

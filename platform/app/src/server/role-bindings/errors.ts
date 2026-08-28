@@ -9,9 +9,8 @@
  * follow the family contract: 404 for lookups, 409 for conflicts, 422 for a
  * request that is well-formed but refers to things it cannot.
  */
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "../app-layer/error-remediation";
 
 export class RoleBindingNotFoundError extends NotFoundError {
   declare readonly code: "role_binding_not_found";

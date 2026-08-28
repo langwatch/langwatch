@@ -13,7 +13,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { History } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { VersionList } from "./VersionHistoryList";

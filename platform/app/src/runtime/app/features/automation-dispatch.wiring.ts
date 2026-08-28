@@ -32,6 +32,7 @@ import { AppAutomationClock } from "./automation";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { incrementAutomationOverflowFlushTotal } from "~/server/metrics";
 import { captureException } from "~/utils/posthogErrorCapture";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 
 /**
  * ADR-052 composition root for automation dispatch: builds the deps the
@@ -112,7 +113,9 @@ export function buildAutomationDispatchPorts({
   traces,
   dataset,
   annotations,
+  mailer,
   baseHost,
+  nextauthSecret,
   emailHourlyCap,
   tenantDailyCap,
 }: {
@@ -127,8 +130,10 @@ export function buildAutomationDispatchPorts({
   };
   dataset: DatasetService;
   annotations: AnnotationService;
+  mailer: EmailDeliveryPort;
   /** Semantic process configuration resolved by the executable boot. */
   baseHost: string;
+  nextauthSecret?: string;
   emailHourlyCap: number;
   tenantDailyCap: number;
 }): AutomationDispatchPorts {
@@ -151,7 +156,10 @@ export function buildAutomationDispatchPorts({
       traceCanonicalisation: traces.canonicalisation,
       dataset,
     }),
-    delivery: createAutomationNotificationDeliveryPort(),
+    delivery: createAutomationNotificationDeliveryPort(mailer, {
+      baseHost,
+      nextauthSecret,
+    }),
     emailCaps,
     slack: SlackProviderAdapter.create({ encrypt, decrypt }),
     webhooks: WebhookProviderAdapter.create({ encrypt, decrypt }),

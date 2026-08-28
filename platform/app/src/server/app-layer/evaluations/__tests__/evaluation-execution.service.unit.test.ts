@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { EvaluatorSettingsService } from "@langwatch/evaluation-server/internal";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import { EvaluatorNotFoundError, TraceNotEvaluatableError } from "../errors";

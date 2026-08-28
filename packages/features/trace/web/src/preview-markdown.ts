@@ -10,16 +10,16 @@ export function stripPreviewMarkdownNoise(text: string): MarkdownNoiseResult {
   let hadCode = false;
   let hadImage = false;
   const fence = /```(?:[a-zA-Z0-9_+-]*)\n([\s\S]*?)\n?```/g;
-  text = text.replace(fence, (_match, body: string) => {
+  let stripped = text.replace(fence, (_match, body: string) => {
     hadCode = true;
     return body;
   });
   const image = /!\[([^\]]*)\]\([^)]*\)/g;
-  text = text.replace(image, (_match, alt: string) => {
+  stripped = stripped.replace(image, (_match, alt: string) => {
     hadImage = true;
     return alt.trim() ? `\u{1F4F7} ${alt.trim()}` : "\u{1F4F7}";
   });
-  return { text, hadCode, hadImage };
+  return { text: stripped, hadCode, hadImage };
 }
 
 export function applyPreviewNewlineTreatment(text: string, mode: NewlineTreatment): string {

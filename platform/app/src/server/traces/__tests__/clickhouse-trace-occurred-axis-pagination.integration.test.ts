@@ -20,7 +20,8 @@ import {
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 const traceCanonicalisation = TraceCanonicalisationService.create();
-import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
+import type { TracesForProjectResult } from "@langwatch/trace-contract";
+import type { GetAllTracesForProjectInput } from "../types";
 import { openProtections } from "./open-protections";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({

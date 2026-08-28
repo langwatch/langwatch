@@ -8,7 +8,10 @@ import {
   type TopicClusteringLangevalsKind,
   type TopicClusteringMetricsPort,
 } from "@langwatch/topic-server";
-import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
+import {
+  LangevalsStagedPayloadClient,
+  type LangevalsStagedPayloadConfig,
+} from "~/server/langevals/stagedFetch";
 import {
   getPayloadSizeHistogram,
   incrementTopicClusteringPageTotal,
@@ -17,6 +20,14 @@ import {
 
 /** App-owned S3 staging transport for Topic's langevals requests. */
 export class AppTopicClusteringLangevalsPort extends TopicClusteringLangevalsPort {
+  static create(config: LangevalsStagedPayloadConfig): AppTopicClusteringLangevalsPort {
+    return new AppTopicClusteringLangevalsPort(LangevalsStagedPayloadClient.create(config));
+  }
+
+  private constructor(private readonly client: LangevalsStagedPayloadClient) {
+    super();
+  }
+
   postClustering(params: {
     url: string;
     body: BatchClusteringParams | IncrementalClusteringParams;
@@ -24,7 +35,7 @@ export class AppTopicClusteringLangevalsPort extends TopicClusteringLangevalsPor
     kind: "topic_clustering_batch" | "topic_clustering_incremental";
     signal?: AbortSignal;
   }) {
-    return stagedLangevalsFetch(params);
+    return this.client.post(params);
   }
 }
 
@@ -41,13 +52,14 @@ export function createAppTopicClusteringExecutionDependencies(options: {
   resolveClickHouseClient: TopicClusteringClickHouseResolver;
   modelProviders: ModelProviderService;
   langevalsEndpoint: string | null;
+  langevalsPayload: LangevalsStagedPayloadConfig;
 }): TopicClusteringExecutionDependencies {
   return {
     resolveClickHouseClient: options.resolveClickHouseClient,
     models: ModelProviderExecutionAdapter.create({
       modelProviders: options.modelProviders,
     }),
-    langevals: new AppTopicClusteringLangevalsPort(),
+    langevals: AppTopicClusteringLangevalsPort.create(options.langevalsPayload),
     langevalsEndpoint: options.langevalsEndpoint,
     observePayloadSize(kind: TopicClusteringLangevalsKind, sizeBytes: number): void {
       getPayloadSizeHistogram(kind).observe(sizeBytes);

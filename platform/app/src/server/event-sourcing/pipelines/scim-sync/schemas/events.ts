@@ -15,7 +15,7 @@ import {
   scimUserPushedPayloadSchema,
 } from "@langwatch/identity";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
+import { EventSchema } from "@langwatch/eventing";
 
 /**
  * The directory-sync pipeline's wire schemas: the framework envelope (id,

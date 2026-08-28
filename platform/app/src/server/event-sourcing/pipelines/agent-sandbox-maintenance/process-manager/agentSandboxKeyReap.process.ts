@@ -4,7 +4,7 @@ import { z } from "zod";
 import type {
   IntentSpec,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "@langwatch/eventing";
 
 const logger = createLogger("langwatch:agent-sandbox:key-reap");
 

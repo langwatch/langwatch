@@ -22,7 +22,14 @@ import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
-import { type AccessPolicy, credentialClassFor, familyFromBasePath, publicEndpoint, registerRoutePolicy, requires } from "@langwatch/platform-api/app-rest";
+import {
+  type AccessPolicy,
+  credentialClassFor,
+  familyFromBasePath,
+  publicEndpoint,
+  registerRoutePolicy,
+  requires,
+} from "@langwatch/platform-api/app-rest";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 

@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { DEFAULT_PII_REDACTION_LEVEL, SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
 import {
@@ -19,15 +20,15 @@ import type {
   CustomMetadata,
   ReservedTraceMetadata,
   Span,
-} from "../tracer/types";
+} from "@langwatch/trace-contract";
 import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
   reservedTraceMetadataSchema,
   spanMetricsSchema,
-  spanSchema,
+  langWatchSpanSchema,
   spanValidatorSchema,
-} from "../tracer/types";
+} from "@langwatch/trace-contract";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { bodyLimit } from "./_lib/body-limit";
 
@@ -377,7 +378,7 @@ secured
         return c.json({ error: validationError.message }, 400);
       }
 
-      const spanFields = spanSchema.options.flatMap((option) =>
+      const spanFields = langWatchSpanSchema.options.flatMap((option) =>
         Object.keys(option.shape),
       );
       const spans = ((body as Record<string, any>).spans ?? []) as Span[];

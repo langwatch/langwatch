@@ -27,9 +27,8 @@
  * @see dev/docs/best_practices/error-handling.md
  * @see ./validation/errors.ts — the refusal half
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
  * The LangWatchQL surface is switched off for this project.

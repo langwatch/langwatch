@@ -6,8 +6,8 @@ import {
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../../../projections/abstractFoldProjection";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import {
   type ConnectionActivatedEvent,
   type ConnectionDiscardedEvent,

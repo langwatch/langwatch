@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { TraceEditOverlayRepository } from "../traceEditOverlay.repository";
-import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const patch: TraceEditOverlayPatch = {
   version: 1,

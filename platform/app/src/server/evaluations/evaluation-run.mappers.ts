@@ -1,5 +1,5 @@
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/trace-contract";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 
 /**

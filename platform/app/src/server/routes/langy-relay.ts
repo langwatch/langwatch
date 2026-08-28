@@ -22,7 +22,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { LangyRelayConnection } from "@langwatch/langy-contract";
-import { createServiceApp, internalSecret } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret } from "@langwatch/platform-api/app-rest";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
 import { verifyLangyInternalSecret } from "./langy-internal";
 

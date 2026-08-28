@@ -8,7 +8,8 @@
  * same document at `/.well-known/openapi` and `/api/openapi.json` for those,
  * from the same module — three URLs, one document, by construction.
  */
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { respondWithApiDocument } from "~/server/openapi/serve-document";
 
 const secured = createServiceApp({ basePath: "/api/gateway/v1" });

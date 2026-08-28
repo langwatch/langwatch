@@ -61,13 +61,22 @@ describe("AppDatasetS3ClientManager", () => {
     awsConfig.mockClear();
   });
 
+  it("requires an explicitly composed AWS client graph", () => {
+    expect(() => AppDatasetS3ClientManager.create()).toThrow(
+      "Dataset S3 clients require a process-owned AWS configuration.",
+    );
+  });
+
   it("reuses an unchanged target and replaces a changed bucket or credential identity", async () => {
     const resolveTarget = vi
       .fn<(projectId: string) => Promise<ResolvedS3ClientTarget>>()
       .mockResolvedValueOnce(target({ bucket: "before", fingerprint: "identity-1" }))
       .mockResolvedValueOnce(target({ bucket: "before", fingerprint: "identity-1" }))
       .mockResolvedValueOnce(target({ bucket: "after", fingerprint: "identity-2" }));
-    const manager = AppDatasetS3ClientManager.create({ resolveTarget });
+    const manager = AppDatasetS3ClientManager.create({
+      resolveTarget,
+      buildClientConfig: awsConfig,
+    });
 
     const first = await manager.acquire("project-1");
     first.release();
@@ -96,7 +105,10 @@ describe("AppDatasetS3ClientManager", () => {
       .fn<(projectId: string) => Promise<ResolvedS3ClientTarget>>()
       .mockResolvedValueOnce(target({ bucket: "before", fingerprint: "identity-1" }))
       .mockResolvedValueOnce(target({ bucket: "after", fingerprint: "identity-2" }));
-    const manager = AppDatasetS3ClientManager.create({ resolveTarget });
+    const manager = AppDatasetS3ClientManager.create({
+      resolveTarget,
+      buildClientConfig: awsConfig,
+    });
 
     const active = await manager.acquire("project-1");
     const replacement = await manager.acquire("project-1");
@@ -112,7 +124,10 @@ describe("AppDatasetS3ClientManager", () => {
       .fn<(projectId: string) => Promise<ResolvedS3ClientTarget>>()
       .mockResolvedValueOnce(target({ bucket: "before", fingerprint: "identity-1" }))
       .mockResolvedValueOnce(target({ bucket: "after", fingerprint: "identity-2" }));
-    const manager = AppDatasetS3ClientManager.create({ resolveTarget });
+    const manager = AppDatasetS3ClientManager.create({
+      resolveTarget,
+      buildClientConfig: awsConfig,
+    });
     const storage = S3DatasetStorageAdapter.create(manager);
     const body = new PassThrough();
     responses.push({ Body: body });
@@ -137,7 +152,10 @@ describe("AppDatasetS3ClientManager", () => {
       .fn<(projectId: string) => Promise<ResolvedS3ClientTarget>>()
       .mockResolvedValueOnce(target({ bucket: "one", fingerprint: "identity-1" }))
       .mockResolvedValueOnce(target({ bucket: "two", fingerprint: "identity-2" }));
-    const manager = AppDatasetS3ClientManager.create({ resolveTarget });
+    const manager = AppDatasetS3ClientManager.create({
+      resolveTarget,
+      buildClientConfig: awsConfig,
+    });
 
     const one = await manager.acquire("project-1");
     one.release();

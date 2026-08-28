@@ -4,7 +4,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
-import { createServiceApp, internalSecret } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret } from "@langwatch/platform-api/app-rest";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import {
   reportHasFailures,

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { LangyTokenBuffer } from "../streaming/langyTokenBuffer";
+import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import {
   LangyUiActionUnknownError,
   LangyUiHandlerFailedError,

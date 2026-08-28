@@ -22,7 +22,8 @@
 import type { Context } from "hono";
 import { z } from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { enforceApiKeyCeiling, extractCredentials } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import type { App } from "~/server/app-layer/app";

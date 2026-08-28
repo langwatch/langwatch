@@ -1,4 +1,4 @@
-import type { Span, SpanInputOutput } from "~/server/tracer/types";
+import type { Span, SpanInputOutput } from "@langwatch/trace-contract";
 
 /**
  * The text one system-instruction entry contributes: the entry itself when it

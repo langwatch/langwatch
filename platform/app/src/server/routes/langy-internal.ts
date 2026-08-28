@@ -22,7 +22,8 @@ import { createLogger } from "@langwatch/observability";
 import { timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
-import { createServiceApp, internalSecret } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret } from "@langwatch/platform-api/app-rest";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { getLangySessionKeysCounter, getLangyTurnResultsCounter } from "~/server/metrics";
 

@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
 import { z } from "zod";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 const mockGetTracesByThreadId = vi.fn();
 

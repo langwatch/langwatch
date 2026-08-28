@@ -16,7 +16,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 

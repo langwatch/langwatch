@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { LimitType } from "../server/license-enforcement";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";

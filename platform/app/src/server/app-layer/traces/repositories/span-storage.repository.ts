@@ -1,6 +1,6 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**

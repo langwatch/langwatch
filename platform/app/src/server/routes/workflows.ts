@@ -20,8 +20,8 @@ import {
   type StudioServerEvent,
   studioClientEventSchema,
 } from "@langwatch/workflow-contract";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth, validator as zValidator } from "@langwatch/platform-api/app-rest";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "@langwatch/dataset-contract";

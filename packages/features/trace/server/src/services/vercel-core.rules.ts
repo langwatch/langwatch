@@ -51,12 +51,12 @@ function canonicaliseSpanIdentity(ctx: ExtractorContext): void {
   }
 
   if (
-    !extractModelToBoth(
+    !extractModelToBoth({
       ctx,
-      ATTR_KEYS.AI_MODEL,
-      (raw) => normaliseModelFromAiModelObject(raw),
-      `${VERCEL_RULE_PREFIX}:ai.model->gen_ai.*.model`,
-    )
+      sourceKey: ATTR_KEYS.AI_MODEL,
+      ruleId: `${VERCEL_RULE_PREFIX}:ai.model->gen_ai.*.model`,
+      transform: (raw) => normaliseModelFromAiModelObject(raw),
+    })
   ) {
     attrs.take(ATTR_KEYS.AI_MODEL);
   }

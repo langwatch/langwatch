@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { appContextBindingsFor } from "~/app/api/middleware/app-context";
-import { getRoutePolicy } from "~/server/api/security";
+import { getRoutePolicy } from "@langwatch/platform-api/app-rest";
 import { createTestApp } from "~/server/app-layer/presets";
 import { app } from "../routes";
 

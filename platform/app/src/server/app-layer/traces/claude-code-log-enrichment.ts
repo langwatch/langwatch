@@ -25,7 +25,7 @@ import type { Logger } from "pino";
 import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { capPayloadString } from "@langwatch/trace-server";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,

@@ -55,6 +55,7 @@ export type AppAutomationGraphPorts = {
   analytics: AnalyticsService;
   notifier: AutomationGraphNotifierPort;
   baseHost: string;
+  nextauthSecret?: string;
   logger: AutomationLoggerPort;
   slackTokens: AutomationSlackBotTokenDecryptorPort;
   dispatchErrors: AutomationDispatchErrorPort;
@@ -174,7 +175,10 @@ async function releaseClaim({
 }
 
 class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDeliveryPort {
-  constructor(private readonly mailer: EmailDeliveryPort) {
+  constructor(
+    private readonly mailer: EmailDeliveryPort,
+    private readonly input: { baseHost: string; nextauthSecret: string | undefined },
+  ) {
     super();
   }
 
@@ -202,6 +206,8 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
       triggerMessage: input.triggerMessage,
       isRecipientSent: input.isRecipientSent,
       recordRecipientSent: input.recordRecipientSent,
+      baseHost: this.input.baseHost,
+      nextauthSecret: this.input.nextauthSecret,
     });
   }
 
@@ -223,6 +229,8 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
       html: input.html,
       isRecipientSent: input.isRecipientSent,
       recordRecipientSent: input.recordRecipientSent,
+      baseHost: this.input.baseHost,
+      nextauthSecret: this.input.nextauthSecret,
     });
   }
 
@@ -275,8 +283,9 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
 /** One named host adapter shared by graph and settled-trace delivery. */
 export function createAutomationNotificationDeliveryPort(
   mailer: EmailDeliveryPort,
+  input: { baseHost: string; nextauthSecret: string | undefined },
 ): AutomationNotificationDeliveryPort {
-  return new AppAutomationNotificationDeliveryAdapter(mailer);
+  return new AppAutomationNotificationDeliveryAdapter(mailer, input);
 }
 
 class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
@@ -301,6 +310,7 @@ export function createAutomationGraphPorts(input: {
   analytics: AnalyticsService;
   resolveClickHouseClient: ClickHouseClientResolver;
   baseHost: string;
+  nextauthSecret: string | undefined;
   emailHourlyCap: number;
   tenantDailyCap: number;
 }): AppAutomationGraphPorts {
@@ -309,7 +319,10 @@ export function createAutomationGraphPorts(input: {
   const notifier = GraphAlertDispatchService.create({
     persistence: input.delivery,
     emailCaps: input.emailCaps,
-    delivery: createAutomationNotificationDeliveryPort(input.mailer),
+    delivery: createAutomationNotificationDeliveryPort(input.mailer, {
+      baseHost: input.baseHost,
+      nextauthSecret: input.nextauthSecret,
+    }),
     webhooks: WebhookProviderAdapter.create({ encrypt, decrypt }),
     clock: input.clock,
     emailHourlyCap: input.emailHourlyCap,
@@ -324,6 +337,7 @@ export function createAutomationGraphPorts(input: {
     slackTokens: new AppAutomationSlackTokensAdapter(),
     dispatchErrors: new AppAutomationDispatchErrorsAdapter(),
     baseHost: input.baseHost,
+    nextauthSecret: input.nextauthSecret,
     logger,
     heartbeat: new AppAutomationHeartbeatAdapter(input.resolveClickHouseClient),
     runaway: new AppAutomationRunawayAdapter({

@@ -1,5 +1,5 @@
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
-import type { ErrorCapture, Span, SpanInputOutput, Trace } from "~/server/tracer/types";
+import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

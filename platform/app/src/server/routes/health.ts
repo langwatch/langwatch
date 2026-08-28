@@ -3,7 +3,8 @@
  *
  * Replaces src/pages/api/health.ts
  */
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { publicEndpoint } from "@langwatch/platform-api/app-rest";
 
 const secured = createServiceApp({ basePath: "/api" });
 

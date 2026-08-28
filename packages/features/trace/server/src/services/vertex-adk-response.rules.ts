@@ -65,15 +65,14 @@ export function canonicaliseVertexAdkResponse(ctx: ExtractorContext): void {
     }
   }
 
-  if (isNonEmptyString(response.finish_reason)) {
-    if (
-      setIfMissing({
-        ctx,
-        key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS,
-        value: [response.finish_reason],
-      })
-    ) {
-      ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:finish_reason`);
-    }
+  if (
+    isNonEmptyString(response.finish_reason) &&
+    setIfMissing({
+      ctx,
+      key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS,
+      value: [response.finish_reason],
+    })
+  ) {
+    ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:finish_reason`);
   }
 }

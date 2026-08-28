@@ -153,8 +153,8 @@ function capAttributeList(attributes: AttributeList, maxBytes: number): number {
 export function valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
   if (value == null || typeof value !== "object") return false;
 
-  if (typeof value.stringValue === "string") {
-    if (utf8ByteLength(value.stringValue) > maxBytes) return true;
+  if (typeof value.stringValue === "string" && utf8ByteLength(value.stringValue) > maxBytes) {
+    return true;
   }
 
   if (value.bytesValue != null) {

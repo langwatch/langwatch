@@ -7,13 +7,13 @@ export class AppPromptRuntime {
   private constructor(
     private readonly options: {
       database: PrismaClient;
-      modelProvider: ModelProviderService;
+      modelProvider?: ModelProviderService;
     },
   ) {}
 
   static create(options: {
     database: PrismaClient;
-    modelProvider: ModelProviderService;
+    modelProvider?: ModelProviderService;
   }): AppPromptRuntime {
     return new AppPromptRuntime(options);
   }

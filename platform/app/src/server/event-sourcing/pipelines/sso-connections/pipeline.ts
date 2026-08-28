@@ -3,9 +3,11 @@ import {
   TEARDOWN_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
-import { definePipeline } from "../..";
-import type { ProcessManagerInitialStage } from "../../pipeline/processBuilder";
-import type { StateProjectionStore } from "../../projections/stateProjection.types";
+import {
+  definePipeline,
+  type ProcessManagerInitialStage,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import {
   ActivateConnectionCommand,
   ApproveDomainClaimCommand,

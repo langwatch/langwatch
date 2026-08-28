@@ -16,7 +16,7 @@ import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-i
 import { prisma as defaultPrisma } from "~/server/db";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { applyOverlayToTrace } from "./edit-overlay/applyTraceEditOverlay";
@@ -87,14 +87,16 @@ export class AmbiguousTraceIdPrefixError extends Error {
 const HEX_ONLY = /^[0-9a-f]+$/i;
 
 import type {
-  AggregationFiltersInput,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
-  GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
   PromptStudioSpanResult,
   TopicCountsResult,
   TracesForProjectResult,
+} from "@langwatch/trace-contract";
+import type {
+  AggregationFiltersInput,
+  GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
 } from "./types";
 
 /**

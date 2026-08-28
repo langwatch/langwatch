@@ -18,7 +18,7 @@ import {
   testManagedProviders,
   testModelProviders,
 } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "@langwatch/trace-contract";
 
 import {
   redactSpanContent,

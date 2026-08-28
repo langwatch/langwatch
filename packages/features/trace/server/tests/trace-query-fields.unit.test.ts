@@ -77,12 +77,12 @@ describe("FIELD_DEFS", () => {
       const def = fieldDefs[field];
       expect(def).toBeDefined();
 
-      let result: boolean | typeof UNSUPPORTED;
+      let result: boolean | typeof UNSUPPORTED | undefined;
       expect(() => {
         result = def!.evaluateInMemory(tag, false, minimalTrace);
       }).not.toThrow();
 
-      expect(result! === true || result! === false || result! === UNSUPPORTED).toBe(true);
+      expect([true, false, UNSUPPORTED]).toContain(result);
     });
   });
 

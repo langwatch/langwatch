@@ -7,7 +7,7 @@ import {
   type TraceEditSpanField,
   type TraceEditSpanPatch,
   type TraceEditTraceField,
-} from "./traceEditOverlay.schemas";
+} from "@langwatch/trace-contract";
 import { traceAttributeKeyForMetadata } from "./traceMetadataEditableKeys";
 
 /**

@@ -18,7 +18,13 @@ import {
 } from "~/app/api/middleware/auth";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
-import { credentialClassFor, familyFromBasePath, publicEndpoint, registerRoutePolicy, requires } from "@langwatch/platform-api/app-rest";
+import {
+  credentialClassFor,
+  familyFromBasePath,
+  publicEndpoint,
+  registerRoutePolicy,
+  requires,
+} from "@langwatch/platform-api/app-rest";
 import type { App } from "~/server/app-layer/app";
 
 /**

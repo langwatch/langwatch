@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Thin Auth0 webhook mount; parsing and provisioning live in Enterprise SCIM. */
 import { ScimWebhookApi } from "@langwatch/enterprise-scim-server";
-import { createServiceApp, internalSecret } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret } from "@langwatch/platform-api/app-rest";
 
 const secured = createServiceApp({ basePath: "/api/webhooks" });
 const scimWebhookApi = ScimWebhookApi.create();

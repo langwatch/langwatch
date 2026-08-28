@@ -15,7 +15,7 @@ import {
   userErasedPayloadSchema,
 } from "@langwatch/identity";
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
+import { EventSchema } from "@langwatch/eventing";
 
 /**
  * The identity pipeline's wire schemas: the framework envelope (id,

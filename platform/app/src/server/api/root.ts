@@ -20,8 +20,11 @@ import {
   createPromptTrpcRouter,
   createScenarioTrpcRouter,
   createShareTrpcRouter,
+  createSpansTrpcRouter,
   createStoredObjectTrpcRouter,
   createSuiteTrpcRouter,
+  createTraceEditOverlayTrpcRouter,
+  createTracesTrpcRouter,
   declaredCheckFrom,
   type AppTrpcPolicyKit,
   type AppTrpcPolicyMiddlewares,
@@ -57,6 +60,20 @@ import {
 } from "@langwatch/enterprise-api";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
+import { evaluatorsSchema } from "@langwatch/evaluator-contract";
+import { z } from "zod";
+import {
+  buildPreconditionTraceDataFromTrace,
+  checkEvaluatorRequiredFields,
+  evaluatePreconditions,
+} from "~/server/evaluations/preconditions";
+import { checkPreconditionSchema } from "~/server/evaluations/types";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEditOverlayPatch";
+import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
+import { getAllForProjectInput, tracesFilterInput } from "./routers/traces.schemas";
+import type { TRPCContext } from "./trpc.context";
+import { getUserProtectionsForProject } from "./utils";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
 import { GatewayUsageService, resolveProviderLabels } from "@langwatch/gateway-server";
 import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
@@ -147,11 +164,8 @@ import { savedViewsRouter } from "./routers/savedViews";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { sharedTraceRouter } from "./routers/sharedTrace";
-import { spansRouter } from "./routers/spans";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
-import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
-import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
@@ -185,6 +199,44 @@ const pinnedTraceRouter = createPinnedTraceTrpcRouter(appTrpcMount);
 const suiteRouter = createSuiteTrpcRouter(appTrpcMount);
 const storedObjectsRouter = createStoredObjectTrpcRouter(appTrpcMount);
 const promptTagsRouter = createPromptTagTrpcRouter(appTrpcMount);
+
+/**
+ * The caller's read-time redactions, resolved per request. Every trace
+ * transport takes them and hands them straight to the read: they depend on the
+ * session, the project's data-privacy policy and the plan's visibility window,
+ * none of which the trace package owns.
+ */
+const traceViewerProtections = (ctx: TRPCContext, input: { projectId: string }) =>
+  getUserProtectionsForProject(ctx, { projectId: input.projectId });
+
+const spansRouter = createSpansTrpcRouter({
+  ...appTrpcMount,
+  ports: { getViewerProtections: traceViewerProtections },
+});
+
+const traceEditOverlayRouter = createTraceEditOverlayTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    getViewerProtections: traceViewerProtections,
+    redactPatchForViewer,
+    restoreWithheldEdits,
+  },
+});
+
+const tracesRouter = createTracesTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    filterInputSchema: tracesFilterInput,
+    listInputSchema: getAllForProjectInput,
+    evaluatorTypeSchema: evaluatorsSchema.keyof().or(z.string().startsWith("custom/")),
+    preconditionSchema: checkPreconditionSchema,
+    getViewerProtections: traceViewerProtections,
+    formatSpansDigest,
+    checkEvaluatorRequiredFields,
+    buildPreconditionTraceData: buildPreconditionTraceDataFromTrace,
+    evaluatePreconditions,
+  },
+});
 
 const promptsRouter = createPromptTrpcRouter({
   ...appTrpcMount,

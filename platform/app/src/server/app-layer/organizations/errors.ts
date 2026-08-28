@@ -1,6 +1,5 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "../error-remediation";
 
 export class OrganizationNotFoundForTeamError extends NotFoundError {
   declare readonly code: "organization_not_found_for_team";

@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { datasetSpanSchema } from "@langwatch/dataset-contract";
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "@langwatch/trace-contract";
 import { applyOverlayToTrace, expandDeletedSpanIds } from "../applyTraceEditOverlay";
 import {
   applyOverlayToSpanDetail,
@@ -16,7 +16,7 @@ import {
   changedSpanFields,
   changedTraceMetadataKeys,
 } from "../applyTraceEditOverlayToViews";
-import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const span = (overrides: Partial<Span> & Pick<Span, "span_id">): Span =>
   ({

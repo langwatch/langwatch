@@ -4,6 +4,9 @@ import type { MailerConfiguration } from "~/server/mailer/providers/types";
 
 const mailerPrivateConfigDefinition = RuntimeConfig.define({
   baseHost: Config.value(z.string().min(1), { env: "BASE_HOST" }),
+  // Keep the legacy empty-string value: unsubscribe signing rejects it at the
+  // security boundary, while trigger no-reply hashing deliberately degrades.
+  nextauthSecret: Config.value(z.string().optional(), { env: "NEXTAUTH_SECRET" }),
   emailDefaultFrom: Config.value(z.string().optional(), { env: "EMAIL_DEFAULT_FROM" }),
   provider: Config.value(z.string().optional(), { env: "EMAIL_PROVIDER" }),
   ses: {
@@ -31,6 +34,11 @@ const mailerPrivateConfigDefinition = RuntimeConfig.define({
 });
 
 type MailerPrivateConfig = ConfigValue<typeof mailerPrivateConfigDefinition>;
+
+export type AppMailRuntimeConfiguration = Readonly<{
+  baseHost: string;
+  nextauthSecret: string | undefined;
+}>;
 
 const extractHostname = (baseHost: string): string => {
   try {
@@ -64,13 +72,26 @@ export function resolveMailerDefaultFrom(input: {
 export function resolveAppMailerConfiguration(
   source: Readonly<Record<string, unknown>>,
 ): MailerConfiguration {
+  return resolveAppMailConfiguration(source).mailer;
+}
+
+export function resolveAppMailConfiguration(source: Readonly<Record<string, unknown>>): {
+  mailer: MailerConfiguration;
+  runtime: AppMailRuntimeConfiguration;
+} {
   const configuration = RuntimeConfig.create({
     name: "application mailer",
     definition: mailerPrivateConfigDefinition,
     source,
   }).value;
 
-  return toMailerConfiguration(configuration);
+  return {
+    mailer: toMailerConfiguration(configuration),
+    runtime: {
+      baseHost: configuration.baseHost,
+      nextauthSecret: configuration.nextauthSecret,
+    },
+  };
 }
 
 function toMailerConfiguration(configuration: MailerPrivateConfig): MailerConfiguration {

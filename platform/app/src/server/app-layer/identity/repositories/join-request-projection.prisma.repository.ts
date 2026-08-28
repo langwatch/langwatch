@@ -7,11 +7,11 @@ import type {
 } from "@langwatch/identity";
 import type { JoinRequest, PrismaClient } from "~/generated/prisma/client";
 import type { JoinRequestFoldState } from "~/server/event-sourcing/pipelines/join-requests/projections/joinRequestState.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
 
 /**
  * The join-request pipeline's projection store (D12, ADR-117): the Postgres

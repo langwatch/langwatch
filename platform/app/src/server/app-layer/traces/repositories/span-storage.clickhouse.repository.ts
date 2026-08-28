@@ -18,7 +18,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import type {

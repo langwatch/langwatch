@@ -28,18 +28,14 @@ import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { encrypt } from "~/utils/encryption";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
-import {
-  CodexAccountService,
-  CodexAuthError,
-} from "~/server/modelProviders/codexAccount.service";
+import { CodexAccountService, CodexAuthError } from "~/server/modelProviders/codexAccount.service";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { ModelClientConfig } from "../model-client.config";
 
 class AppModelProviderCatalog extends ModelProviderCatalog {
   constructor(
     private readonly managedProviders: ManagedProviderService,
-    private readonly systemProviderEnvironment: Readonly<
-      Record<string, string | undefined>
-    > = {},
+    private readonly systemProviderEnvironment: Readonly<Record<string, string | undefined>> = {},
     private readonly isSaas = false,
   ) {
     super();
@@ -51,17 +47,14 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
     referenceCreatedAt: Date;
   }): Promise<ModelProviderSummary[]> {
     const now = new Date(0);
-    const organizationId =
-      _input.organizationId ?? `system:${_input.projectId ?? "global"}`;
+    const organizationId = _input.organizationId ?? `system:${_input.projectId ?? "global"}`;
     return Object.entries(modelProviders)
       .filter(([, definition]) => definition.enabledSince)
       .map(([provider, definition]) => {
         const enabled =
           definition.enabledSince < _input.referenceCreatedAt &&
           this.isSystemProviderEnabled(provider, definition.apiKey);
-        const models = getProviderModelOptions(provider, "chat").map(
-          (model) => model.value,
-        );
+        const models = getProviderModelOptions(provider, "chat").map((model) => model.value);
         const embeddingsModels = getProviderModelOptions(provider, "embedding").map(
           (model) => model.value,
         );
@@ -97,8 +90,7 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
     return (
       this.isSaas &&
       Boolean(this.systemProviderEnvironment[apiKey]) &&
-      (provider !== "vertex_ai" ||
-        Boolean(this.systemProviderEnvironment.VERTEXAI_PROJECT))
+      (provider !== "vertex_ai" || Boolean(this.systemProviderEnvironment.VERTEXAI_PROJECT))
     );
   }
 
@@ -160,9 +152,7 @@ class AppCodexTokenRefresher extends CodexTokenRefresher {
 
   async refresh(input: {
     tokens: CodexTokenKeys;
-  }): Promise<
-    { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }
-  > {
+  }): Promise<{ status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }> {
     try {
       const tokens = await this.account.refresh(input.tokens);
       return { status: "refreshed", tokens };
@@ -218,7 +208,10 @@ class AppModelProviderIdService extends ModelProviderIdService {
 }
 
 class AppModelTranslation extends ModelTranslationPort {
-  constructor(private readonly managedProviders: ManagedProviderService) {
+  constructor(
+    private readonly managedProviders: ManagedProviderService,
+    private readonly clientConfig: ModelClientConfig | undefined,
+  ) {
     super();
   }
 
@@ -234,6 +227,8 @@ class AppModelTranslation extends ModelTranslationPort {
       featureKey: "translate.text",
       modelProviders: input.modelProviders,
       managedProviders: this.managedProviders,
+      executionProxyUrl: this.clientConfig?.executionProxyUrl,
+      codexGatewayUrl: this.clientConfig?.codexGatewayUrl,
     });
     const result = await generateText({
       model,
@@ -251,6 +246,8 @@ export interface AppModelProviderRuntimeOptions {
   systemProviderEnvironment?: Readonly<Record<string, string | undefined>>;
   isSaas?: boolean;
   permissions: AuthzService;
+  /** Parsed process configuration for the model SDK boundary. */
+  modelClient?: ModelClientConfig;
 }
 
 export class AppModelProviderRuntime {
@@ -274,7 +271,7 @@ export class AppModelProviderRuntime {
       codexTokenRefresher: new AppCodexTokenRefresher(),
       connectionRateLimiter: new AppModelProviderConnectionRateLimiter(),
       authorization: this.options.permissions,
-      translation: new AppModelTranslation(this.options.managedProviders),
+      translation: new AppModelTranslation(this.options.managedProviders, this.options.modelClient),
       ids: new AppModelProviderIdService(),
     }).build();
   }

@@ -57,16 +57,16 @@ export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
     ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:system_instruction`);
   }
 
-  if (Array.isArray(config.tools) && config.tools.length > 0) {
-    if (
-      setIfMissing({
-        ctx,
-        key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
-        value: config.tools,
-      })
-    ) {
-      ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:tools->gen_ai.tool.definitions`);
-    }
+  if (
+    Array.isArray(config.tools) &&
+    config.tools.length > 0 &&
+    setIfMissing({
+      ctx,
+      key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
+      value: config.tools,
+    })
+  ) {
+    ctx.recordRule(`${VERTEX_ADK_RULE_PREFIX}:tools->gen_ai.tool.definitions`);
   }
 
   const paramMap: [string, unknown][] = [

@@ -10,7 +10,7 @@ import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { chatMessageSchema } from "~/server/tracer/types";
+import { chatMessageSchema } from "@langwatch/trace-contract";
 import { createTabId, createWindowId } from "./utils/id-generators";
 
 const logger = createLogger("DraggableTabsBrowserStore");

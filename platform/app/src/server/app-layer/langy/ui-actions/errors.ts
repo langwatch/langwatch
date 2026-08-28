@@ -1,6 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation, remediationFor } from "@langwatch/handled-error";
 
-import { remediation, remediationFor } from "../../error-remediation";
 
 /**
  * UI-action channel errors (specs/langy/langy-ui-actions.feature).

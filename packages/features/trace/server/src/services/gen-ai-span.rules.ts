@@ -51,12 +51,12 @@ function canonicaliseIdentity(ctx: ExtractorContext): void {
     ctx.recordRule(`${GEN_AI_RULE_PREFIX}:agent.name`);
   }
 
-  extractModelToBoth(
+  extractModelToBoth({
     ctx,
-    ATTR_KEYS.LLM_MODEL_NAME,
-    (raw) => (typeof raw === "string" ? raw : null),
-    `${GEN_AI_RULE_PREFIX}:model(llm.model_name)`,
-  );
+    sourceKey: ATTR_KEYS.LLM_MODEL_NAME,
+    ruleId: `${GEN_AI_RULE_PREFIX}:model(llm.model_name)`,
+    transform: (raw) => (typeof raw === "string" ? raw : null),
+  });
 }
 
 function canonicaliseMessages(ctx: ExtractorContext): void {

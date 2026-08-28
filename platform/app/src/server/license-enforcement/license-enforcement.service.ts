@@ -7,7 +7,11 @@ import {
   type MemberTypeLimits,
 } from "./license-limit-guard";
 import type { RoleChangeType } from "./member-classification";
-import type { LimitCheckResult, LimitType, limitTypes } from "./types";
+import type {
+  LimitCheckResult,
+  LimitType,
+  limitTypes,
+} from "@langwatch/enterprise-licensing-contract";
 
 /**
  * Configuration for a single limit type.
@@ -23,7 +27,7 @@ type LimitTypeConfig = {
  * Adding a new LimitType to the union requires adding it here (compile-time enforced).
  *
  * Open/Closed Principle (OCP): To add a new limit type:
- * 1. Add the type to limitTypes array in types.ts
+ * 1. Add the type to the limitTypes array in @langwatch/enterprise-licensing-contract
  * 2. Add the configuration entry here
  * No need to modify any switch statements.
  */

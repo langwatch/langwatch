@@ -13,8 +13,11 @@ import {
 } from "@langwatch/identity";
 import type { ScimSyncGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
-import { defineCommandSchema } from "../../..";
-import type { Command, CommandHandler } from "../../../commands/command";
+import {
+  type Command,
+  type CommandHandler,
+  defineCommandSchema,
+} from "@langwatch/eventing";
 import { scimSyncEventsFor } from "../envelope";
 import type { ScimSyncEvent } from "../schemas/events";
 

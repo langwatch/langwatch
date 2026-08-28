@@ -16,8 +16,6 @@ export {
   assertMemberTypeLimitNotExceeded,
   LICENSE_LIMIT_ERRORS,
 } from "./license-limit-guard";
-export type { LimitCheckResult, LimitType } from "./types";
-export { limitTypeSchema, limitTypes } from "./types";
 // Re-export utilities for router usage
 export { getOrganizationIdForProject } from "./utils";
 

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { LambdaClient } from "@aws-sdk/client-lambda";
 import {
+  NlpLambdaAwsClientPort,
   NlpLambdaPayloadStagingPort,
   NlpLambdaRuntime,
   NlpLambdaStagedPayload,
@@ -35,6 +38,24 @@ vi.mock("@aws-sdk/client-lambda", () => ({
   GetFunctionCommand: class {},
   UpdateFunctionCodeCommand: class {},
 }));
+
+class TestNlpLambdaAwsClients extends NlpLambdaAwsClientPort {
+  private readonly lambda = new LambdaClient({});
+
+  private readonly logs = new CloudWatchLogsClient({});
+
+  createLambdaClient(): LambdaClient {
+    return this.lambda;
+  }
+
+  createLogsClient(): CloudWatchLogsClient {
+    return this.logs;
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:nlpgo-project";
 
@@ -93,6 +114,7 @@ function createRuntime(
         studioCacheKeySalt: undefined,
       },
       redis: null,
+      awsClients: new TestNlpLambdaAwsClients(),
       payloadStaging: staging,
     }),
     staging,

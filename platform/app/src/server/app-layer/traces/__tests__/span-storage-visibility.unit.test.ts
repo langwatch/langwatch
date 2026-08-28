@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 
 import { SpanStorageService } from "../span-storage.service";
 import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../visibility-window.service";

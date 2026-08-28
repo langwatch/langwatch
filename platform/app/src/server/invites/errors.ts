@@ -2,9 +2,8 @@
  * Custom error types for invite domain.
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "../app-layer/error-remediation";
 
 /**
  * Message thrown by `organization.acceptInvite` when the invite has already

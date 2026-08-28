@@ -10,8 +10,8 @@ import {
   chatRichContentSchema,
   collectorRESTParamsSchema,
   spanInputOutputSchema,
-  spanSchema,
-} from "~/server/tracer/types";
+  langWatchSpanSchema,
+} from "@langwatch/trace-contract";
 
 // vitest runs from the langwatch package root, so cwd is the langwatch dir.
 const LANGWATCH_ROOT = process.cwd();
@@ -47,13 +47,13 @@ describe("given Zod schemas are the single source of truth", () => {
 
     /** @scenario The collector validates an incoming trace against the span schema */
     it("accepts a well-formed span and rejects one missing required fields", () => {
-      expect(spanSchema.safeParse(validSpan).success).toBe(true);
+      expect(langWatchSpanSchema.safeParse(validSpan).success).toBe(true);
       expect(collectorRESTParamsSchema.safeParse({ spans: [validSpan] }).success).toBe(
         true,
       );
       // span_id is required
       expect(
-        spanSchema.safeParse({
+        langWatchSpanSchema.safeParse({
           trace_id: "t1",
           type: "span",
           timestamps: { started_at: 1, finished_at: 2 },

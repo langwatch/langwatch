@@ -25,6 +25,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -35,6 +36,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/otlp-transformer": "0.55.0",
+    "@trpc/server": "^11.18.0",
     "langwatch": "workspace:*",
     "zod": "^4.4.3"
   },

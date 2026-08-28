@@ -14,7 +14,8 @@
  */
 
 import superjson from "superjson";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
 let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;

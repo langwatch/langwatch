@@ -31,7 +31,8 @@ import type {
   GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import type { App } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";

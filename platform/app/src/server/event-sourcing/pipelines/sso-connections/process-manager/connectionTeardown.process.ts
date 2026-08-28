@@ -4,7 +4,7 @@ import type {
   EventHandler,
   IntentSpec,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "@langwatch/eventing";
 
 const logger = createLogger("langwatch:identity:connection-teardown");
 

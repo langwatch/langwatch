@@ -4,7 +4,7 @@ import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../errors";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 import { LicenseEnforcementService } from "../license-enforcement.service";
-import type { LimitType } from "../types";
+import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 /**
  * Unit tests for LicenseEnforcementService.

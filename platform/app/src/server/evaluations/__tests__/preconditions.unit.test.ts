@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { RAGChunk, RAGSpan, Span } from "../../tracer/types";
+import type { RAGChunk, RAGSpan, Span } from "@langwatch/trace-contract";
 import {
   buildPreconditionTraceDataFromCommand,
   buildPreconditionTraceDataFromTrace,

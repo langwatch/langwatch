@@ -26,7 +26,8 @@ import {
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
-import { createServiceApp, internalSecret, publicEndpoint } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret, publicEndpoint } from "@langwatch/platform-api/app-rest";
 
 type ScimEnv = { Variables: { scimOrganizationId: string } };
 

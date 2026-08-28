@@ -36,7 +36,8 @@
  * integration test issues real HTTP requests.
  */
 import { timingSafeEqual } from "node:crypto";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import {
   buildExplainQuery,
   explainBodySchema,

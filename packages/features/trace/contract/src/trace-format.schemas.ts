@@ -6,6 +6,14 @@ import { z } from "zod";
 // so the schema and the type can never drift apart. The few ElasticSearch and
 // dataset shapes that are pure structural transforms (Omit/Partial of the
 // schemas above) stay as inferred-type derivations.
+//
+// This is the LangWatch trace format: the shape the collector accepts, the
+// shape a stored trace has, and the shape the SDK ships. It is not the OTLP
+// wire format — `trace.otlp.ts` owns that, and its `spanSchema`/`eventSchema`
+// describe an OTLP export span and an OTLP span event. The two spellings meet
+// in this package's barrel, so the LangWatch pair carries the qualifier:
+// `langWatchSpanSchema` and `langWatchEventSchema`, the same way
+// `LangWatchMessage` sits beside `OpenAIMessage` in trace-message.schemas.ts.
 // ---------------------------------------------------------------------------
 
 const chatRoleSchema = z.union([
@@ -408,9 +416,9 @@ export const rAGSpanSchema = baseSpanSchema.extend({
 
 export type RAGSpan = z.infer<typeof rAGSpanSchema>;
 
-export const spanSchema = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
+export const langWatchSpanSchema = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
 
-export type Span = z.infer<typeof spanSchema>;
+export type Span = z.infer<typeof langWatchSpanSchema>;
 
 const spanInputOutputValidatorSchema = spanInputOutputSchema.and(
   z.object({
@@ -510,7 +518,7 @@ export const traceMetadataSchema = reservedTraceMetadataSchema.and(customMetadat
 
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
 
-export const eventSchema = z.object({
+export const langWatchEventSchema = z.object({
   event_id: z.string(),
   event_type: z.string(), // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
   project_id: z.string(),
@@ -524,9 +532,9 @@ export const eventSchema = z.object({
   }),
 });
 
-export type Event = z.infer<typeof eventSchema>;
+export type Event = z.infer<typeof langWatchEventSchema>;
 
-export const elasticSearchEventSchema = eventSchema
+export const elasticSearchEventSchema = langWatchEventSchema
   .omit({ metrics: true, event_details: true })
   .and(
     z.object({
@@ -662,9 +670,9 @@ export const traceSchema = z.object({
     .optional(),
   error: errorCaptureSchema.optional().nullable(),
   indexing_md5s: z.array(z.string()).optional(),
-  events: z.array(eventSchema).optional(),
+  events: z.array(langWatchEventSchema).optional(),
   evaluations: z.array(evaluationSchema).optional(),
-  spans: z.array(spanSchema),
+  spans: z.array(langWatchSpanSchema),
   // Set server-side when content was teaser-redacted by the plan's
   // visibility window — the UI renders the upgrade CTA off this flag.
   redacted_by_visibility_window: z.boolean().optional(),
@@ -709,7 +717,7 @@ export type ElasticSearchTrace = Omit<
 
 export const collectorRESTParamsSchema = z.object({
   trace_id: z.union([z.string(), z.undefined()]).optional().nullable(),
-  spans: z.array(spanSchema),
+  spans: z.array(langWatchSpanSchema),
   metadata: z
     .object({
       user_id: z.union([z.string(), z.undefined()]).optional().nullable(),
@@ -738,7 +746,7 @@ export type CollectorRESTParamsValidator = z.infer<
   typeof collectorRESTParamsValidatorSchema
 >;
 
-export const trackEventRESTParamsValidatorSchema = eventSchema
+export const trackEventRESTParamsValidatorSchema = langWatchEventSchema
   .omit({
     event_id: true,
     project_id: true,

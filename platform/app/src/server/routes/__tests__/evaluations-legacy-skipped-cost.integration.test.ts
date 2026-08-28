@@ -42,8 +42,8 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-vi.mock("~/server/api/routers/evaluations", () => ({
-  getCustomEvaluators: vi.fn().mockResolvedValue([]),
+vi.mock("@langwatch/platform-api/app-trpc", () => ({
+  listCustomEvaluators: vi.fn().mockResolvedValue([]),
 }));
 
 const mockReportEvaluation = vi.fn().mockResolvedValue(undefined);

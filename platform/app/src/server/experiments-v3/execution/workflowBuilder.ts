@@ -36,7 +36,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ChatMessage } from "~/server/tracer/types";
+import type { ChatMessage } from "@langwatch/trace-contract";
 import type {
   ExecutionCell,
   WorkflowBuilderInput,

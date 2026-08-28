@@ -49,7 +49,8 @@ import { env } from "~/env.mjs";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,

@@ -9,7 +9,7 @@ import {
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
   type TraceEditSpanPatch,
-} from "./traceEditOverlay.schemas";
+} from "@langwatch/trace-contract";
 
 /**
  * The span fields the stored correction holds that this viewer never received

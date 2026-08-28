@@ -33,7 +33,7 @@
  * no-op (empty map) when there are no claude content logs.
  */
 import { capPayloadString } from "@langwatch/trace-server";
-import type { ChatMessage, SpanInputOutput } from "~/server/tracer/types";
+import type { ChatMessage, SpanInputOutput } from "@langwatch/trace-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /** A claude_code content log record, normalized by the caller. */

@@ -2,9 +2,9 @@ import {
   HandledError,
   type HandledErrorOptions,
   NotFoundError,
+  remediation,
 } from "@langwatch/handled-error";
 
-import { remediation } from "../error-remediation";
 
 export class EvaluationNotFoundError extends NotFoundError {
   declare readonly code: "evaluation_not_found";

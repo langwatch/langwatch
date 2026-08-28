@@ -1,7 +1,6 @@
 import { ValidationError } from "@langwatch/handled-error";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
-  type TraceEditOverlayAuthor,
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
 } from "./traceEditOverlay.repository";
@@ -10,24 +9,16 @@ import {
   encodeSpanIOFromEditedText,
   parseTraceEditOverlayPatch,
   patchHasAnyEdit,
+  type TraceEditOverlayDto,
   type TraceEditOverlayPatch,
   type TraceEditSpanPatch,
   traceEditOverlayPatchSchema,
-} from "./traceEditOverlay.schemas";
+} from "@langwatch/trace-contract";
 
 /** The fields a suggestion can correct, on the trace itself or on one of its
  *  spans: the two that hold a captured value a reviewer reads and can rewrite
  *  as text. */
 export type TraceEditIOField = "input" | "output";
-
-export interface TraceEditOverlayDto {
-  traceId: string;
-  patch: TraceEditOverlayPatch;
-  createdBy: TraceEditOverlayAuthor | null;
-  updatedBy: TraceEditOverlayAuthor | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 /**
  * Reviewer corrections for a trace: read, replace, merge and remove. There is

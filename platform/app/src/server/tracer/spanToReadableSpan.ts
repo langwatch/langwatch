@@ -2,7 +2,7 @@ import type { Attributes, HrTime, SpanContext, SpanStatus } from "@opentelemetry
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { emptyResource } from "@opentelemetry/resources";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import type { Span, SpanTypes } from "./types";
+import type { Span, SpanTypes } from "@langwatch/trace-contract";
 
 function msToHrTime(ms: number): HrTime {
   const seconds = Math.trunc(ms / 1000);

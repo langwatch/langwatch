@@ -20,8 +20,8 @@ import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persis
 import { ExperimentType } from "~/generated/prisma/client";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { Permission } from "~/server/api/rbac";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth, validator as zValidator } from "@langwatch/platform-api/app-rest";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,

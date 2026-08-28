@@ -14,9 +14,8 @@
  * @see dev/docs/best_practices/error-handling.md
  * @see dev/docs/adr/045-domain-errors-handled-boundary.md
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "~/server/app-layer/error-remediation";
 import type { RejectedLangWatchQL } from "./validate";
 import type { LangWatchQLViolation } from "./violations";
 

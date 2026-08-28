@@ -16,7 +16,8 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { enforceApiKeyCeiling, extractCredentials } from "~/server/api-key/auth-middleware";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import {

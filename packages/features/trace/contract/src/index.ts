@@ -30,9 +30,12 @@ export * from "./trace-log-contribution";
 export * from "./trace-metric-correlation";
 export * from "./trace-message.schemas";
 export * from "./trace-evaluation.contract";
+export * from "./trace-format.schemas";
 export * from "./trace-full-read.contract";
 export * from "./trace-derived-event";
 export * from "./trace-list.repository";
+export * from "./trace-read.contract";
+export * from "./trace-edit-overlay.contract";
 export {
   normalizedSpanSchema,
   NormalizedSpanKind,

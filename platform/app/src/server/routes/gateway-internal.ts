@@ -22,7 +22,8 @@ import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { GatewayBudget } from "~/generated/prisma/client";
-import { createServiceApp, internalSecret } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { internalSecret } from "@langwatch/platform-api/app-rest";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {

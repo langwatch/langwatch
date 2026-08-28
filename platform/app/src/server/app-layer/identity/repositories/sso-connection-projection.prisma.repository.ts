@@ -13,11 +13,11 @@ import type {
   SsoConnection,
 } from "~/generated/prisma/client";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
 
 /**
  * The connection pipeline's projection store (D04, ADR-117 §5): the Postgres

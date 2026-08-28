@@ -15,7 +15,7 @@ import type {
   RAGChunk,
   Span,
   SpanInputOutput,
-} from "./types";
+} from "@langwatch/trace-contract";
 
 export const getRAGChunks = (spans: (ElasticSearchSpan | Span)[]): RAGChunk[] => {
   const sortedSpans = flattenSpanTree(

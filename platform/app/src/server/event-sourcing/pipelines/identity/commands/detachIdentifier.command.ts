@@ -4,8 +4,11 @@ import {
   detachIdentifierCommandDataSchema,
 } from "@langwatch/identity";
 import type { IdentityGuards } from "@langwatch/identity-server";
-import { defineCommandSchema } from "../../..";
-import type { Command, CommandHandler } from "../../../commands/command";
+import {
+  type Command,
+  type CommandHandler,
+  defineCommandSchema,
+} from "@langwatch/eventing";
 import { identityEventsFor } from "../envelope";
 import type { IdentityEvent } from "../schemas/events";
 

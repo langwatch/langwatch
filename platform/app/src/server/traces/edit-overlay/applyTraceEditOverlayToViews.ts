@@ -21,7 +21,7 @@ import {
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
   type TraceEditSpanPatch,
-} from "./traceEditOverlay.schemas";
+} from "@langwatch/trace-contract";
 import { traceAttributeKeyForMetadata } from "./traceMetadataEditableKeys";
 
 function correctedTreeNode({

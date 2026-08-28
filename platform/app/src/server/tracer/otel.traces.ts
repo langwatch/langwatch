@@ -41,7 +41,7 @@ import {
   spanTypesSchema,
   type TypedValueChatMessages,
   typedValueChatMessagesSchema,
-} from "./types";
+} from "@langwatch/trace-contract";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");

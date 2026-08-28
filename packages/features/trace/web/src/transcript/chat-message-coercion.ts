@@ -75,10 +75,8 @@ export function collectChatTextLeaves(messages: ChatMessage[]): Record<string, s
         return;
       }
       if (!part || typeof part !== "object") return;
-      if (part.type === "text" && typeof part.text === "string") {
-        if (part.text.length > 0) {
-          leaves[`${msgIdx}.${partIdx}`] = part.text;
-        }
+      if (part.type === "text" && typeof part.text === "string" && part.text.length > 0) {
+        leaves[`${msgIdx}.${partIdx}`] = part.text;
       }
     });
   });

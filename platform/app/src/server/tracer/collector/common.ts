@@ -5,7 +5,7 @@ import type {
   Span,
   SpanInputOutput,
   TypedValueJson,
-} from "../types";
+} from "@langwatch/trace-contract";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostSpans = flattenSpanTree(organizeSpansIntoTree(spans), "outside-in");

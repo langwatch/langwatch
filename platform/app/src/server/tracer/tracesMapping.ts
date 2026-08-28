@@ -13,7 +13,7 @@ import {
   type Evaluation,
   reservedTraceMetadataSchema,
   type Span,
-} from "./types";
+} from "@langwatch/trace-contract";
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file

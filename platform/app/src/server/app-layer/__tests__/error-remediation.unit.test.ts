@@ -3,7 +3,11 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { REMEDIATION_CODES, REMEDIATION_DOC_PATHS } from "../error-remediation";
+import {
+  REMEDIATION_CODES,
+  REMEDIATION_DOC_PATHS,
+  remediation,
+} from "@langwatch/handled-error";
 
 // platform/app/src/server/app-layer/__tests__ → repo root → docs/
 const DOCS_ROOT = path.resolve(__dirname, "../../../../../../docs");
@@ -18,8 +22,7 @@ describe("error remediation registry", () => {
 
   describe("when the dataset storage root is not writable", () => {
     /** @scenario The remediation names the two ways an operator fixes it */
-    it("names the object storage bucket and the local storage path", async () => {
-      const { remediation } = await import("../error-remediation");
+    it("names the object storage bucket and the local storage path", () => {
       const tips = remediation("storage_not_writable").tips ?? [];
 
       expect(tips.some((tip) => tip.includes("S3_BUCKET_NAME"))).toBe(true);
@@ -30,8 +33,7 @@ describe("error remediation registry", () => {
   });
 
   describe("when no model is configured for a feature", () => {
-    it("names the Default Models page, the organization scope, and the documentation", async () => {
-      const { remediation } = await import("../error-remediation");
+    it("names the Default Models page, the organization scope, and the documentation", () => {
       const { tips = [], docsUrl } = remediation("model_not_configured");
 
       expect(tips.some((tip) => tip.includes("Default Models"))).toBe(true);
@@ -44,8 +46,7 @@ describe("error remediation registry", () => {
     expect(new Set(REMEDIATION_CODES).size).toBe(REMEDIATION_CODES.length);
   });
 
-  it("every entry carries at least one remediation channel", async () => {
-    const { remediation } = await import("../error-remediation");
+  it("every entry carries at least one remediation channel", () => {
     for (const code of REMEDIATION_CODES) {
       const r = remediation(code);
       expect(

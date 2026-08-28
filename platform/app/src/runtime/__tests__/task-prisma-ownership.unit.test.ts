@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 async function taskSource(): Promise<string> {
-  return await readFile(fileURLToPath(new URL("../../task.ts", import.meta.url)), "utf8");
+  return await readFile(
+    fileURLToPath(new URL("../task/legacy-platform-task.executor.ts", import.meta.url)),
+    "utf8",
+  );
 }
 
 describe("standalone task Prisma ownership", () => {
@@ -11,7 +14,7 @@ describe("standalone task Prisma ownership", () => {
     const source = await taskSource();
     const composeAt = source.indexOf("createProcessPrismaConnection({");
     const configureAt = source.indexOf("configure: configurePrismaConnection");
-    const taskRegistryAt = source.indexOf('await import("./tasks.generated")');
+    const taskRegistryAt = source.indexOf('await import("~/tasks.generated")');
     const taskLoadAt = source.indexOf("const script = await load()");
 
     expect(composeAt).toBeGreaterThan(-1);

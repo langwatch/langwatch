@@ -10,7 +10,8 @@
 import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth } from "@langwatch/platform-api/app-rest";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { getVercelAIModel } from "~/server/modelProviders/utils";

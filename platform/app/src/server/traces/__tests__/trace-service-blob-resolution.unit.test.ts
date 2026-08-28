@@ -14,7 +14,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "../trace.service";
 

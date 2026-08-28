@@ -45,8 +45,12 @@ import {
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "@langwatch/eventing";
-import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
+import {
+  type AggregateType,
+  createTenantId,
+  type EventStore,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import {
@@ -54,8 +58,6 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "~/server/event-sourcing/pipelines/sso-connections/schemas/constants";
 import type { SsoConnectionEvent } from "~/server/event-sourcing/pipelines/sso-connections/schemas/events";
-import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 

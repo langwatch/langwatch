@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import {
   extractEventsFromSpans,
   mapTraceSummaryToTrace as mapTraceSummaryToTraceWithServices,

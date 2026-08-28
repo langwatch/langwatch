@@ -66,8 +66,12 @@ export class AppAutomationClock extends AutomationClock {
 }
 
 class AppUnsubscribeTokenVerifier extends UnsubscribeTokenVerifier {
+  constructor(private readonly nextauthSecret: string | undefined) {
+    super();
+  }
+
   tryVerify(token: string) {
-    return verifyUnsubscribeToken(token);
+    return verifyUnsubscribeToken(token, this.nextauthSecret);
   }
 }
 
@@ -90,6 +94,7 @@ export class AppAutomationRuntime {
     private readonly clock: AutomationClock,
     private readonly testFire: AutomationTestFirePort,
     private readonly persistCaps: AutomationPersistCapService,
+    private readonly nextauthSecret: string | undefined,
   ) {}
 
   static create(options: {
@@ -99,6 +104,7 @@ export class AppAutomationRuntime {
     clock?: AutomationClock;
     testFire: AutomationTestFirePort;
     persistCaps: AutomationPersistCapService;
+    nextauthSecret?: string;
   }): AppAutomationRuntime {
     return new AppAutomationRuntime(
       options.database,
@@ -107,6 +113,7 @@ export class AppAutomationRuntime {
       options.clock ?? new AppAutomationClock(),
       options.testFire,
       options.persistCaps,
+      options.nextauthSecret,
     );
   }
 
@@ -117,7 +124,7 @@ export class AppAutomationRuntime {
       database: this.database,
       jobs,
       clock: this.clock,
-      verifier: new AppUnsubscribeTokenVerifier(),
+      verifier: new AppUnsubscribeTokenVerifier(this.nextauthSecret),
       wake: new AppSchedulerWake(this.redis),
       ...this.graph,
       testFire: this.testFire,
