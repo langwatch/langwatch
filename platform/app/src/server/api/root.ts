@@ -9,7 +9,7 @@ import { ingestionTemplatesRouter } from "./routers/governance/ingestionTemplate
 import { personalSessionsRouter } from "./routers/governance/personalSessions";
 import { sessionPolicyRouter } from "./routers/governance/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
-import { agentsRouter } from "./routers/agents";
+import { agentsRouter } from "~/runtime/app/internal-api/agents.router";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
@@ -73,7 +73,7 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
-import { secretsRouter } from "./routers/secrets";
+import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
