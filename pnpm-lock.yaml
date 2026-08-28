@@ -110,6 +110,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@hono/node-server':
+        specifier: '>=2.0.10'
+        version: 2.0.10(hono@4.13.1)
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../packages/features/agent/contract
@@ -119,6 +122,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -161,7 +167,13 @@ importers:
       superjson:
         specifier: ^2.2.6
         version: 2.2.6
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

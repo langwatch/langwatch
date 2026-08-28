@@ -25,9 +25,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.6",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -41,9 +43,11 @@
     "@opentelemetry/api": "^1.9.0",
     "@trpc/server": "^11.18.0",
     "hono": "^4.10.7",
-    "superjson": "^2.2.6"
+    "superjson": "^2.2.6",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }
