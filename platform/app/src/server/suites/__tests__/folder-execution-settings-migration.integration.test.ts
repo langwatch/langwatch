@@ -172,7 +172,7 @@ afterAll(async () => {
 });
 
 describe("given a folder row carrying execution settings", () => {
-  /** @scenario "The stored execution settings are cleared off every folder row" */
+  /** @scenario "The stored execution settings are cleared off every test suite row" */
   it("clears its targets, repeat count and models", async () => {
     const projectId = projectIds.folders;
     const folder = await createSuite({

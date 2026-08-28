@@ -57,7 +57,7 @@ describe("normalizePlanScope", () => {
   });
 
   describe("when the scope names some but not all folders", () => {
-    /** @scenario "A scope naming some but not all suites stays a folders scope" */
+    /** @scenario "A scope naming some but not all suites stays a test suites scope" */
     it("stays a folders scope naming those folders", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
@@ -70,7 +70,7 @@ describe("normalizePlanScope", () => {
   });
 
   describe("when the scope names no folder", () => {
-    /** @scenario "A folders scope naming no suite is not treated as everything" */
+    /** @scenario "A test suites scope naming no suite is not treated as everything" */
     it("stays a folders scope naming none", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",

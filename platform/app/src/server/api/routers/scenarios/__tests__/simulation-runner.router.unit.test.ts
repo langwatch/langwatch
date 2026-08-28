@@ -430,7 +430,7 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
-      /** @scenario "A run of a single case records the models the validation prefetch resolved" */
+      /** @scenario "A run of a single scenario records the models the validation prefetch resolved" */
       it("records the models the prefetch resolved on the queued run", async () => {
         await caller.run(defaultInput);
 
@@ -696,8 +696,8 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("the reserved langwatch namespace on a one-off run", () => {
-      /** @scenario "A single-case run records which target it ran against" */
-      /** @scenario "A single-case run records that case version" */
+      /** @scenario "A single-scenario run records which target it ran against" */
+      /** @scenario "A single-scenario run records that scenario version" */
       /** @scenario "A one-off run started in the app records the person who started it" */
       it("records the target, its kind, the case version read at queue time and the person who started it", async () => {
         await caller.run(defaultInput);

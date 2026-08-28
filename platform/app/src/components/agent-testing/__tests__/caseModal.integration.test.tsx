@@ -209,7 +209,7 @@ describe("the scenario dialog", () => {
   };
 
   describe("when a new case is written", () => {
-    /** @scenario "New scenario opens the case dialog straight away" */
+    /** @scenario "New scenario opens the scenario dialog straight away" */
     it("opens on the form itself, with no model-writing step first", async () => {
       openNew();
 
@@ -222,7 +222,7 @@ describe("the scenario dialog", () => {
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
-    /** @scenario "The case dialog footer holds the labels, Save and Save and Run" */
+    /** @scenario "The scenario dialog footer holds the labels, Save and Save and Run" */
     it("holds the labels on the left and the two save buttons on the right", async () => {
       openNew();
       await screen.findByTestId("case-modal");
@@ -283,7 +283,7 @@ describe("the scenario dialog", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Save and Run saves the case and then asks what to run it against" */
+    /** @scenario "Save and Run saves the scenario and then asks what to run it against" */
     it("saves first, then opens the run dialog for what it saved", async () => {
       const user = userEvent.setup();
       openNew();
@@ -307,7 +307,7 @@ describe("the scenario dialog", () => {
   });
 
   describe("when a stored case is edited", () => {
-    /** @scenario "Editing a case opens the blocks it already uses" */
+    /** @scenario "Editing a scenario opens the blocks it already uses" */
     it("opens the blocks the stored case already carries", async () => {
       mockGetById.mockReturnValue({
         data: storedCase({
@@ -337,7 +337,7 @@ describe("the scenario dialog", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Editing a case names its version and opens the history" */
+    /** @scenario "Editing a scenario names its version and opens the history" */
     /** @scenario "History opens a popover listing the versions newest first" */
     it("names the version in the header and opens the history beside it", async () => {
       const user = userEvent.setup();

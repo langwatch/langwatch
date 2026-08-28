@@ -43,7 +43,7 @@ function makeTx(overrides?: {
 
 describe("reconcileFolderMembership", () => {
   describe("when the folder holds archived and active cases", () => {
-    /** @scenario "Recomputing membership counts only active cases" */
+    /** @scenario "Recomputing membership counts only active scenarios" */
     it("recomputes the member list from active cases only", async () => {
       const tx = makeTx({ scenarios: [{ id: "scen_1" }, { id: "scen_2" }] });
 
@@ -74,7 +74,7 @@ describe("reconcileFolderMembership", () => {
       });
     });
 
-    /** @scenario "A scenario belongs to at most one folder" */
+    /** @scenario "A scenario belongs to at most one test suite" */
     it("derives membership from the case's single folderId, so a case is in one folder only", async () => {
       // The member query filters on folderId equality: a case naming folder A
       // can never be counted into folder B's recompute.

@@ -457,7 +457,7 @@ describe("the scenarios table", () => {
     expect(critical.className).not.toEqual(billing.className);
   });
 
-  /** @scenario "The cases table shows the scenario column and the row actions, and no last result" */
+  /** @scenario "The scenarios table shows the scenario column and the row actions, and no last result" */
   it("has no LAST RESULT column header and no per-row result cell", () => {
     renderPanel({
       cases: [makeCase()],
@@ -535,7 +535,7 @@ describe("the scenarios table", () => {
     ]);
   });
 
-  /** @scenario "Open last run is not offered for a case that never ran" */
+  /** @scenario "Open last run is not offered for a scenario that never ran" */
   it("does not offer Open last run for a case that never ran", async () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
     await openRowMenu("Double charge");
@@ -549,7 +549,7 @@ describe("the scenarios table", () => {
   });
 
   /** @scenario "Duplicate creates a copy in the same suite" */
-  /** @scenario "Duplicating a case copies its suite" */
+  /** @scenario "Duplicating a scenario copies its suite" */
   it("puts the copy of a duplicated case in the same suite", async () => {
     const original = makeCase({ labels: ["critical"] });
     const { props, view } = renderPanel({ cases: [original] });
@@ -630,7 +630,7 @@ describe("the scenarios table", () => {
 
   // --- Row click ---
 
-  /** @scenario "Clicking a row opens the case editor" */
+  /** @scenario "Clicking a row opens the scenario editor" */
   it("opens the case editor when the row is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
@@ -645,7 +645,7 @@ describe("the scenarios table", () => {
     expect(props.onOpenLastRun).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Clicking a row with no last run opens the case editor" */
+  /** @scenario "Clicking a row with no last run opens the scenario editor" */
   it("opens the case editor when a row with no last run is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
@@ -1066,7 +1066,7 @@ describe("the scenarios table", () => {
 
   // --- External sets ---
 
-  /** @scenario "An external set lists its cases read-only with a last run column" */
+  /** @scenario "An external set lists its scenarios read-only with a last run column" */
   it("lists the cases of an external set read-only", () => {
     renderPanel({
       selection: { kind: "external", setId: "nightly-ci" },

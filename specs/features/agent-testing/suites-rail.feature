@@ -57,7 +57,7 @@ Feature: The test suites rail
   Scenario: An external set carries the code icon and no counts
     Given a project with an external set
     When the rail is read
-    Then the external set carries the folder-with-code icon
+    Then the external set carries the test suite-with-code icon
     And it shows no count and no run time
     And it shows no Run control
 
@@ -185,10 +185,10 @@ Feature: The test suites rail
   # --- Selection ---
 
   @integration
-  Scenario: Choosing a suite filters the case table to that suite
+  Scenario: Choosing a suite filters the scenario table to that suite
     Given a project with two test suites
     When one of them is chosen in the rail
-    Then the case table lists only the cases of that suite
+    Then the scenario table lists only the scenarios of that suite
     And the suite is marked as selected in the rail
 
   @integration

@@ -65,8 +65,8 @@ Feature: Scenario CLI Commands
   # Test suite membership (Agent Testing v2)
   # ============================================================================
   # A scenario belongs to at most one test suite. The domain rules are
-  # in specs/suites/suite-folders.feature and
-  # specs/scenarios/scenario-folder-assignment.feature.
+  # in specs/suites/test-suites.feature and
+  # specs/scenarios/scenario-test-suite-assignment.feature.
 
   @unit
   Scenario: Create a scenario inside a test suite

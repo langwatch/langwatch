@@ -191,7 +191,7 @@ describe("scenarios version procedures", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    /** @scenario "Version history of a case in another project is not readable" */
+    /** @scenario "Version history of a scenario in another project is not readable" */
     it("answers not found for a case of another project", async () => {
       const scenario = await createCase();
 

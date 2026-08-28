@@ -141,8 +141,8 @@ beforeEach(async () => {
 
 describe("folder membership", () => {
   describe("when a case is created inside a folder", () => {
-    /** @scenario "Creating a case inside a folder puts it on both sides at once" */
-    /** @scenario "A case created from inside a suite is filed into that suite" */
+    /** @scenario "Creating a scenario inside a test suite puts it on both sides at once" */
+    /** @scenario "A scenario created from inside a suite is filed into that suite" */
     it("names the folder on the case and holds the case on the folder", async () => {
       const folder = await createFolder("Refunds");
       const scenario = await createCase({
@@ -155,7 +155,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "A case created without naming a test suite is filed into Default" */
+    /** @scenario "A scenario created without naming a test suite is filed into Default" */
     /** @scenario "A scenario created with no suite is filed into Default" */
     it("files a case created without a folder into Default", async () => {
       const scenario = await createCase({ name: "Unfiled" });
@@ -235,7 +235,7 @@ describe("folder membership", () => {
   });
 
   describe("when a case moves between folders", () => {
-    /** @scenario "Moving a case between folders updates both folders" */
+    /** @scenario "Moving a scenario between test suites updates both test suites" */
     it("updates both folders in one write", async () => {
       const refunds = await createFolder("Refunds");
       const checkout = await createFolder("Checkout");
@@ -278,7 +278,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "Taking a case out of its folder files it into Default" */
+    /** @scenario "Taking a scenario out of its test suite files it into Default" */
     /** @scenario "Removing a scenario from its suite files it into Default instead of leaving it loose" */
     it("files a case into Default when it is taken out of its folder", async () => {
       const refunds = await createFolder("Refunds");
@@ -304,7 +304,7 @@ describe("folder membership", () => {
     });
 
     /** @scenario "A move that fails leaves both sides untouched" */
-    /** @scenario "A case cannot be filed into an archived folder" */
+    /** @scenario "A scenario cannot be filed into an archived test suite" */
     it("leaves both sides untouched when the destination is refused", async () => {
       const refunds = await createFolder("Refunds");
       const archived = await createFolder("Old");
@@ -330,7 +330,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "A case cannot be filed into a run plan that is not a folder" */
+    /** @scenario "A scenario cannot be filed into a run plan that is not a test suite" */
     it("refuses to file a case into a custom run plan", async () => {
       const refunds = await createFolder("Refunds");
       const scenario = await createCase({
@@ -363,7 +363,7 @@ describe("folder membership", () => {
       expect(kept?.folderId).toBe(refunds.id);
     });
 
-    /** @scenario "Filing a case into a suite of another project is refused with scenario_folder_not_found" */
+    /** @scenario "Filing a scenario into a suite of another project is refused with scenario_test_suite_not_found" */
     it("refuses a folder that belongs to another project", async () => {
       const foreign = await createFolder("Foreign", otherProjectId);
       const refunds = await createFolder("Refunds");
@@ -388,7 +388,7 @@ describe("folder membership", () => {
   });
 
   describe("when cases are archived", () => {
-    /** @scenario "Archiving one case drops it from its folder" */
+    /** @scenario "Archiving one scenario drops it from its test suite" */
     it("drops the archived case from the folder and keeps the rest", async () => {
       const refunds = await createFolder("Refunds");
       const first = await createCase({ name: "One", folderId: refunds.id });
@@ -400,7 +400,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "Archiving many cases at once drops all of them from their folders" */
+    /** @scenario "Archiving many scenarios at once drops all of them from their test suites" */
     it("recomputes the folder once for a batch archive", async () => {
       const refunds = await createFolder("Refunds");
       const cases = [];
@@ -419,7 +419,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "Restoring an archived case puts it back in its folder" */
+    /** @scenario "Restoring an archived scenario puts it back in its test suite" */
     it("puts a restored case back through the reconcile", async () => {
       const refunds = await createFolder("Refunds");
       const scenario = await createCase({
@@ -449,7 +449,7 @@ describe("folder membership", () => {
   });
 
   describe("when a folder is archived", () => {
-    /** @scenario "An archived folder keeps the membership it had" */
+    /** @scenario "An archived test suite keeps the membership it had" */
     it("keeps the final member list as a snapshot and archives the cases", async () => {
       const refunds = await createFolder("Refunds");
       const caseIds = [];
@@ -479,7 +479,7 @@ describe("folder membership", () => {
   });
 
   describe("when a duplicate is made", () => {
-    /** @scenario "Duplicating a case copies its suite" */
+    /** @scenario "Duplicating a scenario copies its suite" */
     it("files the copy in the same folder with the same definition", async () => {
       const refunds = await createFolder("Refunds");
       const scenario = await scenarioService.create({
@@ -551,7 +551,7 @@ describe("folder membership", () => {
   });
 
   describe("when two cases are filed into one folder at the same time", () => {
-    /** @scenario "Two cases filed into one folder at the same time both land in it" */
+    /** @scenario "Two scenarios filed into one test suite at the same time both land in it" */
     it("holds both of them", async () => {
       const refunds = await createFolder("Refunds");
       const first = await createCase({ name: "First" });

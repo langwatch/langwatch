@@ -27,7 +27,7 @@ const FOLDER = {
 
 describe("given a stored row opened from the Results tab", () => {
   describe("when the row is a run plan", () => {
-    /** @scenario "A folder answers to no plan name, so its run still derives one" */
+    /** @scenario "A test suite answers to no plan name, so its run still derives one" */
     it("opens on the name the plan is stored under", () => {
       expect(storedPlanSubject(RUN_PLAN).planName).toBe("Refunds prod-agent");
     });
@@ -48,7 +48,7 @@ describe("given a stored row opened from the Results tab", () => {
   });
 
   describe("when the row is a folder", () => {
-    /** @scenario "A folder answers to no plan name, so its run still derives one" */
+    /** @scenario "A test suite answers to no plan name, so its run still derives one" */
     it("names no plan, so the run name is derived", () => {
       expect(storedPlanSubject(FOLDER).planName).toBeUndefined();
     });

@@ -1203,7 +1203,7 @@ describe("SuiteService", () => {
 
   describe("getAll()", () => {
     describe("when the caller names no kind", () => {
-      /** @scenario "A caller that names no kind of suite gets custom run plans only" */
+      /** @scenario "A caller that names no kind of suite gets run plans only" */
       it("asks the repository for custom suites only", async () => {
         const { service, suiteRepo } = createService();
         suiteRepo.findAll.mockResolvedValue([makeSuite()]);
@@ -1256,7 +1256,7 @@ describe("SuiteService", () => {
 
   describe("getFolderDetail()", () => {
     describe("given a folder holding active and archived cases", () => {
-      /** @scenario "A folder reads back with the cases filed in it" */
+      /** @scenario "A test suite reads back with the scenarios filed in it" */
       it("names every active case in the order the folder holds them", async () => {
         const { service, suiteRepo } = createService({
           scenarioRepository: {
@@ -1305,7 +1305,7 @@ describe("SuiteService", () => {
 
   describe("createFolder()", () => {
     describe("when the name is only spaces", () => {
-      /** @scenario "A folder created with a blank name is rejected with validation_error" */
+      /** @scenario "A test suite created with a blank name is rejected with validation_error" */
       it("rejects with validation_error and stores nothing", async () => {
         const { service, suiteRepo } = createService();
 
@@ -1340,7 +1340,7 @@ describe("SuiteService", () => {
     });
 
     describe("when another suite already holds the slug", () => {
-      /** @scenario "A folder created with a name another suite already uses keeps both names readable" */
+      /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
       it("appends a numeric suffix instead of refusing", async () => {
         const { service, suiteRepo } = createService({
           suiteRepository: {
@@ -1428,7 +1428,7 @@ describe("SuiteService", () => {
     }
 
     describe("when the run carries a repeat count", () => {
-      /** @scenario "A folder run honours the repeat count sent with the run" */
+      /** @scenario "A test suite run honours the repeat count sent with the run" */
       it("schedules cases x targets x repeat count runs", async () => {
         const { service, suiteRunService, suiteRepo } = folderRunService();
 
@@ -1565,7 +1565,7 @@ describe("SuiteService", () => {
   });
 
   describe("when a custom run plan is run by its id", () => {
-    /** @scenario "A run plan run through the folder path refuses stored execution settings" */
+    /** @scenario "A run plan run through the test suite path refuses stored execution settings" */
     it("refuses a request that carries execution settings", async () => {
       const { service, suiteRunService } = createService();
 
@@ -1601,7 +1601,7 @@ describe("SuiteService", () => {
 
   describe("given a folder suite", () => {
     describe("when the suite editor updates it", () => {
-      /** @scenario "The suite editor refuses execution settings on a folder suite" */
+      /** @scenario "The suite editor refuses execution settings on a test suite" */
       it("saves the name and labels and refuses every execution field", async () => {
         const { service, suiteRepo } = createService();
         const stored = makeSuite({
@@ -1662,7 +1662,7 @@ describe("SuiteService", () => {
         expect(suiteRepo.update).not.toHaveBeenCalled();
       });
 
-      /** @scenario "The suite editor refuses to broaden a folder into a code-owned suite" */
+      /** @scenario "The suite editor refuses to broaden a test suite into a code-owned suite" */
       it("refuses a scope or scenarioIds write on a folder", async () => {
         const { service, suiteRepo } = createService();
         suiteRepo.findById.mockResolvedValue(

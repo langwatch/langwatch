@@ -5,7 +5,7 @@ Feature: A note on a run
 
   Background: what a note is.
     A note is one short line of free text, like a commit message or a
-    hypothesis. It belongs to one batch run, not to a test case and not to a
+    hypothesis. It belongs to one batch run, not to a scenario and not to a
     run plan. Every run in that batch carries the same note.
 
     A note can come from the platform run dialog, from the command line, or
@@ -27,7 +27,7 @@ Feature: A note on a run
 
   @integration
   Scenario: A note given on the command line is stored with the batch
-    Given a test suite with active cases and targets
+    Given a test suite with active scenarios and targets
     When the suite is run from the command line with a note
     Then the batch that starts carries that note
 
@@ -40,8 +40,8 @@ Feature: A note on a run
 
   @integration
   Scenario: A note on a single scenario run is stored with that run
-    Given a test case and a target
-    When a run of that case is started with a note
+    Given a scenario and a target
+    When a run of that scenario is started with a note
     Then that run carries the note
 
   # --- Reading a note back ---

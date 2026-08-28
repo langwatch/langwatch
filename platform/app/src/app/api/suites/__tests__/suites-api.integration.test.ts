@@ -507,7 +507,7 @@ describe("Feature: Suites REST API", () => {
     }
 
     describe("when no kind is named", () => {
-      /** @scenario "The v1 run plan list holds no folder rows" */
+      /** @scenario "The v1 run plan list holds no test suite rows" */
       it("returns only custom run plans", async () => {
         await createFolder("Refunds");
         await createFolder("Checkout");
@@ -539,7 +539,7 @@ describe("Feature: Suites REST API", () => {
 
   describe("POST /api/suites with a kind", () => {
     describe("when the body names kind folder", () => {
-      /** @scenario "A new folder is created empty and appears in the rail" */
+      /** @scenario "A new test suite is created empty and appears in the rail" */
       it("creates an empty folder without scenarios or targets", async () => {
         const res = await helpers.api.post("/api/suites", {
           name: "Refunds",

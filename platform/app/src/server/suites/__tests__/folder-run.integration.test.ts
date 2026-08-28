@@ -104,7 +104,7 @@ beforeEach(async () => {
 
 describe("running a folder", () => {
   describe("when the folder holds active and archived cases", () => {
-    /** @scenario "Running a folder schedules its active cases against the chosen targets" */
+    /** @scenario "Running a test suite schedules its active scenarios against the chosen targets" */
     it("schedules active cases x targets and lands in the run plan the run resolved", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -180,7 +180,7 @@ describe("running a folder", () => {
       expect(folderRow.judgeModel).toBeNull();
     });
 
-    /** @scenario "The target chosen for a folder run is offered again from the last run plan of that suite" */
+    /** @scenario "The target chosen for a test suite run is offered again from the last run plan of that suite" */
     it("leaves the target on the run plan the run resolved", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -212,7 +212,7 @@ describe("running a folder", () => {
   });
 
   describe("when no target is chosen", () => {
-    /** @scenario "Running a folder with no target is refused with suite_targets_required" */
+    /** @scenario "Running a test suite with no target is refused with suite_targets_required" */
     it("refuses with suite_targets_required and schedules nothing", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -237,7 +237,7 @@ describe("running a folder", () => {
   });
 
   describe("when every case in the folder is archived", () => {
-    /** @scenario "Running a folder whose cases are all archived is refused with suite_scope_empty" */
+    /** @scenario "Running a test suite whose scenarios are all archived is refused with suite_scope_empty" */
     it("refuses with suite_scope_empty and schedules nothing", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -309,7 +309,7 @@ describe("running a folder", () => {
   });
 
   describe("when a custom run plan spans the cases of several folders", () => {
-    /** @scenario "A custom run plan can span the cases of several folders" */
+    /** @scenario "A run plan can span the scenarios of several test suites" */
     it("runs the four cases and changes neither folder", async () => {
       const refunds = await suiteService.createFolder({
         projectId,

@@ -345,7 +345,7 @@ describe("starting a run of one scenario from the case table", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "Confirming a run from a case row does not change the address" */
+  /** @scenario "Confirming a run from a scenario row does not change the address" */
   it("keeps the address and the table when a run is confirmed", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
@@ -438,7 +438,7 @@ describe("starting a run of one scenario from the case table", () => {
     expect(mockRunScenario).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Running the same case against the same agent again joins the same plan" */
+  /** @scenario "Running the same scenario against the same agent again joins the same plan" */
   it("sends the same name both times, so the second run joins the first plan", async () => {
     const user = userEvent.setup();
     const view = render(<TestCasesTab />, { wrapper: Wrapper });
@@ -480,7 +480,7 @@ describe("starting a run of one scenario from the case table", () => {
     );
   });
 
-  /** @scenario "Running the same case against another agent is another plan" */
+  /** @scenario "Running the same scenario against another agent is another plan" */
   it("names the other agent when the run goes against it", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });

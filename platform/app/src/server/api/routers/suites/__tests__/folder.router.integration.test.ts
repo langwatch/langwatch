@@ -154,7 +154,7 @@ describe("suites.folders integration", () => {
   }
 
   describe("creating a folder", () => {
-    /** @scenario "A new folder is created empty and appears in the rail" */
+    /** @scenario "A new test suite is created empty and appears in the rail" */
     it("creates it empty and lists it in folders.getAll", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -169,7 +169,7 @@ describe("suites.folders integration", () => {
       expect(folders.find((f) => f.id === folder.id)?.caseIds).toEqual([]);
     });
 
-    /** @scenario "A folder created with a name another suite already uses keeps both names readable" */
+    /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
     it("keeps the name readable and takes a different address when a run plan holds the slug", async () => {
       const plan = await prisma.simulationSuite.create({
         data: {
@@ -195,7 +195,7 @@ describe("suites.folders integration", () => {
   });
 
   describe("renaming a folder", () => {
-    /** @scenario "Renaming a folder keeps its cases and its run history" */
+    /** @scenario "Renaming a test suite keeps its scenarios and its run history" */
     it("changes the name and keeps the slug and the member list", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -222,7 +222,7 @@ describe("suites.folders integration", () => {
       expect(renamed.scenarioIds).toEqual([scenario.id]);
     });
 
-    /** @scenario "Renaming a folder in another project is refused with suite_not_found" */
+    /** @scenario "Renaming a test suite in another project is refused with suite_not_found" */
     it("refuses a folder of another project with suite_not_found", async () => {
       const foreign = await prisma.simulationSuite.create({
         data: {
@@ -255,8 +255,8 @@ describe("suites.folders integration", () => {
   });
 
   describe("archiving a folder", () => {
-    /** @scenario "Archiving a folder archives the cases in it" */
-    /** @scenario "Archiving a folder archives its run plan too" */
+    /** @scenario "Archiving a test suite archives the scenarios in it" */
+    /** @scenario "Archiving a test suite archives its run plan too" */
     it("archives the folder and its cases together", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -297,7 +297,7 @@ describe("suites.folders integration", () => {
       expect(archivedRow?.archivedAt).not.toBeNull();
     });
 
-    /** @scenario "Archiving a folder that is already archived changes nothing" */
+    /** @scenario "Archiving a test suite that is already archived changes nothing" */
     it("keeps the first archive time on a second archive", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -318,7 +318,7 @@ describe("suites.folders integration", () => {
   });
 
   describe("folder execution settings", () => {
-    /** @scenario "Updating a folder with execution settings is refused with validation_error" */
+    /** @scenario "Updating a test suite with execution settings is refused with validation_error" */
     it("refuses targets, a repeat count and models on a folder", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -387,7 +387,7 @@ describe("suites.folders integration", () => {
   });
 
   describe("the v1 kind guard", () => {
-    /** @scenario "The v1 run plan list holds no folder rows" */
+    /** @scenario "The v1 run plan list holds no test suite rows" */
     it("keeps folder rows out of suites.getAll when no kind is named", async () => {
       await caller.suites.folders.create({ projectId, name: "Refunds" });
       await caller.suites.folders.create({ projectId, name: "Checkout" });
@@ -398,7 +398,7 @@ describe("suites.folders integration", () => {
       expect(listed.map((suite) => suite.id)).toEqual([plan.id]);
     });
 
-    /** @scenario "The v2 Test Runs list holds custom run plans only" */
+    /** @scenario "The v2 Test Runs list holds run plans only" */
     it("lists custom plans for Test Runs and folders for the suites rail", async () => {
       const refunds = await caller.suites.folders.create({
         projectId,
@@ -424,7 +424,7 @@ describe("suites.folders integration", () => {
   });
 
   describe("permissions", () => {
-    /** @scenario "A viewer can read folders but cannot create or archive one" */
+    /** @scenario "A viewer can read test suites but cannot create or archive one" */
     it("lets a viewer read folders and refuses their writes", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -445,7 +445,7 @@ describe("suites.folders integration", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    /** @scenario "A person with read-only access cannot move a case" */
+    /** @scenario "A person with read-only access cannot move a scenario" */
     it("refuses a viewer's move of a case", async () => {
       const folder = await caller.suites.folders.create({
         projectId,
@@ -475,8 +475,8 @@ describe("suites.folders integration", () => {
   });
 
   describe("moving a case over tRPC", () => {
-    /** @scenario "Moving a case from its row menu regroups the case list" */
-    /** @scenario "Taking a case out of its suite moves it to Default" */
+    /** @scenario "Moving a scenario from its row menu regroups the scenario list" */
+    /** @scenario "Taking a scenario out of its suite moves it to Default" */
     it("moves a case between suites and back to Default, keeping its id and history key", async () => {
       const refunds = await caller.suites.folders.create({
         projectId,

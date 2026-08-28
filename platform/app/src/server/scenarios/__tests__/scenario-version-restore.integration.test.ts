@@ -257,7 +257,7 @@ describe("restoring a scenario version", () => {
       ).rejects.toMatchObject({ code: "scenario_version_not_found" });
     });
 
-    /** @scenario "Restoring a version of a case in another project is refused with not_found" */
+    /** @scenario "Restoring a version of a scenario in another project is refused with not_found" */
     it("refuses a restore across projects as not found", async () => {
       const scenario = await createCaseAtVersionFive();
 

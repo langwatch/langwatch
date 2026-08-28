@@ -456,7 +456,7 @@ describe("resolving a run plan by name", () => {
       expect(await plansNamed(expected)).toHaveLength(1);
     });
 
-    /** @scenario "A folder-kind suite does not answer to a run plan name" */
+    /** @scenario "A test suite does not answer to a run plan name" */
     it("ignores a folder of the same name", async () => {
       await createCase("One");
       const agent = await createHttpAgent();
@@ -662,7 +662,7 @@ describe("resolving a run plan by name", () => {
       expect(startSuiteRun).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A run refused for covering no case creates no plan" */
+    /** @scenario "A run refused for covering no scenario creates no plan" */
     it("creates no plan when the scope covers no case", async () => {
       await createCase("One");
       const agent = await createHttpAgent();

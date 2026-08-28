@@ -287,7 +287,7 @@ describe("getLastResultSummaries", () => {
 
 describe("a folder's runs in the results view", () => {
   describe("when a folder's internal run set holds a finished batch", () => {
-    /** @scenario "A folder run appears in the results view under the folder's name" */
+    /** @scenario "A test suite run appears in the results view under the test suite's name" */
     it("reports the folder's set in the internal suite summaries", async () => {
       const folderId = `folder-${nanoid(6)}`;
       const setId = getSuiteSetId(folderId);

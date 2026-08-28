@@ -41,7 +41,7 @@ describe("the models a run resolves", () => {
   });
 
   describe("when the run plan names no model", () => {
-    /** @scenario "A case answers when its run plan names no model" */
+    /** @scenario "A scenario answers when its run plan names no model" */
     it("takes the case's own model", async () => {
       const resolveFeatureModel = projectDefaults();
 
@@ -59,7 +59,7 @@ describe("the models a run resolves", () => {
   });
 
   describe("when neither the plan nor the case names a model", () => {
-    /** @scenario "The project default answers when neither the plan nor the case names a model" */
+    /** @scenario "The project default answers when neither the plan nor the scenario names a model" */
     it("reads the project default of each role", async () => {
       const models = await resolveRunModels({
         plan: {},

@@ -211,7 +211,7 @@ describe("Feature: Test Suites REST API", () => {
   // ── list ───────────────────────────────────────────────────────────────────
 
   describe("given the project holds one test suite and one run plan", () => {
-    /** @scenario "Listing test suites returns the folders only" */
+    /** @scenario "Listing test suites returns the test suites only" */
     it("returns the test suite alone", async () => {
       const folder = await createFolder("Refunds");
       await createPlan("Nightly");

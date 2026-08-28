@@ -269,7 +269,7 @@ describe("the version chip in the case editor", () => {
       { wrapper: Wrapper },
     );
 
-  /** @scenario "The editor shows the current version beside the case name" */
+  /** @scenario "The editor shows the current version beside the scenario name" */
   it("shows the current version beside the case name", async () => {
     renderEditor();
 
@@ -311,7 +311,7 @@ describe("the version chip in the case editor", () => {
     expect(await screen.findByTestId("case-version-5")).toBeInTheDocument();
   });
 
-  /** @scenario "A save that lost a race says the case changed" */
+  /** @scenario "A save that lost a race says the scenario changed" */
   it("says the case changed and offers the reload when a save lost the race", async () => {
     const user = userEvent.setup();
     mocks.mockUpdateMutateAsync.mockRejectedValue({
@@ -477,7 +477,7 @@ describe("the History drawer", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "A case that never had a save shows one Created entry" */
+  /** @scenario "A scenario that never had a save shows one Created entry" */
   it("shows one Created entry for a case saved before history existed", () => {
     mocks.mockListVersions.mockReturnValue({
       data: {

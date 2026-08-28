@@ -375,7 +375,7 @@ describe("scenario versioning", () => {
       expect(versions[0]?.createdAt).toEqual(scenario.createdAt);
     });
 
-    /** @scenario "The first save of a pre-existing case starts real history" */
+    /** @scenario "The first save of a pre-existing scenario starts real history" */
     it("starts real history above the synthesized entry on the first save", async () => {
       const scenario = await createPreVersioningCase();
 
@@ -405,7 +405,7 @@ describe("scenario versioning", () => {
   });
 
   describe("tenancy", () => {
-    /** @scenario "Version history of a case in another project is not readable" */
+    /** @scenario "Version history of a scenario in another project is not readable" */
     it("does not read history across projects", async () => {
       const scenario = await createCase();
 

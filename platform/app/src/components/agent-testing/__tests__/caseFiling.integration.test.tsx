@@ -248,7 +248,7 @@ describe("the Scenarios tab", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "A case created from inside a suite is filed into that suite" */
+  /** @scenario "A scenario created from inside a suite is filed into that suite" */
   it("files a case made inside a suite into that suite", async () => {
     const user = userEvent.setup();
     renderTab();
@@ -287,7 +287,7 @@ describe("the Scenarios tab", () => {
     );
   });
 
-  /** @scenario "Archive asks for confirmation and names the case" */
+  /** @scenario "Archive asks for confirmation and names the scenario" */
   it("names the case in the archive dialog and archives it on confirm", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
@@ -312,7 +312,7 @@ describe("the Scenarios tab", () => {
     });
   });
 
-  /** @scenario "Running one case on its own starts a run plan of that case and target" */
+  /** @scenario "Running one scenario on its own starts a run plan of that scenario and target" */
   it("runs one case as a run plan named after the case and the agent", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
@@ -352,7 +352,7 @@ describe("the Scenarios tab", () => {
 describe("the case editor", () => {
   afterEach(cleanup);
 
-  /** @scenario "The case editor offers the test suites of the project" */
+  /** @scenario "The scenario editor offers the test suites of the project" */
   it("offers every test suite of the project and an option to file none", () => {
     render(
       <ScenarioForm
@@ -418,7 +418,7 @@ describe("the case picker of a run plan", () => {
     ...overrides,
   });
 
-  /** @scenario "A custom run plan can select single scenarios grouped by their folder" */
+  /** @scenario "A run plan can select single scenarios grouped by their test suite" */
   it("lists the cases under their suite names and saves the ones picked", async () => {
     const user = userEvent.setup();
     const props = pickerProps({

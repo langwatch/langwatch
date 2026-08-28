@@ -8,11 +8,11 @@ Feature: The scenarios table
     pills. A Run button and a row menu sit at the end of the row. There is no
     Edit button: clicking the row opens the editor, and Edit stays in the row
     menu, so the editor is reachable two ways. There is no leading file icon:
-    it told scenarios apart from folders back when both shared one table, and
+    it told scenarios apart from test suites back when both shared one table, and
     no such table exists now.
 
     The row carries no author, no date and no version. The row carries no
-    last result: the table is authoring only, and the last run of a case is
+    last result: the table is authoring only, and the last run of a scenario is
     reached from the row menu or on the Results tab.
 
     One test suite is always open, so the rows are always flat. There is no
@@ -40,10 +40,10 @@ Feature: The scenarios table
 
   @integration
   Scenario: The table lists the scenarios of the suite the address names
-    Given two test suites holding cases
+    Given two test suites holding scenarios
     When the address names the second suite
     Then only the scenarios of that suite are listed
-    And no folder row is drawn
+    And no test suite row is drawn
 
   @integration
   Scenario: An address that names no suite opens the first suite of the rail
@@ -87,9 +87,9 @@ Feature: The scenarios table
       of the row it sits beside
 
   @integration
-  Scenario: The cases table shows the scenario column and the row actions, and no last result
+  Scenario: The scenarios table shows the scenario column and the row actions, and no last result
     Given a scenario whose last run passed
-    When the cases table is read
+    When the scenarios table is read
     Then the header carries only a Scenario column
     And no row carries a last result cell
 
@@ -119,7 +119,7 @@ Feature: The scenarios table
   Scenario: Move to suite... on a row starts checkbox selection with that row pre-checked
     Given a scenario row
     When "Move to suite..." is chosen from the row menu
-    Then the cases table shows a checkbox on every row
+    Then the scenarios table shows a checkbox on every row
     And the checkbox on that row is pre-checked
     And a selection action bar names the count and offers one "Move to suite" action
 
@@ -139,7 +139,7 @@ Feature: The scenarios table
     And no "No test suite" option is offered, because a scenario always sits in one
 
   @integration
-  Scenario: Open last run is not offered for a case that never ran
+  Scenario: Open last run is not offered for a scenario that never ran
     Given a scenario with no run
     When its row menu is opened
     Then "Open last run" is not offered
@@ -152,46 +152,46 @@ Feature: The scenarios table
     And the copy carries the content of the original
 
   @integration
-  Scenario: Archive asks for confirmation and names the case
+  Scenario: Archive asks for confirmation and names the scenario
     Given a scenario row
     When "Archive" is chosen
-    Then a confirmation dialog names the case
+    Then a confirmation dialog names the scenario
     And confirming removes the row from the table
 
   # --- Row click ---
 
   @integration
-  Scenario: Clicking a row opens the case editor
+  Scenario: Clicking a row opens the scenario editor
     Given a scenario whose last run finished
     When its row is clicked
-    Then the case editor opens for that case
+    Then the scenario editor opens for that scenario
     And the run detail drawer does not open
 
   @integration
-  Scenario: Clicking a row with no last run opens the case editor
+  Scenario: Clicking a row with no last run opens the scenario editor
     Given a scenario with no run in the period
     When its row is clicked
-    Then the case editor opens for that case
+    Then the scenario editor opens for that scenario
 
-  # --- The case editor ---
+  # --- The scenario editor ---
 
   @integration
-  Scenario: New scenario opens the case dialog straight away
+  Scenario: New scenario opens the scenario dialog straight away
     Given the Agent Testing page is open
     When "New scenario" is chosen
-    Then the case dialog opens titled "New scenario"
+    Then the scenario dialog opens titled "New scenario"
     And it asks for a title, a test suite, a situation and the criteria
-    And no step asks to write the case with a model first
+    And no step asks to write the scenario with a model first
 
   @integration
-  Scenario: The case dialog footer holds the labels, Save and Save and Run
-    Given the case dialog is open
+  Scenario: The scenario dialog footer holds the labels, Save and Save and Run
+    Given the scenario dialog is open
     When its footer is read
-    Then the labels of the case sit on the left
+    Then the labels of the scenario sit on the left
     And "Save" and "Save & Run" sit on the right
 
   @integration
-  Scenario: Editing a case names its version and opens the history
+  Scenario: Editing a scenario names its version and opens the history
     Given a scenario at version 4
     When its editor is opened
     Then the dialog is titled "Edit scenario"
@@ -199,34 +199,34 @@ Feature: The scenarios table
     And choosing it opens the version history
 
   @integration
-  Scenario: Save and Run saves the case and then asks what to run it against
-    Given the case dialog holds a title and one criterion
+  Scenario: Save and Run saves the scenario and then asks what to run it against
+    Given the scenario dialog holds a title and one criterion
     When "Save & Run" is chosen
-    Then the case is saved
-    And the run dialog opens for the case that was saved
+    Then the scenario is saved
+    And the run dialog opens for the scenario that was saved
 
   # --- Customize scenario ---
 
   @integration
   Scenario: The parameters, the turn limits and the models wait behind chips
-    Given the case dialog is open
+    Given the scenario dialog is open
     When the body is read
     Then the parameters, the simulator model, the judge and the turn limits are not shown
     And a "Customize scenario" section offers "Add parameters", "Define min and max turns" and "Override models"
 
   @integration
   Scenario: A chip opens its block and the block can be removed again
-    Given the case dialog is open
+    Given the scenario dialog is open
     When "Define min and max turns" is chosen
     Then the min and the max turn fields are added to the form
     And the chip is no longer offered
     And removing the block takes the fields away and offers the chip again
 
   @integration
-  Scenario: Editing a case opens the blocks it already uses
-    Given a stored case with parameters and a judge model of its own
+  Scenario: Editing a scenario opens the blocks it already uses
+    Given a stored scenario with parameters and a judge model of its own
     When its editor is opened
-    Then the parameters block is open on the values of the case
+    Then the parameters block is open on the values of the scenario
     And the model overrides block is open on that judge
     And the turn limits stay behind their chip
 
@@ -241,9 +241,9 @@ Feature: The scenarios table
 
   @integration
   Scenario: The label filter narrows the table to one label
-    Given cases with the labels "critical", "billing" and "edge"
+    Given scenarios with the labels "critical", "billing" and "edge"
     When "critical" is chosen in the label filter
-    Then only the cases with that label are listed
+    Then only the scenarios with that label are listed
 
   # --- Renaming the open suite ---
 
@@ -362,10 +362,10 @@ Feature: The scenarios table
   # --- External sets ---
 
   @integration
-  Scenario: An external set lists its cases read-only with a last run column
-    Given an external set with runs for three named cases
+  Scenario: An external set lists its scenarios read-only with a last run column
+    Given an external set with runs for three named scenarios
     When the set is chosen in the rail
-    Then the three case names are listed
+    Then the three scenario names are listed
     And each row shows when it last ran
     And no Run button and no row menu are offered
 

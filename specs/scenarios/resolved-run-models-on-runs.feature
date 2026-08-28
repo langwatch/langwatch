@@ -5,8 +5,8 @@ Feature: A run records the models it really ran on
 
   Background: what a run records, and why it records two things.
     A run plan can name the model that plays the person and the model that
-    decides the verdict. When it names neither, the case's own choice answers,
-    and when the case names none either, the project default for that role
+    decides the verdict. When it names neither, the scenario's own choice answers,
+    and when the scenario names none either, the project default for that role
     does.
 
     The plan's choice is what keys a configuration in the run dialog, so it
@@ -18,7 +18,7 @@ Feature: A run records the models it really ran on
     only "the plan named no model" cannot say which model judged it.
 
     Both travel in the reserved "langwatch" namespace of the run metadata, the
-    same way the case version and the person who started the run travel, so
+    same way the scenario version and the person who started the run travel, so
     they need no column of their own.
 
     The chain that picks the models has one definition. The queue path uses it
@@ -32,22 +32,22 @@ Feature: A run records the models it really ran on
   @unit
   Scenario: A run plan that names a model resolves that model
     Given a run plan whose simulator model is "openai/gpt-5-mini"
-    And a case that names its own simulator model
+    And a scenario that names its own simulator model
     When the models of the run are resolved
     Then the simulator model is "openai/gpt-5-mini"
     And the project default is never read for the simulator
 
   @unit
-  Scenario: A case answers when its run plan names no model
+  Scenario: A scenario answers when its run plan names no model
     Given a run plan that names no judge model
-    And a case whose judge model is "anthropic/claude-sonnet-4"
+    And a scenario whose judge model is "anthropic/claude-sonnet-4"
     When the models of the run are resolved
     Then the judge model is "anthropic/claude-sonnet-4"
     And the project default is never read for the judge
 
   @unit
-  Scenario: The project default answers when neither the plan nor the case names a model
-    Given a run plan and a case that name no model at all
+  Scenario: The project default answers when neither the plan nor the scenario names a model
+    Given a run plan and a scenario that name no model at all
     When the models of the run are resolved
     Then the simulator model is the project default for "scenarios.user_simulator"
     And the judge model is the project default for "scenarios.judge"
@@ -81,8 +81,8 @@ Feature: A run records the models it really ran on
     # the run at the queue over a record kept for the reader would be worse.
 
   @unit
-  Scenario: A run of a single case records the models the validation prefetch resolved
-    Given a single case is run against a target
+  Scenario: A run of a single scenario records the models the validation prefetch resolved
+    Given a single scenario is run against a target
     When the run is queued
     Then it records the resolved simulator model and the resolved judge model
 

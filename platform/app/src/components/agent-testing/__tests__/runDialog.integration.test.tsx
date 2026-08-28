@@ -1082,7 +1082,7 @@ describe("<RunDialog/>", () => {
 
   // --- Failure paths ---
 
-  /** @scenario "A parameter value the cases do not declare is refused by name" */
+  /** @scenario "A parameter value the scenarios do not declare is refused by name" */
   it("names the unknown parameter and the declared ones in the refusal", async () => {
     const user = userEvent.setup();
     mockSuitesRunPlan.mockRejectedValue(
@@ -1105,7 +1105,7 @@ describe("<RunDialog/>", () => {
     expect(error).toHaveTextContent("model");
   });
 
-  /** @scenario "A run refused because every case is archived says so in the dialog" */
+  /** @scenario "A run refused because every scenario is archived says so in the dialog" */
   it("says there is nothing left to run when every case is archived", async () => {
     const user = userEvent.setup();
     mockSuitesRunPlan.mockRejectedValue(
@@ -1811,7 +1811,7 @@ describe("what the run covers", () => {
   });
 
   /** @scenario "A run can hold a hand-picked list of scenarios" */
-  /** @scenario "A custom run plan can select single scenarios grouped by their folder" */
+  /** @scenario "A run plan can select single scenarios grouped by their test suite" */
   it("lists the scenarios under their test suite and runs the ticked ones", async () => {
     const user = userEvent.setup();
     renderDialog(planSubject());

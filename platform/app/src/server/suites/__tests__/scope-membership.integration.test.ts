@@ -145,7 +145,7 @@ beforeEach(async () => {
 
 describe("what a run plan covers", () => {
   describe("when the plan covers all scenarios", () => {
-    /** @scenario "A plan scoped to all scenarios runs every active case" */
+    /** @scenario "A plan scoped to all scenarios runs every active scenario" */
     it("runs every active case of the project", async () => {
       const cases = [
         await createCase({ name: "One" }),
@@ -176,7 +176,7 @@ describe("what a run plan covers", () => {
   });
 
   describe("when the plan covers chosen test suites", () => {
-    /** @scenario "A plan scoped to test suites runs the cases filed in them" */
+    /** @scenario "A plan scoped to test suites runs the scenarios filed in them" */
     it("runs the cases filed in them and nothing else", async () => {
       const first = await suiteService.createFolder({
         projectId,
@@ -272,7 +272,7 @@ describe("what a run plan covers", () => {
   });
 
   describe("when the plan covers chosen labels", () => {
-    /** @scenario "A plan scoped to labels runs the cases carrying them" */
+    /** @scenario "A plan scoped to labels runs the scenarios carrying them" */
     it("runs the cases carrying one of them", async () => {
       const wanted = await createCase({
         name: "One",

@@ -109,7 +109,7 @@ beforeEach(async () => {
 });
 
 describe("the version stamp on suite runs", () => {
-  /** @scenario "A test suite run records the version of every case it ran" */
+  /** @scenario "A test suite run records the version of every scenario it ran" */
   it("records each case's own stored version on its queued run", async () => {
     const atThree = await createCaseAtVersion("Refund", 3);
     const atSeven = await createCaseAtVersion("Checkout", 7);
@@ -148,7 +148,7 @@ describe("the version stamp on suite runs", () => {
     });
   });
 
-  /** @scenario "Editing a case after a run leaves the run unchanged" */
+  /** @scenario "Editing a scenario after a run leaves the run unchanged" */
   it("keeps the queued stamp at the version read at queue time after a later edit", async () => {
     const scenario = await createCaseAtVersion("Refund", 5);
     const agent = await createHttpAgent();
