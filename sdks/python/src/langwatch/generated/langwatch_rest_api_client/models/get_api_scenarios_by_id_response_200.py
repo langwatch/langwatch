@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.get_api_scenarios_by_id_response_200_parameters_item import (
         GetApiScenariosByIdResponse200ParametersItem,
@@ -25,8 +27,9 @@ class GetApiScenariosByIdResponse200:
         criteria (list[str]):
         labels (list[str]):
         parameters (list[GetApiScenariosByIdResponse200ParametersItem]):
-        folder_id (None | str): The test suite (folder) this scenario is filed in, or null when unfiled.
         platform_url (str):
+        folder_id (None | str | Unset): The test suite (folder) this scenario is filed in, or null when unfiled. Absent
+            on servers that predate test suites.
     """
 
     id: str
@@ -35,8 +38,8 @@ class GetApiScenariosByIdResponse200:
     criteria: list[str]
     labels: list[str]
     parameters: list[GetApiScenariosByIdResponse200ParametersItem]
-    folder_id: None | str
     platform_url: str
+    folder_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,10 +58,13 @@ class GetApiScenariosByIdResponse200:
             parameters_item = parameters_item_data.to_dict()
             parameters.append(parameters_item)
 
-        folder_id: None | str
-        folder_id = self.folder_id
-
         platform_url = self.platform_url
+
+        folder_id: None | str | Unset
+        if isinstance(self.folder_id, Unset):
+            folder_id = UNSET
+        else:
+            folder_id = self.folder_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -70,10 +76,11 @@ class GetApiScenariosByIdResponse200:
                 "criteria": criteria,
                 "labels": labels,
                 "parameters": parameters,
-                "folderId": folder_id,
                 "platformUrl": platform_url,
             }
         )
+        if folder_id is not UNSET:
+            field_dict["folderId"] = folder_id
 
         return field_dict
 
@@ -101,14 +108,16 @@ class GetApiScenariosByIdResponse200:
 
             parameters.append(parameters_item)
 
-        def _parse_folder_id(data: object) -> None | str:
+        platform_url = d.pop("platformUrl")
+
+        def _parse_folder_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
-            return cast(None | str, data)
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
 
-        folder_id = _parse_folder_id(d.pop("folderId"))
-
-        platform_url = d.pop("platformUrl")
+        folder_id = _parse_folder_id(d.pop("folderId", UNSET))
 
         get_api_scenarios_by_id_response_200 = cls(
             id=id,
@@ -117,8 +126,8 @@ class GetApiScenariosByIdResponse200:
             criteria=criteria,
             labels=labels,
             parameters=parameters,
-            folder_id=folder_id,
             platform_url=platform_url,
+            folder_id=folder_id,
         )
 
         get_api_scenarios_by_id_response_200.additional_properties = d

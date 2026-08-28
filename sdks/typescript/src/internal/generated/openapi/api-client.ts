@@ -22352,6 +22352,8 @@ export interface operations {
                             scenarioVersion?: number;
                             simulatorModel?: string;
                             judgeModel?: string;
+                            resolvedSimulatorModel?: string;
+                            resolvedJudgeModel?: string;
                             actorId?: string;
                             /** @enum {string} */
                             actorLabel?: "user" | "api" | "cli";
@@ -23029,8 +23031,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        folderId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -23133,8 +23135,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        folderId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23219,8 +23221,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        folderId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23335,8 +23337,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        folderId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24542,10 +24544,10 @@ export interface operations {
                             updatedAt: number;
                             durationInMs: number;
                             totalCost?: number;
-                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                            note: string | null;
-                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                            scenarioVersion: number | null;
+                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                            note?: string | null;
+                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                            scenarioVersion?: number | null;
                             /** Format: uri */
                             platformUrl: string;
                         }[];
@@ -24643,10 +24645,10 @@ export interface operations {
                         updatedAt: number;
                         durationInMs: number;
                         totalCost?: number;
-                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                        note: string | null;
-                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                        scenarioVersion: number | null;
+                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                        note?: string | null;
+                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                        scenarioVersion?: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24752,8 +24754,8 @@ export interface operations {
                             allCompletedAt: number | null;
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
-                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                            note: string | null;
+                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                            note?: string | null;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -24845,8 +24847,8 @@ export interface operations {
                         allCompletedAt: number | null;
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;
-                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                        note: string | null;
+                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                        note?: string | null;
                     };
                 };
             };
@@ -24935,14 +24937,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
-                        scope: {
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -25090,14 +25092,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
-                        scope: {
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -25202,14 +25204,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
-                        scope: {
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -25450,14 +25452,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
-                        scope: {
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -25576,14 +25578,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
-                        scope: {
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {

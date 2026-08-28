@@ -29,11 +29,19 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
+  /**
+   * Optional in the document, not in the answer: every server sends it. The
+   * field arrived after clients were generated from this family, and a client
+   * that reads it as required fails against a server that predates it.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
   folderId: z
     .string()
     .nullable()
+    .optional()
     .describe(
-      "The test suite (folder) this scenario is filed in, or null when unfiled.",
+      "The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
     ),
 });
 

@@ -47031,6 +47031,12 @@
                               "judgeModel": {
                                 "type": "string"
                               },
+                              "resolvedSimulatorModel": {
+                                "type": "string"
+                              },
+                              "resolvedJudgeModel": {
+                                "type": "string"
+                              },
                               "actorId": {
                                 "type": "string"
                               },
@@ -49099,7 +49105,7 @@
                           "string",
                           "null"
                         ],
-                        "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                        "description": "The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                       },
                       "platformUrl": {
                         "type": "string",
@@ -49113,7 +49119,6 @@
                       "criteria",
                       "labels",
                       "parameters",
-                      "folderId",
                       "platformUrl"
                     ]
                   }
@@ -49287,7 +49292,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49301,7 +49306,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -49560,7 +49564,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49574,7 +49578,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -49778,7 +49781,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49792,7 +49795,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -52021,14 +52023,14 @@
                               "string",
                               "null"
                             ],
-                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes."
                           },
                           "scenarioVersion": {
                             "type": [
                               "integer",
                               "null"
                             ],
-                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions."
                           },
                           "platformUrl": {
                             "type": "string",
@@ -52047,8 +52049,6 @@
                           "timestamp",
                           "updatedAt",
                           "durationInMs",
-                          "note",
-                          "scenarioVersion",
                           "platformUrl"
                         ]
                       }
@@ -52301,14 +52301,14 @@
                         "string",
                         "null"
                       ],
-                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes."
                     },
                     "scenarioVersion": {
                       "type": [
                         "integer",
                         "null"
                       ],
-                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -52327,8 +52327,6 @@
                     "timestamp",
                     "updatedAt",
                     "durationInMs",
-                    "note",
-                    "scenarioVersion",
                     "platformUrl"
                   ]
                 }
@@ -52525,7 +52523,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes."
                           }
                         },
                         "required": [
@@ -52540,8 +52538,7 @@
                           "lastUpdatedAt",
                           "firstCompletedAt",
                           "allCompletedAt",
-                          "isComplete",
-                          "note"
+                          "isComplete"
                         ]
                       }
                     },
@@ -52740,7 +52737,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes."
                     }
                   },
                   "required": [
@@ -52755,8 +52752,7 @@
                     "lastUpdatedAt",
                     "firstCompletedAt",
                     "allCompletedAt",
-                    "isComplete",
-                    "note"
+                    "isComplete"
                   ]
                 }
               }
@@ -52915,7 +52911,7 @@
                           "custom",
                           "folder"
                         ],
-                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                       },
                       "description": {
                         "type": [
@@ -53049,10 +53045,8 @@
                       "id",
                       "name",
                       "slug",
-                      "kind",
                       "description",
                       "scenarioIds",
-                      "scope",
                       "targets",
                       "repeatCount",
                       "labels",
@@ -53198,7 +53192,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -53332,10 +53326,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -53612,7 +53604,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -53746,10 +53738,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -53914,7 +53904,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -54048,10 +54038,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -54505,7 +54493,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -54639,10 +54627,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",

@@ -64,18 +64,27 @@ const scopeSchema = suiteScopeSchema.describe(
   "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
 );
 
+/**
+ * The suite as this family answers it. `kind` and `scope` are optional in the
+ * document, not in the answer: every server sends both. They arrived after
+ * clients were generated from this family, and a client that reads them as
+ * required fails against a server that predates them.
+ *
+ * @see specs/api-reference/legacy-response-fields-optional.feature
+ */
 const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
   kind: z
     .enum(["custom", "folder"])
+    .optional()
     .describe(
-      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.",
+      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
     ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
-  scope: scopeSchema.nullable(),
+  scope: scopeSchema.nullable().optional(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),

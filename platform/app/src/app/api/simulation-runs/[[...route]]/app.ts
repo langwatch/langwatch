@@ -43,18 +43,28 @@ const scenarioRunResponseSchema = z.object({
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+  /**
+   * `note` and `scenarioVersion` are optional in the document, not in the
+   * answer: every server sends both. They arrived after clients were generated
+   * from this family, and a client that reads them as required fails against
+   * a server that predates them.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
   note: z
     .string()
     .nullable()
+    .optional()
     .describe(
-      "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
+      "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes.",
     ),
   scenarioVersion: z
     .number()
     .int()
     .nullable()
+    .optional()
     .describe(
-      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
+      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.",
     ),
 });
 
@@ -89,8 +99,9 @@ const batchSummarySchema = z.object({
   note: z
     .string()
     .nullable()
+    .optional()
     .describe(
-      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
+      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes.",
     ),
 });
 
