@@ -24,6 +24,10 @@
  */
 
 import { z } from "zod";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
@@ -209,9 +213,7 @@ const run = protectedProcedure
         ...(input.granularitySeconds === undefined
           ? {}
           : { granularitySeconds: input.granularitySeconds }),
-        ...(input.onBudgetOverflow
-          ? { onBudgetOverflow: input.onBudgetOverflow }
-          : {}),
+        ...(input.onBudgetOverflow ? { onBudgetOverflow: input.onBudgetOverflow } : {}),
       },
     });
   });

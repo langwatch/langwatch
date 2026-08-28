@@ -5,7 +5,7 @@ import { InviteExpiredError, InviteNotFoundError } from "~/server/invites/errors
 import { InviteService, resolveInviteDisplayStatus } from "~/server/invites/invite.service";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
-import { EmailAlreadyRegisteredError } from "~/server/users/errors";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { getClientIp } from "~/utils/getClientIp";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 

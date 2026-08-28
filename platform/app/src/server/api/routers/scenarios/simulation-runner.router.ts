@@ -9,6 +9,7 @@ import {
   getOnPlatformSetId,
   type RunParameterValues,
   type RunSecretCiphertext,
+  runNoteSchema,
   runParameterValuesSchema,
   ScenarioNotFoundError,
   type ScenarioService,

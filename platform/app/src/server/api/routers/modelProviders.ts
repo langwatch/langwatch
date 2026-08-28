@@ -16,10 +16,7 @@ import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "../../modelProviders/providerValidation";
-import {
-  ROUTING_HANDLE_MAX_LENGTH,
-  ROUTING_HANDLE_RULE,
-} from "@langwatch/model-provider-contract";
+import { ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE } from "@langwatch/model-provider-contract";
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { CODEX_DEFAULT_MODEL, MODEL_ROLES } from "@langwatch/model-provider-contract";
@@ -66,10 +63,7 @@ function toLegacyProvider(provider: CanonicalProvider) {
   };
 }
 
-function toLegacyProviderMap(
-  providers: Record<string, CanonicalProvider>,
-  _includeKeys: boolean,
-) {
+function toLegacyProviderMap(providers: Record<string, CanonicalProvider>, _includeKeys: boolean) {
   return Object.fromEntries(
     Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)]),
   );
@@ -127,11 +121,7 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      const hasSetupPermission = await probeProjectPermission(
-        ctx,
-        projectId,
-        "project:update",
-      );
+      const hasSetupPermission = await probeProjectPermission(ctx, projectId, "project:update");
 
       const providers = await ctx.app.modelProviders.getForProject({ projectId });
       return toLegacyProviderMap(providers, hasSetupPermission);
@@ -141,11 +131,7 @@ export const modelProviderRouter = createTRPCRouter({
     .permission("project:view")
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const hasSetupPermission = await probeProjectPermission(
-        ctx,
-        projectId,
-        "project:update",
-      );
+      const hasSetupPermission = await probeProjectPermission(ctx, projectId, "project:update");
       return toLegacyProviderMap(
         await ctx.app.modelProviders.getForProject({ projectId }),
         hasSetupPermission,
@@ -163,9 +149,9 @@ export const modelProviderRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return (
-        await ctx.app.modelProviders.listForProject({ projectId: input.projectId })
-      ).map(toLegacyProvider);
+      return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(
+        toLegacyProvider,
+      );
     }),
   /**
    * Org-wide variant: returns every ModelProvider attached anywhere
@@ -253,10 +239,7 @@ export const modelProviderRouter = createTRPCRouter({
         enabled: input.enabled,
         customKeys: input.customKeys as Record<string, unknown> | null | undefined,
         customModels: toCanonicalModels(input.customModels, "chat"),
-        customEmbeddingsModels: toCanonicalModels(
-          input.customEmbeddingsModels,
-          "embedding",
-        ),
+        customEmbeddingsModels: toCanonicalModels(input.customEmbeddingsModels, "embedding"),
         extraHeaders: input.extraHeaders,
         defaultModel: input.defaultModel,
         routingHandle: input.routingHandle,
@@ -269,10 +252,7 @@ export const modelProviderRouter = createTRPCRouter({
         rateLimitTpm: input.rateLimitTpm,
         rateLimitRpd: input.rateLimitRpd,
         fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-        providerConfig: input.providerConfig as
-          | Record<string, unknown>
-          | null
-          | undefined,
+        providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
       });
 
       return toLegacyProvider(result);
@@ -600,9 +580,10 @@ export const modelProviderRouter = createTRPCRouter({
    * config attached at the scope and updates the matching key in
    * place, or creates a new config if none exists.
    *
-   * Scope-aware authz: org needs organization:manage, team needs
-   * team:manage, project needs project:update — same map the
-   * provider update mutation uses.
+   * Scope-aware authz: the tier the caller names picks the permission —
+   * `requiredManagePermission` maps organization to `organization:manage`,
+   * team to `team:manage` and project to `project:manage` — and the service
+   * applies it per scope, so the declaration here names all three.
    */
   setRoleAssignmentForScope: protectedProcedure
     .input(
@@ -613,6 +594,11 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
+    .authorizeInService({
+      reason:
+        "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+      permissions: ["organization:manage", "team:manage", "project:manage"],
+    })
     .mutation(async ({ input, ctx }) => {
       await ctx.app.modelProviders.setDefault({
         scope: { scopeType: input.scopeType, scopeId: input.scopeId },
@@ -633,6 +619,11 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
+    .authorizeInService({
+      reason:
+        "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+      permissions: ["organization:manage", "team:manage", "project:manage"],
+    })
     .mutation(async ({ input, ctx }) => {
       await ctx.app.modelProviders.setDefault({
         scope: { scopeType: input.scopeType, scopeId: input.scopeId },
@@ -677,6 +668,11 @@ export const modelProviderRouter = createTRPCRouter({
           .min(1, "Pick at least one scope."),
       }),
     )
+    .authorizeInService({
+      reason:
+        "the tier is data: each scope the caller picks decides its own permission, and the service's assertCanWriteDefault is what checks them",
+      permissions: ["organization:manage", "team:manage", "project:manage"],
+    })
     .mutation(async ({ input, ctx }) => {
       const saved = await ctx.app.modelProviders.saveDefaultConfig({
         ...input,
@@ -693,6 +689,11 @@ export const modelProviderRouter = createTRPCRouter({
    */
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
+    .authorizeInService({
+      reason:
+        "the scopes are the stored row's, not the caller's input, so only the service can know which permissions to require",
+      permissions: ["organization:manage", "team:manage", "project:manage"],
+    })
     .mutation(async ({ input, ctx }) => {
       await ctx.app.modelProviders.deleteDefaultConfig({
         id: input.id,
@@ -827,12 +828,7 @@ function checkProviderValidationPermission() {
       // Both paths the body can take: project:update when a project is named,
       // and the per-scope manage permissions assertCanManageAllScopes probes
       // when it is not (canManageScope in modelProvider.authz.ts).
-      permissions: [
-        "project:update",
-        "project:manage",
-        "team:manage",
-        "organization:manage",
-      ],
+      permissions: ["project:update", "project:manage", "team:manage", "organization:manage"],
     },
     async (params: {
       ctx: any;
