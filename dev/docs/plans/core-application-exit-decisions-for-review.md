@@ -6512,6 +6512,128 @@ radius.
 
 ---
 
+## 265. `authzLedgerWriteSourceSchema` is the grant vocabulary, not a subset of it
+
+The move commit introduced it as a hand-written four-value enum
+(`grants-service`, `scim`, `invite`, `read-through-mint`). The implementation
+beneath it types its own `source` as `GrantEventSource` — six values — the
+persisted fact validates against `grantEventSourceSchema`, the database column
+documents the same six by name, and the audit adapter decides auditability by
+naming `migration` and `read-through-mint` OUT of that list.
+
+So the input vocabulary refused `join-request`, a source whose whole point is
+that it IS audited, and which the writer below it accepts. The adapter reporting
+a join-request grant had no correct value available: `grants-service` would have
+been a lie and `invite` worse. Aliased to `grantEventSourceSchema`, with both
+names kept so they cannot drift apart again.
+
+**Alternative not taken:** stamping a different provenance at the adapter. That
+is a silent data-quality bug on an audited record, which is exactly the failure
+this vocabulary exists to prevent.
+
+**Reversible:** yes, revert the alias and the error returns unchanged.
+**Review:** confirm no consumer switches exhaustively over
+`AuthzLedgerWriteSource` — a grep found none, but this widens a union.
+
+## 266. `registeredUserMigrations` was restored, because a merge deleted it
+
+Recorded because the instruction it ran against said to report rather than
+decide if the user-migration concept had been folded into `registeredMigrations`.
+It had not been folded. It was deleted by merge `5770224e31`, which resolved
+`system-migrations/` by taking main's call sites against the branch's
+definitions. Four live call sites were still calling the function it removed.
+
+Evidence it is alive, not retired: `origin/main` still has it; both migration
+factories it returns are still exported and referenced by nothing else in
+production; `runtime-enrollment.unit.test.ts` on this branch asserts the user
+leg carries the D01 backfill; `newborn-sweep-pass.unit.test.ts` mocks all four
+symbols, so it expects the imports to exist.
+
+Deleting the four call sites — the other way to clear the error — would have
+silently removed the entire user-rooted migration pass.
+
+**Review:** if the user leg really is meant to retire, that is a deliberate
+change with a spec, not a merge artefact.
+
+## 267. The D04 connection-grandfather migration had no caller at all — RESTORED
+
+The worst of the merge damage, because nothing could have reported it. Main
+registers `connectionGrandfatherMigration()` in `registeredMigrations()`. The
+branch's version returns only the runtime authz migration plus whatever a
+composition passes, and no composition passes the grandfather.
+
+The factory is still exported. Its two tests mock it. So there was no type
+error, no failing test, and no lint finding — just a migration that never ran
+for any tenant. The record it writes carries the routing proof whose verdict is
+the `SSOCONN_ROUTING` flip's exit gate, so the flip would have had nothing to
+read.
+
+Restored, with a comment saying why it is registered here rather than composed.
+
+**Review:** decide whether it should arrive through composition like the authz
+migration does. It is dark until the flag flips, so restoring it is low-risk;
+leaving it out was the risk.
+
+## 268. `getOverview`'s automatic-enrollment guard was restored
+
+Same merge. `MigrationOverview.enrollment` documents that the gauge must be
+null for a migration admitting every organization automatically, "where the
+count would describe rows that decide nothing". The merge dropped the
+`&& !migration.enrolledAutomatically` half of the condition, so the code
+contradicted the doc comment on its own return type — and deleted the test suite
+that pinned it.
+
+**Cost:** the ops page shows one fewer gauge than it does today on this branch.
+That is the documented behaviour, and what main renders.
+
+## 269. The feature-flag targeting module was landed in the contract package
+
+`platform/app/src/server/featureFlag/targeting.ts` was deleted and its four
+symbols (`NOT_TARGETED`, `NotTargeted`, `FeatureFlagTargetId`,
+`toRuleContextId`) were never landed anywhere — while every importer had already
+been repointed to `@langwatch/feature-flag-contract`, which does not export them
+and never has. Seventeen files imported symbols that do not exist, including the
+`useFeatureFlag` hook itself and `pages/settings.tsx`.
+
+Restored verbatim into that package, with a header distinguishing it from the
+server's `FeatureFlagTarget` union that lives beside it.
+
+**Alternative not taken:** converting the seventeen call sites to the server
+union. That is a behaviour change, not a rename: the union spells "no tenant" as
+`kind: "user"` while `NOT_TARGETED` is a per-scope opt-out, and
+`bucketingIdForTarget` now returns `target.userId`, so a percentage-rollout rule
+silently never matches a read carrying no user id. Converting a signed-in
+surface carelessly turns a rollout off.
+
+**Review:** whether the two vocabularies should converge is a real question, now
+answerable in one place since both live in the same package.
+
+## 270. Two dependency majors are split across the workspace — NOT FIXED
+
+Both need a manifest change plus an install plus a full typecheck, so both are
+deliberately left as single, reviewable changes rather than a lane's side effect.
+
+**zod.** `packages/identity` and `packages/identity-server` pin `^3.25.76`;
+`packages/eventing`, `identity-eventing` and every other consumer of
+`@langwatch/identity` are on `^4.4.3`. `identity-eventing` feeds zod-3 payload
+schemas into zod-4's `EventSchema.extend()`, whose shape parameter wants a zod-4
+type — so inference degrades exactly one property, `data`, to `unknown`, and
+`IdentityFact`'s documented invariant ("every framework identity event is
+structurally one of these") stops holding. The zod-3 pin is now the only holdout.
+
+**better-auth.** `packages/enterprise/features/sso/server` pins `^1.6.23` while
+`platform/app` and `packages/identity-server` pin `^1.7.1`, and pnpm resolved
+both. The SSO adapter returns 1.6 types into a 1.7 `betterAuth()`. This one
+touches provider identity, which has already caused a production sign-in outage
+on a 1.7 `providerId` change, so it must not be casted around — and bumping it
+will probably surface further real 1.6→1.7 deltas in the adapter once it
+compiles.
+
+**Review:** do these one at a time, each with its own install and typecheck.
+Neither is a lane's business.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
