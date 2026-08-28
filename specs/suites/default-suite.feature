@@ -4,10 +4,10 @@ Feature: Every scenario belongs to a test suite
   So that no surface has to render or explain a loose scenario
 
   Background: the invariant, and where each half of it lives.
-    A scenario belongs to exactly one suite. `Scenario.folderId` stays a
-    nullable column, because an archived scenario keeps the test suite it had for a
-    later restore and a code-pushed scenario has no row at all. The invariant is
-    enforced by the service on the write path, not by the column.
+    A scenario belongs to exactly one suite. `Scenario.testSuiteId` stays a
+    nullable column, because an archived scenario keeps the test suite it had
+    for a later restore and a code-pushed scenario has no row at all. The
+    invariant is enforced by the service on the write path, not by the column.
 
     Existing projects are brought to the invariant by one migration, which
     creates a `Default` test suite for each project that still holds an

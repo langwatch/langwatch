@@ -95,7 +95,7 @@ export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
-function caseIdsOf(scope: RunScope): string[] | undefined {
+function scenarioIdsOf(scope: RunScope): string[] | undefined {
   return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
@@ -103,7 +103,7 @@ function caseIdsOf(scope: RunScope): string[] | undefined {
 export function scopeKeyOf(scope: RunScope): string {
   return scopeKey({
     scope: toSuiteScope(scope),
-    scenarioIds: caseIdsOf(scope),
+    scenarioIds: scenarioIdsOf(scope),
   });
 }
 
@@ -130,7 +130,7 @@ export function configurationKeyOf({
       simulatorModel: configuration.simulatorModel,
       judgeModel: configuration.judgeModel,
     },
-    scenarioIds: caseIdsOf(configuration.scope),
+    scenarioIds: scenarioIdsOf(configuration.scope),
     parameters: runParameters,
   });
 }

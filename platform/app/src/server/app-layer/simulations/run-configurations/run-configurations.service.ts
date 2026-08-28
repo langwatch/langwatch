@@ -149,7 +149,7 @@ function toSuiteScope(scope: RunConfigurationScope): SuiteScope {
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
-function caseIdsOf(scope: RunConfigurationScope): string[] | undefined {
+function scenarioIdsOf(scope: RunConfigurationScope): string[] | undefined {
   return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
@@ -267,7 +267,7 @@ function toEntry({
         simulatorModel: configuration.simulatorModel,
         judgeModel: configuration.judgeModel,
       },
-      scenarioIds: caseIdsOf(scope),
+      scenarioIds: scenarioIdsOf(scope),
       parameters: runParameters,
     }),
     planId: plan.id,
