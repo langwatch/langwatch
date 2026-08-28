@@ -70,7 +70,13 @@ logHttpRequest(logger, {
 });
 ```
 
-## Environment variables
+## Process configuration
+
+The package does not read environment variables. Each process composition root
+maps its deployment environment into `LoggerConfiguration`, calls
+`configureLogger()` before importing modules that create loggers, then reuses
+that configured factory for the process lifetime. The legacy environment names
+remain process-composition compatibility inputs:
 
 | Variable            | Default                               | Description                                                        |
 | ------------------- | ------------------------------------- | ------------------------------------------------------------------ |

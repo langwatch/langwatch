@@ -18,9 +18,12 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getCurrentContext, runWithContext } from "../context/core";
-import { createLogger, registerLogContextProvider, resetLoggerCache } from "../logger";
-
-const ORIGINAL_ENV = { ...process.env };
+import {
+  configureLogger,
+  createLogger,
+  registerLogContextProvider,
+  resetLoggerCache,
+} from "../logger";
 
 /** Everything the loggers wrote while `run` executed, parsed. */
 function emitted(run: () => void): Record<string, unknown>[] {
@@ -47,7 +50,7 @@ function emitted(run: () => void): Record<string, unknown>[] {
 
 describe("given createLogger memoises by name", () => {
   beforeEach(() => {
-    process.env.PINO_LOG_LEVEL = "info";
+    configureLogger({ environment: "test", level: "info" });
     resetLoggerCache();
     registerLogContextProvider(() => {
       const context = getCurrentContext();
@@ -56,7 +59,6 @@ describe("given createLogger memoises by name", () => {
   });
 
   afterEach(() => {
-    process.env = { ...ORIGINAL_ENV };
     resetLoggerCache();
   });
 
@@ -64,6 +66,16 @@ describe("given createLogger memoises by name", () => {
     /** @scenario Asking for the same logger twice returns the same logger */
     it("hands back the same instance", () => {
       expect(createLogger("langwatch:test:reuse")).toBe(createLogger("langwatch:test:reuse"));
+    });
+  });
+
+  describe("when composition configures the same process twice", () => {
+    it("keeps the existing factory and cached logger", () => {
+      const logger = createLogger("langwatch:test:configured-once");
+
+      configureLogger({ environment: "test", level: "info" });
+
+      expect(createLogger("langwatch:test:configured-once")).toBe(logger);
     });
   });
 

@@ -8,6 +8,10 @@ void (async () => {
   const { initializeEnvironmentConfig } = await import("./env.mjs");
   initializeEnvironmentConfig(process.env);
 
+  const { resolveLegacyLoggerConfiguration } = await import("./runtime/logger.config");
+  const { configureLogger } = await import("@langwatch/observability");
+  configureLogger(resolveLegacyLoggerConfiguration(process.env));
+
   const { AppBoot } = await import("./runtime/app/boot");
   const { setEnvironment } = await import("@langwatch/ksuid");
   const { createLogger } = await import("@langwatch/observability");

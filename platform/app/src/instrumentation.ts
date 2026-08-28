@@ -1,5 +1,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { resolveLegacyLoggerConfiguration } = await import("./runtime/logger.config");
+    const { configureLogger } = await import("@langwatch/observability");
+    configureLogger(resolveLegacyLoggerConfiguration(process.env));
+
     const { setEnvironment } = await import("@langwatch/ksuid");
     setEnvironment(process.env.ENVIRONMENT ?? "local");
 

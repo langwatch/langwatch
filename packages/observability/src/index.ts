@@ -19,10 +19,16 @@ export type {
   RequestContext,
 } from "./context/core";
 export {
+  configureLogger,
+  createLoggerFactory,
   type CreateLoggerOptions,
   consoleIgnoreFields,
   createLogger,
+  type LoggerConfiguration,
+  type LoggerFactory,
+  type LoggerFormat,
   type Logger,
+  type ResolvedLoggerConfiguration,
 } from "./logger";
 export {
   getLogLevelFromStatusCode,

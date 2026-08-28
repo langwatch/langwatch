@@ -27,24 +27,11 @@
  * against a secondary demo org already in the allowlist.
  */
 
-import { createLogger } from "@langwatch/observability";
-import * as fs from "fs";
-import * as path from "path";
-import { prisma as defaultPrisma } from "~/server/db";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { seedBirdEye } from "./_actions/seedBirdEye";
-import { seedHeavyUsage } from "./_actions/seedHeavyUsage";
-import { verifyOrgIdentity } from "./_actions/verifyOrgIdentity";
-import { DemoOrgScope } from "./_lib/scopeGuard";
-import {
-  formatReport,
-  reportHasFailures,
-  runSeedActions,
-  type SeedAction,
-  type SeedRunReport,
-} from "./_lib/seedRunner";
-
-const logger = createLogger("langwatch:scripts:dogfood:governance:seed-demo");
+import type { DemoOrgScope } from "./_lib/scopeGuard";
+import type { SeedRunReport } from "./_lib/seedRunner";
 
 interface ParsedArgs {
   execute: boolean;
@@ -78,7 +65,26 @@ export function parseArgs(args: readonly string[]): ParsedArgs {
   return { execute, orgId, reportPath };
 }
 
-const ACTIONS: readonly SeedAction[] = [verifyOrgIdentity, seedBirdEye, seedHeavyUsage];
+if (isDirectExecution()) {
+  void runDirectSeedDemo(process.argv.slice(2)).catch((error: unknown) => {
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    process.stderr.write(`[seed-demo] fatal failure: ${message}\n`);
+    process.exitCode = 1;
+  });
+}
+
+async function runDirectSeedDemo(args: string[]): Promise<void> {
+  const { resolveLegacyLoggerConfiguration } = await import("../../../src/runtime/logger.config");
+  const { configureLogger } = await import("@langwatch/observability");
+  configureLogger(resolveLegacyLoggerConfiguration(process.env));
+
+  await execute(...args);
+}
+
+function isDirectExecution(): boolean {
+  const entry = process.argv[1];
+  return entry !== undefined && resolve(entry) === fileURLToPath(import.meta.url);
+}
 
 export interface RunSeedDemoOptions {
   execute: boolean;
@@ -87,59 +93,12 @@ export interface RunSeedDemoOptions {
   scope?: DemoOrgScope;
 }
 
-/**
- * Pure runner used by both the CLI default export and the cron API
- * route. Returns the SeedRunReport without console output, file writes,
- * or process.exitCode side effects, so the caller controls how to
- * present the result.
- */
 export async function runSeedDemo(options: RunSeedDemoOptions): Promise<SeedRunReport> {
-  const scope = options.scope ?? DemoOrgScope.fromEnv();
-  const targetOrgId = options.organizationId ?? scope.getAllowlist()[0];
-  if (targetOrgId === undefined) {
-    throw new Error(
-      "No target org id available. DemoOrgScope yielded no allowlisted entries.",
-    );
-  }
-  scope.assertOrgIdAllowed(targetOrgId);
-
-  logger.info(
-    {
-      mode: options.execute ? "execute" : "dry-run",
-      targetOrgId,
-      allowlist: scope.getAllowlist(),
-    },
-    "starting demo seed run",
-  );
-
-  return runSeedActions({
-    prisma: options.prisma ?? defaultPrisma,
-    scope,
-    organizationId: targetOrgId,
-    actions: ACTIONS,
-    execute: options.execute,
-  });
+  const runner = await import("./seed-demo.runner");
+  return await runner.runSeedDemo(options);
 }
 
 export default async function execute(...args: string[]): Promise<void> {
-  const { execute: executeMode, orgId, reportPath } = parseArgs(args);
-
-  const report = await runSeedDemo({
-    execute: executeMode,
-    organizationId: orgId,
-  });
-
-  const formatted = formatReport(report);
-  console.log("\n" + formatted + "\n");
-
-  if (reportPath !== undefined) {
-    fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-    fs.writeFileSync(reportPath, formatted + "\n");
-    logger.info({ reportPath }, "report written");
-  }
-
-  if (reportHasFailures(report)) {
-    logger.error("demo seed run had failures");
-    process.exitCode = 1;
-  }
+  const runner = await import("./seed-demo.runner");
+  await runner.executeSeedDemo(args);
 }
