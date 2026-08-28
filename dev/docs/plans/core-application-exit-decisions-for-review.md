@@ -432,6 +432,36 @@ by direction, not by dependencies, and no install will unpin it.
 
 ---
 
+## 18. `apps/**` still gates no CI, and the extraction is making that worse — `NOT DONE, YOUR CALL`
+
+**Not decided — raised.** `apps/**` is absent from the `relevant` change filter
+in `.github/workflows/langwatch-app-ci.yml`, so a change confined to `apps/api`,
+`apps/ui`, `apps/server` or `apps/worker` starts no CI at all. Their suites run
+whenever something else relevant changed, which on a feature branch is most
+pushes — but that is a side effect, not a gate.
+
+The workflow states this as a known gap and says adding `apps/**` switches on
+nine jobs for an apps-only change, which is a cost decision to take on its own
+terms. That was right when `apps/*` held almost nothing.
+
+**Why it now reads differently.** This extraction's entire purpose is to move
+code into `apps/*`. Every slice makes the untested fraction larger, and the
+end state — `platform/app` deleted — makes it total. The commits landed on this
+branch today moved the tRPC policy spine, the operator back office's 92
+procedures, nine worker features and the UI route guard, and none of them gates
+on a job that runs because they changed.
+
+`apps/ui`'s seventeen test files are also outside the root `pnpm test` filter,
+which names `./packages/*`, `./packages/features/*/*` and
+`./packages/enterprise/*` — so they are unreachable from two directions.
+
+**I did not change it**, because the file says plainly that this is a cost
+decision and nine jobs per apps-only change is real money on a constrained
+runner pool. It needs your call, not mine. The cheap version is to gate only
+`package-suites` on `apps/**` rather than all nine.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
