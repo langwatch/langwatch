@@ -129,6 +129,11 @@ spec:
               value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
 
             {{- with .Values.langwatch_nlp.extraEnvs}}
+            {{- range . }}
+            {{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+            {{- fail (printf "langwatch_nlp.extraEnvs must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" .name) }}
+            {{- end }}
+            {{- end }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 

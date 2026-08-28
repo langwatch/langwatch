@@ -304,7 +304,6 @@ describe("getProjectLambdaArn", () => {
     const currentImageUri =
       "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest";
 
-    /** Filter send calls to extract UpdateFunctionConfiguration commands in send order. */
     const configUpdateCalls = (send: any) =>
       send.mock.calls.filter(
         (call: any[]) => call[0] instanceof UpdateFunctionConfigurationCommand,
