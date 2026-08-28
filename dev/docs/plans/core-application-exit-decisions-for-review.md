@@ -1134,6 +1134,30 @@ A reviewer must run, before this is deployed:
 
 ---
 
+## 19. `apps/` is now a feature-parity test root — `LANDED`
+
+**Decided.** `"apps"` joins `DEFAULT_TEST_ROOTS` in
+`platform/app/scripts/check-feature-parity.ts`.
+
+**Why this is not housekeeping.** Six test files under `apps/` already carried
+`@scenario` annotations before this change, and the parity checker could not see
+any of them. A scenario is only enforced when a tagged spec is bound by an
+annotated test; a binding the checker cannot see is a spec that reads as
+unimplemented while a real test covers it. The failure is silent in the
+direction that matters — it under-reports enforcement, so nobody investigates.
+
+**It compounds with [entry 18].** `apps/**` gates no CI *and* was outside the
+parity roots. Code leaving `platform/app` with its tests was losing both its CI
+gate and its spec binding at the same moment, which is the exact opposite of
+what moving code into a canonical owner is supposed to achieve.
+
+**Review this if** you would rather the parity checker stay scoped to
+`platform/app` and `packages`, in which case tests must not move to `apps/`
+with their code — but then the extraction's whole shape needs rethinking, not
+just this line.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
