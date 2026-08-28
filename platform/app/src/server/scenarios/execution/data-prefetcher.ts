@@ -38,7 +38,7 @@ import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
-import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -527,10 +527,10 @@ export async function prefetchScenarioData({
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
   // above.
-  // One key for the whole run, not one per turn: every turn of this run shares
-  // the cache entries it writes, and a key per turn would leave a row of live
-  // credentials behind each run. A run that cannot get one still runs, and
-  // every turn does its own work.
+  // One key for the whole run, and the same key the project's other runs
+  // hold: every turn of this run shares the cache entries it writes, and a key
+  // per turn or per run would leave a ledger of live credentials behind. A
+  // run that cannot get one still runs, and every turn does its own work.
   if (adapterData.type === "code" && project.organizationId) {
     adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
       projectId: context.projectId,
@@ -1352,7 +1352,7 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         }),
     },
     sandboxKeyMinter: {
-      mint: (params) => tryMintAgentSandboxApiKey({ prisma, ...params }),
+      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {

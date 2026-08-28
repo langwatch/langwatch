@@ -40,7 +40,7 @@ import type {
 } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import type {
@@ -1430,9 +1430,10 @@ function runExecutesCode({
 /**
  * The credential every code node of this run authenticates with, or undefined.
  *
- * One key for the whole run: every row shares the cache entries the run
- * writes, and a key per row would leave a row of live credentials behind each
- * run. A run that cannot get one still runs, and every row does its own work.
+ * One key for the whole run, and the same key the project's other runs hold:
+ * every row shares the cache entries the run writes, and a key per row or per
+ * run would leave a ledger of live credentials behind. A run that cannot get
+ * one still runs, and every row does its own work.
  */
 async function mintRunSandboxApiKey({
   projectId,
@@ -1452,7 +1453,7 @@ async function mintRunSandboxApiKey({
   const organizationId = project?.team?.organizationId;
   if (!organizationId) return undefined;
 
-  return tryMintAgentSandboxApiKey({ prisma, projectId, organizationId });
+  return tryGetAgentSandboxApiKey({ prisma, projectId, organizationId });
 }
 
 /**

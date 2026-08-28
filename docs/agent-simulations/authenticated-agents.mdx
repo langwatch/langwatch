@@ -135,7 +135,7 @@ That answer exists only behind the auth wall, so the scenario passing is the pro
 
 Rows are isolated and run in parallel, so by default each row logs in on its own. You can use the **agent cache** to store the login credential after the first row and read it back on every row that follows, so the run authenticates once instead of once per row.
 
-The cache is encrypted at rest and entries expire on their own. The platform gives each run a scoped credential inside the sandbox, so no `langwatch.setup()` call or LangWatch secret is required.
+The cache is encrypted at rest and entries expire on their own. The platform puts a short-lived credential scoped to the cache inside the sandbox, shared by the runs of the project, so no `langwatch.setup()` call or LangWatch secret is required.
 
 This code is executed on every commit against the real runtime:
 
