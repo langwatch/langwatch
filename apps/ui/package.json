@@ -18,6 +18,10 @@
       "types": "./src/behavior/public-config.ts",
       "default": "./src/behavior/public-config.ts"
     },
+    "./public-config/projection": {
+      "types": "./src/behavior/public-config.projection.ts",
+      "default": "./src/behavior/public-config.projection.ts"
+    },
     "./design-system": {
       "types": "./src/behavior/design-system.ts",
       "default": "./src/behavior/design-system.ts"

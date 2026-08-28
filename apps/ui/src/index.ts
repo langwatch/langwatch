@@ -27,13 +27,19 @@ export {
   PUBLIC_APP_CONFIG_META_NAME,
   publicAppConfigSchema,
   readPublicAppConfig,
+  type PublicAppConfig,
+  type PublicEnvironment,
+  toPublicEnvironment,
+} from "./behavior/public-config";
+// The deployment projection, kept off the browser reader's graph on purpose —
+// it declares the names of the deployment's secret variables at module scope.
+// Server code should prefer `@langwatch/ui/public-config/projection`, which
+// reaches it without pulling the root barrel.
+export {
+  LOCAL_GATEWAY_URL,
   resolveGatewayBaseUrl,
   resolveUiPublicBootstrap,
   SAAS_GATEWAY_URL,
-  LOCAL_GATEWAY_URL,
-  type PublicAppConfig,
-  type PublicEnvironment,
   type GatewayBaseUrlSource,
   type UiPublicBootstrap,
-  toPublicEnvironment,
-} from "./behavior/public-config";
+} from "./behavior/public-config.projection";

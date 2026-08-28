@@ -1,3 +1,19 @@
+/**
+ * The browser's half of the public application config: the schema, the meta-tag
+ * carrier, and the reader that parses it back out of the shell.
+ *
+ * Deliberately imports nothing from `./public-config.projection`. That module
+ * declares the deployment's full runtime configuration at module scope,
+ * including the NAMES of secret variables — `SENDGRID_API_KEY`,
+ * `RESEND_API_KEY`, `SMTP_URL`. Re-exporting it from here put all of that on
+ * the browser's import graph, because `usePublicEnv` imports this subpath and
+ * neither this package nor `@langwatch/config` sets `sideEffects: false`, so a
+ * module-scope `RuntimeConfig.define` does not tree-shake away.
+ *
+ * The values never reached the browser — there is no `process.env` there — but
+ * the variable names and the whole config runtime did. Server code wanting the
+ * projection imports `@langwatch/ui/public-config/projection` instead.
+ */
 import {
   PUBLIC_APP_CONFIG_META_NAME,
   publicAppConfigSchema,
@@ -8,14 +24,6 @@ export { PUBLIC_APP_CONFIG_META_NAME } from "../model/public-config";
 export { publicAppConfigSchema, type PublicAppConfig } from "../model/public-config";
 export { type PublicEnvironment } from "../model/public-environment";
 export { toPublicEnvironment } from "./public-environment";
-export {
-  LOCAL_GATEWAY_URL,
-  resolveGatewayBaseUrl,
-  resolveUiPublicBootstrap,
-  SAAS_GATEWAY_URL,
-  type GatewayBaseUrlSource,
-  type UiPublicBootstrap,
-} from "./public-config.projection";
 
 const BASE64URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
