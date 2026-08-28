@@ -79,6 +79,11 @@ export function toIngestionSourceDto({
     pullSchedule: string | null;
     status: string;
     traceProjectId: string | null;
+    // Required, not optional, for the reason above: health is derived from
+    // these two, and a `select` that stopped fetching them would silently
+    // report every source as healthy.
+    errorCount: number;
+    lastSuccessAt: Date | null;
     lastEventAt: Date | null;
     archivedAt: Date | null;
     createdAt: Date;
@@ -135,6 +140,16 @@ export function toIngestionSourceDto({
      */
     pullSchedule: row.pullSchedule,
     status: row.status,
+    /**
+     * The two facts the health badge is derived from (ADR-128).
+     *
+     * Health is not a fourth `status` value, so the client needs the inputs
+     * rather than a verdict: how many runs in a row have failed, and when one
+     * last worked. Neither is a secret — a failure count and a timestamp say
+     * that we could not reach a provider, not what we reached it with.
+     */
+    errorCount: row.errorCount,
+    lastSuccessAt: row.lastSuccessAt,
     traceProjectId: row.traceProjectId,
     traceProjectArchived: row.traceProjectId
       ? !liveTraceProjectIds.has(row.traceProjectId)

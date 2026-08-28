@@ -451,7 +451,6 @@ const LEGACY_INERT: string[] = [
   // its file as it lands. Remove each entry with its first binding.
   "specs/governance/governance-cost-rollup.feature",
   "specs/governance/governance-cost-screen.feature",
-  "specs/governance/ingestion-source-health.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
