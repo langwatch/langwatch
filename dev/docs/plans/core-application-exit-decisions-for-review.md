@@ -924,6 +924,216 @@ transport — the transport is the easy half once those move.
 
 ---
 
+## The worker's liveness and metrics server moved to `apps/worker`
+
+`platform/app/src/server/workers/startWorkers.ts` was 584 lines, of which ~330
+were the metrics/liveness HTTP server: `LIVENESS_THREAD_SOURCE`, the
+`worker_threads` server that binds the metrics port and answers `/healthz`, the
+bearer gate plumbing, the fallback in-loop server and the thread proxy. That
+block is process concern, not application logic, so it moved to
+`apps/worker/src/platform/liveness/worker-metrics.server.ts`. `startWorkers.ts`
+is now 301 lines and its metrics stage is a 21-line adapter.
+
+```
+BEFORE                                   AFTER
+platform/app/.../startWorkers.ts         apps/worker/.../worker-metrics.server.ts
+  WORKER_LIVENESS_PATH ......(dup)         (imports WORKER_LIVENESS_PATH)
+  LIVENESS_THREAD_SOURCE                   LIVENESS_THREAD_SOURCE
+  createWorkerMetricsHandler               createWorkerMetricsHandler
+  bootMetricsServer                        startWorkerMetricsServer
+    -> getWorkerMetricsPort()                <- port           (port)
+    -> isMetricsAuthorized()                 <- isAuthorized   (port)
+    -> prom-client register                  <- readMetrics    (port)
+
+apps/worker/.../worker.liveness.ts       apps/worker/.../worker.liveness.ts
+  WORKER_LIVENESS_PATH ......(dup)         WORKER_LIVENESS_PATH   (the one copy)
+  isWorkerHeartbeatLive .....(dead)        WORKER_HEARTBEAT_STALL_BUDGET_MS
+  createWorkerLivenessPolicy (dead)
+```
+
+**The cost.** The Kubernetes liveness path for the production worker fleet now
+crosses a package boundary. A resolution failure of
+`@langwatch/worker/liveness/server` is a boot failure of the standalone worker,
+where before it was a local import that could not fail on its own.
+
+**Reversibility.** High — the module is self-contained and has no importer other
+than `startWorkers.ts`.
+
+**What to look at when reviewing.** That the probe contract is byte-identical:
+path `/healthz`, port `getWorkerMetricsPort()` (2999 by default, what the chart
+probes), 200 `text/plain` `ok` when the heartbeat is fresh, 503 `text/plain`
+`main loop stalled Ns` past the budget, and `/metrics` still 401 / 500 / 200 with
+the registry's own content type.
+
+---
+
+## `prom-client` is a port, not an import, and the moved handler test lost its real registry
+
+`register` is a process-global singleton. If `apps/worker` and `platform/app`
+ever resolved two copies of `prom-client`, the endpoint would serve an EMPTY
+registry rather than fail — a total, silent loss of worker metrics. So the
+server takes `readMetrics(): Promise<{ body, contentType }>` and the host reads
+its own registry.
+
+The consequence is in the test. `workerMetricsHandler.unit.test.ts` registered a
+real `Counter` and asserted the rendered body contained it, against
+`register.contentType`. The moved test
+(`apps/worker/tests/worker-metrics.server.unit.test.ts`) asserts that whatever
+`readMetrics` returns is passed through untouched, body and content type both.
+That is the right assertion for the handler, and it is strictly less than the
+old one: nothing now proves `register.metrics()` is what actually gets called,
+because that wiring lives in `startWorkers.ts`'s adapter and has no test.
+
+**The alternative not taken.** Add `prom-client` to `apps/worker` and keep the
+test as it was. Rejected: the duplicate-singleton failure is invisible in
+production and the test would not catch it either, since a test process resolves
+one copy.
+
+**The cost.** A four-line adapter in `startWorkers.ts` is untested. If someone
+changes it to return an empty body, or drops `contentType`, every unit test
+stays green and Prometheus stops parsing the worker registry. The chart e2e
+(`Worker /metrics serves samples to an authenticated scrape`) is the only guard
+left on it, and it runs only in the chart e2e workflow.
+
+**What to look at when reviewing.** Whether that adapter deserves a test in
+`platform/app/src/server/__tests__/metrics.unit.test.ts` (an existing file — this
+programme forbids creating new files under `platform/app`, which is why I did not
+add one).
+
+---
+
+## The auth port is narrowed to the header the gate reads
+
+`isMetricsAuthorized` takes a full `IncomingMessage` but reads exactly
+`req.headers.authorization`. The old code already knew this: it passed
+`Pick<IncomingMessage, "headers">` internally and cast back with `as
+IncomingMessage`. The port declares the narrow shape
+(`{ headers: { authorization?: string } }`), so the cast moved to the call site
+in `startWorkers.ts`, where the real `IncomingMessage` is.
+
+**The cost.** The cast still exists; it is one line in `platform/app` rather than
+one line in the package. It stops being safe the moment `isMetricsAuthorized`
+reads a second property of the request — it would then read `undefined` on the
+thread-proxy path, which is exactly the fail-open shape a bearer gate must not
+have.
+
+**What to look at when reviewing.** Whether the gate should be re-typed to take
+`{ authorization?: string }` outright, deleting the cast. That is a change to
+`~/server/metrics`, which also serves the web process's `/metrics`, so it was
+out of this slice's scope.
+
+---
+
+## `isWorkerHeartbeatLive` was deleted, not wired up
+
+`apps/worker/src/platform/liveness/worker.liveness.ts` exported a zod-validated
+policy and a predicate that no production code called. The liveness thread does
+its own `stalledMs > stallBudgetMs` comparison inline, because it is a string
+evaluated by `new Worker(src, { eval: true })` and can import nothing.
+
+The convergence asked for is "one liveness predicate, used by the thing that
+actually serves the probe". The thread's inline comparison IS that thing, so I
+deleted the parallel TypeScript one (`isWorkerHeartbeatLive`,
+`createWorkerLivenessPolicy`, `WorkerLivenessPolicy`) along with
+`apps/worker/tests/worker.liveness.unit.test.ts`, whose four tests covered three
+deleted symbols and one constant. `worker.liveness.ts` now holds the liveness
+POLICY — the path and the stall budget — and the mechanism lives next door.
+
+**The alternative not taken.** Generate the thread source from the predicate's
+`Function.prototype.toString()`, so there is literally one definition. Rejected:
+it makes the production liveness path depend on how a bundler treats a function
+body, and the blast radius of getting that wrong is the whole worker fleet
+crash-looping.
+
+**The second alternative not taken.** Keep `createWorkerLivenessPolicy` alive by
+letting `startWorkerMetricsServer` accept a configurable `stallBudgetMs`.
+Rejected: nobody asked for a configurable budget, and adding a knob to keep a
+validator employed is backwards.
+
+**The cost.** The budget is applied by a comparison inside a template literal, so
+no type checker reads it. The moved thread test
+(`worker-metrics.liveness-thread.unit.test.ts`) executes it on both sides of the
+boundary, which is the only guard.
+
+**Reversibility.** High — the deleted code is three exports in git history.
+
+**What to look at when reviewing.** That deleting a package export subpath's
+symbols is acceptable: `@langwatch/worker/liveness` had no importers other than
+the package's own index, so nothing outside broke.
+
+---
+
+## `check-feature-parity.ts` gained `apps` as a test root
+
+This is an edit to a shared `platform/app` file, made because the move needed it.
+
+`DEFAULT_TEST_ROOTS` lists `platform/app/src`, `packages`, `sdks`, `mcp` and
+others — not `apps`. `specs/server/worker-liveness-probe.feature` has ten
+`@unit` scenarios bound by the two tests I moved. Moving them to
+`apps/worker/tests/` would have taken all ten out of the scanner's sight, and
+the spec would have reported them unbound while the tests carried on passing —
+the feature-parity failure mode where a spec reads as "never enforced" because
+the code left the room.
+
+Four files under `apps/` already carry `@scenario` annotations (`apps/api/tests`,
+`apps/ui/tests`, `apps/server/test`), so this was already true for other slices
+of this programme; my move is only the first that would have made it visible.
+
+**The cost.** One more root to walk (node_modules is excluded), and an edit to a
+file another agent in this wave may also be editing. The checker has no
+orphan-binding check, so extra bindings cannot fail anything.
+
+**What to look at when reviewing.** Whether the parity report's totals move in a
+way you did not expect — scenarios already bound from `apps/` will now count as
+bound where they previously counted as unbound.
+
+---
+
+## Two lint carry-overs handled at the source
+
+`.oxlintrc.architecture.json` suppressed `no-return-assign` for
+`platform/app/src/server/workers/__tests__/livenessThread.unit.test.ts`, for one
+line: `res.on("data", (c) => (body += c.toString()))`. The config's own comment
+says "Fix a file, delete its line", so the moved test uses a block body and the
+now-dangling path is deleted from the override.
+
+**The cost.** An edit to `.oxlintrc.architecture.json`, which is already modified
+in this working tree by another slice. It is a single-line deletion, so a
+conflict would be visible rather than silent.
+
+---
+
+## What I did NOT verify
+
+Nothing was run: no `tsc`, no `vitest`, no lint, no chart render. The machine had
+no capacity and the instruction was explicit. Everything above is reasoned from
+the code.
+
+A reviewer must run, before this is deployed:
+
+1. `pnpm --filter @langwatch/worker typecheck` and `pnpm --filter
+   @langwatch/worker test:unit` — the new module and its two moved tests.
+   `apps/worker/tsconfig.json` sets `"types": []` and the package declares no
+   `@types/node`; the new file needs `node:http` and `node:worker_threads` the
+   same way `worker-stored-object-storage.adapter.ts` already needs `node:fs`,
+   so it either already works or was already broken, but I could not confirm
+   which.
+2. `pnpm typecheck` for `platform/app` — `startWorkers.ts` now imports a package
+   subpath (`@langwatch/worker/liveness/server`) that pnpm must resolve.
+3. `pnpm test:unit run src/server/__tests__/frontend-boundary.unit.test.ts` —
+   that guard walks the real import graph out of `src/server/**` and now has a
+   new package subpath edge to resolve.
+4. `bash charts/langwatch/tests/e2e.sh` (or its CI workflow) — the only end-to-end
+   proof that the kubelet still gets 200 on `/healthz` and a scraper still gets
+   samples on `/metrics`. This is the one that matters: a mistake here is a
+   crash-looping worker fleet on the next deploy, not a red test.
+5. `WORKERS_IN_PROCESS=1 pnpm dev` — the in-process path calls `startWorkers({
+   shouldStartMetricsServer: false })`, so it never reaches the moved code, but
+   the new top-level import is evaluated before `setEnvironment()` and must stay
+   side-effect-free (it imports two node built-ins, a type, and two constants).
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the

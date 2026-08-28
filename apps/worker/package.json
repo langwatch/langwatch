@@ -21,6 +21,10 @@
     "./liveness": {
       "types": "./src/platform/liveness/worker.liveness.ts",
       "default": "./src/platform/liveness/worker.liveness.ts"
+    },
+    "./liveness/server": {
+      "types": "./src/platform/liveness/worker-metrics.server.ts",
+      "default": "./src/platform/liveness/worker-metrics.server.ts"
     }
   },
   "scripts": {

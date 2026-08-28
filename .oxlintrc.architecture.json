@@ -623,8 +623,7 @@
       "files": [
         "platform/app/e2e/code-agent/auth0-code-agent.scenario.test.ts",
         "platform/app/src/components/home/HomePageBanners.tsx",
-        "platform/app/src/server/traces/trace.service.ts",
-        "platform/app/src/server/workers/__tests__/livenessThread.unit.test.ts"
+        "platform/app/src/server/traces/trace.service.ts"
       ],
       "rules": { "no-return-assign": "off" }
     },

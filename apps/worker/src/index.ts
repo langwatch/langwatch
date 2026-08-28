@@ -105,11 +105,21 @@ export {
   type WorkerSignalSource,
 } from "./platform/lifecycle/worker.signals";
 export {
+  WORKER_HEARTBEAT_STALL_BUDGET_MS,
   WORKER_LIVENESS_PATH,
-  createWorkerLivenessPolicy,
-  isWorkerHeartbeatLive,
-  type WorkerLivenessPolicy,
 } from "./platform/liveness/worker.liveness";
+export {
+  createWorkerMetricsHandler,
+  LIVENESS_THREAD_SOURCE,
+  startWorkerMetricsServer,
+  WORKER_HEARTBEAT_INTERVAL_MS,
+  type StartWorkerMetricsServerOptions,
+  type WorkerMetricsLogger,
+  type WorkerMetricsPorts,
+  type WorkerMetricsRequest,
+  type WorkerMetricsServerHandle,
+  type WorkerMetricsSnapshot,
+} from "./platform/liveness/worker-metrics.server";
 export {
   bootWorker,
   WorkerProcess,

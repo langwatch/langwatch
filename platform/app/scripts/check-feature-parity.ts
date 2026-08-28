@@ -83,6 +83,13 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // behavior. Without this root those specs could only be @unimplemented.
   "platform/app/e2e",
   "packages",
+  // The process compositions (apps/api, apps/ui, apps/worker, apps/server).
+  // Code moving out of platform/app takes its tests with it — the worker's
+  // liveness/metrics server is the first — and without this root every
+  // scenario those tests bind would silently become unbound the moment the
+  // code left, which reads as "the spec was never enforced" rather than as a
+  // move.
+  "apps",
   // Langy's pi-harness wrapper: the process that turns the manager's config
   // into pi's model registry and speaks the stdio protocol. Scenarios about
   // what the wrapper generates can only bind from its own vitest suite.

@@ -10,11 +10,19 @@
 import http from "node:http";
 import { Worker } from "node:worker_threads";
 import { afterEach, describe, expect, it } from "vitest";
+import { LIVENESS_THREAD_SOURCE } from "../src/platform/liveness/worker-metrics.server";
 import {
-  LIVENESS_THREAD_SOURCE,
   WORKER_HEARTBEAT_STALL_BUDGET_MS as STALL_BUDGET_MS,
   WORKER_LIVENESS_PATH,
-} from "../startWorkers";
+} from "../src/platform/liveness/worker.liveness";
+
+/**
+ * The probe path as the Helm chart writes it — `charts/langwatch/templates/
+ * workers/deployment.yaml` and `charts/langwatch/tests/e2e.sh` both hard-code
+ * this literal. Asserted against the constant, and then USED as the literal
+ * below, so renaming the constant fails here instead of in a rolling deploy.
+ */
+const CHART_PROBE_PATH = "/healthz";
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve) => {
@@ -34,7 +42,9 @@ function fetchStatus(
     http
       .get({ port, path, timeout: 2_000 }, (res) => {
         let body = "";
-        res.on("data", (c: Buffer) => (body += c.toString()));
+        res.on("data", (c: Buffer) => {
+          body += c.toString();
+        });
         res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
       })
       .on("error", reject);
@@ -70,6 +80,12 @@ describe("worker liveness thread", () => {
     return port;
   }
 
+  describe("when the chart's probe path is compared with the served one", () => {
+    it("serves the path the workers Deployment probes", () => {
+      expect(WORKER_LIVENESS_PATH).toBe(CHART_PROBE_PATH);
+    });
+  });
+
   describe("when the main loop heartbeat is fresh", () => {
     /** @scenario A busy-but-alive main loop still passes liveness */
     it("answers 200 on the liveness path", async () => {
@@ -77,7 +93,7 @@ describe("worker liveness thread", () => {
       heartbeat[0] = BigInt(Date.now());
       const port = await bootThread(heartbeat);
 
-      const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
+      const res = await fetchStatus(port, CHART_PROBE_PATH);
       expect(res.status).toBe(200);
       expect(res.body).toBe("ok");
     });
@@ -90,7 +106,7 @@ describe("worker liveness thread", () => {
       heartbeat[0] = BigInt(Date.now() - STALL_BUDGET_MS - 60_000);
       const port = await bootThread(heartbeat);
 
-      const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
+      const res = await fetchStatus(port, CHART_PROBE_PATH);
       expect(res.status).toBe(503);
       expect(res.body).toContain("stalled");
     });
