@@ -149,12 +149,40 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
 tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   valid: [
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "packages/features/agent/tests/example.test.ts",
+      code: "export const value = process.env.TEST_VALUE;",
+    },
+    {
+      filename: "apps/api/src/platform/config/api.config.ts",
       code: "export const value = process.env.APPLICATION_VALUE;",
     },
     {
-      filename: "packages/features/agent/tests/example.test.ts",
+      filename: "apps/worker/src/platform/config/worker.config.ts",
+      code: "export const value = import.meta.env.APPLICATION_VALUE;",
+    },
+    {
+      filename: "packages/architecture-lint/tests/environment.test.ts",
       code: "export const value = process.env.TEST_VALUE;",
+    },
+    {
+      filename: "packages/redaction/src/__bench__/secrets.bench.ts",
+      code: "export const value = process.env.BENCHMARK_VALUE;",
+    },
+    {
+      filename: "packages/features/agent/server/src/testing/runtime.spec.ts",
+      code: "export const value = process.env.TEST_VALUE;",
+    },
+    {
+      filename: "packages/eventing/src/probe.ts",
+      code: 'const env = "not-env"; export const value = process[env];',
+    },
+    {
+      filename: "packages/eventing/src/probe.ts",
+      code: 'const suffix = "nv"; export const value = process["e" + suffix];',
+    },
+    {
+      filename: "platform/app/src/server/example.ts",
+      code: "export const value = process.env.APPLICATION_VALUE;",
     },
   ],
   invalid: [
@@ -166,6 +194,56 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
     {
       filename: "packages/config/src/example.ts",
       code: "export const value = import.meta.env.CONFIG_VALUE;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/eventing/src/services/event-sourcing.service.ts",
+      code: "export const value = process.env.NODE_ENV;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/observability/src/logger.ts",
+      code: "export const value = import.meta.env.LOG_LEVEL;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/prisma-client/src/config.ts",
+      code: 'export const value = process["env"].DATABASE_URL;',
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/enterprise/composition/api/src/config.ts",
+      code: "export const value = process?.env.DATABASE_URL;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/enterprise/composition/worker/src/config.ts",
+      code: 'export const value = process?.["env"].QUEUE_URL;',
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/config.ts",
+      code: "export const value = process[`env`].AGENT_KEY;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/config.ts",
+      code: 'export const value = process["e" + "nv"].AGENT_KEY;',
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/observability/src/logger.ts",
+      code: 'export const value = import.meta["env"].LOG_LEVEL;',
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/runtime.unit.helper.ts",
+      code: "export const value = process.env.AGENT_KEY;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "packages/architecture-lint/src/example.ts",
+      code: "export const value = process.env.LINT_MODE;",
       errors: [{ messageId: "environment" }],
     },
   ],

@@ -385,32 +385,25 @@ const environmentBoundariesRule = {
     type: "problem",
     messages: {
       environment:
-        "Feature and framework packages receive typed configuration; they must not read environment variables directly.",
+        "Reusable packages receive typed configuration; they must not read environment variables directly. Parse environment configuration at a physical application composition root and inject semantic values.",
     },
   },
   create(context) {
     const filename = normalizedFilename(context);
     const classification = classifyFile(filename, context.cwd);
-    const governed =
-      classification.feature ||
-      classification.role === "config" ||
-      classification.role === "design-system";
-    const productionSource = !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
-      classification.workspacePath,
-    );
-    if (!governed || !productionSource) return {};
+    const workspacePath = classification.workspacePath;
+    const reusablePackage = /^packages\/.+\/src\//.test(workspacePath);
+    const productionSource = !isNonProductionPackageSource(workspacePath);
+    if (!reusablePackage || !productionSource) return {};
 
     return {
       MemberExpression(node) {
+        const propertyName = staticMemberPropertyName(node);
         const isProcessEnv =
           node.object.type === "Identifier" &&
           node.object.name === "process" &&
-          node.property.type === "Identifier" &&
-          node.property.name === "env";
-        const isImportMetaEnv =
-          node.object.type === "MetaProperty" &&
-          node.property.type === "Identifier" &&
-          node.property.name === "env";
+          propertyName === "env";
+        const isImportMetaEnv = node.object.type === "MetaProperty" && propertyName === "env";
         if (isProcessEnv || isImportMetaEnv) {
           context.report({ node, messageId: "environment" });
         }
@@ -418,6 +411,41 @@ const environmentBoundariesRule = {
     };
   },
 };
+
+function isNonProductionPackageSource(workspacePath) {
+  const nonProductionDirectory = /(?:^|\/)(?:__tests__|tests|__bench__|benchmarks?)(?:\/|$)/.test(
+    workspacePath,
+  );
+  const nonProductionFilename = /\.(?:test|unit|integration|spec|bench)\.[cm]?[jt]sx?$/.test(
+    workspacePath,
+  );
+  return nonProductionDirectory || nonProductionFilename;
+}
+
+/**
+ * This is a direct-syntax guard, not taint analysis: it catches canonical
+ * process/import-meta environment spellings, including static computed keys,
+ * but deliberately does not follow aliases or global-object indirection.
+ */
+function staticMemberPropertyName(member) {
+  if (!member.computed && member.property.type === "Identifier") return member.property.name;
+  return staticComputedPropertyName(member.property);
+}
+
+function staticComputedPropertyName(property) {
+  if (property.type === "Literal" && typeof property.value === "string") {
+    return property.value;
+  }
+  if (property.type === "TemplateLiteral" && property.expressions.length === 0) {
+    return property.quasis[0]?.value.cooked ?? void 0;
+  }
+  if (property.type === "BinaryExpression" && property.operator === "+") {
+    const left = staticComputedPropertyName(property.left);
+    const right = staticComputedPropertyName(property.right);
+    return left === undefined || right === undefined ? void 0 : `${left}${right}`;
+  }
+  return void 0;
+}
 
 const serviceClassesRule = {
   meta: {
