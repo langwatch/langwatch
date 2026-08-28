@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz-contract";
 import {
   INDEFINITE_RETENTION_DAYS,
   killRetroactiveMutationInputSchema,
@@ -26,11 +26,36 @@ export type RetentionScopeTarget = Readonly<{
   scopeId: string;
 }>;
 
-/** The process supplies authentication, authorization and audit policy. */
+/** The process supplies authentication; authorization arrives as `authz`. */
 export type DataRetentionTrpcContext = Readonly<{
   app: DataRetentionApplication;
   actor(): Readonly<{ id: string }>;
-  authorize(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<void>;
+}>;
+
+/**
+ * The process's tracing, logging, error, scope-lineage, authorization and
+ * audit policy, in the two declaration kinds this router needs.
+ *
+ * Applied by this feature AFTER its own input parser rather than composed
+ * ahead of it, because the authorization check reads its scope id from the
+ * validated input: tRPC runs middlewares in the order they were added, so a
+ * check installed before `.input()` would see no input at all.
+ *
+ * Two kinds, because the eight procedures never shared one decision:
+ *
+ *   `permission` — the declared check, resolved from the input's own
+ *     `projectId`; the five procedures whose authorized target IS the project
+ *     the caller named.
+ *   `inResolver` — the resolver-authorized declaration, for the three
+ *     scope-targeted procedures where `projectId` is not acted on at all and
+ *     the real gate runs against the organization, team or project named by
+ *     `scope`, which no fixed input tier could express. `enforces` names, per
+ *     scope id the input carries, what enforces it — the claim the router
+ *     sweep counts as covered.
+ */
+export type DataRetentionTrpcAuthz = Readonly<{
+  permission(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  inResolver(enforces: EnforcedScopeFields): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
 /**
@@ -79,7 +104,10 @@ type DataRetentionTrpcProcedures<
   TSnapshot,
   TStorageUsage,
 > = Readonly<{
+  /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
+  /** The process's authorization, audit, error, logging and tracing chain. */
+  authz: DataRetentionTrpcAuthz;
   policy: DataRetentionTrpcPolicy<TSnapshot, TStorageUsage>;
 }>;
 
@@ -94,9 +122,9 @@ const triggerRetroactiveMutationInputSchema = retroactiveMutationProjectInputSch
 
 /**
  * Installs the complete legacy `dataRetention.*` tRPC surface on a
- * process-owned root. The procedure is injected by the process so its auth,
- * audit, error, logging and tracing policies wrap every feature procedure
- * consistently.
+ * process-owned root. The procedure and the authorization policy are injected
+ * by the process so its auth, audit, error, logging and tracing policies wrap
+ * every feature procedure consistently.
  */
 export class DataRetentionTrpcApi {
   static create<
@@ -107,15 +135,10 @@ export class DataRetentionTrpcApi {
     TStorageUsage,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
-    procedures: DataRetentionTrpcProcedures<
-      TContext,
-      TOptions,
-      TRoot,
-      TSnapshot,
-      TStorageUsage
-    >,
+    procedures: DataRetentionTrpcProcedures<TContext, TOptions, TRoot, TSnapshot, TStorageUsage>,
   ) {
     const procedure = procedures.protected;
+    const authz = procedures.authz;
     const policy = procedures.policy;
 
     return trpc.router({
@@ -125,11 +148,10 @@ export class DataRetentionTrpcApi {
        * chip picker. Read access is project:view; the snapshot RBAC-filters what
        * it returns.
        */
-      getRules: procedure
-        .input(z.object({ projectId: z.string() }))
+      getRules: authz
+        .permission("project:view")(procedure.input(z.object({ projectId: z.string() })))
         .query(async ({ ctx, input }) => {
           ctx.actor();
-          await ctx.authorize("project:view", { projectId: input.projectId });
           return policy.getPolicySnapshot(ctx, { projectId: input.projectId });
         }),
 
@@ -141,14 +163,19 @@ export class DataRetentionTrpcApi {
        * target is `scope`, and both policy checks below run against the scope's
        * own organization.
        */
-      setForScope: procedure
-        .input(
-          z.object({
-            projectId: z.string(),
-            scope: scopeInput,
-            category: retentionCategorySchema,
-            retentionDays: retentionDaysInputSchema,
-          }),
+      setForScope: authz
+        .inResolver({
+          projectId:
+            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionWriteAllowed run against the scope's own organization",
+        })(
+          procedure.input(
+            z.object({
+              projectId: z.string(),
+              scope: scopeInput,
+              category: retentionCategorySchema,
+              retentionDays: retentionDaysInputSchema,
+            }),
+          ),
         )
         .mutation(async ({ ctx, input }) => {
           ctx.actor();
@@ -189,8 +216,11 @@ export class DataRetentionTrpcApi {
        * gated by the same write-on-scope check as the removal it previews, so the
        * resolved org-default never leaks to a caller who couldn't remove the rule.
        */
-      previewScopeRemoval: procedure
-        .input(z.object({ projectId: z.string(), scope: scopeInput }))
+      previewScopeRemoval: authz
+        .inResolver({
+          projectId:
+            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope gates the preview exactly like the removal it previews",
+        })(procedure.input(z.object({ projectId: z.string(), scope: scopeInput })))
         .query(async ({ ctx, input }) => {
           ctx.actor();
           await policy.assertCanWriteScope(ctx, input.scope);
@@ -198,13 +228,18 @@ export class DataRetentionTrpcApi {
         }),
 
       /** Remove one category's override at one scope; the next tier then applies. */
-      removeForScope: procedure
-        .input(
-          z.object({
-            projectId: z.string(),
-            scope: scopeInput,
-            category: retentionCategorySchema,
-          }),
+      removeForScope: authz
+        .inResolver({
+          projectId:
+            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionPlanForScope run against the scope's own organization",
+        })(
+          procedure.input(
+            z.object({
+              projectId: z.string(),
+              scope: scopeInput,
+              category: retentionCategorySchema,
+            }),
+          ),
         )
         .mutation(async ({ ctx, input }) => {
           ctx.actor();
@@ -216,11 +251,10 @@ export class DataRetentionTrpcApi {
           });
         }),
 
-      triggerRetroactiveUpdate: procedure
-        .input(triggerRetroactiveMutationInputSchema)
+      triggerRetroactiveUpdate: authz
+        .permission("project:update")(procedure.input(triggerRetroactiveMutationInputSchema))
         .mutation(async ({ ctx, input }) => {
           ctx.actor();
-          await ctx.authorize("project:update", { projectId: input.projectId });
           await policy.assertPlanForProject(ctx, input.projectId);
           // Resolve the retention value server-side. Trusting a client-supplied
           // newRetentionDays would let a project:update caller rewrite existing
@@ -252,21 +286,19 @@ export class DataRetentionTrpcApi {
           return { ...result, appliedRetentionDays: newRetentionDays };
         }),
 
-      getMutationProgress: procedure
-        .input(retroactiveMutationProjectInputSchema)
+      getMutationProgress: authz
+        .permission("traces:view")(procedure.input(retroactiveMutationProjectInputSchema))
         .query(async ({ ctx, input }) => {
           ctx.actor();
-          await ctx.authorize("traces:view", { projectId: input.projectId });
           return ctx.app.dataRetention.getRetroactiveMutationProgress({
             projectId: input.projectId,
           });
         }),
 
-      killMutation: procedure
-        .input(killRetroactiveMutationInputSchema)
+      killMutation: authz
+        .permission("project:update")(procedure.input(killRetroactiveMutationInputSchema))
         .mutation(async ({ ctx, input }) => {
           ctx.actor();
-          await ctx.authorize("project:update", { projectId: input.projectId });
           await policy.assertPlanForProject(ctx, input.projectId);
           await ctx.app.dataRetention.killRetroactiveMutation({
             projectId: input.projectId,
@@ -282,11 +314,12 @@ export class DataRetentionTrpcApi {
        * resolver against the scope's owning org, so a wider scope never leaks a
        * project's storage the caller couldn't see.
        */
-      getScopeStorageUsage: procedure
-        .input(z.object({ projectId: z.string(), scope: scopeInput }))
+      getScopeStorageUsage: authz
+        .permission("traces:view")(
+          procedure.input(z.object({ projectId: z.string(), scope: scopeInput })),
+        )
         .query(async ({ ctx, input }) => {
           ctx.actor();
-          await ctx.authorize("traces:view", { projectId: input.projectId });
           return policy.getScopeStorageUsage(ctx, {
             projectId: input.projectId,
             scope: input.scope,

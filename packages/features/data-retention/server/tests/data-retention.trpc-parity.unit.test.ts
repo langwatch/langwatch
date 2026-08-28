@@ -6,6 +6,7 @@ import { TrpcRootDefinition } from "@langwatch/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DataRetentionTrpcApi,
+  type DataRetentionTrpcAuthz,
   type DataRetentionTrpcContext,
   type DataRetentionTrpcPolicy,
 } from "../src/api/app-trpc/data-retention.api";
@@ -19,8 +20,25 @@ type StorageUsage = { totalBytes: number; projectCount: number };
 
 function createCaller() {
   const actor = vi.fn(() => ({ id: "user-1" }));
-  const authorize = vi.fn(async () => undefined);
   const assertPlanForProject = vi.fn(async () => undefined);
+
+  // The process's authorization chain, recorded per call rather than per
+  // build: what a procedure DECLARES is the permission its process middleware
+  // was constructed with, and the only way to read that back from a mounted
+  // router is to let the middleware run and name its own path.
+  const declared: Array<[string, string]> = [];
+  const authz: DataRetentionTrpcAuthz = {
+    permission: (permission) => (procedure) =>
+      (procedure as any).use(({ path, next }: any) => {
+        declared.push([path, `permission:${permission}`]);
+        return next();
+      }),
+    inResolver: (enforces) => (procedure) =>
+      (procedure as any).use(({ path, next }: any) => {
+        declared.push([path, `inResolver:${Object.keys(enforces).sort().join(",")}`]);
+        return next();
+      }),
+  };
 
   // Only the three retroactive methods are exercised here; the abstract service
   // declares twenty, and stubbing the rest would say nothing about this router.
@@ -41,13 +59,17 @@ function createCaller() {
   };
 
   const root = TrpcRootDefinition.forContext<DataRetentionTrpcContext>().create({});
-  const router = DataRetentionTrpcApi.create(root, { protected: root.procedure, policy });
+  const router = DataRetentionTrpcApi.create(root, {
+    protected: root.procedure,
+    authz,
+    policy,
+  });
 
   return {
     actor,
-    authorize,
+    declared,
     assertPlanForProject,
-    caller: router.createCaller({ app: { dataRetention }, actor, authorize }),
+    caller: router.createCaller({ app: { dataRetention }, actor }),
   };
 }
 
@@ -64,7 +86,7 @@ describe("data-retention retroactive tRPC parity", () => {
       triggerRetroactiveUpdate.mockResolvedValue({
         tables: ["trace_summaries", "trace_analytics", "trace_analytics_rollup"],
       });
-      const { authorize, assertPlanForProject, caller } = createCaller();
+      const { declared, assertPlanForProject, caller } = createCaller();
 
       await expect(
         caller.triggerRetroactiveUpdate({
@@ -81,7 +103,7 @@ describe("data-retention retroactive tRPC parity", () => {
         category: "traces",
         newRetentionDays: 49,
       });
-      expect(authorize).toHaveBeenCalledWith("project:update", { projectId: "project-1" });
+      expect(declared).toEqual([["triggerRetroactiveUpdate", "permission:project:update"]]);
       expect(assertPlanForProject).toHaveBeenCalledWith(expect.anything(), "project-1");
     });
 
@@ -112,12 +134,12 @@ describe("data-retention retroactive tRPC parity", () => {
         },
       ];
       getRetroactiveMutationProgress.mockResolvedValue(progress);
-      const { authorize, caller } = createCaller();
+      const { declared, caller } = createCaller();
 
       await expect(caller.getMutationProgress({ projectId: "project-1" })).resolves.toEqual(
         progress,
       );
-      expect(authorize).toHaveBeenCalledWith("traces:view", { projectId: "project-1" });
+      expect(declared).toEqual([["getMutationProgress", "permission:traces:view"]]);
     });
   });
 });

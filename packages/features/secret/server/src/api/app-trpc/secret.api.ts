@@ -1,3 +1,18 @@
+/**
+ * The project's secrets over a host's tRPC transport.
+ *
+ *   list:   the project's customer-owned secrets, metadata only.
+ *   create: a new secret, encrypted before it is stored.
+ *   update: a new value for an existing secret.
+ *   delete: removal of one secret from the project.
+ *
+ * Reading takes `secrets:view`; every write takes `secrets:manage`, because a
+ * secret is a live credential for whatever the project points it at.
+ *
+ * Transport only: policy, then delegation to `SecretService`. Plaintext values
+ * arrive in `create`/`update` input and are never read back out — nothing here
+ * logs, echoes, or copies one, and the host's audit trail redacts the field.
+ */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import {
@@ -12,25 +27,83 @@ import {
 import { z } from "zod";
 
 type SecretApplication = Readonly<{ secrets: SecretService }>;
+
+/** The host supplies authentication; authorization arrives as `policy`. */
 export type SecretTrpcContext = Readonly<{
   app: SecretApplication;
   actor(): Readonly<{ id: string }>;
+  /**
+   * The project-scoped authorization a host performs when it injects no
+   * `policy` of its own. Still required, because that fallback is what keeps a
+   * host without a declared-permission pipeline authorized.
+   */
   authorize(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<void>;
 }>;
+
+/**
+ * The host's policy for one declared permission.
+ *
+ * Applied by this feature AFTER its own input parser rather than composed
+ * ahead of it, because the authorization check reads its scope id from the
+ * validated input: tRPC runs middlewares in the order they were added, so a
+ * check installed before `.input()` would see no input at all.
+ */
+export type SecretTrpcPolicy = (
+  permission: AuthzPermission,
+) => <TProcedure>(procedure: TProcedure) => TProcedure;
+
+/**
+ * The `.use()` surface every tRPC procedure builder shares. Named at the one
+ * seam that applies a middleware to a builder whose input generics belong to
+ * the caller, so the fallback policy below needs no `any`.
+ */
+type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
+
+type PolicyMiddlewareOptions = Readonly<{
+  ctx: SecretTrpcContext;
+  input: Readonly<{ projectId: string }>;
+  next(): Promise<unknown>;
+}>;
+
+/**
+ * The policy for a host that injects none: exactly the project-scoped
+ * `ctx.authorize` the handlers used to run inline, lifted to a middleware so
+ * every host authorizes at the same point in the chain and no handler carries
+ * an authorization branch of its own.
+ */
+const contextAuthorizePolicy: SecretTrpcPolicy =
+  (permission) =>
+  <TProcedure,>(procedure: TProcedure): TProcedure =>
+    (procedure as unknown as ChainableProcedure).use(
+      async ({ ctx, input, next }: PolicyMiddlewareOptions) => {
+        await ctx.authorize(permission, { projectId: input.projectId });
+        return next();
+      },
+    ) as unknown as TProcedure;
+
 type SecretTrpcProcedures<
   TContext extends SecretTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
+  /** The host's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
+  /**
+   * The host's tracing, logging, error, scope-lineage, authorization and audit
+   * policy for one declared permission. A host that omits it authorizes
+   * through `ctx.authorize` instead.
+   */
+  policy?: SecretTrpcPolicy;
 }>;
+
 const legacyUpdateInputSchema = z
   .object({ projectId: secretProjectIdSchema, secretId: secretIdSchema, value: secretValueSchema })
   .strict();
 const legacyDeleteInputSchema = deleteSecretInputSchema
   .omit({ id: true })
   .extend({ secretId: secretIdSchema });
-/** Installs Secret on the process-owned tRPC root and its policy procedures. */
+
+/** Installs Secret on the host-owned tRPC root and its policy procedures. */
 export class SecretTrpcApi {
   static create<
     TContext extends SecretTrpcContext,
@@ -42,38 +115,40 @@ export class SecretTrpcApi {
       protected: trpc.procedure,
     },
   ) {
-    const procedure = procedures.protected;
+    const { protected: procedure, policy = contextAuthorizePolicy } = procedures;
 
     return trpc.router({
-      list: procedure.input(listSecretsInputSchema).query(async ({ ctx, input }) => {
-        ctx.actor();
-        await ctx.authorize("secrets:view", { projectId: input.projectId });
-        return ctx.app.secrets.list(input);
-      }),
-      create: procedure
-        .input(createSecretInputSchema.omit({ actorId: true }))
-        .mutation(async ({ ctx, input }) => {
-          const actor = ctx.actor();
-          await ctx.authorize("secrets:manage", { projectId: input.projectId });
-          return ctx.app.secrets.create({ ...input, actorId: actor.id });
-        }),
-      update: procedure.input(legacyUpdateInputSchema).mutation(async ({ ctx, input }) => {
+      list: policy("secrets:view")(procedure.input(listSecretsInputSchema)).query(
+        async ({ ctx, input }) => {
+          ctx.actor();
+          return ctx.app.secrets.list(input);
+        },
+      ),
+      create: policy("secrets:manage")(
+        procedure.input(createSecretInputSchema.omit({ actorId: true })),
+      ).mutation(async ({ ctx, input }) => {
         const actor = ctx.actor();
-        await ctx.authorize("secrets:manage", { projectId: input.projectId });
-        await ctx.app.secrets.update({
-          projectId: input.projectId,
-          id: input.secretId,
-          value: input.value,
-          actorId: actor.id,
-        });
-        return { success: true };
+        return ctx.app.secrets.create({ ...input, actorId: actor.id });
       }),
-      delete: procedure.input(legacyDeleteInputSchema).mutation(async ({ ctx, input }) => {
-        ctx.actor();
-        await ctx.authorize("secrets:manage", { projectId: input.projectId });
-        await ctx.app.secrets.delete({ projectId: input.projectId, id: input.secretId });
-        return { success: true };
-      }),
+      update: policy("secrets:manage")(procedure.input(legacyUpdateInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const actor = ctx.actor();
+          await ctx.app.secrets.update({
+            projectId: input.projectId,
+            id: input.secretId,
+            value: input.value,
+            actorId: actor.id,
+          });
+          return { success: true };
+        },
+      ),
+      delete: policy("secrets:manage")(procedure.input(legacyDeleteInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          ctx.actor();
+          await ctx.app.secrets.delete({ projectId: input.projectId, id: input.secretId });
+          return { success: true };
+        },
+      ),
     });
   }
 }

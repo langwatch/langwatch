@@ -18,7 +18,7 @@ type PresenceApplication = Readonly<{
   broadcast: PresenceEmitterPort;
 }>;
 
-/** The process supplies authentication, authorization and audit policy. */
+/** The process supplies authentication; authorization arrives as `policy`. */
 export type PresenceTrpcContext = Readonly<{
   app: PresenceApplication;
   actor(): Readonly<{ id: string }>;
@@ -30,7 +30,6 @@ export type PresenceTrpcContext = Readonly<{
   session: Readonly<{
     user: Readonly<{ id: string; name?: string | null; image?: string | null }>;
   }> | null;
-  authorize(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<void>;
 }>;
 
 type PresenceTrpcProcedures<
@@ -38,9 +37,25 @@ type PresenceTrpcProcedures<
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
+  /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
+  /**
+   * The process's tracing, logging, error, scope-lineage, authorization and
+   * audit policy for one declared permission.
+   *
+   * Applied by this feature AFTER its own input parser rather than composed
+   * ahead of it, because the authorization check reads its scope id from the
+   * validated input: tRPC runs middlewares in the order they were added, so a
+   * check installed before `.input()` would see no input at all.
+   */
+  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
 
+/**
+ * Presence is a read-side view of who else is looking at the same project, so
+ * seeing it — and being seen in it — takes exactly what seeing the traces
+ * takes. Every procedure declares this one permission at the project tier.
+ */
 const PRESENCE_PERMISSION: AuthzPermission = "traces:view";
 
 const cursorSubscriptionInputSchema = presenceProjectInputSchema.extend({
@@ -68,8 +83,9 @@ function streamsOf(ctx: PresenceTrpcContext): PresenceStreamService {
 
 /**
  * Installs the complete `presence.*` tRPC surface on a process-owned root.
- * The procedure is injected by the process so its auth, audit, error, logging
- * and tracing policies wrap every feature procedure consistently.
+ * The procedure and the policy are injected by the process so its auth,
+ * audit, error, logging and tracing policies wrap every feature procedure
+ * consistently.
  */
 export class PresenceTrpcApi {
   static create<
@@ -78,11 +94,9 @@ export class PresenceTrpcApi {
     TRoot extends AnyTRPCRootTypes,
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
-    procedures: PresenceTrpcProcedures<TContext, TOptions, TRoot> = {
-      protected: trpc.procedure,
-    },
+    procedures: PresenceTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const procedure = procedures.protected;
+    const { protected: procedure, policy } = procedures;
 
     return trpc.router({
       /**
@@ -91,67 +105,65 @@ export class PresenceTrpcApi {
        * The userId is taken from the authenticated session — clients cannot
        * impersonate another user by setting it in the payload.
        */
-      update: procedure
-        .input(presenceUpdateInputSchema.omit({ user: true }))
-        .mutation(async ({ ctx, input }) => {
-          await ctx.authorize(PRESENCE_PERMISSION, { projectId: input.projectId });
-          if (!(await ctx.app.presence.isEnabledForProject({ projectId: input.projectId }))) {
-            return { ok: true as const };
-          }
-          await ctx.app.presence.update({
-            projectId: input.projectId,
-            sessionId: input.sessionId,
-            user: presenceUserOf(ctx),
-            location: input.location,
-          });
-          return { ok: true as const };
-        }),
-
-      /** Remove a session immediately and notify peers. */
-      leave: procedure.input(presenceLeaveInputSchema).mutation(async ({ ctx, input }) => {
-        await ctx.authorize(PRESENCE_PERMISSION, { projectId: input.projectId });
+      update: policy(PRESENCE_PERMISSION)(
+        procedure.input(presenceUpdateInputSchema.omit({ user: true })),
+      ).mutation(async ({ ctx, input }) => {
         if (!(await ctx.app.presence.isEnabledForProject({ projectId: input.projectId }))) {
           return { ok: true as const };
         }
-        await ctx.app.presence.leave({
+        await ctx.app.presence.update({
           projectId: input.projectId,
           sessionId: input.sessionId,
+          user: presenceUserOf(ctx),
+          location: input.location,
         });
         return { ok: true as const };
       }),
+
+      /** Remove a session immediately and notify peers. */
+      leave: policy(PRESENCE_PERMISSION)(procedure.input(presenceLeaveInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          if (!(await ctx.app.presence.isEnabledForProject({ projectId: input.projectId }))) {
+            return { ok: true as const };
+          }
+          await ctx.app.presence.leave({
+            projectId: input.projectId,
+            sessionId: input.sessionId,
+          });
+          return { ok: true as const };
+        },
+      ),
 
       /**
        * Subscribe to presence updates for a project. Yields one snapshot event
        * on connect, then deltas (`join`, `update`, `leave`) until the client
        * disconnects.
        */
-      onPresenceUpdate: procedure
-        .input(presenceProjectInputSchema)
-        .subscription(async function* (opts) {
-          const { projectId } = opts.input;
-          await opts.ctx.authorize(PRESENCE_PERMISSION, { projectId });
-          yield* streamsOf(opts.ctx).events({ projectId, signal: opts.signal });
-        }),
+      onPresenceUpdate: policy(PRESENCE_PERMISSION)(
+        procedure.input(presenceProjectInputSchema),
+      ).subscription(async function* (opts) {
+        const { projectId } = opts.input;
+        yield* streamsOf(opts.ctx).events({ projectId, signal: opts.signal });
+      }),
 
       /**
        * High-frequency cursor tick. Fire-and-forget — server drops the event
        * silently if the per-tenant rate-limit bucket is exhausted.
        */
-      cursor: procedure
-        .input(presenceCursorInputSchema.omit({ user: true }))
-        .mutation(async ({ ctx, input }) => {
-          await ctx.authorize(PRESENCE_PERMISSION, { projectId: input.projectId });
-          if (!(await ctx.app.presence.isEnabledForProject({ projectId: input.projectId }))) {
-            return { ok: true as const };
-          }
-          await ctx.app.presence.broadcastCursor({
-            projectId: input.projectId,
-            sessionId: input.sessionId,
-            user: presenceUserOf(ctx),
-            payload: input.payload,
-          });
+      cursor: policy(PRESENCE_PERMISSION)(
+        procedure.input(presenceCursorInputSchema.omit({ user: true })),
+      ).mutation(async ({ ctx, input }) => {
+        if (!(await ctx.app.presence.isEnabledForProject({ projectId: input.projectId }))) {
           return { ok: true as const };
-        }),
+        }
+        await ctx.app.presence.broadcastCursor({
+          projectId: input.projectId,
+          sessionId: input.sessionId,
+          user: presenceUserOf(ctx),
+          payload: input.payload,
+        });
+        return { ok: true as const };
+      }),
 
       /**
        * Subscribe to cursor ticks for a single anchor. Only events whose anchor
@@ -159,18 +171,17 @@ export class PresenceTrpcApi {
        * out at the server boundary so the wire is never wasted on cursors the
        * client cannot render.
        */
-      onPresenceCursor: procedure
-        .input(cursorSubscriptionInputSchema)
-        .subscription(async function* (opts) {
-          const { projectId, anchor, sessionId } = opts.input;
-          await opts.ctx.authorize(PRESENCE_PERMISSION, { projectId });
-          yield* streamsOf(opts.ctx).cursors({
-            projectId,
-            anchor,
-            sessionId,
-            signal: opts.signal,
-          });
-        }),
+      onPresenceCursor: policy(PRESENCE_PERMISSION)(
+        procedure.input(cursorSubscriptionInputSchema),
+      ).subscription(async function* (opts) {
+        const { projectId, anchor, sessionId } = opts.input;
+        yield* streamsOf(opts.ctx).cursors({
+          projectId,
+          anchor,
+          sessionId,
+          signal: opts.signal,
+        });
+      }),
     });
   }
 }

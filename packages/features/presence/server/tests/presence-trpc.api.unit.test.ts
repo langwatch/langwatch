@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   PresenceService,
   type PresenceCursorEvent,
@@ -39,19 +40,48 @@ class TestEmitters extends PresenceEmitterPort {
   readonly cleanupTenantEmitter = vi.fn();
 }
 
+/**
+ * Stands in for the process's policy: a middleware the feature applies AFTER
+ * its own `.input()`, so `input` here is the parsed payload. A policy composed
+ * ahead of the parser would see `undefined` and blow up on `projectId` — which
+ * is exactly the ordering these assertions pin.
+ */
+function createTestPolicy() {
+  const authorize = vi.fn(async (_permission: AuthzPermission, _target: { projectId: string }) => {
+    return undefined;
+  });
+  type ChainableProcedure = {
+    use(middleware: (params: { input: unknown; next(): unknown }) => unknown): ChainableProcedure;
+  };
+  const policy =
+    (permission: AuthzPermission) =>
+    <TProcedure>(procedure: TProcedure): TProcedure =>
+      (procedure as unknown as ChainableProcedure).use(async ({ input, next }) => {
+        await authorize(permission, { projectId: (input as { projectId: string }).projectId });
+        return next();
+      }) as unknown as TProcedure;
+
+  return { authorize, policy };
+}
+
 function createCaller(presence: TestPresenceService) {
-  const authorize = vi.fn(async () => undefined);
+  const { authorize, policy } = createTestPolicy();
   const actor = vi.fn(() => ({ id: "user-1" }));
   const emitters = new TestEmitters();
   const context: PresenceTrpcContext = {
     app: { presence, broadcast: emitters },
     actor,
     session: { user: { id: "user-1", name: "Ada", image: "https://example.test/ada.png" } },
-    authorize,
   };
 
   const root = TrpcRootDefinition.forContext<PresenceTrpcContext>().create({});
-  const router = PresenceTrpcApi.create(root);
+  // Mirrors the mount's `authProtectedProcedure`: it narrows the context, so
+  // the builder handed over is not the root's bare one.
+  const authenticated = root.procedure.use(({ ctx, next }) => {
+    if (!ctx.session) throw new Error("unauthenticated");
+    return next({ ctx: { session: { user: ctx.session.user } } });
+  });
+  const router = PresenceTrpcApi.create(root, { protected: authenticated, policy });
 
   return { authorize, actor, emitters, caller: router.createCaller(context), router };
 }
@@ -258,10 +288,11 @@ describe("PresenceTrpcApi", () => {
         app: { presence, broadcast: new TestEmitters() },
         actor: () => ({ id: "user-1" }),
         session: { user: { id: "user-1", name: "Ada", image: null } },
-        authorize: async () => undefined,
       };
       const root = TrpcRootDefinition.forContext<PresenceTrpcContext>().create({});
-      return { repository, caller: PresenceTrpcApi.create(root).createCaller(context) };
+      const { policy } = createTestPolicy();
+      const router = PresenceTrpcApi.create(root, { protected: root.procedure, policy });
+      return { repository, caller: router.createCaller(context) };
     }
 
     /**

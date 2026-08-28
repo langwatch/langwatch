@@ -1,4 +1,4 @@
-import { SecretNotFoundError, type Secret } from "@langwatch/secret-contract";
+import { type Secret, SecretNotFoundError } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const list = vi.fn();
@@ -40,6 +40,9 @@ function caller() {
     app: {
       permissions: {
         getDecision,
+        // The declared policy runs the scope-lineage guard ahead of the
+        // permission check, and every id here belongs to one project.
+        checkScopeLineage: async () => ({ kind: "consistent" }),
       },
       secrets: {
         list,
