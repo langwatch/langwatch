@@ -318,7 +318,7 @@ reviews:
         `dev/docs/design/guidelines.md` § 6 and ADR-018.
 
     # design/guidelines.md §3: prefer Drawer wrapper, not raw Chakra Modal.
-    # Biome's noRestrictedImports already bans @chakra-ui/react Dialog/Drawer/
+    # oxlint's no-restricted-imports already bans @chakra-ui/react Dialog/Drawer/
     # Modal — this catches the path_instructions side (new code introducing
     # modal-style flows that should use Dialog wrapper).
     - path: "platform/app/src/**/*.tsx"

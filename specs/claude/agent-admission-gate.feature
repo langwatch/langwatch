@@ -59,7 +59,7 @@ Feature: haven answers an agent's tool call before it runs
   @unit
   Scenario: Only a named set of commands is treated as heavy
     When the gate classifies a command
-    Then vitest, tsgo, biome, next build, go build and docker build are heavy
+    Then vitest, tsgo, next build, go build and docker build are heavy
     And everything else defers, because gating ordinary commands would be its own outage
 
   @unit @unimplemented

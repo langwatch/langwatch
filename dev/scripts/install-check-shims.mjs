@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Routes direct tsgo / tsc / biome invocations through the check queue.
+ * Routes direct tsgo / tsc invocations through the check queue.
  *
  * The queue only ever saw the package scripts. Anything that reached the
  * binary another way (`pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
@@ -17,11 +17,11 @@
  * WHOLE-TREE runs queue: `-p`/`--project`, a directory argument, or nothing
  * that names an existing file (every one of these walks the whole project).
  * A positional argument only counts as a target if it exists, because a
- * subcommand (`biome check`) and a flag's value (`--pretty false`) are
- * positional too, and reading either as a named file would let a whole-tree
- * run through uncounted.
- * TARGETED runs do not queue: `tsgo --noEmit src/foo.ts`, `biome check --write
- * a.ts b.ts`. Those finish in a moment and are the entire point of the
+ * subcommand and a flag's value (`--pretty false`) are positional too, and
+ * reading either as a named file would let a whole-tree run through
+ * uncounted.
+ * TARGETED runs do not queue: `tsgo --noEmit src/foo.ts`, `tsc --noEmit a.ts
+ * b.ts`. Those finish in a moment and are the entire point of the
  * iterate-fast loop, so making them wait behind a full typecheck would be a
  * worse trade than the pile-up this prevents.
  * LONG-LIVED runs do not queue either: `--watch` and `--lsp` would hold a slot
@@ -46,7 +46,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const TOOLS = ["tsgo", "tsc", "biome"];
+const TOOLS = ["tsgo", "tsc"];
 const MARKER = "langwatch-check-queue-shim";
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), "../../..");
@@ -86,10 +86,10 @@ for arg in "$@"; do
     -p|--project|--project=*) whole_tree=1 ;;
     -*) ;;
     *)
-      # Only something that exists is a target. A subcommand (\`biome check\`)
-      # and a flag's value (\`--pretty false\`, \`--max-diagnostics 1000\`) are
-      # positional too, and counting either as a named file is what turns a
-      # whole-tree run into one nothing waits behind.
+      # Only something that exists is a target. A subcommand and a flag's
+      # value (\`--pretty false\`, \`--max-diagnostics 1000\`) are positional
+      # too, and counting either as a named file is what turns a whole-tree
+      # run into one nothing waits behind.
       if [ -e "$arg" ]; then
         named_a_target=1
         if [ -d "$arg" ]; then whole_tree=1; fi
@@ -118,8 +118,8 @@ exec "$real" "$@"
  *
  * The shims are a laptop concern. On CI the queue is off anyway (a job runs
  * one check at a time, so `resolveSlots` reads CI the same way and returns 0),
- * which leaves the shim adding a node process in front of every tsc and biome
- * to decide nothing. A production install has less business still: rewriting
+ * which leaves the shim adding a node process in front of every tsc run to
+ * decide nothing. A production install has less business still: rewriting
  * bin entries in an image or on a server buys no laptop any RAM, and the
  * shim's queue path is absolute, so a stage that copies node_modules without
  * `dev/` gets an indirection that only ever prints that it found no queue.

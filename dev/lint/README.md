@@ -37,22 +37,18 @@ The division that keeps review comments worth reading:
 
 | Kind of rule                             | Home                                       |
 | ---------------------------------------- | ------------------------------------------ |
-| Expressible as Biome config, `platform/app/**` | `platform/app/biome.jsonc`           |
-| Expressible as oxlint config, `packages/**`    | `/.oxlintrc.architecture.json`       |
+| Expressible as oxlint config             | `/.oxlintrc.architecture.json`             |
 | Expressible as a syntactic pattern       | `/dev/lint/ast-grep/rules/`                |
 | Expressible as a semantic pattern        | `/dev/lint/semgrep/langwatch.yml`          |
 | Genuinely needs judgement                | `path_instructions` in `/.coderabbit.yaml` |
 
-**The first two rows are two linters because they cover disjoint trees, not
-because anyone wanted two.** `/biome.jsonc` scopes the whole Biome workspace to
-`platform/app/**` on purpose (see the comment there), so `packages/**` — where
-the extracted features now live — had no general-purpose linter at all: only
-the `langwatch/*` architecture rules, which police boundaries and say nothing
-about the code inside one. oxlint already walks those paths for the
-architecture rules, so the readability and type-safety rules ride along with it
-rather than adding a fourth tool. A rule that belongs on both trees is
-configured in both, at the severity each tree's baseline supports; the two
-files each carry the measured numbers.
+**There is one general-purpose JavaScript and TypeScript linter, and it is
+oxlint.** `/.oxlintrc.architecture.json` covers `packages/**` and
+`platform/app/**` in separate override blocks, because the two trees arrived
+with different baselines rather than because they deserve different rules.
+Every rule in it is `error`; where a tree already violates one, the offending
+files are named in the debt register at the bottom of that file, which can
+only shrink. Formatting is oxfmt's, configured in `/.oxfmtrc.json`.
 
 A rule in more than one home gets reported twice — once deterministically and
 once probabilistically — which is how a review thread fills up with mechanics

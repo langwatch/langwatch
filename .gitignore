@@ -157,7 +157,3 @@ server.log
 platform/app/dev.log
 .claude/tmp/
 
-# Biome gate artifacts (.github/workflows/langwatch-app-ci.yml lint job)
-/biome.raw.json
-/biome.rdjson
-/biome.posted.json

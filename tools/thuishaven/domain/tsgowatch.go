@@ -114,7 +114,7 @@ type WatchedProcess struct {
 // ClassifyWatchedProcess maps a command line to the process class haven
 // tracks, or ok=false for everything haven has no interest in. The class list
 // is deliberately the dev-tooling that shapes machine health: compilers and
-// checkers (the TypeScript compiler under either name, gopls, biome), test
+// checkers (the TypeScript compiler under either name, gopls, oxlint), test
 // workers (vitest — matched on the worker path, the same marker the orphan
 // sweep uses), the JS runtimes every dev server and script runs on (node,
 // bun), and coding agents (claude). Only the TypeScript compiler carries kill
@@ -131,8 +131,8 @@ func ClassifyWatchedProcess(command string) (WatchedProcess, bool) {
 	switch base {
 	case "gopls":
 		return WatchedProcess{Class: "gopls", Role: TsgoLSP}, true
-	case "biome":
-		return WatchedProcess{Class: "biome", Role: TsgoRun}, true
+	case "oxlint":
+		return WatchedProcess{Class: "oxlint", Role: TsgoRun}, true
 	case "claude":
 		return WatchedProcess{Class: "claude", Role: TsgoRun}, true
 	case "bun":

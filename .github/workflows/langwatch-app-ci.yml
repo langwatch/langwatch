@@ -706,6 +706,100 @@ jobs:
         working-directory: platform/app
         run: bash ../../.github/scripts/notify-slack-test-failure.sh test-component
 
+  # Every workspace package's own suite, discovered rather than listed.
+  #
+  # The hand-written block on `test-unit` above names seventeen packages. The
+  # workspace has 157 with a `test` or `test:unit` script, and 136 of them are
+  # named by no workflow anywhere — 132 under packages/. Nobody decided that: a
+  # hand-written list makes a NEW package invisible BY DEFAULT, and it rots
+  # quietly besides. `pnpm --filter <name> run test` exits 0 when the filter
+  # matches nothing, so the `Run @langwatch/authz unit tests` step above has
+  # been reporting green while running nothing at all since that package became
+  # @langwatch/authz-contract under packages/features/.
+  #
+  # The feature extraction turns a slow leak into an active one
+  # (dev/docs/plans/core-application-feature-extraction-plan.md, F-CI-02): every
+  # wave moves behaviour out of platform/app, which this workflow runs, into
+  # packages/features/*, which it did not. The more of the plan lands, the less
+  # of the product CI covers.
+  #
+  # .github/scripts/run-package-suites.sh asks pnpm for the workspace membership
+  # — the same list the installer resolves, so it cannot drift from
+  # pnpm-workspace.yaml — and runs each package's own script. A new package is
+  # covered the moment it has one. What must not gate is enumerated in two
+  # registers, one line and one stated reason each:
+  # `.github/package-suites.excluded` (not run here at all) and
+  # `.github/package-suites.allowed-failures` (run, and red today). The script
+  # fails if either names a package the workspace no longer has.
+  #
+  # The seventeen named above run twice for now, which costs seconds — they are
+  # small suites. Deleting the duplicate steps is a separate edit, worth making
+  # only once this job has a real run behind it, and the `typecheck` steps
+  # interleaved with them have to survive it: this job runs suites, not
+  # typechecks.
+  #
+  # NO DATASTORE URLS in `env:`, deliberately, and unlike `test-unit` above.
+  # Suites that need a database gate themselves on the connection string
+  # (`describe.skipIf(!process.env.DATABASE_URL)`, the way
+  # packages/features/share/server does), so leaving it unset is exactly what
+  # makes them skip cleanly here while still running wherever a database exists.
+  # Setting one to a plausible value on a runner with no Postgres does the
+  # opposite: it satisfies the guard, and the suite then fails on connect.
+  #
+  # `install: all` rather than a filter, and it is the only job in this file
+  # that installs the whole workspace: it runs every package, so every package's
+  # dependencies have to be present.
+  #
+  # KNOWN GAP, stated rather than fixed: `apps/**` is absent from the `relevant`
+  # filter on `changes`, so a change confined to apps/api, apps/ui, apps/server
+  # or apps/worker starts none of this. Their suites run here whenever anything
+  # else relevant changed — most pushes on a feature branch — but that is a side
+  # effect, not a gate. Adding `apps/**` there switches on nine jobs for an
+  # apps-only change, which is a cost decision to take on its own terms, the way
+  # the `charts/**` note above says.
+  package-suites:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    env:
+      BUILD_TIME: "true"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+    runs-on: ubuntu-latest
+    # No services and no shards: a hundred and fifty small suites, run one after
+    # another. Serial is not thrift — each suite is its own vitest with its own
+    # worker pool, and several at once on a 4-core runner produce
+    # "[vitest-pool]: Worker forks emitted error", which reads as a broken test
+    # and is not one.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "all"
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # Same reason as test-unit and test-component: anything encrypted at
+        # rest has to round-trip through a real key, and a test asserting that
+        # ciphertext is not readable text cannot mock the cipher it asserts on.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Run every workspace package suite
+        run: bash .github/scripts/run-package-suites.sh
+
   test-integration:
     name: "test-integration (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})"
     needs: changes
@@ -971,20 +1065,12 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
-    # Scoped to this job rather than the workflow, so nothing else gains write
-    # access. `reporter: github-pr-review` posts inline review comments, which
-    # needs `pull-requests: write`; without it reviewdog gets a 403 from the
-    # Review API and silently degrades to logging commands. The gate itself
-    # still bites either way — the exit code does not depend on posting — but
-    # the findings stop landing on the diff, which is the whole point of
-    # annotating rather than just failing.
-    #
-    # A pull_request from a fork gets a read-only token no matter what is
-    # declared here, so reviewdog falls back to logging for those. That is
-    # GitHub's rule, not something this block can opt out of.
+    # Read-only. This job used to carry `pull-requests: write` so that a
+    # reviewdog pass could post inline lint annotations through the Review
+    # API. The Oxlint gate reports through the job's exit code and writes
+    # nothing back, so the write scope went with it.
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -1061,154 +1147,41 @@ jobs:
             --shrinking-baseline-only \
             --baseline-reference-dir "$RUNNER_TEMP/architecture-lint-baselines"
 
-      # THE GATE. Everything below this step is annotation, not enforcement.
+      # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
+      # fails the job. A config error and a lint violation both surface here.
       #
-      # reviewdog-action-biome runs with fail_on_error: false and pipes Biome's
-      # stdout into reviewdog, so it reports success whenever Biome produces no
-      # parseable diagnostics — including when Biome refuses to start. That is
-      # not hypothetical: three `nursery` rules graduated out of nursery in
-      # Biome 2.5.x, the unknown keys were a fatal config error, and `pnpm lint`
-      # exited 1 having checked zero files while this job stayed green.
+      # It replaced a two-part step: a blocking full-tree lint plus a
+      # reviewdog pass that made the previous linter's `warn`-tier rules
+      # blocking on the lines a PR added, gated by a script that counted
+      # violations per (file, rule) on both sides of the merge base and
+      # failed only on an increase. See
+      # packages/architecture-lint/adrs/003-unified-oxc-toolchain.md.
       #
-      # So run Biome ourselves and let a non-zero exit fail the job. A config
-      # error and a lint violation both surface here.
-      - name: Biome (blocking — config errors included)
-        working-directory: platform/app
-        run: pnpm lint
-
-      - name: Set up reviewdog
-        if: github.event_name == 'pull_request'
-        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0
-        with:
-          reviewdog_version: v0.21.0
-
-      # The house rules that still carry a baseline are `warn` in biome.jsonc,
-      # so the step above lets them through. This step makes them BLOCKING for
-      # new violations, and annotates the diff with the rest.
+      # NONE OF THAT MACHINERY HAS AN EQUIVALENT HERE, AND NONE IS NEEDED.
+      # It existed because that ruleset carried a warn tier with a baseline
+      # in the thousands, and a rule that cannot block full-tree has to be
+      # narrowed to the diff somehow. /.oxlintrc.architecture.json has no
+      # warn tier: a rule is `error` for the whole tree, and where a backlog
+      # exists the offending files are named in the debt register at the
+      # bottom of that file. The gate is full-tree and the register is the
+      # exemption, in place of a diff filter that had to guess which findings
+      # the author wrote.
       #
-      # TWO JOBS, TWO MECHANISMS, because one tool cannot do both well:
+      # The register is also strictly better on the failure mode that
+      # motivated the delta gate: a formatter rewrapping a signature re-added
+      # the declaration line and handed the PR a whole function's backlog,
+      # because the rules anchored there counted lines. No carried rule
+      # counts lines, so nothing anchors that way any more.
       #
-      #   ANNOTATE — reviewdog maps each diagnostic onto the diff and drops
-      #     anything outside the added lines, which is line-level filtering
-      #     Biome cannot do itself. This pass cannot fail the job.
+      # What IS lost: inline annotations on the diff. Findings now arrive as
+      # job output rather than as review comments.
       #
-      #   GATE — .github/scripts/biome-new-violations.sh counts violations per
-      #     (file, rule) on both sides of the merge base and fails only on an
-      #     increase. Its header explains why the added-lines filter is the
-      #     wrong thing to GATE on: these rules anchor at a function's
-      #     declaration line, so a formatter rewrapping a signature re-adds
-      #     that line and hands the PR the function's entire pre-existing
-      #     backlog. Measured on this branch: 61 such findings, none of them
-      #     authored here.
-      #
-      # `biome lint --changed` is not a substitute for either: it is
-      # file-granular, so a one-line typo fix in a legacy file would inherit
-      # every long-function violation already in it (measured at 902 on this
-      # branch alone). A gate that fires on work you did not do is a gate
-      # people switch off.
-      #
-      # reviewdog comes from its own first-party setup action, pinned to the
-      # same v0.21.0 the previous wrapper resolved. Biome comes from this
-      # repo's lockfile rather than a second copy bundled by a wrapper action.
-      #
-      # That split replaces mongolyy/reviewdog-action-biome, for four measured
-      # reasons:
-      #
-      #  1. VERSION DRIFT. That action bundles its own Biome (renovate moved it
-      #     to ^2.5.5) while this repo pins 2.5.1 in package.json. Rule
-      #     behaviour is version-sensitive, so CI would enforce rules the
-      #     developer's `pnpm lint` never runs. `pnpm exec` uses the lockfile's
-      #     Biome, so the gate and the local command are the same program.
-      #  2. It shells out to `biome check --write`, which MUTATES files during
-      #     what is supposed to be a check.
-      #  3. It reconstructs diagnostics by scraping Biome's human-readable
-      #     console output through a stack of errorformat regexes. Biome 2.x
-      #     emits `--reporter=rdjson` — reviewdog's own schema — so the parsing
-      #     step disappears along with its failure mode.
-      #  4. It passes `--max-diagnostics=30`, silently capping what is reported.
-      #
-      # Biome's own CI recipe is `biome ci`, which annotates via GitHub
-      # directly. That is not enough on its own here: `biome ci` has no notion
-      # of a diff, and the `warn`-tier rules have a baseline in the thousands.
-      # reviewdog is what narrows them to the lines this PR actually adds.
-      #
-      # rdjson carries no severity (verified — Biome omits it even for errors),
-      # so `-level=warning` supplies it for the annotating pass. Errors are
-      # already caught full-tree by the blocking step above.
-      - name: Biome house rules — annotate the diff, gate on new violations
-        if: github.event_name == 'pull_request'
-        env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          # One list, used by the head run, the annotator and the gate's base
-          # run. They must agree: a path linted on one side and not the other
-          # reads as that file's whole backlog appearing or vanishing.
-          # `./packages` is GONE from this list, and deliberately not replaced
-          # with `../../packages`. The nine workspace packages live in one
-          # repo-root tree that this run does not reach: it is started from the
-          # app directory, and /biome.jsonc scopes the workspace to
-          # platform/app/** anyway. Biome reports files outside the project root
-          # by ABSOLUTE path, and the gate keys counts on the reported path, so
-          # the base tree's temp-dir prefix can never match the head's: all 268
-          # of their diagnostics read as brand new every run. Restoring coverage
-          # means giving packages/ a nested config of its own, adding it to the
-          # root config's includes, and giving it its own gate run -- a change to
-          # the lint setup rather than to this list, tracked as a follow-up. The
-          # app tree, which is what this job is named for, is still fully
-          # covered.
-          BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
-
-          # Biome exits non-zero whenever it reports anything; the gate is the
-          # script's decision, not this line's, so don't abort here.
-          pnpm --dir platform/app exec biome lint --reporter=rdjson \
-            "${BIOME_PATHS[@]}" > biome.raw.json || true
-          echo "diagnostics: $(jq '.diagnostics | length' biome.raw.json)"
-
-          # --- ANNOTATE (cannot fail the job) ---
-          #
-          # Biome ran with platform/app as its cwd, so its paths are relative to
-          # that; reviewdog matches against a repo-root diff. Rewriting the
-          # paths here rather than running reviewdog from platform/app keeps the
-          # mapping explicit — a path that silently fails to match the diff
-          # would filter every finding away and read as a clean pass.
-          #
-          # The gate below reads biome.raw.json, NOT this file: it compares
-          # against a base tree whose paths are app-relative too.
-          jq '.diagnostics |= map(.location.path = "platform/app/" + .location.path)' \
-            biome.raw.json > biome.rdjson
-
-          # A single un-capped `github-pr-review` pass died on `422 Body is too
-          # long (maximum is 65536 characters)`: GitHub caps a review body, and
-          # a PR that reformats files has a lot of added lines to annotate.
-          # Capping is safe now that posting and deciding are separate — the
-          # cap costs annotations, never enforcement.
-          POSTED=200
-          jq --argjson n "$POSTED" \
-            '.diagnostics |= (sort_by(.location.path, .location.range.start.line) | .[:$n])' \
-            biome.rdjson > biome.posted.json
-          total=$(jq '.diagnostics | length' biome.rdjson)
-          if [ "$total" -gt "$POSTED" ]; then
-            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate reads all $total"
-          fi
-
-          reviewdog -f=rdjson -name=Biome \
-            -reporter=github-pr-review \
-            -filter-mode=added \
-            -level=warning \
-            -fail-level=none \
-            < biome.posted.json || true
-
-          # --- GATE (the only thing that can fail this step) ---
-          #
-          # Fetch the base explicitly: the script needs a real merge base, and
-          # a missing ref must fail the fetch rather than quietly leave the
-          # comparison with nothing to compare against.
-          BASE="${{ github.base_ref }}"
-          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-          bash .github/scripts/biome-new-violations.sh \
-            biome.raw.json "origin/$BASE" "${BIOME_PATHS[@]}"
+      # `lint:oxlint` rather than `lint`, because `lint` also runs the
+      # architecture-lint CLI, and the step above already runs it with the
+      # merge-base baselines this job needs. `lint:oxlint` is the same binary,
+      # config and path set that `pnpm lint` gives a contributor.
+      - name: Oxlint (blocking -- config errors included)
+        run: pnpm lint:oxlint
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1509,11 +1482,11 @@ jobs:
       - name: Test start-boxd-ssh-agent.sh
         run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
-      - name: Test biome-new-violations.sh
-        run: bash .github/scripts/__tests__/biome-new-violations.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      - name: Test run-package-suites.sh
+        run: bash .github/scripts/__tests__/run-package-suites.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which
@@ -1690,6 +1663,7 @@ jobs:
         test-unit,
         test-component,
         test-integration,
+        package-suites,
         lint,
         ast-grep,
         feature-parity,
@@ -1705,4 +1679,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-component, test-integration, package-suites, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test

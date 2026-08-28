@@ -40,6 +40,18 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
     },
     {
+      filename: "apps/api/tests/evaluation-trpc.mount.unit.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "apps/worker/tests/worker-durable.composition.unit.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "packages/enterprise/composition/worker/tests/wiring.unit.test.ts",
+      code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
+    },
+    {
       filename: "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },

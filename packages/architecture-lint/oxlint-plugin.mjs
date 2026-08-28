@@ -143,8 +143,14 @@ function packageSubpath(specifier, packageName) {
 }
 
 function isFeatureServerCompositionRoot(workspacePath) {
+  // `tests` alongside `src`, because a composition root's own test suite has
+  // to import exactly what the root imports in order to test that it wires it.
+  // Without this the rule fires on the one place the import is unavoidable,
+  // and the only ways out are to stop testing the wiring or to record a rule
+  // gap as if it were debt. A test elsewhere is still held: this is scoped to
+  // the composition workspaces, not to test files in general.
   return (
-    /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/src\//.test(
+    /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
       workspacePath,
     ) ||
     /^platform\/app\/src\/runtime\/(app|worker)\//.test(workspacePath) ||

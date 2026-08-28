@@ -47,7 +47,6 @@ var heavyCommands = []string{
 	"test:integration",
 	"typecheck",
 	"tsgo",
-	"biome",
 	"lint",
 	"next build",
 	"go build",

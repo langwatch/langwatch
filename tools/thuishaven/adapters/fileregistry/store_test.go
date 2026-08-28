@@ -175,7 +175,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 func TestObserveDurationKeepsEveryKeyWhenRunsFinishTogether(t *testing.T) {
 	t.Run("given many runs recording different commands at the same moment", func(t *testing.T) {
 		store := New(t.TempDir())
-		keys := []string{"unit", "integration", "typecheck", "lint", "biome", "tsgo"}
+		keys := []string{"unit", "integration", "typecheck", "lint", "oxlint", "tsgo"}
 
 		var wg sync.WaitGroup
 		for _, key := range keys {

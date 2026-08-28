@@ -312,7 +312,7 @@ registry, and dashboard stay the same.
   3 GiB floor and `GOMAXPROCS` is halved, so the check pays for the shortage
   instead of everything else swapping. `CHECK_PRESSURE=green|amber|red`
   forces the level; explicit `GOMEMLIMIT`/`GOMAXPROCS`/`CHECK_SLOTS` win. The
-  same watch observes gopls, biome, vitest workers, node, bun and claude
+  same watch observes gopls, oxlint, vitest workers, node, bun and claude
   agents (never touched — observed only) and ships every class's footprint to
   the local Grafana as `haven_proc_*` metrics. See
   `dev/docs/adr/095-haven-tsgo-governor.md`.

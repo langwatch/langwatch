@@ -45,13 +45,14 @@ the second-largest cluster (45 findings): tests that cannot fail. Measured
 across `src`, `ee` and `packages`: 171 `should`/vague names, 20 tautological
 assertions, 10 assertion-free tests.
 
-Biome covers the rest of the test surface — `noFocusedTests`,
-`noSkippedTests`, `noDuplicateTestHooks`, `noMisplacedAssertion`,
-`noExportsInTest`, `useTestHooksOnTop`, `noExcessiveNestedTestSuites` — scoped
-to test files in `platform/app/biome.jsonc`. Unscoped, `noFocusedTests` fires on
-any function named `fit(...)`, including a production zoom hook. Each rule that moves here should be **deleted**
-from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
-reported twice, once deterministically and once probabilistically.
+oxlint covers the rest of the test surface — `vitest/no-focused-tests`,
+`jest/no-export`, `jest/max-nested-describe`, `jest/no-duplicate-hooks`,
+`jest/prefer-hooks-on-top` — scoped to test files in
+`/.oxlintrc.architecture.json`. Unscoped, `no-focused-tests` fires on any
+function named `fit(...)`, including a production zoom hook, which is why the
+scoping is deliberate. Each rule that moves here should be **deleted** from
+`path_instructions` in `/.coderabbit.yaml`, or every violation gets reported
+twice, once deterministically and once probabilistically.
 
 Most rules are `severity: warning` during rollout. Promote per-rule to `error`
 once its baseline is verifiably clean — **severity is what makes a rule a
@@ -95,5 +96,5 @@ rule is unproven.
   heavy-column dedup anti-pattern).
 - `/.coderabbit.yaml` — the AI reviewer; consumes `rules/`, and carries the
   judgement-level rules that genuinely cannot be expressed syntactically.
-- `platform/app/biome.json` — the TypeScript linter proper. Rules expressible as
-  Biome config belong there, not here.
+- `/.oxlintrc.architecture.json` — the TypeScript linter proper. Rules
+  expressible as oxlint config belong there, not here.

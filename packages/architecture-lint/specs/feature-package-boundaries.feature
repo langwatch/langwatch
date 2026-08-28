@@ -121,6 +121,13 @@ Feature: Feature package boundary lint
     And the diagnostic names the compatible application or enterprise composition directory as the allowed location
 
   @unit @architecture
+  Scenario: A composition root's own tests import what the root imports
+    Given a test inside an application or enterprise composition workspace imports a feature server package
+    When architecture lint checks the importer
+    Then the server dependency is allowed, because the test exists to prove the root wires it
+    And a test outside a composition workspace is still rejected
+
+  @unit @architecture
   Scenario: A relative import cannot escape its physical package
     Given feature source uses a relative path that resolves outside its package root
     When architecture lint resolves the import

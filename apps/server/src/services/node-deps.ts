@@ -219,7 +219,7 @@ export async function ensureLangwatchDeps(
 
   // Take the dev dependencies back out, the way the production Dockerfile
   // does after ITS build (install → build → prod-only pass → prisma generate).
-  // This is what drops vite, vitest, playwright, biome and the rest of the
+  // This is what drops vite, vitest, playwright and the rest of the
   // build tooling from the tree the server actually runs — on the order of a
   // gigabyte — while prisma stays, because migrations run through the prisma
   // CLI and it is declared as a runtime dependency. tsx goes out with the

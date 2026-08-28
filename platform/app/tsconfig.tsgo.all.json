@@ -30,10 +30,6 @@
     ".next-saas",
     "**/*.snippet.*",
     "src/**/codegen/snippets/**/*",
-    "packages/insanity-check/**/*",
-    // Fixtures for the biome plugin tests. They are sources for a lint rule
-    // to match against, not code that has to compile, and neither the app
-    // project nor the tests project reaches them.
-    "biome-plugins/**"
+    "packages/insanity-check/**/*"
   ]
 }

@@ -144,11 +144,19 @@ in order of how often they are violated:
    _inside_ that helper and described under "The 4xx authored-prose channel"
    below; it is not something to reimplement at a call site.
 
-   A Biome plugin (`biome-plugins/no-raw-error-toast.grit`) flags this at author
-   time and `logic/__tests__/noRawErrorToasts.unit.test.ts` scans the tree for
-   it. Both work by derivation, so they will occasionally flag a value that only
-   _looks_ message-derived — a string that went through a sanitiser, or a local
-   parser's message that never crossed the wire. Mark that one line
+   `logic/__tests__/noRawErrorToasts.unit.test.ts` scans the tree for it. It is
+   now the only guard: an author-time GritQL plugin used to run alongside it and
+   went with the linter that hosted it (see
+   `packages/architecture-lint/adrs/003-unified-oxc-toolchain.md`). The scanner
+   was always the authority on what may ship, and it catches everything the
+   plugin did except one shape — a copy object built outside the toast call's
+   own argument list, `toaster.create(buildToast({ description: error.message
+   }))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
+   an oxlint JavaScript plugin is open follow-up work.
+
+   The scanner works by derivation, so it will occasionally flag a value that
+   only _looks_ message-derived — a string that went through a sanitiser, or a
+   local parser's message that never crossed the wire. Mark that one line
    `// no-raw-error-toast-ok` with a reason. Prefer the marker to the guard's
    file-level allowlist: an exemption entry blinds the guard to the whole file.
 
@@ -172,12 +180,10 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    anywhere from the key's line to the line the value ends on — so both the
    compact and the wrapped spelling work.
 
-   **Write the marker _inside_ the call or element it exempts.** Both guards
-   honour it there, and only there. GritQL sees a node as the span from its
-   first token to its last, so the Biome plugin can only see comments _between_
-   those tokens: a marker trailing the statement's closing `);` suppresses the
-   scanner but not the plugin, and the line still fails CI. Inside the
-   construct, either spelling is honoured:
+   **Write the marker _inside_ the call or element it exempts.** The scanner
+   matches it against the line of the copy slot's key, and writing it inside the
+   construct is what keeps it on that line through a reformat. Either spelling
+   is honoured:
 
    ```tsx
    toaster.create({
@@ -190,10 +196,8 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    </Alert.Description>;
    ```
 
-   If you need a blanket escape hatch, `// biome-ignore lint: <reason>` on the
-   line above works. `// biome-ignore plugin: …` parses but suppresses nothing,
-   and `// biome-ignore plugin/no-raw-error-toast: …` is a hard parse error —
-   neither is a valid Biome suppression category.
+   There is no blanket escape hatch. The scanner has a file-level allowlist,
+   which blinds it to the whole file; use the per-line marker instead.
 
 2. **Title and description both come from the `code`**, not the server. The
    registry owns the customer-facing copy. A code the registry does not know

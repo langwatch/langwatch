@@ -82,7 +82,7 @@ COPY platform/app ./platform/app
 RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/web..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
-# gigabyte of vite, vitest, playwright and biome. A filtered re-install with
+# gigabyte of vite, vitest and playwright. A filtered re-install with
 # --prod rather than `pnpm prune --prod`: prune takes no --filter, so in a
 # workspace it reasons about every project instead of the one subtree we
 # installed.
@@ -106,7 +106,7 @@ RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@la
 # /app/node_modules. Measured on a scratch workspace: after
 # `pnpm install --prod`, `node_modules/.pnpm/<devdep>@<ver>` is still present;
 # after `pnpm prune --prod` it is gone. Without this line vite, vitest,
-# playwright, biome and esbuild all ship in the production image, merely
+# playwright and esbuild all ship in the production image, merely
 # unreferenced — roughly the gigabyte this step is supposed to remove.
 #
 # `prune` takes no --filter, which is why the install above is filtered and

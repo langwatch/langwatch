@@ -171,6 +171,8 @@ From the repo root (it proxies these to `@langwatch/web`)
 
 ```bash
 pnpm typecheck        # Type check (TypeScript 7's native tsc, fast)
+pnpm lint             # oxlint, the only JavaScript/TypeScript linter
+pnpm format           # oxfmt, the only formatter
 pnpm test:unit        # Unit tests
 pnpm test:component   # Integration tests that need no datastore (jsdom, parallel)
 pnpm test:integration # Integration tests that do (Postgres/ClickHouse/Redis)
@@ -195,10 +197,9 @@ fails loudly on the first run rather than passing for the wrong reason. See
 **Whole-repo checks take a machine-wide slot.** A typecheck holds a 2.3 to
 3.5 GiB working set and uses every core — though what you see in Activity
 Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
-gave it (ADR-100); a biome run over 6,800 files spends 38 CPU-seconds in 4
-seconds of wall clock. That is fine once and ruinous four times over, so
-`typecheck`, `typecheck:tests`, `lint`, `lint:fix`,
-`lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
+gave it (ADR-100). That is fine once and ruinous four times over, so
+`typecheck`, `typecheck:tests`, `lint`, `lint:fix` and `format` all go through
+`dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
 limit waits its turn instead of piling on. With haven installed the wrapper
@@ -213,15 +214,15 @@ from a person's shell only: agent shells carry `CLAUDECODE`, and a gate-off
 there is ignored with a note (never set `CHECK_SLOTS` yourself — the queue
 exists to serialize agents). Unset, the limit comes from the machine (one per
 6 GiB of RAM, capped at one per 4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
---explain` shows the limit and who currently holds a slot. Don't cap the tools'
-own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
-CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+--explain` shows the limit and who currently holds a slot. Don't cap a tool's
+own threads instead (`RAYON_NUM_THREADS` works on the Rust tools): it spends
+the same CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
 **Going around the scripts does not go around the queue.** `platform/app`'s
-`node_modules/.bin/{tsc,tsgo,biome}` are shims installed by
+`node_modules/.bin/{tsc,tsgo}` are shims installed by
 `dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsc
---noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/biome check ./src` take
-a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
+--noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/tsgo -p ...` take a
+slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
 no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
 for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with

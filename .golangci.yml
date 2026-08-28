@@ -73,7 +73,7 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true
 
-    # Mirrors the TypeScript side: biome.new-code.jsonc caps functions at 60
+    # Mirrors the TypeScript side, which caps functions at 60
     # lines. Statements are capped too because a 60-line function of dense
     # one-liners is the same SRP problem.
     funlen:
@@ -86,7 +86,7 @@ linters:
 
     revive:
       rules:
-        # 3 positional params, matching biome's useMaxParams. Past that, a
+        # 3 positional params. Past that, a
         # struct or options type reads better at the call site.
         - name: argument-limit
           arguments: [3]
