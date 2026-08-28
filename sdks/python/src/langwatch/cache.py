@@ -8,8 +8,9 @@ so the rows that follow read it instead of repeating the work.
 Values are encrypted at rest, expire on their own, and belong to one project.
 """
 
+import json
 import urllib.parse
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -17,23 +18,43 @@ from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
 from langwatch.state import get_instance
-from langwatch.utils.exceptions import extract_api_error_code
+from langwatch.utils.exceptions import (
+    extract_api_error_code,
+    extract_api_error_reasons,
+)
 from langwatch.utils.initialization import ensure_setup
+
+CacheValue = Union[str, Dict[str, Any], List[Any]]
+"""What an entry holds: text, or a dict or list, which travels as JSON text."""
 
 
 def _quote(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
-def _error_code(response: httpx.Response) -> str:
+def _error_detail(response: httpx.Response) -> str:
+    """The platform's code and the fields it named, or an empty string.
+
+    A refused write names the field and what was expected of it, which is the
+    one thing the caller needs to fix it. Nothing from the request itself is
+    read back: the platform's wording never quotes a value.
+    """
     try:
-        return extract_api_error_code(response.json()) or ""
+        body = response.json()
     except Exception:
         return ""
+    code = extract_api_error_code(body) or ""
+    reasons = extract_api_error_reasons(body)
+    if code and reasons:
+        return f" ({code}: {'; '.join(reasons)})"
+    if code:
+        return f" ({code})"
+    return ""
 
 
 def _raise_for_status(response: httpx.Response) -> None:
-    """Raise for a refused call, naming the status and the platform's code.
+    """Raise for a refused call, naming the status, the platform's code and
+    the fields it rejected.
 
     Nothing from the request reaches the message. A cache value is a
     credential often enough that quoting one in an exception, which a run then
@@ -43,13 +64,38 @@ def _raise_for_status(response: httpx.Response) -> None:
         return
 
     status = response.status_code
-    code = _error_code(response)
-    detail = f" ({code})" if code else ""
-    if status in (400, 404):
+    detail = _error_detail(response)
+    if status in (400, 404, 422):
         raise ValueError(f"The agent cache refused the call: {status}{detail}")
     if status in (401, 403):
         raise RuntimeError(f"The agent cache refused the credential: {status}{detail}")
     raise RuntimeError(f"The agent cache answered {status}{detail}")
+
+
+def _encode(value: CacheValue) -> str:
+    """The text the platform stores: a str as is, a dict or list as JSON."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
+    raise TypeError(
+        "A cache value must be a str, a dict or a list; "
+        f"got {type(value).__name__}"
+    )
+
+
+def _decode(text: str) -> CacheValue:
+    """The value the caller stored: JSON text of a dict or list comes back
+    parsed, any other text comes back as it is."""
+    stripped = text.lstrip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            return text
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    return text
 
 
 class CacheFacade:
@@ -71,13 +117,18 @@ class CacheFacade:
     def _http(self) -> httpx.Client:
         return self._client.get_httpx_client()
 
-    def get(self, name: str, default: Optional[str] = None) -> Optional[str]:
+    def get(
+        self, name: str, default: Optional[CacheValue] = None
+    ) -> Optional[CacheValue]:
         """
         Read an entry, or `default` when the project holds none under `name`.
 
         A name that was never stored and one whose lifetime has passed answer
         the same way, so the calling code has one branch rather than a
         try/except around every read.
+
+        A dict or list stored through `set` or `claim` comes back parsed;
+        text comes back as it was stored.
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
@@ -87,21 +138,22 @@ class CacheFacade:
         if response.status_code == 404:
             return default
         _raise_for_status(response)
-        return response.json()["value"]
+        return _decode(response.json()["value"])
 
     def set(
-        self, name: str, value: str, ttl_seconds: Optional[int] = None
+        self, name: str, value: CacheValue, ttl_seconds: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Store a value under a name, whether or not the name is held yet.
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
-            value: What to store. It is encrypted server-side.
+            value: What to store: text, or a dict or list, which is stored as
+                JSON and comes back parsed. It is encrypted server-side.
             ttl_seconds: How long the entry stays readable. The project's
                 default applies when this is not given.
         """
-        body: Dict[str, Any] = {"value": value}
+        body: Dict[str, Any] = {"value": _encode(value)}
         if ttl_seconds is not None:
             body["ttl_seconds"] = ttl_seconds
 
@@ -109,7 +161,9 @@ class CacheFacade:
         _raise_for_status(response)
         return response.json()
 
-    def claim(self, name: str, value: str, ttl_seconds: Optional[int] = None) -> bool:
+    def claim(
+        self, name: str, value: CacheValue, ttl_seconds: Optional[int] = None
+    ) -> bool:
         """
         Take a name, but only if the project does not hold it yet.
 
@@ -124,11 +178,12 @@ class CacheFacade:
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
-            value: What to store. It is encrypted server-side.
+            value: What to store: text, or a dict or list, which is stored as
+                JSON and comes back parsed. It is encrypted server-side.
             ttl_seconds: How long the entry stays readable. The project's
                 default applies when this is not given.
         """
-        body: Dict[str, Any] = {"value": value}
+        body: Dict[str, Any] = {"value": _encode(value)}
         if ttl_seconds is not None:
             body["ttl_seconds"] = ttl_seconds
 

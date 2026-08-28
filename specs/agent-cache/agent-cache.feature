@@ -290,3 +290,29 @@ Feature: The agent cache
       When the agent reads the exception
       Then nothing in it quotes the value the agent sent
       # A run shows what it printed, and an exception text is printed often.
+
+    # The route stores text. A session is a dict more often than not, and an
+    # agent that hands one over should not have to know that: the SDK stores
+    # it as JSON and reads it back parsed. Text passes through untouched, so
+    # an entry written over REST, or by an older SDK, reads the same as before.
+    @unit
+    Scenario: The SDK stores a dict or list as JSON and reads it back parsed
+      When the agent stores a dict under ACME_SESSION
+      Then the write carries the dict as JSON text
+      And reading ACME_SESSION gives the agent the dict back
+
+    @unit
+    Scenario: The SDK refuses a value it cannot store before calling the platform
+      When the agent stores a number
+      Then the agent is told which types a value can be
+      And no call reaches the platform
+
+    # A customer report: every write refused with "400 (validation_error)" and
+    # nothing more, because the message stopped at the code. The platform
+    # names the rejected field and what it expected, and that is what the
+    # caller needs. The platform's wording never quotes a value.
+    @unit
+    Scenario: A refused write names the field the platform rejected
+      Given the platform refuses a write because the value is not text
+      When the agent reads the exception
+      Then it names the field and what was expected of it
