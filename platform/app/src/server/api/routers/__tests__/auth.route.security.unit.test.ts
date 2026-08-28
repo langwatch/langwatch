@@ -74,7 +74,6 @@ describe("auth.route public budgets", () => {
     routeMock.mockResolvedValue(REDIRECT_DECISION);
   });
 
-  /** @scenario Public auth limits ignore caller-controlled forwarding headers */
   it("keys the caller budget on the direct socket peer", async () => {
     await caller({ peer: "203.0.113.9" }).route({
       identifier: "sam@example.com",
@@ -90,7 +89,6 @@ describe("auth.route public budgets", () => {
     );
   });
 
-  /** @scenario Auth routing spends one canonical per-address budget */
   it("hashes canonical addresses while preserving distinct plus tags", async () => {
     const routeCaller = caller({ peer: "203.0.113.9" });
 
@@ -110,7 +108,6 @@ describe("auth.route public budgets", () => {
     expect(addressKeys.join(" ")).not.toContain("sam");
   });
 
-  /** @scenario A route request without an identifier has no address budget */
   it("uses the conservative unknown-peer bucket and skips an absent address", async () => {
     await caller({}).route({ identifier: null });
 
@@ -122,7 +119,6 @@ describe("auth.route public budgets", () => {
     });
   });
 
-  /** @scenario Auth routing is refused when either public budget is exhausted */
   it("enforces both the peer and address budgets", async () => {
     rateLimitMock.mockResolvedValueOnce({
       allowed: false,
@@ -158,7 +154,6 @@ describe("auth.route public budgets", () => {
     expect(routeMock).not.toHaveBeenCalled();
   });
 
-  /** @scenario The auth.route wire response has one provider identifier */
   it("omits the redundant top-level connection id from serialization", async () => {
     const response = await caller({ peer: "203.0.113.9" }).route({
       identifier: "sam@example.com",

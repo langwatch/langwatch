@@ -32,7 +32,6 @@ async function directPeerFrom(incoming?: IncomingMessage) {
 }
 
 describe("the Hono to tRPC request shim", () => {
-  /** @scenario The tRPC context carries the direct Node socket peer */
   it("copies conninfo's direct peer onto the Next request socket", async () => {
     const request = new Request("https://langwatch.test/api/trpc/auth.route", {
       headers: { "x-forwarded-for": "198.51.100.77" },
@@ -46,7 +45,6 @@ describe("the Hono to tRPC request shim", () => {
     expect(shim.headers["x-forwarded-for"]).toBe("198.51.100.77");
   });
 
-  /** @scenario An adapter without conninfo carries no invented peer address */
   it("leaves the socket peer absent when Hono has no Node connection", async () => {
     const directPeer = await directPeerFrom();
     const shim = buildReqShim(

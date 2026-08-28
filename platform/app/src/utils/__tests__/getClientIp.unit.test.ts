@@ -80,7 +80,6 @@ describe("getClientIp()", () => {
 });
 
 describe("getDirectPeerIp()", () => {
-  /** @scenario Public auth limits ignore caller-controlled forwarding headers */
   it("uses the socket peer even when a forwarding header disagrees", () => {
     const req = {
       headers: { "x-forwarded-for": "198.51.100.77" },
