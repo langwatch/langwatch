@@ -440,6 +440,19 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/identity-server run typecheck
 
+      # @langwatch/identity-eventing is the third of the identity trio: the
+      # framework envelope, commands, folds, process managers and the four
+      # pipeline definitions the worker registers. It carries the seven suites
+      # that moved out of platform/app with them, so without these steps that
+      # coverage would run nowhere.
+      - name: Run @langwatch/identity-eventing unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-eventing run test
+
+      - name: Typecheck @langwatch/identity-eventing
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/identity-eventing run typecheck
+
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
       - name: Run @langwatch/system-migrations unit tests

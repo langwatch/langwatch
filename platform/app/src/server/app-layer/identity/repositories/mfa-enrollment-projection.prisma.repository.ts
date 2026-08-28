@@ -5,7 +5,7 @@ import type {
   MfaMethod,
 } from "@langwatch/identity";
 import type { MfaEnrollment, PrismaClient } from "~/generated/prisma/client";
-import type { MfaFoldState } from "~/server/event-sourcing/pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import type { MfaFoldState } from "@langwatch/identity-eventing";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

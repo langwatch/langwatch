@@ -11,10 +11,12 @@ import { describe, expect, it } from "vitest";
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
-} from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
-import { createTenantId } from "@langwatch/eventing";
-import type { Command } from "../../../commands/command";
-import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
+} from "../../testing";
+import {
+  type Command,
+  createTenantId,
+  validateEventAggregateType,
+} from "@langwatch/eventing";
 import { AttachIdentifierCommand } from "../commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "../commands/detachIdentifier.command";
 import { EraseUserCommand } from "../commands/eraseUser.command";

@@ -20,6 +20,12 @@ const IDENTITY_SERVER_SRC = join(
   "identity-server",
   "src",
 );
+const IDENTITY_EVENTING_SRC = join(
+  REPO_ROOT,
+  "packages",
+  "identity-eventing",
+  "src",
+);
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];
@@ -46,12 +52,28 @@ function importSpecifiers(file: string): string[] {
   ].map((match) => match[1] as string);
 }
 
-const FORBIDDEN_FOR_BOTH = [
+/**
+ * The app and the storage engines, for every identity package.
+ *
+ * `event-sourcing` is the path the framework had while it lived in
+ * `platform/app`; `@langwatch/eventing` is its package name, and it is listed
+ * separately because the old pattern silently stopped matching when the
+ * framework became a package — a guard that reads as enforcing "no framework"
+ * while matching nothing at all.
+ */
+const FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE = [
   /^~\//,
   /^@prisma\//,
   /^\.prisma\//,
   /prisma\/client/,
-  /event-sourcing/,
+];
+
+/** …plus the framework, for the two packages that must never reach it. */
+const FORBIDDEN_FRAMEWORK = [/event-sourcing/, /^@langwatch\/eventing(?:\/|$)/];
+
+const FORBIDDEN_FOR_BOTH = [
+  ...FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE,
+  ...FORBIDDEN_FRAMEWORK,
 ];
 
 describe("identity package boundaries", () => {
@@ -79,6 +101,28 @@ describe("identity package boundaries", () => {
       for (const file of sourceFiles(IDENTITY_SERVER_SRC)) {
         for (const specifier of importSpecifiers(file)) {
           if (FORBIDDEN_FOR_BOTH.some((pattern) => pattern.test(specifier))) {
+            offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
+          }
+        }
+        if (/process\.env/.test(readFileSync(file, "utf8"))) {
+          offenders.push(`${relative(REPO_ROOT, file)} reads process.env`);
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+  });
+
+  describe("when the event-sourcing layer's sources are scanned", () => {
+    /** @scenario "The identity event-sourcing layer reads no storage engine and no environment" */
+    it("import no Prisma and no app, and read no process.env", () => {
+      const offenders: string[] = [];
+      for (const file of sourceFiles(IDENTITY_EVENTING_SRC)) {
+        for (const specifier of importSpecifiers(file)) {
+          if (
+            FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE.some((pattern) =>
+              pattern.test(specifier),
+            )
+          ) {
             offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
           }
         }

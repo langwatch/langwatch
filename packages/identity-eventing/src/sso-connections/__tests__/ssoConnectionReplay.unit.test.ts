@@ -11,11 +11,11 @@ import {
   TEARDOWN_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "../../../projections/stateProjection.types";
+} from "@langwatch/eventing";
 import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,

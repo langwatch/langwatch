@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/identity-eventing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116, ADR-117): the framework envelope over @langwatch/identity's fact payloads, the thin command handlers that run @langwatch/identity-server's guards, the fold projections, the two process managers, and the four pipeline definitions the worker registers. Storage-engine-free - the app supplies every projection store and repository.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/identity": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

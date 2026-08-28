@@ -11,9 +11,11 @@ import {
   MfaGuards,
 } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "@langwatch/eventing";
-import type { Command } from "../../../commands/command";
-import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
+import {
+  type Command,
+  createTenantId,
+  validateEventAggregateType,
+} from "@langwatch/eventing";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,

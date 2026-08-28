@@ -17,14 +17,14 @@
 import { IdentityGuards } from "@langwatch/identity-server";
 import { IdentityEngineUnavailableError } from "@langwatch/identity-server/better-auth";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
+import type { IdentityEvent } from "@langwatch/identity-eventing";
 import { IdentityBirthService } from "../birth";
 import type { IdentityLedgerWriter } from "../ledger";
 import type { PrismaIdentityNewbornRepository } from "../repositories/identity-newborn.prisma.repository";
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
-} from "./support/identity-test-doubles";
+} from "@langwatch/identity-eventing/testing";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;

@@ -9,20 +9,22 @@ import {
   IdentityService,
 } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
-import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
-import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import {
+  type IdentityEvent,
+  type IdentityFoldState,
+  identityEventsFor,
+} from "@langwatch/identity-eventing";
 import type {
+  ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "@langwatch/eventing";
 import { IdentityLedgerWriter } from "../ledger";
 import { identityProjectionConvergenceTimeoutsTotal } from "../metrics";
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
-} from "./support/identity-test-doubles";
+} from "@langwatch/identity-eventing/testing";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

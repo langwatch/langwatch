@@ -21,7 +21,9 @@
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

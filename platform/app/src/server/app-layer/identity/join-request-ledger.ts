@@ -41,13 +41,13 @@ import {
   type EventStore,
   type StateProjectionStore,
 } from "@langwatch/eventing";
-import { joinRequestEventsFor } from "~/server/event-sourcing/pipelines/join-requests/envelope";
-import type { JoinRequestFoldState } from "~/server/event-sourcing/pipelines/join-requests/projections/joinRequestState.foldProjection";
 import {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
-} from "~/server/event-sourcing/pipelines/join-requests/schemas/constants";
-import type { JoinRequestEvent } from "~/server/event-sourcing/pipelines/join-requests/schemas/events";
+  type JoinRequestEvent,
+  type JoinRequestFoldState,
+  joinRequestEventsFor,
+} from "@langwatch/identity-eventing";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 

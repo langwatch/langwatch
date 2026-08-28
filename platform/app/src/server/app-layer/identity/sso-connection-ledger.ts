@@ -51,13 +51,13 @@ import {
   type EventStore,
   type StateProjectionStore,
 } from "@langwatch/eventing";
-import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
-import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
-} from "~/server/event-sourcing/pipelines/sso-connections/schemas/constants";
-import type { SsoConnectionEvent } from "~/server/event-sourcing/pipelines/sso-connections/schemas/events";
+  type SsoConnectionEvent,
+  type SsoConnectionFoldState,
+  ssoConnectionEventsFor,
+} from "@langwatch/identity-eventing";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 

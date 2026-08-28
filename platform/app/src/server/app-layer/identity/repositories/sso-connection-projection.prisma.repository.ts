@@ -12,7 +12,7 @@ import type {
   PrismaClient,
   SsoConnection,
 } from "~/generated/prisma/client";
-import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
+import type { SsoConnectionFoldState } from "@langwatch/identity-eventing";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

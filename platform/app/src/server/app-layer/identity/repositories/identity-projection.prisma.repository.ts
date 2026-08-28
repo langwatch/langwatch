@@ -7,7 +7,7 @@ import type { IdentityReservationRepository } from "@langwatch/identity-server";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
+import type { IdentityFoldState } from "@langwatch/identity-eventing";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

@@ -1,4 +1,4 @@
-Feature: Identity ships as two packages with one composition root
+Feature: Identity ships as three packages with one composition root
   As a LangWatch engineer
   I need the identity platform's boundaries enforced by module resolution,
   not by convention
@@ -15,6 +15,13 @@ Feature: Identity ships as two packages with one composition root
   #                                verbs, the ceremonies better-auth's own
   #                                databaseHooks call; no Prisma, no env,
   #                                no framework, and no better-auth either
+  #   @langwatch/identity-eventing the framework half — envelopes, thin
+  #                                commands, folds, process managers and the
+  #                                four pipeline definitions; ADR-115 put
+  #                                these in platform/app, and the core
+  #                                application exit deletes that host, so
+  #                                they became their own package rather than
+  #                                pulling the framework into identity-server
   #   platform/app                 Prisma repositories, the ledger writer,
   #                                the gate, and ONE runtime that composes
   #                                everything
@@ -34,6 +41,14 @@ Feature: Identity ships as two packages with one composition root
     When its sources are scanned for imports and environment reads
     Then none of them import Prisma, the app, or the event-sourcing framework
     And none of them read process.env
+
+  @unit
+  Scenario: The identity event-sourcing layer reads no storage engine and no environment
+    Given the @langwatch/identity-eventing package
+    When its sources are scanned for imports and environment reads
+    Then none of them import Prisma or the app
+    And none of them read process.env
+    But it may import the event-sourcing framework, which is the half it owns
 
   @unit
   Scenario: The app composes the identity services in exactly one place

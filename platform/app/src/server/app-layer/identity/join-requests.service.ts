@@ -28,7 +28,7 @@ import {
   newJoinRequestId,
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { JOIN_REQUEST_EXPIRY_MS } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import { JOIN_REQUEST_EXPIRY_MS } from "@langwatch/identity-eventing";
 import { rateLimit } from "~/server/rateLimit";
 import type { PrismaJoinRequestReadRepository } from "./repositories/join-request.prisma.repository";
 

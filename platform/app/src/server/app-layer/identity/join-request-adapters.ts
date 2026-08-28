@@ -11,7 +11,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { JoinRequestLifecyclePort } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestLifecyclePort } from "@langwatch/identity-eventing";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import {
   sendDomainAutoJoinedEmail,

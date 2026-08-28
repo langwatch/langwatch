@@ -5,9 +5,11 @@ import {
 } from "@langwatch/identity";
 import { ScimSyncGuards } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../..";
-import type { Command } from "../../../commands/command";
-import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
+import {
+  type Command,
+  createTenantId,
+  validateEventAggregateType,
+} from "@langwatch/eventing";
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,

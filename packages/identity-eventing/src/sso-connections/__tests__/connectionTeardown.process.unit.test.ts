@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 import { describe, expect, it, vi } from "vitest";
-import type { ProcessHandlerContext } from "../../../pipeline/processManagerDefinition";
+import type { ProcessHandlerContext } from "@langwatch/eventing";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   type ConnectionTeardownIntents,

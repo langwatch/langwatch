@@ -20,7 +20,7 @@ import { emptySsoConnection } from "@langwatch/identity";
 import { newSsoConnectionId } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaSsoConnectionProjectionRepository } from "~/server/app-layer/identity/repositories/sso-connection-projection.prisma.repository";
-import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
+import { SsoConnectionStateFoldProjection } from "@langwatch/identity-eventing";
 
 /**
  * An ACTIVE connection for the given organization. ACTIVE because that is the

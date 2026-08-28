@@ -9,9 +9,11 @@ import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { createTenantId } from "@langwatch/eventing";
-import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
-import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
-import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
+import {
+  type SsoConnectionFoldState,
+  SsoConnectionStateFoldProjection,
+  ssoConnectionEventsFor,
+} from "@langwatch/identity-eventing";
 import { LocalDoorBreakGlassBinding } from "../../break-glass-binding";
 import { AdminEmailPlatformOperators } from "../../platform-operators";
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";

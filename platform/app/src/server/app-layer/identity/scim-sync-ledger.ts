@@ -39,12 +39,12 @@ import type { ScimSyncLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { type AggregateType, createTenantId, type EventStore } from "@langwatch/eventing";
-import { scimSyncEventsFor } from "~/server/event-sourcing/pipelines/scim-sync/envelope";
 import {
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_PIPELINE_NAME,
-} from "~/server/event-sourcing/pipelines/scim-sync/schemas/constants";
-import type { ScimSyncEvent } from "~/server/event-sourcing/pipelines/scim-sync/schemas/events";
+  type ScimSyncEvent,
+  scimSyncEventsFor,
+} from "@langwatch/identity-eventing";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
 

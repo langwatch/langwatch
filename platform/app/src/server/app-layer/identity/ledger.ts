@@ -57,10 +57,12 @@ import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
-import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
-import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
-import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
+import {
+  IDENTITY_PIPELINE_NAME,
+  type IdentityEvent,
+  type IdentityFoldState,
+  identityEventsFor,
+} from "@langwatch/identity-eventing";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,

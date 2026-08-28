@@ -4,15 +4,15 @@ import { describe, expect, it } from "vitest";
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
-} from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
-import { createTenantId } from "@langwatch/eventing";
+} from "../../testing";
+import {
+  createTenantId,
+  EventSourcing,
+  type ProjectionStoreContext,
+  type StateProjectionStore,
+  type StoredProjection,
+} from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { EventSourcing } from "../../../eventSourcing";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "../../../projections/stateProjection.types";
 import { createIdentityPipeline } from "../pipeline";
 import type { IdentityFoldState } from "../projections/identityState.foldProjection";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "../schemas/constants";

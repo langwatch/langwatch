@@ -1,6 +1,7 @@
 {
   "version": 0,
   "features": [
+    "api-key",
     "authz",
     "automation",
     "billing-reporting",
@@ -12,9 +13,13 @@
     "github",
     "governance-events",
     "governance-ingestion",
+    "identity",
+    "join-request",
     "log",
     "metric",
     "scenario",
+    "scim-sync",
+    "sso-connection",
     "suite",
     "topic",
     "trace"

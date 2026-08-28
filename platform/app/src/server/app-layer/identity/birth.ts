@@ -19,8 +19,10 @@ import {
   type IdentityNewborn,
 } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
-import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
-import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
+import {
+  type IdentityEvent,
+  identityEventsFor,
+} from "@langwatch/identity-eventing";
 import type { IdentityLedgerWriter } from "./ledger";
 import type { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 
