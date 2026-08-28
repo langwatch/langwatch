@@ -85,6 +85,16 @@ function nullableInt(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
 
+/** A missing string column reads as empty, never as the text "undefined". */
+function str(value: unknown): string {
+  return String(value ?? "");
+}
+
+/** An Array(String) column, defensive about a shape the driver did not give. */
+function strArray(value: unknown): string[] {
+  return Array.isArray(value) ? (value as string[]) : [];
+}
+
 /**
  * Read and write side of `governance_cost_rollup_1d`.
  *
@@ -371,19 +381,25 @@ export class GovernanceCostRollupClickHouseRepository {
     return latest > 0 ? latest : null;
   }
 
+  /**
+   * One driver row into the typed row. Every field goes through one of the
+   * four coercions above rather than coercing inline, so this stays a flat
+   * mapping with no branching of its own — which is also what keeps its
+   * complexity inside the lint budget as columns are added.
+   */
   private decode(row: Record<string, unknown>): GovernanceCostRollupRow {
     return {
-      TenantId: String(row.TenantId ?? ""),
-      Day: String(row.Day ?? ""),
-      CostSource: String(row.CostSource ?? ""),
-      IngestionSourceId: String(row.IngestionSourceId ?? ""),
-      Provider: String(row.Provider ?? ""),
-      Model: String(row.Model ?? ""),
-      AgentId: String(row.AgentId ?? ""),
-      CurrencyCode: String(row.CurrencyCode ?? ""),
-      RawActorId: String(row.RawActorId ?? ""),
-      OrganizationId: String(row.OrganizationId ?? ""),
-      ExactOrEstimate: String(row.ExactOrEstimate ?? ""),
+      TenantId: str(row.TenantId),
+      Day: str(row.Day),
+      CostSource: str(row.CostSource),
+      IngestionSourceId: str(row.IngestionSourceId),
+      Provider: str(row.Provider),
+      Model: str(row.Model),
+      AgentId: str(row.AgentId),
+      CurrencyCode: str(row.CurrencyCode),
+      RawActorId: str(row.RawActorId),
+      OrganizationId: str(row.OrganizationId),
+      ExactOrEstimate: str(row.ExactOrEstimate),
       AmountNanoUsd: nullableInt(row.AmountNanoUsd),
       AmountNanoMinor: int(row.AmountNanoMinor),
       TokensInput: int(row.TokensInput),
@@ -393,11 +409,9 @@ export class GovernanceCostRollupClickHouseRepository {
       RequestCount: int(row.RequestCount),
       RevisionCount: int(row.RevisionCount),
       PreviousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
-      PulledItemsJson: String(row.PulledItemsJson ?? ""),
-      Version: String(row.Version ?? ""),
-      AppliedEventIds: Array.isArray(row.AppliedEventIds)
-        ? (row.AppliedEventIds as string[])
-        : [],
+      PulledItemsJson: str(row.PulledItemsJson),
+      Version: str(row.Version),
+      AppliedEventIds: strArray(row.AppliedEventIds),
       CreatedAt: int(row.CreatedAt),
       LastEventOccurredAt: int(row.LastEventOccurredAt),
       EventTimestamp: int(row.LatestEventTimestamp),
