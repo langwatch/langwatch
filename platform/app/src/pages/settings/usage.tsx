@@ -24,7 +24,7 @@ import {
   mapUsageToLimits,
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
-} from "../../components/license/ResourceLimitsDisplay";
+} from "@langwatch/enterprise-licensing-web";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";

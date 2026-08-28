@@ -21,7 +21,7 @@ import {
 } from "../../server/traces/findPromptReferenceInAncestors";
 import { durationColor } from "../../utils/durationColor";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
+import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-web";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
 import { Menu } from "@langwatch/design-system/menu";

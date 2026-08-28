@@ -19,7 +19,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
-import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
+import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-web";
 import { HoverableBigText } from "../HoverableBigText";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";

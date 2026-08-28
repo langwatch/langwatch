@@ -9,7 +9,7 @@
  */
 
 import { useArchivedItemsResolution } from "~/components/suites/useArchivedItemsResolution";
-import { useSuiteForm } from "~/components/suites/useSuiteForm";
+import { useSuiteForm } from "@langwatch/suite-web";
 import {
   getFlowCallbacks,
   useDrawer,

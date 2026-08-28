@@ -14,6 +14,7 @@ export function createAnnotationTestProjects(organizationId = "organization-1") 
     isPresenceEnabled: unavailable,
     getById: unavailable,
     getOrganizationId: vi.fn(async () => organizationId),
+    tryGetOrganizationId: unavailable,
     tryGetById: unavailable,
     tryGetSummaryById: unavailable,
     getWithTeam: unavailable,
@@ -24,19 +25,24 @@ export function createAnnotationTestProjects(organizationId = "organization-1") 
     listByOrganization: unavailable,
     listByTeam: unavailable,
     listNamesByIds: unavailable,
+    listIdsByOrganization: unavailable,
     listActiveByScopes: unavailable,
     updateMetadata: unavailable,
     touchCodingAgentSessionSeen: unavailable,
     touchCodingAgentPullRequestSeen: unavailable,
     searchByQuery: unavailable,
-    isFeatureEnabled: unavailable,
     tryGetTraceSharingConfig: unavailable,
     resolveOrgAdmin: unavailable,
+    resolveTraceDestination: unavailable,
+    tryGetTraceDestination: unavailable,
+    listTraceDestinations: unavailable,
   } satisfies ProjectService;
 }
 
 export function createAnnotationTestOrganizations() {
   return {
+    getSettings: unavailable,
+    updateSettings: unavailable,
     getOrganizationMembers: vi.fn(async ({ userIds }: { userIds: string[] }) => userIds),
     isMember: unavailable,
     getOldestTeamId: unavailable,

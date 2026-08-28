@@ -40,6 +40,16 @@ export interface ScenarioPickerScenario {
   labels: string[];
 }
 
+/**
+ * What the group of scenarios filed in no test suite reads as.
+ *
+ * Distinct from `UNFILED_GROUP_NAME` ("Unfiled test cases") in the agent-testing
+ * cases list: this is the picker's own wording. The constant was dropped when
+ * this component moved out of `platform/app`, leaving two importers pointing at
+ * a symbol that existed in no build; restored here with its copy unchanged.
+ */
+export const PICKER_UNFILED_GROUP_NAME = "No test suite";
+
 export interface ScenarioPickerProps {
   /** Filtered list of scenarios to display. */
   scenarios: ScenarioPickerScenario[];

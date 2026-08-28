@@ -5,8 +5,16 @@ import { runStandaloneNlpLambdaTask } from "../task-nlp-lambda.lifecycle";
 import { runStandaloneTaskWithPrisma } from "../task-prisma.lifecycle";
 import { closePrismaConnection, configurePrismaConnection } from "~/server/db";
 
+/**
+ * The slice of the application environment a task run reads. `DATABASE_URL` is
+ * optional here because it is optional in the environment itself — a
+ * build-time evaluation has no database — so the requirement is asserted when
+ * the connection is opened rather than asserted by a type the caller cannot
+ * satisfy. The object handed in is the whole environment: the cleanup task's
+ * NLP-lambda config is resolved off the same value.
+ */
 export interface LegacyPlatformTaskEnvironment {
-  readonly DATABASE_URL: string;
+  readonly DATABASE_URL?: string | undefined;
   readonly NODE_ENV: string;
 }
 
@@ -36,10 +44,14 @@ export class LegacyPlatformTaskExecutor extends LocalTaskExecutorPort {
   }
 
   async execute(input: LocalTaskExecution): Promise<void> {
+    const databaseUrl = this.options.environment.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error(`DATABASE_URL must be set to run the "${input.taskName}" task.`);
+    }
     await runStandaloneTaskWithPrisma({
       compose: () =>
         createProcessPrismaConnection({
-          databaseUrl: this.options.environment.DATABASE_URL,
+          databaseUrl,
           nodeEnv: this.options.environment.NODE_ENV,
         }),
       configure: configurePrismaConnection,

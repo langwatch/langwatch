@@ -54,13 +54,11 @@ import {
   ruleSummary,
   type SecretsChoice,
   selectionToAudience,
-} from "~/components/settings/dataPrivacyRuleConfig";
-import {
   ESSENTIAL_PII_ENTITY_LABELS,
   ESSENTIAL_PII_SUMMARY,
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
-} from "~/components/settings/piiEntityLabels";
+} from "@langwatch/data-privacy-web";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,

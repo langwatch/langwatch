@@ -13,7 +13,7 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import type { SuiteScopeMode } from "@langwatch/suite-contract";
-import { PICKER_UNFILED_GROUP_NAME } from "~/components/suites/ScenarioPicker";
+import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-web";
 import { Checkbox } from "~/components/ui/checkbox";
 import { TagPill } from "~/components/ui/TagPill";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";

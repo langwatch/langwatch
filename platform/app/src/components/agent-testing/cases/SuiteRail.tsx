@@ -17,7 +17,7 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
+import { SuiteArchiveDialog } from "@langwatch/suite-web";
 import { VoiceAgentsCallout } from "~/components/suites/VoiceAgentsCallout";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { NewSuiteDialog } from "./NewSuiteDialog";

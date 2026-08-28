@@ -11,7 +11,7 @@
 import { type MutableRefObject, useCallback, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import type { DrawerType } from "~/components/drawerRegistry";
-import type { SuiteFormData } from "~/components/suites/useSuiteForm";
+import type { SuiteFormData } from "@langwatch/suite-web";
 import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
 import { toaster } from "~/components/ui/toaster";
 import {

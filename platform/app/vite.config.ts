@@ -10,9 +10,11 @@ import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
 import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
 import {
   injectPublicAppConfigIntoHtml,
-  resolveUiPublicBootstrap,
   type PublicAppConfig,
 } from "@langwatch/ui/public-config";
+// The resolver reads the server environment, so it deliberately lives on the
+// projection subpath rather than being re-exported to browser code.
+import { resolveUiPublicBootstrap } from "@langwatch/ui/public-config/projection";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself

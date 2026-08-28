@@ -2,7 +2,7 @@ import { SettingsMap, type ClickHouseClient, type ClickHouseSettings } from "@cl
 import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
 import { AppGovernanceRuntime } from "@langwatch/enterprise-api/governance/runtime";
 import { AppGovernanceEventingAdapter } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
-import { AppGovernanceBudgetOverviewPort } from "~/server/app-layer/presets";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { AppIngestionSourceAdapter } from "@langwatch/enterprise-api/governance/ingestion-source.adapter";
 import { AppIngestionSourceActivityAdapter } from "@langwatch/enterprise-api/governance/ingestion-source-activity.adapter";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
@@ -180,11 +180,13 @@ export function installClickHouseTestApp({
     ocsfEvents: governanceOcsfEvents,
     personalUsage,
     virtualKeys: governanceVirtualKeys,
-    budgetOverview: AppGovernanceBudgetOverviewPort.create({
+    budgetOverview: BudgetOverviewService.create({
       database: prisma,
       organizations: baseApp.organizations,
+      featureFlags: baseApp.featureFlags,
+      personalVirtualKeys: governanceVirtualKeys,
       personalUsage,
-      virtualKeys: governanceVirtualKeys,
+      budgetDecisions: baseApp.gateway.budgetDecisions,
     }),
     providers: {
       list: () =>

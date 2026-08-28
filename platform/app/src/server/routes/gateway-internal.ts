@@ -540,6 +540,9 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     where: { id: vkId },
     include: {
       scopes: true,
+      // Part of the virtual-key record the materialiser is typed against, and
+      // read exactly as the gateway's own repository reads it.
+      principalUser: { select: { id: true, name: true, email: true } },
       // The routing policy is where model_aliases and policy_rules live.
       // Without it the materialiser reads an absent relation and emits an
       // empty alias map plus empty deny/allow lists, so the gateway never
