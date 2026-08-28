@@ -32,7 +32,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
-} from "./_shared";
+} from "./shared";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
 const ea = "ea";

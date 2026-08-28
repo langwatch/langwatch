@@ -25,7 +25,7 @@
  * than a bespoke extractor.
  */
 import * as z from "zod";
-import { parseCliJson } from "./cliJson.js";
+import { parseCliJson } from "./cli-json.js";
 import { resolveTotal, type Pagination } from "./primitives.js";
 import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.js";
 

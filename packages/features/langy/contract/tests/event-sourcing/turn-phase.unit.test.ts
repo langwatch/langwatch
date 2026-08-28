@@ -7,7 +7,7 @@ import {
   requestStop,
   settleTurn,
   type TurnPhaseState,
-} from "../../src/event-sourcing/turnPhase";
+} from "../../src/event-sourcing/turn-phase";
 
 const active = (turnId = "t1"): TurnPhaseState =>
   beginTurn(initialTurnPhaseState, turnId);

@@ -32,7 +32,7 @@
  */
 
 export * from "./primitives.js";
-export * from "./cliJson.js";
+export * from "./cli-json.js";
 export * from "./schemas.js";
 export * from "./derived-safe.js";
 export * from "./registry.js";

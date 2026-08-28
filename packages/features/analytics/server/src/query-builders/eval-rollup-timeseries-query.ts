@@ -19,7 +19,7 @@
 import { buildMetricAlias } from "../clickhouse/metric-translator";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
-import { dateTrunc } from "./_shared";
+import { dateTrunc } from "./shared";
 
 const ROLLUP_TABLE = "evaluation_analytics_rollup" as const;
 const ra = "ra";

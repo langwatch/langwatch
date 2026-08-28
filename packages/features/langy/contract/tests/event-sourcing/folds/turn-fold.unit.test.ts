@@ -12,7 +12,7 @@ import {
   parseConversationTurnKey,
   type LangyConversationTurnEvent,
   type LangyConversationTurnFoldState,
-} from "../../../src/event-sourcing/folds/turnFold";
+} from "../../../src/event-sourcing/folds/turn-fold";
 
 const IDS = { conversationId: "conv-1", turnId: "turn-1" };
 

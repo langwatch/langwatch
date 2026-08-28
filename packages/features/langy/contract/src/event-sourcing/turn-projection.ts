@@ -16,12 +16,12 @@
  * from this projection).
  */
 import { compareLangyEventCursors, type LangyEventCursor } from "./contracts/cursor";
-import type { LangyConversationTurnWireEvent } from "./contracts/turnWire";
+import type { LangyConversationTurnWireEvent } from "./contracts/turn-wire";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
   type LangyConversationTurnFoldState,
-} from "./folds/turnFold";
+} from "./folds/turn-fold";
 
 export interface LangyTurnProjectionState {
   /** Position of the last folded event; null before the snapshot seeds it. */

@@ -33,7 +33,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
-} from "./_shared";
+} from "./shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";

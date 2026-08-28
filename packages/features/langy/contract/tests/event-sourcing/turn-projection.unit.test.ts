@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "../../src/constants";
-import type { LangyConversationTurnWireEvent } from "../../src/event-sourcing/contracts/turnWire";
+import type { LangyConversationTurnWireEvent } from "../../src/event-sourcing/contracts/turn-wire";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
   isLangyTurnProjectionTerminal,
   seedLangyTurnProjection,
-} from "../../src/event-sourcing/turnProjection";
+} from "../../src/event-sourcing/turn-projection";
 
 const accepted = (o: {
   id: string;

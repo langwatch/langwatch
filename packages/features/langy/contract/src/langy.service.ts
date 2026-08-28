@@ -18,7 +18,7 @@ import type {
 import type { LangyMessagePart } from "./json";
 import type { CliResultDigest } from "./cards/digest";
 import type { CliToolResult } from "./cards/tool-result";
-import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turnWire";
+import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor";
 
 export type LangyConversationListItem = {

@@ -6,7 +6,7 @@ import {
   initLangyConversationState,
   type LangyConversationStateEvent,
   type LangyConversationStateFoldState,
-} from "../../../src/event-sourcing/folds/conversationFold";
+} from "../../../src/event-sourcing/folds/conversation-fold";
 
 const CONVERSATION_ID = "conv-1";
 

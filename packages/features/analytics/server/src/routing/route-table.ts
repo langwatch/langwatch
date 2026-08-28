@@ -43,7 +43,7 @@
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import { PAYLOAD_BLOCKLIST_EXACT, PAYLOAD_BLOCKLIST_PREFIXES } from "./payload-blocklist";
-import { collectStringValues, hasFilterValues } from "../query-builders/_shared";
+import { collectStringValues, hasFilterValues } from "../query-builders/shared";
 import { type AnalyticsMetricSource, getMetricSource } from "./field-availability";
 
 /** The six destination tables routed between. */
