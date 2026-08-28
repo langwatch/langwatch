@@ -37,7 +37,8 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock("~/features/langy/components/LangyContextTarget", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   LangyContextTarget: ({ children }: { children: ReactElement }) => children,
 }));
 // The link only renders the highlight; what is under test is the layout

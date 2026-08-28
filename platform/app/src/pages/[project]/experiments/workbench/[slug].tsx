@@ -34,8 +34,8 @@ import { useRegisterLangyActions, useRegisterLangyHandlers } from "~/features/la
 import {
   LangyUiPageOutOfDateError,
   LangyUiSaveFailedError,
-} from "~/features/langy/uiActions/errors";
-import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
+} from "@langwatch/langy-web";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

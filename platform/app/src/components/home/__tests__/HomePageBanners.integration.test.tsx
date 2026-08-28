@@ -26,7 +26,8 @@ vi.mock("~/hooks/useReducedMotion", () => ({
 
 // The Langy announcement starts its conversation in place rather than routing.
 const askLangy = vi.fn();
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
 }));
 

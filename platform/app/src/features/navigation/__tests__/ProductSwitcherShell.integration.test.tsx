@@ -241,7 +241,8 @@ vi.mock("~/hooks/useOpsPermission", () => ({
   useOpsPermission: () => ({ hasAccess: false }),
 }));
 
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (selector: (state: unknown) => unknown) =>
     selector({
       dockShifted: false,

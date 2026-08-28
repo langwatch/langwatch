@@ -71,7 +71,8 @@ vi.mock("~/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-vi.mock("~/features/langy/components/LangyContextTarget", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   LangyContextTarget: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 

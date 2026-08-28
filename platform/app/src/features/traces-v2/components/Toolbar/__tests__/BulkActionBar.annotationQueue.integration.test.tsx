@@ -17,7 +17,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => true,
 }));
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (
     selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown,
   ) => selector({ attachContext: vi.fn(), openPanel: vi.fn() }),

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useFilterStore } from "@langwatch/trace-web";
 import { handOffSearchToLangy } from "./searchLangyHandoff";
 

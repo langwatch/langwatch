@@ -4,8 +4,8 @@ import {
 } from "@langwatch/evaluator-web";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { useState } from "react";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { evaluationContextChip } from "@langwatch/langy-web";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 

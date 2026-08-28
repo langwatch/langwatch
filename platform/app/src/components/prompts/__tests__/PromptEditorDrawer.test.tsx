@@ -276,18 +276,27 @@ vi.mock("~/components/outputs", () => ({
 }));
 
 // Mock buildDefaultFormValues — supports overrides to test initialLocalConfig seeding
-vi.mock("~/prompts/utils/buildDefaultFormValues", () => ({
-  buildDefaultFormValues: (overrides?: Record<string, unknown>) => {
-    if (!overrides) return mockDefaultFormValues;
-    // Deep merge overrides into defaults (simplified for test)
-    const merged = JSON.parse(JSON.stringify(mockDefaultFormValues));
-    const ov = overrides as any;
-    if (ov?.version?.configData) {
-      Object.assign(merged.version.configData, ov.version.configData);
-    }
-    return merged;
-  },
-}));
+// `buildDefaultFormValues` and `areFormValuesEqual` now ship from the same
+// package entry, so both stubs live in one factory — a second `vi.mock` on
+// the same specifier would silently replace this one.
+vi.mock("@langwatch/prompt-web/forms", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@langwatch/prompt-web/forms")>();
+  return {
+    ...actual,
+    buildDefaultFormValues: (overrides?: Record<string, unknown>) => {
+      if (!overrides) return mockDefaultFormValues;
+      // Deep merge overrides into defaults (simplified for test)
+      const merged = JSON.parse(JSON.stringify(mockDefaultFormValues));
+      const ov = overrides as any;
+      if (ov?.version?.configData) {
+        Object.assign(merged.version.configData, ov.version.configData);
+      }
+      return merged;
+    },
+    areFormValuesEqual: () => mockAreFormValuesEqual(),
+  };
+});
 
 // Mock the conversion utils
 vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
@@ -312,11 +321,9 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
   })),
 }));
 
-// Mock areFormValuesEqual - start with default implementation
+// Mock areFormValuesEqual - start with default implementation.
+// The stub itself is wired in the `@langwatch/prompt-web/forms` factory above.
 const mockAreFormValuesEqual = vi.fn(() => true);
-vi.mock("~/prompts/utils/areFormValuesEqual", () => ({
-  areFormValuesEqual: () => mockAreFormValuesEqual(),
-}));
 
 // Mock usePromptHandleCheck for ChangeHandleDialog validation
 vi.mock("~/hooks/prompts/usePromptHandleCheck", () => ({

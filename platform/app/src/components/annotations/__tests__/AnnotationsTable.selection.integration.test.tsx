@@ -155,7 +155,8 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: mocks.toastCreate },
 }));
 vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
-vi.mock("~/features/langy/components/LangyContextTarget", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   LangyContextTarget: ({ children }: { children: ReactElement }) => children,
 }));
 vi.mock("~/components/ui/RedactedField", () => ({

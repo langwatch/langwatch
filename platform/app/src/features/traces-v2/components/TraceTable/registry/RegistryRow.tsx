@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
-import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
-import type { LangyContextTarget } from "~/features/langy/stores/langyContextTargetStore";
+import { useLangyContextTarget } from "@langwatch/langy-web";
+import type { LangyContextTargetDescriptor } from "@langwatch/langy-web";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore, useRowPulseStore } from "@langwatch/trace-web";
 import type { TraceStatus } from "../../../types/trace";
@@ -73,7 +73,7 @@ interface RegistryRowProps<TRow> {
    * Everything downstream of it is inert unless the Langy panel is open, so a
    * row that declares itself a target costs nothing on a page without Langy.
    */
-  langyTarget?: LangyContextTarget | null;
+  langyTarget?: LangyContextTargetDescriptor | null;
   /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
   ref?: React.Ref<HTMLTableSectionElement>;
   "data-index"?: number;

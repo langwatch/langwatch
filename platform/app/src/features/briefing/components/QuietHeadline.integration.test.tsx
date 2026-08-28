@@ -28,7 +28,8 @@ vi.mock("~/features/langy/hooks/useShowLangy", () => ({
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => gates.langy,
 }));
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (selector: (state: { askLangy: typeof askLangy }) => unknown) =>
     selector({ askLangy }),
 }));

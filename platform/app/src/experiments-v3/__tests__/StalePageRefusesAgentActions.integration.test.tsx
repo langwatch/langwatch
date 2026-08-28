@@ -23,7 +23,7 @@
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web";
 
 const captured = vi.hoisted(() => ({
   handlers: undefined as LangyUiActionHandlers | undefined,

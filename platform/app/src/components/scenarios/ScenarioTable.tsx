@@ -3,8 +3,8 @@ import {
   type ScenarioListItem,
 } from "@langwatch/scenario-web";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { scenarioContextChip } from "@langwatch/langy-web";
 import type { Scenario } from "~/generated/prisma/client";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TagList } from "../ui/TagList";

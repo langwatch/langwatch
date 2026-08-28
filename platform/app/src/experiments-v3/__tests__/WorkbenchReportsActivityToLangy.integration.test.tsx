@@ -126,7 +126,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import WorkbenchPage from "~/pages/[project]/experiments/workbench/[slug]";
 
 const reported = () => useLangyStore.getState().pageActivity;

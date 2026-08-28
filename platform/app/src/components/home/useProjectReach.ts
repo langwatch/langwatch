@@ -1,4 +1,4 @@
-import type { ProjectReach } from "~/features/langy/logic/langyHomeSuggestions";
+import type { ProjectReach } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 

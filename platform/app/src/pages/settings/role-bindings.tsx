@@ -17,7 +17,7 @@ import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

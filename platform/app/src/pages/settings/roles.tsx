@@ -22,7 +22,7 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { PermissionViewer } from "../../components/settings/PermissionViewer";
 import { RoleCard } from "../../components/settings/RoleCard";
 import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
-import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";

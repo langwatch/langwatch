@@ -17,7 +17,7 @@ import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
 } from "@langwatch/langy-web";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import {
   type Organization,
   OrganizationUserRole,

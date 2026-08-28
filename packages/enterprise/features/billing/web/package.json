@@ -22,12 +22,21 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/enterprise-billing-contract": "workspace:*"
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "lucide-react": "^1.22.0",
+    "numeral": "^2.0.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/numeral": "^2.0.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
@@ -35,6 +44,7 @@
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }

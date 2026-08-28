@@ -70,7 +70,7 @@ vi.mock("../effects/useEasterEggEffects", () => ({
   useEasterEggEffects: () => ({ triggerEffect: vi.fn() }),
 }));
 
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { CommandPalette } from "../CommandPalette";
 
 const QUESTION = "what are my traces about?";

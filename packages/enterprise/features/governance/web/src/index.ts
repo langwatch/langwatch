@@ -1,7 +1,9 @@
+export * from "./ai-tool-tile";
 export * from "./components/add-ingestion-source-menu";
 export * from "./components/ottl-editor";
 export * from "./components/pull-cadence-field";
 export * from "./components/quarantine-fill-alert";
+export * from "./components/routing-policy-row-actions";
 export * from "./components/source-events-table";
 export * from "./components/spend-by-team-bar";
 export * from "./components/trace-destination-field";
@@ -10,3 +12,4 @@ export * from "./hooks/use-source-events-pager";
 export * from "./ingestion-source-catalog";
 export * from "./ports/governance-ottl-validation.client";
 export * from "./pull-cadence";
+export * from "./tool-icons";

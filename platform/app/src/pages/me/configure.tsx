@@ -19,7 +19,7 @@ import { DevicesPanel } from "~/components/me/DevicesPanel";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
-import { formatRelativeTime } from "~/components/me/relativeTime";
+import { formatRelativeTime } from "@langwatch/user-web";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,

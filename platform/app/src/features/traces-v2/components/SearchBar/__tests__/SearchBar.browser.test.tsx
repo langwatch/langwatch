@@ -33,7 +33,8 @@ vi.mock("~/features/langy/hooks/useShowLangy", () => ({
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => false,
 }));
-vi.mock("~/features/langy/stores/langyStore", () => {
+vi.mock("@langwatch/langy-web", async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: false,
     askLangy: () => undefined,
@@ -43,7 +44,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
     selector(state());
   useLangyStore.getState = state;
-  return { useLangyStore };
+  return { ...actual, useLangyStore };
 });
 
 import { useFilterStore } from "@langwatch/trace-web";

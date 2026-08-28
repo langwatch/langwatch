@@ -57,7 +57,7 @@ vi.mock("../OnboardAgentPill", () => ({
   OnboardAgentPill: () => <div data-testid="onboard-pill" />,
 }));
 
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { LangyHomeLantern } from "../LangyHomeLantern";
 
 const renderLantern = () =>

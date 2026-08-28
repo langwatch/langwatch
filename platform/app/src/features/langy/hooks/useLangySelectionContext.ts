@@ -1,6 +1,9 @@
 import { useMemo } from "react";
-import { useFilterStore } from "../../traces-v2/stores/filterStore";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "@langwatch/trace-web";
+import {
+  SELECT_ALL_MATCHING_CAP,
+  useFilterStore,
+  useSelectionStore,
+} from "@langwatch/trace-web";
 import {
   ALL_MATCHING_PREFIX,
   type LangyContextChip,

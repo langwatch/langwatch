@@ -1,5 +1,5 @@
 import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
-import type { LangyAttachedContext } from "~/features/langy/stores/langyStore";
+import type { LangyAttachedContext } from "@langwatch/langy-web";
 
 /**
  * The half-written question the ask button leaves in the composer.

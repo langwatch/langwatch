@@ -24,7 +24,7 @@ import { ProjectSelector } from "../../components/DashboardLayout";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import { PeriodSelector, usePeriodSelector } from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";

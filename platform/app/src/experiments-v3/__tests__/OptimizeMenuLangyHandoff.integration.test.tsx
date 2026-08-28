@@ -39,8 +39,8 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 
-import { useLangyContextTargetStore } from "~/features/langy/stores/langyContextTargetStore";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyContextTargetStore } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web";
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useOptimizeWithLangy } from "../hooks/useOptimizeWithLangy";

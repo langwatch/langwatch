@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
-import { traceContextChip } from "~/features/langy/logic/langyContextChips";
+import { traceContextChip } from "@langwatch/langy-web";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import type { LensConfig } from "@langwatch/trace-web";
 import {

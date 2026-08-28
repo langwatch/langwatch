@@ -23,8 +23,8 @@ import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDi
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { showErrorToast } from "~/features/errors";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { traceContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { traceContextChip } from "@langwatch/langy-web";
 import { AddToAnnotationQueueDialog } from "~/features/traces-v2/components/AddToAnnotationQueueDialog";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";

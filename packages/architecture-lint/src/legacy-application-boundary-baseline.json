@@ -14,26 +14,14 @@
       ],
       "platform/app/src/server.mts": ["./env-load", "./instrumentation.node", "./start"],
       "platform/app/src/server/analytics/utils.ts": ["../../hooks/useFilterParams"],
-      "platform/app/src/server/api-key/api-key-token.utils.ts": ["~/env.mjs"],
       "platform/app/src/server/api/rbac.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/currency.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/httpProxy.ts": [
-        "~/optimization_studio/server/addEnvs",
-        "~/optimization_studio/types/events"
-      ],
-      "platform/app/src/server/api/routers/license.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/organization.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/publicEnv.ts": ["../../../env.mjs"],
-      "platform/app/src/server/api/routers/subscription.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/user.ts": ["../../../env.mjs"],
       "platform/app/src/server/app-layer/bug-reports/bug-report-slack.ts": ["~/env.mjs"],
       "platform/app/src/server/app-layer/config.ts": ["../../env-create.mjs"],
       "platform/app/src/server/app-layer/ops/metrics-collector.ts": ["~/shared/ops/latency"],
       "platform/app/src/server/app-layer/ops/replay.service.ts": ["~/env.mjs"],
-      "platform/app/src/server/app-layer/ops/scheduler-ops.service.ts": [
-        "../../../shared/ops/schedulerControl"
-      ],
-      "platform/app/src/server/app-layer/ops/types.ts": ["~/shared/ops/latency"],
       "platform/app/src/server/app-layer/presets.ts": ["~/env.mjs"],
       "platform/app/src/server/app-layer/redis-readiness.ts": ["../../env.mjs"],
       "platform/app/src/server/app-layer/reports/report-chart.service.ts": [
@@ -53,28 +41,8 @@
       "platform/app/src/server/auth0/passwordService.ts": ["../../env.mjs"],
       "platform/app/src/server/better-auth/index.ts": ["~/env.mjs"],
       "platform/app/src/server/data-retention/policy/dataRetentionPolicy.authz.ts": ["~/env.mjs"],
-      "platform/app/src/server/datasets/dataset-mutations.ts": [
-        "~/optimization_studio/utils/datasetUtils"
-      ],
-      "platform/app/src/server/datasets/dataset-normalize.queue.ts": ["~/env.mjs"],
-      "platform/app/src/server/datasets/dataset.service.ts": [
-        "~/optimization_studio/utils/datasetUtils"
-      ],
-      "platform/app/src/server/datasets/upload-utils.ts": [
-        "~/components/datasets/utils/reservedColumns"
-      ],
       "platform/app/src/server/db.ts": ["../env.mjs"],
       "platform/app/src/server/evaluations/runEvaluation.ts": ["../../env.mjs"],
-      "platform/app/src/server/evaluators/runCodeEvaluator.ts": [
-        "~/optimization_studio/server/addEnvs",
-        "~/optimization_studio/types/events"
-      ],
-      "platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/services/trace-attribute-accumulation.service.ts": [
-        "~/shared/traces/media-refs"
-      ],
-      "platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/services/trace-io-accumulation.service.ts": [
-        "~/shared/traces/media-refs"
-      ],
       "platform/app/src/server/experiments-v3/execution/dataLoader.ts": [
         "~/optimization_studio/utils/datasetUtils"
       ],
@@ -115,7 +83,6 @@
       ],
       "platform/app/src/server/modelProviders/utils.ts": ["../../env.mjs"],
       "platform/app/src/server/nlpgo/nlpgoFetch.ts": ["../../optimization_studio/server/lambda"],
-      "platform/app/src/server/notifications/usage-limit.service.ts": ["../../env.mjs"],
       "platform/app/src/server/posthog.ts": ["../env.mjs"],
       "platform/app/src/server/routes/auth-cli.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/auth.ts": ["~/env.mjs"],
@@ -133,11 +100,6 @@
       "platform/app/src/server/routes/misc.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/playground.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/workflows.ts": ["~/optimization_studio/server/addEnvs"],
-      "platform/app/src/server/scenarios/execution/child-environment.ts": ["~/env.mjs"],
-      "platform/app/src/server/scenarios/execution/data-prefetcher.ts": [
-        "~/env.mjs",
-        "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase"
-      ],
       "platform/app/src/server/storage.ts": ["../env.mjs"],
       "platform/app/src/server/stored-objects/azure-credentials.ts": ["~/env.mjs"],
       "platform/app/src/server/stored-objects/content-extractor.ts": [
@@ -157,9 +119,6 @@
       ],
       "platform/app/src/server/traces/trace-blob-resolution.deps.ts": ["~/env.mjs"],
       "platform/app/src/server/websockets/trpc-ws.ts": ["~/env.mjs"],
-      "platform/app/src/server/workflows/runWorkflow.ts": [
-        "../../optimization_studio/server/addEnvs"
-      ],
       "platform/app/src/server/workflows/workflowEvaluation.service.ts": [
         "~/experiments-v3/types",
         "~/experiments-v3/types/persistence"
@@ -189,10 +148,6 @@
       "platform/app/src/components/analytics/UserMetrics.tsx": ["../../server/analytics/registry"],
       "platform/app/src/components/AnnotationExpectedOutputs.tsx": [
         "~/server/annotations/annotationSuggestedOutput"
-      ],
-      "platform/app/src/components/annotations/annotationRow.ts": [
-        "~/server/annotations/annotationAnchor",
-        "~/server/annotations/annotationAnchorLabel"
       ],
       "platform/app/src/components/checks/CheckConfigForm.tsx": [
         "../../server/evaluations/evaluationMappings",
@@ -232,19 +187,6 @@
       "platform/app/src/components/datasets/bulkUpload/BulkUploadDrawer.tsx": [
         "~/server/datasets/types"
       ],
-      "platform/app/src/components/datasets/bulkUpload/bulkUploadOrchestrator.ts": [
-        "~/server/datasets/types"
-      ],
-      "platform/app/src/components/datasets/bulkUpload/columnReorder.ts": [
-        "~/server/datasets/types"
-      ],
-      "platform/app/src/components/datasets/bulkUpload/columnValidation.ts": [
-        "~/server/datasets/types"
-      ],
-      "platform/app/src/components/datasets/bulkUpload/useBulkUpload.ts": [
-        "~/server/datasets/types",
-        "~/server/datasets/upload-utils"
-      ],
       "platform/app/src/components/datasets/CopyDatasetDialog.tsx": ["../../server/api/rbac"],
       "platform/app/src/components/datasets/DatasetMappingPreview.tsx": [
         "../../server/datasets/types",
@@ -261,23 +203,10 @@
       "platform/app/src/components/datasets/editor/DatasetPreviewTable.tsx": [
         "~/server/datasets/types"
       ],
-      "platform/app/src/components/datasets/editor/EditableCell.tsx": ["~/server/datasets/types"],
-      "platform/app/src/components/datasets/editor/TableCell.tsx": ["~/server/datasets/types"],
-      "platform/app/src/components/datasets/editor/useDatasetEditorStore.ts": [
-        "~/server/datasets/types"
-      ],
       "platform/app/src/components/datasets/SelectDatasetDrawer.tsx": ["~/server/datasets/types"],
-      "platform/app/src/components/datasets/services/directUpload.ts": ["~/server/datasets/types"],
       "platform/app/src/components/datasets/UploadCSVDrawer.tsx": [
         "../../server/datasets/types",
         "../../server/datasets/upload-utils"
-      ],
-      "platform/app/src/components/datasets/utils/parseHeaderColumns.ts": [
-        "~/server/datasets/types",
-        "~/server/datasets/upload-utils"
-      ],
-      "platform/app/src/components/drawers/FeatureFlagsDrawer.tsx": [
-        "~/server/featureFlag/frontendFeatureFlags"
       ],
       "platform/app/src/components/evaluations/OnlineEvaluationDrawer.tsx": [
         "~/server/evaluations/types",
@@ -348,20 +277,14 @@
       ],
       "platform/app/src/components/home/RecentItemsSection.tsx": ["~/server/home/types"],
       "platform/app/src/components/home/TracesOverview.tsx": ["~/server/analytics/registry"],
-      "platform/app/src/components/license/ResourceLimitsDisplay.tsx": [
-        "~/server/license-enforcement/constants"
-      ],
       "platform/app/src/components/LLMMetrics.tsx": ["../server/analytics/registry"],
       "platform/app/src/components/ModelSelector.tsx": [
         "../server/modelProviders/customModelDisplayNames"
       ],
       "platform/app/src/components/NavigationFooter.tsx": ["../server/api/root"],
-      "platform/app/src/components/ops/blobs/BlobRow.tsx": ["~/server/app-layer/ops/types"],
-      "platform/app/src/components/ops/blobs/BlobStoreBody.tsx": ["~/server/app-layer/ops/types"],
       "platform/app/src/components/ops/blobs/BlobStoreContent.tsx": [
         "~/server/app-layer/ops/types"
       ],
-      "platform/app/src/components/ops/blobs/BlobTable.tsx": ["~/server/app-layer/ops/types"],
       "platform/app/src/components/ops/blobs/DeletePayloadDialog.tsx": [
         "~/server/app-layer/ops/types"
       ],
@@ -372,25 +295,10 @@
       "platform/app/src/components/ops/dashboard/OpsDashboardContent.tsx": [
         "~/server/app-layer/ops/types"
       ],
-      "platform/app/src/components/ops/dashboard/paused/ParkedTenantsSection.tsx": [
-        "~/server/app-layer/ops/types"
-      ],
       "platform/app/src/components/ops/dashboard/paused/PausedCard.tsx": [
         "~/server/app-layer/ops/types"
       ],
-      "platform/app/src/components/ops/dashboard/RedisStatTile.tsx": [
-        "~/server/app-layer/ops/types"
-      ],
       "platform/app/src/components/ops/dashboard/StatStrip.tsx": ["~/server/app-layer/ops/types"],
-      "platform/app/src/components/ops/dashboard/TopErrorsCard.tsx": [
-        "~/server/app-layer/ops/types"
-      ],
-      "platform/app/src/components/ops/dejaview/ManagerCard.tsx": [
-        "~/server/app-layer/ops/manager-explorer.service"
-      ],
-      "platform/app/src/components/ops/event-sourcing/projectionHealth.ts": [
-        "~/server/app-layer/ops/types"
-      ],
       "platform/app/src/components/ops/processes/instanceDrawer/OutboxMessageCard.tsx": [
         "~/server/app-layer/ops/repositories/process-ops.repository"
       ],
@@ -398,29 +306,16 @@
         "~/server/app-layer/ops/manager-explorer.service",
         "~/server/app-layer/ops/repositories/process-ops.repository"
       ],
-      "platform/app/src/components/ops/processes/processFleet.ts": [
-        "~/server/app-layer/ops/manager-explorer.service"
-      ],
       "platform/app/src/components/ops/processes/ProcessInstancesDrawer.tsx": [
         "~/server/app-layer/ops/repositories/process-ops.repository"
       ],
-      "platform/app/src/components/ops/processes/subscriberHealth.ts": [
-        "~/server/app-layer/ops/types"
-      ],
       "platform/app/src/components/ops/projections/ReplayHistoryTable.tsx": [
         "~/server/app-layer/ops/repositories/replay.repository"
-      ],
-      "platform/app/src/components/ops/queues/groupDetail/GroupDetailContent.tsx": [
-        "~/server/app-layer/ops/types"
       ],
       "platform/app/src/components/ops/queues/GroupsCard.tsx": ["~/server/app-layer/ops/types"],
       "platform/app/src/components/ops/queues/PipelineTreeCard.tsx": [
         "~/server/app-layer/ops/types"
       ],
-      "platform/app/src/components/ops/queues/PipelineTreeNode.tsx": [
-        "~/server/app-layer/ops/types"
-      ],
-      "platform/app/src/components/ops/queues/pipelineUtils.ts": ["~/server/app-layer/ops/types"],
       "platform/app/src/components/ops/replay-progress/ReplayProgressContent.tsx": [
         "~/server/app-layer/ops/repositories/replay.repository"
       ],
@@ -449,17 +344,11 @@
         "../../server/modelProviders/customModel.schema"
       ],
       "platform/app/src/components/settings/CodexSignIn.tsx": ["~/server/scopes/scope.types"],
-      "platform/app/src/components/settings/dataPrivacyRuleConfig.ts": [
-        "~/server/data-privacy/dataPrivacy.types"
-      ],
       "platform/app/src/components/settings/DefaultModelOverrideDrawer.tsx": [
         "~/server/modelProviders/customModelDisplayNames"
       ],
       "platform/app/src/components/settings/LLMModelCostDrawer.tsx": [
         "../../server/modelProviders/llmModelCost"
-      ],
-      "platform/app/src/components/settings/MemberSeatUsage.tsx": [
-        "../../server/license-enforcement/constants"
       ],
       "platform/app/src/components/settings/ModelChip.tsx": [
         "~/server/modelProviders/customModelDisplayNames"
@@ -481,15 +370,6 @@
       "platform/app/src/components/sidebar/UsageIndicator.tsx": [
         "../../server/app-layer/usage/usage-meter-policy"
       ],
-      "platform/app/src/components/simulations/run-state-polling.ts": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/scenario-run-status-config.ts": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/scenario-run-status.utils.ts": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
       "platform/app/src/components/simulations/ScenarioMessageRenderer.tsx": [
         "~/server/scenarios/scenario-event.types",
         "~/server/stored-objects/coerce-content-to-array"
@@ -497,91 +377,18 @@
       "platform/app/src/components/simulations/ScenarioRunDetailDrawer.tsx": [
         "~/server/scenarios/parameters"
       ],
-      "platform/app/src/components/simulations/ScenarioRunHeader.tsx": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/ScenarioRunStatusIcon.tsx": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/SetCard.tsx": [
-        "~/server/scenarios/internal-set-id",
-        "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/simulations/simulation-console/constants.ts": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/simulation-console/CriteriaDetails.tsx": [
-        "~/server/scenarios/schemas"
-      ],
-      "platform/app/src/components/simulations/simulation-console/ErrorDetails.tsx": [
-        "~/server/scenarios/scenario-infra-error"
-      ],
-      "platform/app/src/components/simulations/simulation-console/MetricsSummary.tsx": [
-        "~/server/scenarios/schemas"
-      ],
-      "platform/app/src/components/simulations/simulation-console/SimulationConsole.tsx": [
-        "~/server/scenarios/scenario-event.enums",
-        "~/server/scenarios/schemas"
-      ],
-      "platform/app/src/components/simulations/simulation-console/StatusDisplay.tsx": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/SimulationCard.tsx": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/simulations/SimulationResults.tsx": [
-        "~/server/scenarios/schemas"
-      ],
-      "platform/app/src/components/simulations/SimulationStatusOverlay.tsx": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
       "platform/app/src/components/simulations/utils/convert-scenario-messages.ts": [
         "~/server/scenarios/scenario-event.types"
       ],
-      "platform/app/src/components/subscription/subscription-types.ts": [
-        "~/server/license-enforcement/member-classification"
-      ],
       "platform/app/src/components/subscription/SubscriptionPage.tsx": [
         "~/server/license-enforcement/member-classification"
-      ],
-      "platform/app/src/components/subscription/useBillingPricing.ts": [
-        "~/server/license-enforcement/member-classification"
-      ],
-      "platform/app/src/components/subscription/UserManagementDrawer.tsx": [
-        "~/server/license-enforcement/member-classification"
-      ],
-      "platform/app/src/components/subscription/useSubscriptionActions.ts": [
-        "~/server/license-enforcement/member-classification"
-      ],
-      "platform/app/src/components/suites/BatchSection.tsx": [
-        "~/server/scenarios/scenario-event.types"
       ],
       "platform/app/src/components/suites/ExternalSetDetailPanel.tsx": [
         "~/server/scenarios/scenario-event.enums",
         "~/server/scenarios/scenario-event.types"
       ],
-      "platform/app/src/components/suites/format-run-status-label.ts": [
-        "~/server/scenarios/scenario-event.enums"
-      ],
-      "platform/app/src/components/suites/getAdaptivePollingInterval.ts": [
-        "~/server/scenarios/scenario-event.enums",
-        "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/suites/GroupRow.tsx": [
-        "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/suites/MessagePreview.tsx": [
-        "~/server/scenarios/scenario-event.types"
-      ],
       "platform/app/src/components/suites/PromptTargetMappingSection.tsx": [
         "~/server/suites/types"
-      ],
-      "platform/app/src/components/suites/run-history-transforms.ts": [
-        "~/server/scenarios/internal-set-id",
-        "~/server/scenarios/scenario-event.enums",
-        "~/server/scenarios/scenario-event.types",
-        "~/server/scenarios/scenario-run-category",
-        "~/server/suites/suite-set-id"
       ],
       "platform/app/src/components/suites/RunHistoryPanel.tsx": [
         "~/server/scenarios/internal-set-id",
@@ -589,23 +396,9 @@
         "~/server/scenarios/scenario-event.types",
         "~/server/suites/suite-set-id"
       ],
-      "platform/app/src/components/suites/RunRow.tsx": ["~/server/scenarios/scenario-event.types"],
-      "platform/app/src/components/suites/ScenarioGridCard.tsx": [
-        "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/suites/ScenarioRunContent.tsx": [
-        "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/suites/ScenarioTargetRow.tsx": [
-        "~/server/scenarios/scenario-event.enums",
-        "~/server/scenarios/scenario-event.types"
-      ],
       "platform/app/src/components/suites/SimulationsPage.tsx": [
         "~/server/scenarios/browser-tab/scenario-tab-events",
         "~/server/scenarios/scenario-event.types"
-      ],
-      "platform/app/src/components/suites/status-icons.ts": [
-        "~/server/scenarios/scenario-event.enums"
       ],
       "platform/app/src/components/suites/SuiteDetailPanel.tsx": [
         "~/server/suites/suite-set-id",
@@ -692,7 +485,6 @@
       "platform/app/src/features/command-bar/hooks/useFilteredCommands.ts": [
         "~/server/featureFlag/frontendFeatureFlags"
       ],
-      "platform/app/src/features/langy/data/langy.dtos.ts": ["~/server/api/routers/langy.schemas"],
       "platform/app/src/features/langy/hooks/useLangyConversationUpdateListener.ts": [
         "~/server/api/routers/langy.schemas"
       ],
@@ -734,9 +526,6 @@
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationEditorCard.tsx": [
         "~/server/annotations/annotationAnchorLabel"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/annotationForm.types.ts": [
-        "~/server/annotations/annotationAnchor"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/TurnSteps.tsx": [
         "~/server/api/routers/tracesV2.schemas"
@@ -795,25 +584,7 @@
       "platform/app/src/features/traces-v2/components/TraceDrawer/ScopeChip.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/sequenceView/_mermaidShared.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/sequenceView/mermaid.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/sequenceView/topologyMermaid.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/sequenceView/types.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/SpanTabBar.tsx": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/terminalView/sessionBanner.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/terminalView/toolSpans.ts": [
         "~/server/api/routers/tracesV2.schemas"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/SpanAccordions.tsx": [
@@ -933,9 +704,6 @@
       "platform/app/src/hooks/useAvailableEvaluators.ts": ["../server/evaluations/evaluators"],
       "platform/app/src/hooks/useCustomModels.ts": ["../server/modelProviders/customModel.schema"],
       "platform/app/src/hooks/useFeatureFlag.ts": ["../server/featureFlag/frontendFeatureFlags"],
-      "platform/app/src/hooks/useFeatureFlagOverrides.ts": [
-        "../server/featureFlag/frontendFeatureFlags"
-      ],
       "platform/app/src/hooks/useFilterParams.ts": [
         "../server/analytics/utils",
         "../server/filters/registry",
@@ -995,23 +763,6 @@
       "platform/app/src/optimization_studio/hooks/useGetDatasetData.ts": [
         "../../server/api/root",
         "../../server/datasets/types"
-      ],
-      "platform/app/src/optimization_studio/registry.ts": ["../server/evaluations/evaluators"],
-      "platform/app/src/optimization_studio/server/addEnvs.ts": [
-        "../../server/api/routers/modelProviders.utils",
-        "../../server/db"
-      ],
-      "platform/app/src/optimization_studio/server/lambda/index.ts": [
-        "../../../server/s3/stagePayload",
-        "../../../server/utils/ttlCache"
-      ],
-      "platform/app/src/optimization_studio/server/loadDatasets.ts": [
-        "../../server/api/routers/datasetRecord.utils"
-      ],
-      "platform/app/src/optimization_studio/utils/datasetUtils.ts": ["../../server/datasets/types"],
-      "platform/app/src/optimization_studio/utils/registryUtils.ts": [
-        "../../server/evaluations/evaluatorDisplayNames",
-        "../../server/evaluations/evaluators"
       ],
       "platform/app/src/pages/[project]/analytics/custom/index.tsx": [
         "../../../../server/analytics/registry",
@@ -1113,10 +864,6 @@
         "~/server/prompt-config"
       ],
       "platform/app/src/prompts/providers/types.ts": ["~/server/prompt-config"],
-      "platform/app/src/prompts/schemas/field-schemas.ts": ["~/server/prompt-config/enums"],
-      "platform/app/src/prompts/schemas/form-schema.ts": [
-        "~/server/prompt-config/repositories/llm-config-version-schema"
-      ],
       "platform/app/src/prompts/utils/computeInitialFormValuesForPrompt.ts": [
         "~/server/prompt-config/prompt.service"
       ],

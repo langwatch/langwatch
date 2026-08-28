@@ -5,7 +5,7 @@ import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/l
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { withCredentials } from "~/features/skills/logic/setupPrompt";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

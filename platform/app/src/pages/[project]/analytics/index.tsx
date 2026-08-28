@@ -13,8 +13,8 @@ import {
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { dashboardContextChip } from "@langwatch/langy-web";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,

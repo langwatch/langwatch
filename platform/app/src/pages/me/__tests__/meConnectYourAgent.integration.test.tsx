@@ -178,7 +178,8 @@ vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => canAskMock(),
 }));
 
-vi.mock("~/features/langy/stores/langyStore", () => {
+vi.mock("@langwatch/langy-web", async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
   const state: Record<string, unknown> = {
     askLangy: askLangyMock,
     isOpen: false,
@@ -193,7 +194,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   useLangyStore.subscribe = () => () => undefined;
   useLangyStore.getState = () => state;
   useLangyStore.setState = () => undefined;
-  return { useLangyStore };
+  return { ...actual, useLangyStore };
 });
 
 vi.mock("~/components/ui/toaster", () => ({

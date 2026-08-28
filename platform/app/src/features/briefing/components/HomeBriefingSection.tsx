@@ -2,7 +2,7 @@ import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "~/features/asaplangy";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLangyBriefing } from "../hooks/useLangyBriefing";
 import type { BriefingReceipt } from "../types";

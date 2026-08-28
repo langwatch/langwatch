@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "@langwatch/prompt-web/forms";
 import type { LlmConfigOutputType } from "~/types";
 import { type Output, OutputsSection, type OutputType } from "./OutputsSection";
 

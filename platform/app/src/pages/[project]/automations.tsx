@@ -42,8 +42,8 @@ import {
 } from "@langwatch/automation-web";
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { automationContextChip } from "@langwatch/langy-web";
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

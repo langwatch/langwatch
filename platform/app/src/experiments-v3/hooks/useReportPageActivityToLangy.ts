@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { narrateWorkbenchRun } from "../actions/narration";
 
 /**

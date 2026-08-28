@@ -28,7 +28,8 @@ vi.mock("~/components/ui/toaster", () => ({
 }));
 
 const askLangyMock = vi.fn();
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { askLangy: (p: string) => void }) => unknown) =>
     selector({ askLangy: askLangyMock }),
 }));

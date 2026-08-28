@@ -6,8 +6,8 @@ import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGho
 import { LangyMark } from "@langwatch/langy-web";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
-import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { selectLangySuggestions } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useHomeDevState } from "./dev/homeDevState";
 import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";

@@ -26,7 +26,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

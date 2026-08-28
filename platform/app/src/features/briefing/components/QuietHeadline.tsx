@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useState } from "react";
 import { LuArrowRight, LuZap } from "react-icons/lu";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";

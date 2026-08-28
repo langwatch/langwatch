@@ -26,7 +26,8 @@ const canAskMock = vi.fn(() => true);
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => canAskMock(),
 }));
-vi.mock("~/features/langy/stores/langyStore", () => ({
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
     selector({ askLangy: vi.fn() }),
 }));

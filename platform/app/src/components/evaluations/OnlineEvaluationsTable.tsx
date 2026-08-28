@@ -9,8 +9,8 @@ import {
   LuTrash,
 } from "react-icons/lu";
 
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
-import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
+import { LangyContextTarget } from "@langwatch/langy-web";
+import { evaluationContextChip } from "@langwatch/langy-web";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import Link from "~/utils/compat/next-link";
 

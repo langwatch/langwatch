@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
-import { absorbContextTarget } from "~/features/langy/stores/langyContextTargetStore";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { absorbContextTarget } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TargetConfig } from "../types";

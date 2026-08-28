@@ -1,0 +1,46 @@
+/**
+ * Contact Sales Block - CTA for enterprise or higher-tier needs
+ */
+import { Button, Card, Flex, HStack, Link, SimpleGrid, Text } from "@chakra-ui/react";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
+import { Check } from "lucide-react";
+import { ENTERPRISE_PLAN_FEATURES } from "../billing-plans";
+
+export function ContactSalesBlock() {
+  return (
+    <Card.Root data-testid="contact-sales-block" borderWidth={1} borderColor="border">
+      <Card.Body paddingY={5} paddingX={6}>
+        <Text fontWeight="semibold" fontSize="lg">
+          Need more?
+        </Text>
+        <SimpleGrid
+          data-testid="enterprise-features-list"
+          templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
+          gap={2}
+          marginTop={4}
+        >
+          {ENTERPRISE_PLAN_FEATURES.map((feature) => (
+            <HStack key={feature} gap={2} alignItems="start">
+              <Check size={16} color="var(--chakra-colors-orange-solid)" />
+              <Text fontSize="sm" color="fg.muted">
+                {feature}
+              </Text>
+            </HStack>
+          ))}
+        </SimpleGrid>
+        <Flex justifyContent="flex-end" marginTop={6}>
+          <Button asChild variant="outline" size="sm" colorPalette="orange">
+            <Link
+              href={CONTACT_SALES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              fontWeight="semibold"
+            >
+              Contact Sales
+            </Link>
+          </Button>
+        </Flex>
+      </Card.Body>
+    </Card.Root>
+  );
+}

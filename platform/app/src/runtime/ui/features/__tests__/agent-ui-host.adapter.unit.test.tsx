@@ -118,11 +118,12 @@ vi.mock("~/components/WithPermissionGuard", () => ({
 
 vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
-vi.mock("~/features/langy/components/LangyContextTarget", () => ({
+// Both symbols now live in the same package, so this is one mock rather than
+// two, and it spreads the real module: replacing the whole barrel would strip
+// every other export this graph reads from it.
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   LangyContextTarget: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
-
-vi.mock("~/features/langy/logic/langyContextChips", () => ({
   agentContextChip: () => ({}),
 }));
 

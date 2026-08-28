@@ -43,7 +43,8 @@ vi.mock("~/features/langy/hooks/useShowLangy", () => ({
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => langyMock.enabled,
 }));
-vi.mock("~/features/langy/stores/langyStore", () => {
+vi.mock("@langwatch/langy-web", async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: langyMock.panelOpen,
     askLangy: langyMock.ask,
@@ -58,7 +59,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
     selector(state());
   useLangyStore.getState = state;
-  return { useLangyStore };
+  return { ...actual, useLangyStore };
 });
 
 // SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
