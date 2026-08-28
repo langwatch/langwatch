@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveApiConfig } from "../src/platform/config/api.config";
+import {
+  apiLoggerConfiguration,
+  apiObservabilityConfiguration,
+  resolveApiConfig,
+} from "../src/platform/config/api.config";
 
 describe("API process configuration", () => {
   it("parses the listener and drain settings once at executable composition", () => {
@@ -12,13 +16,77 @@ describe("API process configuration", () => {
       }),
     ).toEqual({
       environment: "production",
+      nodeEnvironment: "development",
+      serviceName: "langwatch-api",
+      serviceVersion: undefined,
       host: "127.0.0.1",
       port: 6560,
       httpDrainGraceMs: 9000,
+      logger: {
+        format: undefined,
+        level: undefined,
+        consoleLevel: undefined,
+        otelExportEnabled: undefined,
+      },
+      observability: {
+        apiKey: undefined,
+        endpoint: undefined,
+        processorType: "batch",
+      },
     });
   });
 
   it("rejects invalid executable ports before a listener is constructed", () => {
     expect(() => resolveApiConfig({ API_PORT: "0" })).toThrow("Invalid api configuration");
+  });
+
+  it("uses standalone compatibility aliases in deterministic precedence", () => {
+    expect(
+      resolveApiConfig({ API_PORT: "6560", LANGWATCH_API_PORT: "6561", PORT: "6562" }).port,
+    ).toBe(6560);
+    expect(resolveApiConfig({ LANGWATCH_API_PORT: "6561", PORT: "6562" }).port).toBe(6561);
+    expect(resolveApiConfig({ PORT: "6562" }).port).toBe(6562);
+  });
+
+  it("projects parsed logger and telemetry settings without retaining the source", () => {
+    const config = resolveApiConfig({
+      NODE_ENV: "production",
+      ENVIRONMENT: "eu-west",
+      API_SERVICE_NAME: "api-edge",
+      SERVICE_VERSION: "build-42",
+      LOG_FORMAT: "json",
+      LOG_LEVEL: "info",
+      LOG_CONSOLE_LEVEL: "warn",
+      LOG_OTEL_EXPORT_ENABLED: "true",
+      LANGWATCH_API_KEY: "sk-lw-test",
+      LANGWATCH_ENDPOINT: "https://telemetry.example.test",
+      LANGWATCH_PROCESSOR_TYPE: "simple",
+    });
+
+    expect(apiLoggerConfiguration(config)).toMatchObject({
+      environment: "production",
+      format: "json",
+      level: "info",
+      consoleLevel: "warn",
+      otelExportEnabled: true,
+      serviceName: "api-edge",
+      serviceVersion: "build-42",
+      deploymentEnvironment: "eu-west",
+    });
+    expect(apiObservabilityConfiguration(config)).toMatchObject({
+      serviceName: "api-edge",
+      loggerName: "api-edge",
+      setup: {
+        langwatch: {
+          apiKey: "sk-lw-test",
+          endpoint: "https://telemetry.example.test",
+          processorType: "simple",
+        },
+        attributes: {
+          "deployment.environment.name": "eu-west",
+          "service.version": "build-42",
+        },
+      },
+    });
   });
 });

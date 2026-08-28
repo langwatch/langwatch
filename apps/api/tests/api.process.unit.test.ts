@@ -31,6 +31,7 @@ vi.mock("../src/api-http.listener", () => ({
 }));
 
 import { ApiProcess } from "../src/api.process";
+import { ApiProcessGraphPort } from "../src/api.process";
 
 class TestAgentService extends AgentService {
   getById() {
@@ -161,9 +162,39 @@ describe("ApiProcess", () => {
     expect(mocks.listenerClose).toHaveBeenCalledOnce();
     expect(mocks.observabilityShutdown).toHaveBeenCalledOnce();
   });
+
+  it("closes listener, composed graph, then telemetry in that order", async () => {
+    const phases: string[] = [];
+    mocks.listenerClose.mockImplementation(async () => {
+      phases.push("listener");
+    });
+    mocks.observabilityShutdown.mockImplementation(async () => {
+      phases.push("telemetry");
+    });
+    const graph = new TestGraph(async () => {
+      phases.push("graph");
+    });
+    const process = createProcess(graph);
+
+    await Promise.all([process.close(), process.close()]);
+
+    expect(phases).toEqual(["listener", "graph", "telemetry"]);
+    expect(graph.close).toHaveBeenCalledOnce();
+  });
 });
 
-function createProcess(): ApiProcess {
+class TestGraph extends ApiProcessGraphPort {
+  private readonly closeImpl: () => Promise<void>;
+
+  constructor(closeImpl: () => Promise<void>) {
+    super();
+    this.closeImpl = closeImpl;
+  }
+
+  readonly close = vi.fn(async () => this.closeImpl());
+}
+
+function createProcess(graph?: ApiProcessGraphPort): ApiProcess {
   return ApiProcess.create({
     agents: new TestAgentService(),
     secrets: new TestSecretService(),
@@ -175,5 +206,6 @@ function createProcess(): ApiProcess {
     },
     observability: { serviceName: "langwatch:api-test" },
     listener: { port: 0 },
+    graph,
   });
 }

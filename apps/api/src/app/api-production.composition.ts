@@ -1,6 +1,5 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
 import {
   ApiAuditPort,
   ApiAuthenticationPort,
@@ -8,36 +7,57 @@ import {
   ApiRequestPolicy,
 } from "../api-request.policy";
 import { ApiProcess } from "../api.process";
+import {
+  ApiRuntimeCompositionPort,
+  ApiRuntimeProcessPort,
+  type ApiRuntimeCompositionOptions,
+} from "../api.main";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
 import type { ApiRestSecurityPort } from "../api-rest.security";
-import type { ApiConfig } from "../platform/config/api.config";
 
-/** The directly runnable API graph for feature-owned transports. */
-export class ApiProductionComposition {
+/** The concrete composition port for the migrated API transports. */
+export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   static create(options: {
-    config: ApiConfig;
     agents: AgentService;
     secrets: SecretService;
     authentication: ApiAuthenticationPort;
     authorization: ApiAuthorizationPort;
     restSecurity: ApiRestSecurityPort;
     audit?: ApiAuditPort;
-    observability: ProcessObservabilityOptions;
   }): ApiProductionComposition {
     const policy = ApiRequestPolicy.create({
       authentication: options.authentication,
       authorization: options.authorization,
       audit: options.audit,
     });
+    return new ApiProductionComposition(
+      options.agents,
+      options.secrets,
+      policy,
+      options.restSecurity,
+    );
+  }
+
+  private constructor(
+    private readonly agents: AgentService,
+    private readonly secrets: SecretService,
+    readonly policy: ApiRequestPolicy,
+    private readonly restSecurity: ApiRestSecurityPort,
+  ) {
+    super();
+  }
+
+  compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const process = ApiProcess.create({
-      agents: options.agents,
-      secrets: options.secrets,
-      requestPolicy: policy,
+      agents: this.agents,
+      secrets: this.secrets,
+      requestPolicy: this.policy,
       rest: ApiSecretRestFeature.create({
-        secrets: options.secrets,
-        security: options.restSecurity,
+        secrets: this.secrets,
+        security: this.restSecurity,
       }),
       observability: options.observability,
+      graph: options.graph,
       listener: {
         host: options.config.host,
         port: options.config.port,
@@ -45,13 +65,19 @@ export class ApiProductionComposition {
       },
     });
 
-    return new ApiProductionComposition(process, policy);
+    return Promise.resolve(ApiProductionProcess.create(process));
+  }
+}
+
+/** The real listener/process whose close sequence owns graph and telemetry shutdown. */
+class ApiProductionProcess extends ApiRuntimeProcessPort {
+  static create(process: ApiProcess): ApiProductionProcess {
+    return new ApiProductionProcess(process);
   }
 
-  private constructor(
-    readonly process: ApiProcess,
-    readonly policy: ApiRequestPolicy,
-  ) {}
+  private constructor(private readonly process: ApiProcess) {
+    super();
+  }
 
   start(): Promise<{ host: string; port: number } | undefined> {
     return this.process.start();

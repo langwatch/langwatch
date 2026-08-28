@@ -10,6 +10,11 @@ import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listene
 import { ApiRequestPolicy } from "./api-request.policy";
 import type { Hono } from "hono";
 
+/** Resources backing the composed service graph, closed after HTTP intake stops. */
+export abstract class ApiProcessGraphPort {
+  abstract close(): Promise<void>;
+}
+
 /**
  * Boot boundary for a standalone API listener. The host owns socket binding;
  * this process object owns the one logger/tracer provider and its final flush.
@@ -23,6 +28,7 @@ export class ApiProcess {
     rest?: Hono;
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
+    graph?: ApiProcessGraphPort;
   }): ApiProcess {
     if (options.http && options.requestPolicy) {
       throw new Error("API process composition accepts HTTP options or request policy, not both.");
@@ -47,7 +53,7 @@ export class ApiProcess {
           logger: observability.logger,
         })
       : undefined;
-    return new ApiProcess(application, observability, listener);
+    return new ApiProcess(application, observability, listener, options.graph);
   }
 
   private closing: Promise<void> | undefined;
@@ -56,6 +62,7 @@ export class ApiProcess {
     readonly application: ApiApplication,
     private readonly observability: ProcessObservability,
     private readonly listener: ApiHttpListener | undefined,
+    private readonly graph: ApiProcessGraphPort | undefined,
   ) {}
 
   start(): Promise<{ host: string; port: number } | undefined> {
@@ -73,6 +80,11 @@ export class ApiProcess {
       await this.listener?.close();
     } catch (error) {
       firstError = error;
+    }
+    try {
+      await this.graph?.close();
+    } catch (error) {
+      firstError ??= error;
     }
     try {
       await this.observability.shutdown();
