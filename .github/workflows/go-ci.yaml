@@ -99,7 +99,7 @@ jobs:
           cache-dependency-path: go.sum
       - uses: ./.github/actions/go-build-cache
       - run: go mod verify
-      - run: go build ./cmd/... ./tools/thuishaven/...
+      - run: go build ./cmd/... ./tools/thuishaven/... ./tools/openapidiff/...
 
   # CI's own invariant: every checkout leaves the marketing media on the
   # server. It regresses silently — a job without the sparse-checkout does not
@@ -152,7 +152,7 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
-      - run: go test -count=1 -race ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./cmd/linkcheck/... ./tools/docscheck/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./cmd/linkcheck/... ./cmd/openapidiff/...
 
   lint:
     needs: changes
@@ -207,7 +207,7 @@ jobs:
           args: >-
             --disable=funlen,gocognit,revive
             ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/...
-            ./tools/migrationorder/... ./tools/herrgen/... ./tools/ciguard/...
+            ./tools/migrationorder/... ./tools/herrgen/... ./tools/ciguard/... ./tools/openapidiff/...
             ./tools/linkcheck/... ./tools/docscheck/...
 
       # funlen / gocognit / revive encode house rules over a codebase that
@@ -263,7 +263,7 @@ jobs:
       # pinning that to what `go vet` runs, so "already covered" is likely but
       # not guaranteed. A cheap job is the wrong thing to bet coverage on.
       - uses: ./.github/actions/go-build-cache
-      - run: go vet ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/...
+      - run: go vet ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr
   # codes; the TypeScript presentation registry is keyed off it, so a Go code
