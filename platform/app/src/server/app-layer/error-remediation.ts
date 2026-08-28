@@ -180,6 +180,12 @@ const registry = {
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
+  lwql_unknown_identifier: {
+    tips: [
+      "Check the column name against the dataset's columns; a typo is the usual cause",
+      "Column existence is only known when the query runs, so a saved chart can carry this until it is run",
+    ],
+  },
   lwql_unavailable: {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",

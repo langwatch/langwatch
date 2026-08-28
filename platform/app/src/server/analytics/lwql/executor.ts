@@ -35,11 +35,16 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   isClickHouseObjectUnavailableError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
+  unknownIdentifierFromError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
 
-import { LangWatchQLUnavailableError } from "./errors";
+import {
+  LangWatchQLUnavailableError,
+  LangWatchQLUnknownIdentifierError,
+} from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
@@ -264,6 +269,18 @@ export function createLangWatchQLExecutor(
         // `reasons` for the operator's logs and never in the response.
         if (isClickHouseObjectUnavailableError(error)) {
           throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+        }
+        // A name that resolves to no column IS the caller's SQL, and is the
+        // one refusal on this path they fix themselves. The validator approves
+        // table names, not columns, and column existence is not knowable when a
+        // chart is saved, so run time is the only place this can be named. The
+        // identifier is lifted from the server's message by an extractor that
+        // fails closed; the message itself never leaves here.
+        if (isClickHouseUnknownIdentifierError(error)) {
+          throw new LangWatchQLUnknownIdentifierError(
+            unknownIdentifierFromError(error),
+            { reasons: [toError(error)] },
+          );
         }
         // Reuses the read path's translation, so the two resource ceilings a
         // caller can act on arrive as the platform's existing codes rather than

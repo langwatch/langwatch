@@ -93,6 +93,54 @@ export class LangWatchQLUnavailableError extends HandledError {
 }
 
 /**
+ * A name in the query resolves to no column.
+ *
+ * ClickHouse answers this with UNKNOWN_IDENTIFIER (47), which reached the
+ * caller as an unknown 500: the dashboard widget rendered "Something went
+ * wrong" and `langwatch chart run` said "An unknown error occurred", for a
+ * typo the author fixes in one edit. It cannot be caught earlier than run
+ * time, because whether a column exists is not knowable when the chart is
+ * saved.
+ *
+ * `customer` fault and a 400: the SQL is the member's own, and so is the name.
+ *
+ * The identifier is optional on purpose. It is lifted out of the server's
+ * message by a deliberately narrow extractor that fails closed
+ * (`unknownIdentifierFromError`), because that message also echoes the
+ * submitted query and names internal objects. When it cannot be read with
+ * confidence the refusal still arrives coded and actionable, just without the
+ * name.
+ */
+export class LangWatchQLUnknownIdentifierError extends HandledError {
+  declare readonly code: "lwql_unknown_identifier";
+
+  constructor(
+    /** The unresolvable name, when it could be read from the server's refusal. */
+    identifier: string | undefined,
+    options: { reasons?: readonly Error[] } = {},
+  ) {
+    super(
+      "lwql_unknown_identifier",
+      identifier === undefined
+        ? "The query names a column that does not exist."
+        : `The query names a column that does not exist: ${identifier}.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the workbench, which highlights the offending name,
+        // and the CLI, which prints it. Omitted rather than sent as null when
+        // it could not be read, so a client can tell "no name" from "the name
+        // is the string null".
+        ...(identifier === undefined ? {} : { meta: { identifier } }),
+        ...remediation("lwql_unknown_identifier"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLUnknownIdentifierError";
+  }
+}
+
+/**
  * The query declares a bound parameter the request supplied no value for.
  *
  * Caught at the gateway rather than left to the database: ClickHouse answers a
