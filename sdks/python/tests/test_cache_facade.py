@@ -184,6 +184,78 @@ class TestDelete:
         assert ("DELETE", "/api/agent-cache/ACME_SESSION") in stub.calls
 
 
+class TestValuesThatAreNotText:
+    # @scenario "The SDK stores a dict or list as JSON and reads it back parsed"
+    def test_a_dict_is_stored_as_json_text_and_comes_back_as_a_dict(self):
+        stub = CacheStub()
+        session = {"token": "abc", "expires_at": 1787920000, "scopes": ["read"]}
+
+        facade_over(stub).set("ACME_SESSION", session, ttl_seconds=837)
+
+        assert stub.stored["ACME_SESSION"] == json.dumps(session)
+        assert facade_over(stub).get("ACME_SESSION") == session
+
+    def test_a_list_round_trips_the_same_way(self):
+        stub = CacheStub()
+
+        facade_over(stub).claim("ACME_HANDLES", ["h1", "h2"])
+
+        assert stub.stored["ACME_HANDLES"] == '["h1", "h2"]'
+        assert facade_over(stub).get("ACME_HANDLES") == ["h1", "h2"]
+
+    def test_text_is_stored_and_read_back_untouched(self):
+        stub = CacheStub()
+
+        facade_over(stub).set("ACME_SESSION", "  a-session-token ")
+
+        assert stub.stored["ACME_SESSION"] == "  a-session-token "
+        assert facade_over(stub).get("ACME_SESSION") == "  a-session-token "
+
+    def test_text_that_only_looks_like_json_comes_back_as_text(self):
+        stub = CacheStub(stored={"ACME_NOTE": "{not json", "ACME_NUMBER": "42"})
+
+        assert facade_over(stub).get("ACME_NOTE") == "{not json"
+        assert facade_over(stub).get("ACME_NUMBER") == "42"
+
+    # @scenario "JSON text an older writer stored reads back parsed"
+    def test_json_text_an_older_writer_stored_reads_back_parsed(self):
+        stub = CacheStub(
+            stored={"ACME_MODE": '{"mode":"legacy"}', "ACME_STEPS": '["one"]'}
+        )
+
+        assert facade_over(stub).get("ACME_MODE") == {"mode": "legacy"}
+        assert facade_over(stub).get("ACME_STEPS") == ["one"]
+
+    # @scenario "The SDK refuses a value it cannot store before calling the platform"
+    def test_a_value_of_another_type_is_refused_before_any_call(self):
+        stub = CacheStub()
+
+        with pytest.raises(TypeError) as raised:
+            facade_over(stub).set("ACME_COUNT", 42)  # type: ignore[arg-type]
+
+        assert "int" in str(raised.value)
+        assert stub.calls == []
+
+    def test_a_tuple_is_stored_as_a_json_array_and_reads_back_as_a_list(self):
+        stub = CacheStub()
+
+        facade_over(stub).set("ACME_HANDLES", {"items": ("a", "b")})
+
+        assert stub.stored["ACME_HANDLES"] == '{"items": ["a", "b"]}'
+        assert facade_over(stub).get("ACME_HANDLES") == {"items": ["a", "b"]}
+
+    @pytest.mark.parametrize(
+        "number", [float("nan"), float("inf"), float("-inf")]
+    )
+    def test_a_number_json_cannot_carry_is_refused_before_any_call(self, number):
+        stub = CacheStub()
+
+        with pytest.raises(TypeError):
+            facade_over(stub).set("ACME_READING", {"value": number})
+
+        assert stub.calls == []
+
+
 class TestMessages:
     # @scenario "No message from the SDK quotes a cached value"
     def test_no_message_quotes_the_value_the_caller_sent(self):
@@ -194,3 +266,34 @@ class TestMessages:
             facade_over(stub).set("ACME_SESSION", "a-session-nobody-may-print")
 
         assert "a-session-nobody-may-print" not in str(raised.value)
+
+    # @scenario "A refused write names the field the platform rejected"
+    def test_a_refused_write_names_the_rejected_field(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                400,
+                json={
+                    "code": "validation_error",
+                    "message": "validation_error",
+                    "meta": {"target": "json", "fields": ["value"]},
+                    "reasons": [
+                        {
+                            "code": "schema_failure",
+                            "meta": {
+                                "field": "value",
+                                "type": "invalid_type",
+                                "message": "Expected string, received object",
+                            },
+                        }
+                    ],
+                },
+            )
+
+        with pytest.raises(ValueError) as raised:
+            CacheFacade(FakeRestClient(handler)).set("ACME_SESSION", "whatever")
+
+        assert str(raised.value) == (
+            "The agent cache refused the call: 400 "
+            "(validation_error: value: Expected string, received object)"
+        )
+        assert "whatever" not in str(raised.value)
