@@ -19,7 +19,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { buildSpanAttributeKeysFacetQuery } from "@langwatch/trace-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "../../clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { seedSpans } from "../../analytics/clickhouse/__tests__/test-utils/clickhouse-fixtures";
 import {
   cleanupTestData,
@@ -44,7 +45,7 @@ describe("span-attribute-keys facet integration", () => {
   beforeAll(async () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
-    ch = wrapWithDefaultSettings(rawClient);
+    ch = withClickHouseDefaultQuerySettings(rawClient, DEFAULT_CLICKHOUSE_SETTINGS);
 
     await seedSpans(ch, {
       tenantId: TENANT_ID,

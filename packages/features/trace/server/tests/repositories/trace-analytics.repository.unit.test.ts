@@ -347,8 +347,9 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 /**
  * The write half of the migration window (ADR-066).
  *
- * `wrapWithDefaultSettings` proxies only `.query`, so an insert carries exactly
- * the settings the repository passes and nothing else. ClickHouse defaults
+ * `withClickHouseDefaultQuerySettings` proxies only `.query`, so an insert
+ * carries exactly the settings the repository passes and nothing else.
+ * ClickHouse defaults
  * `input_format_skip_unknown_fields` ON, and the workers Deployment overrides
  * the entrypoint so it never runs migrations — they run in the app pod's boot,
  * and the two roll concurrently. Without the explicit 0, a worker writing before

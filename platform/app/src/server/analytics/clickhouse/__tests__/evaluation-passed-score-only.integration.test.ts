@@ -22,7 +22,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -87,7 +88,7 @@ describe("evaluation_passed groupBy on score-only / non-processed rows", () => {
   beforeAll(async () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
-    ch = wrapWithDefaultSettings(rawClient);
+    ch = withClickHouseDefaultQuerySettings(rawClient, DEFAULT_CLICKHOUSE_SETTINGS);
 
     await seedSpans(ch, {
       tenantId: TENANT_ID,

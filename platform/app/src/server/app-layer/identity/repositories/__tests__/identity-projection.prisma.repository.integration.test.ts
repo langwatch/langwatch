@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing";
+import { createTenantId } from "@langwatch/eventing";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
 import { PrismaIdentityProjectionRepository } from "../identity-projection.prisma.repository";

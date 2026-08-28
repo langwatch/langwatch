@@ -8,7 +8,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing";
+import { createTenantId } from "@langwatch/eventing";
 import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";

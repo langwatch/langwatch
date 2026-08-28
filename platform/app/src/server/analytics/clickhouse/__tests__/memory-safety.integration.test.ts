@@ -9,7 +9,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -240,7 +241,7 @@ describe("memory-safety integration", () => {
     async () => {
       const rawClient = getTestClickHouseClient();
       if (!rawClient) throw new Error("ClickHouse client not available");
-      ch = wrapWithDefaultSettings(rawClient);
+      ch = withClickHouseDefaultQuerySettings(rawClient, DEFAULT_CLICKHOUSE_SETTINGS);
 
       // Seed 10K spans with 50 attribute keys across 1000 traces
       // knownCost: 0.05 per trace so total_cost = 1000 * 0.05 = 50.0

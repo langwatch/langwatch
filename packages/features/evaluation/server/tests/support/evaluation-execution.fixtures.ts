@@ -31,6 +31,9 @@ import { monitorWithEvaluatorSchema, MonitorService } from "@langwatch/monitor-c
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
   SpanTreeDeltaInput,
   SpanTreeNode,
   SpanTreeInput,
@@ -184,6 +187,14 @@ export class TestTraceService extends TraceService {
 
   async getById(): Promise<never> {
     throw new Error("unused trace capability");
+  }
+
+  async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
+    throw new Error(`unused trace full-record capability: ${input.traceId}`);
+  }
+
+  async getFullThread(_input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
+    return [];
   }
 
   async deriveEvents(): Promise<never> {

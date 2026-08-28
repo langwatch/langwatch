@@ -45,7 +45,7 @@ import {
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "~/server/event-sourcing";
+import { createTenantId } from "@langwatch/eventing";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";

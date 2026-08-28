@@ -21,7 +21,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -72,7 +73,7 @@ let ch: ClickHouseClient;
 beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse client not available");
-  ch = wrapWithDefaultSettings(rawClient);
+  ch = withClickHouseDefaultQuerySettings(rawClient, DEFAULT_CLICKHOUSE_SETTINGS);
 
   // Pre-clean: an aborted previous run leaves its rows behind (afterAll
   // never ran), and a second fixture copy passes the count-at-least guard

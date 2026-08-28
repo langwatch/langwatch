@@ -15,11 +15,11 @@
  * about none of them — the substitution
  * `sso-connection-grandfather.integration.test.ts` makes for the same reason.
  */
+import { createTenantId } from "@langwatch/eventing";
 import { emptySsoConnection } from "@langwatch/identity";
 import { newSsoConnectionId } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaSsoConnectionProjectionRepository } from "~/server/app-layer/identity/repositories/sso-connection-projection.prisma.repository";
-import { createTenantId } from "~/server/event-sourcing";
 import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 
 /**

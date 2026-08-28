@@ -272,9 +272,9 @@ describe("memory-safety", () => {
 
         // The trace service must resolve through the App's per-tenant
         // resolver, whose clients are built by the one construction path that
-        // wraps them with wrapWithDefaultSettings - so memory-safety defaults
+        // applies the package query-default policy - so memory-safety defaults
         // are automatically injected on every query. The wrapper's merge
-        // behavior is tested in safeClickhouseClient.unit.test.ts.
+        // behavior is tested in the package managed-client suite.
         expect(source).toContain("clickhouse.resolveClient(");
       });
     });

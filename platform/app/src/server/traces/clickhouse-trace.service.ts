@@ -432,7 +432,7 @@ export class ClickHouseTraceService {
   /**
    * Resolve the ClickHouse client for a given project.
    *
-   * The returned client is already wrapped with wrapWithDefaultSettings
+   * The returned client already applies the managed query defaults
    * by the App's per-tenant resolver, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    *

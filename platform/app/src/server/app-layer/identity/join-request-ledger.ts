@@ -35,7 +35,7 @@ import {
 import type { JoinRequestLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "~/server/event-sourcing";
+import { createTenantId } from "@langwatch/eventing";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import { joinRequestEventsFor } from "~/server/event-sourcing/pipelines/join-requests/envelope";
 import type { JoinRequestFoldState } from "~/server/event-sourcing/pipelines/join-requests/projections/joinRequestState.foldProjection";

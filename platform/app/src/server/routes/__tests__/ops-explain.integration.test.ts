@@ -18,27 +18,43 @@
  * shared native server.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
-import { _resetOpsClickHouseClientForTesting } from "~/server/ops/explain-core";
+import {
+  OpsExplainClickHouseRepository,
+  OpsExplainClientResolver,
+  type OpsExplainClientResolution,
+} from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
+import { OpsClickHouseRuntime } from "~/server/ops/explain-core";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
+
+class OpsOnlyClientResolver extends OpsExplainClientResolver {
+  static create(runtime: OpsClickHouseRuntime): OpsOnlyClientResolver {
+    return new OpsOnlyClientResolver(runtime);
+  }
+
+  private constructor(private readonly runtime: OpsClickHouseRuntime) {
+    super();
+  }
+
+  resolve(): OpsExplainClientResolution | null {
+    const client = this.runtime.resolveClient();
+    return client === null ? null : { client, usingFallback: false };
+  }
+}
+
+let opsRuntime: OpsClickHouseRuntime;
 
 // The route takes its service from `getApp()`; standing in for the App
 // keeps this suite testing the route against a real ClickHouse without
 // booting the rest of the application (redis, postgres, event sourcing).
-// The repository the service reads through resolves
-// `getOpsClickHouseClient()` (or its injected fallback) fresh on every
-// call, so a single instance built here behaves exactly like one built per
-// request would.
+// The composed test runtime is process-owned just like the production graph.
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
     opsExplain: {
       service: new OpsExplainService(
-        // The suite always configures CLICKHOUSE_OPS_URL, so the shared-client
-        // fallback is never consulted here.
-        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+        new OpsExplainClickHouseRepository(OpsOnlyClientResolver.create(opsRuntime)),
       ),
     },
   }),
@@ -84,19 +100,17 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
     await c.close();
 
     process.env.LANGWATCH_OPS_API_KEY = API_KEY;
-    process.env.CLICKHOUSE_OPS_URL = ops!.url;
     process.env.NODE_ENV = "test";
-    _resetOpsClickHouseClientForTesting();
+    opsRuntime = OpsClickHouseRuntime.create({ url: ops!.url, buildTime: false });
 
     // Built AFTER env is set so the route module reads the right values
     // on first init.
     router = createApiRouter(getApp());
   }, 300_000);
 
-  afterAll(() => {
+  afterAll(async () => {
     delete process.env.LANGWATCH_OPS_API_KEY;
-    delete process.env.CLICKHOUSE_OPS_URL;
-    _resetOpsClickHouseClientForTesting();
+    await opsRuntime.close();
   });
 
   it("is mounted at /api/ops/clickhouse/explain and serves EXPLAIN PLAN rows", async () => {
@@ -144,8 +158,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("rejects a table function (SSRF surface)", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query:
-        "SELECT * FROM url('http://evil.example/x', CSV, 'a String') WHERE TenantId = 'p_x'",
+      query: "SELECT * FROM url('http://evil.example/x', CSV, 'a String') WHERE TenantId = 'p_x'",
     });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toMatch(/table function/i);

@@ -11,7 +11,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * Delete every `evaluation_runs` row for a tenant, synchronously.
  *
- * Takes the wrapped client (`wrapWithDefaultSettings`) so cleanup carries the
+ * Takes the managed client so cleanup carries the
  * same default settings as the queries under test, rather than the bare client.
  * Always runs with `mutations_sync = 1` so the mutation finishes before the next
  * test file starts, preventing cross-file `evaluation_runs` bleed. A nullish

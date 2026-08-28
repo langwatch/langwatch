@@ -22,7 +22,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -61,7 +62,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
   beforeAll(async () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
-    ch = wrapWithDefaultSettings(rawClient);
+    ch = withClickHouseDefaultQuerySettings(rawClient, DEFAULT_CLICKHOUSE_SETTINGS);
 
     // Seed 2 traces with knownCost=10 each. One span per trace is enough —
     // the bug is about evaluation_runs fan-out, not span fan-out.
