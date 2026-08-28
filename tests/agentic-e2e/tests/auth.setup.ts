@@ -78,6 +78,20 @@ setup("authenticate", async ({ page, request }) => {
   await expect(page).not.toHaveURL(/\/auth\/signin/);
   console.log("Signed in successfully. Current URL:", page.url());
 
+  // The security offer is product behaviour, but leaving its modal open would
+  // obstruct every unrelated authenticated browser test that reuses this state.
+  const dismissNudgeResponse = await page.request.post(
+    "/api/trpc/user.dismissSecureAccountNudge?batch=1",
+    { data: { "0": { json: {} } } },
+  );
+  const dismissNudgeData = await dismissNudgeResponse.json().catch(() => null);
+
+  if (!dismissNudgeResponse.ok() || dismissNudgeData?.["0"]?.error) {
+    throw new Error(
+      `dismissSecureAccountNudge failed: ${JSON.stringify(dismissNudgeData).slice(0, 500)}`,
+    );
+  }
+
   // Step 3: Create org + project via API if not already set up.
   // page.request inherits the browser session cookies from the sign-in above,
   // so this call is fully authenticated. This is more reliable than clicking
