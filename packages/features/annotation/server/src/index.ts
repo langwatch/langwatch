@@ -8,7 +8,7 @@ export {
   type AnnotationQueueStore,
   type AnnotationTrpcContext,
   type AnnotationTrpcPorts,
-} from "./api/app-trpc/annotation.trpc-schemas";
+} from "./api/app-trpc/annotation.api";
 export {
   AnnotationScoreTrpcApi,
   type AnnotationScoreTrpcContext,

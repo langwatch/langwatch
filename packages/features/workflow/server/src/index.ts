@@ -32,4 +32,4 @@ export {
   type WorkflowTrpcContext,
   type WorkflowTrpcPorts,
   type WorkflowVersionRow,
-} from "./api/app-trpc/workflow.trpc-schemas";
+} from "./api/app-trpc/workflow.api";

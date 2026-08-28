@@ -11,24 +11,24 @@ export {
   type StoredOrganizationSettings,
   type PersonalWorkspaceResourceIds,
 } from "./ports/organization.port";
-export { TeamTrpcApi, type TeamTrpcContext } from "./api/app-trpc/team.trpc-schemas";
+export { TeamTrpcApi, type TeamTrpcContext } from "./api/app-trpc/team.api";
 export {
   GroupTrpcApi,
   type GroupTrpcContext,
   type GroupTrpcPorts,
-} from "./api/app-trpc/group.trpc-schemas";
+} from "./api/app-trpc/group.api";
 export {
   JoinRequestTrpcApi,
   type JoinRequestTrpcContext,
   type JoinRequestTrpcPorts,
-} from "./api/app-trpc/join-request.trpc-schemas";
+} from "./api/app-trpc/join-request.api";
 export {
   OrganizationTrpcApi,
   type FullyLoadedOrganization,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
   type OrganizationWithMembersAndTheirTeams,
-} from "./api/app-trpc/organization.trpc-schemas";
+} from "./api/app-trpc/organization.api";
 export {
   PersonalWorkspaceFeaturesTrpcApi,
   type PersonalWorkspaceFeaturesTrpcContext,

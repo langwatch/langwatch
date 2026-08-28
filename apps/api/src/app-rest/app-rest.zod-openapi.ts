@@ -10,6 +10,20 @@ declare module "zod" {
   }
 }
 
+/**
+ * Applied on import of this module, not by its callers.
+ *
+ * Feature modules call `.openapi()` on schemas at module scope, so the patch
+ * has to be in place before any of them is evaluated. Thirty of them used to
+ * call `patchZodOpenapi()` themselves through the `app-rest` barrel — which
+ * is a cycle: the barrel imports the features, so the feature body ran before
+ * the barrel's own export bindings were initialised and the call threw
+ * "patchZodOpenapi is not a function". Importing this module for its side
+ * effect is what removes the ordering problem rather than moving it.
+ *
+ * The function stays exported and stays idempotent, for a composition root
+ * that wants to be explicit.
+ */
 export const patchZodOpenapi = () => {
   // Zod 4 owns JSON Schema metadata natively. The old zod-openapi prototype
   // extension targets Zod 3 and replaces Zod 4 object methods with wrappers

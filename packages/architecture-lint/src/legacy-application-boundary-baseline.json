@@ -537,9 +537,6 @@
       "platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/DrawerHeader.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/EditableTraceName.tsx": [
-        "~/server/event-sourcing/pipelines/trace-processing/schemas/constants"
-      ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/useRetainedTraceHeader.ts": [
         "~/server/api/routers/tracesV2.schemas"
       ],
@@ -843,9 +840,6 @@
       ],
       "platform/app/src/prompts/forms/prompt-config-form/components/VersionHistoryButton.tsx": [
         "~/server/prompt-config"
-      ],
-      "platform/app/src/prompts/forms/schemas/change-handle-form.schema.ts": [
-        "../../../server/prompt-config/repositories/llm-config-version-schema"
       ],
       "platform/app/src/prompts/hooks/useRenamePromptHandle.ts": ["~/server/prompt-config"],
       "platform/app/src/prompts/prompt-playground/components/prompt-browser/ExperimentFromPlaygroundButton.tsx": [

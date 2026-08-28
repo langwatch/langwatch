@@ -19,7 +19,6 @@ import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
 import {
-  connectionGrandfatherMigration,
   identifierBackfillMigration,
   identityNewbornReconciliation,
   identitySecretHealMigration,
@@ -113,18 +112,23 @@ export function registeredMigrations(
   const migrations = [
     ...(runtimeMigration ? [runtimeMigration] : []),
     ...additionalMigrations,
-    // D04 (ADR-117 §5): the organization's legacy SSO strings become connection
-    // history, proved by routing. Dark — the connection projection decides
-    // nothing until `SSOCONN_ROUTING` is flipped, and this record carries the
-    // routing proof's verdict, which is what that flip's exit gate reads.
+    // D04 (ADR-117 §5) — the legacy-SSO grandfather migration — is NOT
+    // registered here, and that is deliberate rather than an oversight.
     //
-    // Registered here rather than arriving through composition because no
-    // composition passes it. It was dropped by the merge that resolved this
-    // directory (5770224e31) by taking main's call sites against the branch's
-    // definitions, and nothing caught it: the factory is still exported, its
-    // two tests mock it, so there was no type error and no failing test — only
-    // a migration that never runs for any tenant.
-    connectionGrandfatherMigration(),
+    // It was registered briefly and reverted. `main` does register it, and on
+    // this branch it looked like a dropped registration, but the same wave
+    // also removed `createSsoConnectionPipeline` from the registry. The
+    // migration writes through `SsoConnectionService.grandfatherConnection`,
+    // which commits through `SsoConnectionLedgerWriter`, which resolves its
+    // command sender from that pipeline and throws when it is absent. So
+    // registering it without the pipeline converts a migration that silently
+    // does nothing into one that throws a plain `Error` per tenant carrying
+    // legacy SSO — a generic "unknown" failure, and worse than the no-op.
+    //
+    // Restoring this means restoring the pipeline first (and with it
+    // `ConnectionTeardownPort`'s only implementation, deleted as orphaned
+    // because the registration had already gone). Half the chain is worse
+    // than none of it.
   ];
   return [
     ...new Map(migrations.map((migration) => [migration.name, migration])).values(),

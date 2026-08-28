@@ -134,7 +134,7 @@ export {
   AutomationTrpcApi,
   type AutomationTrpcContext,
   type AutomationTrpcPorts,
-} from "./api/app-trpc/automation.trpc-schemas";
+} from "./api/app-trpc/automation.api";
 export {
   EmailSuppressionTrpcApi,
   type EmailSuppressionTrpcContext,
