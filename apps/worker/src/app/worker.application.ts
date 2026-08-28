@@ -62,7 +62,13 @@ export class WorkerApplication {
       await this.runtime.start();
       this.started = true;
     } catch (error) {
-      await this.closeFeatureHandlesBestEffort();
+      // A queue readiness or transport-start failure can happen after Eventing
+      // has staged work. Drain it while the feature handles and process
+      // infrastructure are still available, then release the rest of the
+      // process graph. The boot error remains the one the caller receives.
+      this.closed = true;
+      await this.closeEventingAndFeaturesBestEffort();
+      await this.runtime.close().catch(() => void 0);
       throw error;
     } finally {
       this.starting = void 0;
@@ -73,17 +79,8 @@ export class WorkerApplication {
     await this.starting?.catch(() => void 0);
 
     let firstError: unknown;
-    try {
-      // The Eventing runtime owns the shared queue consumer. Its close path
-      // first stops process work and drains the queue before the registry is
-      // released. Infrastructure must remain available for that drain.
-      await this.eventing?.close();
-    } catch (error) {
-      firstError = error;
-    }
-
-    const featureError = await this.closeFeatureHandlesBestEffort();
-    firstError ??= featureError;
+    const eventingAndFeatureError = await this.closeEventingAndFeaturesBestEffort();
+    firstError ??= eventingAndFeatureError;
 
     try {
       await this.runtime.close();
@@ -92,6 +89,22 @@ export class WorkerApplication {
     }
 
     if (firstError) throw firstError;
+  }
+
+  /**
+   * Queued Eventing work can retain feature-owned repositories and executors.
+   * Its drain therefore completes before feature handles are released.
+   */
+  private async closeEventingAndFeaturesBestEffort(): Promise<unknown> {
+    let firstError: unknown;
+    try {
+      await this.eventing?.close();
+    } catch (error) {
+      firstError = error;
+    }
+
+    const featureError = await this.closeFeatureHandlesBestEffort();
+    return firstError ?? featureError;
   }
 
   private async closeFeatureHandlesBestEffort(): Promise<unknown> {

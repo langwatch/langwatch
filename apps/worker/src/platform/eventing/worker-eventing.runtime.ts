@@ -3,6 +3,7 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
   type EventStore,
+  type ExecutionTarget,
   type ProcessStore,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
@@ -13,7 +14,7 @@ export interface WorkerEventingDependencies {
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
   ): EventSourcedQueueProcessor<Record<string, unknown>>;
   processStore: ProcessStore;
-  executionTarget: string;
+  executionTarget: ExecutionTarget;
   /**
    * A consumer may run only when this process registers every job type on the
    * shared Eventing queue. The Topic slice alone is not that registry.

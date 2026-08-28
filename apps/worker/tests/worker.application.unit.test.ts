@@ -116,6 +116,66 @@ describe("WorkerApplication", () => {
     expect(first.handle.close).toHaveBeenCalledOnce();
   });
 
+  it("drains Eventing before tearing down a graph whose transport cannot start", async () => {
+    const phases: string[] = [];
+    const transport = new Transport();
+    const startError = new Error("transport unavailable");
+    transport.start.mockRejectedValueOnce(startError);
+    const lifecycle = new Lifecycle();
+    lifecycle.close.mockImplementation(async () => {
+      phases.push("lifecycle");
+    });
+    const feature = new FeatureInstaller();
+    feature.handle.close.mockImplementation(async () => {
+      phases.push("feature");
+    });
+    const application = WorkerApplication.create({
+      runtime: WorkerRuntime.create({ lifecycle, transport }),
+      eventing: createEventing(phases),
+      featureInstallers: [feature],
+    });
+
+    await expect(application.start()).rejects.toBe(startError);
+
+    expect(phases).toEqual(["eventing", "feature", "lifecycle"]);
+    await expect(application.start()).rejects.toThrow("Worker application is closed.");
+  });
+
+  it("cleans up in drain order when Eventing readiness fails", async () => {
+    const phases: string[] = [];
+    const readinessError = new Error("Redis is unavailable");
+    const queue = new EventingQueue(phases);
+    queue.waitUntilReady = async () => {
+      throw readinessError;
+    };
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: new EventStoreMemory(),
+      queueFactory: () => queue,
+      processStore: new InMemoryProcessStore(),
+      executionTarget: "worker",
+      consumersEnabled: false,
+    });
+    const feature = new FeatureInstaller();
+    feature.handle.close.mockImplementation(async () => {
+      phases.push("feature");
+    });
+    const lifecycle = new Lifecycle();
+    lifecycle.close.mockImplementation(async () => {
+      phases.push("lifecycle");
+    });
+    const transport = new Transport();
+    const application = WorkerApplication.create({
+      runtime: WorkerRuntime.create({ lifecycle, transport }),
+      eventing,
+      featureInstallers: [feature],
+    });
+
+    await expect(application.start()).rejects.toBe(readinessError);
+
+    expect(transport.start).not.toHaveBeenCalled();
+    expect(phases).toEqual(["eventing", "feature", "lifecycle"]);
+  });
+
   it("closes every feature even when one feature cleanup fails", async () => {
     const first = new FeatureInstaller();
     const second = new FeatureInstaller();
