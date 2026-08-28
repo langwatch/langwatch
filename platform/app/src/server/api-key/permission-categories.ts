@@ -66,6 +66,7 @@ const GOVERNANCE_RESOURCES: AuthzResource[] = [
   "complianceExport",
   "activityMonitor",
   "aiTools",
+  "governanceCost",
 ];
 
 export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [

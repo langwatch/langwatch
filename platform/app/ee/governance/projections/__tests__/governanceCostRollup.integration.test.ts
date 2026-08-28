@@ -343,6 +343,58 @@ describe("governance cost rollup", () => {
     });
   });
 
+  describe("given a restated day read through the screen's range query", () => {
+    it("totals only the surviving version, and keeps the two lanes apart", async () => {
+      await foldThroughExecutor(
+        observed({
+          costNanoUsd: 12_340_000_000,
+          observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
+        }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoUsd: 9_000_000_000,
+          observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
+          costStatus: "exact",
+        }),
+      );
+      await foldThroughExecutor(confirmed({ costNanoUsd: 5_000_000_000 }));
+
+      // Deliberately NOT compacted: the superseded version is still there, so
+      // the read has to survive it rather than wait for a merge.
+      // Deliberately NOT compacted. The self-check: the table must still hold
+      // more physical rows than the read returns cells, or this test would be
+      // asserting dedup against data that has nothing left to dedup.
+      const rawRows = await rawRowCount();
+      expect(rawRows).toBe(3);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(rawRows).toBeGreaterThan(lanes.length);
+
+      const pulled = lanes.find((lane) => lane.costSource === "pulled");
+      const gateway = lanes.find((lane) => lane.costSource === "gateway");
+      expect(pulled?.amountNanoUsd).toBe(9_000_000_000);
+      expect(gateway?.amountNanoUsd).toBe(5_000_000_000);
+      // The lanes are never combined — a summed figure is the defect.
+      expect(lanes).toHaveLength(2);
+      expect(pulled?.day).toBe(DAY);
+    });
+
+    it("answers null, never zero, for a window nothing reported", async () => {
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lanes).toEqual([]);
+    });
+  });
+
   describe("given the same event is redelivered after its state was stored", () => {
     // Queue delivery is at-least-once and this fold ACCUMULATES: without the
     // applied-event-id watermark riding on the row, a retry that reaches a

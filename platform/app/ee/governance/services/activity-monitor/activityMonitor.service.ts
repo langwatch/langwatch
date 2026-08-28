@@ -47,7 +47,7 @@ import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
-import { PROJECT_KIND } from "../governanceProject.service";
+import { resolveGovProjectId } from "../govProject";
 import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
@@ -447,15 +447,7 @@ export class ActivityMonitorService {
   private async resolveGovProjectId(
     organizationId: string,
   ): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
+    return await resolveGovProjectId({ prisma: this.prisma, organizationId });
   }
 
   // -----------------------------------------------------------------------

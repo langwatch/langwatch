@@ -264,6 +264,77 @@ export class GovernanceCostRollupClickHouseRepository {
   }
 
   /**
+   * Every (day, lane) total across a closed day range, deduped — the cost
+   * screen's whole read in one query.
+   *
+   * The dedup CANNOT be done in the same pass as the aggregation: picking the
+   * newest version of a cell is a `GROUP BY` over the sort key, and totalling
+   * a lane's day is a `GROUP BY` over two of its columns. So the inner query
+   * collapses each cell to its surviving version and the outer one sums only
+   * those survivors. A single-pass `sum(AmountNanoUsd)` here would add a
+   * restated figure to the figure it restates, which is the exact defect the
+   * permanent counterexample test on this repository exists to catch.
+   *
+   * `sumOrNull` rather than `sum`: a lane whose every cell holds no USD figure
+   * must come back NULL, because 0 is a claim that nothing was spent. Cells
+   * without an amount are counted separately so a caller can say which.
+   *
+   * The `Day` range prunes partitions (`PARTITION BY toYYYYMM(Day)`), and
+   * TenantId leads the predicate because nothing else here is unique across
+   * tenants.
+   */
+  async sumDaysByLane(input: {
+    tenantId: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    fromDay: string;
+    /** Inclusive, `YYYY-MM-DD`. */
+    toDay: string;
+  }): Promise<
+    Array<{
+      day: string;
+      costSource: string;
+      amountNanoUsd: number | null;
+      cellsWithoutAmount: number;
+    }>
+  > {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Day                              AS Day,
+          CostSource                       AS CostSource,
+          sumOrNull(LatestAmountNanoUsd)   AS AmountNanoUsd,
+          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount
+        FROM (
+          SELECT
+            ${KEY_COLUMNS.join(",\n            ")},
+            argMax(AmountNanoUsd, EventTimestamp) AS LatestAmountNanoUsd
+          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+          WHERE TenantId = {tenantid:String}
+            AND Day >= {fromday:Date}
+            AND Day <= {today:Date}
+          GROUP BY ${KEY_COLUMNS.join(", ")}
+        )
+        GROUP BY Day, CostSource
+        ORDER BY Day, CostSource
+      `,
+      query_params: {
+        tenantid: input.tenantId,
+        fromday: input.fromDay,
+        today: input.toDay,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      day: String(row.Day ?? ""),
+      costSource: String(row.CostSource ?? ""),
+      amountNanoUsd: nullableInt(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+    }));
+  }
+
+  /**
    * The newest business time any cell of a lane has summarized, for the lag
    * gauge. Null when the lane has summarized nothing yet.
    */
