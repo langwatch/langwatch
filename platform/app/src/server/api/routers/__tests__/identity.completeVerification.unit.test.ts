@@ -56,6 +56,7 @@ vi.mock(
     identityService: () => ({}),
     identityGuards: () => ({}),
     identityProjectionStore: () => ({}),
+    twoStepAccount: () => ({}),
     identityBridgeCeremonies: () => ({
       beforeAccountCreate: async () => undefined,
       beforeAccountDelete: async () => undefined,

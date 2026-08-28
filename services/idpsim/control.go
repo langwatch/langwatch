@@ -145,7 +145,42 @@ func (s *Server) handleControlSCIMPush(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "a push needs a target SCIM base URL", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusOK, pushDirectory(r.Context(), t, req))
+	result := pushDirectory(r.Context(), t, req)
+	// The result and the sentence describing it, together: the activity feed
+	// reads the sentence, an assertion reads the counts. Embedded rather than
+	// nested so the counts stay where a caller already looks for them.
+	writeJSON(w, http.StatusOK, struct {
+		scimPushResult
+		Summary string `json:"summary"`
+	}{result, pushSummary(result, req.BaseURL)})
+}
+
+// handleControlSCIMPull reads a target's directory back over the same
+// credential, which is how a provisioning run is checked without leaving the
+// simulator: a push reports what the target ACCEPTED, and this reports what it
+// turned out to be holding. The two disagree exactly where a service provider
+// deduplicated, dropped members, or took a deactivation as a delete.
+func (s *Server) handleControlSCIMPull(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.tenantFor(r); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	var req ProvisioningTarget
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BaseURL == "" {
+		http.Error(w, "a read-back needs a target SCIM base URL", http.StatusBadRequest)
+		return
+	}
+	snapshot, err := pullDirectory(r.Context(), req)
+	if err != nil {
+		// The target answering badly is the target's news, not a fault of the
+		// simulator, so it is reported as an upstream failure rather than a 500.
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		directorySnapshot
+		Summary string `json:"summary"`
+	}{snapshot, pullSummary(snapshot, req.BaseURL)})
 }
 
 // handleControlDNS sets or clears a TXT record.
