@@ -26,9 +26,10 @@ export interface RunScenarioOptions {
 /**
  * Runs one scenario against one or more targets.
  *
- * This is a run plan scoped to a single case: one request, no suite created
- * for it and none deleted afterwards. The platform files the run under a plan
- * named after the scenario and the target unless `--name` says otherwise.
+ * This is a run plan scoped to a single scenario: one request, no test suite
+ * created for it and none deleted afterwards. The platform files the run under
+ * a plan named after the scenario and the target unless `--name` says
+ * otherwise.
  *
  * @see specs/features/scenario-cli.feature
  */
