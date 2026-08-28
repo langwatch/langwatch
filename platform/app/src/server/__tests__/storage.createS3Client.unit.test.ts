@@ -22,6 +22,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createS3Client } from "../storage";
 
 const s3ClientConstructorCalls: any[] = [];
+type AwsClientConfigInput = {
+  region?: string;
+  targetHost: string;
+  endpoint?: string;
+  staticCredentials?: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken?: string;
+  };
+};
+const awsClientConfigCalls: AwsClientConfigInput[] = [];
+const storageDestinationMock = vi.hoisted(() =>
+  vi.fn(async () => ({ kind: "s3" as const, bucket: "test-bucket" })),
+);
 
 vi.mock("@aws-sdk/client-s3", () => {
   class FakeS3Client {
@@ -43,10 +57,7 @@ vi.mock("../dataplane-s3", () => ({
 }));
 
 vi.mock("../stored-objects/project-storage-destination", () => ({
-  resolveProjectStorageDestination: vi.fn(async () => ({
-    kind: "s3",
-    bucket: "test-bucket",
-  })),
+  resolveProjectStorageDestination: storageDestinationMock,
 }));
 
 vi.mock("../../env.mjs", () => ({
@@ -69,8 +80,22 @@ vi.mock("../../env.mjs", () => ({
   ),
 }));
 
+vi.mock("~/runtime/app/aws-client.composition", () => ({
+  buildAwsClientConfig: vi.fn((input: AwsClientConfigInput) => {
+    awsClientConfigCalls.push(input);
+    return {
+      ...(input.region !== undefined ? { region: input.region } : {}),
+      ...(input.endpoint !== undefined ? { endpoint: input.endpoint } : {}),
+      ...(input.staticCredentials !== undefined ? { credentials: input.staticCredentials } : {}),
+    };
+  }),
+}));
+
 function resetS3Env() {
   s3ClientConstructorCalls.length = 0;
+  awsClientConfigCalls.length = 0;
+  storageDestinationMock.mockReset();
+  storageDestinationMock.mockResolvedValue({ kind: "s3", bucket: "test-bucket" });
   delete process.env.S3_ENDPOINT;
   delete process.env.S3_ACCESS_KEY_ID;
   delete process.env.S3_SECRET_ACCESS_KEY;
@@ -187,6 +212,59 @@ describe("createS3Client credential mode handling", () => {
       expect(config.credentials).toBeUndefined();
       expect("credentials" in config).toBe(false);
     });
+  });
+});
+
+describe("process AWS client composition", () => {
+  beforeEach(resetS3Env);
+
+  it("uses the process-owned transport policy for the current project target", async () => {
+    process.env.S3_ENDPOINT = "https://r2.example.test";
+    process.env.S3_ACCESS_KEY_ID = "AKIAEXAMPLE";
+    process.env.S3_SECRET_ACCESS_KEY = "secret-value";
+
+    await createS3Client("test-project");
+
+    expect(awsClientConfigCalls).toEqual([
+      {
+        region: "auto",
+        targetHost: "https://r2.example.test",
+        endpoint: "https://r2.example.test",
+        staticCredentials: {
+          accessKeyId: "AKIAEXAMPLE",
+          secretAccessKey: "secret-value",
+        },
+      },
+    ]);
+  });
+
+  it.each([
+    ["a standard AWS region", "eu-central-1", "s3.eu-central-1.amazonaws.com"],
+    ["AWS China", "cn-north-1", "s3.cn-north-1.amazonaws.com.cn"],
+    ["the compatibility auto region", "auto", "s3.amazonaws.com"],
+  ])("uses %s's actual default S3 host for proxy selection", async (_, region, targetHost) => {
+    process.env.S3_REGION = region;
+
+    await createS3Client("test-project");
+
+    expect(awsClientConfigCalls).toEqual([
+      {
+        region,
+        targetHost,
+      },
+    ]);
+  });
+
+  it("resolves the destination again for each operation instead of retaining a tenant target", async () => {
+    storageDestinationMock.mockResolvedValueOnce({ kind: "s3", bucket: "first-bucket" });
+    storageDestinationMock.mockResolvedValueOnce({ kind: "s3", bucket: "second-bucket" });
+
+    const first = await createS3Client("test-project");
+    const second = await createS3Client("test-project");
+
+    expect(first.s3Bucket).toBe("first-bucket");
+    expect(second.s3Bucket).toBe("second-bucket");
+    expect(awsClientConfigCalls).toHaveLength(2);
   });
 });
 

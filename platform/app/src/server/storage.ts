@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "fs/promises";
 import path from "path";
 import { env } from "../env.mjs";
+import { buildAwsClientConfig } from "~/runtime/app/aws-client.composition";
 import { getS3ConfigForProject } from "./dataplane-s3";
 import { resolveProjectStorageDestination } from "./stored-objects/project-storage-destination";
 
@@ -97,14 +98,27 @@ export class StorageService {
 export const createS3Client = async (projectId: string) => {
   const target = await resolveS3ClientTarget(projectId);
   const s3Client = new S3Client({
-    ...(target.region !== undefined ? { region: target.region } : {}),
-    ...(target.endpoint ? { endpoint: target.endpoint } : {}),
-    ...(target.credentials ? { credentials: target.credentials } : {}),
+    ...buildAwsClientConfig({
+      region: target.region,
+      // The project endpoint is the actual network destination for BYOC S3
+      // providers. AWS' default endpoint needs a stable public host so the
+      // process-owned proxy policy can make the same decision as SES/SQS.
+      targetHost: target.endpoint ?? defaultS3Host(target.region),
+      endpoint: target.endpoint,
+      staticCredentials: target.credentials,
+    }),
     forcePathStyle: true,
   });
 
   return { s3Client, s3Bucket: target.s3Bucket };
 };
+
+function defaultS3Host(region: string | undefined): string {
+  if (!region || region === "auto") return "s3.amazonaws.com";
+
+  const suffix = region.startsWith("cn-") ? ".amazonaws.com.cn" : ".amazonaws.com";
+  return `s3.${region}${suffix}`;
+}
 
 /**
  * Current S3 wiring for one tenant. The opaque fingerprint changes whenever
