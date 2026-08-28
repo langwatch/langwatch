@@ -102,6 +102,13 @@ Feature: The Results tab
     Then the Targets cell names both agents
 
   @integration
+  Scenario: A set that runs from code reads its last run and pass rate on the list
+    Given a set that runs from code with runs inside the window
+    When the list of run plans is read
+    Then its row reads when it last ran, its pass rate and its trend
+    And not "nothing in 30 days"
+
+  @integration
   Scenario: The Pass column is a plain coloured percentage
     Given a run plan whose runs passed nine of ten
     When its row is read

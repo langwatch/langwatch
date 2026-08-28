@@ -326,11 +326,19 @@ function buildPlanRows({
 }): PlanRowModel[] {
   if (grouping !== "plan") return [];
 
-  const byPlanSlug = new Map(groups.map((group) => [group.key, group]));
+  const byKey = new Map(groups.map((group) => [group.key, group]));
   const narrowed = isNarrowed(filters);
 
+  // The read keys a set that runs from code by its bare set id, while the
+  // list names it under the external plan slug, so such a plan is looked up
+  // by its set id when its slug finds nothing.
+  const groupOf = (plan: RunPlan): ResultGroup | null =>
+    byKey.get(plan.slug) ??
+    (plan.kind === "external" ? byKey.get(plan.scenarioSetId) : undefined) ??
+    null;
+
   return plans
-    .map((plan) => ({ plan, group: byPlanSlug.get(plan.slug) ?? null }))
+    .map((plan) => ({ plan, group: groupOf(plan) }))
     .filter(({ group }) => !narrowed || group !== null);
 }
 

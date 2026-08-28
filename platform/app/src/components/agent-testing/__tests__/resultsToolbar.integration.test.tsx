@@ -414,6 +414,32 @@ describe("the toolbar of the Results tab", () => {
   });
 
   describe("when the Group by control is read", () => {
+    /** @scenario "A set that runs from code reads its last run and pass rate on the list" */
+    it("reads the runs of a set that runs from code on its own row", () => {
+      // The read keys the group by the bare set id; the list names that set
+      // under its external plan slug.
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [makeGroup({ key: "default", passRate: 75, lastRunAt: NOW })],
+      };
+
+      renderList({
+        externalSets: [
+          {
+            scenarioSetId: "default",
+            passedCount: 3,
+            failedCount: 1,
+            totalCount: 4,
+            lastRunTimestamp: NOW,
+          },
+        ],
+      });
+
+      const row = screen.getByTestId("run-plan-row-external:default");
+      expect(row).toHaveTextContent("75%");
+      expect(row).not.toHaveTextContent(/nothing in/);
+    });
+
     /** @scenario "Every control of the filter row is one height" */
     it("draws every control of the row at one height and one type size", () => {
       renderList();
