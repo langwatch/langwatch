@@ -26,6 +26,21 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
+// Identifier-aware acceptance (D11): the router asks the identity runtime
+// for the user's verified addresses. `null` = not on identifiers, keep the
+// legacy session-email comparison — the default here so the pre-identifier
+// tests exercise exactly the legacy branch.
+const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+vi.mock("~/server/app-layer/identity/runtime", () => ({
+  identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  // `betterAuth()` builds its adapter EAGERLY at module load, and this
+  // suite's import graph reaches it through the router. It has to be real
+  // enough to initialise; better-auth's own memory engine over an empty
+  // store is exactly that, and holds nothing this suite could assert
+  // against by accident.
+  identityStorageAdapter: () => memoryAdapter({}),
+}));
+
 // The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
 const ledger = vi.hoisted(() => ({
   attachBindings: vi.fn(),
@@ -46,6 +61,10 @@ vi.mock("../../../app-layer/app", () => ({
       }),
     },
     authzGrants: ledger,
+    // The scope-lineage guard runs ahead of every resolver and reads this.
+    permissions: {
+      checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+    },
     notifications: {
       sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
     },

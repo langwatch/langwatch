@@ -61,8 +61,6 @@ export function useInviteActions({
     | undefined;
 
   const createInvitesMutation = api.organization.createInvites.useMutation();
-  const createInviteRequestMutation = api.organization.createInviteRequest.useMutation();
-  const approveInviteMutation = api.organization.approveInvite.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
   const resendInviteMutation = api.organization.resendInvite.useMutation();
 

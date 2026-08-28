@@ -10,6 +10,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { identityEmail, joinRequestsService } from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -28,7 +29,6 @@ import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
   InviteExpiredError,
-  InviteNotFoundError,
   InviteWrongAccountError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
@@ -437,7 +437,7 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .permission("organization:manage")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // The settings form round-trips every S3 field on save, so an absent
       // credential means "clear it". `updateSettings` is a partial update
       // where absent means "leave it alone", so the clearing is made
@@ -722,279 +722,6 @@ export const organizationRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
     }),
-  createInviteRequest: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        invites: z.array(
-          z.object({
-            email: z.string().email(),
-            role: z.enum(["MEMBER", "EXTERNAL"]),
-            teamIds: z.string().optional(),
-            teams: z
-              .array(
-                z.object({
-                  teamId: z.string(),
-                  role: z.union([
-                    z.nativeEnum(TeamUserRole),
-                    z
-                      .string()
-                      .regex(
-                        /^custom:[a-zA-Z0-9_-]+$/,
-                        "Custom role must be in format 'custom:{roleId}'",
-                      ),
-                  ]),
-                  customRoleId: z.string().optional(),
-                }),
-              )
-              .optional(),
-          }),
-        ),
-      }),
-    )
-    .permission("organization:view")
-    .mutation(async ({ input, ctx }) => {
-      const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some((t) => typeof t.role === "string" && isCustomRole(t.role)),
-      );
-      if (hasCustomRoleInvite) {
-        await assertEnterprisePlan({
-          planProvider: ctx.app.planProvider,
-          organizationId: input.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
-
-      const prisma = ctx.prisma;
-      const inviteService = InviteService.create(prisma, { mailer: ctx.app.mailer });
-
-      try {
-        // Check license limits for all invites at once
-        await inviteService.checkLicenseLimits({
-          organizationId: input.organizationId,
-          newInvites: input.invites.map((invite) => ({
-            role: invite.role as OrganizationUserRole,
-            teams: invite.teams,
-          })),
-          user: ctx.session.user,
-        });
-
-        const normalizedPayloadEmails = input.invites.map((invite) =>
-          invite.email.trim().toLowerCase(),
-        );
-        const duplicatePayloadEmails = normalizedPayloadEmails.filter(
-          (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
-        );
-
-        if (duplicatePayloadEmails.length > 0) {
-          const uniqueDuplicatePayloadEmails = [...new Set(duplicatePayloadEmails)];
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
-          });
-        }
-
-        const preparedInvites = await Promise.all(
-          input.invites.map(async (invite) => {
-            const normalizedEmail = invite.email.trim().toLowerCase();
-
-            // Validate team IDs
-            let teamIdsString = "";
-            let teamAssignments: Array<{
-              teamId: string;
-              role: TeamUserRole;
-              customRoleId?: string;
-            }> = [];
-
-            if (invite.teams && invite.teams.length > 0) {
-              const teamIds = invite.teams.map((t) => t.teamId);
-              const validTeamIds = await inviteService.validateTeamIds({
-                teamIds,
-                organizationId: input.organizationId,
-              });
-
-              if (validTeamIds.length === 0) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "No valid teams provided",
-                });
-              }
-
-              teamAssignments = invite.teams
-                .filter((t) => validTeamIds.includes(t.teamId))
-                .map((t) => {
-                  const hasCustom = typeof t.role === "string" && isCustomRole(t.role);
-                  return {
-                    teamId: t.teamId,
-                    role: hasCustom ? ("CUSTOM" as TeamUserRole) : (t.role as TeamUserRole),
-                    customRoleId: hasCustom && t.customRoleId ? t.customRoleId : undefined,
-                  };
-                });
-
-              // Validate custom role IDs belong to this organization and are user-assignable
-              const customRoleIds = teamAssignments
-                .filter((t) => t.customRoleId)
-                .map((t) => t.customRoleId!);
-              if (customRoleIds.length > 0) {
-                const validCustomRoles = await prisma.customRole.findMany({
-                  where: {
-                    id: { in: customRoleIds },
-                    organizationId: input.organizationId,
-                    kind: "custom",
-                  },
-                  select: { id: true },
-                });
-                const validCustomRoleIds = new Set(validCustomRoles.map((r) => r.id));
-                const invalidRoleIds = customRoleIds.filter((id) => !validCustomRoleIds.has(id));
-                if (invalidRoleIds.length > 0) {
-                  throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: `Custom role(s) ${invalidRoleIds.join(", ")} not found in this organization`,
-                  });
-                }
-              }
-
-              teamIdsString = validTeamIds.join(",");
-            } else if (invite.teamIds?.trim()) {
-              const teamIdArray = invite.teamIds
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
-
-              const validTeamIds = await inviteService.validateTeamIds({
-                teamIds: teamIdArray,
-                organizationId: input.organizationId,
-              });
-
-              if (validTeamIds.length === 0) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "No valid teams provided",
-                });
-              }
-
-              teamAssignments = validTeamIds.map((teamId) => ({
-                teamId,
-                role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role as OrganizationUserRole],
-              }));
-
-              teamIdsString = validTeamIds.join(",");
-            } else {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "At least one team must be provided",
-              });
-            }
-
-            return {
-              email: normalizedEmail,
-              role: invite.role as OrganizationUserRole,
-              organizationId: input.organizationId,
-              teamIds: teamIdsString,
-              teamAssignments: teamAssignments.length > 0 ? teamAssignments : undefined,
-              requestedBy: ctx.session.user.id,
-            };
-          }),
-        );
-
-        const results = await prisma.$transaction(async (tx) => {
-          const transactionalInviteService = InviteService.create(tx, { mailer: ctx.app.mailer });
-          return Promise.all(
-            preparedInvites.map((invite) =>
-              transactionalInviteService.createMemberInviteRequest(invite),
-            ),
-          );
-        });
-
-        return results;
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          void ctx.app.usageLimits
-            .notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-          });
-        }
-        if (error instanceof DuplicateInviteError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-    }),
-  approveInvite: protectedProcedure
-    .input(
-      z.object({
-        inviteId: z.string(),
-        organizationId: z.string(),
-      }),
-    )
-    .permission("organization:manage")
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const inviteService = InviteService.create(prisma, { mailer: ctx.app.mailer });
-
-      try {
-        // Re-validate license limits before approving (org may have reached cap since request)
-        const invite = await prisma.organizationInvite.findFirst({
-          where: {
-            id: input.inviteId,
-            organizationId: input.organizationId,
-            status: "WAITING_APPROVAL",
-          },
-        });
-
-        if (!invite) {
-          throw new InviteNotFoundError();
-        }
-
-        const teamAssignments = (invite.teamAssignments as Array<{ customRoleId?: string }>) ?? [];
-        await inviteService.checkLicenseLimits({
-          organizationId: input.organizationId,
-          newInvites: [{ role: invite.role, teams: teamAssignments }],
-          user: ctx.session.user,
-        });
-
-        return await inviteService.approveInvite({
-          inviteId: input.inviteId,
-          organizationId: input.organizationId,
-        });
-      } catch (error) {
-        if (error instanceof InviteNotFoundError || error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: error.message,
-          });
-        }
-        if (error instanceof LimitExceededError) {
-          void ctx.app.usageLimits
-            .notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-    }),
   acceptInvite: protectedProcedure
     .input(
       z.object({
@@ -1045,12 +772,19 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      // Case-insensitive email comparison: BetterAuth lowercases emails
-      // during signup/signin (see `findUserByEmail` in
-      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
-      // `session.user.email` is always lowercase, but `invite.email`
-      // preserves the admin's original casing. A strict `!==` would
-      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
+      // Identifier-aware acceptance (D11): an invitation targets an address,
+      // and ANY of the signed-in user's VERIFIED identifiers holding that
+      // address vouches for them — password, Google, or the org's SSO. The
+      // person invited by email who signed in with their Google account is
+      // no longer a support ticket. A user not yet on identifiers answers
+      // `null` and keeps the legacy session-email comparison byte-for-byte.
+      const { matches: inviteEmailMatches, viaIdentifierId } = matchInviteToAcceptor({
+        inviteEmail: invite.email,
+        sessionEmail: session.user.email,
+        matchable: await identityEmail().verifiedEmailsOf({
+          userId: session.user.id,
+        }),
+      });
       // Signed in as somebody else is a wrong turn, not a refusal: the screen
       // names which account is wanted and offers the way back. The hint is
       // masked because an invite code is a bearer token — the landing already
