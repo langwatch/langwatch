@@ -57,6 +57,15 @@ const SCHEMA = defineCommandSchema(
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
+/*
+ * `occurredAt` is carried through every retry by the `...data` spread and never
+ * restamped. It becomes the emitted event's `occurredAt`, which is both the
+ * ReplacingMergeTree version and the monthly partition key of
+ * `simulation_run_metrics`. Migrations 00080 and 00081 state this invariant —
+ * "a retry re-inserts a row with the SAME OccurredAt" — and a fresh clock
+ * reading breaks it: a retry that crosses a month boundary lands in a partition
+ * where the engine cannot collapse it, leaving one trace with two rows forever.
+ */
 export class ComputeRunMetricsAdapter implements CommandHandler<
   Command<ComputeRunMetricsCommandData>,
   SimulationProcessingEvent
@@ -107,7 +116,6 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
           await this.deps.scheduleRetry({
             ...data,
             retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
           });
         } else {
           // Error, not warn: giving up here means this run's cost and
@@ -160,7 +168,6 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
           await this.deps.scheduleRetry({
             ...data,
             retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
           });
         } else {
           logger.error(

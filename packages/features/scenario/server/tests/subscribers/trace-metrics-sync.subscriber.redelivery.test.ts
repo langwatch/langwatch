@@ -132,11 +132,12 @@ describe("traceMetricsSync subscriber redelivery", () => {
     });
 
     /**
-     * The documented defect, stated as behaviour rather than as an intention.
-     * Every other dispatched field is copied from the event; `occurredAt` is
-     * not, so the redelivered command is not the command that was sent first.
+     * `occurredAt` rides on the event, so the redelivered command is the same
+     * command. A clock reading here would travel all the way to the fact
+     * table, where it is both the ReplacingMergeTree version and the monthly
+     * partition key: the month-crossing case below is what that costs.
      */
-    it("stamps a fresh clock reading on the redelivered command", async () => {
+    it("dispatches the same command a month later", async () => {
       vi.useFakeTimers();
       const metrics = makeMetricsPipeline();
       const subscriber = createTraceMetricsSyncSubscriber(metrics.deps);
@@ -148,9 +149,8 @@ describe("traceMetricsSync subscriber redelivery", () => {
       await subscriber.handler(event, CONTEXT);
 
       const [first, second] = metrics.commands;
-      expect(second).not.toEqual(first);
-      expect(second?.occurredAt).not.toBe(first?.occurredAt);
-      expect(first?.occurredAt).not.toBe(event.occurredAt);
+      expect(second).toEqual(first);
+      expect(first?.occurredAt).toBe(event.occurredAt);
     });
   });
 
@@ -172,11 +172,16 @@ describe("traceMetricsSync subscriber redelivery", () => {
 
   describe("given a redelivery that crosses the fact table's month partition", () => {
     /**
-     * The consequence of the fresh clock reading. Two rows survive for one
-     * trace because a ReplacingMergeTree cannot collapse across partitions,
-     * which is exactly what migration 00080's header assumes will not happen.
+     * The case the invariant exists for. `simulation_run_metrics` is a
+     * ReplacingMergeTree partitioned by month, and a ReplacingMergeTree never
+     * collapses across partitions — so a redelivery whose row lands in the next
+     * month is a row that survives forever. It only lands there if `occurredAt`
+     * moves, which is why this test and the wall clock are the same test.
+     *
+     * Migrations 00080 and 00081 state the invariant in their headers: "a retry
+     * re-inserts a row with the SAME OccurredAt". This is what holds them to it.
      */
-    it("retains two metrics rows for one trace", async () => {
+    it("retains one metrics row for the trace", async () => {
       vi.useFakeTimers();
       const metrics = makeMetricsPipeline();
       const subscriber = createTraceMetricsSyncSubscriber(metrics.deps);
@@ -187,10 +192,7 @@ describe("traceMetricsSync subscriber redelivery", () => {
       vi.setSystemTime(new Date("2026-02-01T00:00:30.000Z"));
       await subscriber.handler(event, CONTEXT);
 
-      expect(metrics.retainedFactRows().size).toBe(2);
-      // The read path is what keeps the customer-visible figure right: it
-      // merges per trace and never looks at the partition, so the duplicate
-      // rows still resolve to one contribution per trace.
+      expect(metrics.retainedFactRows().size).toBe(1);
       expect(metrics.traceIdentities().size).toBe(1);
     });
   });
