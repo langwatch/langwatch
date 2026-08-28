@@ -325,6 +325,48 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return restore(renderUrlTemplate({ template, context }));
   }
 
+  /**
+   * Logs an upstream error response and throws the error the caller reports.
+   * It never returns.
+   */
+  private async failOnErrorResponse({
+    response,
+    loggedUrl,
+    method,
+    durationMs,
+    redactedHeaders,
+  }: {
+    response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+    loggedUrl: string;
+    method: string;
+    durationMs: number;
+    redactedHeaders: Record<string, string>;
+  }): Promise<never> {
+    const responseBody = this.scrub(
+      typeof response.text === "function"
+        ? await response.text().catch(() => "")
+        : "",
+    );
+    const upstreamRequestId = pickUpstreamRequestId(response.headers);
+    this.logger.warn(
+      {
+        url: loggedUrl,
+        method,
+        statusCode: response.status,
+        durationMs,
+        responseBodyPreview: previewResponseBody(responseBody),
+        requestId: upstreamRequestId,
+        headers: redactedHeaders,
+      },
+      "http call failed",
+    );
+    throw new Error(
+      `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
+        upstreamRequestId ?? "none"
+      }): ${previewErrorBody(responseBody)}`,
+    );
+  }
+
   private async executeHttpRequest(
     url: string,
     headers: Record<string, string>,
@@ -368,29 +410,13 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     const durationMs = Date.now() - startedAt;
 
     if (!response.ok) {
-      const responseBody = this.scrub(
-        typeof response.text === "function"
-          ? await response.text().catch(() => "")
-          : "",
-      );
-      const upstreamRequestId = pickUpstreamRequestId(response.headers);
-      this.logger.warn(
-        {
-          url: loggedUrl,
-          method,
-          statusCode: response.status,
-          durationMs,
-          responseBodyPreview: previewResponseBody(responseBody),
-          requestId: upstreamRequestId,
-          headers: redactedHeaders,
-        },
-        "http call failed",
-      );
-      throw new Error(
-        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
-          upstreamRequestId ?? "none"
-        }): ${previewErrorBody(responseBody)}`,
-      );
+      await this.failOnErrorResponse({
+        response,
+        loggedUrl,
+        method,
+        durationMs,
+        redactedHeaders,
+      });
     }
 
     this.logger.info(

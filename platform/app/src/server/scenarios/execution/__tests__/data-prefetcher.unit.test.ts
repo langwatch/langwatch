@@ -693,17 +693,12 @@ describe("prefetchScenarioData", () => {
       // that must expand it before litellm params are prepared: providers
       // do not understand "latest" as a model id. The expected concrete
       // model comes from the same registry resolution the picker shows.
-      const expectConcrete = ({
-        alias,
-        actual,
-      }: {
-        alias: string;
-        actual: string | undefined;
-      }) => {
+      const concreteFor = (alias: string) => {
         const concrete = resolveLatestAlias(alias);
-        expect(concrete).not.toBeNull();
-        expect(actual).toBe(concrete);
-        expect(actual).not.toBe(alias);
+        if (concrete === null || concrete === alias) {
+          throw new Error(`"${alias}" does not resolve to a concrete model`);
+        }
+        return concrete;
       };
 
       /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
@@ -728,10 +723,9 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete({
-            alias: "openai/latest",
-            actual: result.data.simulatorModelParams?.model,
-          });
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest"),
+          );
         }
       });
 
@@ -757,10 +751,9 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete({
-            alias: "anthropic/latest-mini",
-            actual: result.data.judgeModelParams?.model,
-          });
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("anthropic/latest-mini"),
+          );
         }
       });
 
@@ -785,10 +778,9 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete({
-            alias: "openai/latest-mini",
-            actual: result.data.simulatorModelParams?.model,
-          });
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest-mini"),
+          );
         }
       });
 
@@ -813,10 +805,9 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-          expectConcrete({
-            alias: "gemini/latest",
-            actual: result.data.judgeModelParams?.model,
-          });
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("gemini/latest"),
+          );
         }
       });
     });

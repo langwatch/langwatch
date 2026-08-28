@@ -230,6 +230,19 @@ const updateScenarioSchema = z.object({
 });
 
 /**
+ * The fields the caller named. The schema marks every field optional, and a
+ * field the body omits stays out of the update, so a PATCH never overwrites a
+ * value the caller did not send. A null is a value: it clears the field.
+ */
+function scenarioUpdateData(
+  body: z.infer<typeof updateScenarioSchema>,
+): Partial<z.infer<typeof updateScenarioSchema>> {
+  return Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  ) as Partial<z.infer<typeof updateScenarioSchema>>;
+}
+
+/**
  * Who a version row written through this surface names as its author.
  *
  * A project key names no person, so `userId` stays null. The `langwatch` CLI
@@ -502,22 +515,7 @@ function registerUpdateScenarioVerb({
       const scenario = await service.update({
         id,
         projectId: project.id,
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.situation !== undefined && { situation: body.situation }),
-          ...(body.criteria !== undefined && { criteria: body.criteria }),
-          ...(body.labels !== undefined && { labels: body.labels }),
-          ...(body.parameters !== undefined && { parameters: body.parameters }),
-          ...(body.testSuiteId !== undefined && {
-            testSuiteId: body.testSuiteId,
-          }),
-          ...(body.simulatorModel !== undefined && {
-            simulatorModel: body.simulatorModel,
-          }),
-          ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
-          ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
-          ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
-        },
+        data: scenarioUpdateData(body),
         options: { actor: actorFromRequest(c) },
       });
 

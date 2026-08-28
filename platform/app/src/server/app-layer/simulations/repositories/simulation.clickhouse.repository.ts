@@ -325,6 +325,18 @@ export const FULL_MESSAGES_PAGE_LIMIT = 20;
  * read. The first batch is always kept whole, so a single batch larger than
  * the ceiling still moves the cursor forward.
  */
+function groupRunsByBatch(
+  runs: ScenarioRunData[],
+): Map<string, ScenarioRunData[]> {
+  const byBatch = new Map<string, ScenarioRunData[]>();
+  for (const run of runs) {
+    const existing = byBatch.get(run.batchRunId);
+    if (existing) existing.push(run);
+    else byBatch.set(run.batchRunId, [run]);
+  }
+  return byBatch;
+}
+
 export function capRunsAtBatchBoundary({
   runs,
   batchRunIds,
@@ -334,12 +346,7 @@ export function capRunsAtBatchBoundary({
   batchRunIds: string[];
   ceiling: number;
 }): { runs: ScenarioRunData[]; batchesKept: number } {
-  const byBatch = new Map<string, ScenarioRunData[]>();
-  for (const run of runs) {
-    const existing = byBatch.get(run.batchRunId);
-    if (existing) existing.push(run);
-    else byBatch.set(run.batchRunId, [run]);
-  }
+  const byBatch = groupRunsByBatch(runs);
 
   const kept: ScenarioRunData[] = [];
   let batchesKept = 0;
@@ -1109,6 +1116,114 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     };
   }
 
+  /** The newest UpdatedAt across every live run, for the cheap change check. */
+  private async readMaxUpdatedAt(projectId: string): Promise<number> {
+    const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ArchivedAt IS NULL`,
+      { tenantId: projectId },
+    );
+    return Number(tsRows[0]?.LastUpdatedAt ?? "0");
+  }
+
+  /**
+   * One page of batch ids, newest first, with the cursor and the date filter
+   * applied.
+   *
+   * NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
+   * purpose — aliasing as ScenarioSetId would shadow the underlying column
+   * referenced in the dedup IN-tuple below, causing ClickHouse to reject the
+   * query with "Aggregate function ... is found in WHERE in query".
+   */
+  private async selectBatchPage({
+    projectId,
+    decoded,
+    startDate,
+    endDate,
+    fetchLimit,
+  }: {
+    projectId: string;
+    decoded: CursorPayload | null;
+    startDate?: number;
+    endDate?: number;
+    fetchLimit: number;
+  }): Promise<
+    { BatchRunId: string; MaxCreatedAt: string; NormalizedSetId: string }[]
+  > {
+    const cursorPredicate = decoded
+      ? `(
+          (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+          OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})
+        )`
+      : "1 = 1";
+
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
+
+    return await this.queryRows<{
+      BatchRunId: string;
+      MaxCreatedAt: string;
+      NormalizedSetId: string;
+    }>(
+      `SELECT
+        BatchRunId,
+        toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
+        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         ${dateFilter.whereClause}
+         AND ArchivedAt IS NULL
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+       GROUP BY BatchRunId
+       ${combinedHaving}
+       ORDER BY MaxCreatedAt DESC, BatchRunId ASC
+       LIMIT {fetchLimit:UInt32}`,
+      {
+        tenantId: projectId,
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
+          : {}),
+        ...dateFilter.params,
+        fetchLimit: String(fetchLimit),
+      },
+    );
+  }
+
+  /**
+   * Stops a full-message page at a batch boundary and moves the cursor to the
+   * last batch that was kept.
+   */
+  private capPageAtBatchBoundary({
+    runs,
+    pageRows,
+    nextCursor,
+    hasMore,
+  }: {
+    runs: ScenarioRunData[];
+    pageRows: { BatchRunId: string; MaxCreatedAt: string }[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }): { runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean } {
+    const capped = capRunsAtBatchBoundary({
+      runs,
+      batchRunIds: pageRows.map((row) => row.BatchRunId),
+      ceiling: FULL_MESSAGES_PAGE_LIMIT,
+    });
+    const cutShort = capped.batchesKept < pageRows.length;
+    const lastKept = pageRows[capped.batchesKept - 1];
+    return {
+      runs: capped.runs,
+      nextCursor:
+        cutShort && lastKept
+          ? this.encodeCursor(lastKept.MaxCreatedAt, lastKept.BatchRunId)
+          : nextCursor,
+      hasMore: cutShort ? true : hasMore,
+    };
+  }
+
   async getRunDataForAllSuites({
     projectId,
     limit = 20,
@@ -1138,14 +1253,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   > {
     // Cheap timestamp check: skip heavy query if nothing changed
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId },
-      );
-      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
+      const lastUpdatedAt = await this.readMaxUpdatedAt(projectId);
       if (lastUpdatedAt <= sinceTimestamp) {
         return { changed: false, lastUpdatedAt };
       }
@@ -1154,48 +1262,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const validatedLimit = clampPageLimit({ limit, shouldIncludeMessages });
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorPredicate = decoded
-      ? `(
-          (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-          OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})
-        )`
-      : "1 = 1";
-
-    const dateFilter = buildDateFilter({ startDate, endDate });
-
-    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
-
-    // NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
-    // purpose — aliasing as ScenarioSetId would shadow the underlying column
-    // referenced in the dedup IN-tuple below, causing ClickHouse to reject the
-    // query with "Aggregate function ... is found in WHERE in query".
-    const batchRows = await this.queryRows<{
-      BatchRunId: string;
-      MaxCreatedAt: string;
-      NormalizedSetId: string;
-    }>(
-      `SELECT
-        BatchRunId,
-        toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
-        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
-       GROUP BY BatchRunId
-       ${combinedHaving}
-       ORDER BY MaxCreatedAt DESC, BatchRunId ASC
-       LIMIT {fetchLimit:UInt32}`,
-      {
-        tenantId: projectId,
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
-          : {}),
-        ...dateFilter.params,
-        fetchLimit: String(validatedLimit + 1),
-      },
-    );
+    const batchRows = await this.selectBatchPage({
+      projectId,
+      decoded,
+      startDate,
+      endDate,
+      fetchLimit: validatedLimit + 1,
+    });
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
@@ -1243,23 +1316,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       };
     }
 
-    const capped = capRunsAtBatchBoundary({
-      runs,
-      batchRunIds,
-      ceiling: FULL_MESSAGES_PAGE_LIMIT,
-    });
-    const cutShort = capped.batchesKept < pageRows.length;
-    const lastKept = pageRows[capped.batchesKept - 1];
     return {
       changed: true,
       lastUpdatedAt,
-      runs: capped.runs,
       scenarioSetIds,
-      nextCursor:
-        cutShort && lastKept
-          ? this.encodeCursor(lastKept.MaxCreatedAt, lastKept.BatchRunId)
-          : nextCursor,
-      hasMore: cutShort ? true : hasMore,
+      ...this.capPageAtBatchBoundary({ runs, pageRows, nextCursor, hasMore }),
     };
   }
 
