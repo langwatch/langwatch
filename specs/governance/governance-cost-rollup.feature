@@ -10,13 +10,13 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
   Background:
     Given an organization with recorded cost events
 
-  @integration @unimplemented
+  @integration
   Scenario: A day's spend lands as one summary row per dimension combination
     When cost events for one day and one dimension combination are processed
     Then the summary holds exactly one row for that day and combination
     And its amount is the sum of those events
 
-  @integration @unimplemented
+  @integration
   Scenario: Two spenders with identical numbers stay two rows after compaction
     Given two different spenders with the same provider, model, day, and amount
     When their events are processed
@@ -28,7 +28,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     And the summary storage is compacted
     Then the summary still holds a separate row for each spender
 
-  @integration @unimplemented
+  @integration
   Scenario: Amounts in different currencies stay separate rows after compaction
     Given one day has events in two currencies
     When the day is summarized
@@ -39,7 +39,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Then each currency keeps its own total
     And no combined single figure is produced
 
-  @integration @unimplemented
+  @integration
   Scenario: A restated day reads as the restated amount even before compaction
     Given a day was summarized at one amount
     When the provider restates that day at a different amount
@@ -50,7 +50,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Then reading the summary returns only the restated amount
     And the reader can see the day was revised and what it was before
 
-  @integration @unimplemented
+  @integration
   Scenario: Rebuilding the summary from history reproduces it exactly
     Given a populated summary
     # Seed inside the event-log retention horizon (ADR-022), or the replay
@@ -58,7 +58,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     When the summary is rebuilt from the event history
     Then every row matches the original summary
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace cost stays out of the rollup
     # ADR-128 reserves the trace lane and excludes it from wave 1: trace
     # cost must not appear in the summary under any cost source label.
@@ -66,7 +66,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     When that day is summarized and read
     Then no summary row carries trace cost
 
-  @integration @unimplemented
+  @integration
   Scenario: The comparator counts a summary that drifted from its events
     Given a summary row that no longer matches the sum of its events
     When the scheduled comparator runs
@@ -76,7 +76,7 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Then the drift metric counts the mismatch
     And the mismatch details are in the log
 
-  @unit @unimplemented
+  @unit
   Scenario: The summary's lag behind the event log is measured
     Given events newer than the latest summarized moment
     When the lag is computed
