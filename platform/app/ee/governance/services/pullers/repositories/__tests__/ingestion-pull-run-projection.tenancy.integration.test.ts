@@ -20,10 +20,19 @@ import type { Organization, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ensureHiddenGovernanceProject } from "../../../governanceProject.service";
 import { PrismaIngestionPullRunProjectionRepository } from "../ingestion-pull-run-projection.prisma.repository";
 
 const ns = `pull-tenancy-${nanoid(8)}`;
+const homeOrgSlug = `--test-org-${ns}`;
+const otherOrgSlug = `--test-org-other-${ns}`;
+/**
+ * Both orgs, named at import time. Teardown filters on these rather than on
+ * the ids setup assigns, so it still identifies this suite's rows when
+ * `beforeAll` threw before assigning any of them.
+ */
+const orgSlugs = [homeOrgSlug, otherOrgSlug];
 
 let organization: Organization;
 let team: Team;
@@ -65,7 +74,7 @@ function projectionFor(
 
 beforeAll(async () => {
   organization = await prisma.organization.create({
-    data: { name: `Tenancy ${ns}`, slug: `--test-org-${ns}` },
+    data: { name: `Tenancy ${ns}`, slug: homeOrgSlug },
   });
   team = await prisma.team.create({
     data: {
@@ -75,7 +84,7 @@ beforeAll(async () => {
     },
   });
   otherOrganization = await prisma.organization.create({
-    data: { name: `Tenancy other ${ns}`, slug: `--test-org-other-${ns}` },
+    data: { name: `Tenancy other ${ns}`, slug: otherOrgSlug },
   });
   otherTeam = await prisma.team.create({
     data: {
@@ -103,26 +112,34 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // `homeProjectId` is the last thing setup assigns, so a `beforeAll` that
-  // threw partway leaves it undefined here — and Prisma drops an undefined
-  // filter rather than matching nothing, turning this into a deleteMany with
-  // no `where` at all: every projection row in the database, not this test's.
-  if (homeProjectId) {
-    await prisma.ingestionPullRunProjection.deleteMany({
-      where: { projectId: homeProjectId },
-    });
-  }
-  for (const org of [organization, otherOrganization]) {
-    if (!org) continue;
-    const organizationId = org.id;
-    // Not swallowed: a delete that fails leaves rows behind for every later
-    // run against this database, and a silent teardown is how that goes
-    // unnoticed until an unrelated suite starts failing.
-    await prisma.ingestionSource.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { team: { organizationId } } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
-  }
+  // Team's tenancy guard rejects a relation filter and demands a literal
+  // `organizationId`, so the ids have to be gathered before anything is
+  // deleted. The prelude is anchored on the module-level slugs rather than on
+  // what setup assigned, so it names exactly this suite's rows even when
+  // `beforeAll` threw partway, and an empty result makes every entry below a
+  // no-op instead of a delete with a collapsed filter (#6219).
+  const orgIds = (
+    await prisma.organization.findMany({
+      where: { slug: { in: orgSlugs } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+  // Includes each org's hidden governance project, which is what the
+  // projection rows are tenanted to.
+  const projectIds = (
+    await prisma.project.findMany({
+      where: { team: { organizationId: { in: orgIds } } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+
+  await cleanupTestRows(prisma, [
+    ["ingestionPullRunProjection", { projectId: { in: projectIds } }],
+    ["ingestionSource", { organizationId: { in: orgIds } }],
+    ["project", { id: { in: projectIds } }],
+    ["team", { organizationId: { in: orgIds } }],
+    ["organization", { id: { in: orgIds } }],
+  ]);
 });
 
 describe("given a run-status projection whose source belongs to another organization", () => {
