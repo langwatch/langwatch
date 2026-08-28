@@ -293,8 +293,9 @@ Feature: The agent cache
 
     # The route stores text. A session is a dict more often than not, and an
     # agent that hands one over should not have to know that: the SDK stores
-    # it as JSON and reads it back parsed. Text passes through untouched, so
-    # an entry written over REST, or by an older SDK, reads the same as before.
+    # it as JSON and reads it back parsed. What JSON carries is what comes
+    # back, so a tuple reads back as a list and a key that is not a string
+    # reads back as one.
     @unit
     Scenario: The SDK stores a dict or list as JSON and reads it back parsed
       When the agent stores a dict under ACME_SESSION

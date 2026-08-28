@@ -236,6 +236,14 @@ class TestValuesThatAreNotText:
         assert "int" in str(raised.value)
         assert stub.calls == []
 
+    def test_a_tuple_is_stored_as_a_json_array_and_reads_back_as_a_list(self):
+        stub = CacheStub()
+
+        facade_over(stub).set("ACME_HANDLES", {"items": ("a", "b")})
+
+        assert stub.stored["ACME_HANDLES"] == '{"items": ["a", "b"]}'
+        assert facade_over(stub).get("ACME_HANDLES") == {"items": ["a", "b"]}
+
     @pytest.mark.parametrize(
         "number", [float("nan"), float("inf"), float("-inf")]
     )

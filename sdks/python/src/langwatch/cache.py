@@ -76,10 +76,12 @@ def _raise_for_status(response: httpx.Response) -> None:
 def _encode(value: CacheValue) -> str:
     """The text the platform stores: a str as is, a dict or list as JSON.
 
-    A dict or list must hold what JSON can carry, so a member of another type
-    raises a TypeError here, and a key that is not a string is stored as one.
-    nan and inf are refused with it: Python writes them as NaN and Infinity,
-    which the REST callers and the other SDKs read as broken JSON.
+    What comes back is what JSON carries, and JSON has fewer types than
+    Python: a tuple is stored as an array and reads back as a list, and a key
+    that is not a string is stored as one. A member JSON has no type for
+    raises a TypeError here, and so do nan and inf, which Python writes as
+    NaN and Infinity for the REST callers and the other SDKs to read as
+    broken JSON.
     """
     if isinstance(value, str):
         return value
