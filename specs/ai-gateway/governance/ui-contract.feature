@@ -102,9 +102,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # Hidden internal Governance Project — invisible at every consumer
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in the
-            ProjectSelector dropdown
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in the ProjectSelector dropdown
     Given the org has at least one IngestionSource (so the hidden
       Governance Project has been auto-created)
     When the admin opens the ProjectSelector dropdown anywhere in
@@ -114,9 +113,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     And the dropdown count matches the count of user-visible projects
       (the hidden project is not counted)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in
-            /api/v1/projects responses
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in /api/v1/projects responses
     When any client (UI, CLI, customer integration) calls
       GET /api/v1/projects with a token scoped to the org
     Then the response body lists only Projects with kind != "internal_governance"
@@ -124,9 +122,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     And no metadata field hints at its existence (no count delta,
       no opaque ID reference, no error condition revealing it)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in billing
-            exports or invoice line-items
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in billing exports or invoice line-items
     When the org's monthly billing export is generated
     Then per-Project rollup lines list only Projects with
       kind != "internal_governance"
@@ -134,9 +131,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       Project is folded into the org-level total (NOT a separate line
       item that would reveal the hidden project's existence)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in RBAC role
-            binding pickers
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in RBAC role binding pickers
     When an admin opens any RBAC role-binding composer
       (RoleBinding scope picker, custom role assignments, project ACL UI)
     Then the project picker lists only Projects with
@@ -147,15 +143,14 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       by Sergey's backend at IngestionSource mint), NOT via UI-visible
       role binding flows
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in any other
-            user-visible Project surface
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in any other user-visible Project surface
     When any UI component renders a Project (badge, dropdown, list,
       breadcrumb, search result, deep link target)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
       as a bug (regression test in
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/server/__tests__/projectFilter.invariant.integration.test.ts
       asserts every Project consumer applies the filter)
 
   # ---------------------------------------------------------------------------
@@ -324,7 +319,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Scenario: Lane-B test suite asserts every Project consumer filters
             kind=internal_governance
     When the test suite runs
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/server/__tests__/projectFilter.invariant.integration.test.ts
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

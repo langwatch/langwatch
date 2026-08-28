@@ -24,6 +24,11 @@ export const costsRouter = createTRPCRouter({
 
       const userProjects = await prisma.project.findMany({
         where: {
+          // Pulled provider cost is STORED under the org's governance project
+          // but OWNED by a team or the org (ADR-128), so dropping the home
+          // here hides a row members must never see without hiding the money
+          // — that reaches this view under its own scope.
+          kind: { not: "internal_governance" },
           OR: [
             {
               team: {

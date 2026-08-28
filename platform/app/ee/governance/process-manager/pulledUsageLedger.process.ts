@@ -70,8 +70,9 @@ export interface PulledUsageLedgerProcessDeps {
  * Where one pulled record's cost is filed.
  *
  * The team when the source has one, the organization otherwise. Never the
- * hidden governance project: that is the storage tenant these rows live under,
- * and filing a customer's money under a project they cannot see would make it
+ * hidden governance project: that is the row's storage home (the ledger's
+ * TenantId and the event's projectId, ADR-128), and a home is not an owner.
+ * Filing a customer's money under a project they cannot see would make it
  * invisible in exactly the screens this whole ADR exists to populate.
  */
 export function pulledUsageScopeId(
