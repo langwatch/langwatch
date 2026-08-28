@@ -344,7 +344,17 @@ function requireDestructiveOpsAuth(
   ctx: { session: Readonly<{ user: OpsSessionUser }> | null },
   confirm: string | undefined,
 ) {
-  if (ctx.session?.user.impersonator) {
+  // An absent session is refused rather than skipped. The authenticated
+  // procedure this mounts behind makes it unreachable, but a guard whose
+  // strictest branch is the one a missing session bypasses is fail-open in
+  // shape, and this one stands in front of irreversible infrastructure work.
+  if (!ctx.session) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This action needs a signed-in session.",
+    });
+  }
+  if (ctx.session.user.impersonator) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
