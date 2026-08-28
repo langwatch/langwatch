@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import type { ExportProgressEvent } from "~/server/api/routers/export";
+import type { ExportProgressEvent } from "@langwatch/platform-api/app-trpc";
 import type {
   ScenarioRunExportMode,
   ScenarioRunExportRequest,

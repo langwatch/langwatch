@@ -7,6 +7,7 @@
  * procedure names, schemas and delegation.
  */
 export {
+  appTrpcCustomPolicy,
   appTrpcNoPermissionPolicy,
   appTrpcPolicy,
   appTrpcPolicyAny,
@@ -15,6 +16,15 @@ export {
   type AppTrpcPolicyMiddlewares,
 } from "./app-trpc.policy";
 export { createApiKeyTrpcRouter } from "../features/api-key/api-key-trpc.mount";
+export {
+  createAutomationTrpcRouter,
+  createEmailSuppressionTrpcRouter,
+  type AutomationMountPorts,
+} from "../features/automation/automation-trpc.mount";
+export { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount";
+export { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
+export { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
+export { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount";
 export {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
@@ -44,6 +54,8 @@ export { createFrontDoorTrpcRouter } from "../features/auth/auth-trpc.mount";
 export {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
+  createOrganizationTrpcRouter,
+  createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
 export {
   createIdentityTrpcRouter,
@@ -64,6 +76,22 @@ export {
   createSavedWorkbenchChartTrpcRouter,
 } from "../features/dashboard/dashboard-trpc.mount";
 export { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
+export {
+  createExportTrpcRouter,
+  exportProgressEventSchema,
+  type ExportProgressBroadcast,
+  type ExportProgressEvent,
+  type ExportTrpcContext,
+} from "../features/export/export-trpc.mount";
+export {
+  createWorkflowOptimizationTrpcRouter,
+  createWorkflowTrpcRouter,
+} from "../features/workflow/workflow-trpc.mount";
+export { createHomeTrpcRouter } from "../features/project/project-trpc.mount";
+export {
+  createLimitsTrpcRouter,
+  createPlanTrpcRouter,
+} from "../features/entitlement/entitlement-trpc.mount";
 export {
   permissionPolicy,
   policyForCheck,

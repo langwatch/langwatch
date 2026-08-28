@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { readHandledError, showErrorToast } from "~/features/errors";
-import type { ExportProgressEvent } from "~/server/api/routers/export";
+import type { ExportProgressEvent } from "@langwatch/platform-api/app-trpc";
 import type { ExportFormat, ExportMode, ExportProgress } from "~/server/export/types";
 import { api } from "~/utils/api";
 

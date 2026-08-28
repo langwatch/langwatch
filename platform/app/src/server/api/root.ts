@@ -17,6 +17,7 @@ import {
   createAutomationTrpcRouter,
   createCodingAgentTrpcRouter,
   createEmailSuppressionTrpcRouter,
+  createExportTrpcRouter,
   createGatewayTrpcRouters,
   createHomeTrpcRouter,
   createHttpProxyTrpcRouter,
@@ -28,6 +29,7 @@ import {
   createPlanTrpcRouter,
   createPromptTagTrpcRouter,
   createPromptTrpcRouter,
+  createSavedViewTrpcRouter,
   createScenarioTrpcRouter,
   createShareTrpcRouter,
   createSpansTrpcRouter,
@@ -36,7 +38,6 @@ import {
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
   createTranslateTrpcRouter,
-  createWorkflowOptimizationTrpcRouter,
   declaredCheckFrom,
   type AppTrpcPolicyKit,
   type AppTrpcPolicyMiddlewares,
@@ -183,6 +184,7 @@ import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import type { SlackActionParams } from "@langwatch/automation-contract";
+import { PostgresSavedViewAdapter } from "@langwatch/dashboard-server";
 import { canReadCapturedContent } from "@langwatch/trace-server";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -214,7 +216,6 @@ import { datasetRecordRouter } from "~/runtime/app/internal-api/dataset-record.r
 import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "~/runtime/app/internal-api/evaluator.router";
 import { experimentsRouter } from "./routers/experiments";
-import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "~/runtime/app/internal-api/feature-flag.router";
 import { frontDoorRouter } from "./routers/frontDoor";
 import { githubRouter } from "~/runtime/app/internal-api/github.router";
@@ -234,7 +235,6 @@ import { projectRouter } from "~/runtime/app/internal-api/project.router";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
-import { savedViewsRouter } from "./routers/savedViews";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { sharedTraceRouter } from "./routers/sharedTrace";
@@ -242,7 +242,7 @@ import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
 import { tracesV2Router } from "./routers/tracesV2";
 import { userRouter } from "./routers/user";
-import { workflowRouter } from "./routers/workflows";
+import { optimizationRouter, workflowRouter } from "./routers/workflows";
 
 /** This process's concrete policy chain, in the order the mounts apply it. */
 const appTrpcMiddlewares: AppTrpcPolicyMiddlewares = {
@@ -268,10 +268,15 @@ const appTrpcMount = {
 };
 
 const shareRouter = createShareTrpcRouter(appTrpcMount);
+const exportRouter = createExportTrpcRouter(appTrpcMount);
 const pinnedTraceRouter = createPinnedTraceTrpcRouter(appTrpcMount);
 const suiteRouter = createSuiteTrpcRouter(appTrpcMount);
 const storedObjectsRouter = createStoredObjectTrpcRouter(appTrpcMount);
 const promptTagsRouter = createPromptTagTrpcRouter(appTrpcMount);
+const savedViewsRouter = createSavedViewTrpcRouter({
+  ...appTrpcMount,
+  ports: { savedViews: PostgresSavedViewAdapter.create({ database: prisma }).build() },
+});
 const planRouter = createPlanTrpcRouter(appTrpcMount);
 const authzRouter = createAuthzTrpcRouter(appTrpcMount);
 const personalWorkspaceFeaturesRouter = createPersonalWorkspaceFeaturesTrpcRouter(appTrpcMount);
@@ -631,71 +636,6 @@ const organizationRouter = createOrganizationTrpcRouter({
     sendSlackSignupEvent: (ctx, input) =>
       organizationCtx(ctx).app.notifications.sendSlackSignupEvent(input),
     reportError: (error, context) => captureException(toError(error), context),
-  },
-});
-
-const optimizationRouter = createWorkflowOptimizationTrpcRouter({
-  ...appTrpcMount,
-  ports: {
-    // The studio's chat panel runs the workflow over the same public run
-    // endpoint an external caller uses, authenticated as the project.
-    runPublishedWorkflow: async (ctx, input) => {
-      const project = await (ctx as TRPCContext).prisma.project.findFirst({
-        where: { id: input.projectId },
-      });
-
-      const apiKey = project?.apiKey;
-
-      const response = await fetch(
-        `${process.env.BASE_HOST}/api/workflows/${input.workflowId}/run`,
-        {
-          method: "POST",
-          body: JSON.stringify(input.body),
-          headers: {
-            "Content-Type": "application/json",
-            ...(apiKey && { "x-auth-token": apiKey }),
-          },
-        },
-      );
-
-      return await response.json();
-    },
-    tryGetWorkflow: async (ctx, input) =>
-      await (ctx as TRPCContext).prisma.workflow.findFirst({
-        where: { id: input.workflowId, projectId: input.projectId },
-      }),
-    tryGetWorkflowVersion: async (ctx, input) =>
-      await (ctx as TRPCContext).prisma.workflowVersion.findFirst({
-        where: { id: input.versionId, projectId: input.projectId },
-      }),
-    setWorkflowFlags: async (ctx, input) => {
-      await (ctx as TRPCContext).prisma.workflow.update({
-        where: { id: input.workflowId, projectId: input.projectId },
-        data: {
-          ...(input.isComponent === undefined ? {} : { isComponent: input.isComponent }),
-          ...(input.isEvaluator === undefined ? {} : { isEvaluator: input.isEvaluator }),
-        },
-      });
-    },
-    listPublishedComponents: async (ctx, input) => {
-      const workflows = await (ctx as TRPCContext).prisma.workflow.findMany({
-        where: {
-          projectId: input.projectId,
-          OR: [{ isComponent: true }, { isEvaluator: true }],
-        },
-        include: { versions: true },
-      });
-
-      // Each component carries only the version it publishes; the studio picks
-      // a component by its published shape, never by a draft.
-      workflows.forEach((workflow) => {
-        workflow.versions = workflow.versions.filter(
-          (version) => version.id === workflow.publishedId,
-        );
-      });
-
-      return workflows;
-    },
   },
 });
 
