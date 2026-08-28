@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { GenericEndpointContext } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, getSessionFromCtx } from "better-auth/api";
 import { env } from "~/env.mjs";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
@@ -39,9 +39,12 @@ export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
  * which become PUBLIC. That is the security surface of this file, and there
  * are three answers to it:
  *
- *   - `resolveUser` runs only where there is NO session. The plugin prefers a
- *     session when it finds one, so adding a passkey from account settings is
- *     untouched by any of this and still attributes to the signed-in user.
+ *   - `resolveUser` runs only where there is NO session, because the plugin
+ *     prefers a session when it finds one. `afterVerification` is NOT the
+ *     same: the plugin runs it whichever way the user was resolved, so it has
+ *     to recognise a signed-in caller itself and hand the credential to them.
+ *     It does. Adding a passkey from account settings therefore still
+ *     attributes to the signed-in user — by that branch, not by this one.
  *   - an address that already has an account is REFUSED. This is the one that
  *     matters: without it the endpoint would attach a stranger's passkey to
  *     anybody's account by name, which is a total account takeover with no
@@ -220,11 +223,32 @@ async function resolveUser({
  * which reads as the first one having failed.
  */
 async function afterVerification({
+  ctx,
   context,
 }: {
   ctx: GenericEndpointContext;
   context?: string | null | undefined;
 }): Promise<{ userId: string; name: string }> {
+  // ADDING a passkey to an account that already exists, which is what the
+  // settings page does, and what the nudge and the post-reset offer do.
+  //
+  // The plugin resolves the user from the session when it finds one, but it
+  // runs this callback either way — there is no branch in it that skips the
+  // sign-up hook for a signed-in caller. So without this line a reader who is
+  // already signed in falls into the SIGN-UP path below, which reads a
+  // `context` the settings page has no reason to send and refuses the
+  // ceremony they just completed with "Enter an email address to create an
+  // account". Worse than the message: with an address in hand it would go on
+  // to create a SECOND account for somebody who is already signed into one.
+  //
+  // Handing back the session's own user id attaches the credential to them.
+  // The plugin compares that id against the session immediately after, so
+  // this can only ever name the account the caller already holds.
+  const session = await getSessionFromCtx(ctx);
+  if (session?.user?.id) {
+    return { userId: session.user.id, name: session.user.email };
+  }
+
   const email = requireEmail(context);
   // Again, because the check in `resolveUser` was one network round trip ago
   // and an account can be created in that window. This is the one that

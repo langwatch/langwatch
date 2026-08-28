@@ -25,6 +25,16 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
+// The session read that tells "somebody is adding a passkey to the account
+// they are signed into" apart from "somebody is creating one". `APIError` is
+// kept REAL: every refusal below is asserted by the code it carries, and a
+// stand-in would only assert the stand-in.
+const getSessionFromCtx = vi.fn();
+vi.mock("better-auth/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("better-auth/api")>()),
+  getSessionFromCtx: (...args: unknown[]) => getSessionFromCtx(...args),
+}));
+
 import { PasskeySignUpAddressTakenError } from "~/server/users/credential-user";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
@@ -83,6 +93,8 @@ describe("given passkey sign-up, which creates an account with no session", () =
     findFirst.mockResolvedValue(null);
     createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
     requestVerification.mockResolvedValue(void 0);
+    // Nobody signed in, which is the case this whole block is about.
+    getSessionFromCtx.mockResolvedValue(null);
   });
 
   describe("when the address already has an account", () => {
@@ -392,6 +404,83 @@ describe("given passkey sign-up, which creates an account with no session", () =
       await expect(
         afterVerification({ ctx, context: "someone@example.com" }),
       ).resolves.toMatchObject({ userId: "user_1" });
+    });
+  });
+});
+
+/**
+ * The other caller of the same two endpoints, and the one the sign-up shape
+ * broke: a reader who is already signed in, adding a passkey from Settings,
+ * from the secure-account nudge, or from the offer after a password reset.
+ *
+ * The plugin resolves such a caller from their session and never calls
+ * `resolveUser` — but it calls `afterVerification` regardless of how the user
+ * was resolved. So the sign-up callback has to recognise them itself, which
+ * is what these hold it to.
+ */
+describe("given somebody who is already signed in", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findFirst.mockResolvedValue(null);
+    createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
+    requestVerification.mockResolvedValue(void 0);
+    getSessionFromCtx.mockResolvedValue({
+      user: { id: "signed_in_user", email: "sergio+test@langwatch.ai" },
+    });
+  });
+
+  describe("when they add a passkey without a context", () => {
+    /**
+     * The settings page calls `addPasskey({})`, so no `context` reaches the
+     * endpoint. Reading one anyway refused the ceremony they had just
+     * completed with "Enter an email address to create an account", on a page
+     * displaying the very address it said was missing.
+     */
+    /** @scenario Adding a passkey while signed in attaches it to that account */
+    it("attaches the passkey to the account they are signed into", async () => {
+      const { ctx } = fakeContext();
+
+      await expect(afterVerification({ ctx, context: null })).resolves.toEqual({
+        userId: "signed_in_user",
+        name: "sergio+test@langwatch.ai",
+      });
+    });
+
+    it("does not refuse them for having no address to create an account with", async () => {
+      const { ctx } = fakeContext();
+
+      await expect(
+        afterVerification({ ctx, context: undefined }),
+      ).resolves.toMatchObject({ userId: "signed_in_user" });
+    });
+
+    /**
+     * The consequence worse than the message: with an address in hand the
+     * sign-up path would have written a SECOND account for somebody who is
+     * already signed into one.
+     */
+    it("creates no second account for them", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({ ctx, context: "sergio+test@langwatch.ai" });
+
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    it("sends them no address confirmation, because they are not signing up", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({ ctx, context: null });
+
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+
+    it("opens no session of its own, because they already hold one", async () => {
+      const { ctx, createSession } = fakeContext();
+
+      await afterVerification({ ctx, context: null });
+
+      expect(createSession).not.toHaveBeenCalled();
     });
   });
 });
