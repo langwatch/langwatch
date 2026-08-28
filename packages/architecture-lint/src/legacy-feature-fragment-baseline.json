@@ -3763,11 +3763,6 @@
     },
     {
       "feature": "prompt",
-      "file": "platform/app/src/prompts/forms/fields/ModelSelectField.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "prompt",
       "file": "platform/app/src/prompts/forms/fields/ModelSelectFieldMini.tsx",
       "kind": "legacy-implementation"
     },
@@ -3780,11 +3775,6 @@
       "feature": "prompt",
       "file": "platform/app/src/prompts/forms/fields/RuntimeParametersField.tsx",
       "kind": "legacy-implementation"
-    },
-    {
-      "feature": "prompt",
-      "file": "platform/app/src/prompts/forms/prompt-config-form/components/PromptHandleInfo.tsx",
-      "kind": "page-shell"
     },
     {
       "feature": "prompt",
