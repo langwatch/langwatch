@@ -215,6 +215,7 @@ function SourceDetailHeader({
  */
 function NoDataSinceCallout({ source }: { source: Source }) {
   const notice = noDataSinceNotice({
+    status: source.status,
     errorCount: source.errorCount,
     lastSuccessAt: source.lastSuccessAt,
   });
