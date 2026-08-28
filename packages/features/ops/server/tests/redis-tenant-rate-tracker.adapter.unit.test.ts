@@ -2,6 +2,7 @@ import Redis from "ioredis";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisTenantRateTrackerAdapter } from "../src/adapters/redis-tenant-rate-tracker.adapter";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../src/services/anomaly.constants";
 
 function redisFake() {
   const redis = new Redis({ lazyConnect: true, enableOfflineQueue: false });
@@ -105,22 +106,48 @@ describe("RedisTenantRateTrackerAdapter", () => {
     expect(hashes.get("obs:tenant_rate:proj_acme")?.has(staleMinute)).toBe(false);
   });
 
-  /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
-  it("uses the feature flag as a fail-open hot-path kill switch", async () => {
-    const { redis } = redisFake();
-    const flags = MemoryFeatureFlagService.create();
-    const isEnabled = vi.spyOn(flags, "isEnabled");
-    const tracker = RedisTenantRateTrackerAdapter.create({
-      redis,
-      now: () => now,
-      featureFlags: flags,
+  describe("given the kill-switch flag is enabled for one tenant", () => {
+    /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
+    it("writes nothing for that tenant and keeps recording the others", async () => {
+      const { redis } = redisFake();
+      const flags = MemoryFeatureFlagService.create();
+      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const tracker = RedisTenantRateTrackerAdapter.create({
+        redis,
+        now: () => now,
+        featureFlags: flags,
+      });
+      isEnabled.mockImplementation(
+        async (_key, target) =>
+          target.kind === "project" && target.projectId === "proj_killed",
+      );
+
+      await tracker.record("proj_killed");
+      await tracker.record("proj_open");
+
+      expect(redis.pipeline).toHaveBeenCalledTimes(1);
+      expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
+      expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
+        kind: "project",
+        projectId: "proj_killed",
+      });
     });
-    isEnabled.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("down"));
 
-    await tracker.record("proj_killed");
-    await tracker.record("proj_open");
+    it("records the enqueue anyway when the flag service is down", async () => {
+      const { redis } = redisFake();
+      const flags = MemoryFeatureFlagService.create();
+      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const tracker = RedisTenantRateTrackerAdapter.create({
+        redis,
+        now: () => now,
+        featureFlags: flags,
+      });
+      isEnabled.mockRejectedValue(new Error("down"));
 
-    expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
+      await tracker.record("proj_open");
+
+      expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
+    });
   });
 
   it("keeps cache read failures non-fatal and forwards a custom TTL", async () => {

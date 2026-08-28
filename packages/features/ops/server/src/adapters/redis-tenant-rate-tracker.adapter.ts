@@ -176,6 +176,11 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
     }
   }
 
+  /**
+   * The same per-tenant switch the detector reads, resolved on the hot path so
+   * a killed tenant costs no Redis write. A `system` target carries no
+   * identity, so a rule naming one project would match nobody here too.
+   */
   private async isKilledForTenant(tenantId: string): Promise<boolean> {
     if (!this.featureFlags) {
       return false;
@@ -183,7 +188,8 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
 
     try {
       return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        kind: "system",
+        kind: "project",
+        projectId: tenantId,
       });
     } catch {
       return false;

@@ -1,6 +1,9 @@
 import type { Anomaly } from "@langwatch/ops-contract";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type {
+  FeatureFlagService,
+  FeatureFlagTarget,
+} from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AnomalyHardTierAlertPort } from "../src/ports/anomaly-hard-tier-alert.port";
 import { AnomalyRateTrackerPort } from "../src/ports/anomaly-rate-tracker.port";
@@ -11,7 +14,13 @@ import {
   INSUFFICIENT_DATA_RECHECK_SECONDS,
   SURFACE_TIER_SUSTAIN_MINUTES,
 } from "../src/services/anomaly-detector.service";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../src/services/anomaly.constants";
 import { percentile } from "../src/ops.anomaly-percentile";
+
+/** The tenant a kill-switch resolution was asked about, or none. */
+function projectIdOf(target: FeatureFlagTarget): string | undefined {
+  return target.kind === "project" ? target.projectId : void 0;
+}
 
 class RateTrackerFake extends AnomalyRateTrackerPort {
   readonly baselines = new Map<string, number>();
@@ -182,27 +191,62 @@ describe("AnomalyDetectorService", () => {
     expect(anomalyState.clear).toHaveBeenCalledWith("proj_acme", "rate_breaker");
   });
 
-  /** @scenario "Kill-switch FF disables anomaly detection for one tenant without a redeploy" */
-  /** @scenario "Kill-switch fails open when PostHog is unavailable" */
-  it("skips a killed tenant and fails open when flags are unavailable", async () => {
-    const flags = MemoryFeatureFlagService.create();
-    const isEnabled = vi.spyOn(flags, "isEnabled");
-    const { detector, rateTracker, anomalyState } = createDetector({ flags });
-    rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
-    rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
-    rateTracker.currentWindowCount.mockResolvedValue(500);
-    isEnabled.mockImplementation(
-      async (_key, input) => input.distinctId === "proj_killed",
-    );
+  describe("given the kill-switch flag is resolved per tenant", () => {
+    /** @scenario "Kill-switch FF disables anomaly detection for one tenant without a redeploy" */
+    it("skips only the tenant the flag names and still evaluates the others", async () => {
+      const flags = MemoryFeatureFlagService.create();
+      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const { detector, rateTracker, anomalyState } = createDetector({ flags });
+      rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
+      rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
+      rateTracker.currentWindowCount.mockResolvedValue(500);
+      isEnabled.mockImplementation(
+        async (_key, target) => projectIdOf(target) === "proj_killed",
+      );
 
-    const result = await detector.tick();
-    expect(result.skippedKillSwitch).toBe(1);
-    expect(anomalyState.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: "proj_normal" }),
-    );
+      const result = await detector.tick();
 
-    isEnabled.mockRejectedValue(new Error("feature flag service unavailable"));
-    const retry = await detector.tick();
-    expect(retry.skippedKillSwitch).toBe(0);
+      expect(result.skippedKillSwitch).toBe(1);
+      expect(anomalyState.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "proj_normal" }),
+      );
+      expect(anomalyState.upsert).not.toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "proj_killed" }),
+      );
+    });
+
+    it("carries the evaluated tenant into the flag target", async () => {
+      const flags = MemoryFeatureFlagService.create();
+      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const { detector, rateTracker } = createDetector({ flags });
+      rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
+      rateTracker.currentWindowCount.mockResolvedValue(500);
+
+      await detector.tick();
+
+      expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
+        kind: "project",
+        projectId: "proj_acme",
+      });
+    });
+
+    /** @scenario "Kill-switch fails open when PostHog is unavailable" */
+    it("evaluates the tenant when the flag service throws", async () => {
+      const flags = MemoryFeatureFlagService.create();
+      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const { detector, rateTracker, anomalyState } = createDetector({ flags });
+      rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
+      rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
+      rateTracker.currentWindowCount.mockResolvedValue(500);
+      isEnabled.mockRejectedValue(new Error("feature flag service unavailable"));
+
+      const result = await detector.tick();
+
+      expect(result.skippedKillSwitch).toBe(0);
+      expect(anomalyState.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "proj_acme" }),
+      );
+    });
   });
 });

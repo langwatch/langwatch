@@ -162,13 +162,21 @@ export class AnomalyDetectorService {
     };
   }
 
+  /**
+   * The kill switch is per-tenant, so it resolves against the tenant being
+   * evaluated. A `system` target carries no identity at all, so a rule naming
+   * one project would match nobody and the switch could only ever be
+   * all-or-nothing. Resolution failure fails open: a flag outage must not
+   * silently disable observability.
+   */
   private async isKilledForTenant(tenantId: string): Promise<boolean> {
     if (!this.featureFlags) {
       return false;
     }
     try {
       return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        kind: "system",
+        kind: "project",
+        projectId: tenantId,
       });
     } catch {
       return false;
