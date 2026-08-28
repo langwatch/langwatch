@@ -6,15 +6,15 @@ Feature: Fields added to a published family stay optional in its document
 
   # /api/scenarios, /api/suites and /api/simulation-runs were published, and
   # clients were generated from them, before test suites, run notes and
-  # scenario versions existed. Those features added folderId, kind, scope,
+  # scenario versions existed. Those features added testSuiteId, kind, scope,
   # note and scenarioVersion to their answers. A generated client reads a
   # required field with no fallback, so marking one of them required in the
   # document breaks that client against every server that predates the field,
   # even though every current server sends it.
 
-  Scenario: The scenario answers read folderId as optional
+  Scenario: The scenario answers read testSuiteId as optional
     When I read the generated OpenAPI document
-    Then no /api/scenarios success answer lists folderId as required
+    Then no /api/scenarios success answer lists testSuiteId as required
 
   Scenario: The suite answers read kind and scope as optional
     When I read the generated OpenAPI document

@@ -5,7 +5,7 @@ Feature: The Results tab
 
   Background: three levels.
     The Results tab opens on a list titled "Test Runs". Each row is a run plan.
-    A test suite is a folder of scenarios and is never a row: the run plans
+    A test suite is a group of scenarios and is never a row: the run plans
     that run it are. There is no bucket row that collects runs belonging to no
     plan either: a single scenario run gets a run plan of its own, so iterating
     on one scenario reads as run 1, run 2, run 3 against that agent.
@@ -443,28 +443,28 @@ Feature: The Results tab
 
   @integration
   Scenario: The results read as a table by default
-    Given a finished run of three cases against one target
+    Given a finished run of three scenarios against one target
     When the run is selected
-    Then a table lists one row per case and target pair
+    Then a table lists one row per scenario and target pair
     And each row shows the verdict, the duration and the cost
 
   @integration
   Scenario: A row that has not settled shows no time and no cost
-    Given a run whose first case is still running
+    Given a run whose first scenario is still running
     When the results table is read
     Then the time and cost cell of that row is empty
-    And the cell fills in once the case reaches its verdict
+    And the cell fills in once the scenario reaches its verdict
 
   @integration
   Scenario: The row menu of a result opens the editor of the scenario
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Edit scenario"
     And choosing it opens the editor of that scenario
 
   @integration
   Scenario: The row menu of a result runs the scenario again on its own
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Open the conversation"
     And it offers "Rerun this scenario"
@@ -667,7 +667,7 @@ Feature: The Results tab
   Scenario: A run that is still going updates without a reload
     Given a run that is queued and starting
     When its results are open
-    Then each case moves from queued to running to its verdict as it happens
+    Then each scenario moves from queued to running to its verdict as it happens
     And no manual reload is needed
 
   @integration
@@ -687,22 +687,22 @@ Feature: The Results tab
   # --- Stopping ---
 
   @integration
-  Scenario: One case in a running batch can be stopped on its own
-    Given a run in which one case is still running
+  Scenario: One scenario in a running batch can be stopped on its own
+    Given a run in which one scenario is still running
     When Stop is chosen on that row
-    Then that case stops
-    And the other cases keep running
+    Then that scenario stops
+    And the other scenarios keep running
 
   @integration
   Scenario: A whole running batch can be stopped at once
-    Given a run with several cases queued and running
+    Given a run with several scenarios queued and running
     When Stop all is chosen for the run
-    Then every queued and running case stops
-    And cases that already finished keep their verdict
+    Then every queued and running scenario stops
+    And scenarios that already finished keep their verdict
 
   @integration
-  Scenario: Stop is not offered for a case that already finished
-    Given a run in which every case finished
+  Scenario: Stop is not offered for a scenario that already finished
+    Given a run in which every scenario finished
     When the results are read
     Then no Stop control is offered
 
@@ -753,5 +753,5 @@ Feature: The Results tab
   Scenario: A run that stopped reporting reads as stalled
     Given a run that stopped reporting long ago
     When the results are read
-    Then that case reads as stalled with a warning mark
+    Then that scenario reads as stalled with a warning mark
     And it is treated as finished for the counts

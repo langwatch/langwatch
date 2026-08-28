@@ -16,11 +16,13 @@ Feature: Running a test suite reuses the run plan path
     count and the models. A run started there goes through the run plan path,
     which writes the whole configuration onto a RUN PLAN.
 
-    The test suite ROW carries no `targets`, no `repeatCount`, no `simulatorModel`
-    and no `judgeModel`. A second place holding execution settings is a second
-    answer to what a run uses, and the two drift: a run started from the
-    dialog would say one thing and the row another, with nothing saying which
-    one the next run reads.
+    The test suite ROW holds no execution setting of its own: `targets` is
+    empty, `repeatCount` is the column default of one, and `simulatorModel` and
+    `judgeModel` are null. The columns stay on the table because a run plan row
+    uses all four. A second place holding execution settings is a second answer
+    to what a run uses, and the two drift: a run started from the dialog would
+    say one thing and the row another, with nothing saying which one the next
+    run reads.
 
     So every caller sends the execution settings with the run. A caller that
     addresses a test suite by its id and starts a run without a dialog,
@@ -56,8 +58,9 @@ Feature: Running a test suite reuses the run plan path
     When the test suite is run
     Then six runs are scheduled
 
-    The repeat count travels with the request. The test suite row holds none, so
-    there is nothing to read it from and nothing to keep in step.
+    The repeat count travels with the request. The test suite row holds only
+    the column default of one, so there is nothing to read it from and nothing
+    to keep in step.
 
   # --- The last run plan is the memory ---
 

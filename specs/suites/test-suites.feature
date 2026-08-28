@@ -4,10 +4,14 @@ Feature: A test suite groups scenarios
   So that I can find them, run them together, and archive them together
 
   Background: what a test suite is.
-    A test suite and a run plan are the same kind of record. A test suite carries the
-    name a person reads in the rail, the scenarios that belong to it, and the run
-    plan that runs those scenarios. A scenario belongs to at most one test suite. A scenario
-    that belongs to no test suite is unfiled and stays visible in the scenario list.
+    A test suite and a run plan are the same kind of record. A test suite
+    carries the name a person reads in the rail, the scenarios that belong to
+    it, and the run plan that runs those scenarios.
+
+    A scenario belongs to exactly one test suite. A scenario written without one
+    named is filed into the project's Default suite, so no scenario is ever
+    loose. See specs/suites/default-suite.feature and
+    specs/scenarios/scenario-test-suite-assignment.feature.
 
     Test suites are a v2 surface. The v1 run plan list never shows them. See
     specs/suites/test-suite-run-plan-reuse.feature for the run path and the v1
@@ -97,7 +101,7 @@ Feature: A test suite groups scenarios
     And the archived scenario is left out
 
   @unit
-  Scenario: A scenario belongs to at most one test suite
+  Scenario: A scenario belongs to exactly one test suite
     Given a scenario in the test suite "Refunds"
     When the scenario is moved to the test suite "Checkout"
     Then the scenario is in "Checkout" only
@@ -111,11 +115,39 @@ Feature: A test suite groups scenarios
     And the scenario keeps the test suite it had
 
   @integration
-  Scenario: A scenario cannot be filed into an archived test suite
+  Scenario: A refused move leaves the scenario in the test suite it was in
     Given an archived test suite "Refunds"
     When a scenario is moved into "Refunds"
     Then the request is refused with "scenario_test_suite_not_found"
-    And the scenario stays unfiled
+    And the scenario is still in the test suite it was in
+
+  # --- What the store calls it ---
+
+  # The stored words follow the product words: a scenario names its test suite
+  # in "Scenario"."testSuiteId", a suite row holds the kind "test_suite" or
+  # "run_plan", and a plan scope holds the mode "test_suites" or "scenarios".
+
+  @integration
+  Scenario: The scenario column names the test suite it is filed in
+    When the stored shape of a scenario is read
+    Then it carries a test suite column named testSuiteId
+    And the index over the project and that column follows the column name
+
+  @integration
+  Scenario: The stored suite kinds are test_suite and run_plan
+    Given suite rows stored under the old kinds
+    When the migration runs
+    Then a test suite row reads as "test_suite"
+    And a run plan row reads as "run_plan"
+    And a suite row written with no kind reads as "run_plan"
+
+  @integration
+  Scenario: The stored scope modes are test_suites and scenarios
+    Given a plan scoped to test suites and a plan that runs its own list
+    When the migration runs
+    Then the first plan reads mode "test_suites" with its ids under testSuiteIds
+    And the second plan reads mode "scenarios"
+    And a plan with no scope is left as it is
 
   # --- Permissions ---
 
