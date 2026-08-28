@@ -37,6 +37,31 @@ import type {
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
+/**
+ * A refusal, logged on its way out.
+ *
+ * better-auth catches an adapter throw and turns it into a redirect carrying
+ * the error CODE and nothing else, so an unlogged refusal reaches the
+ * customer as a sign-in error page and leaves NOTHING behind to diagnose it
+ * with. That is not hypothetical: `identity_unsupported_storage_query` broke
+ * production sign-in and appeared zero times in the logs for the whole
+ * outage, while the detail naming the exact shape sat unread on the error's
+ * own `reasons`. It is logged at error because it is `fault: "platform"` —
+ * nothing the customer did caused it and nothing they can do fixes it.
+ *
+ * Returns the error so a caller can `throw refused(...)` and keep the throw
+ * visible at the site it happens.
+ */
+const refused = <T>(error: T): T => {
+  if (error instanceof IdentityUnsupportedStorageQueryError) {
+    logger.error(
+      { err: error, detail: error.reasons[0]?.message },
+      "the identity storage adapter refused a better-auth account operation; the sign-in or account write it belongs to fails",
+    );
+  }
+  return error;
+};
+
 /** The secret set the identity branch owns. Everything else on the `account`
  *  model is linkage, and linkage is a command rather than a column write. */
 const SECRET_FIELDS = [
@@ -52,6 +77,47 @@ const SECRET_FIELDS = [
 /** Written by the store itself, so an update naming it is not a linkage
  *  rewrite and does not have to refuse. */
 const UPDATE_PASSTHROUGH_FIELDS = ["createdAt", "updatedAt"] as const;
+
+/**
+ * Linkage columns better-auth RESTATES on an update it means as a secret
+ * write — accepted when the value it carries already matches the row, and
+ * refused when it differs.
+ *
+ * A restatement is not a rewrite. better-auth 1.7 rebuilt the sign-in token
+ * refresh (`oauth2/link-account`) to send `providerId` alongside the tokens,
+ * echoing back the value it just read; 1.6 sent `scope` and no linkage at
+ * all. Refusing the echo failed EVERY OAuth sign-in for a latched user, so
+ * the field alone cannot decide this — only the field and its value together
+ * can. Equality is what makes accepting it safe: a matching value writes
+ * nothing, and a differing one is a real rewrite and still refuses.
+ */
+const LINKAGE_RESTATEMENT_FIELDS = [
+  "providerId",
+  "issuer",
+  "accountId",
+  "userId",
+] as const;
+
+type LinkageRestatementField = (typeof LINKAGE_RESTATEMENT_FIELDS)[number];
+
+const isLinkageRestatementField = (
+  field: string,
+): field is LinkageRestatementField =>
+  LINKAGE_RESTATEMENT_FIELDS.some((known) => known === field);
+
+/**
+ * The value a row states for a linkage field, with `issuer` resolved the
+ * same way the served row resolves it — a row attached before the fact
+ * carried an issuer answers with the synthetic form better-auth minted, and
+ * that is the value better-auth is echoing back.
+ */
+const linkageValueOf = (
+  row: IdentityAccountRow,
+  field: LinkageRestatementField,
+): string =>
+  field === "issuer"
+    ? (row.issuer ?? issuerForProviderId(row.providerId))
+    : row[field];
 
 export interface IdentityStorageAdapterDeps {
   /**
@@ -295,16 +361,27 @@ function identityCustomAdapter({
     const secretsOfUpdate = (
       operation: string,
       update: Row,
+      rows: readonly IdentityAccountRow[],
     ): IdentityAccountSecrets => {
+      /** A linkage field whose value every named row already states — an
+       *  echo of what better-auth just read, which writes nothing. */
+      const restatesItself = (field: string): boolean =>
+        isLinkageRestatementField(field) &&
+        rows.length > 0 &&
+        rows.every((row) => linkageValueOf(row, field) === update[field]);
+
       const foreign = Object.keys(update).filter(
         (field) =>
           !SECRET_FIELDS.some((secret) => secret === field) &&
-          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field),
+          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field) &&
+          !restatesItself(field),
       );
       if (foreign.length > 0) {
-        throw new IdentityUnsupportedStorageQueryError(
-          `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
-            "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+        throw refused(
+          new IdentityUnsupportedStorageQueryError(
+            `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
+              "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+          ),
         );
       }
       return secretsOf(update);
@@ -424,9 +501,13 @@ function identityCustomAdapter({
         // operator has enrolled anyone.
         return null;
       }
-      const served = await serveAccounts(
-        parseAccountQuery({ operation, where: canonical }),
-      );
+      let query: AccountQuery;
+      try {
+        query = parseAccountQuery({ operation, where: canonical });
+      } catch (error) {
+        throw refused(error);
+      }
+      const served = await serveAccounts(query);
       return served === null ? null : served.map(withIssuer);
     };
 
@@ -742,6 +823,7 @@ function identityCustomAdapter({
               secrets: secretsOfUpdate(
                 "update",
                 toCanonicalKeys(model, update as Row),
+                [first],
               ),
             });
             const [fresh] = await accounts.findByAccountIds({
@@ -797,6 +879,7 @@ function identityCustomAdapter({
               secrets: secretsOfUpdate(
                 "updateMany",
                 toCanonicalKeys(model, update),
+                rows,
               ),
             });
             return rows.length;
