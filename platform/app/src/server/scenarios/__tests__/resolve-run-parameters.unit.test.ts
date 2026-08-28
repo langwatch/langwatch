@@ -25,6 +25,7 @@ function scenario(
     id: "scen_1",
     name: "Refund flow",
     situation: "A customer asks for a refund",
+    version: 1,
     criteria: ["Answers the question"],
     parameters: null,
     ...overrides,

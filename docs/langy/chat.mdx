@@ -36,6 +36,14 @@ Langy runs `langwatch trace search` and `langwatch analytics query` over the rel
 
 For a cheaper-model migration, Langy pulls the traces for that feature, then writes an [evaluation or a Scenario test](/langy/scenario-tests-and-evals) that measures the current behavior, so you can compare the cheaper model against it.
 
+### Optimize a prompt
+
+- "Optimize the support classifier prompt."
+- "Can you improve this prompt's pass rate?"
+- "Try a better version of this prompt and compare."
+
+Langy scores the current prompt, duplicates it, rewrites the duplicate, and reruns both against your evaluator. See [Prompt Optimization](/langy/prompt-optimization).
+
 ### Set up testing and evals
 
 - "Set up an evaluator for answer correctness on the support agent."

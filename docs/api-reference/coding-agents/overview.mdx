@@ -3,6 +3,11 @@ title: "Overview"
 description: "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent."
 ---
 
-## Intro
+## Endpoints
 
-Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.
+- [List coding agent session events](/api-reference/coding-agents/list-coding-agent-session-events): every model call, compaction, rate limit and tool run of one session, in time order, with input, output, cache-read and cache-creation tokens, cost, duration and model per row.
+- [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage): the rollup of everything spent on a pull request over its lifetime, split by project, user and agent.
+
+Both authenticate with a project API key and read under the project's [data privacy policy](/ai-governance/data-privacy): an API key resolves as a public viewer, so it reads what the policy captures and never what it restricts or drops.
+
+The same data renders in the product on the [sessions](/coding-agents/sessions) and [pull requests](/coding-agents/pull-requests) views, and over the command line as `langwatch session events <sessionId>` and `langwatch trace transcript <traceId>`.

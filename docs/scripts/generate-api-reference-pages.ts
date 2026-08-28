@@ -111,6 +111,8 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -289,6 +291,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/secrets"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
+  },
+  {
+    name: "Agent Cache",
+    dirName: "agent-cache",
+    pathPrefixes: ["/api/agent-cache"],
+    overviewDescription:
+      "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself.",
   },
   {
     name: "Model Providers",

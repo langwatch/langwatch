@@ -13,6 +13,10 @@ import (
 	"github.com/langwatch/langwatch/pkg/config"
 )
 
+// DefaultSandboxPython is the interpreter a code block runs on when nothing
+// names another one: whatever `python3` PATH resolves to inside the image.
+const DefaultSandboxPython = "python3"
+
 // Config is the top-level service configuration.
 type Config struct {
 	Environment                   string        `env:"ENVIRONMENT"`
@@ -54,6 +58,11 @@ type EngineConfig struct {
 	EgressStrictPublicOnly bool `env:"EGRESS_STRICT_PUBLIC_ONLY"`
 	// SandboxPython — the python interpreter used for the code block.
 	// Default: python3 (resolved via PATH inside the container).
+	//
+	// The hydrator prefixes every field of this struct, so the name that
+	// reaches this field is NLPGO_ENGINE_SANDBOX_PYTHON. Both runtime images
+	// set the unprefixed SANDBOX_PYTHON instead, which resolveSandboxPython
+	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
@@ -82,7 +91,7 @@ func defaultConfig() Config {
 			// margin for the outer connection to drain).
 			StreamIdleTimeoutSeconds: 720,
 			CodeBlockTimeoutSeconds:  60,
-			SandboxPython:            "python3",
+			SandboxPython:            DefaultSandboxPython,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable

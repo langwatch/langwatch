@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -149,7 +152,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 2)
+	ports, err := o.sys.FreePorts(nSvc + 3)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -159,7 +162,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
-	// ports[nSvc+1] the worker metrics endpoint.
+	// ports[nSvc+1] the worker metrics endpoint, and ports[nSvc+2] the IdP
+	// simulator's verification nameserver — the one listener that is reached by
+	// address rather than by hostname, so it cannot go through the proxy.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -194,11 +199,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// preallocated port so it is neither routed (dead 502) nor emitted into the
 		// overlay (e.g. an OPENCODE_AGENT_URL/LANGY_INTERNAL_SECRET for a dead
 		// socket). The app is always local.
+		if r.Name == domain.IdPService {
+			svc.DNSPort = ports[nSvc+2]
+		}
 		if !runsLocally(r.Name, opts) {
-			if bp, ok := o.baselinePort(r.Name); ok {
-				svc.Port, svc.IsFallback = bp, true
+			if base, ok := o.baselineService(r.Name); ok {
+				// The nameserver comes with it: a fallback idp answers domain
+				// proofs on the baseline's listener, not on the port this
+				// stack allocated for a simulator it is not running.
+				svc.Port, svc.DNSPort, svc.IsFallback = base.Port, base.DNSPort, true
 			} else {
-				svc.Port = 0
+				svc.Port, svc.DNSPort = 0, 0
 			}
 		}
 		// Portless enabled: the proxy routes every service through one shared
@@ -288,10 +299,78 @@ func (o *Orchestrator) ensurePortlessProxy() error {
 			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
 		}
 	}
+	if err := preflightPortlessCA(); err != nil {
+		return err
+	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	return nil
+}
+
+// portlessCASerialPath is the CA serial openssl maintains while signing the
+// per-host certificates portless serves.
+func portlessCASerialPath(home string) string {
+	return filepath.Join(home, ".portless", "ca.srl")
+}
+
+// preflightPortlessCA stops the up when portless's CA serial file exists but
+// cannot be written.
+//
+// openssl WRITES the serial as it signs (`-CAserial`), so a ca.srl left
+// root-owned by an earlier sudo run makes every per-host signing fail — and
+// the failure is silent: portless leaves a ZERO-BYTE .pem behind instead of
+// erroring, the proxy then serves that hostname with no certificate at all,
+// and the handshake dies with "no peer certificate available".
+//
+// That symptom is indistinguishable from the SAN gap of #7117, which is
+// already fixed (per-stack SANs ship in the cert request). Without this check
+// the next person reads the dead handshake as that bug returning and goes
+// looking for a fix that is already in the tree. Naming the real cause here is
+// the whole point.
+//
+// Reporting only, never repairing: the file is root-owned because something
+// outside haven ran as root, and deleting another user's files is not a dev
+// tool's call. An unreadable home dir or any non-permission error is left to
+// portless to report — this check answers one question and stays quiet
+// otherwise.
+func preflightPortlessCA() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return preflightPortlessCAIn(home)
+}
+
+// preflightPortlessCAIn is preflightPortlessCA against an explicit home, so the
+// check can be exercised without touching the developer's own ~/.portless.
+func preflightPortlessCAIn(home string) error {
+	srl := portlessCASerialPath(home)
+	if _, err := os.Stat(srl); err != nil {
+		// No serial yet — portless creates one owned by whoever runs it.
+		return nil
+	}
+	f, err := os.OpenFile(srl, os.O_WRONLY, 0)
+	if err == nil {
+		_ = f.Close()
+		return nil
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		return nil
+	}
+	// The diagnostic line names the absolute path so there is no doubt WHICH
+	// file; the command lines below stay on `~` because they are meant to be
+	// pasted into a shell, and a home directory with a space in it (or any
+	// other shell metacharacter) would splice an interpolated absolute path
+	// into the wrong arguments. `~/.portless/ca.srl` IS this file — the path
+	// is always $HOME/.portless/ca.srl — so nothing is lost by the shorthand.
+	return fmt.Errorf(
+		"portless's CA serial is not writable by you: %s\n"+
+			"openssl writes it while signing, so every per-host certificate comes out EMPTY and the proxy serves no certificate at all — the handshake failure looks exactly like the SAN bug of #7117, which is already fixed.\n"+
+			"Clear the root-owned leftovers and the empty certs they produced, then re-run `haven up` (no sudo needed — the directory is yours):\n"+
+			"  rm -f ~/.portless/ca.srl ~/.portless/proxy.tls\n"+
+			"  find ~/.portless/host-certs -name '*.pem' -size 0 -delete",
+		srl)
 }
 
 // serviceEndpoint resolves how one routed service is actually reachable.
@@ -397,6 +476,9 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
+	if err := o.ensureAPIBundle(ctx, p.LwDir, env); err != nil {
+		return err
+	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
@@ -404,6 +486,48 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	o.runSeed(ctx, p, env)
+	return nil
+}
+
+// apiBundleRelPath is what `start:app` executes: the PRODUCTION server bundle.
+// Kept as one constant because the check below and the error it prints must
+// name the same file the lane will look for.
+var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
+
+// ensureAPIBundle builds the app bundle when it is missing.
+//
+// The api lane runs `start:app` -> `node dist/server/server.cjs`, but nothing
+// else in the up produces that file: codegen writes generated SOURCE, the
+// migration step only touches the database, and dist/ is gitignored — so a
+// freshly-created worktree has no bundle at all. Without this the lane
+// crash-loops on MODULE_NOT_FOUND while the app (vite) lane sits behind its
+// /api/health ready-probe and never serves the hostname. The stack reports
+// itself up and then answers nothing, which is a much worse failure than a
+// slow first boot.
+//
+// Only the missing case builds. An existing bundle is left alone: rebuilding
+// on every `up` would add a minute to a bring-up for a file that only
+// server-side edits invalidate, and those already require a manual rebuild.
+//
+// The contract is the whole point: when this returns nil, node has a file to
+// execute. So both ends are checked against that, not against a weaker proxy.
+// A REGULAR file, because `node <a directory>` is the same crash by another
+// name; and re-checked AFTER the build, because a build can exit 0 without
+// emitting the server bundle (a changed build script, a partial run) and
+// trusting the exit code would hand the lane the exact MODULE_NOT_FOUND
+// crash-loop this function exists to prevent — only now with no explanation.
+func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
+	bundle := filepath.Join(lwDir, apiBundleRelPath)
+	if info, err := os.Stat(bundle); err == nil && info.Mode().IsRegular() {
+		return nil
+	}
+	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
+	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
+		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
+	}
+	if info, err := os.Stat(bundle); err != nil || !info.Mode().IsRegular() {
+		return fmt.Errorf("the app build reported success but left no %s behind — the api lane runs that file and cannot start without it", apiBundleRelPath)
+	}
 	return nil
 }
 
@@ -512,7 +636,15 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		return true, nil
 	}
 	if !o.sys.ProcessAlive(st.LauncherPID) {
-		// A dead launcher's registry entry must never block up — clean it up.
+		// A dead launcher's registry entry must never block up. Clean it up
+		// and take its hostnames down with it. A route that outlives its stack
+		// is worse than no route: the kernel hands that loopback port to the
+		// next process that asks, and the proxy then serves an unrelated
+		// worktree's dev server on this stack's hostname (HTML 404s from a
+		// stranger, instead of a connection that fails).
+		if !st.PortlessDisabled {
+			o.removeStackRoutes(slug, st.Services)
+		}
 		o.store.RemoveStack(slug)
 		return true, nil
 	}
@@ -555,6 +687,31 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	return true, nil
 }
 
+// removeStackRoutes deregisters every hostname a slug can own: the ones every
+// stack always plans for, the ones this stack actually persisted, and the two
+// datastore aliases. The union is the point: a stack that died mid-provision,
+// or one written by an older haven, has fewer services on record than it
+// registered routes for, and any name left behind keeps resolving to a port the
+// kernel has since reissued.
+func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service) {
+	seen := make(map[string]bool)
+	remove := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		o.proxy.Remove(name, slug)
+	}
+	for _, r := range domain.PerWorktreeServices {
+		remove(r.Name)
+	}
+	for _, s := range services {
+		remove(s.Name)
+	}
+	remove(domain.ClickHouseService)
+	remove(domain.PostgresService)
+}
+
 // Down tears the current worktree's stack down from anywhere: it stops a live
 // launcher (the supervised children die with their process group), removes the
 // routes, and drops the registry entry. Databases are KEPT, always — no flag
@@ -590,11 +747,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 		portlessDisabled = st.PortlessDisabled
 	}
 	if !portlessDisabled {
-		for _, r := range domain.PerWorktreeServices {
-			o.proxy.Remove(r.Name, slug)
-		}
-		o.proxy.Remove(domain.ClickHouseService, slug)
-		o.proxy.Remove(domain.PostgresService, slug)
+		o.removeStackRoutes(slug, st.Services)
 	}
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
@@ -799,6 +952,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.NLP
 	case "langyagent":
 		return opts.Selection.Langy
+	case "idp":
+		return opts.Selection.IDP
 	default:
 		return true
 	}
@@ -816,8 +971,8 @@ func (o *Orchestrator) slugOwnedByOther(slug, worktreeDir string) bool {
 }
 
 // baselinePort routes an opted-out service's hostname to a live baseline stack.
-func (o *Orchestrator) baselinePort(service string) (int, bool) {
-	return domain.BaselinePort(o.store.Stacks(), service, o.sys.ProcessAlive)
+func (o *Orchestrator) baselineService(service string) (domain.Service, bool) {
+	return domain.BaselineService(o.store.Stacks(), service, o.sys.ProcessAlive)
 }
 
 func (o *Orchestrator) printStack(st domain.Stack) {

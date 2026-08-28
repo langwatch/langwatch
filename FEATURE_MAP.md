@@ -19,7 +19,7 @@ prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
 triggers/            — Automations / alerts
-ai-gateway/          — Virtual Keys, Budgets, Governance, Catalog (ingestion)
+ai-gateway/          — Virtual Keys, Budgets, Governance, Inventory (ingestion)
 settings/            — Model Providers, Model Defaults, Project Secrets
 ```
 
@@ -87,7 +87,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Virtual Keys | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | Budgets | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | Governance | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Catalog (ingestion) | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Inventory (ingestion) | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | **Settings** | | | | | | | | | | |
 | Projects | — | — | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | Model Providers | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
@@ -145,9 +145,9 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 - **Scenario SDK** — separate: `@langwatch/scenario` / `langwatch-scenario`
 
 ### Skills
-- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.md`
-- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.md`
-- **Meta** — `skills/level-up/SKILL.md` (orchestrates the feature skills)
+- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
+- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
+- **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
 - **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
 
 ### Documentation
@@ -162,7 +162,7 @@ Validation checklist:
 
 - Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
-- Every `skill` name has a `skills/{name}/SKILL.md`
+- Every `skill` name has a `skills/{name}/SKILL.mdx`
 - Every `cli` command exists in `sdks/typescript/src/cli/`
 - Every `ui` route exists in `platform/app/src/utils/routes.ts`
 - No aspirational entries — use `plannedSync` for future intent

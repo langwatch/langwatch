@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
@@ -70,6 +71,88 @@ func TestWriteErrorLogsUpstreamRejectionAsCustomerFault(t *testing.T) {
 	entry := requireSingleFailureLog(t, logs)
 	assert.Equal(t, zapcore.InfoLevel, entry.Level)
 	assert.Equal(t, "customer", entry.ContextMap()["fault"])
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestWriteErrorLogsTheProviderReasonFromTheForwardedBody(t *testing.T) {
+	// The line that named nothing: the codex backend answered 400 with the
+	// parameter it refused, the client got that body verbatim, and the log said
+	// only "codex backend HTTP 400". Every codex turn in production failed for
+	// a week's worth of debugging over a sentence we already held.
+	logs := observedWriteError(t, context.Background(), &domain.UpstreamError{
+		StatusCode: 400,
+		Message:    "codex backend HTTP 400",
+		Body:       []byte(`{"detail":"Unsupported parameter: prompt_cache_retention"}`),
+	})
+	fields := requireSingleFailureLog(t, logs).ContextMap()
+	assert.Equal(t, "Unsupported parameter: prompt_cache_retention", fields["upstream_reason"])
+	assert.Equal(t, int64(400), fields["status"])
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonReadsEveryShapeProvidersUse(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"openai and anthropic", `{"error":{"type":"invalid_request_error","message":"credit balance too low"}}`, "credit balance too low"},
+		{"the codex backend", `{"detail":"Unsupported parameter: prompt_cache_retention"}`, "Unsupported parameter: prompt_cache_retention"},
+		{"a bare message", `{"message":"model not found"}`, "model not found"},
+		{"a plain error string", `{"error":"invalid virtual key"}`, "invalid virtual key"},
+		{"a body with nothing in it", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, upstreamReason([]byte(tc.body)))
+		})
+	}
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonNeverQuotesABodyItCannotRead(t *testing.T) {
+	// An edge page or a plain-text rejection can reflect the request that
+	// caused it. Quoting one would copy a prompt, a key or personal data onto
+	// an operator's log line, so an unreadable body is described by its size.
+	//
+	// The stand-in key is assembled rather than written out: a test about not
+	// leaking a credential should not commit something shaped like one.
+	credential := "sk-" + "live-" + strings.Repeat("0", 24)
+	reflected := "Bad request: input=my patient's diagnosis is ... key=" + credential
+	reason := upstreamReason([]byte(reflected))
+	assert.NotContains(t, reason, "patient")
+	assert.NotContains(t, reason, credential)
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(reflected)), reason)
+
+	edge := "<html>\n<body>error 1010</body>\n</html>"
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(edge)),
+		upstreamReason([]byte(edge)),
+		"the operator still learns a body came back, and how big")
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonIsBoundedAndNotRepeated(t *testing.T) {
+	t.Run("when the body is longer than the cap", func(t *testing.T) {
+		long := strings.Repeat("x", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.Len(t, reason, upstreamReasonLimit,
+			"a provider answering at length must not take the log line over")
+		assert.True(t, strings.HasSuffix(reason, "..."), "a cut reason says it was cut")
+	})
+
+	t.Run("when the cut lands inside a multi-byte character", func(t *testing.T) {
+		long := strings.Repeat("é", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.LessOrEqual(t, len(reason), upstreamReasonLimit,
+			"the cap counts bytes, so a half-written character cannot push past it")
+		assert.True(t, utf8.ValidString(reason), "a cut reason stays valid UTF-8")
+	})
+
+	t.Run("when our message already states the reason", func(t *testing.T) {
+		body := []byte(`{"error":{"message":"credit balance too low"}}`)
+		assert.Empty(t, unstatedReason("credit balance too low", body))
+		assert.Equal(t, "credit balance too low", unstatedReason("provider HTTP 402", body))
+	})
 }
 
 // @scenario "A gateway-classified error is logged by its error code"

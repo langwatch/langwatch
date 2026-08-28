@@ -46,10 +46,11 @@ const (
 	filePerm = 0o644
 )
 
-// AgentsTemplate returns the AGENTS.md system-prompt template verbatim. It keeps
-// the literal ${LANGWATCH_ENDPOINT} placeholder — the manager substitutes it
-// per-worker at spawn. Read from the binary, so it never depends on a mounted
-// /workspace.
+// AgentsTemplate returns the AGENTS.md system-prompt template verbatim. A spawn
+// writes these bytes to the worker home unchanged: nothing is substituted into
+// the prompt, because the prompt reaches the user through the reply and an
+// address only the worker can use must never enter it. Read from the binary, so
+// it never depends on a mounted /workspace.
 func AgentsTemplate() (string, error) {
 	raw, err := embedded.ReadFile(agentsFile)
 	if err != nil {

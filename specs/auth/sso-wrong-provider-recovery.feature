@@ -5,10 +5,19 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
   the sign-in error page. The error must be actionable and must not trap them
   bouncing between the app and the identity provider.
 
+  # Ported at D04 (ADR-117 §5): what OWNS "acme.com routes to an identity
+  # provider" is an SsoConnection now, not two strings on the organization.
+  # The scenarios below are unchanged in substance because the recovery is
+  # the same on both sides of the flip - it is about what the error page
+  # says and does, and the page reads a routing decision either way. Which
+  # store answered that decision is SSOCONN_ROUTING's business
+  # (specs/identity/sso-connection-lifecycle.feature owns and binds it).
+  # Nothing here retires at the flip.
+
   Background:
-    Given an organization with SSO enforced for domain "acme.com"
-    And the organization's required sign-in method is its enterprise SSO provider
-    And a user "andrei@acme.com" whose account is linked to that SSO provider
+    Given an organization whose ACTIVE SSO connection has verified the domain "acme.com"
+    And the organization's required sign-in method is that connection's identity provider
+    And a user "andrei@acme.com" whose account is linked to that connection
 
   Scenario: Signing in with the wrong method explains what to do and names the right method
     When the user completes an OAuth sign-in with a different method for the same email
@@ -35,7 +44,7 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And they reach a stable error page with a clear recovery action
 
   Scenario: Recovery works the same when the org's required method is not yet known
-    Given a user whose email domain is not mapped to an SSO-enforced organization
+    Given a user whose email domain no ACTIVE connection has verified
     When they hit the same wrong-method sign-in error
     Then the page still offers to sign out of the identity provider and try again
     And the guidance falls back to signing in with the method used originally

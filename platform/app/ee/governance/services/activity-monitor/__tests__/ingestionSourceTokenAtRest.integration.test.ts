@@ -190,3 +190,46 @@ describe("given an admin saves a Genie source carrying a client id and secret", 
     }, 60_000);
   });
 });
+
+describe("given an admin saves an OpenAI Admin source carrying an admin API key", () => {
+  describe("when the source is saved through the service", () => {
+    /** @scenario "The Admin API key is never stored in plain text" */
+    it("stores the key encrypted and unreadable from the source's configuration", async () => {
+      const token = `sk-admin-${nanoid(24)}`;
+      const service = IngestionSourceService.create(prisma);
+
+      // The pullConfig the governance composer produces for the OpenAI Admin
+      // cost source, with the key in PLAINTEXT — the service is the one that
+      // must encrypt it, so encrypting it here would test nothing.
+      const { source } = await service.createSource({
+        organizationId,
+        sourceType: "openai_admin",
+        name: `openai-admin-key-at-rest-${ns}`,
+        pullConfig: {
+          adapter: "openai_admin",
+          report: "cost",
+          startingAt: "2026-07-01T00:00:00.000Z",
+          schedule: "0 * * * *",
+          credentials: { token },
+        },
+        pullSchedule: "0 * * * *",
+        actorUserId,
+      });
+
+      const row = await prisma.ingestionSource.findUniqueOrThrow({
+        where: { id: source.id },
+      });
+      const stored = row.parserConfig as Record<string, unknown>;
+
+      // The whole serialised row, so a key leaking into any other field is
+      // caught, not just one that stayed under `credentials`.
+      expect(JSON.stringify(stored)).not.toContain(token);
+
+      expect(typeof stored.credentials).toBe("string");
+      expect(stored.credentials as string).toMatch(/^enc:v1:/);
+
+      // Encrypted is not the same as lost — the puller still authenticates.
+      expect(decryptCredentials(stored.credentials)).toEqual({ token });
+    }, 60_000);
+  });
+});

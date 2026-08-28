@@ -438,6 +438,17 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   workflow_id: string;
   project_id: string;
   secrets?: Record<string, string>;
+  /**
+   * The short-lived credential a code node's sandbox authenticates with,
+   * minted once for a run. It reaches the project's agent cache and nothing
+   * else, and expires by itself, so a run can keep state between rows without
+   * the project key entering the sandbox.
+   *
+   * Absent on a run that could not mint one, and on a one-off Studio run,
+   * which carries none by design. The engine injects nothing when it is
+   * absent, so every row then does its own work.
+   */
+  sandbox_api_key?: string;
 };
 
 // ============================================================================

@@ -676,9 +676,15 @@ describe("enterprise feature guards", () => {
     });
   });
 
-  // --- createInviteRequest conditional guard ---
+  // --- invite-request surface, now served by createInvites ---
+  //
+  // `createInviteRequest` was consolidated into `createInvites`, which
+  // carries the same custom-role guard. The scenario is kept bound here
+  // because the behaviour it names still holds; only the procedure it goes
+  // through changed. AUDIT_MANIFEST.md already records the scenario itself
+  // as a duplicate of the createInvites pair above.
 
-  describe("organization.createInviteRequest", () => {
+  describe("organization.createInvites via the invite-request surface", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot create invite requests with custom roles */
       it("rejects with FORBIDDEN", async () => {
@@ -686,7 +692,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInviteRequest({
+          caller.organization.createInvites({
             organizationId,
             invites: [
               {
@@ -714,7 +720,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInviteRequest({
+        const result = await caller.organization.createInvites({
           organizationId,
           invites: [
             {

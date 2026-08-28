@@ -93,6 +93,7 @@ async function queuedCommandFor(params: {
     projectId: tenantId,
     activeScenarioIds: [params.scenarioId],
     scenarioNameMap: new Map([[params.scenarioId, "Refund flow"]]),
+    scenarioVersionMap: new Map([[params.scenarioId, 1]]),
     activeTargets: [{ type: "http", referenceId: "agent-1" }],
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
@@ -276,7 +277,11 @@ describe("Feature: recording a run's resolved parameters", () => {
       });
 
       expect(run!.metadata).toEqual({
-        langwatch: { targetReferenceId: "agent-1" },
+        langwatch: {
+          targetReferenceId: "agent-1",
+          targetType: "http",
+          scenarioVersion: 1,
+        },
       });
     });
   });

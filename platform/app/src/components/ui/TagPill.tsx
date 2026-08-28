@@ -9,16 +9,54 @@ import { X } from "lucide-react";
 
 const StyledButton = chakra("button");
 
+/**
+ * How a pill is coloured. `neutral` is one muted grey for every label.
+ * `pastel` gives each label a soft colour of its own, so a row of labels can
+ * be told apart at a glance.
+ */
+export type TagPillTone = "neutral" | "pastel";
+
+/**
+ * The colours a pastel pill can take. Every entry is a Chakra palette, so the
+ * pill follows the light and the dark theme without a second definition.
+ */
+const PASTEL_PALETTES = [
+  "blue",
+  "purple",
+  "teal",
+  "pink",
+  "orange",
+  "cyan",
+  "green",
+  "yellow",
+] as const;
+
+/**
+ * The palette a label always takes. The same label keeps its colour across
+ * rows, pages and reloads because the colour is read from the text itself.
+ */
+export function pastelPaletteForLabel(label: string): string {
+  let hash = 0;
+  for (let index = 0; index < label.length; index++) {
+    hash = (hash * 31 + label.charCodeAt(index)) >>> 0;
+  }
+  return PASTEL_PALETTES[hash % PASTEL_PALETTES.length]!;
+}
+
 type TagPillProps = {
   label: string;
   onRemove?: () => void;
+  tone?: TagPillTone;
 };
 
-export function TagPill({ label, onRemove }: TagPillProps) {
+export function TagPill({ label, onRemove, tone = "neutral" }: TagPillProps) {
+  const palette = tone === "pastel" ? pastelPaletteForLabel(label) : null;
+
   return (
     <HStack
       gap={1}
-      bg="bg.muted"
+      bg={palette ? `${palette}.subtle` : "bg.muted"}
+      color={palette ? `${palette}.fg` : undefined}
       px={2}
       py={0.5}
       borderRadius="full"

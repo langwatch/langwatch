@@ -53,6 +53,25 @@ Feature: haven logs
     When the developer runs "haven logs obs"
     Then the observability stack's container output appears
 
+  Scenario: One unreadable line never ends the capture
+    Given a service that prints a single line of several megabytes
+    When the supervisor captures its output
+    Then the long line is split across captured lines instead of dropped
+    And the lines printed after it are still captured
+    And the service is never blocked writing to a pipe with no reader
+
+  Scenario: A read error is recorded, not swallowed
+    Given the supervisor cannot read a service's output stream
+    When the read fails
+    Then the failure is written to that service's log
+    And everything read before the failure is kept
+
+  Scenario: Capture comes back after the log file cannot be written
+    Given the log directory is momentarily unwritable
+    When the service keeps printing
+    Then capture retries the file instead of giving up for the life of the process
+    And a rotation that cannot happen keeps appending past the cap rather than going silent
+
   Scenario: Log files never grow without bound
     Given a service that logs heavily for days
     Then its captured log stays within the per-service size cap

@@ -20,7 +20,7 @@ export type CellId = {
  * Parameters for computing execution cells.
  */
 export type ComputeExecutionCellsParams = {
-  /** The execution scope (full, rows, target, or cell) */
+  /** The execution scope (full, rows, target, target-rows, or cell) */
   scope: ExecutionScope;
   /** All target IDs in the workbench */
   targetIds: string[];
@@ -54,6 +54,14 @@ export const computeExecutionCells = ({
     return cells;
   }
 
+  // A row or a column named twice is still one cell. Kept in the order it was
+  // asked for; the backend planner drops the repeats the same way, so the two
+  // agree on how many cells a run covers.
+  const picked = (indices: number[]) =>
+    Array.from(
+      new Set(indices.filter((i) => i >= 0 && i < datasetRows.length)),
+    );
+
   // Determine which row indices to process based on scope
   let rowIndices: number[];
   switch (scope.type) {
@@ -61,9 +69,12 @@ export const computeExecutionCells = ({
       rowIndices = datasetRows.map((_, i) => i);
       break;
     case "rows":
-      rowIndices = scope.rowIndices.filter(
-        (i) => i >= 0 && i < datasetRows.length,
-      );
+      rowIndices = picked(scope.rowIndices);
+      break;
+    case "target-rows":
+      rowIndices = scope.rowIndices
+        ? picked(scope.rowIndices)
+        : datasetRows.map((_, i) => i);
       break;
     case "target":
       rowIndices = datasetRows.map((_, i) => i);
@@ -85,6 +96,9 @@ export const computeExecutionCells = ({
     case "target":
     case "cell":
       scopeTargetIds = [scope.targetId];
+      break;
+    case "target-rows":
+      scopeTargetIds = Array.from(new Set(scope.targetIds));
       break;
     default:
       scopeTargetIds = [];

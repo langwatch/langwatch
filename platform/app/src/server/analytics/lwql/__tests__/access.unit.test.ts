@@ -23,6 +23,7 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockIsEnabled },
 }));
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { LWQL_FLAG, lwqlEnabled } from "../access";
 
 /** A Prisma stand-in that resolves the given team, or none at all. */
@@ -58,7 +59,7 @@ describe("the LangWatchQL feature gate's identity", () => {
 
   describe("given a project that cannot be read", () => {
     /** @scenario "The switch is decided for the project's organization, not for the project alone" */
-    it("omits the organization key rather than passing it as undefined", async () => {
+    it("states the organization as not targeted rather than guessing one", async () => {
       await lwqlEnabled({
         prisma: prismaResolving(null),
         projectId: "project-1",
@@ -68,9 +69,9 @@ describe("the LangWatchQL feature gate's identity", () => {
         string,
         Record<string, unknown>,
       ];
-      // `in` is the distinction that matters: a rule matching on the
-      // organization must not be handed a key this function guessed at.
-      expect("organizationId" in identity).toBe(false);
+      // A rule matching on the organization must not be handed a value this
+      // function guessed at, and the opt-out matches no such rule.
+      expect(identity.organizationId).toBe(NOT_TARGETED);
       expect(identity.distinctId).toBe("project-1");
     });
   });

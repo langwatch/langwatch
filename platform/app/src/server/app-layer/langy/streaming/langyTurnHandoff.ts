@@ -68,6 +68,8 @@ export interface LangyTurnHandoff {
 export interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
+  /** Returns 1 when the key existed and was extended, 0 when it was already gone. */
+  expire(key: string, ttlSeconds: number): Promise<number>;
 }
 
 /** TTL for a stashed handoff. Matches the stream buffer window (ADR-044). */
@@ -87,6 +89,33 @@ export class LangyTurnHandoffStore {
       "EX",
       LANGY_HANDOFF_TTL_SECONDS,
     );
+  }
+
+  /**
+   * Extend a live handoff by another full TTL, without rewriting the record.
+   *
+   * The TTL is written once at `stash`, so a turn that runs longer than
+   * LANGY_HANDOFF_TTL_SECONDS used to lose its handoff while the worker was
+   * still working: the heartbeat proving the worker alive refreshes a key with
+   * a 10 second TTL and touched nothing here. Called from the heartbeat frame,
+   * so a turn that is still reporting activity keeps something to be revived
+   * with for as long as it runs.
+   *
+   * Reports whether a handoff was there to extend. False means it had already
+   * aged out, which is worth knowing and is not worth failing a frame over.
+   */
+  async refresh({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    const extended = await this.redis.expire(
+      handoffKey(conversationId, turnId),
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+    return extended === 1;
   }
 
   /**

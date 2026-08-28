@@ -28,6 +28,13 @@
 		"userPrompt": "Connect my agent to LangWatch simulations"
 	},
 	{
+		"id": "context-sweet-spot",
+		"label": "Context sweet spot",
+		"description": "Investigates the context economics of your own coding-agent sessions in LangWatch. Reads real sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn, and delivers a report with the context size your sessions should stay under, with example sessions behind every claim. Use when coding-agent sessions feel expensive or degrade as they grow.",
+		"category": "skill",
+		"userPrompt": "Find my context sweet spot"
+	},
+	{
 		"id": "datasets",
 		"label": "Datasets",
 		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
@@ -44,6 +51,12 @@
 		"label": "Debug with langwatch",
 		"description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production (errors, bad answers, latency spikes).",
 		"category": "recipe"
+	},
+	{
+		"id": "drive-the-ui",
+		"label": "Drive the ui",
+		"description": "Drive the page the user has open through live UI actions. List the actions a page accepts, call them with typed payloads, and read the live state including unsaved edits. Use when the user is looking at a page you can operate, such as the evaluations workbench, and a change should happen in front of them rather than behind their back.",
+		"category": "skill"
 	},
 	{
 		"id": "eval-triage",
@@ -91,6 +104,13 @@
 		"userPrompt": "Take my agent to the next level"
 	},
 	{
+		"id": "lwql-charts",
+		"label": "Lwql charts",
+		"description": "Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.",
+		"category": "recipe",
+		"userPrompt": "Build a chart from a question and put it on my dashboard"
+	},
+	{
 		"id": "online-evaluations",
 		"label": "Online evaluations",
 		"description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
@@ -98,11 +118,24 @@
 		"userPrompt": "Set up online evaluations for my agent"
 	},
 	{
+		"id": "prompt-optimization",
+		"label": "Prompt optimization",
+		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
+		"category": "skill"
+	},
+	{
 		"id": "prompts",
 		"label": "Prompts",
 		"description": "Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.",
 		"category": "skill",
 		"userPrompt": "Version my prompts with LangWatch"
+	},
+	{
+		"id": "provider-cost-comparison",
+		"label": "Provider cost comparison",
+		"description": "Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.",
+		"category": "skill",
+		"userPrompt": "Would another provider be cheaper for my usage?"
 	},
 	{
 		"id": "scenarios",

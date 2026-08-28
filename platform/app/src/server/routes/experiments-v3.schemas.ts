@@ -59,6 +59,23 @@ export const handledErrorEnvelopeSchema = z
   .passthrough();
 
 /**
+ * The 409 a workbench write answers with when someone else saved first.
+ *
+ * `StaleWorkbenchStateError` carries `currentVersion` in `meta`, and the REST
+ * boundary spreads `meta` flat, so the number arrives as a sibling of `error`.
+ * It is declared here because reloading is the whole remedy: a client that
+ * reads it can go straight to the current version instead of guessing.
+ */
+export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.extend(
+  {
+    currentVersion: z
+      .number()
+      .int()
+      .describe("The stored version now. Read the setup again at this one."),
+  },
+);
+
+/**
  * A failure we could name, serialised for a client to branch on (ADR-045).
  *
  * This is the NESTED form, carried as a `domainError` field on a run or a row —
@@ -311,6 +328,132 @@ export const runResultsResponseSchema = z.object({
     .array(evaluationResultSchema)
     .describe("One row per evaluator per dataset entry"),
   timestamps: runTimestampsSchema,
+});
+
+// ── workbench state and version history ─────────────────────────────────────
+
+/**
+ * The workbench setup, as the API carries it.
+ *
+ * Deliberately open: the canonical shape is
+ * `persistedEvaluationsV3StateSchema`, which the service parses on every
+ * write, and re-declaring its ~40 nested objects here would give integrators a
+ * second definition that drifts. What the document promises is the contract
+ * that matters: an object you read, edit and send back whole.
+ */
+export const workbenchStateSchema = z
+  .record(z.string(), z.unknown())
+  .describe(
+    "The experiment setup: datasets, targets and evaluators. Read it, change it, send it back whole.",
+  );
+
+export const createExperimentBodySchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Name for the experiment. A draft name is picked when omitted."),
+  state: workbenchStateSchema
+    .optional()
+    .describe(
+      "Setup to start from. Omit for a blank workbench with one inline dataset.",
+    ),
+});
+
+export const createExperimentResponseSchema = z.object({
+  id: z.string().describe("Identifier of the created experiment"),
+  slug: z.string().describe("Slug to address the experiment by"),
+  version: z.number().describe("Version of the saved setup, starting at 1"),
+});
+
+export const workbenchStateResponseSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string().nullable(),
+  state: workbenchStateSchema.nullable(),
+  version: z
+    .number()
+    .int()
+    .describe("Send this back as expectedVersion to save safely"),
+  updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
+});
+
+/** What `?fields=version` answers: the staleness probe without the setup. */
+export const workbenchVersionProbeResponseSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  version: z.number().int(),
+  updatedAt: z.string().describe("ISO 8601 timestamp of the last save"),
+});
+
+export const saveWorkbenchStateBodySchema = z.object({
+  state: workbenchStateSchema.describe("The full setup to save"),
+  expectedVersion: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "The version you read. Sending it refuses the save when someone else already wrote on top of it.",
+    ),
+  commitMessage: z
+    .string()
+    .optional()
+    .describe("Names this version in the history list"),
+});
+
+export const saveWorkbenchStateResponseSchema = z.object({
+  version: z.number().int().describe("The version the save produced"),
+});
+
+const workbenchVersionSchema = z.object({
+  version: z
+    .number()
+    .int()
+    .describe(
+      "Restore this version by this number. Named versions run 1, 2, 3 with no gaps. The autosave row also has a number, but it changes with every save, so read it as a handle and not as a place in the history.",
+    ),
+  counterVersion: z
+    .number()
+    .int()
+    .describe(
+      "The setup version this row was written at. It says how recent the row is, and it equals the experiment's current version on the row holding the live setup.",
+    ),
+  autoSaved: z
+    .boolean()
+    .describe(
+      "True for the single autosave row, which every ordinary save rewrites in place",
+    ),
+  commitMessage: z.string().nullable(),
+  authorLabel: z
+    .string()
+    .describe("Who wrote it: user, langy or api")
+    .openapi({ example: "user" }),
+  authorId: z.string().nullable().describe("User id, when a person wrote it"),
+  createdAt: z.string().describe("ISO 8601 timestamp of the first write"),
+  updatedAt: z
+    .string()
+    .describe(
+      "ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is.",
+    ),
+});
+
+export const listWorkbenchVersionsResponseSchema = z.object({
+  versions: z
+    .array(workbenchVersionSchema)
+    .describe("Newest first, by `counterVersion`"),
+  nextCursor: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Pass as `cursor` to read the next page, null on the last one"),
+});
+
+export const restoreWorkbenchVersionResponseSchema = z.object({
+  version: z
+    .number()
+    .describe(
+      "The new version the restore wrote. History is never rewritten, so the restored version is still in the list.",
+    ),
 });
 
 export const experimentInitResponseSchema = z.object({

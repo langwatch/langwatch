@@ -336,17 +336,16 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("remove retired plugin dir: %w", err)
 	}
 
-	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
-	// AGENTS.md keeps the literal placeholder; we resolve it here so each worker
-	// emits concrete URLs in its replies. The template bytes are read once at
-	// Pool.New (from the embedded assets) — only the per-worker ReplaceAll happens
-	// here, so a spawn no longer touches disk for AGENTS.md.
+	// The operating contract, written through byte for byte. The template bytes
+	// are read once at Pool.New (from the embedded assets), so a spawn does not
+	// touch disk for AGENTS.md. Nothing is substituted into it: the prompt
+	// reaches the user through the reply, so an address only the worker can use
+	// must never enter it.
 	if in.AgentsTemplate == "" {
 		return fmt.Errorf("AGENTS.md template unavailable")
 	}
-	rendered := strings.ReplaceAll(in.AgentsTemplate, "${LANGWATCH_ENDPOINT}", in.Creds.LangwatchEndpoint)
 	agentsPath := filepath.Join(in.Home, "AGENTS.md")
-	if err := os.WriteFile(agentsPath, []byte(rendered), 0o600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(in.AgentsTemplate), 0o600); err != nil {
 		return fmt.Errorf("write AGENTS.md: %w", err)
 	}
 	if err := in.Runner.Chown(agentsPath, in.UID); err != nil {
@@ -385,7 +384,7 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd := in.Runner.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
+	cmd.Env = buildWorkerEnv(in.Home, in.ConversationID, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
@@ -465,7 +464,7 @@ const LangyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, 
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
-func buildWorkerEnv(workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
+func buildWorkerEnv(workerHome, conversationID string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
 	env := workerenv.BaseEnv()
 
 	// LLM wiring. Mediated (phase 2): OPENAI_BASE_URL points at the manager's
@@ -493,6 +492,10 @@ func buildWorkerEnv(workerHome string, creds domain.Credentials, openCodePasswor
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// A claim, not a credential: the control plane verifies the id belongs
+		// to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+conversationID,
 		// Requires opencode's HTTP control server to authenticate with HTTP
 		// Basic (user "opencode", this password) instead of serving every
 		// request unauthenticated. This is the sibling-isolation guarantee

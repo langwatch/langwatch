@@ -144,8 +144,6 @@ describe("the plugin hook configuration", () => {
       for (const groups of Object.values(events)) {
         expect(groups).toHaveLength(1);
         const entries = groups[0]?.hooks ?? [];
-        expect(entries).toHaveLength(1);
-
         const entry = entries[0]!;
         expect(entry.type).toBe("command");
         // The plugin root is quoted so a path with spaces survives the shell,
@@ -158,6 +156,36 @@ describe("the plugin hook configuration", () => {
         expect(entry.timeout).toBeGreaterThan(0);
         expect(entry.timeout).toBeLessThanOrEqual(60);
       }
+    });
+
+    /** @scenario "The plugin's guidance hook emits the guidance as session context" */
+    it("runs the guidance script on SessionStart only, beside the context hook", () => {
+      const events = hooks.hooks as Record<
+        string,
+        Array<{
+          hooks: Array<{ type: string; command: string; timeout?: number }>;
+        }>
+      >;
+
+      const commandsOf = (event: string): string[] =>
+        (events[event] ?? []).flatMap((group) =>
+          group.hooks.map((hook) => hook.command),
+        );
+
+      const guidance = commandsOf("SessionStart").filter((command) =>
+        command.includes("session-guidance.mjs"),
+      );
+      expect(guidance).toHaveLength(1);
+      expect(guidance[0]).toContain(
+        '"${CLAUDE_PLUGIN_ROOT}/scripts/session-guidance.mjs"',
+      );
+      // Guidance is context for the session's start; the Stop hook stays a
+      // single-purpose context reporter.
+      expect(
+        commandsOf("Stop").some((command) =>
+          command.includes("session-guidance.mjs"),
+        ),
+      ).toBe(false);
     });
   });
 });

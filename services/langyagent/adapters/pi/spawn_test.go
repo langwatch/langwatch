@@ -12,6 +12,11 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
+// A stand-in for the embedded AGENTS.md. It carries no placeholder, because
+// the provision renders nothing into the template: whatever is in the prompt
+// can reach the user in a reply.
+const agentsTemplateFixture = "# AGENTS\nOperating contract.\n"
+
 func testCreds() domain.Credentials {
 	return domain.Credentials{
 		ProjectID:         "proj_1",
@@ -35,7 +40,7 @@ func provisionHome(t *testing.T, creds domain.Credentials) (home string, cfg map
 		SessionDir:     filepath.Join(t.TempDir(), "conv-1"),
 		Creds:          creds,
 		UID:            0,
-		AgentsTemplate: "Operating contract. Endpoint: ${LANGWATCH_ENDPOINT}.",
+		AgentsTemplate: agentsTemplateFixture,
 		Runner:         testRunner{},
 	}); err != nil {
 		t.Fatalf("Provision: %v", err)
@@ -61,8 +66,10 @@ func modelOf(t *testing.T, cfg map[string]any) map[string]any {
 }
 
 // Provision lays out the whole worker home per PROTOCOL.md: config with env
-// var NAMES (never secrets), the rendered AGENTS.md, the session dir, and the
-// shared skills path.
+// var NAMES (never secrets), AGENTS.md, the session dir, and the shared skills
+// path.
+//
+// @scenario "The prompt reaches the worker exactly as it was written"
 func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	creds := testCreds()
 	home, cfg := provisionHome(t, creds)
@@ -78,11 +85,11 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
-	if !strings.Contains(string(agents), "Endpoint: http://app.internal:5560.") {
-		t.Errorf("AGENTS.md endpoint placeholder not substituted: %s", agents)
-	}
-	if strings.Contains(string(agents), "${LANGWATCH_ENDPOINT}") {
-		t.Errorf("AGENTS.md still carries the literal placeholder")
+	// Byte for byte, with no substitution of any kind. The prompt reaches the
+	// user through the reply, so nothing the worker alone can reach may be
+	// rendered into it.
+	if string(agents) != agentsTemplateFixture {
+		t.Errorf("AGENTS.md = %q, want the template written through unchanged (%q)", agents, agentsTemplateFixture)
 	}
 
 	sessions, _ := cfg["sessionDir"].(string)
@@ -173,8 +180,11 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if compatOf(model)["supportsStore"] != false {
 			t.Errorf("codex must pin supportsStore false, got %v", compatOf(model))
 		}
-		if compatOf(model)["supportsLongCacheRetention"] != true {
-			t.Errorf("codex lane must allow long cache retention, got %v", compatOf(model))
+		// The ChatGPT codex backend rejects prompt_cache_retention with 400
+		// "Unsupported parameter" — the flag that makes pi send it must stay
+		// off on this lane, or every codex turn dies on its first LLM call.
+		if _, present := compatOf(model)["supportsLongCacheRetention"]; present {
+			t.Errorf("codex lane must not ask for long cache retention, got %v", compatOf(model))
 		}
 		if model["id"] != "openai_codex/gpt-5-codex" {
 			t.Errorf("codex id must ride verbatim, got %v", model["id"])
@@ -235,7 +245,7 @@ func TestProvision_ChownsLeftoverSessionFiles(t *testing.T) {
 		SessionDir:     sessionDir,
 		Creds:          testCreds(),
 		UID:            4242,
-		AgentsTemplate: "contract ${LANGWATCH_ENDPOINT}",
+		AgentsTemplate: agentsTemplateFixture,
 		Runner:         runner,
 	}); err != nil {
 		t.Fatalf("Provision: %v", err)
@@ -297,7 +307,7 @@ func provisionIntoStash(t *testing.T, stash string) string {
 		SessionDir:     sessionDir,
 		Creds:          testCreds(),
 		UID:            4242,
-		AgentsTemplate: "contract ${LANGWATCH_ENDPOINT}",
+		AgentsTemplate: agentsTemplateFixture,
 		Runner:         testRunner{},
 	}); err != nil {
 		t.Fatalf("Provision: %v", err)
@@ -411,5 +421,21 @@ func TestBuildWorkerEnv_UnmediatedFallback(t *testing.T) {
 	env = envMap(t, buildWorkerEnv(SpawnInput{Home: "/h", Creds: creds}))
 	if env["OPENAI_BASE_URL"] != "http://gateway.internal:5563" {
 		t.Errorf("unmediated anthropic base = %q, want the /v1 suffix stripped", env["OPENAI_BASE_URL"])
+	}
+}
+
+// The CLI's `ui call` names the conversation it drives with this variable; a
+// worker spawned without it could never reach the page channel.
+//
+// @scenario "The worker env carries the conversation id for the UI channel"
+func TestBuildWorkerEnv_CarriesConversationID(t *testing.T) {
+	env := envMap(t, buildWorkerEnv(SpawnInput{
+		Home:           "/h",
+		ConversationID: "conv-ui",
+		Creds:          testCreds(),
+	}))
+
+	if env["LANGY_CONVERSATION_ID"] != "conv-ui" {
+		t.Errorf("LANGY_CONVERSATION_ID = %q, want conv-ui", env["LANGY_CONVERSATION_ID"])
 	}
 }

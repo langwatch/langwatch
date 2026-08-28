@@ -1,5 +1,6 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
   type AttachGrantCommandData,
   attachGrantCommandDataSchema,
@@ -59,16 +60,6 @@ import type {
  * command dedupes at the event store while distinct actions never collide.
  * A command that emits one event always uses index 0.
  */
-
-function eventIdempotencyKey({
-  commandId,
-  index,
-}: {
-  commandId: string;
-  index: number;
-}): string {
-  return `${commandId}:${index}`;
-}
 
 export class AttachGrantCommand
   implements CommandHandler<Command<AttachGrantCommandData>, GrantAttachedEvent>

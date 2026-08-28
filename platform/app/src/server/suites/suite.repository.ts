@@ -15,6 +15,14 @@ import type {
   SimulationSuite,
 } from "~/generated/prisma/client";
 import { ARCHIVED_SLUG_SUFFIX } from "./constants";
+import type { SuiteKind } from "./types";
+
+/**
+ * The client a repository write runs on: the repository's own PrismaClient by
+ * default, or the caller's transaction client when the write must land with
+ * other writes (a folder archive cascade) or not at all.
+ */
+type SuiteWriteClient = Pick<Prisma.TransactionClient, "simulationSuite">;
 
 const tracer = getLangWatchTracer("langwatch.suites.repository");
 const logger = createLogger("langwatch:suites:repository");
@@ -138,7 +146,10 @@ export class SuiteRepository {
     );
   }
 
-  async findAll(params: { projectId: string }): Promise<SimulationSuite[]> {
+  async findAll(params: {
+    projectId: string;
+    kinds: SuiteKind[];
+  }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteRepository.findAll",
       {
@@ -158,6 +169,7 @@ export class SuiteRepository {
         const result = await this.prisma.simulationSuite.findMany({
           where: {
             projectId: params.projectId,
+            kind: { in: params.kinds },
             archivedAt: null,
           },
           orderBy: { updatedAt: "desc" },
@@ -168,10 +180,50 @@ export class SuiteRepository {
     );
   }
 
+  /**
+   * Slugs of non-archived suites whose slug starts with the prefix.
+   * Feeds the numeric-suffix retry that keeps folder and plan slugs unique
+   * inside their shared per-project namespace.
+   */
+  async findSlugsByPrefix(params: {
+    projectId: string;
+    slugPrefix: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.simulationSuite.findMany({
+      where: {
+        projectId: params.projectId,
+        slug: { startsWith: params.slugPrefix },
+        archivedAt: null,
+      },
+      select: { slug: true },
+    });
+    return rows.map((row) => row.slug);
+  }
+
+  /**
+   * The first non-archived suite carrying the label, or null. Used to find
+   * managed singleton suites, which are marked by a reserved label rather
+   * than by name.
+   */
+  async findFirstByLabel(params: {
+    projectId: string;
+    label: string;
+  }): Promise<SimulationSuite | null> {
+    return this.prisma.simulationSuite.findFirst({
+      where: {
+        projectId: params.projectId,
+        labels: { has: params.label },
+        archivedAt: null,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
   async update(params: {
     id: string;
     projectId: string;
     data: UpdateSuiteInput;
+    tx?: SuiteWriteClient;
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.update",
@@ -194,7 +246,7 @@ export class SuiteRepository {
           },
           "Updating suite",
         );
-        return this.prisma.simulationSuite.update({
+        return (params.tx ?? this.prisma).simulationSuite.update({
           where: {
             id: params.id,
             projectId: params.projectId,
@@ -213,6 +265,7 @@ export class SuiteRepository {
   async archive(params: {
     id: string;
     projectId: string;
+    tx?: SuiteWriteClient;
   }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
       "SuiteRepository.archive",
@@ -235,7 +288,8 @@ export class SuiteRepository {
           },
           "Archiving suite",
         );
-        const suite = await this.prisma.simulationSuite.findFirst({
+        const db = params.tx ?? this.prisma;
+        const suite = await db.simulationSuite.findFirst({
           where: { id: params.id, projectId: params.projectId },
         });
         if (!suite) {
@@ -245,7 +299,7 @@ export class SuiteRepository {
         const archivedSlug = suite.slug.endsWith(ARCHIVED_SLUG_SUFFIX)
           ? suite.slug
           : `${suite.slug}${ARCHIVED_SLUG_SUFFIX}-${suite.id.slice(-6)}`;
-        const result = await this.prisma.simulationSuite.update({
+        const result = await db.simulationSuite.update({
           where: { id: params.id, projectId: params.projectId },
           data: {
             archivedAt: suite.archivedAt ?? new Date(),

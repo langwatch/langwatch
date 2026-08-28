@@ -55,6 +55,59 @@ const collectParam = (pair: string, previous: string[] = []): string[] => [
   pair,
 ];
 
+/**
+ * Help for the `--note` flag the run commands share. Written here rather than
+ * imported so the command tree keeps its own boot cost; the reading it
+ * describes lives in `cli/utils/runNote.ts`.
+ */
+const NOTE_FLAG_HELP =
+  "Why this run is being started: its hypothesis or commit message. It is kept with the batch and shown beside every run in it. Up to 200 characters.";
+
+/** Help for the `--folder` flag on the scenario write commands. */
+const FOLDER_FLAG_HELP =
+  "The test suite folder to file this test case in, named by ID or by name.";
+
+/**
+ * Help for the three scope flags of the suite write commands. They answer one
+ * question, so only one of them may be given.
+ */
+const SCOPE_ALL_FLAG_HELP =
+  "Cover every active test case of the project. The set is read again at each run, so a test case written later runs too.";
+
+const SCOPE_FOLDER_FLAG_HELP =
+  "Cover the test cases filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
+
+const SCOPE_LABEL_FLAG_HELP =
+  "Cover the test cases carrying this label. Repeat the flag for more than one.";
+
+/**
+ * Reads the `--folder` / `--no-folder` pair.
+ *
+ * Commander gives both flags ONE attribute, so whichever comes last on the
+ * line silently wins and a caller passing both is never told. Each flag is
+ * recorded as it is read instead, so the command can refuse the pair. The
+ * reader clears what it read, so a second parse in the same process starts
+ * from nothing.
+ */
+const trackFolderFlags = (
+  command: Command,
+): (() => { folder?: string; noFolder: boolean }) => {
+  let folder: string | undefined;
+  let noFolder = false;
+  command.on("option:folder", (value: string) => {
+    folder = value;
+  });
+  command.on("option:no-folder", () => {
+    noFolder = true;
+  });
+  return () => {
+    const read = { ...(folder !== undefined && { folder }), noFolder };
+    folder = undefined;
+    noFolder = false;
+    return read;
+  };
+};
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -749,6 +802,65 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }
   });
 
+  // `langwatch ingest context`: the agent declares the repository and branch
+  // it is working on, run from inside the checkout. Visible, because its
+  // audience IS the agent reading `--help`: the always-loaded guidance the
+  // CLI installs names this command, and the agent runs it when it switches
+  // repository, branch or worktree mid-session. Renders its own result (one
+  // plain line) and never exits non-zero, so a declaration can never be why
+  // a session broke.
+  rendersOwnResult(
+    ingestCmd
+      .command("context")
+      .description(
+        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
+      )
+      .option(
+        "--session-id <id>",
+        "declare for this session instead of resolving the live one",
+      )
+      .option(
+        "--agent <tool>",
+        "the agent the session belongs to: claude-code, codex or opencode",
+      ),
+  ).action(async (options: { sessionId?: string; agent?: string }) => {
+    try {
+      const { contextCommand } = await import("./commands/ingestion/context.js");
+      await contextCommand(options);
+    } catch {
+      // Never break the session the agent runs this from.
+    }
+  });
+
+  // `langwatch ingest guidance <tool>`: prints the declare-your-context
+  // guidance as SessionStart additionalContext JSON. Hidden: nobody types
+  // this, the session-hooks install writes it into claude's settings for
+  // installs without plugin support (the plugin carries its own copy).
+  rendersOwnResult(
+    ingestCmd
+      .command("guidance <tool>", { hidden: true })
+      .description(
+        "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
+      ),
+  ).action(async (tool: string) => {
+    try {
+      if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
+      const { SESSION_CONTEXT_GUIDANCE } = await import(
+        "./utils/governance/session-guidance.js"
+      );
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: SESSION_CONTEXT_GUIDANCE,
+          },
+        })}\n`,
+      );
+    } catch {
+      // A hook is never allowed to be why a session broke.
+    }
+  });
+
   const governanceCmd = program
     .command("governance")
     .description(
@@ -936,11 +1048,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     promptCmd
       .command("list")
       .description("List all available prompts on the server")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option("--limit <n>", "Maximum prompts to return (default: all)"),
+    async (options: { limit?: string }) => {
       try {
         const { listCommand: impl } = await import("./commands/list.js");
-        return await impl();
+        return await impl(options);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
@@ -990,6 +1103,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  emitsResult(
+    promptCmd
+      .command("get <handle>")
+      .description("Show one prompt, with its model and messages")
+      .option("--version <version>", "Read a specific version instead of the latest")
+      .option("--tag <name>", "Read the version this tag points at")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string, options: { version?: string; tag?: string }) => {
+      const { promptGetCommand: impl } = await import("./commands/prompt/get.js");
+      return impl(handle, options);
+    },
+  );
 
   emitsResult(
     promptCmd
@@ -1442,8 +1568,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("status <experiment>")
       .description("Check the status of an experiment run (defaults to the latest run)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)"),
-    async (experiment: string, options: { runId?: string }) => {
+      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+      .option(
+        "--wait",
+        "Keep reading until the run finishes, or until the limit is up. Answers with the progress either way",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait waits before answering with the progress so far (default: 60)",
+      ),
+    async (
+      experiment: string,
+      options: { runId?: string; wait?: boolean; timeout?: string },
+    ) => {
       const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
       return impl(experiment, options);
     },
@@ -1476,7 +1613,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
       .option("--evaluator <name>", "Show only this evaluator's column")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20"),
+      .option("--limit <n>", "Maximum rows to print in the table; the JSON answer always carries every row (default 20)", "20"),
     async (
       experiment: string,
       options: {
@@ -1491,6 +1628,70 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    experimentCmd
+      .command("create")
+      .description("Create an experiment")
+      .option("--name <name>", "Name for the experiment")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { name?: string }) => {
+      const { experimentCreateCommand: impl } = await import("./commands/experiment/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("get-state <experiment>")
+      .description("Read an experiment's setup, with the version to save it back at")
+      .option("--fields <fields>", "Set to `version` to read the version only, without the setup")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { fields?: string }) => {
+      const { experimentGetStateCommand: impl } = await import("./commands/experiment/get-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("set-state <experiment>")
+      .description("Save an experiment's setup from a file, or from stdin with --file -")
+      .option("--file <path>", "File holding the setup as JSON, or - to read stdin")
+      .option("--expected-version <n>", "Refuse the save if someone else already wrote on top of this version")
+      .option("--message <text>", "Name this version in the history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string,
+      options: { file?: string; expectedVersion?: string; message?: string },
+    ) => {
+      const { experimentSetStateCommand: impl } = await import("./commands/experiment/set-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("versions <experiment>")
+      .description("List the saved versions of an experiment's setup")
+      .option("--limit <n>", "Maximum versions to fetch (default 50, max 100)", "50")
+      .option("--cursor <version>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { limit?: string; cursor?: string }) => {
+      const { experimentVersionsCommand: impl } = await import("./commands/experiment/versions.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("restore <experiment> <version>")
+      .description("Restore an experiment to one of its saved versions")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, version: string) => {
+      const { experimentRestoreCommand: impl } = await import("./commands/experiment/restore.js");
+      return impl(experiment, version);
+    },
+  );
 
   // Add workflow command group
   const workflowCmd = program
@@ -2605,25 +2806,40 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
+      .option("--folder <folder>", FOLDER_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+    async (name: string, options: { situation: string; criteria?: string; labels?: string; folder?: string }) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
   );
 
+  const scenarioUpdateCmd = scenarioCmd
+    .command("update <id>")
+    .description("Update an existing scenario")
+    .option("--name <name>", "New scenario name")
+    .option("--situation <situation>", "New situation/context")
+    .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
+    .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+    .option("--folder <folder>", FOLDER_FLAG_HELP)
+    .option("--no-folder", "Take the test case out of its test suite folder")
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  const readScenarioFolderFlags = trackFolderFlags(scenarioUpdateCmd);
+
   emitsResult(
-    scenarioCmd
-      .command("update <id>")
-      .description("Update an existing scenario")
-      .option("--name <name>", "New scenario name")
-      .option("--situation <situation>", "New situation/context")
-      .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
-      .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    scenarioUpdateCmd,
     async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+      const { folder, noFolder } = readScenarioFolderFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
-      return impl(id, options);
+      return impl(id, {
+        name: options.name,
+        situation: options.situation,
+        criteria: options.criteria,
+        labels: options.labels,
+        folder,
+        noFolder,
+      });
     },
   );
 
@@ -2633,11 +2849,41 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
     .option("--wait", "Wait for the scenario run to complete")
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+    .option("--note <text>", NOTE_FLAG_HELP)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
+    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[]; note?: string }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
+
+  // Version history of a test case. Nested under `scenario` because a version
+  // is a state of one case, never a resource of its own.
+  const scenarioVersionCmd = scenarioCmd
+    .command("version")
+    .description("Read the saved versions of a scenario");
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("list <scenarioId>")
+      .description("List the saved versions of a scenario, newest first")
+      .option("--limit <n>", "Max versions to read (default: 20)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, options: { limit?: string }) => {
+      const { listScenarioVersionsCommand: impl } = await import("./commands/scenarios/versions/list.js");
+      return impl(scenarioId, options);
+    },
+  );
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("get <scenarioId> <version>")
+      .description("Read one saved version of a scenario")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, version: string) => {
+      const { getScenarioVersionCommand: impl } = await import("./commands/scenarios/versions/get.js");
+      return impl(scenarioId, version);
+    },
+  );
 
   emitsResult(
     scenarioCmd
@@ -2681,13 +2927,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     suiteCmd
       .command("create <name>")
       .description("Create a new suite (run plan)")
-      .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
+      .option("--scenarios <ids>", "Comma-separated scenario IDs. Not needed when the plan is given a scope")
+      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
+      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
+      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
       .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
       .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
       .option("--labels <labels>", "Comma-separated labels")
       .option("--description <desc>", "Suite description")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
+    async (name: string, options: { scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
       return impl(name, options);
     },
@@ -2699,12 +2948,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Update a suite (run plan)")
       .option("--name <name>", "New suite name")
       .option("--scenarios <ids>", "New comma-separated scenario IDs")
+      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
+      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
+      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
       .option("--targets <targets...>", "New targets as <type>:<referenceId>")
       .option("--repeat-count <n>", "New repeat count")
       .option("--labels <labels>", "New comma-separated labels")
       .option("--description <desc>", "New description")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
+    async (id: string, options: { name?: string; scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
       return impl(id, options);
     },
@@ -2726,8 +2978,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Execute a suite run — schedules all scenario × target × repeat jobs")
     .option("--wait", "Wait for the suite run to complete before returning")
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+    .option("--note <text>", NOTE_FLAG_HELP)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
+    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[]; note?: string }) => {
       const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
       await impl({ id, options });
     });
@@ -2740,6 +2993,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
       return impl(id);
+    },
+  );
+
+  // Test suite folders. Nested under `suite` because a folder IS a suite: it
+  // holds the test cases filed into it and runs through the same path a run
+  // plan does, with `langwatch suite run <folder-id>`.
+  const suiteFolderCmd = suiteCmd
+    .command("folder")
+    .description("Manage test suite folders, the groups a test case is filed in");
+
+  emitsResult(
+    suiteFolderCmd
+      .command("list")
+      .description("List the test suite folders in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listFoldersCommand: impl } = await import("./commands/suites/folders/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("create <name>")
+      .description("Create an empty test suite folder")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (name: string) => {
+      const { createFolderCommand: impl } = await import("./commands/suites/folders/create.js");
+      return impl(name);
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("rename <folder> <name>")
+      .description("Rename a test suite folder")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (folder: string, name: string) => {
+      const { renameFolderCommand: impl } = await import("./commands/suites/folders/rename.js");
+      return impl(folder, name);
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("delete <folder>")
+      .description("Archive a test suite folder and every test case filed in it")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (folder: string) => {
+      const { deleteFolderCommand: impl } = await import("./commands/suites/folders/delete.js");
+      return impl(folder);
     },
   );
 
@@ -2809,6 +3113,167 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteGraphCommand: impl } = await import("./commands/graphs/delete.js");
       return impl(id);
+    },
+  );
+
+  // Add chart command group — saved LangWatchQL workbench charts
+  const chartCmd = program
+    .command("chart")
+    .description("Manage saved LangWatchQL charts and place them on dashboards");
+
+  emitsResult(
+    chartCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write chart SQL against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { chartSchemaCommand: impl } = await import("./commands/charts/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("list")
+      .description("List the project's saved charts")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listChartsCommand: impl } = await import("./commands/charts/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("get <id>")
+      .description("Get a saved chart by ID — its SQL, parameters, specification and placement")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getChartCommand: impl } = await import("./commands/charts/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("create")
+      .description("Save a LangWatchQL chart from a statement, parameters and an optional Vega-Lite specification")
+      .requiredOption("--name <name>", "Chart name")
+      .option("--sql <sql>", "The LangWatchQL statement")
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      sql?: string;
+      sqlFile?: string;
+      param?: string[];
+      specFile?: string;
+      project?: string;
+    }) => {
+      const { createChartCommand: impl } = await import("./commands/charts/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("update <id>")
+      .description("Update a saved chart's name or definition")
+      .option("--name <name>", "New chart name")
+      .option("--sql <sql>", "New LangWatchQL statement")
+      .option("--sql-file <path>", "Read the new statement from a file")
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--spec-file <path>", "New Vega-Lite specification JSON file")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        sql?: string;
+        sqlFile?: string;
+        param?: string[];
+        specFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateChartCommand: impl } = await import("./commands/charts/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("delete <id>")
+      .description("Delete a saved chart")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteChartCommand: impl } = await import("./commands/charts/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("run <id>")
+      .description("Run a saved chart's statement and print the result")
+      .option("--start <datetime>", "Period start for statements declaring {period_start:DateTime}")
+      .option("--end <datetime>", "Period end for statements declaring {period_end:DateTime}")
+      .option("--granularity <seconds>", "Datapoint step for statements declaring {period_granularity_seconds:UInt32}")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: { start?: string; end?: string; granularity?: string; project?: string },
+    ) => {
+      const { runChartCommand: impl } = await import("./commands/charts/run.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("place <id>")
+      .description("Place a saved chart on a dashboard")
+      .requiredOption("--dashboard-id <id>", "Dashboard to place the chart on")
+      .option("--grid-column <n>", "Grid column")
+      .option("--grid-row <n>", "Grid row (allocated automatically when omitted)")
+      .option("--col-span <n>", "Column span")
+      .option("--row-span <n>", "Row span")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        dashboardId?: string;
+        gridColumn?: string;
+        gridRow?: string;
+        colSpan?: string;
+        rowSpan?: string;
+        project?: string;
+      },
+    ) => {
+      const { placeChartCommand: impl } = await import("./commands/charts/place.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    chartCmd
+      .command("unplace <id>")
+      .description("Remove a saved chart from its dashboard")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
+      return impl(id, options);
     },
   );
 
@@ -3064,6 +3529,70 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+
+  // Drive the page the user has open with typed UI actions. Agent plumbing
+  // like `navigate`: only works mid-turn, when the platform can reach the
+  // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.
+  const uiCmd = program
+    .command("ui")
+    .description("Drive the page the user has open with typed actions");
+
+  emitsResult(
+    uiCmd
+      .command("call <kind>")
+      .description("Dispatch one UI action to the open page and print its result")
+      .option("--payload <json>", "The action's payload as JSON (default: {})")
+      .option(
+        "--payload-file <path>",
+        "Read the payload from a file, or from stdin with -. Use this for prompts and any other text a shell would mangle",
+      )
+      .option(
+        "--experiment <slug>",
+        "Experiment for the backend fallback to apply the action to when no page answers",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      kind: string,
+      options: { payload?: string; payloadFile?: string; experiment?: string },
+    ) => {
+      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+      return impl(kind, options);
+    },
+  );
+
+  emitsResult(
+    uiCmd
+      .command("actions")
+      .description("List the UI actions pages accept, with their schemas")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
+      return impl();
+    },
+  );
+
+  const workbenchCmd = program
+    .command("workbench")
+    .description("Work with the evaluations workbench the user has open");
+
+  emitsResult(
+    workbenchCmd
+      .command("get-state [experiment]")
+      .description(
+        "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
+      )
+      .option("--no-include-results", "Leave the results summary out")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string | undefined,
+      options: { includeResults?: boolean },
+    ) => {
+      const { workbenchGetStateCommand: impl } = await import(
+        "./commands/workbench/get-state.js"
+      );
+      return impl(experiment, options);
+    },
+  );
 
   // Add dataset command group
   const datasetCmd = program
