@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
@@ -22,6 +22,8 @@ const SURFACE_FORBIDDEN_DIRECTORIES = new Set([
   "stores",
   "transport",
 ]);
+const WEB_FEATURE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const WEB_UI_LAYERS = new Set(["elements", "blocks", "sections"]);
 
 const featureUseSchema = z
   .object({
@@ -46,8 +48,16 @@ const uiFeatureCatalogueSchema = z
   })
   .strict();
 
+const webFeatureDeclarationSchema = z
+  .object({
+    version: z.literal(0),
+    dependencies: z.array(z.string().regex(WEB_FEATURE_NAME)),
+  })
+  .strict();
+
 type UiFeatureCatalogue = z.infer<typeof uiFeatureCatalogueSchema>;
 type UiFeature = UiFeatureCatalogue["features"][number];
+type WebFeatureDeclaration = z.infer<typeof webFeatureDeclarationSchema>;
 
 type SourceImport = {
   file: string;
@@ -900,6 +910,7 @@ function lintWebSurfaceClosures(
         continue;
       }
       const surfaceRoot = join(sourceRoot, "surfaces", capability.id);
+      const globalModelRoot = join(sourceRoot, "model");
       const pending = [{ file: entry, chain: [entry] }];
       const visited = new Set<string>();
       while (pending.length > 0) {
@@ -919,7 +930,8 @@ function lintWebSurfaceClosures(
         }
         const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
         const surfaceId = surfaceIdForPath(sourceRoot, current);
-        const escapedSurface = !isWithin(surfaceRoot, current);
+        const escapedSurface =
+          !isWithin(surfaceRoot, current) && !isWithin(globalModelRoot, current);
         if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
           const dependencyPath = chain
             .map((path) => relative(sourceRoot, path).split(sep).join("/"))
@@ -984,6 +996,416 @@ function lintWebSurfaceClosures(
   return violations;
 }
 
+type WebPrivateModule =
+  | { kind: "global"; layer: "model" | "behavior" | "ui"; uiLayer?: string }
+  | {
+      kind: "feature";
+      feature: string;
+      layer: "model" | "behavior" | "ui";
+      uiLayer?: string;
+    }
+  | { kind: "feature-entry"; feature: string }
+  | { kind: "package-entry" }
+  | { kind: "screen" }
+  | { kind: "surface" };
+
+function webPrivateModuleForFile(sourceRoot: string, file: string): WebPrivateModule | undefined {
+  const segments = relative(sourceRoot, file).split(sep);
+  const [first, second, third, fourth] = segments;
+  if (segments.length === 1 && isWebRootException(file)) return { kind: "package-entry" };
+  if (first === "screens") return { kind: "screen" };
+  if (first === "surfaces") return { kind: "surface" };
+  if (first === "features" && second && WEB_FEATURE_NAME.test(second)) {
+    if (third === "index.ts") return { kind: "feature-entry", feature: second };
+    if (
+      (third === "model" || third === "behavior" || third === "ui") &&
+      (third !== "ui" || (fourth !== void 0 && WEB_UI_LAYERS.has(fourth)))
+    ) {
+      return {
+        kind: "feature",
+        feature: second,
+        layer: third,
+        uiLayer: third === "ui" ? fourth : void 0,
+      };
+    }
+    return void 0;
+  }
+  if (
+    (first === "model" || first === "behavior" || first === "ui") &&
+    (first !== "ui" || (second !== void 0 && WEB_UI_LAYERS.has(second)))
+  ) {
+    return {
+      kind: "global",
+      layer: first,
+      uiLayer: first === "ui" ? second : void 0,
+    };
+  }
+  return void 0;
+}
+
+function isWebRootException(file: string): boolean {
+  const name = relative(dirname(file), file);
+  return (
+    /^(?:index|testing)\.[cm]?[jt]sx?$/.test(name) ||
+    /^[a-z0-9-]+\.config\.[cm]?[jt]sx?$/.test(name)
+  );
+}
+
+function readWebFeatureDeclarations(sourceRoot: string): {
+  declarations: Map<string, WebFeatureDeclaration>;
+  violations: ArchitectureViolation[];
+} {
+  const featuresRoot = join(sourceRoot, "features");
+  const declarations = new Map<string, WebFeatureDeclaration>();
+  const violations: ArchitectureViolation[] = [];
+  if (!existsSync(featuresRoot)) return { declarations, violations };
+
+  for (const entry of readdirSync(featuresRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const featureRoot = join(featuresRoot, entry.name);
+    const declarationPath = join(featureRoot, "feature.json");
+    if (!WEB_FEATURE_NAME.test(entry.name)) {
+      violations.push({
+        policy: "ui-web-feature-layout",
+        file: featureRoot,
+        message: `Web feature directories must use lower-kebab-case names; ${JSON.stringify(entry.name)} does not.`,
+      });
+      continue;
+    }
+    if (!existsSync(declarationPath)) {
+      violations.push({
+        policy: "ui-web-feature-declaration",
+        file: featureRoot,
+        message: `Web feature ${JSON.stringify(entry.name)} must declare its direct feature dependencies in feature.json.`,
+        allowed:
+          "Add { version: 0, dependencies: [] } before importing another private web feature.",
+      });
+      continue;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(declarationPath, "utf8"));
+    } catch (error) {
+      violations.push({
+        policy: "ui-web-feature-declaration",
+        file: declarationPath,
+        message: `Web feature declaration must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      continue;
+    }
+    const result = webFeatureDeclarationSchema.safeParse(parsed);
+    if (!result.success) {
+      violations.push({
+        policy: "ui-web-feature-declaration",
+        file: declarationPath,
+        message: `Web feature declaration must match version 0: ${result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
+      });
+      continue;
+    }
+    if (new Set(result.data.dependencies).size !== result.data.dependencies.length) {
+      violations.push({
+        policy: "ui-web-feature-declaration",
+        file: declarationPath,
+        message: "Web feature dependencies must not repeat a feature name.",
+      });
+    }
+    if (result.data.dependencies.includes(entry.name)) {
+      violations.push({
+        policy: "ui-web-feature-declaration",
+        file: declarationPath,
+        message: `Web feature ${JSON.stringify(entry.name)} may not depend on itself.`,
+      });
+    }
+    declarations.set(entry.name, result.data);
+  }
+  for (const [feature, declaration] of declarations) {
+    for (const dependency of declaration.dependencies) {
+      if (!declarations.has(dependency)) {
+        violations.push({
+          policy: "ui-web-feature-declaration",
+          file: join(featuresRoot, feature, "feature.json"),
+          message: `Web feature ${JSON.stringify(feature)} declares missing feature dependency ${JSON.stringify(dependency)}.`,
+        });
+      }
+    }
+  }
+  return { declarations, violations };
+}
+
+function canPrivateLayerDependOn(
+  source: Extract<WebPrivateModule, { kind: "global" | "feature" }>,
+  target: Extract<WebPrivateModule, { kind: "global" | "feature" }>,
+): boolean {
+  const sourceLayer = source.layer === "ui" ? source.uiLayer : source.layer;
+  const targetLayer = target.layer === "ui" ? target.uiLayer : target.layer;
+  const allowed: Record<string, readonly string[]> = {
+    model: ["model"],
+    behavior: ["model", "behavior"],
+    elements: ["model", "elements"],
+    blocks: ["model", "elements", "blocks"],
+    sections: ["model", "behavior", "elements", "blocks", "sections"],
+  };
+  return Boolean(
+    sourceLayer !== void 0 && targetLayer !== void 0 && allowed[sourceLayer]?.includes(targetLayer),
+  );
+}
+
+function lintWebPrivateStructure(webPackages: readonly WebPackage[]): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  for (const pkg of webPackages) {
+    const sourceRoot = join(pkg.root, "src");
+    if (!existsSync(sourceRoot)) continue;
+    const { declarations, violations: declarationViolations } =
+      readWebFeatureDeclarations(sourceRoot);
+    violations.push(...declarationViolations);
+    const featureEdges = new Map<string, Set<string>>();
+    for (const [feature, declaration] of declarations) {
+      featureEdges.set(
+        feature,
+        new Set(declaration.dependencies.filter((dependency) => dependency !== feature)),
+      );
+    }
+
+    for (const file of sourceFiles(sourceRoot)) {
+      const segments = relative(sourceRoot, file).split(sep);
+      const module = webPrivateModuleForFile(sourceRoot, file);
+      if (segments.length === 1 && !isWebRootException(file)) {
+        violations.push({
+          policy: "ui-web-root-flat",
+          file,
+          message: "Feature-web production source may not live flat at src/.",
+          allowed:
+            "Use package-global model, behavior, or ui; a named private feature; or a public screen or surface boundary.",
+        });
+      }
+      if (segments[0] === "components") {
+        violations.push({
+          policy: "ui-web-root-components",
+          file,
+          message: "Feature-web packages may not use a generic src/components catch-all.",
+          allowed: "Put UI in package-global ui or in the owning named private feature.",
+        });
+      }
+      if (!module) {
+        violations.push({
+          policy: "ui-web-private-layout",
+          file,
+          message:
+            "Private feature-web code must live in model, behavior, ui/{elements,blocks,sections}, or features/<feature>/{model,behavior,ui}.",
+        });
+        continue;
+      }
+      if (module.kind === "package-entry") continue;
+
+      for (const sourceImport of importsIn(file)) {
+        if (sourceImport.nonLiteral) continue;
+        const targetFile = resolveUiSourceImport(sourceImport, sourceRoot);
+        if (!targetFile || !isWithin(sourceRoot, targetFile)) continue;
+        const target = webPrivateModuleForFile(sourceRoot, targetFile);
+        if (!target) {
+          violations.push({
+            policy: "ui-web-private-layout",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message:
+              "Feature-web code may not import a local module outside the governed private layout.",
+          });
+          continue;
+        }
+        if (
+          (module.kind === "global" ||
+            module.kind === "feature" ||
+            module.kind === "feature-entry") &&
+          (target.kind === "screen" || target.kind === "surface")
+        ) {
+          violations.push({
+            policy: "ui-web-public-boundary-leakage",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message:
+              "Private feature-web implementation may not depend inward on a public screen or surface boundary.",
+          });
+          continue;
+        }
+        if (
+          module.kind === "surface" &&
+          target.kind !== "surface" &&
+          !(target.kind === "global" && target.layer === "model")
+        ) {
+          violations.push({
+            policy: "ui-web-surface-leakage",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message:
+              "A public surface may not reach package-private features, global layers, or a screen.",
+          });
+          continue;
+        }
+        if (module.kind === "screen" && target.kind === "screen") {
+          const sourceScreen = relative(sourceRoot, file).split(sep)[1];
+          const targetScreen = relative(sourceRoot, targetFile).split(sep)[1];
+          if (sourceScreen !== targetScreen) {
+            violations.push({
+              policy: "ui-web-screen-leakage",
+              file,
+              line: sourceImport.line,
+              specifier: sourceImport.specifier,
+              message: "A screen may not compose another owner-only screen.",
+              allowed: "Extract a narrow surface or compose named private feature sections.",
+            });
+            continue;
+          }
+        }
+        if (
+          module.kind === "global" &&
+          (target.kind === "feature" || target.kind === "feature-entry")
+        ) {
+          violations.push({
+            policy: "ui-web-global-feature-leakage",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message:
+              "Package-global model, behavior, and ui may not depend on a private feature implementation.",
+          });
+          continue;
+        }
+        if (
+          module.kind === "feature-entry" &&
+          ((target.kind === "feature" && target.feature !== module.feature) ||
+            (target.kind === "feature-entry" && target.feature !== module.feature))
+        ) {
+          violations.push({
+            policy: "ui-web-feature-entry-leakage",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
+            allowed:
+              "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
+          });
+          continue;
+        }
+        if (module.kind === "feature" && target.kind === "feature-entry") {
+          if (module.feature === target.feature) continue;
+          if (module.layer !== "ui" || module.uiLayer !== "sections") {
+            violations.push({
+              policy: "ui-web-feature-layer-dependency",
+              file,
+              line: sourceImport.line,
+              specifier: sourceImport.specifier,
+              message:
+                "Only a feature ui/sections module may compose another private feature's public entry.",
+              allowed: "Promote lower-level reuse to package-global model, behavior, or ui.",
+            });
+          }
+          const declaration = declarations.get(module.feature);
+          if (!declaration?.dependencies.includes(target.feature)) {
+            violations.push({
+              policy: "ui-web-feature-dependency-declaration",
+              file,
+              line: sourceImport.line,
+              specifier: sourceImport.specifier,
+              message: `Web feature ${JSON.stringify(module.feature)} must declare ${JSON.stringify(target.feature)} before using its public entry.`,
+              allowed: `Add ${JSON.stringify(target.feature)} to features/${module.feature}/feature.json dependencies.`,
+            });
+          }
+          const edges = featureEdges.get(module.feature) ?? new Set<string>();
+          edges.add(target.feature);
+          featureEdges.set(module.feature, edges);
+          continue;
+        }
+        if (
+          module.kind === "feature" &&
+          target.kind === "feature" &&
+          module.feature !== target.feature
+        ) {
+          violations.push({
+            policy: "ui-web-feature-deep-import",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message: `Web feature ${JSON.stringify(module.feature)} may only import the public entry of ${JSON.stringify(target.feature)}.`,
+            allowed: `Import features/${target.feature}/index.ts and declare the dependency.`,
+          });
+          const edges = featureEdges.get(module.feature) ?? new Set<string>();
+          edges.add(target.feature);
+          featureEdges.set(module.feature, edges);
+          continue;
+        }
+        if (
+          (module.kind === "global" || module.kind === "feature") &&
+          (target.kind === "global" || target.kind === "feature") &&
+          !(
+            module.kind === "feature" &&
+            target.kind === "feature" &&
+            module.feature !== target.feature
+          ) &&
+          !canPrivateLayerDependOn(module, target)
+        ) {
+          violations.push({
+            policy: "ui-web-layer-direction",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message:
+              "Feature-web private layers may not depend upward on a composing UI or behavior layer.",
+            allowed:
+              "model is independent; behavior uses model; elements use model; blocks compose elements; sections compose blocks, elements, and behavior.",
+          });
+        }
+      }
+    }
+
+    let nextIndex = 0;
+    const indices = new Map<string, number>();
+    const lowLinks = new Map<string, number>();
+    const stack: string[] = [];
+    const onStack = new Set<string>();
+    const visit = (feature: string): void => {
+      indices.set(feature, nextIndex);
+      lowLinks.set(feature, nextIndex);
+      nextIndex += 1;
+      stack.push(feature);
+      onStack.add(feature);
+
+      for (const dependency of [...(featureEdges.get(feature) ?? [])].sort()) {
+        if (!indices.has(dependency)) {
+          visit(dependency);
+          lowLinks.set(feature, Math.min(lowLinks.get(feature)!, lowLinks.get(dependency)!));
+        } else if (onStack.has(dependency)) {
+          lowLinks.set(feature, Math.min(lowLinks.get(feature)!, indices.get(dependency)!));
+        }
+      }
+
+      if (lowLinks.get(feature) !== indices.get(feature)) return;
+      const component: string[] = [];
+      let member: string | undefined;
+      do {
+        member = stack.pop();
+        if (member === void 0) break;
+        onStack.delete(member);
+        component.push(member);
+      } while (member !== feature);
+      if (component.length < 2) return;
+      const cycle = component.sort();
+      violations.push({
+        policy: "ui-web-feature-cycle",
+        file: join(sourceRoot, "features", cycle[0]!, "feature.json"),
+        message: `Private web feature dependency cycle includes ${cycle.map((name) => JSON.stringify(name)).join(", ")}.`,
+        allowed: "Invert the dependency or extract a real package-global collaborator.",
+      });
+    };
+    for (const feature of [...featureEdges.keys()].sort()) {
+      if (!indices.has(feature)) visit(feature);
+    }
+  }
+  return violations;
+}
+
 export function lintFrontendUiBoundaries(
   root: string,
   packages: ClassifiedPackage[],
@@ -1002,6 +1424,7 @@ export function lintFrontendUiBoundaries(
     ...lintGovernedWebPackages(root, catalogue, webPackages),
     ...lintDeclaredCapabilities(root, catalogue, webPackages),
     ...lintWebPublicExports(selectedWebPackages),
+    ...lintWebPrivateStructure(selectedWebPackages),
     ...lintUiSourceBoundaries(root, catalogue, webPackages),
     ...lintWebScreenClosures(root, selectedWebPackages),
     ...lintWebSurfaceClosures(root, selectedWebPackages),

@@ -79,6 +79,13 @@ function webPackage(feature: string, exports: Record<string, string>): Classifie
   };
 }
 
+function writeWebFeature(feature: string, name: string, dependencies: string[] = []): void {
+  write(
+    `packages/features/${feature}/web/src/features/${name}/feature.json`,
+    JSON.stringify({ version: 0, dependencies }),
+  );
+}
+
 function lint(packages: ClassifiedPackage[]): ReturnType<typeof lintFrontendUiBoundaries> {
   return lintFrontendUiBoundaries(root, packages);
 }
@@ -432,5 +439,229 @@ describe("frontend UI architecture boundaries", () => {
 
     expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(8);
     expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toHaveLength(3);
+  });
+
+  it("accepts the two-scope private web hierarchy and recursive browser-safe screen closure", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+      "./surfaces/browser-port": "./src/surfaces/browser-port/index.ts",
+    });
+    writeCatalogue([
+      {
+        id: "agent-management",
+        screens: ["@langwatch/agent-web/screens/agent-management"],
+        surfaces: ["@langwatch/agent-web/surfaces/browser-port"],
+      },
+    ]);
+    writeWebFeature("agent", "management", ["tunnel"]);
+    writeWebFeature("agent", "tunnel");
+    write(
+      "packages/features/agent/web/src/features/tunnel/index.ts",
+      'export { TunnelBadge } from "./ui/elements/tunnel-badge";',
+    );
+    write(
+      "packages/features/agent/web/src/features/tunnel/ui/elements/tunnel-badge.tsx",
+      "export const TunnelBadge = true;",
+    );
+    write(
+      "packages/features/agent/web/src/features/management/ui/blocks/agent-card.tsx",
+      "export const AgentCard = true;",
+    );
+    write(
+      "packages/features/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      [
+        'import { AgentLabel } from "../../../../model/agent-label";',
+        'import { agentBehavior } from "../../../../behavior/agent-behavior";',
+        'import { PackageElement } from "../../../../ui/elements/package-element";',
+        'import { TunnelBadge } from "../../../tunnel";',
+        'import { AgentCard } from "../blocks/agent-card";',
+        "export const AgentManagement = [AgentLabel, agentBehavior, PackageElement, TunnelBadge, AgentCard];",
+      ].join("\n"),
+    );
+    write(
+      "packages/features/agent/web/src/model/agent-label.ts",
+      'export const AgentLabel = "Agent";',
+    );
+    write(
+      "packages/features/agent/web/src/behavior/agent-behavior.ts",
+      'import { AgentLabel } from "../model/agent-label"; export const agentBehavior = AgentLabel;',
+    );
+    write(
+      "packages/features/agent/web/src/ui/elements/package-element.tsx",
+      'import { AgentLabel } from "../../model/agent-label"; export const PackageElement = AgentLabel;',
+    );
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      'export { AgentManagement } from "../../features/management/ui/sections/agent-management";',
+    );
+    write(
+      "packages/features/agent/web/src/surfaces/browser-port/index.ts",
+      "export abstract class AgentBrowserPort {}",
+    );
+    write(
+      "apps/ui/src/features/agent-management/route.tsx",
+      'import "@langwatch/agent-web/screens/agent-management"; import "@langwatch/agent-web/surfaces/browser-port";',
+    );
+
+    expect(lint([agentWeb])).toEqual([]);
+  });
+
+  it("rejects flat root files, generic components, upward layers, and deep feature imports", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+    });
+    writeCatalogue([
+      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+    ]);
+    writeWebFeature("agent", "management", ["tunnel"]);
+    writeWebFeature("agent", "tunnel");
+    write("packages/features/agent/web/src/agent-card.tsx", "export const AgentCard = true;");
+    write("packages/features/agent/web/src/components/card.tsx", "export const Card = true;");
+    write(
+      "packages/features/agent/web/src/features/management/model/agent.ts",
+      'import "../ui/sections/agent-management";',
+    );
+    write(
+      "packages/features/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      'import "@/features/tunnel/ui/elements/tunnel-badge";',
+    );
+    write(
+      "packages/features/agent/web/src/features/tunnel/ui/elements/tunnel-badge.tsx",
+      "export const TunnelBadge = true;",
+    );
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      "export const AgentManagement = true;",
+    );
+
+    expect(policies([agentWeb])).toEqual(
+      expect.arrayContaining([
+        "ui-web-root-flat",
+        "ui-web-root-components",
+        "ui-web-layer-direction",
+        "ui-web-feature-deep-import",
+      ]),
+    );
+  });
+
+  it("requires declared acyclic feature dependencies through a feature entry point", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+    });
+    writeCatalogue([
+      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+    ]);
+    writeWebFeature("agent", "management");
+    writeWebFeature("agent", "tunnel", ["management"]);
+    write(
+      "packages/features/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      'import "../../../tunnel";',
+    );
+    write(
+      "packages/features/agent/web/src/features/tunnel/index.ts",
+      'export { Tunnel } from "./ui/elements/tunnel";',
+    );
+    write(
+      "packages/features/agent/web/src/features/tunnel/ui/elements/tunnel.tsx",
+      'import "../../../management"; export const Tunnel = true;',
+    );
+    write(
+      "packages/features/agent/web/src/features/management/index.ts",
+      'import "../tunnel"; import "../tunnel/ui/elements/tunnel"; export const Management = true;',
+    );
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      "export const AgentManagement = true;",
+    );
+
+    expect(policies([agentWeb])).toEqual(
+      expect.arrayContaining([
+        "ui-web-feature-dependency-declaration",
+        "ui-web-feature-cycle",
+        "ui-web-feature-entry-leakage",
+      ]),
+    );
+  });
+
+  it("keeps screens and surfaces from leaking into each other's private composition", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+      "./surfaces/browser-port": "./src/surfaces/browser-port/index.ts",
+    });
+    writeCatalogue([
+      {
+        id: "agent-management",
+        screens: ["@langwatch/agent-web/screens/agent-management"],
+        surfaces: ["@langwatch/agent-web/surfaces/browser-port"],
+      },
+    ]);
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      'import "../../surfaces/browser-port"; import "../other-screen"; export const AgentManagement = true;',
+    );
+    write(
+      "packages/features/agent/web/src/surfaces/browser-port/index.ts",
+      'import "../../features/management/ui/sections/agent-management"; export abstract class AgentBrowserPort {}',
+    );
+    writeWebFeature("agent", "management");
+    write(
+      "packages/features/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      'import "../../../../screens/other-screen"; export const AgentManagement = true;',
+    );
+    write(
+      "packages/features/agent/web/src/screens/other-screen/index.ts",
+      "export const Other = true;",
+    );
+
+    expect(policies([agentWeb])).toEqual(
+      expect.arrayContaining([
+        "ui-web-screen-leakage",
+        "ui-web-surface-leakage",
+        "ui-web-public-boundary-leakage",
+      ]),
+    );
+  });
+
+  it("reports only the actual members of a declared feature dependency cycle", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+    });
+    writeCatalogue([
+      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+    ]);
+    writeWebFeature("agent", "alpha", ["beta", "gamma"]);
+    writeWebFeature("agent", "beta", ["gamma"]);
+    writeWebFeature("agent", "gamma", ["beta"]);
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      "export const AgentManagement = true;",
+    );
+
+    const cycleViolations = lint([agentWeb]).filter(
+      (violation) => violation.policy === "ui-web-feature-cycle",
+    );
+    expect(cycleViolations).toHaveLength(1);
+    expect(cycleViolations[0]?.message).toContain('"beta", "gamma"');
+    expect(cycleViolations[0]?.message).not.toContain('"alpha"');
+  });
+
+  it("checks browser capability safety through screen-to-feature recursion", () => {
+    const agentWeb = webPackage("agent", {
+      "./screens/agent-management": "./src/screens/agent-management/index.ts",
+    });
+    writeCatalogue([
+      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+    ]);
+    writeWebFeature("agent", "management");
+    write(
+      "packages/features/agent/web/src/screens/agent-management/index.ts",
+      'export { AgentManagement } from "../../features/management/ui/sections/agent-management";',
+    );
+    write(
+      "packages/features/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "fetch('/api/agents'); export const AgentManagement = true;",
+    );
+
+    expect(policies([agentWeb])).toContain("ui-screen-closure");
   });
 });

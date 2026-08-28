@@ -57,6 +57,30 @@ Feature: Frontend feature boundary lint
     And it identifies the declared screens/<name> or surfaces/<name> entry point
 
   @unit @architecture
+  Scenario: Governed web packages keep private code in two scoped hierarchies
+    Given a governed feature-web package has package-global model, behavior, or UI code
+    And it has named private features under features/<feature> with feature.json declarations
+    When architecture lint checks production source
+    Then flat root files and generic components folders fail
+    And model, behavior, elements, blocks, and sections follow their directed responsibilities
+    And package-global code does not depend on a private feature
+
+  @unit @architecture
+  Scenario: Private web features compose only through declared narrow entries
+    Given a private feature section declares another private feature in feature.json
+    When it imports that feature's exact index entry
+    Then architecture lint accepts the dependency
+    And the target entry may curate that target feature's public model, behavior, or UI API
+    And a lower layer, deep private import, undeclared dependency, or cycle fails
+
+  @unit @architecture
+  Scenario: Public screen and surface boundaries do not leak inward
+    Given a governed screen reaches its own private feature sections and surfaces
+    When private code imports a screen or surface, a screen imports another screen, or a surface reaches private code
+    Then architecture lint rejects the leaking edge
+    And browser-safety remains checked through the full recursive closure
+
+  @unit @architecture
   Scenario: Browser dependency edges remain statically visible
     Given apps/ui or a governed screen or surface loads a module through a variable specifier
     When architecture lint checks the dependency closure

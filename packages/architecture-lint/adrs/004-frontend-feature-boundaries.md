@@ -65,6 +65,52 @@ packages/features/prompt/web/src/
 └── surfaces/variable-type/
 ```
 
+### Private web implementation layout
+
+Governed feature-web packages use two scopes for code that is not a public
+screen or surface:
+
+```text
+src/
+├── model/                         # genuinely package-wide portable values
+├── behavior/                      # package-wide browser behaviour over model/contracts
+├── ui/{elements,blocks,sections}/ # package-wide presentation, only when it is real
+├── features/<feature>/
+│   ├── feature.json               # { version: 0, dependencies: [...] }
+│   ├── index.ts                   # private feature's exact internal entry point
+│   ├── model/
+│   ├── behavior/
+│   └── ui/{elements,blocks,sections}/
+├── screens/
+└── surfaces/
+```
+
+The package-wide layers are optional and are reserved for actual package-wide
+collaborators; they never depend on `features/*`. A named private feature owns
+the browser presentation and interaction for one coherent sub-capability. It
+is not a catch-all `shared` domain. Production TypeScript is not flat at
+`src/`, and `src/components` is forbidden; only an explicit package entry,
+testing support, or configuration module is exempt from that root rule.
+
+The atomic labels describe responsibility and allowed dependencies, not size:
+`model` is independent; `behavior` uses model and portable contracts, not UI;
+an `element` uses model and the Design System; a `block` composes elements; and
+a `section` composes blocks, elements, and behavior. Each layer may use the
+same or lower permitted layer, never a composing one. A screen composes its
+package's feature sections and may compose its own narrow surfaces, but never
+another screen. A surface remains a narrow public boundary: it stays within its
+own directory except for a genuinely package-wide portable model, and never
+reaches a private feature, screen, state, transport, or another surface.
+
+Cross-private-feature dependencies are exceptional. A `ui/sections` module
+may import only `features/<other>/index.ts`, after listing that exact feature
+in its own `feature.json`; lower-level reuse is promoted to a genuine
+package-global model, behavior, or UI collaborator. A feature entry curates
+only its own feature and cannot re-export or compose a foreign feature. The
+declared and observed feature graph is acyclic. These rules keep internal
+reuse visible without turning a package root export or a generic folder into
+an escape hatch.
+
 `screens/<name>` is an exact owner-only package export and may be imported only
 by the frontend feature that declares it in the central catalogue. It may
 expose private composition pieces while a screen is being migrated, but that
@@ -79,8 +125,9 @@ contribution. A consumer must declare that exact surface in the central
 catalogue. A surface accepts portable values and named controlled actions; it
 does not fetch, navigate, read session state, import an app API client, or
 import another feature web package. Its complete production dependency closure
-may reach only that surface directory, portable feature contracts, the Design
-System and browser-safe third-party dependencies. It may not reach `screens`,
+may reach only that surface directory, an explicitly package-wide portable
+model, portable feature contracts, the Design System and browser-safe
+third-party dependencies. It may not reach `screens`,
 `internal`, sibling source folders, stores, transport, queries or routes. This
 makes a Prompt reference usable in Trace Explorer without making Prompt Studio
 or Prompt persistence-shaped UI usable.
@@ -184,11 +231,12 @@ that escaped the surface directory.
 
 ### Contracts and validation
 
-The Prompt pilot validates central-catalogue roots, governed packages, names,
+The Prompt and Agent pilots validate central-catalogue roots, governed packages, names,
 declared screen/surface edges, feature-web export roles, source directions and
 the transitive import closure of every screen and surface. Its fixtures prove
 allowed owner screens and surfaces as well as forbidden cross-feature,
-package-root, deep-source, browser-capability, platform and server edges. The
+package-root, deep-source, private feature layout, upward layer, undeclared or
+cyclic private-feature, browser-capability, platform and server edges. The
 later hub/overlay rules gain fixtures before enforcement. Existing legacy
 findings are tracked only by the checked-in shrinking baseline; no baseline can
 admit new `apps/ui` source.
