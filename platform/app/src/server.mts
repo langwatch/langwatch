@@ -10,7 +10,7 @@ void (async () => {
   loadEnvironment();
 
   const { initializeEnvironmentConfig } = await import("./env.mjs");
-  const environment = initializeEnvironmentConfig(process.env);
+  initializeEnvironmentConfig(process.env);
 
   const { resolveProcessBootstrapConfig } = await import("./runtime/executable-bootstrap.config");
   const bootstrap = resolveProcessBootstrapConfig(process.env);
@@ -65,8 +65,8 @@ void (async () => {
         resources,
       });
       const { startApp } = await import("./start");
-      const { PublicAppConfigService } = await import("./runtime/public-config.server");
-      const publicConfig = new PublicAppConfigService().resolve(environment);
+      const { resolveUiPublicBootstrap } = await import("@langwatch/ui/public-config");
+      const publicConfig = resolveUiPublicBootstrap(process.env).publicConfig;
       return {
         // startApp owns the single AppRuntime.start call and binds HTTP only
         // after the graph has initialized and passed its readiness checks.

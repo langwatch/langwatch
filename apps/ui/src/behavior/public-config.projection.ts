@@ -62,6 +62,23 @@ export const publicAppConfigProjectionDefinition = RuntimeConfig.define({
 type PublicAppConfigValues = ConfigValue<typeof publicAppConfigProjectionDefinition>;
 
 /**
+ * The physical UI process has exactly one role. Keeping this gate beside the
+ * public projection prevents a worker/API deployment from accidentally using
+ * the browser bootstrap configuration.
+ */
+const uiPublicBootstrapDefinition = RuntimeConfig.define({
+  processRole: Config.value(z.literal("ui").default("ui"), { env: "UI_PROCESS_ROLE" }),
+  public: publicAppConfigProjectionDefinition,
+});
+
+type UiPublicBootstrapValues = ConfigValue<typeof uiPublicBootstrapDefinition>;
+
+export type UiPublicBootstrap = Readonly<{
+  processRole: UiPublicBootstrapValues["processRole"];
+  publicConfig: PublicAppConfig;
+}>;
+
+/**
  * The source belongs to a server-side composition root. It accepts values that
  * a prior boot boundary may already have normalized as well as raw strings.
  */
@@ -69,6 +86,7 @@ export type PublicAppConfigSource = Readonly<{
   BASE_HOST?: string;
   DEMO_PROJECT_SLUG?: string;
   NODE_ENV: "development" | "test" | "production";
+  UI_PROCESS_ROLE?: string;
   EMAIL_PROVIDER?: string;
   USE_AWS_SES?: string | boolean;
   AWS_REGION?: string;
@@ -124,6 +142,27 @@ export function resolvePublicAppConfig(
     source: { ...source },
   }).value;
 
+  return projectPublicAppConfig(config);
+}
+
+/**
+ * Parses the complete UI bootstrap exactly once at the physical process
+ * boundary. Callers receive only the UI role and browser-safe projection.
+ */
+export function resolveUiPublicBootstrap(source: PublicAppConfigSource): UiPublicBootstrap {
+  const config = RuntimeConfig.create({
+    name: "ui public bootstrap",
+    definition: uiPublicBootstrapDefinition,
+    source: { ...source },
+  }).value;
+
+  return {
+    processRole: config.processRole,
+    publicConfig: projectPublicAppConfig(config.public),
+  };
+}
+
+function projectPublicAppConfig(config: PublicAppConfigValues): PublicAppConfig {
   return publicAppConfigSchema.parse({
     appBaseUrl: config.appBaseUrl,
     gatewayBaseUrl: resolveGatewayBaseUrl(config),
@@ -160,11 +199,4 @@ function hasConfiguredEmailDelivery(config: PublicAppConfigValues): boolean {
   }
 
   return available.ses || available.sendgrid;
-}
-
-/** Compatibility shape for legacy executable composition while it migrates imports. */
-export class PublicAppConfigService {
-  resolve(source: PublicAppConfigSource): PublicAppConfig {
-    return resolvePublicAppConfig(source);
-  }
 }

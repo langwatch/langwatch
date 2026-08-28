@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  LOCAL_GATEWAY_URL,
   resolveGatewayBaseUrl,
   resolvePublicAppConfig,
+  SAAS_GATEWAY_URL,
 } from "../src/behavior/public-config.projection";
 
 describe("public application configuration projection", () => {
@@ -37,5 +39,27 @@ describe("public application configuration projection", () => {
         IS_SAAS: true,
       }),
     ).toBe("https://public.example.test");
+  });
+
+  it("falls back to the legacy gateway url when no public url is configured", () => {
+    expect(
+      resolveGatewayBaseUrl({
+        LW_GATEWAY_BASE_URL: "https://legacy.example.test",
+        IS_SAAS: true,
+      }),
+    ).toBe("https://legacy.example.test");
+  });
+
+  it("resolves the canonical .ai gateway host for SaaS", () => {
+    const resolved = resolveGatewayBaseUrl({ IS_SAAS: true });
+
+    expect(resolved).toBe("https://gateway.langwatch.ai");
+    // The SaaS gateway is a .ai host. A .com here is a real outage, not a typo.
+    expect(resolved).not.toContain(".com");
+    expect(SAAS_GATEWAY_URL).toBe("https://gateway.langwatch.ai");
+  });
+
+  it("resolves the local Go gateway port for self-hosted deployments", () => {
+    expect(resolveGatewayBaseUrl({ IS_SAAS: false })).toBe(LOCAL_GATEWAY_URL);
   });
 });

@@ -34,7 +34,7 @@ import {
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementService } from "@langwatch/entitlement-server";
-import { resolveGatewayBaseUrl } from "~/runtime/public-config.server";
+import { resolveGatewayBaseUrl } from "@langwatch/ui/public-config";
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
