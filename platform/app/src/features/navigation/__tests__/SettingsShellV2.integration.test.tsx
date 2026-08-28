@@ -280,6 +280,7 @@ beforeEach(() => {
   pushMock.mockClear();
   localStorage.clear();
   sessionStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 

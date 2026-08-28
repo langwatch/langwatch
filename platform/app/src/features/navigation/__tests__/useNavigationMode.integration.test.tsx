@@ -32,11 +32,14 @@ describe("useNavigationMode", () => {
 
   describe("when the device stored a mode", () => {
     /** @scenario The stored mode decides the shell */
-    it("resolves to the stored mode", () => {
-      useNavigationModeStore.setState({ storedMode: "icon-rail" });
+    it("resolves to the stored mode after mount", async () => {
+      localStorage.setItem(STORAGE_KEY, "icon-rail");
 
-      const { result } = renderHook(() => useNavigationMode());
+      const { result, rerender } = renderHook(() => useNavigationMode());
 
+      await act(async () => {
+        rerender();
+      });
       expect(result.current).toBe("icon-rail");
     });
   });
