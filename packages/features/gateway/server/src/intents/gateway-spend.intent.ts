@@ -21,13 +21,13 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   SETTLE_SPEND_COMMAND_TYPE,
-} from "./gateway-spend-constants.adapter";
+} from "../adapters/gateway-spend-constants.adapter";
 import type {
   GatewaySpendAdmittedEvent,
   GatewaySpendConfirmedEvent,
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
-} from "./gateway-spend-events.adapter";
+} from "../adapters/gateway-spend-events.adapter";
 
 /**
  * The four spend commands are pure appends: validate, stamp identity, emit

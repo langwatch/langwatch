@@ -95,11 +95,14 @@ import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "~/runtime/app/features/webhooks";
-import { applicableEndUserCaps, FixedGatewaySettlementPolicy } from "@langwatch/gateway-server";
+import {
+  applicableEndUserCaps,
+  FixedGatewaySettlementPolicy,
+  settlementGraceMs,
+} from "@langwatch/gateway-server";
 import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
 import { appRestSecurity } from "~/server/api/security";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
-import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
 
 /**
@@ -115,7 +118,9 @@ function gatewaySpendRestPorts(): GatewaySpendRestPorts {
     webhookEndpoints: current.gateway.webhookEndpoints,
     webhookEvents: current.gateway.webhookEvents,
     webhookDelivery: current.gateway.webhookDelivery,
-    settlementPolicy: FixedGatewaySettlementPolicy.create(settlementGraceMs()),
+    settlementPolicy: FixedGatewaySettlementPolicy.create(
+      settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
+    ),
     resolveSpendScope,
     endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>
       applicableEndUserCaps({

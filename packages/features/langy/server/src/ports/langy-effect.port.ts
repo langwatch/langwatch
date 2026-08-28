@@ -25,3 +25,14 @@ export interface LangyEffectPorts {
   workerDispatch: LangyWorkerDispatchPort;
   titleGeneration: LangyTitleGenerationPort;
 }
+
+/**
+ * Generates a conversation title from the transcript so far, or null when the
+ * transcript is empty or the model call failed. Declared here because the
+ * effect ports are its only consumer: the process asks for a title, and where
+ * the model comes from is the composition root's business.
+ */
+export type LangyTitleGenerator = (input: {
+  projectId: string;
+  conversationId: string;
+}) => Promise<{ title: string; model: string } | null>;

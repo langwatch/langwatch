@@ -1,4 +1,5 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
+import type { LangyTitleGenerator } from "@langwatch/langy-server";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
@@ -21,11 +22,6 @@ const titleSystemPrompt = [
   "surrounding quotes; no trailing punctuation; Title Case; no prefix like",
   '"Title:". Output ONLY the title, nothing else.',
 ].join(" ");
-
-export type LangyTitleGenerator = (input: {
-  projectId: string;
-  conversationId: string;
-}) => Promise<{ title: string; model: string } | null>;
 
 function sanitizeTitle(raw: string): string {
   let title = raw.trim();

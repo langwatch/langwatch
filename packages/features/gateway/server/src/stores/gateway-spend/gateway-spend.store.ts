@@ -1,6 +1,6 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port";
-import type { GatewaySpendState } from "../projections/gateway-spend.projection";
+import type { GatewaySpendEventsPort } from "../../ports/gateway-spend-events.port";
+import type { GatewaySpendState } from "../../projections/gateway-spend.projection";
 
 /**
  * FoldProjectionStore adapter for the gateway spend fold.
@@ -21,7 +21,11 @@ import type { GatewaySpendState } from "../projections/gateway-spend.projection"
  * rather than duplicates.
  */
 export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState> {
-  constructor(private readonly repo: GatewaySpendEventsPort) {}
+  static create(repo: GatewaySpendEventsPort): GatewaySpendStore {
+    return new GatewaySpendStore(repo);
+  }
+
+  private constructor(private readonly repo: GatewaySpendEventsPort) {}
 
   async get(
     aggregateId: string,

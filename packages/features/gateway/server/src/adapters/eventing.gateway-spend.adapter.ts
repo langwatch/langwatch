@@ -6,12 +6,14 @@ import {
   type ProcessManagerApplier,
 } from "@langwatch/eventing";
 import type { SettleSpendCommandData } from "../processes/gateway-spend-commands.process";
+import type { SpendSettlementProcessDeps } from "../intents/gateway-spend-settlement.intent";
 import {
   SPEND_SETTLEMENT_PROCESS_NAME,
-  type SpendSettlementProcessDeps,
   spendSettlementPM,
 } from "../processes/gateway-spend-settlement.process";
 import type { GatewaySpendState } from "../projections/gateway-spend.projection";
+import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port";
+import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
@@ -22,7 +24,7 @@ import {
   ConfirmSpendCommand,
   FailSpendCommand,
   SettleSpendCommand,
-} from "./eventing.gateway-spend-commands.adapter";
+} from "../intents/gateway-spend.intent";
 import type { GatewaySpendProcessingEvent } from "./gateway-spend-events.adapter";
 import { createGatewaySpendFoldProjection } from "./gateway-spend-fold.adapter";
 
@@ -42,7 +44,16 @@ export interface GatewaySpendProcessManagerMount {
 }
 
 export interface EventingGatewaySpendAdapterOptions {
-  gatewaySpendStore: FoldProjectionStore<GatewaySpendState>;
+  /** The spend ledger the fold reads and writes. The `FoldProjectionStore`
+   *  built over it stays private to this feature, which is what
+   *  `private-runtime-export` requires of a feature server root. */
+  spendEvents: GatewaySpendEventsPort;
+  /** Wraps this feature's own fold store before it is mounted, so the
+   *  composition root can put its Redis read-through cache in front of a
+   *  store it is never handed. Identity when absent. */
+  cacheStore?: (
+    inner: FoldProjectionStore<GatewaySpendState>,
+  ) => FoldProjectionStore<GatewaySpendState>;
   /** The ADR-073 delivery process manager; absent when webhooks are off
    *  (the pipeline still projects, delivery just has no consumer). */
   webhookDelivery?: GatewaySpendProcessManagerMount;
@@ -96,6 +107,11 @@ export class EventingGatewaySpendAdapter {
 
   private constructor(private readonly options: EventingGatewaySpendAdapterOptions) {}
 
+  private foldStore(): FoldProjectionStore<GatewaySpendState> {
+    const inner = GatewaySpendStore.create(this.options.spendEvents);
+    return this.options.cacheStore ? this.options.cacheStore(inner) : inner;
+  }
+
   buildProcessing() {
     let pipeline = definePipeline<GatewaySpendProcessingEvent>({
       name: GATEWAY_SPEND_PIPELINE_NAME,
@@ -105,7 +121,7 @@ export class EventingGatewaySpendAdapter {
       }),
     })
       .withClickHouseFoldProjection(
-        createGatewaySpendFoldProjection(this.options.gatewaySpendStore),
+        createGatewaySpendFoldProjection(this.foldStore()),
       )
       .withCommand("admitSpend", AdmitSpendCommand)
       .withCommand("confirmSpend", ConfirmSpendCommand)

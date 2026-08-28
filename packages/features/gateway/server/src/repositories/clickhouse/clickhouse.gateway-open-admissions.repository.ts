@@ -5,8 +5,8 @@ import {
   type OpenAdmissionQuery,
 } from "../../ports/gateway-open-admissions.port";
 // The cap belongs to the sweep that reports on it, not to the query it
-// bounds. One-way edge: the process imports nothing from here.
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../processes/gateway-spend-settlement.process";
+// bounds. One-way edge: the intent imports nothing from here.
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../intents/gateway-spend-settlement.intent";
 
 const TABLE_NAME = "gateway_spend" as const;
 
@@ -29,7 +29,13 @@ const TABLE_NAME = "gateway_spend" as const;
  * documents.
  */
 export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissionsPort {
-  constructor(private readonly client: GatewayClickHouseClient) {
+  static create(
+    client: GatewayClickHouseClient,
+  ): ClickHouseGatewayOpenAdmissionsRepository {
+    return new ClickHouseGatewayOpenAdmissionsRepository(client);
+  }
+
+  private constructor(private readonly client: GatewayClickHouseClient) {
     super();
   }
 

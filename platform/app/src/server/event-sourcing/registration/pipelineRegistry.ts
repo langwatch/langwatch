@@ -9,6 +9,7 @@ import {
 } from "@langwatch/enterprise-api";
 import {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  GATEWAY_DEBITS_PROCESS_NAME,
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
   createGovernanceEventsPipeline,
   type GovernanceBudgetCrossingData,
@@ -25,7 +26,11 @@ import {
   GovernanceSubscriberRuntime,
   type TraceAlertTriggerMatchInput,
 } from "@langwatch/enterprise-api/governance/governance-subscriber.adapter";
-import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
+import {
+  WEBHOOK_DELIVERY_PROCESS_NAME,
+  type WebhookDeliveryProcessDeps,
+  webhookDeliveryPM,
+} from "~/runtime/app/features/webhooks";
 import { AppGovernanceWebhookAdapter } from "@langwatch/enterprise-api/governance/governance-webhook.adapter";
 import type {
   AppendStore,
@@ -102,16 +107,11 @@ import {
 } from "@langwatch/coding-agent-server";
 import type { EvaluationCostRecorderPort } from "@langwatch/evaluation-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { LangyTitleGenerator } from "~/runtime/app/features/langy-title-generation.adapter";
+import type { LangyTitleGenerator } from "@langwatch/langy-server";
 import type { LangySessionKeyService, LangyWorkerPort } from "@langwatch/langy-server";
 import type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import type { LangyTurnHandoffStore } from "@langwatch/langy-server";
-import {
-  createAgentTurnLivenessSubscriber,
-  createLangyConversationUpdateBroadcastSubscriber,
-  createLangyTurnAdmissionLifecycleSubscriber,
-} from "@langwatch/langy-server";
 import type { LogRuntimeAdapter } from "@langwatch/log-server";
 import type { MetricRuntimeAdapter } from "@langwatch/metric-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -165,18 +165,17 @@ import {
   type ExperimentRunStateData,
   type ExperimentRunStateRepository,
 } from "@langwatch/experiment-server";
-import { createGatewaySpendProcessingPipeline } from "../pipelines/gateway-spend-processing/pipeline";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
-import type { GatewaySpendState } from "@langwatch/gateway-server";
-import { GatewaySpendStore } from "../pipelines/gateway-spend-processing/projections/gatewaySpend.store";
-import type { OpenAdmission } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
-import { getOpenAdmissionFindersByInstance } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "@langwatch/gateway-server";
+import {
+  ClickHouseGatewayOpenAdmissionsAdapter,
+  EventingGatewaySpendAdapter,
+  settlementGraceMs,
+} from "@langwatch/gateway-server";
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
-import { createLangyConversationProcessingPipeline } from "@langwatch/langy-server";
-import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
+import {
+  EventingLangyConversationAdapter,
+  EventingLangyMaintenanceAdapter,
+} from "@langwatch/langy-server";
 import type { LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-server";
-import { createLangyMaintenancePipeline } from "../pipelines/langy-maintenance/pipeline";
 import { type EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
@@ -601,13 +600,13 @@ export class PipelineRegistry {
     // was routed for cron, but the chart ships no CronJobs — so until now the
     // backstop for keys orphaned by a SIGKILLed manager had no caller at all.
     this.deps.eventSourcing.register(
-      createLangyMaintenancePipeline({
+      EventingLangyMaintenanceAdapter.create({
         sessionKeyReap: {
           reap: () => this.deps.langy.sessionKeys.reapExpired(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
-      }),
+      }).buildProcessing(),
     );
 
     // Pull-request linkage maintenance, on the same footing. It used to be a
@@ -760,108 +759,25 @@ export class PipelineRegistry {
 
   /** Langy writes its low-latency operational projections directly to Postgres. */
   private registerLangyConversationPipeline() {
-    const conversationStore = this.deps.repositories.langyConversationState;
-    const failTurn = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        error: string;
-      }) => Promise<void>
-    >("langyFailTurn");
-    const saveTitle = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        title: string;
-        model: string;
-      }) => Promise<void>
-    >("langyGenerateTitle");
-
-    const effectPorts = createLangyEffectPorts({
-      handoffStore: this.deps.langy.handoffStore,
-      worker: this.deps.langy.worker,
-      mintSessionKey: ({ userId, projectId, organizationId }) =>
-        this.deps.langy.sessionKeys.mintForUser({ userId, projectId, organizationId }),
-      revokeSessionKey: ({ apiKeyId, projectId }) =>
-        this.deps.langy.sessionKeys.revoke({ apiKeyId, projectId }),
-      titleGenerator: this.deps.langy.titleGenerator,
-      saveTitle: (args) => saveTitle.fn(args),
-      failTurn: { failTurn: (args) => failTurn.fn(args) },
-      markError: (args) => this.deps.langy.buffer.markError(args),
-    });
-    const conversationReader = {
-      read: async ({
-        projectId,
-        conversationId,
-      }: {
-        projectId: string;
-        conversationId: string;
-      }) => {
-        const projection = await conversationStore.tryLoad(conversationId, {
-          tenantId: createTenantId(projectId),
-          aggregateId: conversationId,
-        });
-        if (!projection) return null;
-        return {
-          cursor: projection.cursor,
-          status: projection.state.Status,
-          currentTurnId: projection.state.CurrentTurnId,
-          lastActivityAtMs: projection.state.LastActivityAt,
-          ownerUserId: projection.state.UserId,
-          isShared: projection.state.IsShared,
-        };
-      },
-    };
-
-    const livenessSubscriber = createAgentTurnLivenessSubscriber({
-      buffer: this.deps.langy.buffer,
-      conversations: conversationReader,
-      failTurn: { failTurn: (args) => failTurn.fn(args) },
-      worker: this.deps.langy.worker,
-      handoffStore: this.deps.langy.handoffStore,
-    });
-    const broadcastSubscriber = createLangyConversationUpdateBroadcastSubscriber({
+    const langy = EventingLangyConversationAdapter.create({
+      langyConversationProjectionStore: this.deps.repositories.langyConversationState,
+      langyConversationTurnProjectionStore: this.deps.repositories.langyConversationTurnState,
+      langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
+      langyAnalyticsEventProjectionStore: this.deps.repositories.langyAnalyticsEventStorage,
       broadcast: this.deps.broadcast,
-      conversations: conversationReader,
-    });
-    const admissionLifecycleSubscriber = createLangyTurnAdmissionLifecycleSubscriber({
       admissions: this.deps.repositories.langyTurnAdmission,
+      buffer: this.deps.langy.buffer,
+      handoffStore: this.deps.langy.handoffStore,
+      worker: this.deps.langy.worker,
+      titleGenerator: this.deps.langy.titleGenerator,
+      sessionKeys: this.deps.langy.sessionKeys,
     });
-
-    const pipeline = this.deps.eventSourcing.register(
-      createLangyConversationProcessingPipeline({
-        langyConversationProjectionStore: conversationStore,
-        langyConversationTurnProjectionStore: this.deps.repositories.langyConversationTurnState,
-        langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
-        langyAnalyticsEventProjectionStore: this.deps.repositories.langyAnalyticsEventStorage,
-        langyProcessPorts: effectPorts,
-        subscribers: [livenessSubscriber, broadcastSubscriber, admissionLifecycleSubscriber],
-      }),
-    );
-
+    const pipeline = this.deps.eventSourcing.register(langy.buildProcessing());
     const commands = mapCommands(pipeline.commands);
-    failTurn.resolve((args) =>
-      commands.failAgentResponse({
-        tenantId: args.projectId,
-        occurredAt: Date.now(),
-        conversationId: args.conversationId,
-        turnId: args.turnId,
-        error: args.error,
-      }),
-    );
-    saveTitle.resolve((args) =>
-      commands.generateConversationTitle({
-        tenantId: args.projectId,
-        occurredAt: Date.now(),
-        conversationId: args.conversationId,
-        turnId: args.turnId,
-        title: args.title,
-        source: "auto",
-        model: args.model,
-      }),
-    );
+    langy.connectCommands({
+      failAgentResponse: commands.failAgentResponse,
+      generateConversationTitle: commands.generateConversationTitle,
+    });
     // The outbox worker, dispatcher and process service are owned by
     // ProcessRuntime now that the process is declared on the pipeline; the
     // registry no longer constructs or starts them.
@@ -908,75 +824,47 @@ export class PipelineRegistry {
     deps: { port: GatewaySpendEventsPort },
     governanceDelivery: GovernanceSignalDeliveryPort,
   ) {
-    return this.deps.eventSourcing.register(
-      createGatewaySpendProcessingPipeline({
-        gatewaySpendStore: this.cached<GatewaySpendState>(
-          new GatewaySpendStore(deps.port),
-          "gateway_spend",
-        ),
-        // The ADR-073 delivery process manager consumes this pipeline's
-        // committed events through its transactional inbox.
-        webhookDelivery: this.deps.webhookDelivery,
-        gatewayDebits: this.createGatewayDebits(governanceDelivery),
-        settlement: {
-          // Lazy: the pipeline is being built by this very call, so the
-          // sweeper resolves the command sender at execution time.
-          sendSettleSpend: async (data) => {
-            const pipeline = this.deps.eventSourcing.getPipeline(
-              GATEWAY_SPEND_PIPELINE_NAME as never,
-            ) as unknown as {
-              commands: {
-                settleSpend: { send: (d: unknown) => Promise<unknown> };
-              };
-            };
-            await pipeline.commands.settleSpend.send(data);
-          },
-          // Every configured instance, shared and private alike: one sweeper
-          // settles the whole install, so it cannot hold a single client.
-          //
-          // Settled per instance, never all-or-nothing. `Promise.all` is
-          // fail-fast, so one unreachable private ClickHouse would reject the
-          // whole read, fail the sweep intent, burn its attempts and keep
-          // failing every wake while that instance was down — taking the
-          // SHARED instance's open admissions with it. That contradicts the
-          // rule the sweep already states for a single tenant's failure, so
-          // it applies at the instance level too: the reachable instances
-          // settle, the unreachable one is reported and retried next sweep.
-          findOpenAdmissions: async (params) => {
-            const finders = await getOpenAdmissionFindersByInstance();
-            const results = await Promise.allSettled(
-              finders.map(({ finder }) => finder.findOpenAdmissions(params)),
-            );
-            const open: OpenAdmission[] = [];
-            results.forEach((result, index) => {
-              if (result.status === "fulfilled") {
-                open.push(...result.value);
-                return;
-              }
-              logger.warn(
-                {
-                  target: finders[index]?.target,
-                  error: result.reason,
-                },
-                "settlement sweep could not read one ClickHouse instance; its open admissions wait for the next sweep",
-              );
-            });
-            // The cap bounds ONE SWEEP, and each instance applies it to its own
-            // query — so N instances would hand the sweeper N times the cap.
-            // Re-applying it here is what makes the documented bound true of
-            // the number the sweeper actually settles.
-            //
-            // Oldest first, across instances, so the cap sheds the newest rows
-            // rather than whichever instance happened to answer last. Each
-            // query already returns its own rows oldest-first; this is what
-            // extends that ordering to the merge, and it keeps the sweep
-            // draining a backlog from the end that has waited longest.
-            open.sort((a, b) => a.admittedAtMs - b.admittedAtMs);
-            return open.slice(0, MAX_OPEN_ADMISSIONS_PER_SWEEP);
-          },
-        },
-      }),
+    const gatewayDebits = this.createGatewayDebits(governanceDelivery);
+    const openAdmissions = ClickHouseGatewayOpenAdmissionsAdapter.create(() =>
+      getApp().clickhouse.allInstances(),
     );
+    const spend = EventingGatewaySpendAdapter.create({
+      spendEvents: deps.port,
+      cacheStore: (inner) => this.cached(inner, "gateway_spend"),
+      // The ADR-073 delivery process manager consumes this pipeline's
+      // committed events through its transactional inbox. Both process
+      // managers are owned by packages the gateway must not depend on, so
+      // each arrives here with the name its durable rows are keyed by.
+      ...(this.deps.webhookDelivery
+        ? {
+            webhookDelivery: {
+              name: WEBHOOK_DELIVERY_PROCESS_NAME,
+              applier: webhookDeliveryPM(this.deps.webhookDelivery),
+            },
+          }
+        : {}),
+      ...(gatewayDebits
+        ? {
+            gatewayDebits: {
+              name: GATEWAY_DEBITS_PROCESS_NAME,
+              applier: gatewayDebits.processManager(),
+            },
+          }
+        : {}),
+      settlement: {
+        graceMs: settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
+        findOpenAdmissions: (params) => openAdmissions.findOpenAdmissions(params),
+      },
+    });
+    const pipeline = this.deps.eventSourcing.register(spend.buildProcessing());
+    // The sweeper's `settleSpend` sender is produced by the very registration
+    // that mounts it, so the loop closes here rather than through a by-name
+    // pipeline lookup at settlement time: a mis-registered graph now fails at
+    // boot instead of tenant by tenant during a sweep.
+    spend.connectSettlement(async (data) => {
+      await pipeline.commands.settleSpend.send(data);
+    });
+    return pipeline;
   }
 
   private createGatewayDebits(governanceDelivery: GovernanceSignalDeliveryPort) {

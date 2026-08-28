@@ -25,12 +25,11 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../process-manager/spendSettlement.process";
-import type { GatewaySpendState } from "@langwatch/gateway-server";
 import {
-  ClickHouseOpenAdmissionFinder,
-  type OpenAdmission,
-} from "../openAdmissions.clickhouse.repository";
+  ClickHouseGatewayOpenAdmissionsRepository,
+  MAX_OPEN_ADMISSIONS_PER_SWEEP,
+} from "@langwatch/gateway-server";
+import type { GatewaySpendState, OpenAdmission } from "@langwatch/gateway-server";
 
 const run = nanoid(8);
 const tenantId = `open-admissions-${run}`;
@@ -50,7 +49,7 @@ const SWEEP = { now: BASE + 2 * HOUR, graceMs: HOUR, lookbackMs: 3 * HOUR };
 
 let client: ClickHouseClient;
 let repo: GatewaySpendEventsRepository;
-let finder: ClickHouseOpenAdmissionFinder;
+let finder: ClickHouseGatewayOpenAdmissionsRepository;
 
 function foldState({
   status,
@@ -113,7 +112,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   client = containers.clickHouseClient;
   repo = new GatewaySpendEventsRepository(async () => client);
-  finder = new ClickHouseOpenAdmissionFinder(client);
+  finder = ClickHouseGatewayOpenAdmissionsRepository.create(client);
   // The superseded versions are the whole point of the dedup scenarios, and a
   // background merge collapses them on its own schedule — which would leave
   // those tests passing for a reason the query had no part in. The writer's

@@ -1,10 +1,12 @@
 import type { LegacyAgentsRestApi } from "@langwatch/agent-server/legacy-rest";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AutomationService } from "@langwatch/automation-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
+import type { ScimService } from "@langwatch/enterprise-scim-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -14,6 +16,7 @@ import type {
   OrganizationService,
 } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { RoleService } from "@langwatch/role-contract";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
@@ -38,7 +41,9 @@ import {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
 } from "../features/agent/agent-legacy-rest";
+import { createApiKeysRestApp } from "../features/api-key/api-keys-rest";
 import { createTriggerRestApp } from "../features/automation/trigger-rest";
+import { createRoleBindingsRestApp } from "../features/authz/role-bindings-rest";
 import {
   type CodingAgentRestServices,
   createCodingAgentRestApp,
@@ -52,6 +57,7 @@ import {
   createDatasetRestApp,
   type DatasetDirectUploadAuthorizer,
 } from "../features/dataset/dataset-rest";
+import { createScimTokensRestApp } from "../features/enterprise-scim/scim-tokens-rest";
 import { createEvaluatorsRestApp } from "../features/evaluator/evaluator-rest";
 import { createExperimentsRestApp } from "../features/experiment/experiment-rest";
 import { createGovernanceRestApp } from "../features/governance/governance-rest";
@@ -65,7 +71,18 @@ import { createEventsRestApp, type TrackedEventPorts } from "../features/trace/e
 import { createModelDefaultsRestApp } from "../features/model-defaults/model-defaults-rest";
 import { createModelProvidersRestApp } from "../features/model-provider/model-provider-rest";
 import { createGroupRestApp } from "../features/organization/group-rest";
+import {
+  createOrganizationsRestApp,
+  type OrganizationProvisioningPort,
+} from "../features/organization/organizations-rest";
+import { createTeamsRestApp } from "../features/organization/teams-rest";
 import { createProjectRestApp } from "../features/project/project-rest";
+import { createRolesRestApp } from "../features/role/roles-rest";
+import { createMeRestApp, type MeRestTeamOrganizationLookup } from "../features/user/me-rest";
+import {
+  createUserAvatarRestApp,
+  type UserAvatarObjectReader,
+} from "../features/user/user-avatar-rest";
 import {
   createWorkflowsRestApp,
   type WorkflowEvaluationTrigger,
@@ -89,7 +106,9 @@ import { createSuiteRestApp } from "../features/suite/suite-rest";
 import { createWebhookRestApp, type WebhookRestServices } from "../features/webhook/webhook-rest";
 import type { ApiErrorBody } from "./app-rest.schemas";
 import type { AppRestBroadcast } from "./app-rest.broadcast";
+import type { AppRestManagementAuditPort } from "./app-rest.management-audit";
 import type { PlatformUrlBuilder } from "./app-rest.platform-url";
+import type { AppRestRbacVocabulary } from "./app-rest.rbac-vocabulary";
 import type { AppRestSecurity } from "./app-rest.security";
 
 /**
@@ -105,6 +124,8 @@ export interface AppRestFeatureServices {
   /** The deprecated `/api/agents` family's read/write capability. */
   agents: () => LegacyAgentsRestApi;
   apiKeys: () => ApiKeyService;
+  /** Writing role bindings: the grants ledger `/api/role-bindings` appends to. */
+  authzGrants: () => AuthzGrantsService;
   automation: () => AutomationService;
   /** Fan-out to every browser watching one tenant. */
   broadcast: () => AppRestBroadcast;
@@ -125,15 +146,36 @@ export interface AppRestFeatureServices {
   codingAgents: () => CodingAgentRestServices;
   modelProviders: () => ModelProviderService;
   monitors: () => MonitorService;
-  organizations: () => OrganizationService;
+  /**
+   * The organization capability, WIDER than the published contract.
+   *
+   * Two families reach past it. `/api/me` resolves the organization behind a
+   * personal workspace from its team, and `/api/organizations` provisions an
+   * organization before any credential for it exists — neither is on
+   * `OrganizationService` today, so each family names what it calls and the
+   * intersection is what a process has to supply. Both belong on the contract;
+   * moving them there is a change to the organization package, not to this
+   * enumeration.
+   */
+  organizations: () => OrganizationService &
+    MeRestTeamOrganizationLookup &
+    OrganizationProvisioningPort;
+  /** Reading effective permissions and the bindings that confer them. */
+  permissions: () => AuthzService;
   projects: () => ProjectService;
+  /** Custom roles, the Enterprise-gated half of RBAC. */
+  roles: () => RoleService;
   scenarios: () => ScenarioService;
   scenarioTabs: () => ScenarioTabRegistry;
+  /** The SCIM provisioning tokens an identity provider authenticates with. */
+  scim: () => ScimService;
   secrets: () => SecretService;
   simulations: () => SimulationService;
   storedObjectOwners: () => StoredObjectOwnerResolver;
   storedObjects: () => StoredObjectService;
   suites: () => SuiteService;
+  /** The avatar bytes `/api/user-avatar` serves, by project and object id. */
+  userAvatarObjects: () => UserAvatarObjectReader;
   /** The webhook platform: endpoints, health, the emitted-events log, the
    *  entitlement gate, the test-fire hop and the idempotency ledger. */
   webhooks: () => WebhookRestServices;
@@ -204,10 +246,54 @@ export interface AppRestFeaturePorts {
    * Resolving it reads the application's team graph.
    */
   organizationMiddleware: MiddlewareHandler;
-  /** Refuses every `/api/groups` route unless the organization is Enterprise. */
-  groupsEnterpriseGate: MiddlewareHandler;
+  /**
+   * Refuses a route unless the resolved organization's plan is Enterprise,
+   * naming which capability was asked for.
+   *
+   * One port for every gated family rather than one per family: the four that
+   * gate today — groups, custom roles, the management API and SCIM — differ
+   * only in the capability they name, and a per-family port would make the
+   * fifth a change to this interface instead of a change to one call. The
+   * process binds it once, to the organization its authentication resolved and
+   * the deployment's plan lookup, and it stays fail-closed: a lookup that
+   * rejects refuses the request rather than admitting it.
+   *
+   * Mount it after authentication and after the RBAC check — "you don't have
+   * access" beats "your plan doesn't include this" — which is what each family
+   * does with the middleware this returns.
+   */
+  enterpriseGate: (feature: EnterpriseFeature) => MiddlewareHandler;
+  /**
+   * The configured instance administrator credential, or undefined when unset
+   * or blank. Read per request, so a deployment that sets it after boot is
+   * honoured.
+   */
+  instanceAdminKey: () => string | undefined;
+  /**
+   * Whether this deployment is the hosted product rather than self-hosted.
+   * The instance-provisioning family does not exist on SaaS, where an
+   * organization is created through signup and billing instead.
+   */
+  isSaas: () => boolean;
+  /**
+   * Audit emission for management API writes. The write has already committed
+   * when this is called, so the process owns the swallow and the port answers
+   * nothing.
+   */
+  managementAudit: AppRestManagementAuditPort;
   /** Who an organization-authenticated REST write is attributed to (ADR-092). */
   organizationLedgerActor: (c: Context<any>) => OrganizationLedgerActor;
+  /**
+   * The permission vocabulary custom roles are built from. Read when the
+   * `/api/roles` family is BUILT — its write schemas and its published
+   * catalogue are both derived from it — so this one is never absent.
+   */
+  rbacVocabulary: AppRestRbacVocabulary;
+  /**
+   * A compensation that itself failed, reported and never raised: the caller
+   * must still see the ORIGINAL failure.
+   */
+  reportError: (error: Error) => void;
   /** The external UI address a read or write links back to. */
   platformUrl: PlatformUrlBuilder;
   /**
@@ -269,6 +355,12 @@ export function createAppRestFeatures(options: {
   const { security, services, ports } = options;
   return [
     createAgentCacheRestApp({ security, agentCache: services.agentCache }).hono,
+    createApiKeysRestApp({
+      security,
+      apiKeys: services.apiKeys,
+      permissions: services.permissions,
+      audit: ports.managementAudit,
+    }).hono,
     createGovernanceRestApp({
       security,
       governance: services.governance,
@@ -366,8 +458,36 @@ export function createAppRestFeatures(options: {
     createGroupRestApp({
       security,
       organizations: services.organizations,
-      enterpriseGate: ports.groupsEnterpriseGate,
+      enterpriseGate: ports.enterpriseGate("GROUPS"),
       ledgerActor: ports.organizationLedgerActor,
+    }).hono,
+    createMeRestApp({
+      security,
+      governance: services.governance,
+      organizations: services.organizations,
+      projects: services.projects,
+    }).hono,
+    createOrganizationsRestApp({
+      security,
+      organizations: services.organizations,
+      apiKeys: services.apiKeys,
+      instanceAdminKey: ports.instanceAdminKey,
+      isSaas: ports.isSaas,
+      audit: ports.managementAudit,
+      reportError: ports.reportError,
+    }).hono,
+    createTeamsRestApp({
+      security,
+      organizations: services.organizations,
+      permissions: services.permissions,
+      projects: services.projects,
+      ledgerActor: ports.organizationLedgerActor,
+    }).hono,
+    createUserAvatarRestApp({
+      security,
+      dualAuth: ports.dualAuth,
+      userAvatarObjects: services.userAvatarObjects,
+      rateLimit: ports.rateLimit,
     }).hono,
     createModelDefaultsRestApp({
       security,
@@ -392,6 +512,30 @@ export function createAppRestFeatures(options: {
         triggerEvaluation: ports.triggerWorkflowEvaluation,
       },
     }).hono,
+    // The versioned management families, built on `@langwatch/api`'s service
+    // builder rather than on a `SecuredApp`. That builder hands back the Hono
+    // app itself, so there is no `.hono` to unwrap — the same mount target by
+    // a shorter route, not a different kind of family.
+    createRolesRestApp({
+      security,
+      enterpriseGate: ports.enterpriseGate("RBAC"),
+      roles: services.roles,
+      vocabulary: ports.rbacVocabulary,
+      ledgerActor: ports.organizationLedgerActor,
+    }),
+    createRoleBindingsRestApp({
+      security,
+      enterpriseGate: ports.enterpriseGate("MANAGEMENT_API"),
+      permissions: services.permissions,
+      grants: services.authzGrants,
+      ledgerActor: ports.organizationLedgerActor,
+    }),
+    createScimTokensRestApp({
+      security,
+      enterpriseGate: ports.enterpriseGate("SCIM"),
+      scim: services.scim,
+      audit: ports.managementAudit,
+    }),
   ];
 }
 
@@ -418,6 +562,7 @@ export function servicesUnavailableOffRequestPath(reason: string): AppRestFeatur
     agentCache: refuse("The agent cache", reason),
     agents: refuse("Agents", reason),
     apiKeys: refuse("API keys", reason),
+    authzGrants: refuse("The grants ledger", reason),
     automation: refuse("Automations", reason),
     broadcast: refuse("Broadcast", reason),
     dashboard: refuse("Dashboard", reason),
@@ -431,14 +576,18 @@ export function servicesUnavailableOffRequestPath(reason: string): AppRestFeatur
     modelProviders: refuse("Model providers", reason),
     monitors: refuse("Monitors", reason),
     organizations: refuse("Organizations", reason),
+    permissions: refuse("Permissions", reason),
     projects: refuse("Projects", reason),
+    roles: refuse("Custom roles", reason),
     scenarios: refuse("Scenarios", reason),
     scenarioTabs: refuse("Scenario tabs", reason),
+    scim: refuse("SCIM provisioning", reason),
     secrets: refuse("Secrets", reason),
     simulations: refuse("Simulations", reason),
     storedObjectOwners: refuse("Stored object owners", reason),
     storedObjects: refuse("Stored objects", reason),
     suites: refuse("Suites", reason),
+    userAvatarObjects: refuse("User avatars", reason),
     webhooks: refuse("Webhooks", reason),
     workflows: refuse("Workflows", reason),
   };
@@ -479,14 +628,36 @@ export function portsUnavailableOffRequestPath(reason: string): AppRestFeaturePo
     gatewaySpendBillingGate: () => {
       throw unavailable("The billing events plan gate");
     },
-    groupsEnterpriseGate: () => {
+    enterpriseGate: () => () => {
       throw unavailable("The Enterprise plan gate");
+    },
+    instanceAdminKey: () => {
+      throw unavailable("The instance administrator credential");
+    },
+    isSaas: () => {
+      throw unavailable("The deployment kind");
+    },
+    managementAudit: () => {
+      throw unavailable("Management audit");
     },
     organizationMiddleware: () => {
       throw unavailable("Organization resolution");
     },
     rateLimit: () => {
       throw unavailable("The rate limiter");
+    },
+    // A real, EMPTY catalogue rather than a refusal. `/api/roles` derives its
+    // write schemas from this vocabulary while it is being built, so a
+    // throwing stub cannot be built at all — and the callers that reach this
+    // provider are enumerating routes for an authorization audit, which reads
+    // policies and never a permission list.
+    rbacVocabulary: {
+      actions: [],
+      resources: [],
+      isOrganizationExclusive: () => false,
+    },
+    reportError: () => {
+      throw unavailable("Error reporting");
     },
     requireProjectPermission: () => {
       throw unavailable("The project permission check");

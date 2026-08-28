@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-server/processes/langy-turn-dispatch-retry";
 import type { LangyTurnHandoff } from "@langwatch/langy-server";
-import { createLangyEffectPorts } from "../langyEffectPorts";
+import { LangyEffectPortsAdapter } from "@langwatch/langy-server";
 
 const PROJECT = "project-1";
 const CONVERSATION = "conversation-1";
@@ -60,7 +60,7 @@ const dispatchParams = {
   resumeFromTurnId: null,
 };
 
-describe("createLangyEffectPorts", () => {
+describe("LangyEffectPortsAdapter", () => {
   describe.each([
     {
       label: "create",
@@ -87,7 +87,7 @@ describe("createLangyEffectPorts", () => {
   ])("worker $label dispatch", ({ stored, expectedIntent }) => {
     it("reads and validates the handoff before mapping the worker request", async () => {
       const deps = makeDeps(stored);
-      const ports = createLangyEffectPorts(deps);
+      const ports = LangyEffectPortsAdapter.create(deps);
 
       await ports.workerDispatch.dispatchTurn(dispatchParams);
 
@@ -114,7 +114,7 @@ describe("createLangyEffectPorts", () => {
 
   it("treats a missing or expired handoff as a safe no-op", async () => {
     const deps = makeDeps(null);
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await expect(
       ports.workerDispatch.dispatchTurn(dispatchParams),
@@ -128,7 +128,7 @@ describe("createLangyEffectPorts", () => {
     handoff({ turnId: "other-turn" }),
   ])("rejects a handoff whose identity does not match the intent", async (stored) => {
     const deps = makeDeps(stored);
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
       "Langy turn handoff identity mismatch",
@@ -141,7 +141,7 @@ describe("createLangyEffectPorts", () => {
     async (outcome) => {
       const deps = makeDeps();
       deps.worker.dispatch.mockResolvedValue(outcome);
-      const ports = createLangyEffectPorts(deps);
+      const ports = LangyEffectPortsAdapter.create(deps);
 
       await expect(
         ports.workerDispatch.dispatchTurn(dispatchParams),
@@ -162,7 +162,7 @@ describe("createLangyEffectPorts", () => {
     deps.worker.dispatch
       .mockResolvedValueOnce("credentialsRequired")
       .mockResolvedValueOnce("accepted");
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await ports.workerDispatch.dispatchTurn(dispatchParams);
 
@@ -202,7 +202,7 @@ describe("createLangyEffectPorts", () => {
     const deps = makeDeps(stored);
     deps.worker.dispatch.mockResolvedValueOnce("credentialsRequired");
     deps.handoffStore.stash.mockRejectedValueOnce(new Error("redis down"));
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
       "redis down",
@@ -215,7 +215,7 @@ describe("createLangyEffectPorts", () => {
 
   it("does not save a title when the trusted generator returns null", async () => {
     const deps = makeDeps();
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await ports.titleGeneration.generateTitle({
       projectId: PROJECT,
@@ -236,7 +236,7 @@ describe("createLangyEffectPorts", () => {
       title: "Fix Trace Ingestion",
       model: "openai/gpt-5-mini",
     });
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await ports.titleGeneration.generateTitle({
       projectId: PROJECT,
@@ -258,7 +258,7 @@ describe("when the agent permanently rejects the dispatch", () => {
   it("terminalizes the turn instead of retrying forever", async () => {
     const deps = makeDeps();
     deps.worker.dispatch.mockResolvedValue("rejected");
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     // Resolving (not throwing) is what consumes the outbox intent — a throw
     // here is the poison loop this behavior exists to prevent.
@@ -277,7 +277,7 @@ describe("when the agent permanently rejects the dispatch", () => {
   it("still retries transient unavailability", async () => {
     const deps = makeDeps();
     deps.worker.dispatch.mockResolvedValue("unavailable");
-    const ports = createLangyEffectPorts(deps);
+    const ports = LangyEffectPortsAdapter.create(deps);
 
     await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
       /not accepted/,

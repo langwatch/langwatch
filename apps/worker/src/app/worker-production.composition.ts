@@ -46,6 +46,14 @@ import {
   type GatewaySpendWorkerCapability,
 } from "../features/gateway/gateway-spend-worker-feature.installer";
 import {
+  LangyConversationWorkerFeatureInstaller,
+  type LangyConversationWorkerCapability,
+} from "../features/langy/langy-conversation-worker-feature.installer";
+import {
+  LangyMaintenanceWorkerFeatureInstaller,
+  type LangyMaintenanceWorkerCapability,
+} from "../features/langy/langy-maintenance-worker-feature.installer";
+import {
   GithubWorkerFeatureInstaller,
   type GithubWorkerCapability,
 } from "../features/github/github-worker-feature.installer";
@@ -113,6 +121,16 @@ export type WorkerAutomationCompositionOptions = {
 export type WorkerEventingMaintenanceCompositionOptions = {
   blobSweep: WorkerBlobSweepPort;
   retentionMetrics: ProcessRetentionMetricsPort;
+};
+
+/** Langy's conversation pipeline, whose own effects append back into it. */
+export type WorkerLangyConversationCompositionOptions = {
+  installer: LangyConversationWorkerCapability;
+};
+
+/** Langy's session-key reaper, on the same footing as the substrate sweeps. */
+export type WorkerLangyMaintenanceCompositionOptions = {
+  installer: LangyMaintenanceWorkerCapability;
 };
 
 /** GitHub pull-request linkage maintenance, fleet-wide rather than per replica. */
@@ -207,6 +225,8 @@ type WorkerProductionCompositionBaseOptions = {
    */
   automation?: WorkerAutomationCompositionOptions;
   eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
+  langyConversation?: WorkerLangyConversationCompositionOptions;
+  langyMaintenance?: WorkerLangyMaintenanceCompositionOptions;
   github?: WorkerGithubCompositionOptions;
   evaluation?: WorkerEvaluationCompositionOptions;
   codingAgent?: WorkerCodingAgentCompositionOptions;
@@ -271,6 +291,18 @@ export class WorkerProductionComposition {
           eventing,
           blobSweep: options.eventingMaintenance.blobSweep,
           retentionMetrics: options.eventingMaintenance.retentionMetrics,
+        })
+      : undefined;
+    const langyMaintenance = options.langyMaintenance
+      ? LangyMaintenanceWorkerFeatureInstaller.create({
+          installer: options.langyMaintenance.installer,
+          eventing,
+        })
+      : undefined;
+    const langyConversation = options.langyConversation
+      ? LangyConversationWorkerFeatureInstaller.create({
+          installer: options.langyConversation.installer,
+          eventing,
         })
       : undefined;
     const github = options.github
@@ -380,6 +412,8 @@ export class WorkerProductionComposition {
       transport: options.transport,
       automation,
       eventingMaintenance,
+      langyMaintenance,
+      langyConversation,
       github,
       evaluation,
       codingAgent,
@@ -413,6 +447,8 @@ export class WorkerProductionComposition {
     transport: WorkerTransportPort;
     automation?: AutomationWorkerFeatureInstaller;
     eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
+    langyConversation?: LangyConversationWorkerFeatureInstaller;
+    langyMaintenance?: LangyMaintenanceWorkerFeatureInstaller;
     github?: GithubWorkerFeatureInstaller;
     evaluation?: EvaluationWorkerFeatureInstaller;
     codingAgent?: CodingAgentWorkerFeatureInstaller;
@@ -561,6 +597,8 @@ export class WorkerProductionComposition {
  *                        and governance graphs is written through its command
  *   eventing-maintenance the substrate's own blob and retention sweeps, which
  *                        belong to no feature and must not depend on one
+ *   langy-maintenance    the session-key reaper, unconditional like the
+ *                        substrate sweeps and mounted with them
  *   github               fleet-wide branch recheck, before the domain graphs
  *   evaluation           before trace, whose evaluation trigger and custom
  *                        evaluation sync dispatch its two commands
@@ -580,6 +618,8 @@ export class WorkerProductionComposition {
  *   experiment           after trace, which reaches it through the
  *                        computeExperimentRunMetrics proxy rather than the
  *                        other way round
+ *   langy-conversation   after experiment, before topic, which is where the
+ *                        legacy registry mounts it
  *   topic
  *   governance-ingestion Enterprise pulled-usage and ingestion-pull
  *   billing-reporting
@@ -593,6 +633,8 @@ export class WorkerProductionComposition {
 function orderedFeatureInstallers(installers: {
   automation?: AutomationWorkerFeatureInstaller;
   eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
+  langyConversation?: LangyConversationWorkerFeatureInstaller;
+  langyMaintenance?: LangyMaintenanceWorkerFeatureInstaller;
   github?: GithubWorkerFeatureInstaller;
   evaluation?: EvaluationWorkerFeatureInstaller;
   codingAgent?: CodingAgentWorkerFeatureInstaller;
@@ -612,6 +654,7 @@ function orderedFeatureInstallers(installers: {
   const ordered: (WorkerFeatureInstallerPort | undefined)[] = [
     installers.automation,
     installers.eventingMaintenance,
+    installers.langyMaintenance,
     installers.github,
     installers.evaluation,
     installers.codingAgent,
@@ -623,6 +666,7 @@ function orderedFeatureInstallers(installers: {
     installers.suite,
     installers.scenario,
     installers.experiment,
+    installers.langyConversation,
     installers.topic,
     installers.governanceIngestion,
     installers.billingReporting,

@@ -21,7 +21,7 @@ describe("settlement on the spend record (real ClickHouse)", () => {
       await import("~/server/event-sourcing/__tests__/integration/testContainers");
     const { GatewaySpendEventsRepository } = await import("@langwatch/gateway-server");
     const { GatewaySpendFoldProjection } = await import("@langwatch/gateway-server");
-    const { GatewaySpendStore } = await import("../projections/gatewaySpend.store");
+    const { GatewaySpendStore } = await import("@langwatch/gateway-server");
     const { spendRowToEnvelope } = await import("~/runtime/app/features/webhooks");
     const { EventUtils, createTenantId } = await import("@langwatch/eventing");
     const constants = await import("@langwatch/gateway-server");
@@ -30,7 +30,7 @@ describe("settlement on the spend record (real ClickHouse)", () => {
     const repo = new GatewaySpendEventsRepository(
       async () => containers.clickHouseClient,
     );
-    const foldStore = new GatewaySpendStore(repo);
+    const foldStore = GatewaySpendStore.create(repo);
     const projection = new GatewaySpendFoldProjection({
       store: foldStore as never,
     });

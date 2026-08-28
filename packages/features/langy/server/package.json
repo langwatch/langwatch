@@ -111,6 +111,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/sdk-trace-node": "2.10.0",
     "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

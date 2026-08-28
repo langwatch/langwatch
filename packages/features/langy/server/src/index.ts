@@ -78,6 +78,25 @@ export type {
 } from "./ports/langy-turn-runtime.port";
 export { createLangyConversationProcessingPipeline } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter";
+export {
+  EventingLangyConversationAdapter,
+  type EventingLangyConversationAdapterOptions,
+  type LangyConversationRuntimeCommands,
+} from "./adapters/eventing.langy-conversation-runtime.adapter";
+export {
+  EventingLangyMaintenanceAdapter,
+  type LangyMaintenancePipelineDeps,
+} from "./adapters/eventing.langy-maintenance.adapter";
+export {
+  LANGY_SESSION_KEY_REAP_INTERVAL_MS,
+  LANGY_SESSION_KEY_REAP_PROCESS_NAME,
+  langySessionKeyReapWake,
+  type LangySessionKeyReapState,
+} from "./processes/langy-session-key-reap.process";
+export {
+  runLangySessionKeyReap,
+  type LangySessionKeyReapDeps,
+} from "./intents/langy-session-key-reap.intent";
 export type { LangyAnalyticsEventProjectionRecord } from "./adapters/eventing.langy-projections-index.adapter";
 export {
   LangyAnalyticsEventStorageAdapter,
@@ -86,6 +105,11 @@ export {
 export { LangyAnalyticsEventSinkPort } from "./ports/langy-analytics-event-sink.port";
 export type { LangyAnalyticsEventRecord } from "./ports/langy-analytics-event-sink.port";
 export type { LangyEffectPorts } from "./ports/langy-effect.port";
+export type { LangyTitleGenerator } from "./ports/langy-effect.port";
+export {
+  LangyEffectPortsAdapter,
+  type CreateLangyEffectPortsOptions,
+} from "./adapters/langy-effect.adapter";
 export {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,

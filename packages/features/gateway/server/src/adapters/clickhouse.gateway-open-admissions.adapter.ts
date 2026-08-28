@@ -6,7 +6,7 @@ import {
   type OpenAdmissionQuery,
 } from "../ports/gateway-open-admissions.port";
 import { ClickHouseGatewayOpenAdmissionsRepository } from "../repositories/clickhouse/clickhouse.gateway-open-admissions.repository";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../processes/gateway-spend-settlement.process";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../intents/gateway-spend-settlement.intent";
 
 export { ClickHouseGatewayOpenAdmissionsRepository };
 
@@ -33,11 +33,11 @@ export type GatewayClickHouseInstanceResolver = () => Promise<GatewayClickHouseI
  * failure, so it applies at the instance level too: the reachable instances
  * settle, the unreachable one is reported and retried next sweep.
  */
-export class MultiInstanceGatewayOpenAdmissions extends GatewayOpenAdmissionsPort {
+export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissionsPort {
   static create(
     resolveInstances: GatewayClickHouseInstanceResolver,
-  ): MultiInstanceGatewayOpenAdmissions {
-    return new MultiInstanceGatewayOpenAdmissions(resolveInstances);
+  ): ClickHouseGatewayOpenAdmissionsAdapter {
+    return new ClickHouseGatewayOpenAdmissionsAdapter(resolveInstances);
   }
 
   private constructor(private readonly resolveInstances: GatewayClickHouseInstanceResolver) {
@@ -48,7 +48,7 @@ export class MultiInstanceGatewayOpenAdmissions extends GatewayOpenAdmissionsPor
     const instances = await this.resolveInstances();
     const results = await Promise.allSettled(
       instances.map(({ client }) =>
-        new ClickHouseGatewayOpenAdmissionsRepository(client).findOpenAdmissions(params),
+        ClickHouseGatewayOpenAdmissionsRepository.create(client).findOpenAdmissions(params),
       ),
     );
 

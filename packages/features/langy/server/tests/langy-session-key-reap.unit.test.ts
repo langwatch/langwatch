@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createLangyMaintenancePipeline } from "../pipeline";
 import {
+  EventingLangyMaintenanceAdapter,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   langySessionKeyReapWake,
   runLangySessionKeyReap,
-} from "../process-manager/langySessionKeyReap.process";
+} from "@langwatch/langy-server";
 
 const wakeContext = (at: number) => ({
   at,
@@ -91,12 +91,12 @@ describe("langySessionKeyReap process", () => {
   describe("given the pipeline is built", () => {
     describe("when its shape is inspected", () => {
       it("registers the reap as a scheduled process and appends no events", () => {
-        const pipeline = createLangyMaintenancePipeline({
+        const pipeline = EventingLangyMaintenanceAdapter.create({
           sessionKeyReap: {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
-        });
+        }).buildProcessing();
 
         const pm = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
         expect(pm).toBeDefined();

@@ -514,7 +514,7 @@ export default async function execute() {
     createGroupRestApp({
       security: appRestSecurity,
       organizations: specOnlyServices.organizations,
-      enterpriseGate: specOnlyPorts.groupsEnterpriseGate,
+      enterpriseGate: specOnlyPorts.enterpriseGate("GROUPS"),
       ledgerActor: specOnlyPorts.organizationLedgerActor,
     }).hono,
   );

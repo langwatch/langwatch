@@ -13,6 +13,7 @@ import {
   FixedGatewaySettlementPolicy,
   GatewayUsageService,
   loadTraceDestinationFacts,
+  settlementGraceMs,
   toVirtualKeySnakeDto,
 } from "@langwatch/gateway-server";
 import type {
@@ -101,10 +102,7 @@ import { instanceAdminApiKey } from "~/server/api/management/instance-admin-key"
 import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
 import type { Permission } from "~/server/api/rbac";
 import { getUserProtectionsForProject } from "~/server/api/utils";
-import {
-  predefinedEventsSchemas,
-  predefinedEventTypes,
-} from "~/server/app-layer/events/predefinedEvents.schema";
+import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
 import {
   generateTrackedEventId,
   recordTrackedEventSpan,
@@ -114,7 +112,6 @@ import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { getServerAuthSession } from "~/server/auth";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
-import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
 import { exportRequestSchema } from "~/server/export/types";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
@@ -283,7 +280,9 @@ function gatewaySpendRestPorts(app: App): GatewaySpendRestPorts {
     webhookEndpoints: app.gateway.webhookEndpoints,
     webhookEvents: app.gateway.webhookEvents,
     webhookDelivery: app.gateway.webhookDelivery,
-    settlementPolicy: FixedGatewaySettlementPolicy.create(settlementGraceMs()),
+    settlementPolicy: FixedGatewaySettlementPolicy.create(
+      settlementGraceMs(process.env.LW_SPEND_SETTLEMENT_GRACE_MS),
+    ),
     resolveSpendScope,
     endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>
       applicableEndUserCaps({
@@ -463,10 +462,10 @@ export function createApiRouter(app: App) {
           workflows: app.workflows,
         }),
       dualAuth,
+      enterpriseGate: requireEnterprisePlanRest,
       extractInlineMedia: (input) =>
         extractInlineMediaFromEvent({ ...input, service: app.storedObjects }),
       gatewaySpendBillingGate,
-      groupsEnterpriseGate: requireEnterprisePlanRest("GROUPS"),
       instanceAdminKey: instanceAdminApiKey,
       isSaas: () => app.config.isSaas,
       managementAudit: managementAuditPort,
