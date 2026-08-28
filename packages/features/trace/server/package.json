@@ -25,6 +25,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'"
   },
   "dependencies": {
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",

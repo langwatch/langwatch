@@ -1,13 +1,14 @@
 import { DatasetNormalizeQueuePort } from "../ports/dataset.port";
+import {
+  DatasetNormalizationWorkerPort,
+  datasetNormalizePayloadSchema,
+  type DatasetNormalizePayload,
+  type DatasetNormalizationSender,
+} from "@langwatch/dataset-contract";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
-import {
-  createDatasetNormalizeHandler,
-  type DatasetNormalizePayload,
-} from "../jobs/dataset-normalize.job";
+import { createDatasetNormalizeHandler } from "../jobs/dataset-normalize.job";
 import { UploadNotPendingError } from "./errors";
-
-type NormalizeSender = (payload: DatasetNormalizePayload) => Promise<void>;
 
 /**
  * Process-owned Dataset normalization capability.
@@ -17,10 +18,13 @@ type NormalizeSender = (payload: DatasetNormalizePayload) => Promise<void>;
  * the package-owned handler. With no worker queue, one process-local chain
  * preserves the documented inline fallback without a module-global registry.
  */
-export class DatasetNormalizationService extends DatasetNormalizeQueuePort {
-  private readonly processPayload: NormalizeSender;
+export class DatasetNormalizationService
+  extends DatasetNormalizeQueuePort
+  implements DatasetNormalizationWorkerPort
+{
+  private readonly processPayload: DatasetNormalizationSender;
   private readonly inlineChains = new Map<string, Promise<void>>();
-  private sender: NormalizeSender | null = null;
+  private sender: DatasetNormalizationSender | null = null;
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
@@ -40,12 +44,12 @@ export class DatasetNormalizationService extends DatasetNormalizeQueuePort {
     return new DatasetNormalizationService(options.datasets, options.storage);
   }
 
-  connect(sender: NormalizeSender): void {
+  connect(sender: DatasetNormalizationSender): void {
     this.sender = sender;
   }
 
   process(payload: DatasetNormalizePayload): Promise<void> {
-    return this.processPayload(payload);
+    return this.processPayload(datasetNormalizePayloadSchema.parse(payload));
   }
 
   async enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void> {

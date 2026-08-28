@@ -299,6 +299,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../packages/features/trace/contract
+      '@langwatch/trace-server':
+        specifier: workspace:*
+        version: link:../../packages/features/trace/server
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -4166,6 +4169,9 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../eventing

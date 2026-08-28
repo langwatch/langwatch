@@ -52,6 +52,7 @@ import type {
   TraceCanonicalisationService,
   TraceService,
   TraceSummaryData,
+  TraceTopicAssignmentPort,
 } from "@langwatch/trace-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { GithubService } from "@langwatch/github-contract";
@@ -68,7 +69,7 @@ import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import type { DatasetNormalizePayload } from "@langwatch/dataset-server";
+import type { DatasetNormalizationWorkerPort } from "@langwatch/dataset-contract";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import type { GatewaySpendEventsPort } from "@langwatch/gateway-server";
 import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
@@ -198,32 +199,22 @@ import {
 } from "@langwatch/suite-server";
 import { TopicServerInstaller } from "@langwatch/topic-server";
 import {
-  EventingTraceTopicAssignmentPort,
+  TraceProcessingServerInstaller,
   resolveSpanCommandShardCount,
 } from "@langwatch/trace-server";
-import { AppTraceTopicAssignmentCommandAdapter } from "~/runtime/app/trace-topic-assignment-command.adapter";
 import {
-  createTraceProcessingPipeline,
+  AppTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "~/runtime/app/trace-processing.adapter";
-import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
 import { SpanStorageStore } from "@langwatch/trace-server";
 import type { TraceAnalyticsData } from "@langwatch/trace-server";
 import { TraceAnalyticsStore } from "@langwatch/trace-server";
 import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
-import type { ResolveOriginCommandData } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
 import { createCustomEvaluationSyncHandler } from "../pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
 import { createEvaluationTriggerSubscriber } from "~/runtime/app/trace-evaluation-trigger.adapter";
 import { createExperimentMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
-import {
-  createDeferredOriginHandler,
-  createOriginGateHandler,
-  DEFERRED_CHECK_DELAY_MS,
-  type DeferredOriginPayload,
-  makeDeferredJobId,
-} from "../pipelines/trace-processing/subscribers/originGate.subscriber";
 import { createProjectMetadataHandler } from "../pipelines/trace-processing/subscribers/projectMetadata.subscriber";
 import { createSimulationMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
 import { createSpanStorageBroadcastHandler } from "../pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
@@ -409,10 +400,7 @@ export interface PipelineRegistryDeps {
   automation: AutomationService;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;
-  datasetNormalization: {
-    process(payload: DatasetNormalizePayload): Promise<void>;
-    connect(sender: (payload: DatasetNormalizePayload) => Promise<void>): void;
-  };
+  datasetNormalization: DatasetNormalizationWorkerPort;
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
@@ -645,6 +633,7 @@ export class PipelineRegistry {
     });
     const {
       pipeline: tracePipeline,
+      traceAssignments,
       simComputeRunMetrics,
       wireExperimentDeps,
     } = this.registerTracePipeline({
@@ -674,9 +663,8 @@ export class PipelineRegistry {
       wireExperimentDeps,
     });
     const { pipeline: langyConversationPipeline } = this.registerLangyConversationPipeline();
-    const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline(
-      tracePipeline.commands.assignTopic,
-    );
+    const { pipeline: topicClusteringPipeline } =
+      this.registerTopicClusteringPipeline(traceAssignments);
     const enterprisePipelines = AppGovernanceEventingAdapter.create(
       this.deps.eventSourcing,
       this.deps.enterprisePipelines,
@@ -722,12 +710,7 @@ export class PipelineRegistry {
 
   private readonly governanceSubscriberRuntime = new AppGovernanceSubscriberRuntime();
 
-  private registerTopicClusteringPipeline(traceAssignTopic: {
-    send(input: import("@langwatch/trace-contract").AssignTopicCommandData): Promise<unknown>;
-  }) {
-    const traceAssignments = EventingTraceTopicAssignmentPort.create(
-      AppTraceTopicAssignmentCommandAdapter.create({ command: traceAssignTopic }),
-    );
+  private registerTopicClusteringPipeline(traceAssignments: TraceTopicAssignmentPort) {
     const installed = this.deps.topicClustering.installer.install({
       eventSourcing: this.deps.eventSourcing,
       traceAssignments,
@@ -1055,20 +1038,9 @@ export class PipelineRegistry {
   }) {
     const evalCommands = evaluationCommands;
 
-    // Deferred dispatchers — resolved after pipeline registration.
-    const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>(
-      "resolveOrigin",
-    );
-    const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>(
-      "scheduleDeferred",
-    );
     const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>(
       "simComputeRunMetrics",
     );
-
-    const originGateHandler = createOriginGateHandler({
-      scheduleDeferred: scheduleDeferred.fn,
-    });
 
     const evaluationTrigger = createEvaluationTriggerSubscriber({
       featureFlags: this.deps.featureFlags,
@@ -1175,8 +1147,8 @@ export class PipelineRegistry {
         }
       : undefined;
 
-    const tracePipeline = this.deps.eventSourcing.register(
-      createTraceProcessingPipeline({
+    const traceInstaller = TraceProcessingServerInstaller.create({
+      pipeline: AppTraceProcessingPipeline.create({
         recordSpanCommand: AppTraceRecordSpanAdapter.create({
           modelProviders: this.deps.modelProviders,
           featureFlags: this.deps.featureFlags,
@@ -1203,7 +1175,6 @@ export class PipelineRegistry {
           "trace_analytics",
         ),
         traceSummaryStore,
-        originGateHandler,
         evaluationTrigger,
         automations,
         customEvaluationSyncHandler,
@@ -1224,66 +1195,14 @@ export class PipelineRegistry {
         governanceOcsfEventsSync,
         subscribers: codingAgentSubscribers,
       }),
-    );
-
-    // Resolve self-referencing commands now that the pipeline is registered
-    const traceCommands = mapCommands(tracePipeline.commands);
-    resolveOrigin.resolve(traceCommands.resolveOrigin);
-
-    // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
-    // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → subscriber.
-    const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
-    const deferredOriginQueue = tracePipeline.service.registerJob<DeferredOriginPayload>({
-      name: "deferredOriginResolution",
-      process: deferredOriginHandler,
-      delay: DEFERRED_CHECK_DELAY_MS,
-      deduplication: {
-        makeId: makeDeferredJobId,
-        ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
-        extend: false, // Don't reset the 5-min timer on new spans
-        replace: false, // Don't update payload (same trace, same data)
-      },
-      groupKeyFn: (p) => p.traceId, // Per-trace parallelism (framework prepends tenantId)
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.trace_id": payload.traceId,
-      }),
+      datasetNormalization: this.deps.datasetNormalization,
     });
-
-    if (deferredOriginQueue) {
-      scheduleDeferred.resolve((payload) => deferredOriginQueue.send(payload));
-    } else {
-      // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
-      scheduleDeferred.resolve(
-        createInMemoryDeferredFallback({
-          makeId: makeDeferredJobId,
-          delayMs: DEFERRED_CHECK_DELAY_MS,
-          process: deferredOriginHandler,
-          logContext: (p) => ({ tenantId: p.tenantId, traceId: p.traceId }),
-          errorMessage: "Deferred origin resolution failed",
-        }),
-      );
-    }
-
-    // ADR-032 D5: the Dataset package owns normalization and its persistence;
-    // this process root only mounts the durable queue and hands the sender back
-    // to that process-owned capability.
-    const datasetNormalizeQueue = tracePipeline.service.registerJob<DatasetNormalizePayload>({
-      name: "datasetNormalize",
-      process: (payload) => this.deps.datasetNormalization.process(payload),
-      // The per-dataset group key already serializes to concurrency-1, so no
-      // deduplication block is needed; the 200ms debounce default is
-      // surprising and could swallow a fast retry (m1).
-      groupKeyFn: (p) => p.datasetId,
-    });
-
-    if (datasetNormalizeQueue) {
-      this.deps.datasetNormalization.connect((payload) => datasetNormalizeQueue.send(payload));
-    }
-    // With no queue, the same capability runs its serialized inline fallback.
+    const installedTrace = traceInstaller.install(this.deps.eventSourcing);
+    const tracePipeline = installedTrace.pipeline;
 
     return {
       pipeline: tracePipeline,
+      traceAssignments: installedTrace.traceAssignments,
       traceSummaryStore,
       /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
       simComputeRunMetrics,

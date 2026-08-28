@@ -39,6 +39,12 @@ Dataset depends on no other product service for the core lifecycle. Experiment
 name resolution is an optional `DatasetExperimentPort`; future storage and
 normalization capabilities will be narrow ports owned by Dataset.
 
+`DatasetNormalizationWorkerPort` is the Dataset-owned worker lifecycle port.
+Its durable payload has a contract Zod schema and is parsed before normalization
+work begins. A process composition root connects the service to the shared
+Eventing sender only when that queue is registered; otherwise its existing
+per-dataset inline fallback remains local to the service.
+
 ### Persistence
 
 The service receives only its Dataset repositories and the optional
@@ -54,6 +60,11 @@ on the process-owned App. Hono and tRPC handlers reuse that instance; they do
 not call `DatasetService.create`, resolve Prisma, or construct repositories per
 request. The current compatibility middleware remains until its caller is
 migrated to the App graph.
+
+The Trace processing installer registers the current Dataset normalize job as
+part of the shared Eventing registry. This does not enable worker consumers:
+the shared queue remains producer-only until all active pipeline registrations
+are present in the worker process.
 
 ### Environment and configuration
 

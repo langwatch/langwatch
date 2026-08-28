@@ -15,7 +15,10 @@ import {
 } from "@langwatch/automation-server";
 import {
   RecordSpanCommand,
+  TraceProcessingPipelinePort,
+  createOriginGateHandler,
   type EventingTracePipelineAdapterOptions,
+  type TraceDeferredOriginSchedulerPort,
 } from "@langwatch/trace-server";
 import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
@@ -32,11 +35,6 @@ import {
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
   hasExperimentCostMetrics,
 } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
-import {
-  needsOriginResolution,
-  ORIGIN_GATE_DEDUP_TTL_MS,
-  ORIGIN_GATE_DELAY_MS,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/originGate.subscriber";
 import {
   isRealFirstIngest,
   PROJECT_METADATA_WINDOW_MS,
@@ -116,6 +114,24 @@ export interface TraceProcessingPipelineDeps {
   };
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
+}
+
+/** App-side composition of Trace's external subscribers into its pipeline. */
+export class AppTraceProcessingPipeline extends TraceProcessingPipelinePort {
+  static create(deps: TraceProcessingPipelineDeps): AppTraceProcessingPipeline {
+    return new AppTraceProcessingPipeline(deps);
+  }
+
+  private constructor(private readonly deps: TraceProcessingPipelineDeps) {
+    super();
+  }
+
+  build(options: { deferredOrigins: TraceDeferredOriginSchedulerPort }) {
+    return createTraceProcessingPipeline({
+      ...this.deps,
+      originGateHandler: createOriginGateHandler(options.deferredOrigins),
+    });
+  }
 }
 
 /**

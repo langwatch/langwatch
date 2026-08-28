@@ -1,116 +1,43 @@
-import type { TriggerContext } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
-import type { ResolveOriginCommandData, TraceSummaryData } from "@langwatch/trace-contract";
-import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import {
+  createOriginGateHandler as createTraceOriginGateHandler,
+  TraceDeferredOriginSchedulerPort,
+  type DeferredOriginPayload,
+} from "@langwatch/trace-server";
 
-const logger = createLogger("langwatch:trace-processing:origin-gate");
-
-/** Delay (ms) before the deferred origin resolution fires */
-export const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
-
-export const ORIGIN_GATE_DELAY_MS = 5_000; // settle before checking origin
-export const ORIGIN_GATE_DEDUP_TTL_MS = 15_000; // debounce multi-span trace bursts
-
-export type DeferredOriginPayload = {
-  id: string; // traceId — used as staged job ID for debuggability
-  tenantId: string;
-  traceId: string;
+export type OriginGateSubscriberDeps = {
+  scheduleDeferred(payload: DeferredOriginPayload): Promise<void>;
 };
 
-export interface OriginGateSubscriberDeps {
-  scheduleDeferred: (payload: DeferredOriginPayload) => Promise<void>;
+/** Compatibility adapter while Trace callers move to the feature server. */
+class LegacyDeferredOriginScheduler extends TraceDeferredOriginSchedulerPort {
+  static create(
+    scheduleDeferred: (payload: DeferredOriginPayload) => Promise<void>,
+  ): LegacyDeferredOriginScheduler {
+    return new LegacyDeferredOriginScheduler(scheduleDeferred);
+  }
+
+  private constructor(
+    private readonly scheduleDeferred: (payload: DeferredOriginPayload) => Promise<void>,
+  ) {
+    super();
+  }
+
+  schedule(payload: DeferredOriginPayload): Promise<void> {
+    return this.scheduleDeferred(payload);
+  }
 }
 
-/**
- * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
- * fold state) and the handler (fail-open path): skip stale resync traces and
- * traces whose origin is already resolved.
- */
-export function needsOriginResolution({
-  event,
-  foldState,
-}: {
-  event: TraceProcessingEvent;
-  foldState: TraceSummaryData;
-}): boolean {
-  if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
-  return !foldState.attributes?.["langwatch.origin"];
+export function createOriginGateHandler(options: OriginGateSubscriberDeps) {
+  return createTraceOriginGateHandler(
+    LegacyDeferredOriginScheduler.create((payload) => options.scheduleDeferred(payload)),
+  );
 }
 
-/**
- * Ensures every trace gets an origin resolved.
- *
- * Fires on every trace event (via traceSummary fold). If origin is already
- * set (explicit, legacy markers, or SDK heuristic), this is a no-op.
- * If absent (pure OTEL traces), schedules a 5-minute deferred origin
- * resolution job.
- *
- * Completely decoupled from evaluation dispatch — evaluationTrigger
- * handles that independently.
- */
-export function createOriginGateHandler(
-  deps: OriginGateSubscriberDeps,
-): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
-  return async (event, context) => {
-    const { tenantId, aggregateId: traceId, state: foldState } = context;
-
-    if (!needsOriginResolution({ event, foldState })) return;
-
-    // Defensive: a trace aggregate with an empty ID can't be resolved, and
-    // scheduling one produces an OriginResolvedEvent with an empty
-    // aggregateId that blows up the automations pipeline later.
-    if (!traceId) {
-      logger.warn(
-        { tenantId, eventId: event.id, eventType: event.type },
-        "Skipping deferred origin resolution: empty traceId on trace event",
-      );
-      return;
-    }
-
-    // No origin — schedule deferred resolution (5-min delay)
-    logger.debug(
-      { tenantId, traceId },
-      "No origin resolved, scheduling deferred origin resolution",
-    );
-    await deps.scheduleDeferred({
-      id: traceId,
-      tenantId,
-      traceId,
-    });
-  };
-}
-
-/**
- * Creates the deferred origin resolution handler.
- *
- * Fires after a 5-minute delay for pure OTEL traces that had no origin
- * at normal debounce time. Unconditionally dispatches a resolveOrigin
- * command with origin="application" — the command's idempotency key
- * and the fold projection's no-override guard handle duplicates.
- *
- * The resulting OriginResolvedEvent flows through:
- *   fold (sets origin if absent) → evaluationTrigger subscriber → dispatchEvaluations()
- */
-export function createDeferredOriginHandler(
-  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>,
-) {
-  return async (payload: DeferredOriginPayload): Promise<void> => {
-    logger.debug(
-      { tenantId: payload.tenantId, traceId: payload.traceId },
-      "Deferred origin resolution: dispatching resolveOrigin command",
-    );
-    await resolveOrigin({
-      tenantId: payload.tenantId,
-      traceId: payload.traceId,
-      origin: "application",
-      reason: "deferred_fallback",
-      occurredAt: Date.now(),
-    });
-  };
-}
-
-/** Dedup key for deferred origin resolution jobs */
-export function makeDeferredJobId(payload: DeferredOriginPayload): string {
-  return `deferred-origin:${payload.tenantId}:${payload.traceId}`;
-}
+export {
+  createDeferredOriginHandler,
+  DEFERRED_ORIGIN_CHECK_DELAY_MS as DEFERRED_CHECK_DELAY_MS,
+  makeDeferredOriginJobId as makeDeferredJobId,
+  needsOriginResolution,
+  ORIGIN_GATE_DEDUP_TTL_MS,
+  ORIGIN_GATE_DELAY_MS,
+} from "@langwatch/trace-server";

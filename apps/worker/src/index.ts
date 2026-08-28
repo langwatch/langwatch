@@ -2,9 +2,11 @@ export { WorkerApplication } from "./app/worker.application";
 export {
   WorkerProductionComposition,
   type WorkerProductionCompositionOptions,
+  type WorkerTraceCompositionOptions,
   type WorkerTopicCompositionOptions,
 } from "./app/worker-production.composition";
 export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer";
+export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer";
 export {
   WorkerFeatureHandlePort,
   WorkerFeatureInstallerPort,

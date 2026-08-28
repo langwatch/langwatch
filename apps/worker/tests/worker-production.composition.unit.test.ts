@@ -1,11 +1,14 @@
 import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
+import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { WorkerProductionComposition } from "../src/app/worker-production.composition";
 import {
   TopicWorkerFeatureInstaller,
   type TopicWorkerCapability,
 } from "../src/features/topic/topic-worker-feature.installer";
+import { TraceWorkerFeatureInstaller } from "../src/features/trace/trace-worker-feature.installer";
 import { WorkerEventingRuntime } from "../src/platform/eventing/worker-eventing.runtime";
 import {
   WorkerHandlePort,
@@ -40,6 +43,18 @@ class TopicCapability implements TopicWorkerCapability {
     recordTopics: vi.fn(async () => undefined),
     requestClustering: vi.fn(async () => undefined),
   };
+}
+
+class TraceAssignments extends TraceTopicAssignmentPort {
+  readonly assignTopic = vi.fn(async (_input: AssignTopicCommandData) => undefined);
+}
+
+class TraceInstaller extends TraceProcessingInstallerPort {
+  readonly install = vi.fn(() => ({ traceAssignments: this.traceAssignments }));
+
+  constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {
+    super();
+  }
 }
 
 class Projects {
@@ -139,5 +154,47 @@ describe("WorkerProductionComposition", () => {
     expect(transport.handle.shutdown).toHaveBeenCalledOnce();
     expect(lifecycle.close).toHaveBeenCalledOnce();
     expect(queue.close).toHaveBeenCalledOnce();
+  });
+
+  it("installs Trace before Topic and passes Topic Trace's canonical assignment port", async () => {
+    const queue = new Queue();
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: new EventStoreMemory(),
+      queueFactory: () => queue,
+      processStore: new InMemoryProcessStore(),
+      executionTarget: "worker",
+      consumersEnabled: false,
+    });
+    const traceAssignments = new TraceAssignments();
+    const traceInstaller = new TraceInstaller(traceAssignments);
+    const trace = TraceWorkerFeatureInstaller.create({
+      installer: traceInstaller,
+      eventing,
+    });
+    const capability = new TopicCapability();
+    const topic = TopicWorkerFeatureInstaller.create({
+      installer: capability,
+      eventing,
+      traceAssignments: trace.traceAssignments,
+    });
+    const composition = WorkerProductionComposition.createFromPorts({
+      config: { environment: "test" },
+      eventing,
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      trace,
+      topic,
+    });
+
+    await composition.application.start();
+
+    expect(traceInstaller.install).toHaveBeenCalledWith(eventing.eventSourcing);
+    expect(capability.install).toHaveBeenCalledWith({
+      eventSourcing: eventing.eventSourcing,
+      traceAssignments: trace.traceAssignments,
+    });
+    expect(traceInstaller.install.mock.invocationCallOrder[0]).toBeLessThan(
+      capability.install.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 });

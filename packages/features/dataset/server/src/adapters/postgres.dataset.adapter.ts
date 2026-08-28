@@ -1,4 +1,7 @@
-import type { DatasetService as DatasetServiceContract } from "@langwatch/dataset-contract";
+import type {
+  DatasetNormalizePayload,
+  DatasetService as DatasetServiceContract,
+} from "@langwatch/dataset-contract";
 import { DatasetService } from "../services/dataset.service";
 import { DatasetRecordRepository } from "../repositories/dataset-record.repository";
 import { DatasetRepository } from "../repositories/dataset.repository";
@@ -16,7 +19,6 @@ import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-r
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { DatasetContentAdapter } from "./dataset-content.adapter";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service";
-import type { DatasetNormalizePayload } from "../jobs/dataset-normalize.job";
 
 export type PostgresDatasetAdapterOptions = {
   database: PrismaClient;

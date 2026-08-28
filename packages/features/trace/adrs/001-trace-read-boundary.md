@@ -30,6 +30,13 @@ command and event definitions, canonicalisation, and the deterministic
 trace-analytics folds, stored-span and timeseries-rollup map projections, their
 stores, and their pure derivation collaborators.
 
+`TraceProcessingServerInstaller` is the package-owned registration boundary for
+that pipeline. It registers `assignTopic`, deferred-origin resolution, and the
+Dataset-normalize worker job with their existing routing, delay, deduplication,
+and grouping semantics. The application composes the complete Trace pipeline
+definition and effect adapters through named ports; it does not register a
+second Trace job graph.
+
 ## Composition and effects
 
 Composition roots create one Trace service, ingestion service, canonicalisation
@@ -42,6 +49,11 @@ include evaluation and automation dispatch, project metadata updates,
 simulation/experiment synchronization, governance subscribers and live UI
 broadcasts. They subscribe to the package-owned graph and do not reimplement its
 commands or projections.
+
+The worker may mount this installer before Topic so Topic receives the canonical
+Trace assignment port. Shared Eventing consumption remains disabled until every
+active shared-queue pipeline is mounted; a mounted Trace tranche is not itself
+authorization to consume unknown jobs.
 
 ## Persistence and query parity
 

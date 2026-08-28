@@ -9,6 +9,20 @@ export {
   type EventingTracePipelineAdapterOptions,
 } from "./adapters/eventing.trace-pipeline.adapter";
 export { EventingTraceProcessingAdapter } from "./adapters/eventing.trace-processing.adapter";
+export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing.installer";
+export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port";
+export {
+  createDeferredOriginHandler,
+  createOriginGateHandler,
+  DEFERRED_ORIGIN_CHECK_DELAY_MS,
+  type DeferredOriginPayload,
+  makeDeferredOriginJobId,
+  needsOriginResolution,
+  ORIGIN_GATE_DEDUP_TTL_MS,
+  ORIGIN_GATE_DELAY_MS,
+  TraceDeferredOriginSchedulerPort,
+} from "./adapters/eventing.deferred-origin.adapter";
+export { TraceProcessingPipelinePort } from "./ports/trace-processing-pipeline.port";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
 export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-analytics.repository";

@@ -34,7 +34,6 @@ export {
 } from "./adapters/postgres.dataset-migration.adapter";
 export { DatasetMigrationDatabasePort } from "./ports/dataset-migration-database.port";
 export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
-export type { DatasetNormalizePayload } from "./jobs/dataset-normalize.job";
 export * from "./services/dataset-chunking";
 export * from "./services/dataset-mutations";
 export * from "./services/presigned-upload";

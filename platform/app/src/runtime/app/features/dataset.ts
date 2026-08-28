@@ -1,4 +1,4 @@
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetNormalizePayload, DatasetService } from "@langwatch/dataset-contract";
 import {
   PostgresDatasetAdapter,
   type DatasetExperimentPort,
@@ -6,7 +6,6 @@ import {
   type DatasetUploadPort,
   type DatasetContentPort,
   type DatasetStorageResolver,
-  type DatasetNormalizePayload,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AppDatasetStorageResolver } from "./dataset-storage";
@@ -52,9 +51,7 @@ export class AppDatasetRuntime {
     return this.adapter.build();
   }
 
-  connectNormalization(
-    sender: (payload: DatasetNormalizePayload) => Promise<void>,
-  ): void {
+  connectNormalization(sender: (payload: DatasetNormalizePayload) => Promise<void>): void {
     this.adapter.connectNormalization(sender);
   }
 

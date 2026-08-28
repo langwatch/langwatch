@@ -11,8 +11,10 @@ import {
   TopicServerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
+import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
+import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
 import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime";
 import {
@@ -31,12 +33,18 @@ export type WorkerTopicCompositionOptions = {
   traceAssignments: TraceTopicAssignmentPort;
 };
 
+/** Trace's package-owned processing registration, mounted before Topic. */
+export type WorkerTraceCompositionOptions = {
+  installer: TraceProcessingInstallerPort;
+};
+
 /** All process boundaries are supplied explicitly by the executable's boot root. */
 export type WorkerProductionCompositionOptions = {
   config: WorkerConfig;
   eventing: EventingServerRuntimeOptions;
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
+  trace?: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
@@ -68,10 +76,16 @@ export class WorkerProductionComposition {
       execution: options.topic.execution,
       metrics: options.topic.metrics,
     });
+    const trace = options.trace
+      ? TraceWorkerFeatureInstaller.create({
+          installer: options.trace.installer,
+          eventing,
+        })
+      : undefined;
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,
-      traceAssignments: options.topic.traceAssignments,
+      traceAssignments: trace?.traceAssignments ?? options.topic.traceAssignments,
     });
     const enterprise = options.enterprise
       ? EnterpriseWorkerComposition.create(options.enterprise)
@@ -83,6 +97,7 @@ export class WorkerProductionComposition {
       lifecycle: options.lifecycle,
       transport: options.transport,
       topic,
+      trace,
       enterprise,
       observability: options.observability,
     });
@@ -98,6 +113,7 @@ export class WorkerProductionComposition {
     lifecycle: WorkerLifecyclePort;
     transport: WorkerTransportPort;
     topic: TopicWorkerFeatureInstaller;
+    trace?: TraceWorkerFeatureInstaller;
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
   }): WorkerProductionComposition {
@@ -109,11 +125,14 @@ export class WorkerProductionComposition {
     const application = WorkerApplication.create({
       runtime,
       eventing: options.eventing,
-      featureInstallers: [options.topic],
+      featureInstallers: options.trace ? [options.trace, options.topic] : [options.topic],
     });
 
     options.observability?.logger.info(
-      { environment: options.config.environment, features: [options.topic.name] },
+      {
+        environment: options.config.environment,
+        features: options.trace ? [options.trace.name, options.topic.name] : [options.topic.name],
+      },
       "worker production graph composed",
     );
 
@@ -128,6 +147,7 @@ export class WorkerProductionComposition {
       application,
       options.eventing,
       options.topic,
+      options.trace,
       enterprise,
     );
   }
@@ -136,6 +156,7 @@ export class WorkerProductionComposition {
     readonly application: WorkerApplication,
     readonly eventing: WorkerEventingRuntime,
     readonly topic: TopicWorkerFeatureInstaller,
+    readonly trace: TraceWorkerFeatureInstaller | undefined,
     readonly enterprise: EnterpriseWorkerComposition | undefined,
   ) {}
 }

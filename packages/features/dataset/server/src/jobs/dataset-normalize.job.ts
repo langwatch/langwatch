@@ -38,6 +38,7 @@ import {
   type DatasetConfirmColumns,
   type FileFormat,
 } from "@langwatch/dataset-contract";
+import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/prisma/dataset-content.repository";
 import { StreamingChunkWriter } from "../services/dataset-chunk-writer";
 import type { DatasetStorage } from "../ports/dataset-storage.port";
@@ -78,22 +79,6 @@ export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
  * sit at 8 MB — tune one without implying the other.
  */
 export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
-
-/** Payload for the `datasetNormalize` GroupQueue job. */
-export type DatasetNormalizePayload = {
-  /** Stable job id (datasetId) — used for staged-job debuggability + dedup. */
-  id: string;
-  /**
-   * Tenant id for the group/fairness machinery. Datasets are project-scoped and
-   * the event-sourcing layer's tenantId IS the projectId (see
-   * `createTenantId("project_…")`), so this equals `projectId`.
-   */
-  tenantId: string;
-  projectId: string;
-  datasetId: string;
-  stagingKey: string;
-  filename: string;
-};
 
 export type DatasetNormalizeDeps = {
   repository: DatasetRepository;
@@ -236,10 +221,7 @@ const parseInto = async (params: {
     // stored row — degrade to a derived all-`string` schema rather than emit the
     // corruption.
     const names = targetColumns.map((c) => c.name);
-    if (
-      names.some((name) => name.trim() === "") ||
-      new Set(names).size !== names.length
-    ) {
+    if (names.some((name) => name.trim() === "") || new Set(names).size !== names.length) {
       return;
     }
     // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
