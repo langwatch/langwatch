@@ -15,6 +15,7 @@ import type {
 import { reduceIdentity } from "@langwatch/identity";
 import type { IdentityHeadsRepository } from "@langwatch/identity-server";
 import { IdentityGuards, IdentityService } from "@langwatch/identity-server";
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readHandledError, resolveErrorCopy } from "~/features/errors";
 import { AccountIdentifiersService } from "~/server/app-layer/identity/account-identifiers.service";
@@ -58,9 +59,9 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   },
   // The composition root is reached at MODULE LOAD by better-auth's own
   // wiring, which the router's import graph pulls in. It is named here so the
-  // double is complete, and it answers an inert object rather than throwing:
-  // a throw would run before any test does.
-  identityStorageAdapter: () => ({}),
+  // double is complete. Better Auth still validates that adapter eagerly, so
+  // use its empty in-memory implementation instead of an incomplete object.
+  identityStorageAdapter: () => memoryAdapter({}),
 }));
 
 import { identityRouter } from "../identity";

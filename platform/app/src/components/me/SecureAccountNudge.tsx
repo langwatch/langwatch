@@ -35,11 +35,27 @@ import { authClient } from "~/utils/auth-client";
  */
 export function SecureAccountNudge() {
   const nudge = api.user.secureAccountNudge.useQuery({});
+
+  if (nudge.data?.offer !== true) return null;
+
+  return (
+    <SecureAccountNudgeOffer
+      offersPasskey={nudge.data.passkey}
+      offersTwoStep={nudge.data.twoStep}
+    />
+  );
+}
+
+function SecureAccountNudgeOffer({
+  offersPasskey,
+  offersTwoStep,
+}: {
+  offersPasskey: boolean;
+  offersTwoStep: boolean;
+}) {
   const answer = useNudgeAnswer();
 
-  if (answer.isAnswered || nudge.data?.offer !== true) return null;
-  const offersPasskey = nudge.data.passkey;
-  const offersTwoStep = nudge.data.twoStep;
+  if (answer.isAnswered) return null;
 
   return (
     <Dialog.Root

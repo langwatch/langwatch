@@ -19,18 +19,12 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // Members settings is org-scoped (resolved via the session's active org),
-  // not project-prefixed. The org context comes from the authenticated
-  // session, not the URL.
-  //
-  // MEMBERS BECAME THE FIRST CUT OF DIRECTORY. The old address is kept alive
-  // as a redirect on purpose — a support thread linking to it has to keep
-  // landing somewhere — so this walks in through the old door and waits for
-  // the page it becomes, which exercises the redirect as well as the list.
-  await page.goto(`/settings/members`);
-  await expect(page).toHaveURL(/\/settings\/directory/, { timeout: 15000 });
+  // Members settings is org-scoped at /settings/members. The organization
+  // context comes from the authenticated session rather than the URL.
+  await page.goto("/settings/members");
+  await expect(page).toHaveURL(/\/settings\/members/, { timeout: 15000 });
   await expect(
-    page.getByRole("heading", { name: "Directory" })
+    page.getByRole("heading", { name: "Organization Members" })
   ).toBeVisible({ timeout: 15000 });
 }
 
@@ -39,15 +33,10 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Open the invite drawer from the Directory's People tab.
- *
- * THE BUTTON AND THE DRAWER SAY DIFFERENT THINGS, on purpose: the control is
- * "Invite people", because that is the act, and the drawer it opens is headed
- * "Add members", because that is what you end up with. So the step names both
- * rather than assuming one word covers the journey.
+ * Open the invite drawer from the members page.
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Invite people/i }).click();
+  await page.getByRole("button", { name: /Add members/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()
