@@ -2,7 +2,7 @@ import type { Event, SubscriberDispatchDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { getBillingMonth, getPreviousBillingMonth } from "~/runtime/app/features/billing";
-import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
+import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 

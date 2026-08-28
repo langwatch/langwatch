@@ -1,9 +1,9 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { type AggregateType, createTenantId } from "@langwatch/eventing";
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,14 +12,14 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
   const aggregateId = "test-aggregate";
   const aggregateType: AggregateType = "trace";
 
-  let mockClickHouseClient: ClickHouseClient;
+  let mockClickHouseClient: EventingClickHouseClient;
   let store: EventingClickHouseEventStore;
 
   beforeEach(() => {
     // Mock ClickHouse client
     mockClickHouseClient = {
       query: vi.fn(),
-    } as unknown as ClickHouseClient;
+    } as unknown as EventingClickHouseClient;
 
     const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
     store = EventingClickHouseEventStore.create({

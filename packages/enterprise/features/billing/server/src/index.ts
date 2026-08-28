@@ -26,6 +26,14 @@ export { BillingSubscriptionNotifierPort } from "./ports/subscription-notifier.p
 export { NullBillingSubscriptionNotifierAdapter } from "./adapters/null-subscription-notifier.adapter";
 export { NullUsageLimitEmailAdapter, UsageLimitEmailAdapter } from "./ports/usage-limit-email.port";
 export { BillableEventsRepository, type BillableEventsWindow } from "./ports/billable-events.port";
+export {
+  BillableEventsMeterPort,
+  type BillableEventRecord,
+} from "./ports/billable-events-meter.port";
+export {
+  ClickHouseBillableEventsMeterAdapter,
+  type BillableEventsMeterClickHouseClientResolver,
+} from "./adapters/clickhouse.billable-events-meter.adapter";
 export { OrganizationPricingRepository } from "./ports/organization-pricing.port";
 export { BillingSubscriptionRepository } from "./ports/subscription.port";
 export {

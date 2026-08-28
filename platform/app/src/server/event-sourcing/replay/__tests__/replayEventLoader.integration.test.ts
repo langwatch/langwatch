@@ -5,7 +5,7 @@ import {
   stopTestContainers,
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
-import type { ReplayEvent } from "../replayEventLoader";
+import type { ReplayEvent } from "@langwatch/eventing";
 import {
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,
@@ -14,15 +14,17 @@ import {
   getAggregateOccurredAtBounds,
   getBoundedCutoffs,
   streamEventsForAggregatesBulk,
-} from "../replayEventLoader";
+} from "@langwatch/eventing/server";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
 
 /** Collect a streamed bulk load into per-aggregate-key event lists. */
 async function collectStreamedEvents(
-  params: Omit<Parameters<typeof streamEventsForAggregatesBulk>[0], "onEvent">,
+  params: Omit<Parameters<typeof streamEventsForAggregatesBulk>[0], "onEvent" | "lean">,
 ): Promise<Map<string, ReplayEvent[]>> {
   const grouped = new Map<string, ReplayEvent[]>();
   await streamEventsForAggregatesBulk({
     ...params,
+    lean: leanReplayEvent,
     onEvent: (event) => {
       const key = `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`;
       let list = grouped.get(key);
@@ -240,6 +242,7 @@ describe("replayEventLoader", () => {
     it("loads events up to cutoff", async () => {
       const client = getTestClickHouseClient()!;
       const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
         client,
         tenantId,
         aggregateIds: ["agg-1"],
@@ -258,6 +261,7 @@ describe("replayEventLoader", () => {
     it("parses event payload into data field", async () => {
       const client = getTestClickHouseClient()!;
       const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
         client,
         tenantId,
         aggregateIds: ["agg-2"],
@@ -276,6 +280,7 @@ describe("replayEventLoader", () => {
       it("returns events after cursor", async () => {
         const client = getTestClickHouseClient()!;
         const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
           client,
           tenantId,
           aggregateIds: ["agg-1"],
@@ -294,6 +299,7 @@ describe("replayEventLoader", () => {
       it("returns at most batchSize events", async () => {
         const client = getTestClickHouseClient()!;
         const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
           client,
           tenantId,
           aggregateIds: ["agg-1"],
@@ -348,6 +354,7 @@ describe("replayEventLoader", () => {
         eventId: "a-accepted-second",
       };
       const firstPage = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
         client,
         tenantId,
         aggregateIds: [aggregateId],
@@ -356,6 +363,7 @@ describe("replayEventLoader", () => {
         batchSize: 1,
       });
       const secondPage = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
         client,
         tenantId,
         aggregateIds: [aggregateId],
@@ -376,6 +384,7 @@ describe("replayEventLoader", () => {
       it("returns only the requested tenant's events", async () => {
         const client = getTestClickHouseClient()!;
         const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
           client,
           tenantId,
           aggregateIds: ["agg-1"],
@@ -614,6 +623,7 @@ describe("replayEventLoader", () => {
         aggregateIds: ["agg-1"],
       });
       const events = await batchLoadAggregateEvents({
+        lean: leanReplayEvent,
         client,
         tenantId,
         aggregateIds: ["agg-1"],

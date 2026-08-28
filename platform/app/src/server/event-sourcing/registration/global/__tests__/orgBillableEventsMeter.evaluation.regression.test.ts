@@ -26,7 +26,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "@langwatch/metric-contract";
 import { orgBillableEventsMeterProjection } from "../orgBillableEventsMeter.mapProjection";
-import type { BillableEventRecord } from "../orgBillableEventsMeter.store";
+import type { BillableEventRecord } from "@langwatch/enterprise-billing-server";
 
 /**
  * Registers the REAL meter projection (its real eventTypes + real map) onto an

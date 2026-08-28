@@ -3,10 +3,8 @@ import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "@langwatch/experiment-server";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
-import {
-  type BillableEventRecord,
-  orgBillableEventsMeterStore,
-} from "./orgBillableEventsMeter.store";
+import type { BillableEventRecord } from "@langwatch/enterprise-billing-server";
+import { orgBillableEventsMeterStore } from "./orgBillableEventsMeter.store";
 
 /**
  * Extracts a deduplication key from a billable event.

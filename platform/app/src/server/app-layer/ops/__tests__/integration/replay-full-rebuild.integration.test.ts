@@ -48,8 +48,9 @@ import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
 import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
-import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
+import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
+import { createReplayRuntime } from "~/runtime/app/replay-runtime.adapter";
 import { ReplayService } from "../../replay.service";
 import { ReplayRedisRepository } from "../../repositories/replay.redis.repository";
 
@@ -85,7 +86,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-vi.mock("~/server/event-sourcing/replay/replayPreset", () => ({
+vi.mock("~/runtime/app/replay-runtime.adapter", () => ({
   createReplayRuntime: vi.fn(),
 }));
 
@@ -294,7 +295,10 @@ describe("given identical span history for tenants whose rollup is empty", () =>
       mapProjections: [registered],
       stateProjections: [],
       service: new EventSourcingReplayService({
-        eventSource: new ClickHouseReplayEventSource(async () => client),
+        eventSource: new EventingClickHouseReplayEventSource({
+          resolveClient: async () => client,
+          lean: leanReplayEvent,
+        }),
         redis,
       }),
       // The connection is shared with the suite, so closing is the harness's job.

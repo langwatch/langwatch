@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
-import type { ClickHouseEventRow } from "../replayEventLoader";
-import { rowToEvent } from "../replayEventLoader";
+import type { ClickHouseEventRow } from "@langwatch/eventing/server";
+import { rowToEvent } from "@langwatch/eventing/server";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
 
 function makeRow(overrides: Partial<ClickHouseEventRow>): ClickHouseEventRow {
   return {
@@ -38,6 +39,7 @@ describe("rowToEvent", () => {
             },
           }),
         }),
+        leanReplayEvent,
       );
 
       const attrs = (event.data as any)?.span?.attributes ?? [];
@@ -50,7 +52,7 @@ describe("rowToEvent", () => {
 
   describe("when a row has no occurred-at value", () => {
     it("falls back to the event timestamp", () => {
-      const event = rowToEvent(makeRow({ EventOccurredAt: 0 }));
+      const event = rowToEvent(makeRow({ EventOccurredAt: 0 }), leanReplayEvent);
       expect(event.occurredAt).toBe(1_700_000_000_000);
     });
   });

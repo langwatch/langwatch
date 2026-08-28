@@ -1,15 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
-import type { BillableEventRecord } from "../orgBillableEventsMeter.store";
-
-const logger = createLogger("langwatch:billing:billable-events-repository");
-
-const TABLE_NAME = "billable_events" as const;
-
-export interface BillableEventsRepository {
-  /** Inserts one deduplicated billable-event row. */
-  insert(input: { record: BillableEventRecord; organizationId: string }): Promise<void>;
-}
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
  * Writes billable events for deduplicated usage counting.
@@ -18,15 +7,31 @@ export interface BillableEventsRepository {
  * per organization (private-instance customers get their own), and the
  * caller has already resolved the organization for the tenant before this is
  * reached. The resolver mirrors `getClickHouseClientForOrganization`'s
- * signature rather than the tenant-keyed `ClickHouseClientResolver` most
- * repositories take.
+ * signature rather than the tenant-keyed resolver most repositories take —
+ * and returns `null` where ClickHouse is not configured at all, which is the
+ * self-hosted case this write is simply skipped on.
  */
-export class BillableEventsMeterClickHouseRepository implements BillableEventsRepository {
-  constructor(
-    private readonly resolveClient: (
-      organizationId: string,
-    ) => Promise<ClickHouseClient | null>,
-  ) {}
+import { createLogger } from "@langwatch/observability";
+import type { BillableEventsMeterClickHouseClientResolver } from "../../adapters/clickhouse.billable-events-meter.adapter";
+import {
+  BillableEventsMeterPort,
+  type BillableEventRecord,
+} from "../../ports/billable-events-meter.port";
+
+const logger = createLogger("langwatch:billing:billable-events-repository");
+
+const TABLE_NAME = "billable_events" as const;
+
+export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterPort {
+  private constructor(private readonly resolveClient: BillableEventsMeterClickHouseClientResolver) {
+    super();
+  }
+
+  static create(options: {
+    resolveClient: BillableEventsMeterClickHouseClientResolver;
+  }): BillableEventsMeterClickHouseRepository {
+    return new BillableEventsMeterClickHouseRepository(options.resolveClient);
+  }
 
   async insert({
     record,

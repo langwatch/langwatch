@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import { getApp } from "../../../app-layer/app";
-import { createReplayRuntime } from "../replayPreset";
+import { createReplayRuntime } from "~/runtime/app/replay-runtime.adapter";
 
 vi.mock("ioredis", () => ({
   default: class {
@@ -48,11 +48,9 @@ vi.mock("@langwatch/suite-server", () => ({
   SUITE_RUN_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));
 
-vi.mock("../../projections/repositoryFoldStore", () => ({
+vi.mock("@langwatch/eventing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/eventing")>()),
   RepositoryFoldStore: class {},
-}));
-
-vi.mock("../replayService", () => ({
   ReplayService: class {},
 }));
 

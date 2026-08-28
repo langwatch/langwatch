@@ -10,7 +10,8 @@
  * invariant in lean-for-projection.unit.test.ts + replay-projection-parity.integration.test.ts.
  */
 
-import type { Event } from "@langwatch/eventing";
+import type { Event, ReplayEvent } from "@langwatch/eventing";
+import type { ReplayEventLean } from "@langwatch/eventing/server";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -331,3 +332,16 @@ function leanLogRecordReceivedEvent(event: Event): Event {
     },
   };
 }
+
+/**
+ * The same lean, in the shape `EventingClickHouseReplayEventSource` takes.
+ *
+ * Replay's event source lives in `@langwatch/eventing`, which the trace
+ * packages depend on, so the substrate cannot import this transform and takes
+ * it as a required dependency instead. Composed here, next to the transform, so
+ * the two casts across `ReplayEvent`/`Event` exist once rather than at every
+ * wiring site — and so a replay wired anywhere leans exactly as live dispatch
+ * does (ADR-022).
+ */
+export const leanReplayEvent: ReplayEventLean = (event) =>
+  leanForProjection(event as unknown as Event) as unknown as ReplayEvent;

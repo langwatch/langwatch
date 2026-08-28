@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import { buildTraceDeps } from "../../core/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "~/runtime/app/trace-processing.adapter";
-import { projectMetadataGroupKey } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/projectMetadata.subscriber";
+import { projectMetadataGroupKey } from "@langwatch/trace-server";
 
 /**
  * The lane and the dedup id must describe the same unit of work. The queue

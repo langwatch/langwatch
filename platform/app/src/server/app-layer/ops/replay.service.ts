@@ -4,7 +4,7 @@ import type { ReplayProgress, RetentionPolicyResolver } from "@langwatch/eventin
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
+import { createReplayRuntime } from "~/runtime/app/replay-runtime.adapter";
 import type {
   ReplayHistoryEntry,
   ReplayRepository,

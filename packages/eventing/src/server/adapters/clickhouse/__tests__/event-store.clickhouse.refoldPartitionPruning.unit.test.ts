@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   type AggregateType,
   createTenantId,
@@ -9,6 +8,7 @@ import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,7 +37,7 @@ beforeEach(() => {
   const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
   store = EventingClickHouseEventStore.create({
     repository: EventingClickHouseEventRepository.create({
-      resolveClient: async () => ({ query: queryMock }) as unknown as ClickHouseClient,
+      resolveClient: async () => ({ query: queryMock }) as unknown as EventingClickHouseClient,
       retention,
     }),
     retention,

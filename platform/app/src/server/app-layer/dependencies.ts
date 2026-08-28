@@ -20,6 +20,7 @@ import type { ManagedProviderService } from "@langwatch/enterprise-managed-provi
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type {
+  BillableEventsMeterPort,
   BillableEventsRepository as BillingEventsReadRepository,
   BillableEventsQueryService,
   CustomerService,
@@ -29,7 +30,6 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { AnnotationService } from "@langwatch/annotation-contract";
 import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { LangWatchQLService } from "~/server/analytics/lwql";
-import type { BillableEventsRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetSpendPort } from "@langwatch/gateway-server";
@@ -257,7 +257,7 @@ export interface AppDependencies {
   redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */
   billing: {
-    events: BillableEventsRepository;
+    events: BillableEventsMeterPort;
   };
   /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One

@@ -1,13 +1,15 @@
-import type { ClickHouseClient, Row } from "@clickhouse/client";
 import type {
-  Event,
-  ReplayEventSource as ReplayEventSourcePort,
-} from "@langwatch/eventing";
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
-
-function compareOrdinal(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
+  CutoffInfo,
+  DiscoveredAggregateWithEventTypes,
+  OccurredAtBounds,
+  ReplayEvent,
+  ReplayEventSource,
+} from "../../../replay/replayEventSource";
+import type {
+  EventingClickHouseReplayClient,
+  EventingClickHouseReplayClientResolver,
+  EventingClickHouseRow,
+} from "../../clickhouse-client-resolver";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -24,49 +26,29 @@ export interface ClickHouseEventRow {
   IdempotencyKey?: string;
 }
 
-/** Simplified event type matching what fold and map projections consume. */
-export interface ReplayEvent {
-  id: string;
-  aggregateId: string;
-  aggregateType: string;
-  tenantId: string;
-  /** Alias of `timestamp`; matches the canonical domain `Event.createdAt`. */
-  createdAt: number;
-  /** Retained for backwards-compat with replay-internal call sites. */
-  timestamp: number;
-  occurredAt: number;
-  type: string;
-  version: string;
-  idempotencyKey: string;
-  data: unknown;
-  metadata?: { processingTraceparent?: string };
-}
-
-/** Aggregate discovered for replay. */
-export interface DiscoveredAggregate {
-  tenantId: string;
-  aggregateType: string;
-  aggregateId: string;
-}
-
-/** Discovered aggregate plus the distinct event types found on it. */
-export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
-  eventTypes: string[];
-}
+/**
+ * The ADR-022 lean, supplied by the composition root.
+ *
+ * The transform belongs to the trace domain, which depends on this package, so
+ * it cannot be imported here. It is a REQUIRED dependency rather than an
+ * optional one with an identity default: replayed output is only byte-identical
+ * to live output when the same lean runs at both seams, and a default would let
+ * a composition that forgot it produce silently divergent projections instead of
+ * failing to compile.
+ */
+export type ReplayEventLean = (event: ReplayEvent) => ReplayEvent;
 
 /**
  * Materialize a raw `event_log` row into the event shape every replay path
  * consumes — including the ADR-022 lean, applied here exactly once (see the
  * comment on the return).
  */
-export function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
+export function rowToEvent(row: ClickHouseEventRow, lean: ReplayEventLean): ReplayEvent {
   const data =
     row.EventPayload && row.EventPayload.length > 0 ? JSON.parse(row.EventPayload) : null;
 
   const occurredAt =
-    row.EventOccurredAt && row.EventOccurredAt > 0
-      ? row.EventOccurredAt
-      : row.EventTimestamp;
+    row.EventOccurredAt && row.EventOccurredAt > 0 ? row.EventOccurredAt : row.EventTimestamp;
 
   const event: ReplayEvent = {
     id: row.EventId,
@@ -90,7 +72,7 @@ export function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
   // through this function, so a single lean here replaces one lean per
   // (event × projection) inside the accumulators while keeping replayed
   // output byte-identical to live.
-  return leanForProjection(event as unknown as Event) as unknown as ReplayEvent;
+  return lean(event);
 }
 
 /**
@@ -103,7 +85,7 @@ export async function discoverAffectedAggregates({
   sinceMs,
   tenantId,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   eventTypes: readonly string[];
   sinceMs: number;
   tenantId?: string;
@@ -145,7 +127,7 @@ export async function countEventsForAggregates({
   sinceMs,
   tenantId,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   eventTypes: readonly string[];
   sinceMs: number;
   tenantId?: string;
@@ -174,47 +156,6 @@ export async function countEventsForAggregates({
 
   const rows = (await result.json()) as { totalEvents: string }[];
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
-}
-
-/** Cutoff info for an aggregate: the last event's timestamp and ID. */
-export interface CutoffInfo {
-  timestamp: number;
-  eventId: string;
-}
-
-/** Compare canonical event-log positions. Aggregate IDs never define order. */
-export function compareEventPositions(left: CutoffInfo, right: CutoffInfo): number {
-  if (left.timestamp !== right.timestamp) {
-    return left.timestamp - right.timestamp;
-  }
-  return compareOrdinal(left.eventId, right.eventId);
-}
-
-/** Return the latest canonical position from a non-empty collection. */
-export function maxEventPosition(positions: Iterable<CutoffInfo>): CutoffInfo {
-  const iterator = positions[Symbol.iterator]();
-  const first = iterator.next();
-  if (first.done) {
-    throw new Error("Cannot find the latest event position in an empty collection");
-  }
-
-  let latest = first.value;
-  for (let next = iterator.next(); !next.done; next = iterator.next()) {
-    if (compareEventPositions(next.value, latest) > 0) latest = next.value;
-  }
-  return latest;
-}
-
-/**
- * Inclusive `EventOccurredAt` range (ms) covering EVERY event of a set of
- * aggregates. Used purely as a partition-pruning predicate: `event_log` is
- * `PARTITION BY toYearWeek(EventOccurredAt)`, so without a WHERE on
- * `EventOccurredAt` every cutoff/load query scans ALL partitions — including
- * cold storage on S3 — once per batch.
- */
-export interface OccurredAtBounds {
-  minMs: number;
-  maxMs: number;
 }
 
 /** SQL fragment + params for an optional occurred-at pruning predicate. */
@@ -259,7 +200,7 @@ export async function getAggregateOccurredAtBounds({
   aggregateTypes,
   aggregateIds,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateTypes: string[];
   aggregateIds: string[];
@@ -309,7 +250,7 @@ export async function batchGetCutoffEventIds({
   eventTypes,
   occurredAtBounds,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
@@ -374,7 +315,7 @@ export async function getBoundedCutoffs({
   aggregateIds,
   eventTypes,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateTypes: string[];
   aggregateIds: string[];
@@ -435,14 +376,16 @@ export async function streamEventsForAggregatesBulk({
   eventTypes,
   cutoffs,
   occurredAtBounds,
+  lean,
   onEvent,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
   cutoffs: Map<string, CutoffInfo>;
   occurredAtBounds?: OccurredAtBounds;
+  lean: ReplayEventLean;
   onEvent: (event: ReplayEvent) => void | Promise<void>;
 }): Promise<{ eventsApplied: number }> {
   if (aggregateIds.length === 0) return { eventsApplied: 0 };
@@ -472,12 +415,12 @@ export async function streamEventsForAggregatesBulk({
   let eventsApplied = 0;
   const stream = result.stream();
   for await (const rows of stream) {
-    for (const streamedRow of rows as Row[]) {
-      const row = streamedRow.json() as ClickHouseEventRow;
+    for (const streamedRow of rows as EventingClickHouseRow[]) {
+      const row = streamedRow.json<ClickHouseEventRow>();
       const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
       if (isRowBeyondCutoff(row, cutoffs.get(key))) continue;
 
-      const maybePromise = onEvent(rowToEvent(row));
+      const maybePromise = onEvent(rowToEvent(row, lean));
       if (maybePromise instanceof Promise) await maybePromise;
       eventsApplied++;
     }
@@ -487,15 +430,10 @@ export async function streamEventsForAggregatesBulk({
 }
 
 /** Whether a row falls past its aggregate's cutoff (skip it, live owns it). */
-function isRowBeyondCutoff(
-  row: ClickHouseEventRow,
-  cutoff: CutoffInfo | undefined,
-): boolean {
+function isRowBeyondCutoff(row: ClickHouseEventRow, cutoff: CutoffInfo | undefined): boolean {
   if (!cutoff) return false;
   const eventTimestamp =
-    typeof row.EventTimestamp === "string"
-      ? parseInt(row.EventTimestamp, 10)
-      : row.EventTimestamp;
+    typeof row.EventTimestamp === "string" ? parseInt(row.EventTimestamp, 10) : row.EventTimestamp;
   if (eventTimestamp > cutoff.timestamp) return true;
   return eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId;
 }
@@ -512,8 +450,9 @@ export async function batchLoadAggregateEvents({
   cursor,
   batchSize,
   occurredAtBounds,
+  lean,
 }: {
-  client: ClickHouseClient;
+  client: EventingClickHouseReplayClient;
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
@@ -521,6 +460,7 @@ export async function batchLoadAggregateEvents({
   cursor?: CutoffInfo;
   batchSize: number;
   occurredAtBounds?: OccurredAtBounds;
+  lean: ReplayEventLean;
 }): Promise<ReplayEvent[]> {
   const pruning = occurredAtPredicate(occurredAtBounds);
 
@@ -576,13 +516,27 @@ export async function batchLoadAggregateEvents({
   });
 
   const rows = (await result.json()) as ClickHouseEventRow[];
-  return rows.map(rowToEvent);
+  return rows.map((row) => rowToEvent(row, lean));
 }
 
-export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
-  constructor(
-    private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient>,
-  ) {}
+/**
+ * The canonical `event_log` reader replay runs against.
+ *
+ * Reads only. It never dispatches to subscribers or process managers, and
+ * offers no seam that could — replay rebuilds derived state and must not
+ * re-fire the side effects the original events already caused.
+ */
+export class EventingClickHouseReplayEventSource implements ReplayEventSource {
+  private readonly resolveClient: EventingClickHouseReplayClientResolver;
+  private readonly lean: ReplayEventLean;
+
+  constructor(deps: {
+    resolveClient: EventingClickHouseReplayClientResolver;
+    lean: ReplayEventLean;
+  }) {
+    this.resolveClient = deps.resolveClient;
+    this.lean = deps.lean;
+  }
 
   async discoverAffectedAggregates(input: {
     eventTypes: readonly string[];
@@ -628,6 +582,7 @@ export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
   }): Promise<{ eventsApplied: number }> {
     return streamEventsForAggregatesBulk({
       client: await this.resolveClient(input.tenantId),
+      lean: this.lean,
       ...input,
     });
   }
@@ -643,6 +598,7 @@ export class ClickHouseReplayEventSource implements ReplayEventSourcePort {
   }): Promise<ReplayEvent[]> {
     return batchLoadAggregateEvents({
       client: await this.resolveClient(input.tenantId),
+      lean: this.lean,
       ...input,
     });
   }

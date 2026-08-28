@@ -1,18 +1,10 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { BillableEventRecord } from "@langwatch/enterprise-billing-server";
 import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
 const logger = createLogger("langwatch:billing:orgBillableEventsMeter");
-
-export interface BillableEventRecord {
-  organizationId: string;
-  tenantId: string;
-  eventId: string;
-  eventType: string;
-  deduplicationKey: string;
-  eventTimestamp: number;
-}
 
 /**
  * AppendStore that records billable events to ClickHouse for deduplicated counting.

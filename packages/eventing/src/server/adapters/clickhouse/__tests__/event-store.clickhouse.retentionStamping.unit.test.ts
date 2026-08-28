@@ -1,13 +1,20 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import { createTenantId } from "@langwatch/eventing";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import { createTenantId, type RetentionPolicyResolver } from "@langwatch/eventing";
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../../data-retention/retentionPolicy.schema";
+
+/**
+ * Stands in for whatever default the composing process injects. A literal
+ * rather than the platform constant on purpose: the platform's value is
+ * environment-dependent and lives in the app, and the behaviour under test is
+ * "the INJECTED default is what gets stamped", which a shared constant on both
+ * sides of the assertion cannot actually distinguish.
+ */
+const INJECTED_DEFAULT_RETENTION_DAYS = 49;
 
 /**
  * @scenario Trace pipeline stamps _retention_days from traces category
@@ -24,7 +31,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   const aggregateId = "trace_123";
   const aggregateType = "trace" as const;
 
-  let mockClient: ClickHouseClient;
+  let mockClient: EventingClickHouseClient;
   let insertSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -32,7 +39,7 @@ describe("EventStoreClickHouse retention stamping", () => {
     mockClient = {
       query: vi.fn(),
       insert: insertSpy,
-    } as unknown as ClickHouseClient;
+    } as unknown as EventingClickHouseClient;
   });
 
   const makeEvent = () => ({
@@ -49,7 +56,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when retention resolver returns a policy with traces=30", () => {
     it("stamps every event_log record with _retention_days = 30", async () => {
-      const resolver: Pick<DataRetentionService, "resolve"> = {
+      const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue({
           traces: 30,
           scenarios: null,
@@ -57,7 +64,7 @@ describe("EventStoreClickHouse retention stamping", () => {
         }),
       };
       const retention = createEventingRetentionConfiguration({
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
       });
       const store = EventingClickHouseEventStore.create({
         repository: EventingClickHouseEventRepository.create({
@@ -88,7 +95,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   describe("when no resolver is wired (e.g. tests)", () => {
     it("falls back to the platform default", async () => {
       const retention = createEventingRetentionConfiguration({
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
       });
       const store = EventingClickHouseEventStore.create({
         repository: EventingClickHouseEventRepository.create({
@@ -103,17 +110,17 @@ describe("EventStoreClickHouse retention stamping", () => {
       const values = insertSpy.mock.calls[0]![0]!.values as Array<{
         _retention_days: number;
       }>;
-      expect(values[0]!._retention_days).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
+      expect(values[0]!._retention_days).toBe(INJECTED_DEFAULT_RETENTION_DAYS);
     });
   });
 
   describe("when the tenant has no policy configured", () => {
     it("falls back to the platform default", async () => {
-      const resolver: Pick<DataRetentionService, "resolve"> = {
+      const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue(null),
       };
       const retention = createEventingRetentionConfiguration({
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
       });
       const store = EventingClickHouseEventStore.create({
         repository: EventingClickHouseEventRepository.create({
@@ -129,7 +136,7 @@ describe("EventStoreClickHouse retention stamping", () => {
       const values = insertSpy.mock.calls[0]![0]!.values as Array<{
         _retention_days: number;
       }>;
-      expect(values[0]!._retention_days).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
+      expect(values[0]!._retention_days).toBe(INJECTED_DEFAULT_RETENTION_DAYS);
     });
   });
 });

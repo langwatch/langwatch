@@ -1,14 +1,14 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   createEventingRetentionConfiguration,
   EVENT_LOG_SELECT_COLUMNS,
   EventingClickHouseEventRepository,
+  type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 
 const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
 
-function repositoryFor(client: ClickHouseClient): EventingClickHouseEventRepository {
+function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEventRepository {
   return EventingClickHouseEventRepository.create({
     resolveClient: async () => client,
     retention,
@@ -41,7 +41,7 @@ function createMockClient(payload: unknown) {
       const projected = Object.fromEntries(selected.map((column) => [column, storedRow[column]]));
       return { json: vi.fn().mockResolvedValue([projected]) };
     }),
-  } as unknown as ClickHouseClient;
+  } as unknown as EventingClickHouseClient;
 }
 
 /** Everything between `SELECT` and the `FROM` that closes it. */
@@ -50,7 +50,13 @@ function selectListOf(query: string): string {
 }
 
 /** The query text the repository sent on its Nth call. */
-function queryOf({ client, call = 0 }: { client: ClickHouseClient; call?: number }): string {
+function queryOf({
+  client,
+  call = 0,
+}: {
+  client: EventingClickHouseClient;
+  call?: number;
+}): string {
   return (client.query as ReturnType<typeof vi.fn>).mock.calls[call]![0].query;
 }
 

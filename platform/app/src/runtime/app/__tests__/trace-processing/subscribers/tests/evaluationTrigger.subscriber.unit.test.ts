@@ -2,7 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
+import { TRACK_EVENT_SPAN_NAME } from "@langwatch/trace-contract";
 import { MAX_PROCESSED_SPANS } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
@@ -10,7 +10,7 @@ import {
   detectCausalityLoop,
   type EvaluationTriggerSubscriberDeps,
 } from "~/runtime/app/trace-evaluation-trigger.adapter";
-import { DEFERRED_CHECK_DELAY_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/originGate.subscriber";
+import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "@langwatch/trace-server";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
@@ -402,7 +402,7 @@ describe("evaluationTrigger subscriber", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_ORIGIN_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
 

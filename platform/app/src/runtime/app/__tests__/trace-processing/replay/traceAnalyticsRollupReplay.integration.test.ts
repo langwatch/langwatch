@@ -40,7 +40,8 @@ import {
   generateTestAggregateId,
   generateTestTenantId,
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
+import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -294,7 +295,10 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
       const result = await runFoldMapReplay({
         ctx: {
           redis,
-          eventSource: new ClickHouseReplayEventSource(async () => client),
+          eventSource: new EventingClickHouseReplayEventSource({
+            resolveClient: async () => client,
+            lean: leanReplayEvent,
+          }),
           accumulatorOpts: {},
         },
         config: {

@@ -22,7 +22,8 @@ import {
   stopTestContainers,
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
-import { ClickHouseReplayEventSource } from "../replayEventLoader";
+import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -107,11 +108,14 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     const redis = getTestRedisConnection()!;
 
     const service = new ReplayService({
-      eventSource: new ClickHouseReplayEventSource(async (tenantId: string) => {
-        resolverCalls.push(tenantId);
-        // In production, different tenants may resolve to different CH instances.
-        // Here we return the same client but track which tenant IDs were requested.
-        return client;
+      eventSource: new EventingClickHouseReplayEventSource({
+        resolveClient: async (tenantId: string) => {
+          resolverCalls.push(tenantId);
+          // In production, different tenants may resolve to different CH instances.
+          // Here we return the same client but track which tenant IDs were requested.
+          return client;
+        },
+        lean: leanReplayEvent,
       }),
       redis,
     });

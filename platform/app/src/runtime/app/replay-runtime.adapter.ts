@@ -5,6 +5,7 @@ import type {
   RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import { ReplayService, RepositoryFoldStore } from "@langwatch/eventing";
+import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "~/server/app-layer/app";
 import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
@@ -19,7 +20,7 @@ import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.ada
 import { AppTraceWindowedReadMetricsAdapter } from "~/runtime/app/trace-windowed-read-metrics.adapter";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "@langwatch/suite-server";
-import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
+import { leanReplayEvent } from "~/server/app-layer/traces/lean-for-projection";
 
 export interface ReplayRuntime {
   service: ReplayService;
@@ -194,7 +195,14 @@ export function createReplayRuntime(config: {
   }
 
   const service = new ReplayService({
-    eventSource: new ClickHouseReplayEventSource(clientResolver),
+    eventSource: new EventingClickHouseReplayEventSource({
+      resolveClient: clientResolver,
+      // ADR-022: the lean is a trace-domain transform and the trace packages
+      // depend on Eventing, so the substrate takes it from here rather than
+      // importing it. Same transform, same seam as live dispatch — that is what
+      // keeps a rebuilt row identical to the one live ingestion wrote.
+      lean: leanReplayEvent,
+    }),
     redis,
     // Reuse the live pipeline's cached resolver so replay-rebuilt rows honour
     // the same per-tenant retention as live ingestion.

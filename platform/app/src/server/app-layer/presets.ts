@@ -37,6 +37,7 @@ import { EntitlementService } from "@langwatch/entitlement-server";
 import { resolveGatewayBaseUrl } from "@langwatch/ui/public-config/projection";
 import {
   BillableEventsQueryService,
+  ClickHouseBillableEventsMeterAdapter,
   ClickHouseBillingAdapter,
   CustomerService,
   NotificationService,
@@ -230,11 +231,10 @@ import {
   EventingClickHouseEventStore,
   PrismaProcessStore,
 } from "@langwatch/eventing/server";
-import { BILLING_REPORTING_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/billing-reporting/pipeline";
+import { BILLING_REPORTING_PIPELINE_NAME } from "@langwatch/enterprise-billing-contract";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server";
 import { createBillingMeterDispatchSubscriber } from "~/server/event-sourcing/registration/global/billingMeterDispatch.subscriber";
 import { orgBillableEventsMeterProjection } from "~/server/event-sourcing/registration/global/orgBillableEventsMeter.mapProjection";
-import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
 import type { PipelineRepositories } from "~/server/event-sourcing/registration/pipelineRegistry";
 import {
   type AppCommands,
@@ -341,7 +341,6 @@ import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsuppo
 import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
-import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
@@ -739,7 +738,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
 
   // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
-  // their own and close it themselves — `replayPreset` (which needs a
+  // their own and close it themselves — `replay-runtime.adapter` (which needs a
   // standalone client, since its multi-key work CROSSSLOT-rejects on a cluster)
   // and the `migrateObjectStorage` task, which boots no App at all. Both go
   // through the client package; neither is a second live connection in a
@@ -2022,7 +2021,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     storedObjects: storedObjectsService,
     evaluationInputsOffloadConfig,
     costRecorder: PrismaEvaluationCostRecorder.create(prisma),
-    billingCheckpoints: new PrismaBillingCheckpointService(prisma),
+    billingCheckpoints: PostgresBillingAdapter.create(prisma).build().checkpoints,
     usageReportingService,
     gatewaySpend,
     webhookDelivery: webhookDeliveryDeps,
@@ -2480,7 +2479,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     },
     redis,
     billing: {
-      events: new BillableEventsMeterClickHouseRepository(getClickHouseClientForOrganization),
+      events: ClickHouseBillableEventsMeterAdapter.create({
+        resolveClient: getClickHouseClientForOrganization,
+      }).build(),
     },
     governance,
     billableEvents: billableEventsRepository ?? undefined,
@@ -3195,7 +3196,7 @@ export function createTestApp(
     // override, or injects a double into the unit directly.
     redis: null,
     billing: {
-      events: new BillableEventsMeterClickHouseRepository(async () => null),
+      events: ClickHouseBillableEventsMeterAdapter.create({ resolveClient: async () => null }).build(),
     },
     governance: testGovernance,
     billableEvents: undefined,

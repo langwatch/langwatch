@@ -143,7 +143,7 @@ const RESOLVES_VIA_APP = /getApp\(\)\s*\.\s*clickhouse\s*\.\s*resolveClient/;
 
 const MAY_RESOLVE_VIA_APP = new Set([
   "src/server/traces/trace-blob-resolution.deps.ts",
-  "src/server/event-sourcing/replay/replayPreset.ts",
+  "src/runtime/app/replay-runtime.adapter.ts",
 ]);
 
 /**
