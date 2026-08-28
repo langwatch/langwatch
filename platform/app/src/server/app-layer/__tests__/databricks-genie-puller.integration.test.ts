@@ -101,7 +101,7 @@ async function pullThroughTheRealPipeline(params: {
   cursor: string | null;
 }): Promise<{ nextCursor: string | null; eventCount: number }> {
   const eventSourcing = new EventSourcing({
-    processStore: new InMemoryProcessStore(),
+    processStore: InMemoryProcessStore.createForTesting(),
     eventStore: EventStoreMemory.createForTesting(),
     // Consumers only run for a worker role, and the outbox dispatcher IS the
     // step under test — without this the intent would sit pending forever and

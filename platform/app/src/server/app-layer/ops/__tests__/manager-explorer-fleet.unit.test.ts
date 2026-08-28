@@ -27,7 +27,7 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
   const fleet = new NullProcessOpsRepository();
   fleet.countByProcessName = async () => rows;
   return new ManagerExplorerService({
-    store: new InMemoryProcessStore(),
+    store: InMemoryProcessStore.createForTesting(),
     fleet,
     audit: new NullProcessAuditSink(),
     registry: () =>

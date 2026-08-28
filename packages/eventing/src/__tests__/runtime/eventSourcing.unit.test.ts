@@ -5,6 +5,7 @@ import { defineAggregate, defineEvents } from "../../domain/definitions";
 import type { Event } from "../../domain/types";
 import { EventSourcing } from "../../eventSourcing";
 import { definePipeline } from "../../pipeline/staticBuilder";
+import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore";
 import {
   createMockEventStore,
   createMockMapProjectionDefinition,
@@ -22,6 +23,25 @@ function createTestPipelineDefinition() {
       events: defineEvents(["test.event"] as const),
     }),
   }).build();
+}
+
+function createProcessPipelineDefinition() {
+  return definePipeline<Event>({
+    name: "process-pipeline",
+    aggregate: defineAggregate({
+      type: "trace",
+      events: defineEvents(["test.event"] as const),
+    }),
+  })
+    .withProcessManager("durable-process", (process) =>
+      process
+        .state({ handled: 0 })
+        .keyBy(() => "test-process")
+        .on("test.event", (state) => ({
+          state: { handled: state.handled + 1 },
+        })),
+    )
+    .build();
 }
 
 describe("EventSourcing", () => {
@@ -150,6 +170,36 @@ describe("EventSourcing", () => {
 
       expect(pipeline.name).toBe("test-pipeline");
       expect(pipeline.aggregateType).toBe("trace");
+    });
+
+    it("rejects process-manager registration atomically without an explicitly injected ProcessStore", () => {
+      const eventSourcing = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      expect(() => eventSourcing.register(createProcessPipelineDefinition())).toThrow(
+        "A durable ProcessStore is required for process managers",
+      );
+
+      expect(eventSourcing.definitions).toEqual([]);
+      expect(() => eventSourcing.getPipeline("process-pipeline")).toThrow(
+        'Pipeline "process-pipeline" not found',
+      );
+
+      const pipeline = eventSourcing.register(createTestPipelineDefinition());
+
+      expect(pipeline.name).toBe("test-pipeline");
+      expect(eventSourcing.definitions).toHaveLength(1);
+    });
+
+    it("accepts a process manager when a test explicitly injects InMemoryProcessStore", async () => {
+      const eventSourcing = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+
+      expect(() => eventSourcing.register(createProcessPipelineDefinition())).not.toThrow();
+      await eventSourcing.close();
     });
 
     it("forwards projection payload preparation into the live pipeline", async () => {

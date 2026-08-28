@@ -63,7 +63,7 @@ describe("LangyConversationProcess", () => {
   let service: ProcessManagerService<LangyConversationProcessState>;
 
   beforeEach(() => {
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
     service = new ProcessManagerService({
       definition: langyConversationProcessDefinition,
       store,

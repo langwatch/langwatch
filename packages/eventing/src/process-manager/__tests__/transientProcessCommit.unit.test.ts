@@ -89,7 +89,7 @@ function refFor(key: string) {
 }
 
 beforeEach(() => {
-  store = new InMemoryProcessStore();
+  store = InMemoryProcessStore.createForTesting();
   service = new ProcessManagerService<ProbeState>({
     store,
     definition: buildProbe(),

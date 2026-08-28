@@ -16,7 +16,7 @@ describe("WorkerEventingRuntime", () => {
     const runtime = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
     });
@@ -32,7 +32,7 @@ describe("WorkerEventingRuntime", () => {
     const runtime = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => new TestQueue(),
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,

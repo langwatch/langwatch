@@ -2894,7 +2894,7 @@ export function createTestApp(
     ops: Object.assign(testOpsService, {
       eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
       managerExplorer: new ManagerExplorerService({
-        store: new InMemoryProcessStore(),
+        store: InMemoryProcessStore.createForTesting(),
         fleet: new NullProcessOpsRepository(),
         audit: new NullProcessAuditSink(),
       }),

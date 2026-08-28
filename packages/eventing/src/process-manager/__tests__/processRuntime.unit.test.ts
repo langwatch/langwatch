@@ -70,7 +70,7 @@ function physicalEvent(id: string): ProcessTestEvent {
 describe("ProcessRuntime", () => {
   describe("given a process manager derives an operation key from its event", () => {
     it("persists the process under that key instead of the aggregate ID", async () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: false });
       const definition = buildProcessManager<ProcessTestEvent>({
         name: "operationInbox",
@@ -117,7 +117,7 @@ describe("ProcessRuntime", () => {
 
   describe("given a registered signal handler", () => {
     it("schema-validates and synchronously returns its committed state", async () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: false });
       const definition = buildProcessManager<ProcessTestEvent>({
         name: "signalInbox",
@@ -190,7 +190,7 @@ describe("ProcessRuntime", () => {
 
   describe("given duplicate physical rows share one logical event key", () => {
     it("evolves the process exactly once", async () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: false });
       const definition = buildProcessManager<ProcessTestEvent>({
         name: "logicalInbox",
@@ -268,7 +268,7 @@ describe("ProcessRuntime", () => {
 
   describe("given a process manager name is registered by two pipelines", () => {
     it("throws mounted by more than one pipeline", () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: false });
       const definition = buildProcessManager<ProcessTestEvent>({
         name: "dupeInbox",
@@ -295,7 +295,7 @@ describe("ProcessRuntime", () => {
 
   describe("given a scheduled process manager is registered with consumers enabled", () => {
     it("arms nextWakeAt on the singleton scheduled process", async () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: true });
       const definition = buildProcessManager<ProcessTestEvent>({
         name: "scheduledSweep",

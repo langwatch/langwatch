@@ -111,7 +111,7 @@ describe("WorkerProductionComposition", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
@@ -180,7 +180,7 @@ describe("WorkerProductionComposition", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
@@ -223,7 +223,7 @@ describe("WorkerProductionComposition", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
@@ -259,7 +259,7 @@ describe("WorkerProductionComposition", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,

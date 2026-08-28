@@ -47,7 +47,7 @@ const wakeContext = (at: number): ProcessHandlerContext<GithubBranchRecheckInten
 function createDeps() {
   return {
     github: TestGithubService.create(),
-    processStore: new InMemoryProcessStore(),
+    processStore: InMemoryProcessStore.createForTesting(),
   };
 }
 

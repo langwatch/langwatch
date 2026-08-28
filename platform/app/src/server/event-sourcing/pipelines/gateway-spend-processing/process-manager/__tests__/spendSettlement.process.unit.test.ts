@@ -129,7 +129,7 @@ beforeEach(() => {
     graceMs: GRACE_MS,
     now: () => clock,
   };
-  store = new InMemoryProcessStore();
+  store = InMemoryProcessStore.createForTesting();
   const definition = buildDefinition(deps);
   service = new ProcessManagerService<SpendSettlementState>({
     store,

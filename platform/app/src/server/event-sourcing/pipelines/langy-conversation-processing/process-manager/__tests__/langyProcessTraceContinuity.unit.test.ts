@@ -83,7 +83,7 @@ describe("Langy process trace continuity", () => {
   });
 
   beforeEach(() => {
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
   });
 
   afterEach(() => {

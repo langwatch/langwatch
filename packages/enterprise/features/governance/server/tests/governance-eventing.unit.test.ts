@@ -182,7 +182,7 @@ class RecordingGatewayDebitPort extends GatewayDebitPort {
 }
 
 class RecordingGovernanceWebhookPort extends GovernanceWebhookPort {
-  readonly processStore = new InMemoryProcessStore();
+  readonly processStore = InMemoryProcessStore.createForTesting();
   readonly maxAttempts = 11;
   readonly batches: GovernanceWebhookSendBatch[] = [];
   enabled = true;

@@ -27,7 +27,7 @@ describe("OutboxDispatcherService", () => {
 
   beforeEach(() => {
     observeDispatchLag.mockClear();
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
     service = new ProcessManagerService({
       definition: pilotDefinition,
       store,

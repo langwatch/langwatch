@@ -234,7 +234,7 @@ beforeAll(async () => {
   chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
   service = GatewayService.create(prisma, chRepo);
   eventSourcing = new EventSourcing({
-    processStore: new InMemoryProcessStore(),
+    processStore: InMemoryProcessStore.createForTesting(),
     executionTarget: "all",
   });
   const pipeline = eventSourcing.register(

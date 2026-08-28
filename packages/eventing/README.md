@@ -54,6 +54,11 @@ manager for durable, stateful orchestration.
   explicitly inject `EventStoreMemory.createForTesting()` or
   `EventStoreMemory.createForLocalDevelopment()` from the testing surface;
   production composition must inject a durable store.
+- A pipeline with `withProcessManager` also requires an injected durable
+  `ProcessStore`. Tests and local tools may explicitly inject
+  `InMemoryProcessStore.createForTesting()` or
+  `InMemoryProcessStore.createForLocalDevelopment()`; process managers never
+  receive an implicit in-memory fallback.
 - Import `@langwatch/eventing/server` only from a process composition root to
   construct the private Prisma, ClickHouse, retention, and Group Queue graph.
   Inject an already-created Prisma client, tenant-aware ClickHouse resolver,

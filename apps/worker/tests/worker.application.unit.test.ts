@@ -55,7 +55,7 @@ function createEventing(phases: string[]): WorkerEventingRuntime {
   return WorkerEventingRuntime.create({
     eventStore: EventStoreMemory.createForTesting(),
     queueFactory: () => new EventingQueue(phases),
-    processStore: new InMemoryProcessStore(),
+    processStore: InMemoryProcessStore.createForTesting(),
     executionTarget: "worker",
     warnWhenProjectionsRunInline: false,
     consumersEnabled: false,
@@ -152,7 +152,7 @@ describe("WorkerApplication", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
@@ -240,7 +240,7 @@ describe("WorkerApplication", () => {
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
-      processStore: new InMemoryProcessStore(),
+      processStore: InMemoryProcessStore.createForTesting(),
       executionTarget: "worker",
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,

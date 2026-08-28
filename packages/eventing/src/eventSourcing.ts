@@ -11,7 +11,6 @@ import type {
 } from "./pipeline/staticBuilder.types";
 import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types";
 import { ProcessRuntime } from "./process-manager/processRuntime";
-import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
 import type { ProcessStore } from "./process-manager/stores/processStore.types";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck";
@@ -49,8 +48,9 @@ export interface EventSourcingOptions {
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   /**
    * Durable persistence for `withProcess` declarations (inbox, state,
-   * outbox). Production passes the PrismaProcessStore; when absent, an
-   * in-memory store backs the processes (tests / no-Postgres dev).
+   * outbox, leases, and wakes. Required when registering a pipeline with a
+   * process manager. Tests and local tools may explicitly inject an
+   * InMemoryProcessStore.
    */
   processStore?: ProcessStore;
 }
@@ -61,6 +61,7 @@ export interface EventSourcingOptions {
 interface RuntimeStores {
   eventStore: EventStore;
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  processStore?: ProcessStore;
 }
 
 /**
@@ -134,9 +135,10 @@ export class EventSourcing {
    * composition root can feed lifecycle envelopes from outside a pipeline.
    */
   get processRuntime(): ProcessRuntime {
+    const processStore = this.requireProcessStore();
     if (!this._processRuntimeInstance) {
       this._processRuntimeInstance = new ProcessRuntime({
-        store: this._processStore ?? new InMemoryProcessStore(),
+        store: processStore,
         consumersEnabled: this._consumersEnabled,
       });
     }
@@ -207,6 +209,9 @@ export class EventSourcing {
         },
       },
       () => {
+        if (definition.processManagers.size > 0) {
+          this.requireProcessStore();
+        }
         createEventCatalogue([
           ...this._definitions.map((registered) => registered.aggregate),
           definition.aggregate,
@@ -355,6 +360,16 @@ export class EventSourcing {
     }
 
     this.initializeStores();
+  }
+
+  private requireProcessStore(): ProcessStore {
+    if (!this._processStore) {
+      throw new ConfigurationError(
+        "EventSourcing",
+        "A durable ProcessStore is required for process managers. Tests must explicitly inject InMemoryProcessStore.createForTesting(); local development must explicitly inject InMemoryProcessStore.createForLocalDevelopment().",
+      );
+    }
+    return this._processStore;
   }
 
   /**
@@ -571,6 +586,7 @@ export class EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       eventStore: stores.eventStore,
+      processStore: stores.processStore,
     });
 
     // Mark as initialized and inject stores directly
@@ -590,6 +606,7 @@ export class EventSourcing {
     executionTarget?: ExecutionTarget;
     retentionPolicyResolver?: RetentionPolicyResolver;
     warnWhenProjectionsRunInline?: boolean;
+    processStore?: ProcessStore;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
@@ -597,6 +614,7 @@ export class EventSourcing {
       executionTarget: options.executionTarget,
       retentionPolicyResolver: options.retentionPolicyResolver,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
+      processStore: options.processStore,
     });
 
     es._initialized = true;

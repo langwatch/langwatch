@@ -10,9 +10,18 @@ import { InMemoryProcessStore } from "../inMemoryProcessStore";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe("InMemoryProcessStore outbox retention", () => {
+  it("creates isolated stores through explicit testing and local-development factories", () => {
+    const testingStore = InMemoryProcessStore.createForTesting();
+    const localDevelopmentStore = InMemoryProcessStore.createForLocalDevelopment();
+
+    expect(testingStore).toBeInstanceOf(InMemoryProcessStore);
+    expect(localDevelopmentStore).toBeInstanceOf(InMemoryProcessStore);
+    expect(localDevelopmentStore).not.toBe(testingStore);
+  });
+
   describe("when deleteDispatchedBefore runs against a mixed outbox", () => {
     it("removes only dispatched rows older than the cutoff and keeps pending work leasable", async () => {
-      const store = new InMemoryProcessStore();
+      const store = InMemoryProcessStore.createForTesting();
       const service = new ProcessManagerService({
         definition: pilotDefinition,
         store,

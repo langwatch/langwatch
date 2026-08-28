@@ -109,7 +109,7 @@ describe("synchronous external process signals", () => {
   let service: ProcessManagerService<LifecycleState>;
 
   beforeEach(() => {
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
     service = new ProcessManagerService({ definition: definition(), store });
   });
 

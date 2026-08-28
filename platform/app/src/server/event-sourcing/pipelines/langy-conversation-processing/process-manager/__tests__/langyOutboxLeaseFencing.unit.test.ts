@@ -61,7 +61,7 @@ describe("Langy process outbox lease fencing", () => {
   let store: InMemoryProcessStore;
 
   beforeEach(async () => {
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
     const service = new ProcessManagerService({
       definition: langyConversationProcessDefinition,
       store,

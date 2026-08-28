@@ -13,7 +13,7 @@ describe("InMemoryProcessStore lease fencing", () => {
     let store: InMemoryProcessStore;
 
     beforeEach(async () => {
-      store = new InMemoryProcessStore();
+      store = InMemoryProcessStore.createForTesting();
       const service = new ProcessManagerService({
         definition: pilotDefinition,
         store,

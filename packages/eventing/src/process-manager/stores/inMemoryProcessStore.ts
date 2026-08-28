@@ -83,6 +83,16 @@ export class InMemoryProcessStore implements ProcessStore {
   private readonly messages = new Map<string, StoredMessage>();
   private readonly attempts = new Map<string, FailedOutboxAttempt[]>();
 
+  private constructor() {}
+
+  static createForTesting(): InMemoryProcessStore {
+    return new InMemoryProcessStore();
+  }
+
+  static createForLocalDevelopment(): InMemoryProcessStore {
+    return new InMemoryProcessStore();
+  }
+
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
   }): Promise<PersistedProcessInstance<State> | null> {

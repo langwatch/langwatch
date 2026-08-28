@@ -62,7 +62,7 @@ describe("process-manager trace continuity", () => {
   });
 
   beforeEach(() => {
-    store = new InMemoryProcessStore();
+    store = InMemoryProcessStore.createForTesting();
     service = new ProcessManagerService({
       definition: pilotDefinition,
       store,

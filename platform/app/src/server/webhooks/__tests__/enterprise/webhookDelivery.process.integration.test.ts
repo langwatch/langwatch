@@ -302,7 +302,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  store = new InMemoryProcessStore();
+  store = InMemoryProcessStore.createForTesting();
   clock = Date.now();
   deps = {
     processStore: store,

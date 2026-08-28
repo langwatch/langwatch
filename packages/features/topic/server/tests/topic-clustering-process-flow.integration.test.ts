@@ -64,7 +64,7 @@ function harness(options?: {
   runPort?: TopicClusteringDispatchDeps["runPort"];
   commands?: TopicClusteringOutcomeCommands;
 }) {
-  const store = new InMemoryProcessStore();
+  const store = InMemoryProcessStore.createForTesting();
   // The EXACT topology the pipeline mounts, composed on the runtime's own
   // definition builder — clamping, intent-key prefixing and the payload
   // boundary all included.
