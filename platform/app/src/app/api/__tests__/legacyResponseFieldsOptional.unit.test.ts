@@ -140,14 +140,14 @@ function readingOf({ family, field }: { family: string; field: string }) {
 
 describe("given the generated OpenAPI document", () => {
   describe("when the scenario answers are read", () => {
-    /** @scenario "The scenario answers read folderId as optional" */
-    it("lists folderId as optional on every success answer", () => {
-      const folderId = readingOf({
+    /** @scenario "The scenario answers read testSuiteId as optional" */
+    it("lists testSuiteId as optional on every success answer", () => {
+      const testSuiteId = readingOf({
         family: "/api/scenarios",
-        field: "folderId",
+        field: "testSuiteId",
       });
-      expect(folderId.occurrences.length).toBeGreaterThan(0);
-      expect(folderId.offenders).toEqual([]);
+      expect(testSuiteId.occurrences.length).toBeGreaterThan(0);
+      expect(testSuiteId.offenders).toEqual([]);
     });
   });
 

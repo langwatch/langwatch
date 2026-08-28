@@ -7,7 +7,7 @@
  *   - a RUN PLAN is what you run. It is identified by its NAME: a run started
  *     under a name joins the plan of that name and replaces its configuration,
  *     or creates the plan when nothing answers.
- *   - a TEST SUITE is a folder of scenarios. It holds what it collects and
+ *   - a TEST SUITE is a group of scenarios. It holds what it collects and
  *     nothing about how a run of it is executed, so the targets, the repeat
  *     count and the models arrive with the run request.
  *
@@ -71,7 +71,7 @@ export const queryBoolean = z
 
 /** What a run plan covers. */
 export const runPlanScopeSchema = suiteScopeSchema.describe(
-  "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
+  "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
 );
 
 /** The configuration a run plan holds, as a caller sends it. */
@@ -105,7 +105,7 @@ export const runPlanConfigSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      "The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time.",
+      "The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time.",
     ),
 });
 
