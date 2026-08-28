@@ -1,8 +1,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { GovernanceCostRollupStore } from "@ee/governance/projections/governanceCostRollup.store";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
+import {
+  COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+  CostRollupComparatorService,
+} from "@ee/governance/services/costRollupComparator.service";
+import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -1028,6 +1034,18 @@ export function initializeDefaultApp(options?: {
     ? { governanceKpisRepository }
     : undefined;
 
+  // ADR-128's daily cost rollup. One instance for the whole App: the fold
+  // writes through it on BOTH pipelines (gateway spend and pulled usage), the
+  // comparator reads through it, and `app.governance.costRollup` hands out the
+  // same reference — so the watchdog can never be reading a different table
+  // from the one the product shows.
+  const governanceCostRollupRepository = clickhouseEnabled
+    ? new GovernanceCostRollupClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceCostRollupStore = governanceCostRollupRepository
+    ? new GovernanceCostRollupStore(governanceCostRollupRepository)
+    : undefined;
+
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
   // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
@@ -1131,6 +1149,33 @@ export function initializeDefaultApp(options?: {
   const systemMigrations = roleRunsWorkers(config.processRole)
     ? startSystemMigrations({ redis })
     : undefined;
+
+  // ADR-128: the cost rollup's comparator, on the same calendar scheduler the
+  // reports use. The fire is a tiny trigger — the lane in `targetId`, the day
+  // derived from the slot — so the handler re-derives everything at fire time
+  // rather than acting on a payload minted when the schedule was written.
+  //
+  // It samples YESTERDAY, not today: a day still being written to is expected
+  // to disagree with its own summary, and a watchdog that fires on that is a
+  // watchdog nobody reads.
+  if (roleRunsWorkers(config.processRole) && governanceCostRollupRepository) {
+    const comparator = new CostRollupComparatorService(
+      governanceCostRollupRepository,
+    );
+    schedulerRegistry.register({
+      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+      handler: async (fire) => {
+        const sampled = new Date(fire.slot.getTime() - 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        await comparator.compareDay({
+          tenantId: fire.projectId,
+          day: sampled,
+          costSource: fire.targetId as never,
+        });
+      },
+    });
+  }
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1329,6 +1374,7 @@ export function initializeDefaultApp(options?: {
             ),
           }
         : undefined,
+      governanceCostRollupStore,
     },
     projects,
     monitors,
@@ -1343,6 +1389,7 @@ export function initializeDefaultApp(options?: {
     gatewaySpend,
     webhookDelivery,
     gatewayDebits,
+    governanceCostRollupStore,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.
@@ -1868,6 +1915,7 @@ export function initializeDefaultApp(options?: {
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
       activityMonitor: activityMonitorRepository,
+      costRollup: governanceCostRollupRepository,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -2238,6 +2286,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       kpis: undefined,
       personalUsage: undefined,
       activityMonitor: undefined,
+      costRollup: undefined,
     },
     billableEvents: undefined,
     codingAgents: {
