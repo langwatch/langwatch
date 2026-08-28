@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `a12b99cb83`
+**Working checkpoint:** `a5b3fda731`
 
 **Current execution wave:** Wave 1, process foundations
 
@@ -136,6 +136,7 @@ The exit is complete only when all of the following are true:
 | `09bc1edae8` | Composed one schema-validated Langevals evaluator client per process.            |
 | `1f4a1adc1d` | Composed task-local object-storage and Enterprise Governance client lifecycles.  |
 | `a12b99cb83` | Moved Stored Object owner resolution into its canonical feature graph.           |
+| `a5b3fda731` | Characterised legacy Trace full-read fields before any production cutover.       |
 
 ### Active, uncommitted slices
 
@@ -147,8 +148,8 @@ The exit is complete only when all of the following are true:
 | Configuration ownership        | UI owns the strict public schema and inert base64url codec. Eventing, logger, telemetry, Gateway virtual-key, evaluation concurrency, scenario-child input and all five Group Queue values are parsed at process composition and injected. `bc0b8df67d` now projects logger, KSUID environment and telemetry before HTTP-specific validation without rereading the resolved App boot value. The broad private `AppConfig`, public-config source projection and executable-specific raw environment reads remain in `platform/app`. | Define API, worker, task/local-orchestrator and UI-public projections, then make the legacy App graph consume only already-projected values before deleting old config modules.                 |
 | OpenAPI ownership              | The comparator is hardened, but checked-in artefacts are stale and generation still imports the platform route graph. The generator currently fails before route composition because environment config is not initialised.                                                                                                                                                                                                                                                                                                        | Move generator/serving ownership with the API route graph, initialise task config explicitly, regenerate, and explain every semantic difference from `main`.                                    |
 | Process observability adoption | API and Worker own injectable typed logger/tracer boot and ordered telemetry flush. Legacy web scope ownership no longer self-waits. The live platform instrumentation now receives one typed, idempotent projection; trace, log and metric headers cannot merge ambient values, and telemetry still flushes last. Physical API/worker launchers remain absent.                                                                                                                                                                    | Bind concrete API request and Worker queue context when their full executable graphs activate, then move the compatibility instrumentation entrypoint to local orchestration.                   |
-| Persistence foundations        | Prisma, Redis and ClickHouse have explicit App/task construction and exact shutdown owners. `server/db.ts` is construction-free. The App and Worker compose canonical Eventing persistence. `a12b99cb83` moved Stored Object owner fan-out into its feature and deleted the displaced App repository/service/test. At this checkpoint the all-source non-test lexical sweep finds 61 platform files mentioning the Prisma compatibility binding.                                                                                   | Move Analytics/Dashboard and Gateway persistence in dependency-closed feature verticals, characterise Trace full-read parity, and keep identity-owned queries deferred to Wave 2.               |
-| Infrastructure clients         | Shared AWS credential/proxy/handler policy, Dataset S3 lifetime and NLP Lambda/CloudWatch pairs are process-owned. `09bc1edae8` adds a schema-validated process-owned Langevals client. `1f4a1adc1d` gives the object-storage migration task and Enterprise Governance S3 explicit AWS/Redis ownership, partition/proxy parity and first-error-safe cleanup. Direct trace-processing DLP/Presidio/tokenizer clients and the mailer cut remain.                                                                                     | Finish the explicit mail-delivery caller graph, then compose the trace-processing client graph without folding tenant-dynamic Slack, Stripe or model-provider credentials into process clients. |
+| Persistence foundations        | Prisma, Redis and ClickHouse have explicit App/task construction and exact shutdown owners. `server/db.ts` is construction-free. The App and Worker compose canonical Eventing persistence. `a12b99cb83` moved Stored Object owner fan-out into its feature and deleted the displaced App repository/service/test. `a5b3fda731` locks the legacy Trace mapper's earliest-summary timing, topic metadata, log-count alias and six reserved token metrics, while recording the remaining full-read parity gates. At this checkpoint the all-source non-test lexical sweep finds 61 platform files mentioning the Prisma compatibility binding. | Finish the active Analytics/Dashboard, Gateway and Prompt persistence verticals. Keep the Trace production read cut and identity-owned queries deferred until their recorded parity/actor gates close. |
+| Infrastructure clients         | Shared AWS credential/proxy/handler policy, Dataset S3 lifetime and NLP Lambda/CloudWatch pairs are process-owned. `09bc1edae8` adds a schema-validated process-owned Langevals client. `1f4a1adc1d` gives the object-storage migration task and Enterprise Governance S3 explicit AWS/Redis ownership, partition/proxy parity and first-error-safe cleanup. A working-tree Trace privacy graph now projects typed DLP/Presidio/tokenizer configuration and composes canonical Data Privacy once; its remaining test migration and review must finish before commit. The mailer cut remains deferred. | Complete and review the Trace privacy test/composition cohort without folding tenant-dynamic Slack, Stripe or model-provider credentials into process clients. |
 | Mail delivery graph            | A reviewed working-tree attempt proved provider configuration, SES/SMTP/SendGrid/Resend lifecycle and most caller injection, but BetterAuth constructs reset/passkey callbacks at module load. There is no bounded Wave 1 seam that avoids an ambient locator, a second provider graph or per-request construction. The whole mailer cut remains uncommitted; its 45 focused tests are evidence, not landed architecture.                                                                                                          | Defer the caller cut to the BetterAuth factory/auth runtime composition. Do not commit a partial duplicate mailer graph or widen Wave 1 into identity/transport work.                           |
 | Workspace reconciliation       | Reviewed API, Worker/Trace and UI hunks are committed. Unrelated Evaluation, Identity, generated-artefact, Secret, SDK, baseline and formatting changes still share the tree.                                                                                                                                                                                                                                                                                                                                                      | Attribute every later lockfile/baseline hunk to its owning slice, stage exact paths or hunks and leave unrelated work untouched.                                                                |
 
@@ -174,7 +175,7 @@ deferred.
 | `F-SECRET-01`     | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Wave 3 clients                      |
 | `F-SECRET-02`     | The standalone API proves all 20 CRUD operations across the four bases, but its `/api/secrets` alias uses the modern validated `projectId` and canonical error response. The live legacy route derives project from the credential and retains legacy payload/error/deprecation semantics; characterise and choose compatibility before retiring it.                                                                                                                                                                                                                                                                                                | Wave 3 compatibility                |
 | `F-SECRET-03`     | The standalone API listener proves the four bases, omitted/latest/header selection, conflicts and response headers. The still-live platform `createApiRouter` lacks an equivalent all-mount regression, so its mount/order protection remains a recorded compatibility test gap.                                                                                                                                                                                                                                                                                                                                                                    | Wave 3 compatibility                |
-| `F-TRACE-01`      | The extracted full-read path trusts a stale storage-anchor hint, can return an empty span set, and does not yet preserve every legacy field/nullability case, including earliest start, topic IDs and reserved metrics. It has no production caller yet.                                                                                                                                                                                                                                                                                                                                                                                            | Trace vertical in Wave 6            |
+| `F-TRACE-01`      | `a5b3fda731` characterises the legacy mapper's earliest-summary timing baseline, topic/subtopic metadata, log-count alias and all six reserved token metrics. The extracted full-read path still trusts a stale storage-anchor hint, can return an empty span set, and lacks parity proof for viewer/export protections, annotations/evaluations/coding-agent overlays, ordering and remaining field/nullability cases. It has no production caller yet.                                                                                                                                                                                                 | Trace vertical in Wave 6            |
 | `F-EVENT-01`      | Eventing process registration now preflights an explicitly injected ProcessStore before mutating catalogues, definitions or pipelines (`e3d2551c6f`), and memory stores are available only through named test/local factories. The full suite still has four pre-existing `StateProjectionStore.load`/`tryLoad` failures, one memory-store expectation that omits the returned `idempotencyKey`, and the corresponding existing test type errors. These remain recorded diagnostics, not a persistence-cutover blocker.                                                                                                                             | Wave 4 test reconciliation          |
 | `F-EVENT-02`      | `7df243483a` cuts the App to the canonical Prisma/ClickHouse Eventing adapters and deletes all three displaced platform implementations. `83cdb89996` composes the Worker durable graph and forces consumers off. Platform integration harnesses remain while callers move; the complete registry and the one tested consumer switch are explicitly Wave 4.                                                                                                                                                                                                                                                                                         | Wave 1 residuals; Wave 4 activation |
 | `F-CONFIG-01`     | At committed checkpoint `a12b99cb83`, an all-source non-test lexical sweep finds 64 platform files mentioning `env.mjs` and 95 mentioning `process.env`, with overlap. `bc0b8df67d` removes the executable bootstrap reread but the broad App config still parses ambient values. Preserve database empty fallback, credential/auth-secret chains, privileged internal-route secrets, mail unsubscribe differences and storage unsafe/test gates before deleting the compatibility proxy.                                                                                                                                                           | Wave 1                              |
@@ -190,6 +191,7 @@ deferred.
 | `F-DATASET-01`    | Dataset S3 operation/stream leases and target reassignment are covered and committed in `6b9ca49158`. The standalone backfill task still has a pre-existing generated-Prisma to `DatasetMigrationDatabasePort` aggregate promise mismatch in the broad platform typecheck; this was not caused by the client-lifecycle cut.                                                                                                                                                                                                                                                                                                                         | Wave 1 and Wave 6                   |
 | `F-AWS-01`        | `@langwatch/aws-client` owns shared credential/proxy/handler policy, and `fa1a759f47` prevents SDK client disposal from destroying a shared raw handler. `b6ee5f2906` routes legacy S3 through it, `ec1240fb37` composes NLP Lambda/CloudWatch pairs, and `1f4a1adc1d` completes task-local object-storage migration plus Enterprise Governance S3/Redis ownership. Remaining AWS work belongs to actual feature/process callers rather than another generic client layer.                                                                                                                                                                          | Wave 1 residual sweep               |
 | `F-LANGEVALS-01`  | `09bc1edae8` replaces the App-layer evaluator HTTP client with one typed, schema-validating process runtime. Direct transports remain in legacy evaluation staging, Topic staging and PII/Presidio collection; move them only with their owning Trace/Topic execution ports and preserve staging, timeout and error-metric semantics.                                                                                                                                                                                                                                                                                                               | Wave 1 Trace clients; Wave 6 owners |
+| `F-PROMPT-01`     | Prompt persistence is moving behind one portable Prompt service and named private Prisma adapter. The ordinary App root injects Model Provider; `scripts/seed-langy-prompts.ts` has no composed provider and deliberately retains the repository's existing default-model fallback through an explicit optional composition input. Keep that fallback script-only, and do not delete the compatibility path until transaction, handle, copy/tag and stale experiment-caller parity are covered.                                                                                                                                                     | Wave 1 Prompt persistence           |
 | `F-WEBHOOK-01`    | The changed webhook/gateway REST integration files contain eight callbacks that the deterministic test-quality review cannot recognise as asserting observable behaviour (`gateway-spend` lines 346, 357, 410, 900 and 1104; `webhooks` lines 150, 161 and 799). The migration review and focused service/router coverage are green; strengthen these scenarios with explicit assertions when the Webhook/API vertical owns the surrounding integration harness.                                                                                                                                                                                    | Wave 3 and Wave 6 batch 8           |
 | `F-AGENT-01`      | `specs/agents/AUDIT_MANIFEST.md` still points at deleted management UI paths and does not bind the moved scenario tests. Refresh it when the next Agent vertical updates feature documentation.                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Wave 6 and Wave 7                   |
 | `F-AGENT-02`      | Agent management replacement coverage does not directly assert every former dialog success/close/toast/invalidation and error outcome. The legacy host remains a named temporary app adapter until UI owns those platform ports.                                                                                                                                                                                                                                                                                                                                                                                                                    | Wave 6 and Wave 7                   |
@@ -387,7 +389,7 @@ independent. Do not start a later wave until the current wave gate is complete.
 
 ### Wave 1: process foundations
 
-Current Wave 1 progress at `a12b99cb83`:
+Current Wave 1 progress at `a5b3fda731`:
 
 - [x] Enforce injected configuration in reusable production packages.
 - [x] Add injectable API and Worker process/lifecycle foundations.
@@ -410,6 +412,8 @@ Current Wave 1 progress at `a12b99cb83`:
       explicit lifetime ownership and first-error-safe cleanup.
 - [x] Move Stored Object owner-resolution persistence into its feature and
       delete the displaced App implementation and duplicate unit suite.
+- [x] Characterise the first legacy Trace full-read field cohort without
+      cutting over the production reader or deleting its compatibility path.
 - [x] Record full shared-registry installation, concrete intent activation and
       the single consumer switch under Wave 4; do not activate them in Wave 1.
 
@@ -473,7 +477,8 @@ Run the persistence work in dependency order:
    persistence cutover; keep registry activation in Wave 4;
 3. move Analytics/Dashboard and Gateway persistence by singular feature while
    leaving their API adapters live;
-4. characterise Trace full-read parity before moving its ClickHouse read graph;
+4. **Characterised prerequisite:** keep the Trace production read cut deferred
+   until the remaining `F-TRACE-01` field, protection and overlay gates close;
 5. compose the Trace processing tokenizer, DLP and Presidio client graph after
    its typed configuration projection;
 6. move remaining product Prisma/ClickHouse batches whose tenant and
@@ -486,7 +491,7 @@ Do not pull Project, Organization, User, Role, AuthZ, API-key or Data
 Privacy/Retention scope queries forward to satisfy that sweep. Their repository
 boundaries depend on the Wave 2 actor/tenant graph and remain deferred.
 
-#### Next parallel Wave 1 lanes at `a12b99cb83`
+#### Next parallel Wave 1 lanes at `a5b3fda731`
 
 1. **Analytics and Dashboard persistence:** move legacy LWQL execution,
    saved-workbench chart and dashboard placement repositories into the existing
@@ -494,22 +499,27 @@ boundaries depend on the Wave 2 actor/tenant graph and remain deferred.
    routing, ceilings, truncation, nullable result fields and grid ordering.
    Keep API routers as later Wave 3 adapters. Delete each displaced production
    repository only with package integration parity.
-2. **Gateway persistence core:** move budget, cache-rule, guardrail, realtime
-   session and materialisation queries into the existing Gateway server graph.
-   Inject Project, Organization, Model Provider and ClickHouse capabilities;
-   exclude virtual-key actor/auth scope and every transport router. Preserve
-   money/window units, precedence, lease/reconciliation and Eventing settlement
-   identifiers.
-3. **Trace full-read characterisation:** close `F-TRACE-01` with field-by-field
-   fixtures for storage anchors, earliest start, topic IDs, reserved metrics,
-   analytics/summaries/timeseries, nullability and offloaded blobs before any
-   production read-path deletion. Only then cut the legacy ClickHouse service
-   to the existing Trace repositories.
-4. **Trace processing clients:** replace module-global/per-request tokenizer,
+2. **Gateway persistence core:** move cache-rule, guardrail and configuration
+   materialisation queries into the existing Gateway server graph. Inject the
+   complete Evaluator, Monitor and Project services plus named change/audit
+   ports; keep transports thin. Preserve atomic mutation/event/audit writes,
+   archive semantics, priority ordering, defaults and materialised payloads.
+   REALTIME booking/reconciliation stays deferred with its advisory-lock,
+   Eventing settlement and idempotency boundary.
+3. **Prompt persistence:** make the public adapter depend only on a portable
+   private persistence port, keep generated Prisma and transactions inside the
+   strict repository, map concrete domain errors at transports, rewire stale
+   experiment callers to the composed Prompt service, and prove handle,
+   version/tag transaction and copy/list parity before deleting residue.
+4. **Trace full-read:** the first characterization cohort is committed in
+   `a5b3fda731`. Do not cut production reads in Wave 1; carry the remaining
+   storage-anchor, protection, overlay, ordering and nullability gates in
+   `F-TRACE-01` to the Trace vertical.
+5. **Trace processing clients:** replace module-global/per-request tokenizer,
    Google DLP and Presidio/Langevals construction with one typed process graph
    behind Trace/Data Privacy ports. Preserve lazy loading, retry, batch limits,
    timeout/error counters, token prewarm and redaction fallback/enforcement.
-5. **Mailer decision, deferred:** a real `createAuth(mailer)` cut must also make
+6. **Mailer decision, deferred:** a real `createAuth(mailer)` cut must also make
    passkey registration a factory, compose Auth on `AppDependencies`, convert
    the Auth/Ops routes to factories and migrate the session adapter's broad
    caller graph. That is Wave 2/3 auth composition. Keep BetterAuth's current
