@@ -324,6 +324,10 @@ Feature: Governance home — route, nav promotion, persona detection
     When the admin looks at the GOVERNANCE rail
     Then "Costs" (/governance/costs) and "Billed" (/governance/billed)
       are listed between Overview and Inventory
-    And each page renders its heading and an empty-state placeholder —
-      no data, no queries; the pages exist so the rail shape ships
-      ahead of the spend views
+    And each page renders its heading
+    # Costs has since grown its real content — the billed/gateway/seat
+    # lanes of specs/governance/governance-cost-screen.feature (ADR-128
+    # wave 1). Billed is still the placeholder shell this scenario was
+    # written for. The scenario TITLE is left verbatim because it is the
+    # parity binding key for sectionNavParity.integration.test.tsx, which
+    # asserts the rail listing and not either page's body.
