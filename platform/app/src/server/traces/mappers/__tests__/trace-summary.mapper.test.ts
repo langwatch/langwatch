@@ -9,17 +9,8 @@ import {
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
-function mapTraceSummaryToTrace(
-  summary: TraceSummaryData,
-  spans: Span[],
-  projectId: string,
-) {
-  return mapTraceSummaryToTraceWithServices(
-    summary,
-    spans,
-    projectId,
-    traceCanonicalisation,
-  );
+function mapTraceSummaryToTrace(summary: TraceSummaryData, spans: Span[], projectId: string) {
+  return mapTraceSummaryToTraceWithServices(summary, spans, projectId, traceCanonicalisation);
 }
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
@@ -237,6 +228,53 @@ function makeSummary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryDat
     ...overrides,
   } as TraceSummaryData;
 }
+
+describe("legacy full-read summary characterization", () => {
+  it("preserves the span-time baseline, topic identities, and reserved token metrics", () => {
+    const trace = mapTraceSummaryToTrace(
+      makeSummary({
+        occurredAt: 1_700_000_000_100,
+        storageAnchorMs: 1_700_000_000_900,
+        topicId: "topic-support",
+        subTopicId: "subtopic-billing",
+        attributes: {
+          "langwatch.reserved.cache_read_tokens": "13",
+          "langwatch.reserved.cache_creation_tokens": "17",
+          "langwatch.reserved.cache_creation_5m_tokens": "19",
+          "langwatch.reserved.cache_creation_1h_tokens": "23",
+          "langwatch.reserved.reasoning_tokens": "29",
+          "langwatch.reserved.context_size_tokens": "31",
+          "langwatch.reserved.log_record_count": "37",
+        },
+      }),
+      [],
+      "project-1",
+    );
+
+    expect(trace).toMatchObject({
+      trace_id: "trace-1",
+      project_id: "project-1",
+      metadata: {
+        topic_id: "topic-support",
+        subtopic_id: "subtopic-billing",
+        otel_log_record_count: "37",
+        "langwatch.reserved.log_record_count": "37",
+      },
+      timestamps: {
+        started_at: 1_700_000_000_100,
+      },
+      metrics: {
+        cache_read_input_tokens: 13,
+        cache_creation_input_tokens: 17,
+        cache_creation_5m_input_tokens: 19,
+        cache_creation_1h_input_tokens: 23,
+        reasoning_tokens: 29,
+        context_size_tokens: 31,
+      },
+    });
+    expect(trace.timestamps.started_at).not.toBe(1_700_000_000_900);
+  });
+});
 
 describe("mapTraceSummaryToTrace — the trace's reported start", () => {
   describe("when the trace has spans", () => {

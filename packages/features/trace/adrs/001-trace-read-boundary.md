@@ -105,6 +105,29 @@ events and blob-backed payloads, but must contain no second Trace domain
 implementation. A residual moves only with a fixture proving its complete
 response, authorization, ordering, pagination and null-versus-omitted parity.
 
+### Full-read characterization status
+
+The package's `TraceFullRecord` remains an internal all-visible capture. It is
+not a substitute for the legacy viewer/export `Trace` response. The following
+matrix is a current compatibility gate for that later cut; it is deliberately
+not a future design decision.
+
+| Behaviour                                                           | Current authoritative owner                   | Package full reader status                                                             |
+| ------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Tenant/private ClickHouse resolution                                | App `ClickHouseTraceService`                  | Package has a tenant-scoped port, but no production caller                             |
+| Storage anchor versus earliest span start                           | App summary mapper and anchored-window reader | Reads a supplied anchor as authoritative; stale-anchor retry is not characterized      |
+| Topic and subtopic identity                                         | App summary mapper                            | Not represented in `TraceFullRecord` metadata                                          |
+| Reserved token and log metrics                                      | App summary mapper                            | Token/log aliases are not parity-proven in the full reader                             |
+| `trace_summaries`, `trace_analytics`, and rollups                   | Separate App/package projection owners        | Must remain separate; no substitution is permitted                                     |
+| Blob recall and preview fallback                                    | App blob resolver plus I/O recomputation      | Internal payload-port recall exists, but viewer/export opt-in and bulk behavior differ |
+| Protections and edit overlays                                       | App `TraceService`                            | Package only applies its internal all-visible policy                                   |
+| Evaluations, annotations, coding-agent enrichment, links and events | App full-detail composition                   | Not complete in the package reader                                                     |
+
+The legacy mapper characterization fixture asserts the earliest-start baseline,
+topic identities, and reserved metrics. Existing blob, protection, overlay and
+bulk-read suites remain required evidence for the remaining rows. No legacy
+full-read production code may be deleted while any row differs.
+
 ## Browser boundary
 
 The web package owns reusable, transport-neutral presentation and loaded-row

@@ -34,6 +34,14 @@ Feature: Trace span-tree read service
     Then whole-tree, shared, REST and full-detail routes remain authoritative in the app
     And their migration waits for a complete byte-and-field characterization fixture
 
+  Scenario: Full-read characterization preserves storage and projected summary distinctions
+    Given a trace has a frozen storage anchor, an earlier span start, topic identities, and reserved token metrics
+    When the legacy viewer or export read maps its trace summary
+    Then its reported start is the earliest span start rather than the storage anchor
+    And topic and subtopic identities remain in metadata
+    And every reserved token metric remains in the response
+    And trace_summaries, trace_analytics, and timeseries rollups are not substituted for one another
+
   Scenario: Cost fallback remains owned by one canonical implementation
     Given a span has no persisted positive cost but has custom, cache, audio, model, or guardrail pricing inputs
     When the Trace service reads the span for a viewer who can see costs
