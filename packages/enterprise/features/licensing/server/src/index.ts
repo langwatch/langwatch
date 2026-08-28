@@ -1,10 +1,11 @@
 export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter";
+export {
+  LicensingEntitlementSource,
+  type LicensingEntitlementSourceMode,
+} from "./adapters/licensing.entitlement-source.adapter";
 export { LicenseCryptographyPort } from "./ports/license-cryptography.port";
 export { LicenseLoggerPort } from "./ports/license-logger.port";
-export {
-  LicenseRetentionPort,
-  type LicenseRetentionRule,
-} from "./ports/license-retention.port";
+export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port";
 export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port";
 export {
   LicenseRepository,

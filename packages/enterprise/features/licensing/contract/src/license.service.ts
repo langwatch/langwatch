@@ -7,6 +7,9 @@ import type {
   StoreLicenseResult,
 } from "./license";
 
+/** The provider-neutral source port Licensing implements for Entitlements. */
+export type { EntitlementSource, ResolvePlanInput } from "@langwatch/entitlement-contract";
+
 /** Application-facing capability supplied by the Enterprise license source. */
 export abstract class LicensingService {
   abstract inspectPlatformAccess(input: {

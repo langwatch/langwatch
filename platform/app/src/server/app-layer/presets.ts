@@ -21,8 +21,16 @@ import {
 } from "@langwatch/feature-flag-server";
 import {
   BillingPriceCatalogue,
+  getFreePlanLimits,
   getStripeEnvironmentFromNodeEnv,
 } from "@langwatch/enterprise-billing-contract";
+import { LicensingEntitlementSource } from "@langwatch/enterprise-licensing-server";
+import {
+  applyPlanTypeEntitlements,
+  FREE_PLAN,
+  UNLIMITED_PLAN,
+} from "@langwatch/enterprise-licensing-contract";
+import { EntitlementService } from "@langwatch/entitlement-server";
 import { resolveGatewayBaseUrl } from "~/runtime/public-config.server";
 import {
   BillableEventsQueryService,
@@ -291,7 +299,6 @@ import {
 } from "./billing/enterprise/billing-runtime.adapter";
 import { EESubscriptionService } from "./billing/enterprise/subscription.service";
 import { EEWebhookService, type WebhookService } from "./billing/enterprise/webhook.service";
-import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { PrismaDataRetentionAdapter } from "@langwatch/data-retention-server";
 import { AppEventingRetentionAdapter } from "~/runtime/app/features/eventing-retention.adapter";
 import { PostgresShareAdapter } from "@langwatch/share-server";
@@ -411,9 +418,7 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
-import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
-import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import {
   AppSuiteRunCommandsPort,
@@ -1250,32 +1255,39 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     adminEmails: env.ADMIN_EMAILS,
   });
 
+  const administratorEmails = new Set(
+    typeof env.ADMIN_EMAILS === "string"
+      ? env.ADMIN_EMAILS.split(",").map((value) => value.trim())
+      : [],
+  );
+  const planEnrichers = [{ enrich: applyPlanTypeEntitlements }];
   const planProvider = config.isSaas
-    ? PlanProviderService.create(
-        createCompositePlanProvider({
-          saasPlanProvider: {
-            getActivePlan: ({ organizationId, user }) =>
-              saasPlanProvider.getActivePlan(organizationId, user),
-          },
-          licensePlanProvider: {
-            getActivePlan: ({ organizationId }) =>
-              getLicenseHandler().getActivePlan(organizationId),
-          },
-          adminEmails: env.ADMIN_EMAILS,
+    ? EntitlementService.create({
+        baseline: getFreePlanLimits(),
+        license: LicensingEntitlementSource.create({
+          licensing: getLicenseHandler(),
+          mode: "cloud",
         }),
-      )
-    : PlanProviderService.create(
-        createSelfHostedPlanProvider({
-          licensePlanProvider: {
-            // Self-hosted asks a different question than the composite provider
-            // above: with no subscription underneath, a license past its end
-            // date has to keep metering the seats it sold instead of stepping
-            // aside. See LicenseHandler.getSelfHostedPlan.
-            getActivePlan: ({ organizationId }) =>
-              getLicenseHandler().getSelfHostedPlan(organizationId),
-          },
+        subscription: {
+          resolve: ({ organizationId, user }) =>
+            saasPlanProvider.getActivePlan(organizationId, user),
+        },
+        enrichers: planEnrichers,
+        authorization: {
+          resolve: (user) => ({
+            overrideAddingLimitations:
+              !!user?.impersonator?.email && administratorEmails.has(user.impersonator.email),
+          }),
+        },
+      })
+    : EntitlementService.create({
+        baseline: UNLIMITED_PLAN,
+        license: LicensingEntitlementSource.create({
+          licensing: getLicenseHandler(),
+          mode: "self-hosted",
         }),
-      );
+        enrichers: planEnrichers,
+      });
 
   let subscription: SubscriptionService | undefined;
   let billingCustomer: CustomerService | undefined;
