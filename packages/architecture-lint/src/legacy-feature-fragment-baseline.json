@@ -438,11 +438,6 @@
     },
     {
       "feature": "billing",
-      "file": "platform/app/src/server/app-layer/billing/nurturing/index.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "billing",
       "file": "platform/app/src/server/app-layer/billing/nurturing/inviteAcceptance.ts",
       "kind": "legacy-implementation"
     },
