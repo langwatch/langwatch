@@ -1287,7 +1287,6 @@
               "api-reference/suites/create-suites",
               "api-reference/suites/get-suites",
               "api-reference/suites/update-suites",
-              "api-reference/suites/put-update-suites",
               "api-reference/suites/action-duplicate",
               "api-reference/suites/action-run",
               "api-reference/suites/delete-suites"

@@ -66692,6 +66692,15 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/put-update-agents.mdx
+
+---
+title: "Update an agent by its id"
+openapi: "PUT /api/agents/{id}"
+---
+
+---
+
 # FILE: ./api-reference/agents/update-agents.mdx
 
 ---
@@ -69811,6 +69820,15 @@ description: "Manage test scenarios for agent simulations. Create, update, and o
 ## Intro
 
 Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents.
+
+---
+
+# FILE: ./api-reference/scenarios/patch-update-scenarios.mdx
+
+---
+title: "Update an existing scenario"
+openapi: "PATCH /api/scenarios/{id}"
+---
 
 ---
 
