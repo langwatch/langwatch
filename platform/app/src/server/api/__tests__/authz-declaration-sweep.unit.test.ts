@@ -89,10 +89,32 @@ function unwrap(schema: unknown): any {
  * ship unchecked while the sweep stayed green.
  */
 function isAbsentable(field: unknown): boolean {
-  const name = (field as any)?._def?.typeName;
-  if (name === "ZodDefault" || name === "ZodNullable") return false;
-  if (name === "ZodOptional") return true;
+  const name = zodKindOf(field);
+  if (name === "default" || name === "nullable") return false;
+  if (name === "optional") return true;
   return typeof (field as any)?.isOptional === "function" && (field as any).isOptional();
+}
+
+/**
+ * The wrapper kind of a schema, as `"default"`, `"nullable"`, `"union"` and so
+ * on.
+ *
+ * Zod 4 replaced `_def.typeName` ("ZodDefault") with `_def.type`
+ * ("default"), and reading the old field returns `undefined` for every schema
+ * in the repo. That silently disabled two things here: a `.default()` scope id
+ * fell through to `isOptional()`, which answers true for a default, so the
+ * sweep stopped requiring a declaration to cover it; and the union branch
+ * below never matched, so a union input read as unshaped and was reported
+ * opaque rather than inspected. Both names are accepted so the helper does not
+ * break again on the next major.
+ */
+function zodKindOf(schema: unknown): string | undefined {
+  const def = (schema as any)?._def;
+  const legacy: string | undefined = def?.typeName;
+  if (typeof legacy === "string") {
+    return legacy.replace(/^Zod/, "").replace(/^([A-Z])/, (c) => c.toLowerCase());
+  }
+  return typeof def?.type === "string" ? def.type : undefined;
 }
 
 type ScopeFieldSets = {
@@ -111,9 +133,9 @@ type ScopeFieldSets = {
  */
 function scopeFieldsOf(parser: unknown): ScopeFieldSets | null {
   const schema = unwrap(parser);
-  const typeName = schema?._def?.typeName;
+  const typeName = zodKindOf(schema);
 
-  if (typeName === "ZodUnion" || typeName === "ZodDiscriminatedUnion") {
+  if (typeName === "union" || typeName === "discriminatedUnion") {
     const options: unknown[] =
       schema._def.options instanceof Map
         ? [...schema._def.options.values()]
