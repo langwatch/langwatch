@@ -3,7 +3,7 @@ import { Ghost, RotateCcw } from "lucide-react";
 import { useRouteError } from "react-router";
 
 import { Link } from "~/components/ui/link";
-import { isChunkLoadError, RELOAD_AT_KEY } from "~/utils/chunkReload";
+import { isChunkLoadError, RELOAD_AT_KEY } from "@langwatch/ui";
 
 /**
  * Shared fallback for (a) unknown routes (path="*") and (b) errors thrown
@@ -32,8 +32,7 @@ export default function NotFoundOrErrorPage() {
     | { status?: number; statusText?: string; message?: string }
     | undefined;
   const explicitStatus = error?.status;
-  const errorMessage =
-    error && "message" in error && error.message ? error.message : null;
+  const errorMessage = error && "message" in error && error.message ? error.message : null;
   const isChunkError = error != null && isChunkLoadError(error);
   // A real exception arrived (errorMessage present, no HTTP status) →
   // it's a runtime throw, not a 404. Promote to "Something went wrong"
@@ -51,20 +50,13 @@ export default function NotFoundOrErrorPage() {
       ? "The URL you were headed to does not exist (anymore). Use the nav to get back on track."
       : isChunkError
         ? "A required file could not be loaded. A browser extension or network issue may be blocking part of the app."
-        : (errorMessage ??
-          "An unexpected error occurred. Try going back to the dashboard.");
+        : (errorMessage ?? "An unexpected error occurred. Try going back to the dashboard.");
   const stack =
     isRuntimeError && error && "stack" in error && typeof error.stack === "string"
       ? error.stack
       : null;
   return (
-    <Box
-      minHeight="100vh"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      padding={8}
-    >
+    <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" padding={8}>
       <VStack gap={4} maxWidth="720px" textAlign="center">
         <Box color="fg.muted">
           <Ghost size={48} />

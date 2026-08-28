@@ -13,7 +13,7 @@
  */
 import { type ComponentProps, type FC, lazy } from "react";
 
-import { warmChunk } from "~/utils/chunkReload";
+import { warmChunk } from "@langwatch/ui";
 import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
 
 /** The import behind each lazy drawer, so a screen can fetch it early. */

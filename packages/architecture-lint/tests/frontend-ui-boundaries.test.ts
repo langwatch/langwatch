@@ -217,6 +217,21 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  it("accepts global browser behaviour under the apps/ui behavior root", () => {
+    writeCatalogue([{ id: "agent-management" }]);
+    write(
+      "apps/ui/src/behavior/chunk-reload.ts",
+      "export function registerChunkReloadListener(): void {}",
+    );
+    write(
+      "apps/ui/src/app/shell.tsx",
+      'import { registerChunkReloadListener } from "../behavior/chunk-reload"; registerChunkReloadListener();',
+    );
+
+    expect(policies([])).not.toContain("ui-root-catch-all");
+    expect(policies([])).not.toContain("ui-dependency-direction");
+  });
+
   it("rejects file-path imports that escape apps/ui source", () => {
     writeCatalogue([{ id: "trace-explorer" }]);
     write(

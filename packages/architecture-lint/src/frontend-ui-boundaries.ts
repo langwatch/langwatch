@@ -12,7 +12,17 @@ const SOURCE_EXTENSION_CANDIDATES = [".ts", ".tsx", ".mts", ".mtsx", ".js", ".js
 const NODE_BUILTIN_SPECIFIERS = new Set(
   builtinModules.flatMap((specifier) => [specifier, `node:${specifier.replace(/^node:/, "")}`]),
 );
-const UI_SOURCE_DIRECTORIES = new Set(["app", "features", "platform", "testing"]);
+const UI_SOURCE_DIRECTORIES = new Set([
+  "app",
+  "behavior",
+  "features",
+  "model",
+  "platform",
+  "screens",
+  "surfaces",
+  "testing",
+  "ui",
+]);
 const SURFACE_FORBIDDEN_DIRECTORIES = new Set([
   "internal",
   "queries",
@@ -405,7 +415,7 @@ function lintUiRootDirectories(root: string): ArchitectureViolation[] {
       {
         policy: "ui-root-catch-all",
         file,
-        message: `apps/ui production source must live in app, platform, features, or testing; ${JSON.stringify(segments[0])} has no architectural owner.`,
+        message: `apps/ui production source must live in global model, behavior, ui, screens, surfaces, a private feature, or a transitional app/platform/testing root; ${JSON.stringify(segments[0])} has no architectural owner.`,
         allowed:
           "Keep only the package entry at src/index.ts; place implementation in an approved source root.",
       },

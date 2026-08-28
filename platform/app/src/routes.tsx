@@ -1,4 +1,5 @@
 import NProgress from "nprogress";
+import { reloadOnChunkError } from "@langwatch/ui";
 import { Suspense, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -13,7 +14,6 @@ import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import { legacyRedirectRoutes } from "./legacyRedirects";
 import NotFoundOrErrorPage from "./pages/_not-found";
-import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
  * Root layout - wraps all routes.

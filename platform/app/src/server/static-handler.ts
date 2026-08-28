@@ -3,10 +3,7 @@ import type { ServerResponse } from "http";
 import path from "path";
 
 import { getAssetBase, injectAssetBaseIntoHtml } from "./asset-base";
-import {
-  injectPublicAppConfigIntoHtml,
-  type PublicAppConfig,
-} from "../runtime/public-config";
+import { injectPublicAppConfigIntoHtml, type PublicAppConfig } from "../runtime/public-config";
 
 const MIME_TYPES: Record<string, string> = {
   ".js": "application/javascript",
@@ -27,7 +24,7 @@ const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const NO_STORE_CACHE = "no-store, max-age=0";
 // The HTML shell must always be revalidated so a post-deploy reload picks up
 // the new chunk hashes. Vite calls this out as a prerequisite for
-// `vite:preloadError` recovery (see src/utils/chunkReload.ts): a cached shell
+// `vite:preloadError` recovery (see apps/ui/src/behavior/chunk-reload.ts): a cached shell
 // would reload straight back into the removed hashes and strand the user.
 const HTML_REVALIDATE_CACHE = "no-cache";
 

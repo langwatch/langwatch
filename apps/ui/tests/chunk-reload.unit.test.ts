@@ -6,7 +6,7 @@ import {
   registerChunkReloadListener,
   reloadOnChunkError,
   warmChunk,
-} from "./chunkReload";
+} from "../src/behavior/chunk-reload";
 
 // jsdom locks down window.location (non-configurable, can't be deleted, redefined
 // or spied), and location.reload() is a harmless no-op there. So rather than
@@ -47,17 +47,13 @@ describe("isChunkLoadError", () => {
 
   describe("when the message is a module-script import failure", () => {
     it("classifies it as a chunk-load error", () => {
-      expect(isChunkLoadError(new Error("error importing a module script failed"))).toBe(
-        true,
-      );
+      expect(isChunkLoadError(new Error("error importing a module script failed"))).toBe(true);
     });
   });
 
   describe("when the error is an ordinary runtime error", () => {
     it("does not classify it as a chunk-load error", () => {
-      expect(isChunkLoadError(new Error("Cannot read properties of undefined"))).toBe(
-        false,
-      );
+      expect(isChunkLoadError(new Error("Cannot read properties of undefined"))).toBe(false);
     });
   });
 
@@ -112,9 +108,9 @@ describe("reloadOnChunkError", () => {
 
   describe("when the error is a chunk error", () => {
     it("reloads and reports it handled the error", () => {
-      expect(
-        reloadOnChunkError(new Error("Failed to fetch dynamically imported module")),
-      ).toBe(true);
+      expect(reloadOnChunkError(new Error("Failed to fetch dynamically imported module"))).toBe(
+        true,
+      );
       expect(reloaded()).toBe(true);
     });
   });

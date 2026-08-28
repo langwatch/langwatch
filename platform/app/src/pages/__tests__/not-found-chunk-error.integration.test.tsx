@@ -3,7 +3,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RELOAD_AT_KEY } from "~/utils/chunkReload";
+import { RELOAD_AT_KEY } from "@langwatch/ui";
 
 vi.mock("react-router", () => ({
   useRouteError: vi.fn(),
@@ -47,9 +47,7 @@ describe("NotFoundOrErrorPage", () => {
       render(<NotFoundOrErrorPage />, { wrapper: Wrapper });
 
       expect(screen.getByText("Failed to load page")).toBeDefined();
-      expect(
-        screen.getByText(/browser extension or network issue may be blocking/),
-      ).toBeDefined();
+      expect(screen.getByText(/browser extension or network issue may be blocking/)).toBeDefined();
     });
 
     it("renders a Reload app button", () => {
@@ -70,9 +68,7 @@ describe("NotFoundOrErrorPage", () => {
 
   describe("when the error is a generic runtime error", () => {
     beforeEach(() => {
-      mockedUseRouteError.mockReturnValue(
-        new Error("Cannot read properties of undefined"),
-      );
+      mockedUseRouteError.mockReturnValue(new Error("Cannot read properties of undefined"));
     });
 
     it("renders the generic error title without the reload button", () => {

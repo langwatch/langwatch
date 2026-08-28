@@ -32,9 +32,15 @@ outer provider
 move. The adapter performs only existing compatibility and registration work;
 it does not become a second shell implementation.
 
-Routes move incrementally after each page's feature-web presentation and
-`apps/ui/src/platform` capabilities are dependency-closed. A route cut preserves
-the current URL, outer-provider order, suspense fallback, error behaviour and
+Global stale-chunk recovery is owned by `apps/ui/src/behavior` and exported
+through the UI package entry. The legacy route, not-found fallback, drawer
+registry and shell adapter consume that one implementation while the rest of
+the platform shell remains in place.
+
+Routes move incrementally after each page's feature-web presentation and its
+app-owned model, behavior, UI, screen, surface or private-feature capabilities
+are dependency-closed. A route cut preserves the current URL, outer-provider
+order, suspense fallback, error behaviour and
 router setup unless a separate product decision explicitly changes them.
 
 ## Alternatives considered
