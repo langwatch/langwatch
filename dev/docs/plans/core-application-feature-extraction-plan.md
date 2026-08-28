@@ -413,6 +413,47 @@ Worker consumer; that gate remains under `F-WORKER-01`.
 
 New findings recorded during the Wave 3 to 5 fan-out:
 
+`F-REST-01` — **Wave 3's Public REST column has a prerequisite the plan never
+named, and two agents found it independently.** One inventoried the ingestion
+and telemetry surface (13 modules, 27 routes), the other the product CRUD
+surface (16 groups, 95 routes). Both delivered the inventory and both declined
+to move anything, for the same reasons:
+
+The routes sit on `platform/app`'s security spine — `createProjectApp`,
+`createServiceApp`, `SecuredApp`, `requires`, `handlerManagedAuth` under
+`server/api/security/**` — and nothing packages it. `apps/api`'s
+`createRestService` is a different contract rather than a different spelling: a
+versioned base path, `projectId` taken from input instead of from the
+credential, a different error envelope, different generated operation ids, and
+API-key-only authentication where `createProjectApp` also accepts a browser
+session cookie. The divergence is enforced, not incidental —
+`createRestService` throws at construction if handed an `onError`, so the legacy
+handler cannot be threaded through. Eighteen of nineteen product route files
+publish the legacy envelope.
+
+Leaving `SecuredApp` also drops routes from the REST authorization audit, which
+enumerates `allRegisteredRoutes()`. That is already recorded as `F-APIKEY-01`
+for the single feature that jumped; repeating it would silently un-audit
+`/api/collector`, all three OTLP endpoints and all four ingest receivers at
+once.
+
+Two facts soften the picture. The service layer is ready: no product route file
+touches Prisma except `evaluations-legacy`, and every feature already has a
+canonical abstract service. And the live pattern already exists and is not the
+`apps/api` one — Secret is package-owned, composed through
+`createProjectRestApiService`, and that helper reaches `registerRoutePolicy` via
+`onRouteMounted`, so it keeps the audit that `apps/api`'s `buildSecretRestApi`
+drops. Under the rule that nothing new goes in `platform/app`, that composition
+seam needs a new home, which is a decision rather than a mechanical move.
+
+One more fact gates all of it: `apps/api` has no `start`, no `dev` and no `bin`.
+Moving a route there today removes it from the served surface.
+
+Sequencing: package the security spine and give `apps/api` an executable boot
+before any REST vertical, or accept `createProjectRestApiService` as the
+compatibility seam and give it a home outside `platform/app`. Both inventories
+are complete and should be reused rather than redone.
+
 `F-CI-02` — **package suites are invisible to CI, and the real number is far
 worse than `F-CI-01` estimated.** Measured across every workflow, not just
 `langwatch-app-ci.yml`: **162 workspace packages declare a `test` or
