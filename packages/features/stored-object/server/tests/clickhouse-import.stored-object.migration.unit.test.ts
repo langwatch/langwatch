@@ -55,7 +55,34 @@ class ProvedDrain extends StoredObjectLegacyWriterDrainPort {
   }
 }
 
+function newMigration() {
+  return ClickHouseImportStoredObjectMigration.create({
+    projects: new OneProject(),
+    legacy: new OneLegacyObject(),
+    locations: new LegacyLocations(),
+    drain: new ProvedDrain(),
+    store: InMemoryStoredObjectStore.create(),
+  });
+}
+
 describe("ClickHouseImportStoredObjectMigration", () => {
+  describe("when the runner reads its declaration", () => {
+    it("registers under a paced, operator-gated rollout posture", () => {
+      const declared = newMigration();
+
+      // The state table's key. Renaming it orphans every stored record.
+      expect(declared.name).toBe("stored-objects-clickhouse-import-v0");
+      // Cut-over changes which store answers for the tenant, so finalizing it
+      // takes the typed confirmation.
+      expect(declared.requiresOperatorConfirmation).toBe(true);
+      // Inert on self-hosted until a later release flips it.
+      expect(declared.runsAutomaticallyOnSelfHosted).toBe(false);
+      // Still soaking on cloud: the rollout is paced per organization from the
+      // ops migrations page, and `true` would retire that pacing.
+      expect(declared.enrolledAutomatically).toBe(false);
+    });
+  });
+
   it("imports directly into the one row store through system migrations", async () => {
     const store = InMemoryStoredObjectStore.create();
     const migration = ClickHouseImportStoredObjectMigration.create({

@@ -40,6 +40,10 @@ export const storedObjectProblemSchema = z
     traceUrl: z.string().url().optional(),
     httpStatus: z.number().int().min(400).max(599).optional(),
     fault: z.enum(["customer", "platform", "provider"]).optional(),
+    // Modelled exactly as `serializedHandledErrorSchema` does: every
+    // `HandledError.serialize()` emits the boolean, and an envelope written by
+    // a peer that omits it still parses as not-retryable.
+    retryable: z.boolean().default(false),
     tips: z.array(z.string()).optional(),
     docsUrl: z.string().url().optional(),
   })

@@ -47,7 +47,16 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
     "ClickHouse into Postgres, then waits for proof that legacy writers have " +
     "drained before allowing the tenant to cut over.";
   readonly requiresOperatorConfirmation = true;
+  // Ships inert on self-hosted until a later release flips this once the cloud
+  // rollout has soaked (ADR-001 "ClickHouse migration").
   readonly runsAutomaticallyOnSelfHosted = false;
+  // The soaking posture on cloud: cut-over is paced per organization from the
+  // ops migrations page, which is the pacing the operator confirmation above
+  // exists to gate. Declaring `true` would say the rollout is finished and stop
+  // the page offering enrollment rows at all. Flip it only once every
+  // organization that existed has cut over and the remaining question is
+  // reaching the ones created since.
+  readonly enrolledAutomatically = false;
 
   static create(
     options: ClickHouseImportStoredObjectMigrationOptions,

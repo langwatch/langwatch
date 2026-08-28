@@ -207,6 +207,37 @@ describe("Stored Objects errors and portable service capability", () => {
     ).toMatchObject({ code, fault: error.fault });
   });
 
+  describe("when a serialized problem crosses the transport boundary", () => {
+    it("keeps the retryable verdict the writer sent", () => {
+      expect(
+        storedObjectProblemSchema.parse({
+          code: "storage_unavailable",
+          message: "Object storage is temporarily unavailable.",
+          retryable: true,
+        }).retryable,
+      ).toBe(true);
+    });
+
+    it("reads an envelope that omits the verdict as not retryable", () => {
+      expect(
+        storedObjectProblemSchema.parse({
+          code: "stored_object_not_found",
+          message: "The stored object was not found.",
+        }).retryable,
+      ).toBe(false);
+    });
+
+    it("still rejects a key the envelope does not define", () => {
+      expect(() =>
+        storedObjectProblemSchema.parse({
+          code: "stored_object_not_found",
+          message: "The stored object was not found.",
+          deliveryUrl: "https://storage.example/private-token",
+        }),
+      ).toThrow(/Unrecognized key/u);
+    });
+  });
+
   it("does not put provider locators in portable storage failures", () => {
     expect(new StorageUnavailableError().serialize().meta).toEqual({});
     expect(new StoredObjectNotFoundError().serialize().meta).toEqual({});
