@@ -492,6 +492,9 @@ importers:
       '@aws-sdk/credential-providers':
         specifier: ^3.1080.0
         version: 3.1108.0
+      '@smithy/core':
+        specifier: ^3.31.0
+        version: 3.31.0
       '@smithy/node-http-handler':
         specifier: ^4.9.11
         version: 4.9.12

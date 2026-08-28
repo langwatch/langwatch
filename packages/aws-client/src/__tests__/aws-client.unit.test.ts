@@ -1,4 +1,5 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
+import { HttpRequest, HttpResponse, type HttpHandlerOptions } from "@smithy/core/protocols";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AwsClientConfiguration,
@@ -7,9 +8,18 @@ import {
   type AwsClientConfigInput,
 } from "../aws-client";
 
+type HandlerOptions = {
+  connectionTimeout?: number;
+  requestTimeout?: number;
+  httpAgent?: unknown;
+  httpsAgent?: unknown;
+};
+
 type RecordedNodeHttpHandler = {
-  destroy: () => void;
-  options: unknown;
+  destroy(): void;
+  handle(request: HttpRequest, options?: HttpHandlerOptions): Promise<{ response: HttpResponse }>;
+  metadata: { handlerProtocol: string };
+  options: HandlerOptions;
 };
 
 // The assume-role branch builds a provider whose shape nothing else can read
@@ -23,13 +33,36 @@ vi.mock("@aws-sdk/credential-providers", () => ({
 // built with are readable without touching the real class's private fields.
 const { createdHandlers, nodeHttpHandlerMock } = vi.hoisted(() => {
   const createdHandlers: RecordedNodeHttpHandler[] = [];
-  const nodeHttpHandlerMock = vi.fn(function (this: RecordedNodeHttpHandler, options: unknown) {
+  const nodeHttpHandlerMock = vi.fn(function (
+    this: RecordedNodeHttpHandler,
+    options: HandlerOptions,
+  ) {
     this.options = options;
     this.destroy = vi.fn();
+    this.handle = vi.fn(async () => ({ response: new HttpResponse({ statusCode: 200 }) }));
+    this.metadata = { handlerProtocol: "http/1.1" };
     createdHandlers.push(this);
   });
   return { createdHandlers, nodeHttpHandlerMock };
 });
+
+function deferredResponse(): {
+  promise: Promise<{ response: HttpResponse }>;
+  resolve: (value: { response: HttpResponse }) => void;
+} {
+  let resolvePromise: ((value: { response: HttpResponse }) => void) | undefined;
+  const promise = new Promise<{ response: HttpResponse }>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  return {
+    promise,
+    resolve: (value) => {
+      if (!resolvePromise) throw new Error("Deferred response was not initialised");
+      resolvePromise(value);
+    },
+  };
+}
 
 vi.mock("@smithy/node-http-handler", () => ({ NodeHttpHandler: nodeHttpHandlerMock }));
 
@@ -46,13 +79,35 @@ vi.mock("https-proxy-agent", () => ({ HttpsProxyAgent: httpsProxyAgentMock }));
  * lazily behind a private field, so the handler is mocked as a recorder of its
  * own arguments rather than read by reflection.
  */
-function handlerOptions(handler: unknown): {
-  connectionTimeout?: number;
-  requestTimeout?: number;
-  httpAgent?: unknown;
-  httpsAgent?: unknown;
-} {
-  return (handler as { options: Record<string, unknown> }).options;
+function isRecordedNodeHttpHandler(value: unknown): value is RecordedNodeHttpHandler {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "options" in value &&
+    typeof value.options === "object" &&
+    value.options !== null &&
+    "destroy" in value &&
+    typeof value.destroy === "function" &&
+    "handle" in value &&
+    typeof value.handle === "function" &&
+    "metadata" in value &&
+    typeof value.metadata === "object" &&
+    value.metadata !== null &&
+    "handlerProtocol" in value.metadata &&
+    typeof value.metadata.handlerProtocol === "string"
+  );
+}
+
+function recordedHandlerWithin(handler: unknown): RecordedNodeHttpHandler {
+  if (isRecordedNodeHttpHandler(handler)) return handler;
+  if (typeof handler === "object" && handler !== null && "handler" in handler) {
+    return recordedHandlerWithin(handler.handler);
+  }
+  throw new Error("Expected a recorded request handler");
+}
+
+function handlerOptions(handler: unknown): HandlerOptions {
+  return recordedHandlerWithin(handler).options;
 }
 
 /**
@@ -317,14 +372,14 @@ describe("buildAwsClientConfig", () => {
       expect(outboundProxy.hosts).toEqual(["mail-relay.internal.corp"]);
     });
 
-    it("reuses the handler and socket pool for one proxy URL", () => {
+    it("reuses the socket pool for one proxy URL while borrowing a handler per client", () => {
       outboundProxy = new RecordingProxyResolver(() => "http://reused.corp:8080");
       aws = AwsClientConfiguration.create({ outboundProxy });
 
       const first = buildAwsClientConfig({ targetHost: "email.eu-central-1.amazonaws.com" });
       const second = buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
 
-      expect(second.requestHandler).toBe(first.requestHandler);
+      expect(second.requestHandler).not.toBe(first.requestHandler);
       expect(httpsProxyAgentMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -347,7 +402,7 @@ describe("buildAwsClientConfig", () => {
       });
     });
 
-    it("reuses the one handler rather than a socket pool per client", () => {
+    it("reuses one socket pool while each client receives a borrowed handler", () => {
       const first = buildAwsClientConfig({
         targetHost: "sqs.eu-central-1.amazonaws.com",
       });
@@ -355,7 +410,57 @@ describe("buildAwsClientConfig", () => {
         targetHost: "email.eu-central-1.amazonaws.com",
       });
 
-      expect(first.requestHandler).toBe(second.requestHandler);
+      expect(first.requestHandler).not.toBe(second.requestHandler);
+    });
+
+    it("keeps another client usable after one client destroys its borrowed handler", async () => {
+      const first = buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
+      const second = buildAwsClientConfig({ targetHost: "email.eu-central-1.amazonaws.com" });
+      const pooled = createdHandlers[0];
+      if (!pooled) throw new Error("Expected a pooled request handler");
+      const request = new HttpRequest({
+        headers: {},
+        hostname: "email.eu-central-1.amazonaws.com",
+        method: "GET",
+        path: "/",
+        protocol: "https:",
+      });
+
+      first.requestHandler.destroy();
+      await second.requestHandler.handle(request);
+
+      expect(pooled.destroy).not.toHaveBeenCalled();
+      expect(pooled.handle).toHaveBeenCalledWith(request, undefined);
+
+      await aws.close();
+      expect(pooled.destroy).toHaveBeenCalledOnce();
+    });
+
+    it("waits for an in-flight request before the process destroys its pooled handler", async () => {
+      const config = buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
+      const pooled = createdHandlers[0];
+      if (!pooled) throw new Error("Expected a pooled request handler");
+      const request = new HttpRequest({
+        headers: {},
+        hostname: "sqs.eu-central-1.amazonaws.com",
+        method: "GET",
+        path: "/",
+        protocol: "https:",
+      });
+      const deferred = deferredResponse();
+      pooled.handle = vi.fn(() => deferred.promise);
+
+      const inFlight = config.requestHandler.handle(request);
+      const close = aws.close();
+
+      await expect(config.requestHandler.handle(request)).rejects.toThrow("is closing");
+      expect(pooled.destroy).not.toHaveBeenCalled();
+
+      deferred.resolve({ response: new HttpResponse({ statusCode: 200 }) });
+      await inFlight;
+      await close;
+
+      expect(pooled.destroy).toHaveBeenCalledOnce();
     });
   });
 
@@ -365,7 +470,9 @@ describe("buildAwsClientConfig", () => {
     });
 
     it("closes one handler pool once, even when shutdown races with itself", async () => {
-      buildAwsClientConfig({ targetHost: "email.eu-central-1.amazonaws.com" });
+      const directConfig = buildAwsClientConfig({
+        targetHost: "email.eu-central-1.amazonaws.com",
+      });
       proxyUrl = "http://proxy.corp:8080";
       buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
 
@@ -375,6 +482,7 @@ describe("buildAwsClientConfig", () => {
       const firstClose = aws.close();
       const concurrentClose = aws.close();
 
+      directConfig.requestHandler.destroy();
       expect(concurrentClose).toBe(firstClose);
       expect(() => buildAwsClientConfig({ targetHost: "sns.eu-central-1.amazonaws.com" })).toThrow(
         "AwsClientConfiguration is closed",

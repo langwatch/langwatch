@@ -1,5 +1,6 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
+import type { HttpHandlerOptions, HttpRequest, HttpResponse } from "@smithy/core/protocols";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
 export abstract class OutboundProxyResolverPort {
@@ -66,8 +67,19 @@ export interface AwsClientConfig {
   endpoint?: string;
   /** Always set, so no client falls back to the SDK's own handler and its
    *  unbounded timeouts. */
-  requestHandler: NodeHttpHandler;
+  requestHandler: AwsClientRequestHandler;
   maxAttempts?: number;
+}
+
+/**
+ * A client-local view of a process-owned request handler. SDK clients call
+ * `destroy()` on their configured handler, but the socket pool belongs to the
+ * process configuration and is closed only when that configuration closes.
+ */
+export interface AwsClientRequestHandler {
+  readonly metadata: { handlerProtocol: string };
+  destroy(): void;
+  handle(request: HttpRequest, options?: HttpHandlerOptions): Promise<{ response: HttpResponse }>;
 }
 
 /**
@@ -143,18 +155,24 @@ export class AwsClientConfiguration {
 }
 
 class AwsRequestHandlerPool {
-  private readonly handlers = new Map<string, NodeHttpHandler>();
+  private readonly handlers = new Map<string, PooledAwsRequestHandler>();
 
-  forProxy(proxyUrl?: string | null): NodeHttpHandler {
+  borrowForProxy(proxyUrl?: string | null): AwsClientRequestHandler {
+    return this.handlerForProxy(proxyUrl).borrow();
+  }
+
+  private handlerForProxy(proxyUrl?: string | null): PooledAwsRequestHandler {
     const key = proxyUrl ?? DIRECT_HANDLER_KEY;
     const cached = this.handlers.get(key);
     if (cached) return cached;
     const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
-    const handler = new NodeHttpHandler({
-      ...(agent ? { httpAgent: agent, httpsAgent: agent } : {}),
-      connectionTimeout: CONNECTION_TIMEOUT_MS,
-      requestTimeout: REQUEST_TIMEOUT_MS,
-    });
+    const handler = new PooledAwsRequestHandler(
+      new NodeHttpHandler({
+        ...(agent ? { httpAgent: agent, httpsAgent: agent } : {}),
+        connectionTimeout: CONNECTION_TIMEOUT_MS,
+        requestTimeout: REQUEST_TIMEOUT_MS,
+      }),
+    );
     this.handlers.set(key, handler);
     return handler;
   }
@@ -162,9 +180,73 @@ class AwsRequestHandlerPool {
   close(): Promise<void> {
     const handlers = [...this.handlers.values()];
     this.handlers.clear();
-    return Promise.resolve().then(() => {
-      for (const handler of handlers) handler.destroy();
-    });
+    return Promise.all(handlers.map((handler) => handler.close())).then(() => void 0);
+  }
+}
+
+/**
+ * The AWS SDK owns its client objects, but not this process's socket pool.
+ * Forward requests to the pooled handler while making client-local destruction
+ * harmless; `AwsRequestHandlerPool.close()` performs the real destruction.
+ */
+class PooledAwsRequestHandler {
+  private activeRequests = 0;
+  private closePromise: Promise<void> | undefined;
+  private settleActiveRequests: (() => void) | undefined;
+
+  constructor(private readonly handler: NodeHttpHandler) {}
+
+  borrow(): AwsClientRequestHandler {
+    return new BorrowedAwsRequestHandler(this);
+  }
+
+  async handle(
+    request: HttpRequest,
+    options?: HttpHandlerOptions,
+  ): Promise<{ response: HttpResponse }> {
+    if (this.closePromise) {
+      throw new Error("AWS request handler is closing");
+    }
+
+    this.activeRequests += 1;
+    try {
+      return await this.handler.handle(request, options);
+    } finally {
+      this.activeRequests -= 1;
+      if (this.activeRequests === 0) this.settleActiveRequests?.();
+    }
+  }
+
+  close(): Promise<void> {
+    this.closePromise ??= this.closeOnce();
+    return this.closePromise;
+  }
+
+  private async closeOnce(): Promise<void> {
+    if (this.activeRequests > 0) {
+      await new Promise<void>((resolve) => {
+        this.settleActiveRequests = resolve;
+      });
+    }
+    this.handler.destroy();
+  }
+
+  get metadata(): { handlerProtocol: string } {
+    return this.handler.metadata;
+  }
+}
+
+class BorrowedAwsRequestHandler implements AwsClientRequestHandler {
+  readonly metadata: { handlerProtocol: string };
+
+  constructor(private readonly handler: PooledAwsRequestHandler) {
+    this.metadata = handler.metadata;
+  }
+
+  destroy(): void {}
+
+  handle(request: HttpRequest, options?: HttpHandlerOptions): Promise<{ response: HttpResponse }> {
+    return this.handler.handle(request, options);
   }
 }
 
@@ -203,8 +285,8 @@ class AwsTransportPolicy {
     return config;
   }
 
-  requestHandlerForHost(hostname: string): NodeHttpHandler {
-    return this.requestHandlers.forProxy(this.outboundProxy.tryResolveForHost(hostname));
+  requestHandlerForHost(hostname: string): AwsClientRequestHandler {
+    return this.requestHandlers.borrowForProxy(this.outboundProxy.tryResolveForHost(hostname));
   }
 }
 

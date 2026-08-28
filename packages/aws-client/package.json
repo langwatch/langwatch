@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@aws-sdk/credential-providers": "^3.1080.0",
+    "@smithy/core": "^3.31.0",
     "@smithy/node-http-handler": "^4.9.11",
     "https-proxy-agent": "^9.1.0"
   },
