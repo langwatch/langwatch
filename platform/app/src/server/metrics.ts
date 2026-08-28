@@ -1573,28 +1573,45 @@ export const incrementGovernanceCostRollupMismatch = (
 };
 
 /**
- * How far behind the event log the rollup is, in seconds, per lane.
+ * How far behind the event log the rollup is, in seconds, per tenant and lane.
  *
  * A gauge and not an alert: ADR-128 wave 1 measures and sends nothing. The
  * value is the distance between the newest event's BUSINESS time and the
  * newest business time any summary row covers, so a lane that stopped folding
  * climbs steadily while a lane that is merely idle sits flat at zero.
+ *
+ * `tenant_id` is load-bearing, not detail. The comparator fires once per
+ * tenant, and a gauge keyed only by lane would have each tenant overwrite the
+ * last: the fleet's worst lag would sit invisible behind whichever tenant
+ * happened to report most recently, which is the one reading this metric
+ * exists to surface. Pinned by governanceCostRollupMetrics.unit.test.ts.
+ *
+ * The series are therefore per tenant, and prom-client keeps a label set for
+ * the life of the process — a deleted tenant's last reading lingers until the
+ * worker restarts. Acceptable for a lag gauge nobody alerts on; it would not
+ * be if this ever became a paging signal.
  */
 register.removeSingleMetric("langwatch_governance_cost_rollup_lag_seconds");
 const governanceCostRollupLagGauge = new Gauge({
   name: "langwatch_governance_cost_rollup_lag_seconds",
   help: "Seconds between the newest cost event and the newest moment the rollup covers",
-  labelNames: ["cost_source"] as const,
+  labelNames: ["tenant_id", "cost_source"] as const,
 });
 
 export const setGovernanceCostRollupLagSeconds = ({
+  tenantId,
   costSource,
   seconds,
 }: {
+  tenantId: string;
   costSource: string;
   seconds: number;
 }): void => {
-  governanceCostRollupLagGauge.labels(costSource).set(seconds);
+  // Named labels rather than positional: two same-typed labels next to each
+  // other are silently swappable, and a swap here mislabels every series.
+  governanceCostRollupLagGauge
+    .labels({ tenant_id: tenantId, cost_source: costSource })
+    .set(seconds);
 };
 
 // ============================================================================
