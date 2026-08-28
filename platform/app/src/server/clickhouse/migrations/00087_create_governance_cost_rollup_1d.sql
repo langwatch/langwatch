@@ -48,7 +48,16 @@
 -- the reconciler's whole-clause MODIFY TTL never rewrites this line. Pinned by
 -- retentionTtl.unit.test.ts.
 --
--- No content: ids, quantities and money. No prompts, no responses, no PII.
+-- No content: ids, quantities and money. No prompts, no responses.
+--
+-- It is NOT PII-free. `RawActorId` carries the provider's own actor identifier
+-- verbatim, which for several providers is an email address, so this table
+-- holds personal data. Two consequences, both load-bearing: the fixed 13-month
+-- TTL DELETE above is what bounds how long it is held, and a subject-deletion
+-- request must reach this table — it is not covered by deleting the trace
+-- data, because the rollup is a separate copy the fold wrote. The identifier
+-- is deliberately not hashed: read-time department resolution needs the raw
+-- value, and changing that is a wave-2 identity decision, not a comment fix.
 --
 -- Reads MUST be replacement-aware (argMax over EventTimestamp, per ADR-015):
 -- the fold writes one version per fold cycle and RMT dedup is eventual, so a
