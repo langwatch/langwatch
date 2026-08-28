@@ -9,7 +9,7 @@ import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
-} from "~/server/tracer/types";
+} from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";

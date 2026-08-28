@@ -72,7 +72,11 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { DatasetNormalizationWorkerPort } from "@langwatch/dataset-contract";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import type { GatewaySpendEventsPort } from "@langwatch/gateway-server";
-import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
+import {
+  incrementAutomationMatchRecordsTotal,
+  incrementProcessManagerRetentionFailures,
+  incrementProcessManagerRetentionSweptRows,
+} from "~/server/metrics";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "~/runtime/app/features/billing";
 import { AppTraceRecordSpanAdapter } from "~/runtime/app/trace-record-span.adapter";
@@ -139,7 +143,12 @@ import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "../pipelines/billing-reporting/pipeline";
-import { createBlobMaintenancePipeline } from "../pipelines/blob-maintenance/pipeline";
+import {
+  createBlobMaintenancePipeline,
+  createProcessManagerMaintenancePipeline,
+  ProcessRetentionMetricsPort,
+  type RetentionFamily,
+} from "@langwatch/eventing/server";
 import {
   EvaluationExecutionIntentService,
   ExecuteEvaluationCommand,
@@ -178,7 +187,6 @@ import { createLangyMaintenancePipeline } from "../pipelines/langy-maintenance/p
 import { type EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
-import { createProcessManagerMaintenancePipeline } from "../pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -243,6 +251,26 @@ class AppGovernanceSubscriberRuntime extends GovernanceSubscriberRuntime {
 
   countAutomationMatchRecords(count: number): void {
     incrementAutomationMatchRecordsTotal(count);
+  }
+}
+
+/**
+ * The web/worker process's own retention counters, handed to the sweep.
+ *
+ * The sweep lives in `@langwatch/eventing/server` and takes this as a port
+ * rather than defining the counters itself, because the process that owns the
+ * Prometheus registry has to own the definitions: a counter registered twice
+ * in one process silently detaches, and the sweep would keep running while its
+ * metrics stopped moving. That is the exact failure the sweep exists to make
+ * visible.
+ */
+class AppProcessRetentionMetricsPort extends ProcessRetentionMetricsPort {
+  recordSweptRows(family: RetentionFamily, rows: number): void {
+    incrementProcessManagerRetentionSweptRows(family, rows);
+  }
+
+  recordFailure(family: RetentionFamily): void {
+    incrementProcessManagerRetentionFailures(family);
   }
 }
 
@@ -560,6 +588,7 @@ export class PipelineRegistry {
             this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
           deleteConsumedInboxBatch: (params) =>
             this.deps.repositories.processStore.deleteConsumedInboxBatch(params),
+          metrics: new AppProcessRetentionMetricsPort(),
         },
       }),
     );
@@ -848,16 +877,13 @@ export class PipelineRegistry {
   }
 
   /**
-   * ADR-056: the session-aggregate pipeline. Contribution commands are its
-   * write surface; the session fold and the (trace → session) map are its
-   * projections. The dispatch subscribers that feed it mount on the source
-   * pipelines and close over this pipeline's commands, so this registers
-   * first.
-   */
-  /**
-   * The spend-command spine: gateway requests as aggregates, spend records
-   * as a fold projection over gateway_spend, rating in the pipeline. Only
-   * registered when ClickHouse is on (the spend table has no PG fallback).
+   * The Governance signal log: virtual-key lifecycle and budget crossings as
+   * durable appends, plus the ADR-073 webhook delivery process manager where
+   * a delivery graph was supplied.
+   *
+   * Registered only alongside the Gateway spend pipeline, and that pairing is
+   * load-bearing: spend's debit adapter delivers through these commands, and
+   * this pipeline's delivery process has no producer without spend.
    */
   private registerGovernanceEventsPipeline() {
     return this.deps.eventSourcing.register(
@@ -869,6 +895,11 @@ export class PipelineRegistry {
     );
   }
 
+  /**
+   * The spend-command spine: gateway requests as aggregates, spend records
+   * as a fold projection over gateway_spend, rating in the pipeline. Only
+   * registered when ClickHouse is on (the spend table has no PG fallback).
+   */
   private registerGatewaySpendPipeline(
     deps: { port: GatewaySpendEventsPort },
     governanceDelivery: GovernanceSignalDeliveryPort,
@@ -951,6 +982,13 @@ export class PipelineRegistry {
     return AppGatewayDebitAdapter.create(gateway, governanceDelivery).build();
   }
 
+  /**
+   * ADR-056: the session-aggregate pipeline. Contribution commands are its
+   * write surface; the session fold and the (trace → session) map are its
+   * projections. The dispatch subscribers that feed it mount on the Metric,
+   * Log and Trace pipelines and close over this pipeline's commands, so this
+   * registers before all three.
+   */
   private registerCodingAgentPipeline(costMetrics: PrometheusCodingAgentCostMetricsAdapter) {
     return this.deps.eventSourcing.register(
       EventingCodingAgentProcessingAdapter.create({

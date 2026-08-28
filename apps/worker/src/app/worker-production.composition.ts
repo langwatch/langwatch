@@ -1,4 +1,7 @@
-import type { EventingServerRuntimeOptions } from "@langwatch/eventing/server";
+import type {
+  EventingServerRuntimeOptions,
+  ProcessRetentionMetricsPort,
+} from "@langwatch/eventing/server";
 import {
   EnterpriseWorkerComposition,
   type EnterpriseWorkerCompositionOptions,
@@ -10,6 +13,68 @@ import {
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
+import {
+  AuthzWorkerFeatureInstaller,
+  type AuthzWorkerCapability,
+} from "../features/authz/authz-worker-feature.installer";
+import {
+  AutomationWorkerFeatureInstaller,
+  type AutomationWorkerCapability,
+} from "../features/automation/automation-worker-feature.installer";
+import {
+  BillingReportingWorkerFeatureInstaller,
+  type BillingReportingWorkerCapability,
+} from "../features/billing/billing-reporting-worker-feature.installer";
+import {
+  CodingAgentWorkerFeatureInstaller,
+  type CodingAgentWorkerCapability,
+} from "../features/coding-agent/coding-agent-worker-feature.installer";
+import {
+  EvaluationWorkerFeatureInstaller,
+  type EvaluationWorkerCapability,
+} from "../features/evaluation/evaluation-worker-feature.installer";
+import {
+  EventingMaintenanceWorkerFeatureInstaller,
+  type WorkerBlobSweepPort,
+} from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
+import {
+  ExperimentWorkerFeatureInstaller,
+  type ExperimentWorkerCapability,
+} from "../features/experiment/experiment-worker-feature.installer";
+import {
+  GatewaySpendWorkerFeatureInstaller,
+  type GatewaySpendWorkerCapability,
+} from "../features/gateway/gateway-spend-worker-feature.installer";
+import {
+  GithubWorkerFeatureInstaller,
+  type GithubWorkerCapability,
+} from "../features/github/github-worker-feature.installer";
+import {
+  GovernanceEventsWorkerFeatureInstaller,
+  type GovernanceEventsWorkerCapability,
+} from "../features/governance/governance-events-worker-feature.installer";
+import {
+  GovernanceIngestionWorkerFeatureInstaller,
+  type GovernanceIngestionWorkerCapability,
+} from "../features/governance/governance-ingestion-worker-feature.installer";
+import {
+  LogWorkerFeatureInstaller,
+  type LogWorkerCapability,
+  type LogWorkerSubscribers,
+} from "../features/log/log-worker-feature.installer";
+import {
+  MetricWorkerFeatureInstaller,
+  type MetricWorkerCapability,
+  type MetricWorkerSubscribers,
+} from "../features/metric/metric-worker-feature.installer";
+import {
+  ScenarioWorkerFeatureInstaller,
+  type ScenarioWorkerCapability,
+} from "../features/scenario/scenario-worker-feature.installer";
+import {
+  SuiteWorkerFeatureInstaller,
+  type SuiteWorkerCapability,
+} from "../features/suite/suite-worker-feature.installer";
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
 import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
@@ -23,6 +88,7 @@ import {
   WorkerTransportPort,
 } from "../platform/lifecycle/worker-runtime.port";
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
+import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer";
 import { WorkerApplication } from "./worker.application";
 
 /** The worker-owned runtime dependencies for the Topic feature. */
@@ -38,6 +104,89 @@ export type WorkerTraceCompositionOptions = {
   installer: TraceProcessingInstallerPort;
 };
 
+/** Automation's package-owned pipeline, mounted before every match producer. */
+export type WorkerAutomationCompositionOptions = {
+  installer: AutomationWorkerCapability;
+};
+
+/** The Eventing substrate's own blob and process-manager retention sweeps. */
+export type WorkerEventingMaintenanceCompositionOptions = {
+  blobSweep: WorkerBlobSweepPort;
+  retentionMetrics: ProcessRetentionMetricsPort;
+};
+
+/** GitHub pull-request linkage maintenance, fleet-wide rather than per replica. */
+export type WorkerGithubCompositionOptions = {
+  installer: GithubWorkerCapability;
+};
+
+/** Evaluation's durable processing pipeline, mounted before its dispatchers. */
+export type WorkerEvaluationCompositionOptions = {
+  installer: EvaluationWorkerCapability;
+};
+
+/** The ADR-056 Coding Agent session pipeline, mounted before its fact sources. */
+export type WorkerCodingAgentCompositionOptions = {
+  installer: CodingAgentWorkerCapability;
+};
+
+/**
+ * The Governance events and Gateway spend pair.
+ *
+ * They are ONE option rather than two, because the live registry mounts both
+ * under a single guard and neither is meaningful alone: the spend pipeline's
+ * debit adapter delivers through Governance's commands, and Governance's
+ * webhook delivery process has no producer without spend. Splitting them into
+ * two optional fields would make "spend without governance" expressible, and
+ * that graph silently drops every debit.
+ */
+export type WorkerGatewaySpendCompositionOptions = {
+  governance: GovernanceEventsWorkerCapability;
+  spend: GatewaySpendWorkerCapability;
+};
+
+/** The Suite run pipeline, mounted before the Scenario pipeline that reports into it. */
+export type WorkerSuiteCompositionOptions = {
+  installer: SuiteWorkerCapability;
+};
+
+/** The Scenario (simulation run) pipeline and its durable metrics retry. */
+export type WorkerScenarioCompositionOptions = {
+  installer: ScenarioWorkerCapability;
+};
+
+/** The Experiment run pipeline, whose metrics command Trace dispatches. */
+export type WorkerExperimentCompositionOptions = {
+  installer: ExperimentWorkerCapability;
+};
+
+/** Enterprise Governance's pulled-usage and ingestion-pull pipelines. */
+export type WorkerGovernanceIngestionCompositionOptions = {
+  installer: GovernanceIngestionWorkerCapability;
+};
+
+/** The monthly billing roll-up, whose command re-dispatches itself forward. */
+export type WorkerBillingReportingCompositionOptions = {
+  installer: BillingReportingWorkerCapability;
+};
+
+/** Metric's package-owned processing pipeline and its dispatch subscribers. */
+export type WorkerMetricCompositionOptions = {
+  installer: MetricWorkerCapability;
+  subscribers?: MetricWorkerSubscribers;
+};
+
+/** Log's package-owned processing pipeline and its dispatch subscribers. */
+export type WorkerLogCompositionOptions = {
+  installer: LogWorkerCapability;
+  subscribers?: LogWorkerSubscribers;
+};
+
+/** The AuthZ grants ledger, mounted last so every producer exists first. */
+export type WorkerAuthzCompositionOptions = {
+  installer: AuthzWorkerCapability;
+};
+
 /** Resolved technical inputs for the Worker-owned transport foundation. */
 export type WorkerInfrastructureCompositionOptions = Omit<
   WorkerInfrastructureAdapterOptions,
@@ -50,6 +199,26 @@ type WorkerProductionCompositionBaseOptions = {
   transport: WorkerTransportPort;
   trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
+  /**
+   * Pipeline groups whose features have moved out of the legacy registry.
+   * Each stays optional until every group in Wave 4 has landed: the shared
+   * `event-sourcing/jobs` queue still belongs to the legacy worker, so an
+   * incomplete graph must be composable without pretending to be complete.
+   */
+  automation?: WorkerAutomationCompositionOptions;
+  eventingMaintenance?: WorkerEventingMaintenanceCompositionOptions;
+  github?: WorkerGithubCompositionOptions;
+  evaluation?: WorkerEvaluationCompositionOptions;
+  codingAgent?: WorkerCodingAgentCompositionOptions;
+  gatewaySpend?: WorkerGatewaySpendCompositionOptions;
+  metric?: WorkerMetricCompositionOptions;
+  log?: WorkerLogCompositionOptions;
+  suite?: WorkerSuiteCompositionOptions;
+  scenario?: WorkerScenarioCompositionOptions;
+  experiment?: WorkerExperimentCompositionOptions;
+  governanceIngestion?: WorkerGovernanceIngestionCompositionOptions;
+  billingReporting?: WorkerBillingReportingCompositionOptions;
+  authz?: WorkerAuthzCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 };
@@ -91,6 +260,63 @@ export class WorkerProductionComposition {
       persistence: eventingOptions,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
     });
+    const automation = options.automation
+      ? AutomationWorkerFeatureInstaller.create({
+          installer: options.automation.installer,
+          eventing,
+        })
+      : undefined;
+    const eventingMaintenance = options.eventingMaintenance
+      ? EventingMaintenanceWorkerFeatureInstaller.create({
+          eventing,
+          blobSweep: options.eventingMaintenance.blobSweep,
+          retentionMetrics: options.eventingMaintenance.retentionMetrics,
+        })
+      : undefined;
+    const github = options.github
+      ? GithubWorkerFeatureInstaller.create({
+          installer: options.github.installer,
+          eventing,
+        })
+      : undefined;
+    const evaluation = options.evaluation
+      ? EvaluationWorkerFeatureInstaller.create({
+          installer: options.evaluation.installer,
+          eventing,
+        })
+      : undefined;
+    const codingAgent = options.codingAgent
+      ? CodingAgentWorkerFeatureInstaller.create({
+          installer: options.codingAgent.installer,
+          eventing,
+        })
+      : undefined;
+    const governanceEvents = options.gatewaySpend
+      ? GovernanceEventsWorkerFeatureInstaller.create({
+          installer: options.gatewaySpend.governance,
+          eventing,
+        })
+      : undefined;
+    const gatewaySpend = options.gatewaySpend
+      ? GatewaySpendWorkerFeatureInstaller.create({
+          installer: options.gatewaySpend.spend,
+          eventing,
+        })
+      : undefined;
+    const metric = options.metric
+      ? MetricWorkerFeatureInstaller.create({
+          installer: options.metric.installer,
+          eventing,
+          ...(options.metric.subscribers ? { subscribers: options.metric.subscribers } : {}),
+        })
+      : undefined;
+    const log = options.log
+      ? LogWorkerFeatureInstaller.create({
+          installer: options.log.installer,
+          eventing,
+          ...(options.log.subscribers ? { subscribers: options.log.subscribers } : {}),
+        })
+      : undefined;
     const trace = TraceWorkerFeatureInstaller.create({
       installer: options.trace.installer,
       eventing,
@@ -107,6 +333,42 @@ export class WorkerProductionComposition {
       eventing,
       traceAssignments: trace.traceAssignments,
     });
+    const suite = options.suite
+      ? SuiteWorkerFeatureInstaller.create({
+          installer: options.suite.installer,
+          eventing,
+        })
+      : undefined;
+    const scenario = options.scenario
+      ? ScenarioWorkerFeatureInstaller.create({
+          installer: options.scenario.installer,
+          eventing,
+        })
+      : undefined;
+    const experiment = options.experiment
+      ? ExperimentWorkerFeatureInstaller.create({
+          installer: options.experiment.installer,
+          eventing,
+        })
+      : undefined;
+    const governanceIngestion = options.governanceIngestion
+      ? GovernanceIngestionWorkerFeatureInstaller.create({
+          installer: options.governanceIngestion.installer,
+          eventing,
+        })
+      : undefined;
+    const billingReporting = options.billingReporting
+      ? BillingReportingWorkerFeatureInstaller.create({
+          installer: options.billingReporting.installer,
+          eventing,
+        })
+      : undefined;
+    const authz = options.authz
+      ? AuthzWorkerFeatureInstaller.create({
+          installer: options.authz.installer,
+          eventing,
+        })
+      : undefined;
     const enterprise = options.enterprise
       ? EnterpriseWorkerComposition.create(options.enterprise)
       : undefined;
@@ -116,8 +378,23 @@ export class WorkerProductionComposition {
       eventing,
       lifecycle: options.lifecycle,
       transport: options.transport,
+      automation,
+      eventingMaintenance,
+      github,
+      evaluation,
+      codingAgent,
+      governanceEvents,
+      gatewaySpend,
+      metric,
+      log,
       topic,
       trace,
+      suite,
+      scenario,
+      experiment,
+      governanceIngestion,
+      billingReporting,
+      authz,
       enterprise,
       observability: options.observability,
       resources: options.resources,
@@ -134,8 +411,23 @@ export class WorkerProductionComposition {
     eventing: WorkerEventingRuntime;
     lifecycle: WorkerLifecyclePort;
     transport: WorkerTransportPort;
+    automation?: AutomationWorkerFeatureInstaller;
+    eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
+    github?: GithubWorkerFeatureInstaller;
+    evaluation?: EvaluationWorkerFeatureInstaller;
+    codingAgent?: CodingAgentWorkerFeatureInstaller;
+    governanceEvents?: GovernanceEventsWorkerFeatureInstaller;
+    gatewaySpend?: GatewaySpendWorkerFeatureInstaller;
+    metric?: MetricWorkerFeatureInstaller;
+    log?: LogWorkerFeatureInstaller;
     topic: TopicWorkerFeatureInstaller;
     trace: TraceWorkerFeatureInstaller;
+    suite?: SuiteWorkerFeatureInstaller;
+    scenario?: ScenarioWorkerFeatureInstaller;
+    experiment?: ExperimentWorkerFeatureInstaller;
+    governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
+    billingReporting?: BillingReportingWorkerFeatureInstaller;
+    authz?: AuthzWorkerFeatureInstaller;
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
     resources?: ResourceScope;
@@ -147,16 +439,17 @@ export class WorkerProductionComposition {
       transport: options.transport,
       resources: options.resources,
     });
+    const featureInstallers = orderedFeatureInstallers(options);
     const application = WorkerApplication.create({
       runtime,
       eventing: options.eventing,
-      featureInstallers: [options.trace, options.topic],
+      featureInstallers,
     });
 
     options.observability?.logger.info(
       {
         environment: options.config.environment,
-        features: [options.trace.name, options.topic.name],
+        features: featureInstallers.map((installer) => installer.name),
       },
       "worker production graph composed",
     );
@@ -168,24 +461,176 @@ export class WorkerProductionComposition {
           ? EnterpriseWorkerComposition.create(options.enterprise)
           : undefined;
 
-    return new WorkerProductionComposition(
+    return new WorkerProductionComposition({
       application,
-      options.eventing,
-      options.topic,
-      options.trace,
+      eventing: options.eventing,
+      topic: options.topic,
+      trace: options.trace,
       enterprise,
-      options.infrastructure,
-    );
+      infrastructure: options.infrastructure,
+      featureInstallers,
+      automation: options.automation,
+      evaluation: options.evaluation,
+      codingAgent: options.codingAgent,
+      governanceEvents: options.governanceEvents,
+      gatewaySpend: options.gatewaySpend,
+      suite: options.suite,
+      scenario: options.scenario,
+      experiment: options.experiment,
+      governanceIngestion: options.governanceIngestion,
+      billingReporting: options.billingReporting,
+      authz: options.authz,
+    });
   }
 
-  private constructor(
-    readonly application: WorkerApplication,
-    readonly eventing: WorkerEventingRuntime,
-    readonly topic: TopicWorkerFeatureInstaller,
-    readonly trace: TraceWorkerFeatureInstaller,
-    readonly enterprise: EnterpriseWorkerComposition | undefined,
-    readonly infrastructure: WorkerInfrastructureAdapter | undefined,
-  ) {}
+  readonly application: WorkerApplication;
+  readonly eventing: WorkerEventingRuntime;
+  readonly topic: TopicWorkerFeatureInstaller;
+  readonly trace: TraceWorkerFeatureInstaller;
+  readonly enterprise: EnterpriseWorkerComposition | undefined;
+  readonly infrastructure: WorkerInfrastructureAdapter | undefined;
+  /** Exactly the installers the application mounts, in mount order. */
+  readonly featureInstallers: readonly WorkerFeatureInstallerPort[];
+  /**
+   * The installers a host wires producers against.
+   *
+   * Each publishes callable command proxies that refuse until the installer
+   * has registered, so exposing them here is what lets a host hand a producer
+   * its dispatcher before the graph starts without risking a silent drop.
+   */
+  readonly automation: AutomationWorkerFeatureInstaller | undefined;
+  readonly evaluation: EvaluationWorkerFeatureInstaller | undefined;
+  readonly codingAgent: CodingAgentWorkerFeatureInstaller | undefined;
+  readonly governanceEvents: GovernanceEventsWorkerFeatureInstaller | undefined;
+  readonly gatewaySpend: GatewaySpendWorkerFeatureInstaller | undefined;
+  readonly suite: SuiteWorkerFeatureInstaller | undefined;
+  readonly scenario: ScenarioWorkerFeatureInstaller | undefined;
+  readonly experiment: ExperimentWorkerFeatureInstaller | undefined;
+  readonly governanceIngestion: GovernanceIngestionWorkerFeatureInstaller | undefined;
+  readonly billingReporting: BillingReportingWorkerFeatureInstaller | undefined;
+  readonly authz: AuthzWorkerFeatureInstaller | undefined;
+
+  private constructor(parts: {
+    application: WorkerApplication;
+    eventing: WorkerEventingRuntime;
+    topic: TopicWorkerFeatureInstaller;
+    trace: TraceWorkerFeatureInstaller;
+    enterprise: EnterpriseWorkerComposition | undefined;
+    infrastructure: WorkerInfrastructureAdapter | undefined;
+    featureInstallers: readonly WorkerFeatureInstallerPort[];
+    automation: AutomationWorkerFeatureInstaller | undefined;
+    evaluation: EvaluationWorkerFeatureInstaller | undefined;
+    codingAgent: CodingAgentWorkerFeatureInstaller | undefined;
+    governanceEvents: GovernanceEventsWorkerFeatureInstaller | undefined;
+    gatewaySpend: GatewaySpendWorkerFeatureInstaller | undefined;
+    suite: SuiteWorkerFeatureInstaller | undefined;
+    scenario: ScenarioWorkerFeatureInstaller | undefined;
+    experiment: ExperimentWorkerFeatureInstaller | undefined;
+    governanceIngestion: GovernanceIngestionWorkerFeatureInstaller | undefined;
+    billingReporting: BillingReportingWorkerFeatureInstaller | undefined;
+    authz: AuthzWorkerFeatureInstaller | undefined;
+  }) {
+    this.application = parts.application;
+    this.eventing = parts.eventing;
+    this.topic = parts.topic;
+    this.trace = parts.trace;
+    this.enterprise = parts.enterprise;
+    this.infrastructure = parts.infrastructure;
+    this.featureInstallers = parts.featureInstallers;
+    this.automation = parts.automation;
+    this.evaluation = parts.evaluation;
+    this.codingAgent = parts.codingAgent;
+    this.governanceEvents = parts.governanceEvents;
+    this.gatewaySpend = parts.gatewaySpend;
+    this.suite = parts.suite;
+    this.scenario = parts.scenario;
+    this.experiment = parts.experiment;
+    this.governanceIngestion = parts.governanceIngestion;
+    this.billingReporting = parts.billingReporting;
+    this.authz = parts.authz;
+  }
+}
+
+/**
+ * The one registration order, and the reason it is written down.
+ *
+ * It reproduces the live registry's order exactly, because the order is
+ * load-bearing rather than incidental:
+ *
+ *   automation           first — every trigger match in the trace, evaluation
+ *                        and governance graphs is written through its command
+ *   eventing-maintenance the substrate's own blob and retention sweeps, which
+ *                        belong to no feature and must not depend on one
+ *   github               fleet-wide branch recheck, before the domain graphs
+ *   evaluation           before trace, whose evaluation trigger and custom
+ *                        evaluation sync dispatch its two commands
+ *   coding-agent         before metric, log and trace, whose dispatch
+ *                        subscribers close over its contribution commands
+ *   governance-events    the pair the live registry mounts under one guard:
+ *   gateway-spend        spend's debit adapter delivers through governance's
+ *                        commands, and governance's webhook delivery process
+ *                        has no producer without spend
+ *   metric, log          before trace, because their coding-agent dispatch
+ *                        subscribers feed the same contribution commands
+ *   trace                before topic: Topic dispatches assignments through
+ *                        Trace's canonical assignment port
+ *   suite                before scenario, whose simulation process manager
+ *                        reports item starts and completions into it
+ *   scenario
+ *   experiment           after trace, which reaches it through the
+ *                        computeExperimentRunMetrics proxy rather than the
+ *                        other way round
+ *   topic
+ *   governance-ingestion Enterprise pulled-usage and ingestion-pull
+ *   billing-reporting
+ *   authz                last, so the grants ledger opens its durable write
+ *                        path only once every producer is registered
+ *
+ * Gaps in the middle are pipeline groups still owned by the legacy registry.
+ * A group landing later slots into its documented position; nothing here
+ * reorders to accommodate it.
+ */
+function orderedFeatureInstallers(installers: {
+  automation?: AutomationWorkerFeatureInstaller;
+  eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
+  github?: GithubWorkerFeatureInstaller;
+  evaluation?: EvaluationWorkerFeatureInstaller;
+  codingAgent?: CodingAgentWorkerFeatureInstaller;
+  governanceEvents?: GovernanceEventsWorkerFeatureInstaller;
+  gatewaySpend?: GatewaySpendWorkerFeatureInstaller;
+  metric?: MetricWorkerFeatureInstaller;
+  log?: LogWorkerFeatureInstaller;
+  trace: TraceWorkerFeatureInstaller;
+  suite?: SuiteWorkerFeatureInstaller;
+  scenario?: ScenarioWorkerFeatureInstaller;
+  experiment?: ExperimentWorkerFeatureInstaller;
+  topic: TopicWorkerFeatureInstaller;
+  governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
+  billingReporting?: BillingReportingWorkerFeatureInstaller;
+  authz?: AuthzWorkerFeatureInstaller;
+}): readonly WorkerFeatureInstallerPort[] {
+  const ordered: (WorkerFeatureInstallerPort | undefined)[] = [
+    installers.automation,
+    installers.eventingMaintenance,
+    installers.github,
+    installers.evaluation,
+    installers.codingAgent,
+    installers.governanceEvents,
+    installers.gatewaySpend,
+    installers.metric,
+    installers.log,
+    installers.trace,
+    installers.suite,
+    installers.scenario,
+    installers.experiment,
+    installers.topic,
+    installers.governanceIngestion,
+    installers.billingReporting,
+    installers.authz,
+  ];
+  return ordered.filter(
+    (installer): installer is WorkerFeatureInstallerPort => installer !== undefined,
+  );
 }
 
 class WorkerProductionLifecycle extends WorkerLifecyclePort {

@@ -1,4 +1,22 @@
 {
   "version": 0,
-  "features": ["topic"]
+  "features": [
+    "authz",
+    "automation",
+    "billing-reporting",
+    "coding-agent",
+    "evaluation",
+    "eventing-maintenance",
+    "experiment",
+    "gateway-spend",
+    "github",
+    "governance-events",
+    "governance-ingestion",
+    "log",
+    "metric",
+    "scenario",
+    "suite",
+    "topic",
+    "trace"
+  ]
 }

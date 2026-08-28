@@ -11,6 +11,11 @@ export {
   type WorkerPrivateInfrastructurePorts,
 } from "./app/worker-private-infrastructure.composition";
 export {
+  createWorkerDurableComposition,
+  type WorkerDurableCompositionOptions,
+  type WorkerDurablePersistencePorts,
+} from "./app/worker-durable.composition";
+export {
   WorkerInfrastructureAdapter,
   WorkerStoredObjectStorageFactory,
   WorkerStorageFactoryPort,
@@ -27,6 +32,48 @@ export {
 } from "./platform/infrastructure/worker-stored-object-storage.adapter";
 export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer";
 export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer";
+export {
+  BillingReportingWorkerFeatureInstaller,
+  type BillingReportingWorkerCapability,
+} from "./features/billing/billing-reporting-worker-feature.installer";
+export {
+  CodingAgentWorkerFeatureInstaller,
+  type CodingAgentWorkerCapability,
+  type CodingAgentWorkerCommands,
+} from "./features/coding-agent/coding-agent-worker-feature.installer";
+export {
+  EvaluationWorkerFeatureInstaller,
+  type EvaluationWorkerCapability,
+  type EvaluationWorkerCommands,
+} from "./features/evaluation/evaluation-worker-feature.installer";
+export {
+  ExperimentWorkerFeatureInstaller,
+  type ExperimentWorkerCapability,
+} from "./features/experiment/experiment-worker-feature.installer";
+export {
+  GatewaySpendWorkerFeatureInstaller,
+  type GatewaySpendWorkerCapability,
+} from "./features/gateway/gateway-spend-worker-feature.installer";
+export {
+  GovernanceEventsWorkerFeatureInstaller,
+  type GovernanceEventsWorkerCapability,
+  type GovernanceEventsWorkerCommands,
+} from "./features/governance/governance-events-worker-feature.installer";
+export {
+  GovernanceIngestionWorkerFeatureInstaller,
+  type GovernanceIngestionInstallation,
+  type GovernanceIngestionWorkerCapability,
+} from "./features/governance/governance-ingestion-worker-feature.installer";
+export {
+  ScenarioWorkerFeatureInstaller,
+  type ScenarioDeferredMetricsJobSpec,
+  type ScenarioWorkerCapability,
+} from "./features/scenario/scenario-worker-feature.installer";
+export {
+  SuiteWorkerFeatureInstaller,
+  type SuiteWorkerCapability,
+  type SuiteWorkerCommands,
+} from "./features/suite/suite-worker-feature.installer";
 export {
   WorkerFeatureHandlePort,
   WorkerFeatureInstallerPort,
