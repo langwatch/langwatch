@@ -97,9 +97,12 @@ Current intended surface:
 - `POST /api/v1/secret/{date|latest?}/secrets`
 - `PUT /api/v1/secret/{date|latest?}/secrets/:id`
 - `DELETE /api/v1/secret/{date|latest?}/secrets/:id`
+- the same five operations under `/api/secret/{date|latest?}`;
 - version `2026-08-24`, also accepted through `X-API-Version`;
-- the deprecated Secret REST and public RPC routes remain as thin compatibility
-  mounts for released callers; internal tRPC compatibility remains.
+- an omitted path/header version resolves to latest;
+- deployed `/api/secrets` and `/api/secrets/:id` REST remain thin compatibility
+  mounts; the branch-invented public RPC family is removed; and
+- internal app tRPC compatibility remains until the API cutover.
 
 The feature adapter uses the sealed fluent API with `withInput`, `withOutput`,
 an explicit permission decision and `.handle`. Input is capped at 16 KiB.
@@ -132,11 +135,12 @@ Proof reported before the frontend integration:
 
 The post-integration migration review found these blockers:
 
-1. live TypeScript, Python, Go and MCP consumers still call the retained
-   `/api/secrets` and `/api/secrets/latest/secrets.*` compatibility URLs;
-2. platform and docs OpenAPI now remove both legacy Secret paths and contain
-   only the six modern `/api/v1/secret` paths; full docs page generation remains
-   blocked by unrelated stale Roles `endpointOrder` entries;
+1. released clients still call deployed `/api/secrets` REST; branch-only RPC
+   callers are being moved to canonical `/api/v1/secret` REST;
+2. current platform/docs OpenAPI artefacts contain only six `/api/v1/secret`
+   paths and are stale: they omit `/api/secret` and the main-equivalent legacy
+   REST operations. Regeneration is blocked before Secret by the unrelated
+   missing identity Eventing envelope import;
 3. `feature-map.json`, the OpenAPI route exclusions and one architecture
    baseline entry still describe the old route; and
 4. real authentication and permission refusal behaviour is not covered by the

@@ -102,9 +102,9 @@ The working tree contains a modern Secret REST adapter and application mount:
 - `platform/app/src/app/api/v1/secret` is the temporary live composition;
 - existing auth and API-key middleware have a narrow throwing mode for the
   modern handled-error boundary; and
-- the former Secret implementation is split into modern REST plus retained
-  unversioned REST/public RPC compatibility adapters; no released caller is
-  forced onto the modern path in this batch.
+- modern REST is mounted under both `/api/v1/secret` and `/api/secret`, while
+  the deployed `/api/secrets` REST surface remains a thin compatibility adapter;
+  the branch-invented public RPC family is removed.
 
 The intended operations are list, get, create, replace and delete at version
 `2026-08-24`. Multi-project, PAT and admin credentials select their project
@@ -115,11 +115,12 @@ Earlier focused route proof passed 9/9, and Secret contract/server checks were
 green. That proof is not sufficient to commit the cut. The migration review
 found these blockers:
 
-1. live TypeScript, Python, Go and MCP callers still use the retained legacy
-   URLs;
-2. platform and docs OpenAPI now remove both legacy Secret paths and contain
-   only the six modern `/api/v1/secret` paths; full docs page generation remains
-   blocked by unrelated stale Roles `endpointOrder` entries;
+1. released clients still use deployed `/api/secrets` REST and need an explicit
+   modern REST release before that compatibility mount can be removed;
+2. current platform/docs OpenAPI artefacts contain only the six
+   `/api/v1/secret` paths and are stale: `/api/secret` and main-equivalent legacy
+   REST are absent. Regeneration currently fails before Secret on the unrelated
+   missing identity Eventing envelope import;
 3. feature maps, exclusions and one architecture baseline entry still name the
    old route;
 4. route tests mock the real authentication and permission refusal boundary;
@@ -128,16 +129,16 @@ found these blockers:
 5. all seven Secret scenarios are unbound, so parity currently reports a
    meaningless 0/0.
 
-Keep compatibility endpoints while live callers remain. They are now thin,
-explicitly named adapters with no business logic. Migrate callers only in a
-separate reviewed client batch.
+Keep deployed REST compatibility while live callers remain. Remove the
+branch-only public RPC and migrate its unreleased callers directly to canonical
+modern REST.
 
 The Go OpenAPI semantic comparison tool is committed at `3d1166d8cc`. It handles
 recursive components and Path Item references, structural validation and OAS
-3.1 boolean schemas, and has Go test/race/vet/golangci coverage. Current
-HEAD-to-worktree facts are platform 10 removed legacy RPC and 15 added modern
-operations, docs 5 removed and 15 added; broad `origin/main` drift predates the
-worktree.
+3.1 boolean schemas, and has Go test/race/vet/golangci coverage. Use `main` as
+the parity baseline: it contains five Secret REST operations and no public
+Secret RPC. Regenerate and compare after the identity Eventing import blocker
+is fixed.
 
 ## Uncommitted internal tRPC pilot
 
