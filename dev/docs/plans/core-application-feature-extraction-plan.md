@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `5b22664452`
+**Working checkpoint:** `30c4356a68`
 
 **Current execution waves:** Wave 1 named foundations + Wave 2 identity/access
 
@@ -79,65 +79,70 @@ The exit is complete only when all of the following are true:
 
 ### Committed foundations
 
-| Commit       | Durable result                                                                   |
-| ------------ | -------------------------------------------------------------------------------- |
-| `5f7f2046dc` | Schema-first public REST framework with explicit access/version/error policy.    |
-| `0b65dc696d` | Architecture lint for fluent REST handlers.                                      |
-| `6d86932ce9` | Public REST and internal tRPC are separate transport surfaces.                   |
-| `13a0805bf3` | Prompt boundary, initial UI shell, frontend lint and Design System integration.  |
-| `410c5dc1eb` | Enforced two-scope feature-web layout and exact screen/surface boundaries.       |
-| `3d1166d8cc` | Semantic OpenAPI 3 comparator with recursive reference handling and CI coverage. |
-| `1431f48836` | Previous coordinated extraction checkpoint.                                      |
-| `2d5066fcd7` | Moved the Agent management screen and reusable behaviour into its web package.   |
-| `555ec3fe07` | Added production Eventing server adapters and runtime composition.               |
-| `8e57032744` | Composed Enterprise managed-provider worker capability from explicit ports.      |
-| `bcf05be631` | Added process-owned Node logging, tracing and shutdown primitives.               |
-| `7cca0848fb` | Added internal Trace full-read and Topic-assignment ports without route cutover. |
-| `0322204dea` | Added reusable path/header/latest REST version selection.                        |
-| `faf6db77e1` | Exposed Secret through the four direct REST prefixes and retained main parity.   |
-| `02457aaebd` | Moved Agent and Secret tRPC behaviour into package-owned app adapters.           |
-| `39f1de6dff` | Routed Topic clustering through Eventing and composed a producer-safe worker.    |
-| `0d877db1d7` | Drained Eventing and feature handles before worker infrastructure/observability. |
-| `589a251194` | Hardened semantic OpenAPI comparison for path and reference edge cases.          |
-| `eab4d6fd6e` | Moved chunk recovery out of `platform/app` into global UI behaviour.             |
-| `f1baea7011` | Added the standalone API listener, request policy, config and graceful drain.    |
-| `f9dbf94c8a` | Mounted package-owned Secret REST on all four bases in the API process.          |
-| `cd28835a7b` | Moved Trace processing and Dataset auxiliary jobs into an Eventing installer.    |
-| `1956fe0c06` | Enforced the global/private UI hierarchy and removed `apps/ui/src/app`.          |
-| `1acf62c524` | Unified Eventing with the workspace SDK and added ordered telemetry flushers.    |
-| `a33224992f` | Preserved worker drain ordering when Eventing readiness or transport boot fails. |
-| `6071fe0fb8` | Added typed process-owned ClickHouse routing, connections and shutdown.          |
-| `e1e7cefb6a` | Moved the strict browser-safe public config schema and codec into UI ownership.  |
-| `f49f214927` | Injected Eventing runtime policy and made durable store selection fail closed.   |
-| `13f6138060` | Moved logger environment compatibility into typed process configuration.         |
-| `de540cf12e` | Enforced injected configuration across production reusable-package source.       |
-| `25d7f809ed` | Added the injectable API process runtime and ordered shutdown boundary.          |
-| `26d0711478` | Injected Gateway virtual-key cryptography through process composition.           |
-| `ad1707fffc` | Composed canonical User avatar storage and removed the displaced User module.    |
-| `02eae20840` | Added the injectable Worker process foundation with fail-safe startup cleanup.   |
-| `67797154c1` | Fixed legacy App resource ownership and removed a process-scope self-wait.       |
-| `2e43807329` | Corrected the Gateway virtual-key process projection boundary.                   |
-| `2088ac9e67` | Parsed and injected the complete Group Queue process policy once.                |
-| `12785bd78f` | Composed process-owned AWS transport policy and retired its duplicate app code.  |
-| `e3d2551c6f` | Made Eventing process storage fail closed with explicit test/local factories.    |
-| `6b9ca49158` | Added target-aware, lease-safe Dataset S3 client lifecycle ownership.            |
-| `834e94f5aa` | Sealed the complete Worker registration phase before Eventing readiness.         |
-| `6efea93600` | Composed one App-owned Redis connection with ordered shutdown.                   |
-| `fa1a759f47` | Isolated SDK client disposal from process-owned AWS handler pools.               |
-| `7246b22c13` | Projected legacy telemetry once and made signal headers authoritative.           |
-| `89b5f2fb17` | Composed explicit Prisma ownership for serving Apps and standalone tasks.        |
-| `d9ab6ce909` | Cut live App ClickHouse, Ops and migration ownership over to typed runtimes.     |
-| `b6ee5f2906` | Routed legacy S3 operations through the process-owned AWS transport policy.      |
-| `ec1240fb37` | Composed process-owned NLP Lambda and CloudWatch clients with ordered cleanup.   |
-| `87fc7f4521` | Projected evaluation and scenario-child process configuration once.              |
-| `7df243483a` | Cut App Eventing persistence over and deleted its three displaced adapters.      |
-| `aa2afb5191` | Composed webhook endpoint, health, event-read and delivery services once.        |
-| `83cdb89996` | Composed the Worker durable Eventing graph with consumers forced off.            |
-| `bc0b8df67d` | Projected private executable bootstrap config before App graph evaluation.       |
-| `09bc1edae8` | Composed one schema-validated Langevals evaluator client per process.            |
-| `1f4a1adc1d` | Composed task-local object-storage and Enterprise Governance client lifecycles.  |
-| `a12b99cb83` | Moved Stored Object owner resolution into its canonical feature graph.           |
-| `a5b3fda731` | Characterised legacy Trace full-read fields before any production cutover.       |
+| Commit       | Durable result                                                                    |
+| ------------ | --------------------------------------------------------------------------------- |
+| `5f7f2046dc` | Schema-first public REST framework with explicit access/version/error policy.     |
+| `0b65dc696d` | Architecture lint for fluent REST handlers.                                       |
+| `6d86932ce9` | Public REST and internal tRPC are separate transport surfaces.                    |
+| `13a0805bf3` | Prompt boundary, initial UI shell, frontend lint and Design System integration.   |
+| `410c5dc1eb` | Enforced two-scope feature-web layout and exact screen/surface boundaries.        |
+| `3d1166d8cc` | Semantic OpenAPI 3 comparator with recursive reference handling and CI coverage.  |
+| `1431f48836` | Previous coordinated extraction checkpoint.                                       |
+| `2d5066fcd7` | Moved the Agent management screen and reusable behaviour into its web package.    |
+| `555ec3fe07` | Added production Eventing server adapters and runtime composition.                |
+| `8e57032744` | Composed Enterprise managed-provider worker capability from explicit ports.       |
+| `bcf05be631` | Added process-owned Node logging, tracing and shutdown primitives.                |
+| `7cca0848fb` | Added internal Trace full-read and Topic-assignment ports without route cutover.  |
+| `0322204dea` | Added reusable path/header/latest REST version selection.                         |
+| `faf6db77e1` | Exposed Secret through the four direct REST prefixes and retained main parity.    |
+| `02457aaebd` | Moved Agent and Secret tRPC behaviour into package-owned app adapters.            |
+| `39f1de6dff` | Routed Topic clustering through Eventing and composed a producer-safe worker.     |
+| `0d877db1d7` | Drained Eventing and feature handles before worker infrastructure/observability.  |
+| `589a251194` | Hardened semantic OpenAPI comparison for path and reference edge cases.           |
+| `eab4d6fd6e` | Moved chunk recovery out of `platform/app` into global UI behaviour.              |
+| `f1baea7011` | Added the standalone API listener, request policy, config and graceful drain.     |
+| `f9dbf94c8a` | Mounted package-owned Secret REST on all four bases in the API process.           |
+| `cd28835a7b` | Moved Trace processing and Dataset auxiliary jobs into an Eventing installer.     |
+| `1956fe0c06` | Enforced the global/private UI hierarchy and removed `apps/ui/src/app`.           |
+| `1acf62c524` | Unified Eventing with the workspace SDK and added ordered telemetry flushers.     |
+| `a33224992f` | Preserved worker drain ordering when Eventing readiness or transport boot fails.  |
+| `6071fe0fb8` | Added typed process-owned ClickHouse routing, connections and shutdown.           |
+| `e1e7cefb6a` | Moved the strict browser-safe public config schema and codec into UI ownership.   |
+| `f49f214927` | Injected Eventing runtime policy and made durable store selection fail closed.    |
+| `13f6138060` | Moved logger environment compatibility into typed process configuration.          |
+| `de540cf12e` | Enforced injected configuration across production reusable-package source.        |
+| `25d7f809ed` | Added the injectable API process runtime and ordered shutdown boundary.           |
+| `26d0711478` | Injected Gateway virtual-key cryptography through process composition.            |
+| `ad1707fffc` | Composed canonical User avatar storage and removed the displaced User module.     |
+| `02eae20840` | Added the injectable Worker process foundation with fail-safe startup cleanup.    |
+| `67797154c1` | Fixed legacy App resource ownership and removed a process-scope self-wait.        |
+| `2e43807329` | Corrected the Gateway virtual-key process projection boundary.                    |
+| `2088ac9e67` | Parsed and injected the complete Group Queue process policy once.                 |
+| `12785bd78f` | Composed process-owned AWS transport policy and retired its duplicate app code.   |
+| `e3d2551c6f` | Made Eventing process storage fail closed with explicit test/local factories.     |
+| `6b9ca49158` | Added target-aware, lease-safe Dataset S3 client lifecycle ownership.             |
+| `834e94f5aa` | Sealed the complete Worker registration phase before Eventing readiness.          |
+| `6efea93600` | Composed one App-owned Redis connection with ordered shutdown.                    |
+| `fa1a759f47` | Isolated SDK client disposal from process-owned AWS handler pools.                |
+| `7246b22c13` | Projected legacy telemetry once and made signal headers authoritative.            |
+| `89b5f2fb17` | Composed explicit Prisma ownership for serving Apps and standalone tasks.         |
+| `d9ab6ce909` | Cut live App ClickHouse, Ops and migration ownership over to typed runtimes.      |
+| `b6ee5f2906` | Routed legacy S3 operations through the process-owned AWS transport policy.       |
+| `ec1240fb37` | Composed process-owned NLP Lambda and CloudWatch clients with ordered cleanup.    |
+| `87fc7f4521` | Projected evaluation and scenario-child process configuration once.               |
+| `7df243483a` | Cut App Eventing persistence over and deleted its three displaced adapters.       |
+| `aa2afb5191` | Composed webhook endpoint, health, event-read and delivery services once.         |
+| `83cdb89996` | Composed the Worker durable Eventing graph with consumers forced off.             |
+| `bc0b8df67d` | Projected private executable bootstrap config before App graph evaluation.        |
+| `09bc1edae8` | Composed one schema-validated Langevals evaluator client per process.             |
+| `1f4a1adc1d` | Composed task-local object-storage and Enterprise Governance client lifecycles.   |
+| `a12b99cb83` | Moved Stored Object owner resolution into its canonical feature graph.            |
+| `a5b3fda731` | Characterised legacy Trace full-read fields before any production cutover.        |
+| `6a62e37cf1` | Hardened API/Worker drain, request log context and Worker signal lifecycle.       |
+| `6831973f51` | Corrected the Worker lifecycle test boundary and restored Worker typecheck.       |
+| `480e9f73ec` | Preserved AuthZ denial reasons through the live tRPC permission middleware.       |
+| `850586835d` | Centralised physical API, Worker, UI-public and local-orchestrator configuration. |
+| `30c4356a68` | Composed canonical Entitlement/Licensing sources and deleted app-local wrappers.  |
 
 ### Active, uncommitted slices
 
@@ -146,7 +151,7 @@ The exit is complete only when all of the following are true:
 | API physical activation         | `apps/api` owns an injectable typed boot/process boundary, a real Node/Hono listener, request policy, graceful drain, Agent/Secret tRPC and all four Secret REST bases. It remains a library without a physical launcher or concrete production session/API-key adapters; the platform route graph remains live.                                                                                                                                                                                                                                                                                                                             | Compose the concrete auth/session/API-key/audit adapters and executable boot, then migrate the remaining REST/tRPC route graph by vertical before deleting compatibility routers.                                                               |
 | Worker physical activation      | `apps/worker` owns an injectable typed boot/process boundary, structural `ResourceScope` borrowing, signals and fail-safe startup cleanup. Its production composition now constructs the canonical PostgreSQL/ClickHouse/Group Queue Eventing graph, installs Trace before Topic and forces both Eventing consumer switches off. The shared queue still contains every other legacy pipeline.                                                                                                                                                                                                                                                | In Wave 4, move the remaining registry groups and concrete intent ports, then enable the one complete shared-queue consumer and delete displaced registrations.                                                                                 |
 | UI physical activation          | Chunk recovery, runtime behaviour, shell sections, browser-safe public config and Agent browser transport now follow the enforced global/private hierarchy. `apps/ui/src/app`, `platform` and `testing` are invalid roots and contain no production files. The private source projection remains in `platform/app` as a compatibility boundary.                                                                                                                                                                                                                                                                                              | Move the actual browser entry, providers, source projection, router, overlays and route families out of `platform/app`, retaining the legacy shell adapter until URL/provider parity is proven.                                                 |
-| Configuration ownership         | UI owns the strict public schema and inert base64url codec. Eventing, logger, telemetry, Gateway virtual-key, evaluation concurrency, scenario-child input and all five Group Queue values are parsed at process composition and injected. `bc0b8df67d` now projects logger, KSUID environment and telemetry before HTTP-specific validation without rereading the resolved App boot value. The broad private `AppConfig`, public-config source projection and executable-specific raw environment reads remain in `platform/app`.                                                                                                           | Define API, worker, task/local-orchestrator and UI-public projections, then make the legacy App graph consume only already-projected values before deleting old config modules.                                                                 |
+| Configuration ownership         | `850586835d` makes `packages/config` the parser used by typed API, Worker, UI-public and local-orchestrator projections. The launcher resolves its config before predeps and injects CI/browser/AIGateway/Postgres controls; the browser-safe source projection now physically belongs to UI behind a behaviour-free app bridge. Focused package/app typechecks and 45 tests pass. The broad private `AppConfig`, instrumentation/task config and remaining executable-specific raw environment reads still live in `platform/app`.                                                                                                          | Preserve and project the remaining credential-secret, queue, ClickHouse, Redis, storage, mail, model, rate-limit and retention compatibility before deleting each old config module behind physical boot tests.                                 |
 | OpenAPI ownership               | The comparator is hardened, but checked-in artefacts are stale and generation still imports the platform route graph. The generator currently fails before route composition because environment config is not initialised.                                                                                                                                                                                                                                                                                                                                                                                                                  | Move generator/serving ownership with the API route graph, initialise task config explicitly, regenerate, and explain every semantic difference from `main`.                                                                                    |
 | Process observability adoption  | API and Worker own injectable typed logger/tracer boot and ordered telemetry flush. Legacy web scope ownership no longer self-waits. The live platform instrumentation now receives one typed, idempotent projection; trace, log and metric headers cannot merge ambient values, and telemetry still flushes last. Physical API/worker launchers remain absent.                                                                                                                                                                                                                                                                              | Bind concrete API request and Worker queue context when their full executable graphs activate, then move the compatibility instrumentation entrypoint to local orchestration.                                                                   |
 | Persistence foundations         | Prisma, Redis and ClickHouse have explicit App/task construction and exact shutdown owners. `server/db.ts` is construction-free. The App and Worker compose canonical Eventing persistence. `a12b99cb83` moved Stored Object owner fan-out into its feature and deleted the displaced App repository/service/test. `a5b3fda731` locks the legacy Trace mapper's earliest-summary timing, topic metadata, log-count alias and six reserved token metrics, while recording the remaining full-read parity gates. At this checkpoint the all-source non-test lexical sweep finds 61 platform files mentioning the Prisma compatibility binding. | Finish the active Analytics/Dashboard, Gateway and Prompt persistence verticals. Keep the Trace production read cut and identity-owned queries deferred until their recorded parity/actor gates close.                                          |
@@ -155,7 +160,7 @@ The exit is complete only when all of the following are true:
 | Gateway persistence             | The working tree has collapsed budget, cache-rule, guardrail and materialisation behaviour onto one canonical Gateway service and deleted the displaced cache/guardrail App services. REALTIME remains untouched. The composition installer is being converted from a generated-Prisma package surface to a portable structural persistence capability.                                                                                                                                                                                                                                                                                      | Finish the full Gateway database capability without a source import, generated declaration, cast or locator; rerun cache/guardrail/budget parity and independent migration review before commit.                                                |
 | Prompt persistence              | Prompt handled-error and stale-caller parity are in progress, including a collected real-database rollback characterization. The active adapter still contains a temporary structural narrowing into legacy Prisma repositories and several generated/repository test fakes.                                                                                                                                                                                                                                                                                                                                                                 | Convert repositories to typed semantic persistence operations, replace the remaining fake type walls, then rerun Prompt package/transport parity and independent migration review before commit.                                                |
 | Mail delivery graph             | A reviewed working-tree attempt proved provider configuration, SES/SMTP/SendGrid/Resend lifecycle and most caller injection, but BetterAuth constructs reset/passkey callbacks at module load. There is no bounded Wave 1 seam that avoids an ambient locator, a second provider graph or per-request construction. The whole mailer cut remains uncommitted; its 45 focused tests are evidence, not landed architecture.                                                                                                                                                                                                                    | Defer the caller cut to the BetterAuth factory/auth runtime composition. Do not commit a partial duplicate mailer graph or widen Wave 1 into identity/transport work.                                                                           |
-| Workspace reconciliation        | Reviewed API, Worker/Trace and UI hunks are committed. Unrelated Evaluation, Identity, generated-artefact, Secret, SDK, baseline and formatting changes still share the tree.                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Attribute every later lockfile/baseline hunk to its owning slice, stage exact paths or hunks and leave unrelated work untouched.                                                                                                                |
+| Workspace reconciliation        | Reviewed API, Worker/Trace, UI, physical config, AuthZ and Entitlement/Licensing hunks are committed. Unrelated Evaluation, generated-artefact, Secret, SDK, baseline and formatting changes still share the tree; Auth and User live-cutover work remains active.                                                                                                                                                                                                                                                                                                                                                                           | Attribute every later lockfile/baseline hunk to its owning slice, stage exact paths or hunks and leave unrelated work untouched.                                                                                                                |
 
 Only reviewed and committed deletions count as application-exit progress. The
 active table names the remaining shared-tree batches and their next safe
@@ -174,8 +179,7 @@ deferred.
 | `F-API-03`        | The global authz declaration sweep currently stops before discovery on an undefined analytics `lwqlTimeWindowSchema`. Agent/Secret focused policy tests are green, but the global sweep has not proved the new package mounts.                                                                                                                                                                                                                                                                                                                                                                                                                      | Wave 2 and Wave 3                   |
 | `F-API-04`        | OpenAPI generation constructs `signInDomainRoutingPort` before the generation task initialises environment/configuration, so the task fails before Secret route composition. Fix this in the OpenAPI ownership move rather than coupling Secret back to app boot.                                                                                                                                                                                                                                                                                                                                                                                   | Wave 3 and Wave 9                   |
 | `F-API-06`        | `apps/api` now owns a callable listener and injected runtime bootstrap that parses typed config and logger/telemetry projections once, retains one scope, and drains listener → graph → telemetry. It deliberately has no `process.env` launcher/package start command: concrete session/project-key/PAT/admin authentication, API-key ceiling/mark-used, rate-limit and audit adapters remain outside the migrated graph, so a physical launcher would create an incomplete second API process. The existing split deployment vocabulary is `LANGWATCH_API_PORT`; `API_PORT` then `PORT` are deterministic future-bootstrap compatibility aliases. | Wave 1, Wave 2 and Wave 3           |
-| `F-AUTHZ-01`      | The compatibility permission decision path does not always preserve the legacy `denialReason`; access remains denied, but specialised membership-disabled and lite-member errors can lose their exact client-visible cause. Characterise this before the universal root is retired.                                                                                                                                                                                                                                                                                                                                                                 | Wave 2 and Wave 3                   |
-| `F-AUTHZ-02`      | Two existing app AuthZ middleware tests import `BlankScopeIdError`, which is not exported by the AuthZ contract. This predates the Agent/Secret adapter commit and remains an exact known failing diagnostic.                                                                                                                                                                                                                                                                                                                                                                                                                                       | Wave 2                              |
+| `F-LINT-01`       | Full architecture lint remains red across the shared migration tree: the legacy-fragment baseline is unsorted/stale and the current dirty feature moves expose new legacy fragments. Test-quality review separately reports existing assertion gaps in Gateway Spend, Webhook and Analytics memory-safety integration tests. The focused Config, AuthZ and Entitlement/Licensing slices add no reported finding; reconcile the owning baseline/test rows with their verticals instead of widening foundation commits.                                                                                                                               | Owning Wave 2–10 verticals          |
 | `F-SECRET-01`     | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Wave 3 clients                      |
 | `F-SECRET-02`     | The standalone API proves all 20 CRUD operations across the four bases, but its `/api/secrets` alias uses the modern validated `projectId` and canonical error response. The live legacy route derives project from the credential and retains legacy payload/error/deprecation semantics; characterise and choose compatibility before retiring it.                                                                                                                                                                                                                                                                                                | Wave 3 compatibility                |
 | `F-SECRET-03`     | The standalone API listener proves the four bases, omitted/latest/header selection, conflicts and response headers. The still-live platform `createApiRouter` lacks an equivalent all-mount regression, so its mount/order protection remains a recorded compatibility test gap.                                                                                                                                                                                                                                                                                                                                                                    | Wave 3 compatibility                |
@@ -220,6 +224,11 @@ Resolved during Wave 1 queue composition: `F-QUEUE-01` is closed by
 `2088ac9e67`. All five queue policy values are parsed once and injected into
 the sole live platform Group Queue factory. This does not enable the partial
 Worker consumer; that gate remains under `F-WORKER-01`.
+
+Resolved during Wave 2 access composition: `F-AUTHZ-01` and `F-AUTHZ-02` are
+closed by `480e9f73ec`. The canonical decision path preserves denial reasons,
+membership-disabled and lite-member errors retain their specialised envelopes,
+and blank scope IDs use the contract-owned validation error.
 
 ## Measured exit inventory
 
@@ -412,17 +421,21 @@ must not be staged with foundation or Wave 2 commits. Reassess them only when
 the user expands the Wave 1 scope or a Wave 2 dependency requires a narrowly
 owned hunk.
 
-#### Active Wave 1 foundation lanes at `5b22664452`
+#### Active Wave 1 foundation lanes at `30c4356a68`
 
-1. Make `packages/config` the single parsing mechanism and complete the four
-   typed process projections with compatibility boot coverage.
-2. Complete physical API/Worker entrypoints, observability context, health and
-   ordered first-error-safe lifecycle drain without activating consumers.
+1. **Projection slice committed in `850586835d`:** `packages/config` now
+   resolves typed API, Worker, UI-public and local-orchestrator projections;
+   the remaining gate is deleting the broad App/instrumentation/task parsers
+   only as their physical boot paths take ownership.
+2. **Lifecycle slice committed in `6a62e37cf1`:** API/Worker now preserve
+   ordered first-error-safe drain, tRPC user log context and tested signal
+   disposal without activating consumers. Physical launchers, full health/
+   profiling parity and production graph binding remain active residuals.
 3. Compose Group Queue, storage and AWS clients once per owning process.
 4. Compose mail, Stripe, Slack, WebSocket, NLP/Langevals and model clients
    behind explicit process adapters; preserve dynamic tenant/project policy.
 
-Current Wave 1 progress at `de578b0f66`:
+Current Wave 1 progress at `30c4356a68`:
 
 - [x] Enforce injected configuration in reusable production packages.
 - [x] Add injectable API and Worker process/lifecycle foundations.
@@ -439,6 +452,8 @@ Current Wave 1 progress at `de578b0f66`:
 - [x] Compose the Worker durable Eventing graph with consumers forced off.
 - [x] Project private executable bootstrap configuration before HTTP-specific
       validation without rereading the resolved App boot value.
+- [x] Define and boot-test typed API, Worker, UI-public and local-orchestrator
+      projections through `packages/config`.
 - [x] Compose the process-owned Langevals evaluator client with schema-first
       response validation and mapped error metrics.
 - [x] Give the object-storage migration task and Enterprise Governance S3/Redis
@@ -455,11 +470,12 @@ Current Wave 1 progress at `de578b0f66`:
 #### Configuration and boot
 
 - [ ] Make `packages/config` the only parser for private runtime configuration.
-- [ ] Define separate typed API, worker, UI-public and local-orchestrator
+- [x] Define separate typed API, worker, UI-public and local-orchestrator
       configuration projections.
 - [ ] Move `runtime/config.ts`, public config, instrumentation configuration and
       process-role switches to their physical apps.
-- [ ] Replace package `process.env` access with injected semantic values.
+- [x] Replace reusable-package `process.env` access with injected semantic
+      values; executable composition roots remain the only permitted readers.
 - [ ] Preserve credential-secret compatibility, queue settings, ClickHouse
       routing, Redis, storage, mail, external model, rate-limit and retention
       configuration.
@@ -577,7 +593,11 @@ independent owners in parallel without sharing composition-root files. Root
 owns the integration hunks and commits each reviewed vertical separately.
 
 Current parallel verticals are Auth/API-key actor extraction, User,
-Organization/Project/Role tenancy, and AuthZ/Entitlement/Enterprise identity.
+and the remaining production caller cutovers. AuthZ denial parity is committed
+in `480e9f73ec`. Entitlement/Enterprise Licensing production composition and
+the deletion of both displaced plan-source wrappers are committed in
+`30c4356a68`. Organization/Project/Role package preparations do not count as
+complete until their live callers are rewired and displaced code is deleted.
 
 Move these owners before broad product transport cutover:
 
