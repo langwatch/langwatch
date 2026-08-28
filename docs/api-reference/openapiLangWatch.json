@@ -7772,7 +7772,8 @@
                             "type": "number"
                           },
                           {
-                            "type": "string"
+                            "type": "string",
+                            "description": "A value already parsed into a native Date. A JSON request body cannot produce this shape — send a string or a number instead."
                           }
                         ]
                       },
@@ -7785,7 +7786,8 @@
                             "type": "number"
                           },
                           {
-                            "type": "string"
+                            "type": "string",
+                            "description": "A value already parsed into a native Date. A JSON request body cannot produce this shape — send a string or a number instead."
                           }
                         ]
                       }
