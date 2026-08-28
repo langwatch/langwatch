@@ -54,6 +54,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { env } from "~/env.mjs";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../db";
+import { PrismaTwoStepAccount } from "./two-step-verification-adapters";
 import { featureFlagService } from "../../featureFlag";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
@@ -755,6 +756,19 @@ export function mfaCeremonies(): MfaCeremonies {
     backupCodeCount: BACKUP_CODE_COUNT,
     now: Date.now,
   });
+}
+
+/**
+ * Which of a user's organizations require a second factor (D06).
+ *
+ * Composed here because better-auth asks it while deciding whether a session
+ * may proceed, and the boundary test holds that better-auth reaches app-layer
+ * identity through this file or not at all. A direct import of the adapter
+ * would be the first exception to that, for a read that has a composition
+ * root already.
+ */
+export function twoStepAccount(): PrismaTwoStepAccount {
+  return new PrismaTwoStepAccount(prisma);
 }
 
 /**

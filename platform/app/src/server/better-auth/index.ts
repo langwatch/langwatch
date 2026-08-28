@@ -35,8 +35,8 @@ import {
   identityCeremonies,
   identityStorageAdapter,
   resolveSignInMethodPolicy,
+  twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
-import { PrismaTwoStepAccount } from "~/server/app-layer/identity/two-step-verification-adapters";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -904,7 +904,7 @@ export const auth = betterAuth({
           body: ctx.body,
           prisma,
           requiringOrganizations: ({ userId }) =>
-            new PrismaTwoStepAccount(prisma).requiringOrganizations({ userId }),
+            twoStepAccount().requiringOrganizations({ userId }),
         });
       }
 

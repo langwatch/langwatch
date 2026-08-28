@@ -57,6 +57,13 @@ function sourceFileOf(moduleSpecifier: string): string {
   }
 }
 
+/**
+ * A page whose whole body is `return <Navigate to=... />`. Anchored on the
+ * return so a page that merely imports `Navigate` for one branch is still
+ * held to the frame.
+ */
+const FORWARDS_ONLY = /return\s*<Navigate\s[^>]*\/>;\s*\n?\s*}/;
+
 describe("the pages under /settings", () => {
   const modules = registeredSettingsPageModules();
 
@@ -76,6 +83,15 @@ describe("the pages under /settings", () => {
     /** @scenario No page the Settings menu opens is left without it */
     it.each(modules)("%s renders SettingsLayout", (moduleSpecifier) => {
       const source = readFileSync(sourceFileOf(moduleSpecifier), "utf-8");
+
+      // A page that only forwards has no chrome of its own to mount: it
+      // renders a redirect and returns, and the frame belongs to wherever it
+      // lands. Held to being ONLY that, so "mentions Navigate somewhere" can
+      // never become the way a real page opts out of the settings frame.
+      if (FORWARDS_ONLY.test(source)) {
+        expect(source).not.toContain("<SettingsLayout");
+        return;
+      }
 
       expect(source).toContain("<SettingsLayout");
     });
