@@ -33,6 +33,7 @@ import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 import {
   mapDashboardSavedWorkbenchChartError,
+  SavedWorkbenchChartService,
   validateSavedWorkbenchChartDefinition,
 } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
@@ -203,7 +204,7 @@ const run = protectedProcedure
       projectId: input.projectId,
     });
 
-    return SavedWorkbenchChartService.create(ctx.prisma).runChart({
+    return SavedWorkbenchChartService.create(ctx.prisma, ctx.app.langWatchQL).runChart({
       id: input.id,
       projectId: input.projectId,
       project,

@@ -7,10 +7,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  LangWatchQLQueryResult,
-  LangWatchQLSchema,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLQueryResult, LangWatchQLSchema } from "@langwatch/analytics-contract";
 import type { Protections } from "../../traces/protections";
 import { lwqlTenantCapability } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
@@ -31,6 +28,7 @@ import {
 } from "./executor";
 import {
   assertLangWatchQLGranularityDeclaration,
+  resolveLangWatchQLGranularity,
   resolveLangWatchQLTimeWindow,
 } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema } from "./schema";
@@ -40,6 +38,82 @@ import { lwqlValidationError } from "./validation/errors";
 import { type AcceptedLangWatchQL, validateLangWatchQL } from "./validation/validate";
 
 const logger = createLogger("langwatch:analytics:lwql");
+
+/**
+ * The run-path half of the reserved-parameter contract, as one step: resolve
+ * what the caller's window and step mean for this request, then refuse when
+ * any declared reserved name would still reach the
+ * database without a value — one refusal naming everything the surface forgot
+ * rather than only its first omission.
+ *
+ * An unvalued declared name cannot simply ride along: ClickHouse answers a
+ * missing substitution with `UNKNOWN_QUERY_PARAMETER`, which reaches the caller
+ * as an unknown 500 for something a surface can fix by sending its window or
+ * step. Refusing here, before execution, is what turns that into a named code.
+ *
+ * @throws {LangWatchQLReservedGranularityTypeError} for a mistyped declaration
+ *   or malformed step, {@link LangWatchQLReservedParameterSuppliedError} when
+ *   the request carries a surface-owned value,
+ *   {@link LangWatchQLGranularityTooFineError} on bucket-budget overflow, and
+ *   {@link LangWatchQLParameterMissingError} when a declared reserved name has
+ *   no value.
+ */
+function resolveRunGranularityOrRefuseUnfilled({
+  declared,
+  parameters,
+  timeWindow,
+  granularitySeconds,
+  onBudgetOverflow,
+  awaitingTimeWindow,
+}: {
+  /** Bound parameters the validated statement declares. */
+  readonly declared: Parameters<typeof resolveLangWatchQLGranularity>[0]["declared"];
+  /** Values the caller sent. */
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  /** The period the surface is showing, when it has one. */
+  readonly timeWindow?: LangWatchQLTimeWindow;
+  /** The step the caller-owned surface chose, when it offers one. */
+  readonly granularitySeconds?: number;
+  /**
+   * What an overflowing period does. Defaults to refusing, which is what every
+   * caller-owned door wants.
+   */
+  readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /**
+   * Reserved window names no window filled — already computed by validate,
+   * joined here so one refusal can name every omission together.
+   */
+  readonly awaitingTimeWindow: readonly string[];
+}): LangWatchQLGranularityResolution {
+  // Caller-owned doors resolve the granularity contract with refuse on
+  // overflow: whoever is asking picked the step, so coarsening it for them
+  // would change the answer they asked for. A surface that picked the step on
+  // the member's behalf rather than at their request — the dashboard, whose
+  // period is dragged around by a control the widget does not own — passes
+  // "coarsen" instead, and reports the substitution rather than hiding it.
+  const granularity = resolveLangWatchQLGranularity({
+    declared,
+    ...(parameters ? { parameters } : {}),
+    ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
+    ...(timeWindow ? { timeWindow } : {}),
+    onBudgetOverflow: onBudgetOverflow ?? "refuse",
+  });
+
+  // Validate lists a declared granularity as awaiting alongside the window
+  // pair; whether it is actually unfilled is this resolver's answer, so the
+  // name is re-derived from the resolution rather than carried over.
+  const unfilledReserved = [
+    ...awaitingTimeWindow.filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER),
+    ...(granularity.followsGranularity && granularity.granularitySeconds === undefined
+      ? [LWQL_PERIOD_GRANULARITY_PARAMETER]
+      : []),
+  ].sort();
+  if (unfilledReserved.length > 0) {
+    throw new LangWatchQLParameterMissingError(unfilledReserved);
+  }
+
+  return granularity;
+}
 
 export type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
