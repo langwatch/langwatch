@@ -1,3 +1,17 @@
+import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import type { LambdaClient } from "@aws-sdk/client-lambda";
+
+/** Process-owned AWS SDK clients used by the NLP Lambda runtime. */
+export abstract class NlpLambdaAwsClientPort {
+  declare protected readonly nlpLambdaAwsClientPortBrand: "NlpLambdaAwsClientPort";
+
+  abstract createLambdaClient(): LambdaClient;
+
+  abstract createLogsClient(): CloudWatchLogsClient;
+
+  abstract close(): Promise<void>;
+}
+
 export type NlpLambdaPayloadStageRequest = {
   projectId: string;
   keyPrefix: string;

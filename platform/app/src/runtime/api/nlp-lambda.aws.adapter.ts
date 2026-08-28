@@ -1,18 +1,18 @@
 import {
-  CloudWatchLogsClient,
   CreateLogGroupCommand,
   PutRetentionPolicyCommand,
+  type CloudWatchLogsClient,
 } from "@aws-sdk/client-cloudwatch-logs";
-import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
+import type { FunctionConfiguration, LambdaClient } from "@aws-sdk/client-lambda";
 import {
   CreateFunctionCommand,
   GetFunctionCommand,
-  LambdaClient,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { NlpLambdaDeploymentConfig } from "./nlp-lambda.config";
+import type { NlpLambdaAwsClientPort } from "./nlp-lambda.ports";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 
@@ -53,6 +53,7 @@ export class NlpLambdaAwsAdapter {
     deployment: NlpLambdaDeploymentConfig,
     baseHost: string | undefined,
     private readonly redis: NlpLambdaArnCache | null,
+    private readonly clients: NlpLambdaAwsClientPort,
   ) {
     this.deployment = deployment;
     this.baseHost = baseHost;
@@ -62,29 +63,21 @@ export class NlpLambdaAwsAdapter {
     deployment: NlpLambdaDeploymentConfig;
     baseHost: string | undefined;
     redis: NlpLambdaArnCache | null;
+    clients: NlpLambdaAwsClientPort;
   }): NlpLambdaAwsAdapter {
-    return new NlpLambdaAwsAdapter(input.deployment, input.baseHost, input.redis);
+    return new NlpLambdaAwsAdapter(input.deployment, input.baseHost, input.redis, input.clients);
   }
 
   createLambdaClient(): LambdaClient {
-    return new LambdaClient({
-      region: this.deployment.AWS_REGION,
-      credentials: {
-        accessKeyId: this.deployment.AWS_ACCESS_KEY_ID,
-        secretAccessKey: this.deployment.AWS_SECRET_ACCESS_KEY,
-      },
-      maxAttempts: LAMBDA_CLIENT_MAX_ATTEMPTS,
-    });
+    return this.clients.createLambdaClient();
   }
 
   createLogsClient(): CloudWatchLogsClient {
-    return new CloudWatchLogsClient({
-      region: this.deployment.AWS_REGION,
-      credentials: {
-        accessKeyId: this.deployment.AWS_ACCESS_KEY_ID,
-        secretAccessKey: this.deployment.AWS_SECRET_ACCESS_KEY,
-      },
-    });
+    return this.clients.createLogsClient();
+  }
+
+  close(): Promise<void> {
+    return this.clients.close();
   }
 
   async getProjectLambdaArn(projectId: string): Promise<string> {
@@ -122,11 +115,7 @@ export class NlpLambdaAwsAdapter {
     }
 
     if (configuration === null) {
-      configuration = await this.createOrReadProjectLambda(
-        lambda,
-        functionName,
-        projectId,
-      );
+      configuration = await this.createOrReadProjectLambda(lambda, functionName, projectId);
     } else {
       configuration = await this.updateImageWhenNeeded(
         lambda,
@@ -164,10 +153,7 @@ export class NlpLambdaAwsAdapter {
         throw error;
       }
 
-      logger.info(
-        { projectId },
-        "NLP Lambda already exists, waiting for its configuration",
-      );
+      logger.info({ projectId }, "NLP Lambda already exists, waiting for its configuration");
       await new Promise((resolve) => setTimeout(resolve, 1_000));
       const configuration = await this.tryReadFunctionConfiguration(lambda, functionName);
       if (configuration === null) {
@@ -183,9 +169,7 @@ export class NlpLambdaAwsAdapter {
     projectId: string,
     configuration: FunctionConfiguration,
   ): Promise<FunctionConfiguration> {
-    const details = await lambda.send(
-      new GetFunctionCommand({ FunctionName: functionName }),
-    );
+    const details = await lambda.send(new GetFunctionCommand({ FunctionName: functionName }));
     const currentImageUri = details.Code?.ImageUri;
     if (currentImageUri === undefined || currentImageUri === this.deployment.image_uri) {
       return configuration;
@@ -240,10 +224,7 @@ export class NlpLambdaAwsAdapter {
     try {
       await this.createLogGroupWithRetention(functionName);
     } catch (error) {
-      logger.warn(
-        { functionName, error },
-        "NLP Lambda was created but log retention was not set",
-      );
+      logger.warn({ functionName, error }, "NLP Lambda was created but log retention was not set");
     }
 
     return response;
@@ -261,41 +242,26 @@ export class NlpLambdaAwsAdapter {
       }
     }
 
-    await logs.send(
-      new PutRetentionPolicyCommand({ logGroupName, retentionInDays: 365 }),
-    );
+    await logs.send(new PutRetentionPolicyCommand({ logGroupName, retentionInDays: 365 }));
   }
 
-  private async pollUntilReady(
-    lambda: LambdaClient,
-    functionName: string,
-  ): Promise<void> {
+  private async pollUntilReady(lambda: LambdaClient, functionName: string): Promise<void> {
     for (let attempt = 0; attempt < 60; attempt++) {
       const configuration = await this.tryReadFunctionConfiguration(lambda, functionName);
       if (configuration === null) {
         throw new Error(`Lambda function ${functionName} disappeared during polling`);
       }
-      if (
-        configuration.State === "Active" &&
-        configuration.LastUpdateStatus === "Successful"
-      ) {
+      if (configuration.State === "Active" && configuration.LastUpdateStatus === "Successful") {
         return;
       }
-      if (
-        configuration.State === "Failed" ||
-        configuration.LastUpdateStatus === "Failed"
-      ) {
+      if (configuration.State === "Failed" || configuration.LastUpdateStatus === "Failed") {
         const reason = configuration.StateReason ?? configuration.LastUpdateStatusReason;
-        throw new Error(
-          `Lambda function ${functionName} failed to become ready: ${reason}`,
-        );
+        throw new Error(`Lambda function ${functionName} failed to become ready: ${reason}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    throw new Error(
-      `Lambda function ${functionName} did not become ready within timeout`,
-    );
+    throw new Error(`Lambda function ${functionName} did not become ready within timeout`);
   }
 
   private async tryReadFunctionConfiguration(
@@ -303,9 +269,7 @@ export class NlpLambdaAwsAdapter {
     functionName: string,
   ): Promise<FunctionConfiguration | null> {
     try {
-      const response = await lambda.send(
-        new GetFunctionCommand({ FunctionName: functionName }),
-      );
+      const response = await lambda.send(new GetFunctionCommand({ FunctionName: functionName }));
       return response.Configuration ?? null;
     } catch (error) {
       if (hasErrorName(error, "ResourceNotFoundException")) {

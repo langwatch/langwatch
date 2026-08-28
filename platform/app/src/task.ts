@@ -17,6 +17,7 @@ void (async () => {
     await import("./runtime/app/prisma-process.composition");
   const { closePrismaConnection, configurePrismaConnection } = await import("./server/db");
   const { runStandaloneTaskWithPrisma } = await import("./runtime/task-prisma.lifecycle");
+  const { runStandaloneNlpLambdaTask } = await import("./runtime/task-nlp-lambda.lifecycle");
   const logger = createLogger("langwatch:task");
   const args = process.argv.slice(2);
 
@@ -52,14 +53,27 @@ void (async () => {
           initializeDefaultApp({ prismaConnection: connection });
         }
         if (taskName === "cleanupOldLambdas") {
+          const { default: cleanupOldLambdas } = await import("./tasks/cleanupOldLambdas");
           const { resolveNlpLambdaRuntimeConfig } = await import("./runtime/api/nlp-lambda");
+          const { AppAwsClientConfiguration } =
+            await import("./runtime/app/aws-client.composition");
           const { createProcessNlpLambdaRuntime } =
             await import("./server/app-layer/nlp-lambda.runtime");
+          const { parseOutboundProxyConfig } = await import("./server/outboundProxy");
+          const aws = AppAwsClientConfiguration.create(parseOutboundProxyConfig(process.env));
           const nlpLambda = createProcessNlpLambdaRuntime({
             config: resolveNlpLambdaRuntimeConfig(environment),
             redis: null,
+            aws,
           });
-          await script.default(nlpLambda);
+          await runStandaloneNlpLambdaTask({
+            execute: async () => await cleanupOldLambdas(nlpLambda),
+            closeNlpLambda: () => nlpLambda.close(),
+            closeAws: () => aws.close(),
+            reportCloseError: ({ target, error }) => {
+              logger.error({ error, taskName }, `failed to close the ${target}`);
+            },
+          });
         } else {
           await script.default(...args.slice(1));
         }

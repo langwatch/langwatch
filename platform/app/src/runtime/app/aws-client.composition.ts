@@ -41,7 +41,9 @@ let configuredAws: AppAwsClientConfiguration | undefined;
 let awsTeardown: Promise<void> | undefined;
 let awsTeardownPending = false;
 
-export function configureAwsClientConfiguration(config: OutboundProxyConfig): void {
+export function configureAwsClientConfiguration(
+  config: OutboundProxyConfig,
+): AppAwsClientConfiguration {
   if (awsTeardownPending) {
     throw new Error("AWS client configuration is closing for this process");
   }
@@ -51,6 +53,7 @@ export function configureAwsClientConfiguration(config: OutboundProxyConfig): vo
 
   configuredAws = AppAwsClientConfiguration.create(config);
   awsTeardown = undefined;
+  return configuredAws;
 }
 
 export function buildAwsClientConfig(input: AwsClientConfigInput): AwsClientConfig {

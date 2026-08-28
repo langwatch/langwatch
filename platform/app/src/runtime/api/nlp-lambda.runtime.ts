@@ -12,6 +12,7 @@ import type { NlpLambdaRuntimeConfig } from "./nlp-lambda.config";
 import {
   NoopNlpLambdaErrorReportingPort,
   NoopNlpLambdaPayloadStagingPort,
+  type NlpLambdaAwsClientPort,
   type NlpLambdaErrorReportingPort,
   type NlpLambdaPayloadStagingPort,
   type NlpLambdaStagedPayload,
@@ -19,6 +20,10 @@ import {
 
 const logger = createLogger("langwatch:nlp-lambda-runtime");
 const defaultStagingThresholdBytes = 5 * 1024 * 1024;
+
+function missingNlpLambdaAwsClients(): never {
+  throw new Error("NLP Lambda infrastructure requires process-owned AWS clients.");
+}
 
 export type NlpLambdaInvocationLimits = {
   maxPayloadBytes: number;
@@ -44,9 +49,7 @@ export type NlpLambdaFetchResponse<T> = {
 export abstract class NlpLambdaResponseStream {
   declare protected readonly nlpLambdaResponseStreamBrand: "NlpLambdaResponseStream";
 
-  abstract readonly eventStream: NonNullable<
-    InvokeWithResponseStreamCommandOutput["EventStream"]
-  >;
+  abstract readonly eventStream: NonNullable<InvokeWithResponseStreamCommandOutput["EventStream"]>;
 
   abstract release(): Promise<void>;
 }
@@ -81,9 +84,7 @@ class PreparedInvocation {
 
 class ManagedNlpLambdaResponseStream extends NlpLambdaResponseStream {
   constructor(
-    readonly eventStream: NonNullable<
-      InvokeWithResponseStreamCommandOutput["EventStream"]
-    >,
+    readonly eventStream: NonNullable<InvokeWithResponseStreamCommandOutput["EventStream"]>,
     private readonly prepared: PreparedInvocation,
   ) {
     super();
@@ -100,6 +101,7 @@ export class NlpLambdaRuntime {
   private constructor(
     private readonly config: NlpLambdaRuntimeConfig,
     redis: NlpLambdaArnCache | null,
+    awsClients: NlpLambdaAwsClientPort | undefined,
     private readonly payloadStaging: NlpLambdaPayloadStagingPort,
     private readonly errorReporting: NlpLambdaErrorReportingPort,
   ) {
@@ -108,6 +110,7 @@ export class NlpLambdaRuntime {
         deployment: config.deployment,
         baseHost: config.baseHost,
         redis,
+        clients: awsClients ?? missingNlpLambdaAwsClients(),
       });
     }
   }
@@ -115,12 +118,14 @@ export class NlpLambdaRuntime {
   static create(input: {
     config: NlpLambdaRuntimeConfig;
     redis: NlpLambdaArnCache | null;
+    awsClients?: NlpLambdaAwsClientPort;
     payloadStaging?: NlpLambdaPayloadStagingPort;
     errorReporting?: NlpLambdaErrorReportingPort;
   }): NlpLambdaRuntime {
     return new NlpLambdaRuntime(
       input.config,
       input.redis,
+      input.awsClients,
       input.payloadStaging ?? new NoopNlpLambdaPayloadStagingPort(),
       input.errorReporting ?? new NoopNlpLambdaErrorReportingPort(),
     );
@@ -128,6 +133,10 @@ export class NlpLambdaRuntime {
 
   usesLambda(): boolean {
     return this.lambda !== undefined && this.config.deployment !== undefined;
+  }
+
+  close(): Promise<void> {
+    return this.lambda?.close() ?? Promise.resolve();
   }
 
   async resolveTarget(projectId: string): Promise<string> {
@@ -155,8 +164,7 @@ export class NlpLambdaRuntime {
   getInvocationLimits(): NlpLambdaInvocationLimits {
     return {
       maxPayloadBytes: this.config.maxPayloadBytes,
-      stagingThresholdBytes:
-        this.config.staging.thresholdBytes ?? defaultStagingThresholdBytes,
+      stagingThresholdBytes: this.config.staging.thresholdBytes ?? defaultStagingThresholdBytes,
       stagingTtlSeconds: this.config.staging.ttlSeconds,
     };
   }
@@ -278,8 +286,7 @@ export class NlpLambdaRuntime {
     enforceMaximumPayload: boolean;
     stagingPrefix: string;
   }): Promise<PreparedInvocation> {
-    const bodyBytes =
-      input.body === undefined ? 0 : Buffer.byteLength(input.body, "utf-8");
+    const bodyBytes = input.body === undefined ? 0 : Buffer.byteLength(input.body, "utf-8");
     if (input.enforceMaximumPayload && bodyBytes > this.config.maxPayloadBytes) {
       throw new NlpLambdaPayloadTooLargeError({
         bytes: bodyBytes,

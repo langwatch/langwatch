@@ -7,12 +7,10 @@ import {
   type NlpLambdaPayloadStageRequest,
   type NlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda";
-import {
-  deleteStagedObject,
-  stagePayloadToS3,
-  type StagedObject,
-} from "~/server/s3/stagePayload";
+import { type AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
+import { deleteStagedObject, stagePayloadToS3, type StagedObject } from "~/server/s3/stagePayload";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { AppNlpLambdaAwsClientAdapter } from "./nlp-lambda.aws-client.adapter";
 
 class AppNlpLambdaStagedPayload extends NlpLambdaStagedPayload {
   constructor(
@@ -47,11 +45,25 @@ class AppNlpLambdaErrorReportingPort extends NlpLambdaErrorReportingPort {
 export function createProcessNlpLambdaRuntime(input: {
   config: NlpLambdaRuntimeConfig;
   redis: RedisConnection | null;
+  aws?: AppAwsClientConfiguration;
 }): NlpLambdaRuntime {
+  const awsClients =
+    input.config.deployment === undefined
+      ? undefined
+      : AppNlpLambdaAwsClientAdapter.create({
+          aws: input.aws ?? missingAwsConfiguration(),
+          deployment: input.config.deployment,
+        });
+
   return NlpLambdaRuntime.create({
     config: input.config,
     redis: input.redis,
+    awsClients,
     payloadStaging: new AppNlpLambdaPayloadStagingPort(),
     errorReporting: new AppNlpLambdaErrorReportingPort(),
   });
+}
+
+function missingAwsConfiguration(): never {
+  throw new Error("NLP Lambda deployment requires a composed AWS configuration.");
 }

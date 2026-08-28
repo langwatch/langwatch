@@ -1,12 +1,11 @@
 import { studioClientEventSchema } from "@langwatch/workflow-contract";
-import {
-  LambdaClient,
-  type InvokeWithResponseStreamCommandOutput,
-} from "@aws-sdk/client-lambda";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { LambdaClient, type InvokeWithResponseStreamCommandOutput } from "@aws-sdk/client-lambda";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   invokeStudioNlp,
   NlpLambdaErrorReportingPort,
+  NlpLambdaAwsClientPort,
   NlpLambdaPayloadStagingPort,
   NlpLambdaRuntime,
   NlpLambdaStagedPayload,
@@ -17,8 +16,7 @@ import {
 const event = studioClientEventSchema.parse({ type: "is_alive", payload: {} });
 
 function installLambdaStreamSendMock() {
-  const send =
-    vi.fn<(command: unknown) => Promise<InvokeWithResponseStreamCommandOutput>>();
+  const send = vi.fn<(command: unknown) => Promise<InvokeWithResponseStreamCommandOutput>>();
   Object.defineProperty(LambdaClient.prototype, "send", {
     configurable: true,
     value: send,
@@ -57,6 +55,24 @@ class TestErrorReportingPort extends NlpLambdaErrorReportingPort {
   }
 }
 
+class TestNlpLambdaAwsClients extends NlpLambdaAwsClientPort {
+  private readonly lambda = new LambdaClient({});
+
+  private readonly logs = new CloudWatchLogsClient({});
+
+  createLambdaClient(): LambdaClient {
+    return this.lambda;
+  }
+
+  createLogsClient(): CloudWatchLogsClient {
+    return this.logs;
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 function createLambdaRuntime(
   input: {
     thresholdBytes?: number;
@@ -79,6 +95,7 @@ function createLambdaRuntime(
       }),
     }),
     redis: null,
+    awsClients: new TestNlpLambdaAwsClients(),
     payloadStaging: input.payloadStaging,
     errorReporting: input.errorReporting,
   });
@@ -129,16 +146,10 @@ describe("invokeStudioNlp", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response('data: {"type":"done"}\n\n'));
 
-    const reader = await invokeStudioNlp(
-      nlpLambda,
-      "project-a",
-      event,
-      "monthly-cache-key",
-      {
-        path: "/go/studio/execute",
-        headers: { "X-LangWatch-Origin": "workflow" },
-      },
-    );
+    const reader = await invokeStudioNlp(nlpLambda, "project-a", event, "monthly-cache-key", {
+      path: "/go/studio/execute",
+      headers: { "X-LangWatch-Origin": "workflow" },
+    });
 
     expect(fetch).toHaveBeenCalledWith("http://nlp.internal/go/studio/execute", {
       method: "POST",
@@ -174,9 +185,7 @@ describe("invokeStudioNlp", () => {
     );
 
     lambdaSend.mockResolvedValue(
-      streamResponse(
-        withPrelude(JSON.stringify({ statusCode: 200 }), 'data: {"type":"done"}\n\n'),
-      ),
+      streamResponse(withPrelude(JSON.stringify({ statusCode: 200 }), 'data: {"type":"done"}\n\n')),
     );
 
     const reader = await invokeStudioNlp(lambdaRuntime, "project-a", event, undefined);
@@ -226,9 +235,7 @@ describe("invokeStudioNlp", () => {
       "arn:aws:lambda:eu-central-1:123:function:nlpgo-project-a",
     );
     lambdaSend.mockResolvedValue(
-      streamResponse(
-        withPrelude(JSON.stringify({ statusCode: 200 }), 'data: {"type":"done"}\n\n'),
-      ),
+      streamResponse(withPrelude(JSON.stringify({ statusCode: 200 }), 'data: {"type":"done"}\n\n')),
     );
 
     const reader = await invokeStudioNlp(lambdaRuntime, "project-a", event, undefined, {

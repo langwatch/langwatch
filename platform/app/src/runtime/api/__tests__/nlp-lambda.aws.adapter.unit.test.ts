@@ -7,6 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LAMBDA_ARN_CACHE_TTL_MS,
+  NlpLambdaAwsClientPort,
   NlpLambdaRuntime,
   resolveNlpLambdaRuntimeConfig,
   type NlpLambdaArnCache,
@@ -68,11 +69,33 @@ function runtimeConfig(imageUri: string) {
   });
 }
 
+class TestNlpLambdaAwsClients extends NlpLambdaAwsClientPort {
+  private readonly lambda = new LambdaClient({ maxAttempts: 6 });
+
+  private readonly logs = new CloudWatchLogsClient({});
+
+  createLambdaClient(): LambdaClient {
+    return this.lambda;
+  }
+
+  createLogsClient(): CloudWatchLogsClient {
+    return this.logs;
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 function createRuntime(
   imageUri = IMAGE_V1,
   redis: NlpLambdaArnCache | null = null,
 ): NlpLambdaRuntime {
-  return NlpLambdaRuntime.create({ config: runtimeConfig(imageUri), redis });
+  return NlpLambdaRuntime.create({
+    config: runtimeConfig(imageUri),
+    redis,
+    awsClients: new TestNlpLambdaAwsClients(),
+  });
 }
 
 class TestArnCache implements NlpLambdaArnCache {
@@ -174,9 +197,7 @@ describe("NLP Lambda ARN resolution", () => {
       .mockResolvedValueOnce(pollOutput());
     const runtime = createRuntime();
 
-    await expect(runtime.resolveTarget("project-a")).rejects.toThrow(
-      "hard create failure",
-    );
+    await expect(runtime.resolveTarget("project-a")).rejects.toThrow("hard create failure");
     const callsAfterFailure = send.mock.calls.length;
     await expect(runtime.resolveTarget("project-a")).resolves.toBe(ARN);
     expect(send.mock.calls.length).toBeGreaterThan(callsAfterFailure);
@@ -187,9 +208,7 @@ describe("NLP Lambda ARN resolution", () => {
       const redis = new TestArnCache();
       mockSuccessfulResolution(lambdaSend, IMAGE_V1);
 
-      await expect(
-        createRuntime(IMAGE_V1, redis).resolveTarget("project-a"),
-      ).resolves.toBe(ARN);
+      await expect(createRuntime(IMAGE_V1, redis).resolveTarget("project-a")).resolves.toBe(ARN);
 
       expect(redis.setexCalls).toEqual([
         expect.objectContaining({ key: "lambda_arn:project-a", seconds: 600 }),
@@ -202,9 +221,7 @@ describe("NLP Lambda ARN resolution", () => {
       await createRuntime(IMAGE_V1, redis).resolveTarget("project-a");
       const callsAfterFirstRuntime = send.mock.calls.length;
 
-      await expect(
-        createRuntime(IMAGE_V1, redis).resolveTarget("project-a"),
-      ).resolves.toBe(ARN);
+      await expect(createRuntime(IMAGE_V1, redis).resolveTarget("project-a")).resolves.toBe(ARN);
 
       expect(send.mock.calls.length).toBe(callsAfterFirstRuntime);
     });
@@ -214,9 +231,7 @@ describe("NLP Lambda ARN resolution", () => {
       redis.values.set("lambda_arn:project-a", "not-json");
       const send = mockSuccessfulResolution(lambdaSend, IMAGE_V1);
 
-      await expect(
-        createRuntime(IMAGE_V1, redis).resolveTarget("project-a"),
-      ).resolves.toBe(ARN);
+      await expect(createRuntime(IMAGE_V1, redis).resolveTarget("project-a")).resolves.toBe(ARN);
 
       expect(send).toHaveBeenCalledTimes(3);
       expect(redis.setexCalls).toHaveLength(1);
@@ -227,9 +242,7 @@ describe("NLP Lambda ARN resolution", () => {
       redis.failGet = true;
       const send = mockSuccessfulResolution(lambdaSend, IMAGE_V1);
 
-      await expect(
-        createRuntime(IMAGE_V1, redis).resolveTarget("project-a"),
-      ).resolves.toBe(ARN);
+      await expect(createRuntime(IMAGE_V1, redis).resolveTarget("project-a")).resolves.toBe(ARN);
 
       expect(send).toHaveBeenCalledTimes(3);
     });
@@ -242,9 +255,9 @@ describe("NLP Lambda ARN resolution", () => {
       );
       mockSuccessfulResolution(lambdaSend, IMAGE_V2, "arn:aws:lambda:new");
 
-      await expect(
-        createRuntime(IMAGE_V2, redis).resolveTarget("project-a"),
-      ).resolves.toBe("arn:aws:lambda:new");
+      await expect(createRuntime(IMAGE_V2, redis).resolveTarget("project-a")).resolves.toBe(
+        "arn:aws:lambda:new",
+      );
 
       expect(redis.delCalls).toEqual(["lambda_arn:project-a"]);
       expect(redis.setexCalls[0]).toEqual(

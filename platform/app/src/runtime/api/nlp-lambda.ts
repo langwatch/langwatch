@@ -20,6 +20,7 @@ export {
 } from "./nlp-lambda.runtime";
 export {
   NlpLambdaErrorReportingPort,
+  NlpLambdaAwsClientPort,
   NlpLambdaPayloadStagingPort,
   NlpLambdaStagedPayload,
   type NlpLambdaExceptionReport,

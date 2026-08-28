@@ -696,7 +696,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   });
   configureClickHouseRuntime(clickhouseRuntime);
   configureProcessOutboundProxy(config.outboundProxy);
-  configureAwsClientConfiguration(config.outboundProxy);
+  const aws = configureAwsClientConfiguration(config.outboundProxy);
   const clickhouseEnabled = !config.buildTime && isClickHouseEnabled();
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
@@ -771,6 +771,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const nlpLambda = createProcessNlpLambdaRuntime({
     config: config.nlpLambda,
     redis,
+    aws,
   });
 
   const authzFeature = AuthzFeature.create({
@@ -2248,6 +2249,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   // Subscribers must settle before their transports disappear. The App owns
   // this sequence so every process role follows the same connection order.
   const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("subscriber", "nlp-lambda-aws-clients", () => nlpLambda.close());
   shutdownResources.register("subscriber", "dataset-s3-clients", () => datasetRuntime.close());
   shutdownResources.register("clickhouse", "langwatchql", () => langWatchQL.close());
   shutdownResources.register("clickhouse", "ops-explain", () => opsClickHouseRuntime.close());
