@@ -78,10 +78,10 @@ def _encode(value: CacheValue) -> str:
 
     What comes back is what JSON carries, and JSON has fewer types than
     Python: a tuple is stored as an array and reads back as a list, and a key
-    that is not a string is stored as one. A member JSON has no type for
-    raises a TypeError here, and so do nan and inf, which Python writes as
-    NaN and Infinity for the REST callers and the other SDKs to read as
-    broken JSON.
+    that is not a string is stored as one. A TypeError is raised here for a
+    member with no JSON type, a set or a datetime for example, and for nan
+    and inf, which Python writes as NaN and Infinity for the REST callers and
+    the other SDKs to read as broken JSON.
     """
     if isinstance(value, str):
         return value
