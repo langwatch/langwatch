@@ -298,11 +298,11 @@ describe("getProjectLambdaArn", () => {
     });
   });
 
-  describe("config reconcile", () => {
+  describe("when configuration drift is detected", () => {
     const currentImageUri =
       "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest";
 
-    /** Indices of the UpdateFunctionConfiguration calls in send order. */
+    /** Filter send calls to extract UpdateFunctionConfiguration commands in send order. */
     const configUpdateCalls = (send: any) =>
       send.mock.calls.filter(
         (call: any[]) => call[0] instanceof UpdateFunctionConfigurationCommand,

@@ -402,16 +402,19 @@ const isLambdaUpdateInProgressError = (error: unknown): boolean => {
  * @returns the updated configuration, or `null` when nothing had drifted (the
  *   common case — no AWS call is made then).
  */
-const reconcileProjectLambdaConfig = async (
-  lambda: LambdaClient,
-  functionName: string,
-  params: {
-    config: LangWatchLambdaConfig;
-    currentConfig: FunctionConfiguration;
-    projectId: string;
-  },
-): Promise<FunctionConfiguration | null> => {
-  const { config, currentConfig, projectId } = params;
+const reconcileProjectLambdaConfig = async ({
+  lambda,
+  functionName,
+  config,
+  currentConfig,
+  projectId,
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  config: LangWatchLambdaConfig;
+  currentConfig: FunctionConfiguration;
+  projectId: string;
+}): Promise<FunctionConfiguration | null> => {
   const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
   const currentEnv = currentConfig.Environment?.Variables ?? {};
   const envDrifted = Object.entries(desiredEnv).some(
@@ -595,21 +598,25 @@ const updateProjectLambdaImageIfDrifted = async (
  * rejects `UpdateFunctionConfiguration` while another update is in flight,
  * which is expected under overlapping reconcile attempts and not an error.
  */
-const reconcileProjectLambdaConfigSafely = async (
-  lambda: LambdaClient,
-  functionName: string,
-  params: {
-    config: LangWatchLambdaConfig;
-    currentConfig: FunctionConfiguration;
-    projectId: string;
-  },
-): Promise<FunctionConfiguration | null> => {
+const reconcileProjectLambdaConfigSafely = async ({
+  lambda,
+  functionName,
+  config,
+  currentConfig,
+  projectId,
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  config: LangWatchLambdaConfig;
+  currentConfig: FunctionConfiguration;
+  projectId: string;
+}): Promise<FunctionConfiguration | null> => {
   try {
-    return await reconcileProjectLambdaConfig(lambda, functionName, params);
+    return await reconcileProjectLambdaConfig({ lambda, functionName, config, currentConfig, projectId });
   } catch (error) {
     if (isLambdaUpdateInProgressError(error)) {
       logger.info(
-        { projectId: params.projectId },
+        { projectId },
         "Lambda function config reconcile skipped, update in progress",
       );
       return null;
@@ -660,15 +667,13 @@ const syncExistingProjectLambda = async (
   // a correct drift baseline regardless: UpdateFunctionCode never changes
   // Environment or MemorySize.
   if (functionDetails.Configuration) {
-    const reconciled = await reconcileProjectLambdaConfigSafely(
+    const reconciled = await reconcileProjectLambdaConfigSafely({
       lambda,
       functionName,
-      {
-        config,
-        currentConfig: functionDetails.Configuration,
-        projectId,
-      },
-    );
+      config,
+      currentConfig: functionDetails.Configuration,
+      projectId,
+    });
     if (reconciled) {
       lambdaConfig = reconciled;
     }

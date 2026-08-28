@@ -75,10 +75,13 @@ export const NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS = 900_000;
  * fail the scenario run, the same contract the engine keeps for its own
  * copy of this parse (`services/nlpgo/cmd/root.go`).
  */
-function resolvePositiveSecondsEnvAsMs(
-  name: string,
-  fallbackSeconds: number,
-): number {
+function resolvePositiveSecondsEnvAsMs({
+  name,
+  fallbackSeconds,
+}: {
+  name: string;
+  fallbackSeconds: number;
+}): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") {
     return fallbackSeconds * 1000;
@@ -91,7 +94,13 @@ function resolvePositiveSecondsEnvAsMs(
 }
 
 /** Same parse as {@link resolvePositiveSecondsEnvAsMs}, but the env var is already milliseconds. */
-function resolvePositiveMsEnv(name: string, fallbackMs: number): number {
+function resolvePositiveMsEnv({
+  name,
+  fallbackMs,
+}: {
+  name: string;
+  fallbackMs: number;
+}): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") {
     return fallbackMs;
@@ -121,10 +130,10 @@ function resolvePositiveMsEnv(name: string, fallbackMs: number): number {
  * @internal Exported for testing.
  */
 export function resolveFloorFetchTimeoutMs(): number {
-  const engineCeilingMs = resolvePositiveSecondsEnvAsMs(
-    NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
-    NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
-  );
+  const engineCeilingMs = resolvePositiveSecondsEnvAsMs({
+    name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
+    fallbackSeconds: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
+  });
   return engineCeilingMs + NLP_FETCH_HEADROOM_MS;
 }
 
@@ -151,10 +160,10 @@ export function resolveFloorFetchTimeoutMs(): number {
  * @internal Exported for testing.
  */
 export function resolveMaxFetchTimeoutMs(): number {
-  return resolvePositiveMsEnv(
-    NLP_FETCH_MAX_TIMEOUT_ENV,
-    NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
-  );
+  return resolvePositiveMsEnv({
+    name: NLP_FETCH_MAX_TIMEOUT_ENV,
+    fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
+  });
 }
 
 /**

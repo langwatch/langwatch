@@ -115,6 +115,8 @@ describe("SerializedCodeAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    // Pin the timeout explicitly so the test doesn't rely on ambient env
+    process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS = "600";
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
