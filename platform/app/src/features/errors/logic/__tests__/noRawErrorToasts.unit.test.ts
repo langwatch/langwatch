@@ -46,7 +46,11 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  * caught — the guard has to cover everywhere the pattern can appear, not just
  * where the migration happened to look.
  */
-const ROOTS = ["src", "ee"].map((dir) => join(PACKAGE_ROOT, dir));
+// `ee` moved to `packages/enterprise` in `4faa77c658`. This guard looks for
+// renders, and the workspace packages carry no UI, so the application source
+// is the whole corpus — but a root that does not exist throws rather than
+// narrowing, which is what silenced this guard entirely.
+const ROOTS = ["src"].map((dir) => join(PACKAGE_ROOT, dir));
 
 /**
  * Cheap substring test that decides whether a file is worth parsing.

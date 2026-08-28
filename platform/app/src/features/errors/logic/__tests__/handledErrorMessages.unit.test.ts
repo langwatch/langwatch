@@ -33,7 +33,9 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
-  join(PACKAGE_ROOT, "ee"),
+  // `ee` moved to `packages/enterprise` in `4faa77c658`, which the packages
+  // root below already walks. Leaving it named did not shrink the corpus, it
+  // threw ENOENT out of `walk` and took the whole guard with it.
   // Repo-root, not app-local: the workspace packages were consolidated into a
   // single `packages/` tree. See codes.unit.test.ts for the same walk.
   join(PACKAGE_ROOT, "../../packages"),
