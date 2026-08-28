@@ -37,9 +37,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

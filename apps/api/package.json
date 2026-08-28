@@ -38,6 +38,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

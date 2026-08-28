@@ -208,6 +208,7 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-1.3.0.tgz",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/server": "workspace:*",
     "@langwatch/scenario-server": "workspace:*",
     "@langwatch/scenario-web": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

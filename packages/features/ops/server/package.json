@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/group-queue": "workspace:*",

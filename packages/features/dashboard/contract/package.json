@@ -22,6 +22,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
