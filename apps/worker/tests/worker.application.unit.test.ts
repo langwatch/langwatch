@@ -92,6 +92,42 @@ describe("WorkerApplication", () => {
     expect(installer.install).toHaveBeenCalledOnce();
   });
 
+  it("completes every feature registration before awaiting Eventing queue readiness", async () => {
+    const phases: string[] = [];
+    const queue = new EventingQueue(phases);
+    queue.waitUntilReady = async () => {
+      phases.push("ready");
+    };
+    const first = new FeatureInstaller();
+    first.install.mockImplementation(async () => {
+      phases.push("first");
+      return first.handle;
+    });
+    const second = new FeatureInstaller();
+    second.install.mockImplementation(async () => {
+      phases.push("second");
+      return second.handle;
+    });
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: EventStoreMemory.createForTesting(),
+      queueFactory: () => queue,
+      processStore: InMemoryProcessStore.createForTesting(),
+      executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
+      consumersEnabled: false,
+    });
+    const application = WorkerApplication.create({
+      runtime: WorkerRuntime.create({ lifecycle: new Lifecycle(), transport: new Transport() }),
+      eventing,
+      featureInstallers: [first, second],
+    });
+
+    await application.start();
+
+    expect(phases).toEqual(["first", "second", "ready"]);
+    await application.close();
+  });
+
   it("closes before start and rejects a later start", async () => {
     const application = WorkerApplication.create({
       runtime: WorkerRuntime.create({ lifecycle: new Lifecycle(), transport: new Transport() }),

@@ -146,6 +146,8 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: expect.any(Object),
     });
     expect(capability.startBootSeeds).toHaveBeenCalledOnce();
+    expect(capability.install).toHaveBeenCalledBefore(queue.waitUntilReady);
+    expect(capability.startBootSeeds).toHaveBeenCalledBefore(queue.waitUntilReady);
     expect(queue.waitUntilReady).toHaveBeenCalledOnce();
     expect(transport.start).toHaveBeenCalledOnce();
 

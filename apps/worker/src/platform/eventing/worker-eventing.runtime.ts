@@ -36,7 +36,9 @@ export class WorkerEventingRuntime {
   }
 
   readonly eventSourcing: EventSourcing;
+  private registrationsComplete = false;
   private started = false;
+  private startPromise: Promise<void> | undefined;
   private closed = false;
 
   private constructor(dependencies: WorkerEventingDependencies) {
@@ -52,16 +54,46 @@ export class WorkerEventingRuntime {
     });
   }
 
-  async start(): Promise<void> {
+  /**
+   * Seals the producer registry after every worker feature has installed its
+   * pipelines, process managers, outbox handlers, and wakes. Queue readiness
+   * is intentionally unavailable before this point.
+   */
+  completeRegistrations(): void {
     if (this.closed) throw new Error("Worker Eventing runtime is closed.");
-    if (this.started) return;
-    await this.eventSourcing.globalQueue?.waitUntilReady();
-    this.started = true;
+    this.registrationsComplete = true;
+  }
+
+  start(): Promise<void> {
+    if (this.closed) return Promise.reject(new Error("Worker Eventing runtime is closed."));
+    if (this.started) return Promise.resolve();
+    if (this.startPromise) return this.startPromise;
+    if (!this.registrationsComplete) {
+      return Promise.reject(
+        new Error("Worker Eventing registrations must complete before queue readiness is awaited."),
+      );
+    }
+
+    const startPromise = Promise.resolve().then(async () => {
+      await this.eventSourcing.globalQueue?.waitUntilReady();
+      this.started = true;
+    });
+    this.startPromise = startPromise;
+    void startPromise.then(
+      () => this.clearStartPromise(startPromise),
+      () => this.clearStartPromise(startPromise),
+    );
+
+    return startPromise;
   }
 
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     await this.eventSourcing.close();
+  }
+
+  private clearStartPromise(startPromise: Promise<void>): void {
+    if (this.startPromise === startPromise) this.startPromise = void 0;
   }
 }

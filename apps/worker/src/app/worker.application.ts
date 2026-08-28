@@ -58,6 +58,7 @@ export class WorkerApplication {
       for (const installer of this.featureInstallers) {
         this.featureHandles.push(await installer.install());
       }
+      this.eventing?.completeRegistrations();
       await this.eventing?.start();
       await this.runtime.start();
       this.started = true;
