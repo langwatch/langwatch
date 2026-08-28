@@ -53,10 +53,11 @@ class EventingQueue implements EventSourcedQueueProcessor<Record<string, unknown
 
 function createEventing(phases: string[]): WorkerEventingRuntime {
   return WorkerEventingRuntime.create({
-    eventStore: new EventStoreMemory(),
+    eventStore: EventStoreMemory.createForTesting(),
     queueFactory: () => new EventingQueue(phases),
     processStore: new InMemoryProcessStore(),
     executionTarget: "worker",
+    warnWhenProjectionsRunInline: false,
     consumersEnabled: false,
   });
 }
@@ -149,10 +150,11 @@ describe("WorkerApplication", () => {
       throw readinessError;
     };
     const eventing = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
     const feature = new FeatureInstaller();
@@ -236,10 +238,11 @@ describe("WorkerApplication", () => {
       throw eventingError;
     };
     const eventing = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
     const application = WorkerApplication.create({

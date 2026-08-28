@@ -13,6 +13,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventSourcing } from "../../eventSourcing";
+import { EventStoreMemory } from "../../stores/eventStoreMemory";
 
 const TEST_PIPELINE_NAME = "gateway_spend_processing";
 
@@ -71,7 +72,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
   it("rejects the spend command for retry and names the request at error level", async () => {
     // No pipeline is registered, which is what an older build looks like to a
     // command minted by a newer one.
-    const eventSourcing = new EventSourcing();
+    const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
 
     await expect(eventSourcing.globalQueue!.send(confirmSpendJob)).rejects.toThrow(
       /not registered in this worker/,
@@ -92,7 +93,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
   });
 
   it("keeps rejecting a job whose routing metadata is missing entirely", async () => {
-    const eventSourcing = new EventSourcing();
+    const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
 
     await expect(
       eventSourcing.globalQueue!.send({

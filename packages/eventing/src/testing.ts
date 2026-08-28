@@ -23,5 +23,8 @@ export type {
 export { QueueManager } from "./services/queues/queueManager";
 export { EventStoreMemory } from "./stores/eventStoreMemory";
 export { validateEventAggregateType } from "./stores/eventStoreUtils";
-export { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
+export {
+  EventRepositoryMemory,
+  type EventRepositoryMemoryOptions,
+} from "./stores/repositories/eventRepositoryMemory";
 export type { SubscriberDispatchContext } from "./subscribers/subscriber.types";

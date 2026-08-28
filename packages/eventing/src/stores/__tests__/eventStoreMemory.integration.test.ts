@@ -3,7 +3,6 @@ import { type AggregateType, EventUtils } from "../../";
 import { createTenantId } from "../../domain/tenantId";
 import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
 import { EventStoreMemory } from "../eventStoreMemory";
-import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 
 describe("EventStoreMemory - Event ID Deduplication", () => {
   const tenantId = createTenantId("test-tenant");
@@ -15,7 +14,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
   let store: EventStoreMemory;
 
   beforeEach(() => {
-    store = new EventStoreMemory(new EventRepositoryMemory());
+    store = EventStoreMemory.createForTesting();
   });
 
   describe("getEvent", () => {

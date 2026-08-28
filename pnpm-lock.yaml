@@ -4931,6 +4931,9 @@ importers:
       '@langwatch/coding-agent-web':
         specifier: workspace:*
         version: link:../../packages/features/coding-agent/web
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../packages/features/dashboard/contract

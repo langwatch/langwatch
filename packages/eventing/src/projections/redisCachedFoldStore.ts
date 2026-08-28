@@ -51,34 +51,31 @@ const MIN_FOLD_CACHE_TTL_SECONDS = FOLD_CACHE_REPLICATION_LAG_SECONDS;
 let ttlFloorClampWarned = false;
 
 /**
- * Resolves the cache TTL from LANGWATCH_FOLD_CACHE_TTL_SECONDS, read at call
- * time so operators can raise residency without a redeploy, clamped up to the
- * replication-lag floor so an override can never silently drop below the
- * correctness invariant. Unset, empty, or unparseable falls back to the default
- * (which already sits at the floor).
+ * Resolves the process-injected cache TTL, clamped up to the replication-lag
+ * floor so an override can never silently drop below the correctness invariant.
+ * An absent or invalid value falls back to the default (which already sits at
+ * the floor).
  */
-function resolveFoldCacheTtlSeconds(): number {
-  const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
-  if (raw === undefined || raw === "") return DEFAULT_FOLD_CACHE_TTL_SECONDS;
+function resolveFoldCacheTtlSeconds(configuredSeconds: number | undefined): number {
+  const configured = configuredSeconds ?? DEFAULT_FOLD_CACHE_TTL_SECONDS;
+  if (!Number.isFinite(configured)) {
+    return DEFAULT_FOLD_CACHE_TTL_SECONDS;
+  }
 
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed)) return DEFAULT_FOLD_CACHE_TTL_SECONDS;
-
-  if (parsed < MIN_FOLD_CACHE_TTL_SECONDS) {
+  if (configured < MIN_FOLD_CACHE_TTL_SECONDS) {
     if (!ttlFloorClampWarned) {
       ttlFloorClampWarned = true;
       logger.warn(
         {
-          configuredSeconds: parsed,
+          configuredSeconds: configured,
           floorSeconds: MIN_FOLD_CACHE_TTL_SECONDS,
-          env: "LANGWATCH_FOLD_CACHE_TTL_SECONDS",
         },
         "Configured fold cache TTL is below the replication-lag floor — clamping up; a TTL under the floor breaks the fold cache's read-your-write consistency guarantee (ADR-066)",
       );
     }
     return MIN_FOLD_CACHE_TTL_SECONDS;
   }
-  return parsed;
+  return configured;
 }
 
 function readUpdatedAt<State>(state: State): number {
@@ -118,7 +115,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     options: RedisCachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;
-    this.ttlSeconds = options.ttlSeconds ?? resolveFoldCacheTtlSeconds();
+    this.ttlSeconds = resolveFoldCacheTtlSeconds(options.ttlSeconds);
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 

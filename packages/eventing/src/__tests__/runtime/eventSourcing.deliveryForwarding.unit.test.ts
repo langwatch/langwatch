@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventSourcing } from "../../eventSourcing";
 import type { EventSourcedQueueDefinition } from "../../queues";
+import { EventStoreMemory } from "../../stores/eventStoreMemory";
 
 const captured: {
   definition?: EventSourcedQueueDefinition<Record<string, unknown>>;
@@ -25,6 +26,7 @@ const ROUTING = {
 
 function createWithEntry() {
   const eventSourcing = new EventSourcing({
+    eventStore: EventStoreMemory.createForTesting(),
     queueFactory: (definition) => {
       captured.definition = definition;
       return {

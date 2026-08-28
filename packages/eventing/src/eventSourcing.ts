@@ -23,12 +23,10 @@ import type {
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
-import { QueueError } from "./services/errorHandling";
+import { ConfigurationError, QueueError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
-import { EventStoreMemory } from "./stores/eventStoreMemory";
-import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -46,6 +44,8 @@ export interface EventSourcingOptions {
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /** Enables warnings when projections run inline because no shared queue exists. */
+  warnWhenProjectionsRunInline?: boolean;
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   /**
    * Durable persistence for `withProcess` declarations (inbox, state,
@@ -104,6 +104,7 @@ export class EventSourcing {
   private readonly _executionTarget?: ExecutionTarget;
   private readonly _replayMarkerChecker?: ReplayMarkerChecker;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
   private _processRuntimeInstance?: ProcessRuntime;
 
@@ -116,6 +117,7 @@ export class EventSourcing {
     this._executionTarget = options.executionTarget;
     this._replayMarkerChecker = options.replayMarkerChecker;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
+    this._warnWhenProjectionsRunInline = options.warnWhenProjectionsRunInline ?? false;
     this._processStore = options.processStore;
 
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -285,6 +287,7 @@ export class EventSourcing {
           executionTarget: this._executionTarget,
           replayMarkerChecker: this._replayMarkerChecker,
           retentionPolicyResolver: this._retentionPolicyResolver,
+          warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
           prepareEventForProjection: definition.prepareEventForProjection,
         });
 
@@ -437,8 +440,10 @@ export class EventSourcing {
 
   private initializeStores(): void {
     if (!this._eventStore) {
-      this._eventStore = new EventStoreMemory(new EventRepositoryMemory());
-      logger.debug("Using in-memory event store");
+      throw new ConfigurationError(
+        "EventSourcing",
+        "An EventStore is required. Tests and local development must explicitly inject EventStoreMemory.",
+      );
     }
 
     // Create the ONE global queue
@@ -584,12 +589,14 @@ export class EventSourcing {
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     executionTarget?: ExecutionTarget;
     retentionPolicyResolver?: RetentionPolicyResolver;
+    warnWhenProjectionsRunInline?: boolean;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       eventStore: options.eventStore,
       executionTarget: options.executionTarget,
       retentionPolicyResolver: options.retentionPolicyResolver,
+      warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
     });
 
     es._initialized = true;

@@ -195,7 +195,10 @@ export class TestModelProviderService extends ModelProviderService {
 }
 
 /** Builds the real pipeline definition without opening its runtime adapters. */
-export function buildTestCodingAgentProcessingPipeline(github?: GithubService) {
+export function buildTestCodingAgentProcessingPipeline(
+  github?: GithubService,
+  foldCacheTtlSeconds?: number,
+) {
   return EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisationService(),
     modelProviders: new TestModelProviderService(),
@@ -205,6 +208,7 @@ export function buildTestCodingAgentProcessingPipeline(github?: GithubService) {
     clock: new TestClock(),
     redis,
     defaultRetentionDays: 365,
+    foldCacheTtlSeconds,
     github,
   }).build();
 }

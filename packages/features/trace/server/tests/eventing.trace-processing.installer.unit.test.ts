@@ -7,7 +7,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { EventRepositoryMemory, EventStoreMemory } from "@langwatch/eventing/testing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   type DatasetNormalizePayload,
   DatasetNormalizationWorkerPort,
@@ -73,7 +73,7 @@ describe("TraceProcessingServerInstaller", () => {
 
   it("registers Trace commands and durable jobs with their existing routing names", async () => {
     const eventSourcing = EventSourcing.createWithStores({
-      eventStore: new EventStoreMemory(new EventRepositoryMemory()),
+      eventStore: EventStoreMemory.createForTesting(),
     });
     const { installer, datasetNormalization } = createInstaller();
 
@@ -127,7 +127,7 @@ describe("TraceProcessingServerInstaller", () => {
 
   it("rejects duplicate installation in one process", () => {
     const eventSourcing = EventSourcing.createWithStores({
-      eventStore: new EventStoreMemory(new EventRepositoryMemory()),
+      eventStore: EventStoreMemory.createForTesting(),
     });
     const { installer } = createInstaller();
 

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
@@ -26,7 +25,7 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("when map projection (handler) failures occur", () => {
     it("map projection errors are non-critical and do not block subsequent events", async () => {
-      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
+      const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -72,7 +71,7 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
 
     it("multiple map projection failures do not block any events", async () => {
-      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
+      const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -127,7 +126,7 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
 
     it("map projection can be retried by re-dispatching same event", async () => {
-      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
+      const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -171,7 +170,7 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("when fold projection failures occur", () => {
     it("fold projection errors are caught and do not fail storeEvents", async () => {
-      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
+      const eventStore = EventStoreMemory.createForTesting<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -207,7 +206,7 @@ describe("EventSourcingService - Recovery Flows", () => {
 
   describe("duplicate prevention does not break map projection dispatch", () => {
     it("duplicate events are dispatched to map projections even after storage dedup", async () => {
-      const eventStore = new EventStoreMemory<Event>(new EventRepositoryMemory());
+      const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,

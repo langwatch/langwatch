@@ -377,6 +377,8 @@ export interface PipelineRegistryDeps {
   repositories: PipelineRepositories;
   /** One write-through fold store shared by projection writes and immediate readers. */
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  /** Typed process configuration for Redis fold-cache consistency TTLs. */
+  foldCacheTtlSeconds?: number;
   /** The Suite package's single run-state store, shared by Eventing and reads. */
   suiteRunState: ProjectionStore<Projection<SuiteRunStateData>>;
   redis: Redis | Cluster;
@@ -512,6 +514,7 @@ export class PipelineRegistry {
   ): FoldProjectionStore<State> {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
+      ttlSeconds: this.deps.foldCacheTtlSeconds,
     });
   }
 
@@ -956,6 +959,7 @@ export class PipelineRegistry {
         clock: SystemCodingAgentClock.create(),
         redis: this.deps.redis,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        foldCacheTtlSeconds: this.deps.foldCacheTtlSeconds,
         ...(this.deps.codingAgent
           ? {
               github: this.deps.codingAgent.github,

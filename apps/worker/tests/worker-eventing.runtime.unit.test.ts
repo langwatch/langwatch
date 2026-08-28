@@ -14,10 +14,11 @@ describe("WorkerEventingRuntime", () => {
   it("requires explicit consumer activation and closes its shared queue", async () => {
     const queue = new TestQueue();
     const runtime = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: true,
     });
 
@@ -30,10 +31,11 @@ describe("WorkerEventingRuntime", () => {
 
   it("rejects a new start after closing", async () => {
     const runtime = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => new TestQueue(),
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
 

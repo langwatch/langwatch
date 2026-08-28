@@ -25,6 +25,7 @@ import {
 import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
 import { AppIngestionPullWorkerAdapter } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import http from "http";
 import { nanoid } from "nanoid";
 import type { AddressInfo } from "net";
@@ -101,6 +102,7 @@ async function pullThroughTheRealPipeline(params: {
 }): Promise<{ nextCursor: string | null; eventCount: number }> {
   const eventSourcing = new EventSourcing({
     processStore: new InMemoryProcessStore(),
+    eventStore: EventStoreMemory.createForTesting(),
     // Consumers only run for a worker role, and the outbox dispatcher IS the
     // step under test — without this the intent would sit pending forever and
     // the ledger assertions would fail for a reason that has nothing to do

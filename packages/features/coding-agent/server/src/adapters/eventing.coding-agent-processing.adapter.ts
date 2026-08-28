@@ -46,6 +46,8 @@ export interface CodingAgentProcessingPipelineDeps {
   clock: CodingAgentClockPort;
   redis: Redis | Cluster;
   defaultRetentionDays: number;
+  /** Typed process configuration for the Redis fold-cache consistency TTL. */
+  foldCacheTtlSeconds?: number;
   /**
    * Asks the organization's GitHub connection which pull requests a folded
    * session's branch has hosted. Absent where there is no GitHub connection to
@@ -81,7 +83,10 @@ export class EventingCodingAgentProcessingAdapter {
         onSessionsStored: (tenantIds) => sessionSeen.record(tenantIds),
       }),
       deps.redis,
-      { keyPrefix: "coding_agent_sessions" },
+      {
+        keyPrefix: "coding_agent_sessions",
+        ttlSeconds: deps.foldCacheTtlSeconds,
+      },
     );
 
     const github = deps.github;

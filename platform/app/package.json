@@ -111,6 +111,7 @@
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/coding-agent-server": "workspace:*",
     "@langwatch/coding-agent-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dashboard-server": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",

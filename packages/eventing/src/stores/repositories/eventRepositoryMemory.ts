@@ -5,6 +5,14 @@ import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 
+export interface EventRepositoryMemoryOptions {
+  /**
+   * Duplicate inserts are operational diagnostics in a local process. Test
+   * factories opt out so intentional duplicate assertions do not emit noise.
+   */
+  duplicateEventWarnings?: "enabled" | "disabled";
+}
+
 /**
  * In-memory implementation of EventRepository.
  * Stores events in a Map keyed by tenantId:aggregateType:aggregateId.
@@ -15,6 +23,19 @@ const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 export class EventRepositoryMemory implements EventRepository {
   // Partition by tenant + aggregateType + aggregateId
   private readonly eventsByKey = new Map<string, EventRecord[]>();
+  private readonly warnOnDuplicateEvent: boolean;
+
+  private constructor(options: EventRepositoryMemoryOptions = {}) {
+    this.warnOnDuplicateEvent = options.duplicateEventWarnings !== "disabled";
+  }
+
+  static createForTesting(): EventRepositoryMemory {
+    return new EventRepositoryMemory({ duplicateEventWarnings: "disabled" });
+  }
+
+  static createForLocalDevelopment(): EventRepositoryMemory {
+    return new EventRepositoryMemory({ duplicateEventWarnings: "enabled" });
+  }
 
   async getEventRecord(request: {
     tenantId: string;
@@ -213,7 +234,7 @@ export class EventRepositoryMemory implements EventRepository {
       const alreadyExists = aggregateEvents.some((e) => e.EventId === record.EventId);
       if (alreadyExists) {
         // Log duplicate attempt for observability
-        if (process.env.NODE_ENV !== "test") {
+        if (this.warnOnDuplicateEvent) {
           logger.warn(
             {
               eventId: record.EventId,

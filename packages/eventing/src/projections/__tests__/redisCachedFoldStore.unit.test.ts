@@ -1,5 +1,5 @@
 import { register } from "prom-client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId";
 import type { FoldProjectionStore } from "../foldProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
@@ -439,81 +439,34 @@ describe("RedisCachedFoldStore", () => {
 
   // The TTL is a correctness invariant (ADR-066): a cache miss is authoritative
   // only because the entry has outlived the ClickHouse replication lag, so an
-  // operator override must never take it below the floor. `resolveFoldCacheTtl`
-  // runs at construction; a fresh module is loaded per case so the once-per-
-  // process clamp warning can be observed.
-  describe("given LANGWATCH_FOLD_CACHE_TTL_SECONDS", () => {
-    const ENV = "LANGWATCH_FOLD_CACHE_TTL_SECONDS";
-    let original: string | undefined;
-
-    beforeEach(() => {
-      original = process.env[ENV];
-      warnSpy.mockClear();
-      vi.resetModules();
-    });
-
-    afterEach(() => {
-      if (original === undefined) delete process.env[ENV];
-      else process.env[ENV] = original;
-    });
-
-    async function freshStore(redis: ReturnType<typeof createRedis>) {
-      const { RedisCachedFoldStore: Fresh } = await import("../redisCachedFoldStore");
-      return new Fresh<TestState>(createInnerStore().store, redis as never, {
+  // injected override must never take it below the floor.
+  describe("given a process-injected fold cache TTL", () => {
+    async function ttlWrittenBy(ttlSeconds: number | undefined) {
+      const redis = createRedis();
+      const store = new RedisCachedFoldStore<TestState>(createInnerStore().store, redis as never, {
         keyPrefix: "test_table",
+        ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
       });
-    }
-
-    async function ttlWrittenBy(redis: ReturnType<typeof createRedis>) {
-      const store = await freshStore(redis);
       await store.store({ count: 1, UpdatedAt: 1 }, CONTEXT);
       return redis.values.get(CACHE_KEY)?.ttlSeconds;
     }
 
-    describe("when the override is below the replication-lag floor", () => {
-      it("clamps the effective TTL up to the floor and warns", async () => {
-        process.env[ENV] = "60";
-        const redis = createRedis();
-
-        // The write lands at the floor, not the configured 60 — the clamp acted.
-        expect(await ttlWrittenBy(redis)).toBe(300);
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-      });
-
-      it("warns only once even when several stores resolve a clamped TTL", async () => {
-        process.env[ENV] = "30";
-        const { RedisCachedFoldStore: Fresh } = await import("../redisCachedFoldStore");
-
-        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
-          keyPrefix: "test_table",
-        });
-        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
-          keyPrefix: "test_table",
-        });
-
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-      });
+    it("defaults to the replication-lag floor without warning", async () => {
+      warnSpy.mockClear();
+      expect(await ttlWrittenBy(undefined)).toBe(300);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    describe("when the override is above the floor", () => {
-      it("honours the configured value and does not warn", async () => {
-        process.env[ENV] = "600";
-        const redis = createRedis();
-
-        // Above the floor is passed through untouched — the override is respected.
-        expect(await ttlWrittenBy(redis)).toBe(600);
-        expect(warnSpy).not.toHaveBeenCalled();
-      });
+    it("clamps a below-floor override and warns", async () => {
+      warnSpy.mockClear();
+      expect(await ttlWrittenBy(60)).toBe(300);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
     });
 
-    describe("when the override is unset", () => {
-      it("falls back to the default without warning", async () => {
-        delete process.env[ENV];
-        const redis = createRedis();
-
-        expect(await ttlWrittenBy(redis)).toBe(300);
-        expect(warnSpy).not.toHaveBeenCalled();
-      });
+    it("honours an override above the floor without warning", async () => {
+      warnSpy.mockClear();
+      expect(await ttlWrittenBy(600)).toBe(600);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 });

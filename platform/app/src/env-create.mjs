@@ -235,6 +235,7 @@ export function createEnvConfig(source) {
           .regex(/^(?:[0-9]|1[0-5])$/, "REDIS_DB_INDEX must be 0-15")
           .optional(),
       ),
+      LANGWATCH_FOLD_CACHE_TTL_SECONDS: z.string().optional(),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
       // Opt out of Google Cloud DLP entirely. When set, the google_dlp PII
       // check is refused and the heavy @google-cloud/dlp SDK (generated protos
@@ -615,6 +616,7 @@ export function createEnvConfig(source) {
       SKIP_REDIS:
         source.SKIP_REDIS === "1" || source.SKIP_REDIS?.toLowerCase() === "true",
       REDIS_DB_INDEX: source.REDIS_DB_INDEX,
+      LANGWATCH_FOLD_CACHE_TTL_SECONDS: source.LANGWATCH_FOLD_CACHE_TTL_SECONDS,
       GOOGLE_APPLICATION_CREDENTIALS: source.GOOGLE_APPLICATION_CREDENTIALS,
       LANGWATCH_DISABLE_GOOGLE_DLP:
         source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",

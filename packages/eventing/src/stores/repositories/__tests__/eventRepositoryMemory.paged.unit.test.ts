@@ -27,7 +27,7 @@ function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
 describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
   // e3a and e3b share a timestamp (tiebreak by EventId); e5 is beyond the bound.
   async function seeded() {
-    const repo = new EventRepositoryMemory();
+    const repo = EventRepositoryMemory.createForTesting();
     await repo.insertEventRecords([
       record({ eventId: "e4", ts: 4000 }),
       record({ eventId: "e2", ts: 2000 }),

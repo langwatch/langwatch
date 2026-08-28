@@ -68,6 +68,7 @@ export class WorkerProductionComposition {
       ...eventingServer.dependencies(),
       executionTarget: "worker",
       consumersEnabled: false,
+      warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
     });
     const topicServer = TopicServerInstaller.create({
       database: options.topic.database,

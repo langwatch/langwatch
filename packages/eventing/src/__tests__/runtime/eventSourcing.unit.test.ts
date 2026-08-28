@@ -42,14 +42,22 @@ describe("EventSourcing", () => {
       expect(es.isEnabled).toBe(true);
     });
 
+    it("rejects an implicit unsafe memory-store fallback", () => {
+      const es = new EventSourcing();
+
+      expect(() => es.getEventStore()).toThrow(
+        "Tests and local development must explicitly inject EventStoreMemory",
+      );
+    });
+
     it("creates disabled when enabled is false", () => {
       const es = new EventSourcing({ enabled: false });
 
       expect(es.isEnabled).toBe(false);
     });
 
-    it("uses memory event store when no clickhouse provided in non-production", () => {
-      const es = new EventSourcing();
+    it("uses memory event store only when a test process opts in", () => {
+      const es = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
       const eventStore = es.getEventStore();
 
       expect(eventStore).toBeInstanceOf(EventStoreMemory);

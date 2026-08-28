@@ -50,6 +50,10 @@ manager for durable, stateful orchestration.
 
 - Import framework contracts from the package root.
 - Import test helpers from `@langwatch/eventing/testing` only in tests.
+- `EventSourcing` requires an injected event store. Tests and local tools must
+  explicitly inject `EventStoreMemory.createForTesting()` or
+  `EventStoreMemory.createForLocalDevelopment()` from the testing surface;
+  production composition must inject a durable store.
 - Import `@langwatch/eventing/server` only from a process composition root to
   construct the private Prisma, ClickHouse, retention, and Group Queue graph.
   Inject an already-created Prisma client, tenant-aware ClickHouse resolver,

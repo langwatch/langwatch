@@ -78,6 +78,7 @@ export interface EventSourcingPipelineDefinition<
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
   prepareEventForProjection?: (event: EventType) => EventType;
+  warnWhenProjectionsRunInline?: boolean;
 }
 
 export interface RegisteredPipeline<

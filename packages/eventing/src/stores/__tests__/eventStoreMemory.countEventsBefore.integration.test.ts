@@ -3,7 +3,6 @@ import { type AggregateType, EventUtils } from "../../";
 import { createTenantId } from "../../domain/tenantId";
 import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
 import { EventStoreMemory } from "../eventStoreMemory";
-import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 
 describe("EventStoreMemory - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");
@@ -15,7 +14,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
   let store: EventStoreMemory;
 
   beforeEach(() => {
-    store = new EventStoreMemory(new EventRepositoryMemory());
+    store = EventStoreMemory.createForTesting();
   });
 
   describe("counts events before a specific timestamp correctly", () => {
@@ -212,13 +211,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const invalidContext = {} as any;
 
       await expect(
-        store.countEventsBefore(
-          aggregateId,
-          invalidContext,
-          aggregateType,
-          1000,
-          "event-id",
-        ),
+        store.countEventsBefore(aggregateId, invalidContext, aggregateType, 1000, "event-id"),
       ).rejects.toThrow("tenantId");
     });
 

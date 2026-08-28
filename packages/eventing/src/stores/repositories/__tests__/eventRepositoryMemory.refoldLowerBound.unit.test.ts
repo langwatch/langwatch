@@ -44,7 +44,7 @@ function record({
 const bound = 1_700_000_000_000;
 
 async function seeded() {
-  const repo = new EventRepositoryMemory();
+  const repo = EventRepositoryMemory.createForTesting();
   await repo.insertEventRecords([
     record({ eventId: "before", occurredAt: bound - 1000 }), // older than the bound
     record({ eventId: "at", occurredAt: bound }), // exactly at the bound

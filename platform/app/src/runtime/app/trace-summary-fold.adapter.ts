@@ -47,6 +47,7 @@ export function createAppTraceSummaryStore(options: {
   repository: TraceSummaryRepository;
   redis: Redis | Cluster | null;
   defaultRetentionDays: number;
+  foldCacheTtlSeconds?: number;
 }): FoldProjectionStore<TraceSummaryData> {
   const durable = TraceSummaryStore.create({
     storage: AppTraceSummaryProjectionAdapter.create(options.repository),
@@ -56,6 +57,7 @@ export function createAppTraceSummaryStore(options: {
   return options.redis
     ? new RedisCachedFoldStore(durable, options.redis, {
         keyPrefix: "trace_summaries",
+        ttlSeconds: options.foldCacheTtlSeconds,
       })
     : durable;
 }

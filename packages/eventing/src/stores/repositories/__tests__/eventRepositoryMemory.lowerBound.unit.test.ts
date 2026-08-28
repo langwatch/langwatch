@@ -22,7 +22,7 @@ describe("EventRepositoryMemory.getEventRecords lower bound", () => {
   const bound = 1_700_000_000_000;
 
   async function seeded() {
-    const repo = new EventRepositoryMemory();
+    const repo = EventRepositoryMemory.createForTesting();
     await repo.insertEventRecords([
       record("before", bound - 1000), // older than the bound
       record("at", bound), // exactly at the bound
@@ -35,9 +35,7 @@ describe("EventRepositoryMemory.getEventRecords lower bound", () => {
   describe("when no lower bound is passed", () => {
     it("returns every event", async () => {
       const repo = await seeded();
-      const ids = (await repo.getEventRecords("tenant", "trace", "agg")).map(
-        (r) => r.EventId,
-      );
+      const ids = (await repo.getEventRecords("tenant", "trace", "agg")).map((r) => r.EventId);
       expect(new Set(ids)).toEqual(new Set(["before", "at", "after", "unknown-time"]));
     });
   });

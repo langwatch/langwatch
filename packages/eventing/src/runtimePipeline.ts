@@ -56,6 +56,7 @@ export class EventSourcingPipeline<
       replayMarkerChecker: definition.replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver,
       prepareEventForProjection: definition.prepareEventForProjection,
+      warnWhenProjectionsRunInline: definition.warnWhenProjectionsRunInline,
     });
   }
 }

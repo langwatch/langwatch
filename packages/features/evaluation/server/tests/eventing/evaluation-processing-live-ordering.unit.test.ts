@@ -5,7 +5,7 @@ import {
   type FoldProjectionStore,
   type JobRegistryEntry,
 } from "@langwatch/eventing";
-import { EventRepositoryMemory, EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
+import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { EvaluationCommandAdapter } from "@langwatch/evaluation-server/internal";
@@ -132,7 +132,7 @@ describe("evaluation processing live FIFO", () => {
       pipelineName: "evaluation_processing",
       aggregateType: "evaluation",
       allowedEventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
-      eventStore: new EventStoreMemory(new EventRepositoryMemory()),
+      eventStore: EventStoreMemory.createForTesting(),
       foldProjections: [
         new EvaluationRunFoldProjection({
           store: foldStore<EvaluationRunData>(),

@@ -15,6 +15,8 @@ export interface WorkerEventingDependencies {
   ): EventSourcedQueueProcessor<Record<string, unknown>>;
   processStore: ProcessStore;
   executionTarget: ExecutionTarget;
+  /** Production-only diagnostic for missing shared projection queues. */
+  warnWhenProjectionsRunInline: boolean;
   /**
    * A consumer may run only when this process registers every job type on the
    * shared Eventing queue. The Topic slice alone is not that registry.
@@ -46,6 +48,7 @@ export class WorkerEventingRuntime {
       executionTarget: dependencies.executionTarget,
       processStore: dependencies.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,
+      warnWhenProjectionsRunInline: dependencies.warnWhenProjectionsRunInline,
     });
   }
 

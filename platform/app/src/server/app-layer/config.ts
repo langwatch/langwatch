@@ -1,4 +1,5 @@
 import { getEnvironmentConfig } from "../../env.mjs";
+import { Config, RuntimeConfig, type ConfigValue } from "@langwatch/config";
 import {
   resolveNlpLambdaRuntimeConfig,
   type NlpLambdaRuntimeConfig,
@@ -12,8 +13,36 @@ import {
   type EvaluationInputOffloadConfig,
 } from "@langwatch/evaluation-server";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { z } from "zod";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
+
+const legacyEventingConfigDefinition = RuntimeConfig.define({
+  foldCacheTtlSeconds: Config.value(
+    z
+      .string()
+      .optional()
+      .transform((value) => {
+        if (value === undefined || value === "") return void 0;
+
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : void 0;
+      }),
+    { env: "LANGWATCH_FOLD_CACHE_TTL_SECONDS" },
+  ),
+});
+
+type LegacyEventingConfig = ConfigValue<typeof legacyEventingConfigDefinition>;
+
+export function resolveLegacyEventingConfig(
+  source: Readonly<Record<string, unknown>>,
+): LegacyEventingConfig {
+  return RuntimeConfig.create({
+    name: "legacy Eventing",
+    definition: legacyEventingConfigDefinition,
+    source,
+  }).value;
+}
 
 /**
  * Roles that run the background worker stack: event-sourcing consumers,
@@ -127,6 +156,9 @@ export interface AppConfig {
 
   /** Typed limits for durable Evaluation input offload. */
   evaluationInputsOffload: EvaluationInputOffloadConfig;
+
+  /** Redis fold-cache TTL, constrained by Eventing to its replication-lag floor. */
+  eventingFoldCacheTtlSeconds?: number;
 }
 
 /** Maps the environment explicitly validated by executable boot. */
@@ -149,6 +181,9 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     ),
     previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
   };
+  const eventing = resolveLegacyEventingConfig({
+    LANGWATCH_FOLD_CACHE_TTL_SECONDS: env.LANGWATCH_FOLD_CACHE_TTL_SECONDS,
+  });
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -200,6 +235,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
       .filter(Boolean),
     codingAgentSpanFilterEnabled: env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== true,
     evaluationInputsOffload,
+    eventingFoldCacheTtlSeconds: eventing.foldCacheTtlSeconds,
   };
 }
 

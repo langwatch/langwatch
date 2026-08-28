@@ -1,6 +1,5 @@
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
-import { ConfigurationError } from "../services/errorHandling";
 import { compareOrdinal } from "../utils/compareOrdinal";
 import { AbstractEventStore } from "./abstractEventStore";
 import { eventToRecord } from "./eventStoreUtils";
@@ -27,16 +26,22 @@ import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
 export class EventStoreMemory<
   EventType extends Event = Event,
 > extends AbstractEventStore<EventType> {
-  constructor(repository: EventRepository = new EventRepositoryMemory()) {
+  private constructor(repository: EventRepository) {
     super(repository);
+  }
 
-    // Prevent accidental use in production - memory stores are not thread-safe
-    if (process.env.NODE_ENV === "production") {
-      throw new ConfigurationError(
-        "EventStoreMemory",
-        "EventStoreMemory is not thread-safe and cannot be used in production. Use EventStoreClickHouse or another thread-safe implementation instead.",
-      );
-    }
+  static createForTesting<EventType extends Event = Event>(
+    repository?: EventRepository,
+  ): EventStoreMemory<EventType> {
+    return new EventStoreMemory<EventType>(repository ?? EventRepositoryMemory.createForTesting());
+  }
+
+  static createForLocalDevelopment<EventType extends Event = Event>(
+    repository?: EventRepository,
+  ): EventStoreMemory<EventType> {
+    return new EventStoreMemory<EventType>(
+      repository ?? EventRepositoryMemory.createForLocalDevelopment(),
+    );
   }
 
   protected override postProcessEvents(events: EventType[]): EventType[] {

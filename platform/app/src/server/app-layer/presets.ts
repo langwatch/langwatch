@@ -1190,6 +1190,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     repository: repositories.traceSummaryFold,
     redis,
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    foldCacheTtlSeconds: config.eventingFoldCacheTtlSeconds,
   });
 
   // The spend-command pipeline projects gateway_spend; it shares the
@@ -1386,6 +1387,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     executionTarget: config.processRole === "all" ? undefined : config.processRole,
     replayMarkerChecker: redis ? new RedisReplayMarkerChecker(redis) : undefined,
     retentionPolicyResolver: eventingRetention,
+    warnWhenProjectionsRunInline: config.nodeEnv === "production",
     configureGlobalProjections: config.isSaas
       ? (registry) => {
           registry.registerMapProjection(orgBillableEventsMeterProjection);
@@ -1640,6 +1642,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
     repositories,
     traceSummaryStore,
+    foldCacheTtlSeconds: config.eventingFoldCacheTtlSeconds,
     suiteRunState: suiteEventing.suiteRunState,
     redis: redis!,
     broadcast,

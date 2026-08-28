@@ -91,10 +91,11 @@ describe("WorkerProductionComposition", () => {
   it("installs Topic's producer graph and boot seeds without claiming the shared Eventing queue", async () => {
     const queue = new Queue();
     const eventing = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
     const capability = new TopicCapability();
@@ -106,7 +107,7 @@ describe("WorkerProductionComposition", () => {
     const transport = new Transport();
     const lifecycle = new Lifecycle();
     const composition = WorkerProductionComposition.createFromPorts({
-      config: { environment: "test" },
+      config: { environment: "test", nodeEnvironment: "test" },
       eventing,
       lifecycle,
       transport,
@@ -159,10 +160,11 @@ describe("WorkerProductionComposition", () => {
   it("installs Trace before Topic and passes Topic Trace's canonical assignment port", async () => {
     const queue = new Queue();
     const eventing = WorkerEventingRuntime.create({
-      eventStore: new EventStoreMemory(),
+      eventStore: EventStoreMemory.createForTesting(),
       queueFactory: () => queue,
       processStore: new InMemoryProcessStore(),
       executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
     const traceAssignments = new TraceAssignments();
@@ -178,7 +180,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: { environment: "test" },
+      config: { environment: "test", nodeEnvironment: "test" },
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),

@@ -123,4 +123,10 @@ export interface EventSourcingServiceOptions<
    */
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * Process composition enables this for production workers and API processes.
+   * It keeps an accidentally inline projection visible without Eventing reading
+   * the host environment.
+   */
+  warnWhenProjectionsRunInline?: boolean;
 }

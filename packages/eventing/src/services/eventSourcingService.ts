@@ -67,6 +67,7 @@ export class EventSourcingService<
     executionTarget,
     replayMarkerChecker,
     retentionPolicyResolver,
+    warnWhenProjectionsRunInline = false,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
@@ -79,13 +80,16 @@ export class EventSourcingService<
     this.prepareEventForProjection = prepareEventForProjection ?? ((event) => event);
     this.metrics = metrics;
 
-    // Warn in production if global queue is not provided
+    // Process composition opts into this production-safety warning. Eventing
+    // deliberately does not inspect the host environment itself.
     if (
-      process.env.NODE_ENV === "production" &&
+      warnWhenProjectionsRunInline &&
       !globalQueue &&
       ((foldProjections && foldProjections.length > 0) ||
         (stateProjections && stateProjections.length > 0) ||
         (mapProjections && mapProjections.length > 0) ||
+        (foldSubscribers && foldSubscribers.length > 0) ||
+        (mapSubscribers && mapSubscribers.length > 0) ||
         (subscribers && subscribers.length > 0))
     ) {
       this.logger.warn(
