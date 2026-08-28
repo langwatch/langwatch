@@ -79,6 +79,69 @@ describe("validationMeta", () => {
     });
   });
 
+  // The shapes below are captured verbatim from zod 4.4.3, which renamed the
+  // codes the cases above match. This package takes no zod dependency on
+  // purpose, so these stand in for the real emitter; without them the zod 4
+  // branches read as covered while never having run.
+  describe("when zod 4 reports a rejected enum", () => {
+    const error = {
+      issues: [
+        {
+          code: "invalid_value",
+          values: ["llm", "chain", "tool"],
+          path: ["spans", 0, "type"],
+          message: 'Invalid option: expected one of "llm"|"chain"|"tool"',
+        },
+      ],
+    };
+
+    /** @scenario A rejected enum reports the options without the value */
+    it("names the options the schema allows", () => {
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain", "tool"]);
+    });
+
+    it("carries no value that arrived", () => {
+      expect(validationMeta(error)?.issues[0]?.received).toBeUndefined();
+    });
+  });
+
+  describe("when zod 4 reports a rejected discriminator", () => {
+    const error = {
+      issues: [
+        {
+          code: "invalid_union",
+          note: "No matching discriminator",
+          discriminator: "type",
+          options: ["llm", "chain"],
+          path: ["spans", 0, "type"],
+          message: "Invalid discriminator value. Expected 'llm' | 'chain'",
+        },
+      ],
+    };
+
+    it("names the options the schema allows", () => {
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain"]);
+    });
+  });
+
+  describe("when zod 4 reports a malformed string", () => {
+    const error = {
+      issues: [
+        {
+          origin: "string",
+          code: "invalid_format",
+          format: "email",
+          path: ["contact"],
+          message: "Invalid email address",
+        },
+      ],
+    };
+
+    it("names the rule that rejected it", () => {
+      expect(validationMeta(error)?.issues[0]?.rule).toBe("email");
+    });
+  });
+
   describe("when a value is not one of the allowed options", () => {
     const error = {
       issues: [

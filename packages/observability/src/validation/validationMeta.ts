@@ -67,6 +67,9 @@ interface RawIssue {
   keys?: unknown;
   options?: unknown;
   validation?: unknown;
+  /** Zod 4 spellings: the permitted set, and the named string format. */
+  values?: unknown;
+  format?: unknown;
   minimum?: unknown;
   maximum?: unknown;
   unionErrors?: unknown;
@@ -132,11 +135,31 @@ function metaForIssue(issue: RawIssue): ValidationIssueMeta {
       meta.options = stringList(issue.options);
       break;
 
+    // Zod 4 folds an enum mismatch and a literal mismatch into one code and
+    // carries the permitted set as `values`, so both older cases above stop
+    // matching and the set they exist to record is dropped. Zod 4 also routes
+    // a discriminator mismatch through `invalid_union`, where it is the arm
+    // that carries `options`; a plain union failure carries none and is left
+    // to `collectIssues`, which follows its branches.
+    case "invalid_value":
+      meta.options = stringList(issue.values);
+      break;
+
+    case "invalid_union":
+      if (issue.options !== undefined) meta.options = stringList(issue.options);
+      break;
+
     case "invalid_literal":
       // `expected` is the literal our schema declares, so it is ours to log.
       if (typeof issue.expected === "string" || typeof issue.expected === "number") {
         meta.expected = String(issue.expected);
       }
+      break;
+
+    // `invalid_string` in zod 3, `invalid_format` in zod 4; the rule name moved
+    // from `validation` to `format`.
+    case "invalid_format":
+      if (typeof issue.format === "string") meta.rule = issue.format;
       break;
 
     case "invalid_string":
