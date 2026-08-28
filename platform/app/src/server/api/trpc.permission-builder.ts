@@ -324,18 +324,35 @@ function middlewareList(value: unknown): readonly unknown[] {
   return Array.isArray(middlewares) ? middlewares : [];
 }
 
+/**
+ * A built procedure is a **callable** carrying `_def`, not a plain object:
+ * tRPC's `createResolver` returns the invoker itself. Reading it as an object
+ * answered `[]` for every procedure in the router, which made
+ * `isPublicProcedure` below say "public" about all of them.
+ *
+ * Unreadable is thrown rather than returned as empty. The one thing this
+ * function must never do is shrug: an empty list reads as "no auth middleware
+ * here", so a shape it does not understand would report the whole surface
+ * anonymous, or — with the sense inverted — hide a genuinely public endpoint.
+ */
 function procedureMiddlewareList(value: unknown): readonly unknown[] {
-  if (typeof value !== "object" || value === null || !("_def" in value)) {
-    return [];
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) {
+    throw new Error(`Not a tRPC procedure: ${typeof value}`);
+  }
+  if (!("_def" in value)) {
+    throw new Error("tRPC procedure carries no `_def` to read its middlewares from");
   }
 
-  const definition = value._def;
+  const definition = (value as { _def: unknown })._def;
   if (typeof definition !== "object" || definition === null || !("middlewares" in definition)) {
-    return [];
+    throw new Error("tRPC procedure `_def` carries no `middlewares` list");
   }
 
-  const middlewares = definition.middlewares;
-  return Array.isArray(middlewares) ? middlewares : [];
+  const middlewares = (definition as { middlewares: unknown }).middlewares;
+  if (!Array.isArray(middlewares)) {
+    throw new Error("tRPC procedure `_def.middlewares` is not a list");
+  }
+  return middlewares;
 }
 
 const authMiddlewares = middlewareList(enforceUserIsAuthed);
