@@ -113,7 +113,7 @@ describe("getProjectLambdaArn", () => {
     });
   });
 
-  describe("ARN cache + single-flight", () => {
+  describe("when the ARN cache and single-flight guard are active", () => {
     /** @scenario First call hits AWS; subsequent calls within TTL serve from cache with zero AWS calls */
     it("serves repeated calls within TTL from cache with zero AWS calls", async () => {
       const _send = vi
