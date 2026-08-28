@@ -80,7 +80,10 @@ in heads and branches, the more it gets "remembered" instead of read.
 
 All from the script kits (`databricks-scripts/`, `openai-scripts/`,
 `anthropic` probes, `microsoft-copilot-scripts/`), run against real
-accounts:
+accounts — each a **single account** (n=1), so account-level
+configuration may differ per customer. Claims marked *unprobed* are
+documentation-derived, not measured; §20 names the probes that must run
+before the relying code ships:
 
 - **OpenAI** puts `user_id`, `user_email`, `api_key_id` on every cost row
   (1,579/1,579) — but 53% of measured spend ($153.28 of $286.85) sits on
@@ -90,17 +93,28 @@ accounts:
   was unset on all 57 keys; amounts arrive in **cents**
   (the 100× class of bug, #6977).
 - **Azure Cost Management** returned **EUR** (25.79 EUR) on our own
-  subscription, and serves `totalCostUSD` (Microsoft's own invoice-grade
-  conversion) alongside — our probe requested only `totalCost`, which is
-  why `50c_cost_by_service.csv` is EUR-only. App-only access is proven
-  (service principal + Cost Management Reader role).
-- **Copilot** has no per-seat price API and no prepaid-credit consumption
-  API (proven dead ends in `KNOWN_DEAD.md`); it has SKU/roster counts
-  (4 licensed / 2 enabled measured) and activity.
-- **Databricks** SCIM lists people with email + IdP object id
-  (`externalId` auto-matched 11/13 against Entra); service principals
-  surface as bare UUIDs. Genie *serving* tokens are provably untieable to
-  requests; warehouse cost prorates by statement.
+  subscription (`50c/51c_cost_by_service.csv`); app-only access is
+  proven (service principal + Cost Management Reader,
+  `51_sp_cost_access.sh`). `totalCostUSD` (Microsoft's own
+  invoice-grade conversion) is **unprobed** — no script ever requested
+  it; a §20 probe before the Azure puller ships.
+- **Copilot** has no prepaid-credit consumption API (proven dead end,
+  `KNOWN_DEAD.md`); the per-seat price API's *absence* is documented
+  reasoning (`er-model.md`), not a probe — no probe can prove a
+  negative. It has SKU/roster counts (4 licensed / 2 enabled measured)
+  and activity.
+- **Databricks** query history shows humans as **emails** and service
+  principals as **bare UUIDs** — proven *under app-only
+  service-principal auth* (`51_by_user.csv`; the probe's own client id
+  is one of those UUIDs). SCIM listing of people under that same
+  app-only auth is **unprobed** (the script ran but no output artifact
+  survives, and its curl would pass a 403 silently); the 11/13 Entra
+  `externalId` match exists in prose notes only. The vault's own later
+  correction (2026-08-20): **email is the primary join key** —
+  `externalId` exists only for IdP-provisioned users, refreshes daily,
+  and Databricks advises against building on it. Genie *serving* tokens
+  are provably untieable to requests; warehouse cost prorates by
+  statement.
 
 ## Decision
 
@@ -129,7 +143,9 @@ Where a pulled bill covers traffic (same provider account, per provider/day
   unallocated share is its own line, never silently netted.
 - **If gateway logs more than the bill** ($6.50 vs $6.00): the total is
   still $6.00, and the screen shows a visible "metering ran $0.50 over
-  bill" variance line. No subtraction, no negative numbers.
+  bill" variance line. No subtraction, and no negative numbers *invented
+  by us* — a provider's own refund can make a billed day genuinely
+  negative (bill composition, below), and that renders as-is.
 - Both numbers are always stored and comparable; the wave-2
   estimated-vs-billed report is this variance line given its own screen.
 
@@ -137,6 +153,24 @@ Where no bill covers the traffic, gateway rows stand alone, labeled
 *metered*. The overlap rule runs at **query time, never insert time**:
 gateway rows arrive instantly, bills days later, and Anthropic restates 30
 days back (#6978) — only a read-time rule survives a restated bill.
+
+**Bill composition — what "the bill" actually contains.** A provider's
+cost feed is not the invoice. Azure Cost Management amounts are
+**pre-tax** and, unfiltered, mix usage, purchases and refunds — a
+refund day can make a daily amount **negative**. Negative days are
+legal in storage (Int64) and on screen, and are never clamped to zero:
+clamping silently eats money. Whether OpenAI's cost endpoint nets out
+granted credits is **unverified** — a §20 probe before the
+reconciliation claim is made for OpenAI. "The bill is the total"
+therefore means: the screen reconciles to the provider's **pre-tax
+cost-feed subtotal**, not to the tax-inclusive invoice line.
+Separately, gateway metering prices at **list rates** while bills
+reflect contracted and discounted rates (batch, cached tokens,
+negotiated pricing): for a discounted account, a persistent "metering
+ran over bill" variance is the **expected signature of the discount**,
+not pipeline drift — the variance line labels it as such, so the
+screen doesn't train users to distrust a healthy pipeline.
+
 Rejects: "gateway wins the overlap" (an earlier draft rule — it made our
 estimate compete with the invoice); skipping the whole bill row when
 gateway detail exists (loses the unallocated remainder — a bug caught in
@@ -167,15 +201,31 @@ Rejects: converting at ingestion (rates are time-dependent; baking one in
 is lossy forever); floats anywhere in stored money (the display-only
 `AmountUSD Decimal` rule stands).
 
+Interop note (checked against the FinOps FOCUS standard, v1.x): the
+model exports cleanly if ever needed — `BilledAmountNano` →
+`BilledCost`, `CurrencyCode` → `BillingCurrency`, `Day` →
+`ChargePeriodStart/End`, `Provider` → `ProviderName`; actor, model and
+our metered amounts as custom `x_` columns. Our metered amount is
+**never** exported as FOCUS's `EffectiveCost` — that column means
+amortized *billed* money, and ours is a list-rate estimate.
+
 ### §4. One daily rollup, filled by a fold projection, read through a thin service
 
 The screen never talks to providers and never merges numbers itself:
 
 ```
-gateway_spend ──(fold projection, app code)──► governance_cost_rollup_1d ──► thin cost service ──► screen
-budget ledger ─┘                                                    ▲
-(pulled bills)                              Postgres (names, price list) ┘
+event_log ── gateway-spend events ──┬─(existing projections)──► gateway_spend / budget ledger  (sibling tables)
+          └─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──► thin cost service ──► screen
+                                                                                  ▲
+                                                             Postgres (names, price list) ┘
 ```
+
+The rollup projection consumes the **events** (gateway-spend and
+pulled-usage events on the log) — the `gateway_spend` table and the
+budget ledger are *sibling projection outputs* of those same streams,
+not the rollup's inputs. Projections register per-pipeline, so this is
+two registrations (one on each money pipeline) writing one table; replay
+means replaying both aggregates from the log.
 
 - **`governance_cost_rollup_1d`** — one row per day × org × ingestion
   source × cost_source × provider × model × agent × currency ×
@@ -244,10 +294,14 @@ production. Wave 1 ships with, not after:
   imported along with its architecture.
 - **Puller health surfaced, not just logged**: the thin service joins
   `IngestionSource` status so a day with no rows renders "no data since
-  [last successful pull]" — distinct from a genuine $0 day. Prerequisite
-  named in §20: the puller worker today never flips source status on
-  repeated failure (`pullerWorker.ts` `assertRunMadeProgress`), so
-  "unknown, never zero" is currently unimplementable without that fix.
+  [last successful pull]" — distinct from a genuine $0 day.
+  Prerequisite named in §20, and it is *two* fixes, not one: the puller
+  worker today never flips source status on repeated failure
+  (`pullerWorker.ts` `assertRunMadeProgress` raises and stops), the
+  model's error counter has **no production writer**, and no
+  last-successful-pull timestamp exists at all (`lastEventAt` records
+  any event's time, not pull success) — the render needs a **new
+  field** plus the status flip.
 
 The variance line (§2) already gives bill-vs-metering drift a first-class
 UI; these three give the pipeline itself the same honesty.
@@ -339,15 +393,16 @@ Old rows are facts; the lens moves, the facts don't.
 ### §10. Five actor kinds, all first-class: people, agents, API keys, seats, service accounts
 
 - **Service accounts** (machine logins — Databricks service principals
-  and kin) are their own kind, detected **deterministically**: Databricks
-  SCIM lists people with email + IdP object id while service principals
-  surface as bare UUIDs. A UUID in `executed_by` is a service account,
+  and kin) are their own kind, detected **deterministically**: in
+  Databricks query history humans surface as emails and service
+  principals as bare UUIDs (proven under app-only auth,
+  `51_by_user.csv`). A UUID in `executed_by` is a service account,
   never lumped into "agent" — agent-adoption numbers must not include
-  plumbing. Honesty note: our own measured "68% of statements by service
-  principal" is an ingestion artifact (273/443 statements came from our
-  own tooling — undici/curl/urllib/node per
-  `20b_query_history_by_app.csv`); the ADR ships the mechanism, not that
-  number.
+  plumbing. Honesty note: our own measured "68% of statements by
+  service principal" (301/443, `51_by_user.csv`) is an ingestion
+  artifact — our own tooling (undici/curl/urllib/node) accounts for
+  269 of the 436 grouped rows in `20b_query_history_by_app.csv`; the
+  ADR ships the mechanism, not that number.
 - **Agents** are first-class discovered records (Genie space, Copilot
   bot, OpenAI project) with cost attached where the provider allows
   (OpenAI per project ✓; Genie via warehouse proration only — serving
@@ -386,9 +441,14 @@ sync (infrastructure for a problem app-layer joins don't have yet).
 The match policy for `IdentityMatch`:
 
 - **Deterministic evidence links automatically**, recording which
-  evidence and when: exact directory-id equality (SCIM `externalId` =
-  provider id — 11/13 Databricks users matched this way) and exact
-  verified-email equality.
+  evidence and when: **exact verified-email equality is the primary
+  key** (the vault's own 2026-08-20 correction), with exact
+  directory-id equality (SCIM `externalId` = provider id) as
+  corroboration where present — `externalId` exists only for
+  IdP-provisioned users, refreshes daily, and Databricks advises
+  against building on it, so it strengthens a match but never stands
+  alone. (The "11/13 matched via externalId" figure survives in prose
+  notes only; no script artifact backs it.)
 - **Anything weaker only suggests** — "m.silva" resembling "Maria Silva"
   creates a suggestion an admin confirms. Nothing ever merges two people
   automatically.
@@ -449,9 +509,11 @@ to the resolve-at-read philosophy (a denormalized display hint, not
 derived truth). Exports and API responses carry the revised flag so
 finance can explain a changed number. Not in v1: revision-history
 screens, diffs, notifications — the event log retains everything if ever
-needed. Rejects: silent recompute (unreconcilable exports);
-freeze-after-N-days (our screen would knowingly disagree with the
-provider's own console).
+needed. If ever exported, corrections materialize as *new rows*
+synthesized from the event log (the FOCUS `ChargeClass="Correction"`
+shape), never as mutated rows. Rejects: silent recompute
+(unreconcilable exports); freeze-after-N-days (our screen would
+knowingly disagree with the provider's own console).
 
 ### §16. Idle seats split across the waves (FR3)
 
@@ -499,15 +561,30 @@ then.
 
 - **Azure cost puller** — built before this starts (Sergio); the ADR
   assumes the data lands, pulling `totalCost` + `totalCostUSD` (§3).
+- **Three one-script probes before the relying code ships** (same rigor
+  as the cents finding): (a) Azure `totalCostUSD` — documentation-only
+  today, no script ever requested it; if this agreement type doesn't
+  serve it, §3(a)'s biller-conversion column stays 0 and per-currency
+  display still holds. (b) Whether OpenAI's cost endpoint nets out
+  granted credits — decides what §2's reconciliation claim means for
+  OpenAI. (c) Databricks SCIM listing under app-only service-principal
+  auth — today unproven (no artifact; the probe's curl would pass a 403
+  silently); also record the privilege level the Databricks puller
+  actually needs (docs indicate CAN MANAGE per Genie space and
+  account-admin grants for system tables — some security teams will
+  refuse; `extraction-tradeoffs.md`).
 - **Audit single-copy** — the 9 adapters' direct-insert audit path
   becomes journal-backed on the infra track
   (`governance/pending/audit-single-copy-infra-track.md`); not an ADR
   risk.
-- **Puller status must flip on repeated failure** — today
+- **Puller success/failure must persist onto the source** — today
   `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but never
-  marks the `IngestionSource` unhealthy, so a silently-failing puller is
-  indistinguishable from a $0 day. §4a's "no data since [date]" render
-  depends on this fix; it ships with wave 1.
+  marks the `IngestionSource` unhealthy, the error counter has no
+  production writer, and no last-successful-pull field exists
+  (`lastEventAt` is not pull success), so a silently-failing puller is
+  indistinguishable from a $0 day. The fix is a status flip on repeated
+  failure **plus a new last-successful-pull timestamp**; §4a's "no data
+  since [date]" render depends on both; ships with wave 1.
 - The broken `openai_compliance` / `claude_compliance` sources are
   replaced/retired per ADR-122's diagnosis, outside this document.
 
@@ -521,14 +598,14 @@ then.
 | Rollup grain | 1 day (`toDate`) | matches bill grain; volume is thousands/day |
 | Idle-seat default | 30 days without activity, per-org adjustable | FR3 wave-2 listing |
 | Permission verbs | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation) | ADR-092 registry entries gating the screens |
-| Feature flags | `release_ui_ai_governance_enabled`, `release_ui_governance_billed_cost_enabled` | staged rollout of the screens |
+| Feature flags | `release_ui_ai_governance_enabled`, `release_ui_governance_billed_cost_enabled` — both already registered (backend + frontend registries), already gating nav and placeholder routes | staged rollout of the screens |
 | Anthropic restatement window | 30 days back (#6978) | why overlap/dedup rules are read-time only |
 
 ## Invariants
 
 | Invariant | Meaning | Satisfied by / test anchor |
 |---|---|---|
-| Bill = total | per provider/day with a bill: displayed total equals the bill; gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over- and under-metered days |
+| Bill = total | per provider/day with a bill: displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
 | Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
 | Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
@@ -548,13 +625,15 @@ then.
 | One writer per money lane | a second writer stamping the same spend breaks one-dollar-one-home; guarded by the exclusion-filter invariant test |
 | `event_log` retention covers the replay horizon (ADR-022: retention is the durability ceiling) | rollup days older than retention keep their last projected values and cannot be rebuilt; restatement markers on those days freeze |
 | SCIM/Entra directory data flows for department links | orgs without it degrade to "unassigned" department; per-person drill still works via provider-native ids |
+| Azure serves `totalCostUSD` on the customer's agreement type (unprobed — §20) | the biller-conversion column stays 0 for Azure; per-currency totals still correct; single-total view waits for a rate table |
+| Databricks grants the puller SCIM read + system-table access under app-only auth (SCIM listing unprobed; privilege bar is high — §20) | Databricks people arrive nameless (UUIDs/emails from query history only); identity wave degrades to email evidence; cost lane unaffected |
 
 ## Gates
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + migration ships with tested down path |
-| Prisma migration adding the three identity tables + seat price list | no (schema) | large | human review + tested down path |
+| ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| Prisma migration adding the three identity tables + seat price list | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration) |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test + both feature flags off until §7 filter merged |
 | Exclusion filter | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the projection |
 | Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); no fuzzy path exists in code |
@@ -586,7 +665,8 @@ CREATE TABLE governance_cost_rollup_1d (
     RevisedAt          Nullable(DateTime),      -- §15 marker (latest revision only)
     PreviousAmountNano Nullable(Int64),         -- §15 "was $X" (immediately-prior amount)
     Version            UInt64                   -- projection write version; reads argMax on this
-) ENGINE = ReplacingMergeTree(Version)   -- projection writes whole corrected rows
+) ENGINE = ReplacingMergeTree(Version)   -- via the CLICKHOUSE_ENGINE_REPLACING_PREFIX
+                                         -- envsub in the real migration, never a bare literal
 ORDER BY (OrganizationId, Day, CostSource, IngestionSourceId,
           Provider, Model, AgentId, CurrencyCode, RawActorId);
 -- The ORDER BY is the dedup key and MUST equal the full dimension tuple:
@@ -719,6 +799,42 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3 (2026-08-29, captain: Sergio Esteban).** Truth audit before lock:
+  three independent auditors re-verified every claim against (1) the
+  script kits' actual output artifacts, (2) the code in this repo, (3)
+  the FinOps FOCUS standard. No design change; every edit makes a claim
+  match its evidence:
+  - **Claims downgraded from "measured" to "unprobed", with §20 probes
+    named**: Azure `totalCostUSD` (appeared in zero scripts — it was a
+    documentation claim promoted to a design foundation); Databricks
+    SCIM listing under app-only auth (script ran, no artifact survives,
+    a 403 would have passed silently); the 11/13 Entra match
+    (prose-only); OpenAI credit netting (never checked). What *is*
+    proven under app-only auth: Azure cost read, and Databricks
+    human-email vs service-principal-UUID attribution in query history.
+  - **Bill composition stated** (§2, Invariants): "the bill" is the
+    provider's pre-tax cost-feed subtotal, refund days can be negative
+    and render as-is (never clamped), and a discounted account's
+    persistent "metering over bill" variance is the discount's expected
+    signature, labeled as such.
+  - **Identity evidence reordered** (§12, provider-behaviour): email is
+    the primary join key per the vault's own 2026-08-20 correction;
+    `externalId` (IdP-only, daily-refreshed, provider-discouraged)
+    corroborates but never stands alone.
+  - **Numbers corrected**: the tooling-artifact count is 269/436 per
+    `20b_query_history_by_app.csv` (273/443 was not derivable); the
+    Copilot seat-price dead end is documented reasoning, not a
+    `KNOWN_DEAD.md` probe (that file proves the credits API only).
+  - **Machinery claims aligned with the repo**: the rollup projection
+    consumes *events*, not the sibling tables (§4 diagram redrawn; two
+    per-pipeline registrations, one table; `CLICKHOUSE_ENGINE_REPLACING_PREFIX`
+    envsub); the Gates' "tested down path" replaced with what the repo
+    actually supports (manual DROP rollback per the 00067 precedent;
+    Prisma has no down files); §20's puller fix widened to status flip
+    **plus a new last-successful-pull field** (`errorCount` has no
+    production writer; `lastEventAt` is not success). FOCUS interop
+    note added (§3): metered money is never exported as
+    `EffectiveCost`.
 - **v2 (2026-08-29, captain: Sergio Esteban).** Red-team round: five
   independent adversarial reviews (correctness, scale, failure,
   second-order effects, alternatives), each attacking the draft with
