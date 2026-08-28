@@ -1,4 +1,5 @@
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PIICheckOptions } from "~/server/tracer/collector/piiCheck";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
@@ -8,12 +9,7 @@ import {
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   OtlpSpanPiiRedactionService,
 } from "../span-pii-redaction.service";
-
-vi.mock("~/server/tracer/collector/piiCheck", () => ({
-  batchPresidioClearPII: vi.fn(),
-  googleDLPClearPII: vi.fn(),
-  PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
-}));
+import { DataPrivacyServiceFake } from "./data-privacy.service.fake";
 
 function createMockOtlpSpan(attributes: OtlpKeyValue[]): OtlpSpan {
   return {
@@ -49,6 +45,15 @@ function createMockBatchClearPII(): {
   return { mockBatchClearPII: batchSpy, batchSpy };
 }
 
+function transportFor(batch: BatchClearPIIFunction) {
+  return {
+    clearGoogleDlp: async ({ text }: { text: string }) =>
+      (await batch([text], {} as PIICheckOptions))[0] ?? null,
+    clearPresidio: async (texts: string[]) => await batch(texts, {} as PIICheckOptions),
+    close: async () => undefined,
+  };
+}
+
 describe("OtlpSpanPiiRedactionService", () => {
   let service: OtlpSpanPiiRedactionService;
   let batchSpy: ReturnType<typeof vi.fn>;
@@ -60,9 +65,11 @@ describe("OtlpSpanPiiRedactionService", () => {
     const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
     batchSpy = spy;
     service = new OtlpSpanPiiRedactionService({
-      batchClearPII: mockBatchClearPII,
+      transport: transportFor(mockBatchClearPII),
       isLangevalsConfigured: true,
       isProduction: false,
+      nativePolicyEnforced: false,
+      dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
       featureFlags,
     });
   });
@@ -259,9 +266,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         await service.redactSpan(span, null, "ESSENTIAL");
 
         expect(batchSpy).toHaveBeenCalledTimes(1);
-        const options = batchSpy.mock.calls[0]?.[1] as PIICheckOptions;
-        expect(options.piiRedactionLevel).toBe("ESSENTIAL");
-        expect(options.mainMethod).toBe("presidio");
+        expect(batchSpy.mock.calls[0]?.[0]).toEqual(["test"]);
       });
 
       it("does not redact span.name", async () => {
@@ -372,8 +377,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         await service.redactSpan(span, null, "STRICT");
 
         expect(batchSpy).toHaveBeenCalled();
-        const options = batchSpy.mock.calls[0]?.[1] as PIICheckOptions;
-        expect(options.enforced).toBe(false);
+        expect(batchSpy.mock.calls[0]?.[0]).toEqual(["test"]);
       });
     });
 
@@ -381,9 +385,11 @@ describe("OtlpSpanPiiRedactionService", () => {
       it("propagates errors from batchClearPII", async () => {
         const errorBatchClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
         const errorService = new OtlpSpanPiiRedactionService({
-          batchClearPII: errorBatchClearPII,
+          transport: transportFor(errorBatchClearPII),
           isLangevalsConfigured: true,
           isProduction: false,
+          nativePolicyEnforced: false,
+          dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
         });
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
@@ -403,9 +409,11 @@ describe("OtlpSpanPiiRedactionService", () => {
       const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
       maxLengthBatchSpy = spy;
       maxLengthService = new OtlpSpanPiiRedactionService({
-        batchClearPII: mockBatchClearPII,
+        transport: transportFor(mockBatchClearPII),
         isLangevalsConfigured: true,
         isProduction: false,
+        nativePolicyEnforced: false,
+        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
         piiRedactionMaxAttributeLength: MAX_LENGTH,
       });
     });

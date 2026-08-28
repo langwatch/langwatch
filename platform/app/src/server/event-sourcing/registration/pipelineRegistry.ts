@@ -212,6 +212,7 @@ import { TraceAnalyticsStore } from "@langwatch/trace-server";
 import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
+import type { AppTracePrivacyRuntime } from "~/runtime/app/trace-privacy.runtime";
 import { createCustomEvaluationSyncHandler } from "../pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
 import { createEvaluationTriggerSubscriber } from "~/runtime/app/trace-evaluation-trigger.adapter";
 import { createExperimentMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
@@ -398,6 +399,8 @@ export interface PipelineRegistryDeps {
   monitors: MonitorService;
   modelProviders: ModelProviderService;
   featureFlags: FeatureFlagService;
+  /** One process-owned external PII and tokenization graph for Trace processing. */
+  tracePrivacy: AppTracePrivacyRuntime;
   evaluationControls: AppEvaluationExecutionControls;
   automation: AutomationService;
   automations: { ports: AutomationDispatchPorts };
@@ -1156,6 +1159,10 @@ export class PipelineRegistry {
         recordSpanCommand: AppTraceRecordSpanAdapter.create({
           modelProviders: this.deps.modelProviders,
           featureFlags: this.deps.featureFlags,
+          piiRedaction: this.deps.tracePrivacy.redaction,
+          tokenizer: this.deps.tracePrivacy.tokenizer,
+          dataPrivacy: this.deps.tracePrivacy.dataPrivacy,
+          nativePolicyEnforced: this.deps.tracePrivacy.nativePolicyEnforced,
           blobStore: this.deps.blobStore,
         }),
         traceCanonicalisation: this.deps.traceCanonicalisation,

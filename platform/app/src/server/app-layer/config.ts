@@ -14,6 +14,10 @@ import {
   type LangevalsRuntimeConfig,
 } from "~/runtime/langevals.config";
 import {
+  resolveTracePrivacyRuntimeConfig,
+  type TracePrivacyRuntimeConfig,
+} from "~/runtime/trace-privacy.config";
+import {
   resolveScenarioChildParentEnvironment,
   type ScenarioChildParentEnvironment,
 } from "~/runtime/worker/scenario-child-parent.config";
@@ -29,6 +33,7 @@ import { DEFAULT_MODEL } from "~/utils/constants";
 import { z } from "zod";
 import { poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { GroupQueuePolicy } from "@langwatch/group-queue";
+import { createLogger } from "@langwatch/observability";
 import { PRIVATE_CH_ENV_PREFIX, parseRouteKey } from "../clickhouse/privateRouteKey";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
@@ -157,6 +162,8 @@ export interface AppConfig {
   // Services
   /** Typed configuration for the process-owned Langevals evaluator transport. */
   langevals: LangevalsRuntimeConfig;
+  /** Typed configuration for the process-owned Trace privacy graph. */
+  tracePrivacy: TracePrivacyRuntimeConfig;
   langyWorker?: LangyWorkerHttpConfig;
   scenarioExecution: {
     langwatchEndpoint: string;
@@ -262,6 +269,31 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     groupQueue,
     outboundProxy: parseOutboundProxyConfig(process.env),
     langevals: resolveLangevalsRuntimeConfig(env),
+    tracePrivacy: resolveTracePrivacyRuntimeConfig(
+      {
+        googleApplicationCredentials: env.GOOGLE_APPLICATION_CREDENTIALS,
+        googleDlpDisabled: env.LANGWATCH_DISABLE_GOOGLE_DLP,
+        langevalsEndpoint: env.LANGEVALS_ENDPOINT,
+        nodeEnv: env.NODE_ENV,
+        dataPrivacyEnforcement: process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT,
+        tiktokensPath: process.env.TIKTOKENS_PATH,
+        tiktokenFetchTimeoutMs: process.env.TIKTOKEN_FETCH_TIMEOUT_MS,
+      },
+      (failure) => {
+        const logger = createLogger("langwatch:trace-privacy:config");
+        if (failure.reason === "invalid-json") {
+          logger.error(
+            { error: failure.error },
+            "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
+          );
+          return;
+        }
+        logger.error(
+          { error: failure.error },
+          "GOOGLE_APPLICATION_CREDENTIALS missing valid project_id",
+        );
+      },
+    ),
     scenarioExecution: {
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,

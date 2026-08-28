@@ -1,4 +1,5 @@
 import type { TenantId } from "@langwatch/eventing";
+import type { DataPrivacyService } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type {
@@ -27,15 +28,15 @@ import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import { applyOtlpSpanContentDrop } from "~/server/data-privacy/applyOtlpSpanContentDrop";
+import type { TokenizerClient } from "~/server/app-layer/clients/tokenizer/tokenizer.client";
+import { applyOtlpSpanContentDropWithPolicy } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 
 class AppTraceSpanPiiRedactionAdapter extends TraceSpanPiiRedactionPort {
   private readonly service: OtlpSpanPiiRedactionService;
 
-  constructor(featureFlags: FeatureFlagService) {
+  constructor(service: OtlpSpanPiiRedactionService) {
     super();
-    this.service = new OtlpSpanPiiRedactionService({ featureFlags });
+    this.service = service;
   }
 
   async redact(
@@ -86,16 +87,19 @@ class AppTraceSpanCostEnrichmentAdapter extends TraceSpanCostEnrichmentPort {
 class AppTraceSpanTokenEstimationAdapter extends TraceSpanTokenEstimationPort {
   private readonly service: OtlpSpanTokenEstimationService;
 
-  private constructor(featureFlags: FeatureFlagService) {
+  private constructor(featureFlags: FeatureFlagService, tokenizer: TokenizerClient) {
     super();
     this.service = new OtlpSpanTokenEstimationService({
-      tokenizer: new TiktokenClient(),
+      tokenizer,
       featureFlags,
     });
   }
 
-  static create(featureFlags: FeatureFlagService): AppTraceSpanTokenEstimationAdapter {
-    return new AppTraceSpanTokenEstimationAdapter(featureFlags);
+  static create(
+    featureFlags: FeatureFlagService,
+    tokenizer: TokenizerClient,
+  ): AppTraceSpanTokenEstimationAdapter {
+    return new AppTraceSpanTokenEstimationAdapter(featureFlags, tokenizer);
   }
 
   async estimate(span: OtlpSpan, tenantId: string): Promise<void> {
@@ -104,8 +108,27 @@ class AppTraceSpanTokenEstimationAdapter extends TraceSpanTokenEstimationPort {
 }
 
 class AppTraceSpanContentDropAdapter extends TraceSpanContentDropPort {
+  private constructor(
+    private readonly dataPrivacy: DataPrivacyService,
+    private readonly nativePolicyEnforced: boolean,
+  ) {
+    super();
+  }
+
+  static create(
+    dataPrivacy: DataPrivacyService,
+    nativePolicyEnforced: boolean,
+  ): AppTraceSpanContentDropAdapter {
+    return new AppTraceSpanContentDropAdapter(dataPrivacy, nativePolicyEnforced);
+  }
+
   async drop(span: OtlpSpan, projectId: string) {
-    return await applyOtlpSpanContentDrop({ span, projectId });
+    return await applyOtlpSpanContentDropWithPolicy({
+      span,
+      projectId,
+      dataPrivacy: this.dataPrivacy,
+      nativePolicyEnforced: this.nativePolicyEnforced,
+    });
   }
 }
 
@@ -161,13 +184,23 @@ export class AppTraceRecordSpanAdapter {
   static create(options: {
     modelProviders: ModelProviderService;
     featureFlags: FeatureFlagService;
+    piiRedaction: OtlpSpanPiiRedactionService;
+    tokenizer: TokenizerClient;
+    dataPrivacy: DataPrivacyService;
+    nativePolicyEnforced: boolean;
     blobStore?: BlobStore;
   }): RecordSpanCommand {
     return RecordSpanCommand.create({
-      piiRedaction: new AppTraceSpanPiiRedactionAdapter(options.featureFlags),
+      piiRedaction: new AppTraceSpanPiiRedactionAdapter(options.piiRedaction),
       costEnrichment: AppTraceSpanCostEnrichmentAdapter.create(options.modelProviders),
-      tokenEstimation: AppTraceSpanTokenEstimationAdapter.create(options.featureFlags),
-      contentDrop: new AppTraceSpanContentDropAdapter(),
+      tokenEstimation: AppTraceSpanTokenEstimationAdapter.create(
+        options.featureFlags,
+        options.tokenizer,
+      ),
+      contentDrop: AppTraceSpanContentDropAdapter.create(
+        options.dataPrivacy,
+        options.nativePolicyEnforced,
+      ),
       spool: options.blobStore ? AppTraceSpanSpoolAdapter.create(options.blobStore) : void 0,
     });
   }

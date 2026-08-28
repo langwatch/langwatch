@@ -95,6 +95,7 @@ import { AppModelProviderRuntime } from "~/runtime/app/features/model-provider";
 import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
 import { AppProjectRuntime } from "~/runtime/app/features/project";
 import { AppRoleRuntime } from "~/runtime/app/features/role";
+import { AppTracePrivacyRuntime } from "~/runtime/app/trace-privacy.runtime";
 import { EvaluatorFeature } from "~/runtime/app/features/evaluator";
 import {
   AppEvaluationExecutionPort,
@@ -229,6 +230,7 @@ import {
   PipelineRegistry,
 } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { FilterService } from "~/server/filters/filter.service";
+import { PrismaDataPrivacyAdapter } from "@langwatch/data-privacy-server";
 import {
   GatewayBudgetLedgerAdapter,
   GatewaySpendEventsClickHouseAdapter,
@@ -333,7 +335,7 @@ import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.serv
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
-import { OtlpSpanPiiRedactionService } from "./traces/span-pii-redaction.service";
+import { resolveTracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
 import {
   type AppConfig,
   createAppConfigFromEnv,
@@ -746,38 +748,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     now: Date.now,
   });
   const traceCanonicalisation = TraceCanonicalisationService.create();
-  const logRuntime = clickhouseEnabled
-    ? LogRuntimeAdapter.create({
-        resolveClient: logMetricClickHouseResolver.resolve,
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        defaultReadLimit: TRACE_LOG_READ_CAP,
-        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
-        redaction: new OtlpSpanPiiRedactionService({ featureFlags }),
-      })
-    : LogRuntimeAdapter.createUnavailable({
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
-        redaction: new OtlpSpanPiiRedactionService({ featureFlags }),
-      });
-  const metricRuntime = clickhouseEnabled
-    ? MetricRuntimeAdapter.create({
-        resolveClient: logMetricClickHouseResolver.resolve,
-        resolveOrganizationClient: logMetricClickHouseResolver.resolve,
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        metricCommandShardCount: resolveMetricCommandShardCount(
-          process.env.METRIC_PROCESSING_SHARDS,
-        ),
-        redaction: new OtlpSpanPiiRedactionService({ featureFlags }),
-      })
-    : MetricRuntimeAdapter.createUnavailable({
-        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        metricCommandShardCount: resolveMetricCommandShardCount(
-          process.env.METRIC_PROCESSING_SHARDS,
-        ),
-        redaction: new OtlpSpanPiiRedactionService({ featureFlags }),
-      });
-  const logs = logRuntime.getService();
-  const metrics = metricRuntime.getService();
   const nlpLambda = createProcessNlpLambdaRuntime({
     config: config.nlpLambda,
     redis,
@@ -842,6 +812,52 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     }).build(),
     "ProjectService",
   );
+  const dataPrivacy = PrismaDataPrivacyAdapter.create({
+    prisma,
+    projects,
+    organizations: canonicalOrganizations,
+  });
+  const tracePrivacy = AppTracePrivacyRuntime.create({
+    config: config.tracePrivacy,
+    dataPrivacy,
+    featureFlags,
+    tokenizer: config.disableTokenization
+      ? new NullTokenizerClient()
+      : TiktokenClient.create(config.tracePrivacy.tokenizer),
+  });
+  const logRuntime = clickhouseEnabled
+    ? LogRuntimeAdapter.create({
+        resolveClient: logMetricClickHouseResolver.resolve,
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        defaultReadLimit: TRACE_LOG_READ_CAP,
+        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
+        redaction: tracePrivacy.redaction,
+      })
+    : LogRuntimeAdapter.createUnavailable({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
+        redaction: tracePrivacy.redaction,
+      });
+  const metricRuntime = clickhouseEnabled
+    ? MetricRuntimeAdapter.create({
+        resolveClient: logMetricClickHouseResolver.resolve,
+        resolveOrganizationClient: logMetricClickHouseResolver.resolve,
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          process.env.METRIC_PROCESSING_SHARDS,
+        ),
+        redaction: tracePrivacy.redaction,
+      })
+    : MetricRuntimeAdapter.createUnavailable({
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        metricCommandShardCount: resolveMetricCommandShardCount(
+          process.env.METRIC_PROCESSING_SHARDS,
+        ),
+        redaction: tracePrivacy.redaction,
+      });
+  const logs = logRuntime.getService();
+  const metrics = metricRuntime.getService();
+  const tokenizer = new TokenizerService(tracePrivacy.tokenizer);
   const modelProviders = AppModelProviderRuntime.create({
     database: prisma,
     organizations: canonicalOrganizations,
@@ -1361,10 +1377,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     testFire: AppAutomationTestFireAdapter.create(),
     persistCaps: automationPersistCaps,
   }).build();
-  const tokenizer = new TokenizerService(
-    config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
-  );
-
   const billingErrorReporter = AppBillingErrorReporter.create();
   const nurturing = config.customerIoApiKey
     ? NurturingService.create({
@@ -1978,6 +1990,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     monitors,
     modelProviders,
     featureFlags,
+    tracePrivacy,
     evaluationControls: evaluationRuntime.buildExecutionControls(),
     automation,
     prisma,
@@ -2276,6 +2289,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const shutdownResources = new AppShutdownResources();
   shutdownResources.register("subscriber", "nlp-lambda-aws-clients", () => nlpLambda.close());
   shutdownResources.register("subscriber", "dataset-s3-clients", () => datasetRuntime.close());
+  shutdownResources.register("subscriber", "trace-privacy", () => tracePrivacy.close());
   shutdownResources.register("clickhouse", "langwatchql", () => langWatchQL.close());
   shutdownResources.register("clickhouse", "ops-explain", () => opsClickHouseRuntime.close());
   shutdownResources.register("clickhouse", "clickhouse", () =>
@@ -2583,6 +2597,10 @@ export function createTestApp(
     },
     outboundProxy: {},
     langevals: resolveLangevalsRuntimeConfig({}),
+    tracePrivacy: resolveTracePrivacyRuntimeConfig({
+      googleDlpDisabled: true,
+      nodeEnv: "test",
+    }),
     nlpLambda: resolveNlpLambdaRuntimeConfig({}),
     featureFlags: resolveFeatureFlagConfig({}),
     scenarioExecution: {
@@ -2612,18 +2630,6 @@ export function createTestApp(
       now: Date.now,
     });
   const traceCanonicalisation = TraceCanonicalisationService.create();
-  const logRuntime = LogRuntimeAdapter.createUnavailable({
-    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    logCommandShardCount: resolveLogCommandShardCount(void 0),
-    redaction: new OtlpSpanPiiRedactionService({ featureFlags: testFeatureFlags }),
-  });
-  const metricRuntime = MetricRuntimeAdapter.createUnavailable({
-    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    metricCommandShardCount: resolveMetricCommandShardCount(void 0),
-    redaction: new OtlpSpanPiiRedactionService({ featureFlags: testFeatureFlags }),
-  });
-  const logs = logRuntime.getService();
-  const metrics = metricRuntime.getService();
   const nlpLambda = createProcessNlpLambdaRuntime({
     config: config.nlpLambda,
     redis: null,
@@ -2644,6 +2650,29 @@ export function createTestApp(
     }).build(),
     "ProjectService",
   );
+  const testDataPrivacy = PrismaDataPrivacyAdapter.create({
+    prisma: testPrisma,
+    projects: testProjects,
+    organizations: testCanonicalOrganizations,
+  });
+  const testTracePrivacy = AppTracePrivacyRuntime.create({
+    config: config.tracePrivacy,
+    dataPrivacy: testDataPrivacy,
+    featureFlags: testFeatureFlags,
+    tokenizer: new NullTokenizerClient(),
+  });
+  const logRuntime = LogRuntimeAdapter.createUnavailable({
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    logCommandShardCount: resolveLogCommandShardCount(void 0),
+    redaction: testTracePrivacy.redaction,
+  });
+  const metricRuntime = MetricRuntimeAdapter.createUnavailable({
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    metricCommandShardCount: resolveMetricCommandShardCount(void 0),
+    redaction: testTracePrivacy.redaction,
+  });
+  const logs = logRuntime.getService();
+  const metrics = metricRuntime.getService();
   const modelProviders = AppModelProviderRuntime.create({
     database: testPrisma,
     organizations: testCanonicalOrganizations,
@@ -2926,6 +2955,7 @@ export function createTestApp(
     }),
   });
   const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("subscriber", "trace-privacy", () => testTracePrivacy.close());
   shutdownResources.register("subscriber", "governance-s3-aws", () => testAws.close());
   shutdownResources.register("database", "prisma", closePrismaConnection);
 
@@ -3194,7 +3224,7 @@ export function createTestApp(
     roles: testRoles,
     permissions: testAuthz.permissions,
     authzGrants: testAuthz.grants,
-    tokenizer: new TokenizerService(new NullTokenizerClient()),
+    tokenizer: new TokenizerService(testTracePrivacy.tokenizer),
     usage: new UsageService(
       nullOrganizations,
       TraceUsageService.create(),

@@ -113,6 +113,8 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dashboard-server": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-server": "workspace:*",
     "@langwatch/data-retention-web": "workspace:*",

@@ -3,12 +3,14 @@ import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { CanonicalLogAdapter, LogService } from "@langwatch/log-server/testing";
 import type { LogTraceContribution } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { IO_PREVIEW_BYTES } from "../lean-for-projection";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service";
 import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
+import { DataPrivacyServiceFake } from "./data-privacy.service.fake";
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -33,7 +35,18 @@ function makeService(args?: { storageFails?: boolean; contributionFails?: boolea
   });
   const logs = LogService.create({
     preparation: CanonicalLogAdapter.create({
-      redaction: new OtlpSpanPiiRedactionService(),
+      redaction: new OtlpSpanPiiRedactionService({
+        transport: {
+          clearGoogleDlp: async () => null,
+          clearPresidio: async () => [],
+          close: async () => undefined,
+        },
+        isLangevalsConfigured: false,
+        isProduction: false,
+        nativePolicyEnforced: false,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+      }),
     }),
   });
   const service = new LogRequestCollectionService({

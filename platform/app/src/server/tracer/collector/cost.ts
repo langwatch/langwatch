@@ -1,14 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { compileSafeRegex } from "../../../utils/safeRegex";
-import {
-  getLLMModelCosts,
-  type MaybeStoredLLMModelCost,
-} from "../../modelProviders/llmModelCost";
+import { getLLMModelCosts, type MaybeStoredLLMModelCost } from "../../modelProviders/llmModelCost";
 
 const logger = createLogger("langwatch:tracer:collector:cost");
-
-const tiktokenClient = new TiktokenClient();
 
 export function estimateCost({
   llmModelCost,
@@ -83,8 +77,7 @@ export function estimateCost({
   const cacheCreationRate = llmModelCost.cacheCreationCostPerToken ?? inputRate;
   // A model that never had the hour-long distinction prices both buckets the
   // same, so pricing is unchanged for it.
-  const cacheCreation1hRate =
-    llmModelCost.cacheCreation1hCostPerToken ?? cacheCreationRate;
+  const cacheCreation1hRate = llmModelCost.cacheCreation1hCostPerToken ?? cacheCreationRate;
 
   // The hour-long count is a subset of the total, but an emitter can report one
   // without the other, so take whichever is larger as the true total and price
@@ -93,8 +86,7 @@ export function estimateCost({
   const cacheWrite1h = Math.max(0, cacheCreation1hTokens ?? 0);
   const cacheWriteTotal = Math.max(Math.max(0, cacheCreationTokens ?? 0), cacheWrite1h);
   const cacheWriteCost =
-    cacheWrite1h * cacheCreation1hRate +
-    (cacheWriteTotal - cacheWrite1h) * cacheCreationRate;
+    cacheWrite1h * cacheCreation1hRate + (cacheWriteTotal - cacheWrite1h) * cacheCreationRate;
 
   return (
     (inputTokens ?? 0) * inputRate +
@@ -292,13 +284,4 @@ const findModelCost = (
 export const getMatchingLLMModelCost = async (projectId: string, model: string) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
   return matchModelCostWithFallbacks(model, llmModelCosts);
-};
-
-// Pre-warm most used models. Invoked explicitly by the collector worker on
-// startup (see collectorWorker.ts) — NOT as a module-load side effect. An
-// eager import-time prewarm fired an un-awaited tiktoken BPE-rank fetch whose
-// socket/WASM-load outlived vitest teardown, wedging the unit-test worker under
-// --coverage and timing out CI (#4476). The worker owns the prewarm lifecycle.
-export const prewarmTiktokenModels = async () => {
-  await tiktokenClient.prewarm(["gpt-4", "gpt-4o"]);
 };

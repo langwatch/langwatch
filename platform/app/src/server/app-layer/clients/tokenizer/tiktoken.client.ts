@@ -1,22 +1,28 @@
 import { createLogger } from "@langwatch/observability";
 import fs from "fs/promises";
 import path from "path";
-import type { TokenizerClient } from "./tokenizer.client";
+import type { ProcessTokenizerClient } from "./tokenizer.client";
 
 const logger = createLogger("langwatch:tiktoken");
 
-const DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS = 10000;
-
 type Tiktoken = { encode: (text: string) => Uint32Array; free: () => void };
 
-export class TiktokenClient implements TokenizerClient {
+export type TiktokenClientConfig = Readonly<{
+  bpeDirectory: string | undefined;
+  fetchTimeoutMs: number;
+}>;
+
+export class TiktokenClient implements ProcessTokenizerClient {
+  static create(config: TiktokenClientConfig): TiktokenClient {
+    return new TiktokenClient(config);
+  }
+
   private readonly cache = new Map<string, Tiktoken>();
   private readonly loading = new Map<string, Promise<Tiktoken | undefined>>();
 
-  async countTokens(
-    model: string,
-    text: string | undefined,
-  ): Promise<number | undefined> {
+  private constructor(private readonly config: TiktokenClientConfig) {}
+
+  async countTokens(model: string, text: string | undefined): Promise<number | undefined> {
     if (!text) return undefined;
 
     // Strip provider prefix (e.g. "openai/gpt-4o" → "gpt-4o")
@@ -35,6 +41,13 @@ export class TiktokenClient implements TokenizerClient {
 
   async prewarm(models: string[]): Promise<void> {
     await Promise.all(models.map((m) => this.getEncoder(m)));
+  }
+
+  async close(): Promise<void> {
+    await Promise.allSettled(this.loading.values());
+    for (const encoder of new Set(this.cache.values())) encoder.free();
+    this.cache.clear();
+    this.loading.clear();
   }
 
   private async getEncoder(model: string): Promise<Tiktoken | undefined> {
@@ -118,9 +131,8 @@ export class TiktokenClient implements TokenizerClient {
       return this.remoteFetch(url);
     }
 
-    // Try local file first if TIKTOKENS_PATH is set
-    if (process.env.TIKTOKENS_PATH) {
-      const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
+    if (this.config.bpeDirectory) {
+      const localPath = path.join(this.config.bpeDirectory, filename);
       try {
         return await fs.readFile(localPath, "utf8");
       } catch (error) {
@@ -138,7 +150,7 @@ export class TiktokenClient implements TokenizerClient {
   }
 
   private async remoteFetch(url: string): Promise<string> {
-    const timeoutMs = this.resolveFetchTimeoutMs();
+    const timeoutMs = this.config.fetchTimeoutMs;
     // A single controller/timer pair guards BOTH the cached-fetch attempt and
     // the native-fetch fallback. The AbortController aborts fetches that honor
     // `signal`; the Promise.race against a rejecting timer is the hard ceiling
@@ -158,13 +170,6 @@ export class TiktokenClient implements TokenizerClient {
     } finally {
       if (timer) clearTimeout(timer);
     }
-  }
-
-  private resolveFetchTimeoutMs(): number {
-    const parsed = parseInt(process.env.TIKTOKEN_FETCH_TIMEOUT_MS ?? "", 10);
-    return Number.isFinite(parsed) && parsed > 0
-      ? parsed
-      : DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS;
   }
 
   private async doRemoteFetch(url: string, signal: AbortSignal): Promise<string> {

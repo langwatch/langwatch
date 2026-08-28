@@ -10,21 +10,38 @@ vi.mock("@google-cloud/dlp", () => ({
   },
 }));
 
-vi.mock("~/env.mjs", () => ({
-  env: {
-    GOOGLE_APPLICATION_CREDENTIALS: JSON.stringify({
-      project_id: "test-project",
-    }),
-  },
-}));
-
 vi.mock("~/server/metrics", () => ({
   getPiiChecksCounter: () => ({ inc: () => undefined }),
   getEvaluationStatusCounter: () => ({ inc: () => undefined }),
   evaluationDurationHistogram: { labels: () => ({ observe: () => undefined }) },
 }));
 
-import { googleDLPClearPII } from "./piiCheck";
+import { AppPiiRedactionTransport } from "./piiCheck";
+import { resolveTracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
+
+const transport = AppPiiRedactionTransport.create(
+  resolveTracePrivacyRuntimeConfig({
+    googleApplicationCredentials: JSON.stringify({ project_id: "test-project" }),
+  }),
+);
+const googleDLPClearPII = async ({
+  currentObject,
+  lastKey,
+  piiRedactionLevel,
+  exceptPatterns,
+}: {
+  currentObject: Record<string, string>;
+  lastKey: string;
+  piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED";
+  exceptPatterns?: readonly string[];
+}) => {
+  const redacted = await transport.clearGoogleDlp({
+    text: currentObject[lastKey]!,
+    piiRedactionLevel,
+    exceptPatterns,
+  });
+  if (redacted !== null) currentObject[lastKey] = redacted;
+};
 
 function mockFindings(ranges: { start: number; end: number }[]): void {
   inspectContentMock.mockResolvedValue([

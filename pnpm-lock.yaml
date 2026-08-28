@@ -4962,6 +4962,12 @@ importers:
       '@langwatch/dashboard-server':
         specifier: workspace:*
         version: link:../../packages/features/dashboard/server
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/data-privacy/contract
+      '@langwatch/data-privacy-server':
+        specifier: workspace:*
+        version: link:../../packages/features/data-privacy/server
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../packages/features/data-retention/contract

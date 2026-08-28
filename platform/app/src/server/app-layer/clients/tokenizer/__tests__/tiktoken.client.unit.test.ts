@@ -24,10 +24,9 @@ import { NullTokenizerClient } from "../tokenizer.client";
 // init, so anything they reference must be hoisted too. `vi.hoisted` is the
 // idiomatic way to share values/spies with those factories without tripping
 // the "not at the top level" warning.
-const { O200K_REGISTRY, deterministicTokenCount, loadMock } = vi.hoisted(() => {
+const { O200K_REGISTRY, deterministicTokenCount, freeMock, loadMock } = vi.hoisted(() => {
   const O200K_REGISTRY = {
-    load_tiktoken_bpe:
-      "https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken",
+    load_tiktoken_bpe: "https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken",
     special_tokens: { "<|endoftext|>": 199999 },
     pat_str: "(?:)",
   };
@@ -49,20 +48,18 @@ const { O200K_REGISTRY, deterministicTokenCount, loadMock } = vi.hoisted(() => {
       ) => Promise<Record<string, unknown>>
     >();
 
-  return { O200K_REGISTRY, deterministicTokenCount, loadMock };
+  return { O200K_REGISTRY, deterministicTokenCount, freeMock: vi.fn(), loadMock };
 });
 
 vi.mock("tiktoken/lite", () => ({
   Tiktoken: class {
-    constructor(
-      _bpeRanks: string,
-      _specialTokens: Record<string, number>,
-      _patStr: string,
-    ) {}
+    constructor(_bpeRanks: string, _specialTokens: Record<string, number>, _patStr: string) {}
     encode(text: string): Uint32Array {
       return new Uint32Array(deterministicTokenCount(text));
     }
-    free(): void {}
+    free(): void {
+      freeMock();
+    }
   },
 }));
 
@@ -75,10 +72,8 @@ vi.mock("tiktoken/model_to_encoding.json", () => ({
 }));
 
 vi.mock("tiktoken/load", () => ({
-  load: (
-    registry: Record<string, unknown>,
-    customFetch: (url: string) => Promise<string>,
-  ) => loadMock(registry, customFetch),
+  load: (registry: Record<string, unknown>, customFetch: (url: string) => Promise<string>) =>
+    loadMock(registry, customFetch),
 }));
 
 // node-fetch-cache's cached fetch delegates to globalThis.fetch in the unit
@@ -108,13 +103,14 @@ describe("TiktokenClient", () => {
       // impl: no fetch, dummy ranks. Fresh client per test so the internal
       // cache never leaks across cases.
       loadMock.mockClear();
+      freeMock.mockClear();
       loadMock.mockImplementation(async (registry: Record<string, unknown>) => ({
         explicit_n_vocab: undefined,
         pat_str: registry.pat_str,
         special_tokens: registry.special_tokens,
         bpe_ranks: "",
       }));
-      client = new TiktokenClient();
+      client = TiktokenClient.create({ bpeDirectory: void 0, fetchTimeoutMs: 10_000 });
     });
 
     it("returns a positive token count for non-empty text", async () => {
@@ -153,19 +149,19 @@ describe("TiktokenClient", () => {
       const count = await client.countTokens("some-unknown-model-xyz", "Hello, world!");
       expect(count).toBeGreaterThan(0);
     });
+
+    it("frees each loaded encoder once when the process closes", async () => {
+      await client.countTokens("gpt-4o", "first");
+      await client.countTokens("openai/gpt-4o", "second");
+
+      await client.close();
+
+      expect(freeMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("when the remote BPE fetch never resolves", () => {
-    const ORIGINAL_TIKTOKENS_PATH = process.env.TIKTOKENS_PATH;
-    const ORIGINAL_TIMEOUT = process.env.TIKTOKEN_FETCH_TIMEOUT_MS;
-
     beforeEach(() => {
-      // Force the remote path: with no local TIKTOKENS_PATH, fetchBpeRanks goes
-      // straight to remoteFetch.
-      delete process.env.TIKTOKENS_PATH;
-      // Tight ceiling so the test is fast but still exercises the real timer.
-      process.env.TIKTOKEN_FETCH_TIMEOUT_MS = "50";
-
       // Drive the encoder load through the REAL single-URL path so it actually
       // calls customFetch -> fetchBpeRanks -> remoteFetch.
       loadMock.mockImplementation(
@@ -201,20 +197,10 @@ describe("TiktokenClient", () => {
 
     afterEach(() => {
       vi.restoreAllMocks();
-      if (ORIGINAL_TIKTOKENS_PATH === undefined) {
-        delete process.env.TIKTOKENS_PATH;
-      } else {
-        process.env.TIKTOKENS_PATH = ORIGINAL_TIKTOKENS_PATH;
-      }
-      if (ORIGINAL_TIMEOUT === undefined) {
-        delete process.env.TIKTOKEN_FETCH_TIMEOUT_MS;
-      } else {
-        process.env.TIKTOKEN_FETCH_TIMEOUT_MS = ORIGINAL_TIMEOUT;
-      }
     });
 
     it("resolves to undefined within the timeout instead of hanging", async () => {
-      const client = new TiktokenClient();
+      const client = TiktokenClient.create({ bpeDirectory: void 0, fetchTimeoutMs: 50 });
 
       const start = Date.now();
       const result = await client.countTokens("gpt-4o", "hello");

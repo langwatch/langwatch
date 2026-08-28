@@ -9,25 +9,19 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { constructClient, inspectContentMock } = vi.hoisted(() => ({
+const { closeMock, constructClient, inspectContentMock } = vi.hoisted(() => ({
+  closeMock: vi.fn(),
   constructClient: vi.fn(),
   inspectContentMock: vi.fn(),
 }));
 
 vi.mock("@google-cloud/dlp", () => ({
   DlpServiceClient: class {
-    constructor() {
-      constructClient();
+    constructor(options: unknown) {
+      constructClient(options);
     }
     inspectContent = inspectContentMock;
-  },
-}));
-
-vi.mock("~/env.mjs", () => ({
-  env: {
-    GOOGLE_APPLICATION_CREDENTIALS: JSON.stringify({
-      project_id: "test-project",
-    }),
+    close = closeMock;
   },
 }));
 
@@ -37,11 +31,55 @@ vi.mock("~/server/metrics", () => ({
   evaluationDurationHistogram: { labels: () => ({ observe: () => undefined }) },
 }));
 
-import { googleDLPClearPII } from "./piiCheck";
+import { AppPiiRedactionTransport } from "./piiCheck";
+import { resolveTracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
 
-describe("googleDLPClearPII", () => {
+describe("AppPiiRedactionTransport", () => {
   beforeEach(() => {
+    constructClient.mockReset();
+    closeMock.mockReset();
+    inspectContentMock.mockReset();
     inspectContentMock.mockResolvedValue([{ result: { findings: [] } }]);
+  });
+
+  it("drops a failed construction and retries the next DLP check", async () => {
+    constructClient.mockImplementationOnce(() => {
+      throw new Error("constructor failed");
+    });
+    const transport = AppPiiRedactionTransport.create(
+      resolveTracePrivacyRuntimeConfig({
+        googleApplicationCredentials: JSON.stringify({ project_id: "test-project" }),
+      }),
+    );
+
+    await expect(
+      transport.clearGoogleDlp({ text: "first", piiRedactionLevel: "STRICT" }),
+    ).rejects.toThrow("constructor failed");
+    await transport.clearGoogleDlp({ text: "second", piiRedactionLevel: "STRICT" });
+
+    expect(constructClient).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes the instantiated DLP client", async () => {
+    const transport = AppPiiRedactionTransport.create(
+      resolveTracePrivacyRuntimeConfig({
+        googleApplicationCredentials: JSON.stringify({ project_id: "test-project" }),
+      }),
+    );
+    await transport.clearGoogleDlp({ text: "value", piiRedactionLevel: "STRICT" });
+    await transport.close();
+
+    expect(closeMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the legacy unavailable-credentials error at DLP use after parse-once rejection", async () => {
+    const transport = AppPiiRedactionTransport.create(
+      resolveTracePrivacyRuntimeConfig({ googleApplicationCredentials: "{invalid" }),
+    );
+
+    await expect(
+      transport.clearGoogleDlp({ text: "value", piiRedactionLevel: "STRICT" }),
+    ).rejects.toThrow("GOOGLE_APPLICATION_CREDENTIALS is not configured");
   });
 
   describe("given no DLP client has been created yet", () => {
@@ -49,10 +87,19 @@ describe("googleDLPClearPII", () => {
       it("creates exactly one client for all of them", async () => {
         // Started without awaiting in between, so every call reaches the client
         // getter while the dynamic import of the SDK is still pending.
+        const transport = AppPiiRedactionTransport.create(
+          resolveTracePrivacyRuntimeConfig({
+            googleApplicationCredentials: JSON.stringify({
+              project_id: "test-project",
+              client_email: "test@example.test",
+              private_key: "private-key",
+              workforce_pool_user_project: "extra-auth-field",
+            }),
+          }),
+        );
         const checks = Array.from({ length: 5 }, (_, index) =>
-          googleDLPClearPII({
-            currentObject: { value: `subject ${index}` },
-            lastKey: "value",
+          transport.clearGoogleDlp({
+            text: `subject ${index}`,
             piiRedactionLevel: "STRICT",
           }),
         );
@@ -60,6 +107,13 @@ describe("googleDLPClearPII", () => {
         await Promise.all(checks);
 
         expect(constructClient).toHaveBeenCalledTimes(1);
+        expect(constructClient).toHaveBeenCalledWith(
+          expect.objectContaining({
+            credentials: expect.objectContaining({
+              workforce_pool_user_project: "extra-auth-field",
+            }),
+          }),
+        );
         expect(inspectContentMock).toHaveBeenCalledTimes(5);
       });
     });

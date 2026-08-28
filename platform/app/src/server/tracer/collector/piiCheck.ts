@@ -1,6 +1,5 @@
 import type { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
-import { createLogger } from "@langwatch/observability";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
 import {
   compilePiiExceptPatterns,
@@ -9,74 +8,100 @@ import {
   subtractProtectedRanges,
 } from "~/server/data-privacy/redaction/essentialPii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import { env } from "../../../env.mjs";
 import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
+import type { TracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../metrics";
 
-const logger = createLogger("langwatch:tracer:collector:piiCheck");
-
-// Lazy initialization - env vars accessed only when getCredentials() is called
-// null = not yet initialized, undefined = initialized but no credentials
-let cachedCredentials: { project_id: string } | undefined | null = null;
-
-function getCredentials(): { project_id: string } | undefined {
-  if (cachedCredentials === null) {
-    if (!env.GOOGLE_APPLICATION_CREDENTIALS) {
-      cachedCredentials = undefined;
-    } else {
-      try {
-        const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
-        if (typeof parsed?.project_id !== "string" || !parsed.project_id.trim()) {
-          logger.error("GOOGLE_APPLICATION_CREDENTIALS missing valid project_id");
-          cachedCredentials = undefined;
-        } else {
-          cachedCredentials = parsed;
-        }
-      } catch (e) {
-        logger.error({ error: e }, "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON");
-        cachedCredentials = undefined;
-      }
-    }
-  }
-  return cachedCredentials ?? undefined;
+/** Process-owned external PII analysis capability. */
+export interface PiiRedactionTransport {
+  clearGoogleDlp(input: {
+    text: string;
+    piiRedactionLevel: PIIRedactionLevel;
+    exceptPatterns?: readonly string[];
+  }): Promise<string | null>;
+  clearPresidio(
+    texts: string[],
+    piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
+  ): Promise<(string | null)[]>;
+  close(): Promise<void>;
 }
 
-// Lazy DLP client - created only when getDlpClient() is called. The
-// @google-cloud/dlp SDK (generated protos via google-gax/grpc) is one of the
-// largest single deps in the server graph, so its module is imported here on
-// first use rather than at boot — and only ever when a google_dlp check
-// actually runs with credentials configured (see dlpCheck's guards).
-//
-// The *promise* is what is cached, not the resolved client: the module import
-// is asynchronous, so caching only the settled value would let every check that
-// arrives while the first import is still in flight construct its own client.
-// Each of those holds a gRPC channel, and all but the last would be dropped
-// without ever being closed.
-let dlpClient: Promise<DlpServiceClient> | undefined;
+type DlpClient = DlpServiceClient & { close?: () => Promise<void> };
 
-function getDlpClient(): Promise<DlpServiceClient> {
-  // Assigned before the first await so concurrent callers observe the in-flight
-  // promise rather than an unset client.
-  dlpClient ??= (async () => {
-    // Dynamic import (the sanctioned exception to the "no inline import()"
-    // rule — same as server.mts / trpc.ts) so the module loads here on first
-    // use, never at boot. Only reached after the guards below confirm DLP is
-    // enabled and credentialed, so it never loads for deployments that don't
-    // use DLP. `import()` rather than `require()` so vitest's module mock
-    // intercepts it (a raw require of this externalized dep would not).
-    const { DlpServiceClient } = await import("@google-cloud/dlp");
-    return new DlpServiceClient({ credentials: getCredentials() });
-  })().catch((error) => {
-    // A failed import or constructor must not poison every later check with the
-    // same rejected promise — drop it so the next call retries.
-    dlpClient = undefined;
-    throw error;
-  });
-  return dlpClient;
+/**
+ * Process-owned Google DLP and Presidio transport. The DLP SDK is kept lazy:
+ * no import or gRPC channel is created until a credentialed DLP check runs.
+ */
+export class AppPiiRedactionTransport implements PiiRedactionTransport {
+  static create(config: TracePrivacyRuntimeConfig): AppPiiRedactionTransport {
+    return new AppPiiRedactionTransport(config);
+  }
+
+  private dlpClient: Promise<DlpClient> | undefined;
+
+  private constructor(private readonly config: TracePrivacyRuntimeConfig) {}
+
+  // Lazy DLP client - created only when getDlpClient() is called. The
+  // @google-cloud/dlp SDK (generated protos via google-gax/grpc) is one of the
+  // largest single deps in the server graph, so its module is imported here on
+  // first use rather than at boot — and only ever when a google_dlp check
+  // actually runs with credentials configured (see dlpCheck's guards).
+  //
+  // The *promise* is what is cached, not the resolved client: the module import
+  // is asynchronous, so caching only the settled value would let every check that
+  // arrives while the first import is still in flight construct its own client.
+  // Each of those holds a gRPC channel, and all but the last would be dropped
+  // without ever being closed.
+  getDlpClient(): Promise<DlpClient> {
+    // Assigned before the first await so concurrent callers observe the in-flight
+    // promise rather than an unset client.
+    this.dlpClient ??= (async () => {
+      // Dynamic import (the sanctioned exception to the "no inline import()"
+      // rule — same as server.mts / trpc.ts) so the module loads here on first
+      // use, never at boot. Only reached after the guards below confirm DLP is
+      // enabled and credentialed, so it never loads for deployments that don't
+      // use DLP. `import()` rather than `require()` so vitest's module mock
+      // intercepts it (a raw require of this externalized dep would not).
+      const { DlpServiceClient } = await import("@google-cloud/dlp");
+      return new DlpServiceClient({ credentials: this.config.googleDlp.credentials });
+    })().catch((error) => {
+      // A failed import or constructor must not poison every later check with the
+      // same rejected promise — drop it so the next call retries.
+      this.dlpClient = undefined;
+      throw error;
+    });
+    return this.dlpClient;
+  }
+
+  getConfig(): TracePrivacyRuntimeConfig {
+    return this.config;
+  }
+
+  async clearGoogleDlp(input: {
+    text: string;
+    piiRedactionLevel: PIIRedactionLevel;
+    exceptPatterns?: readonly string[];
+  }): Promise<string | null> {
+    return await clearGoogleDlp(this, input);
+  }
+
+  async clearPresidio(
+    texts: string[],
+    piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
+  ): Promise<(string | null)[]> {
+    return await clearPresidio(this.config, texts, piiRedactionLevel, entities);
+  }
+
+  async close(): Promise<void> {
+    const client = this.dlpClient ? await this.dlpClient : undefined;
+    await client?.close?.();
+  }
 }
 
 /**
@@ -170,21 +195,23 @@ const essentialInfoTypes = {
 };
 
 const dlpCheck = async (
+  transport: AppPiiRedactionTransport,
+  config: TracePrivacyRuntimeConfig,
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
-  if (env.LANGWATCH_DISABLE_GOOGLE_DLP) {
+  if (config.googleDlp.disabled) {
     throw new Error(
       "Google DLP redaction requested but it is disabled via LANGWATCH_DISABLE_GOOGLE_DLP. Unset that variable to re-enable DLP, or lower the data-privacy PII level for this scope.",
     );
   }
-  const credentials = getCredentials();
+  const credentials = config.googleDlp.credentials;
   if (!credentials) {
     throw new Error(
       "Google DLP redaction requested but GOOGLE_APPLICATION_CREDENTIALS is not configured. Configure the credentials or lower the data-privacy PII level for this scope.",
     );
   }
-  const client = await getDlpClient();
+  const client = await transport.getDlpClient();
   const [response] = await client.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
@@ -258,24 +285,15 @@ const maskDlpFindings = ({
   // `includeQuote` is set, but derive the matched text from the range over the
   // ORIGINAL text as the fallback, so the veto never depends on the quote
   // being echoed back.
-  const protectedRanges: ProtectedRange[] = ranged.flatMap(
-    ({ finding, startIdx, endIdx }) => {
-      const matchedText = finding.quote?.length
-        ? finding.quote
-        : text.substring(startIdx, endIdx);
-      return matchesPiiException(matchedText, exceptions)
-        ? [{ start: startIdx, end: endIdx }]
-        : [];
-    },
-  );
+  const protectedRanges: ProtectedRange[] = ranged.flatMap(({ finding, startIdx, endIdx }) => {
+    const matchedText = finding.quote?.length ? finding.quote : text.substring(startIdx, endIdx);
+    return matchesPiiException(matchedText, exceptions) ? [{ start: startIdx, end: endIdx }] : [];
+  });
 
   let redacted = text;
   let masked = 0;
   for (const { startIdx, endIdx } of ranged) {
-    for (const part of subtractProtectedRanges(
-      { start: startIdx, end: endIdx },
-      protectedRanges,
-    )) {
+    for (const part of subtractProtectedRanges({ start: startIdx, end: endIdx }, protectedRanges)) {
       redacted =
         redacted.substring(0, part.start) +
         "✳".repeat(part.end - part.start) +
@@ -286,32 +304,31 @@ const maskDlpFindings = ({
   return { redacted, masked };
 };
 
-export const googleDLPClearPII = async ({
-  currentObject,
-  lastKey,
-  piiRedactionLevel,
-  exceptPatterns,
-}: {
-  currentObject: Record<string | number, any>;
-  lastKey: string | number;
-  piiRedactionLevel: PIIRedactionLevel;
-  exceptPatterns?: readonly string[];
-}): Promise<void> => {
+const clearGoogleDlp = async (
+  transport: AppPiiRedactionTransport,
+  {
+    text: value,
+    piiRedactionLevel,
+    exceptPatterns,
+  }: {
+    text: string;
+    piiRedactionLevel: PIIRedactionLevel;
+    exceptPatterns?: readonly string[];
+  },
+): Promise<string | null> => {
   getPiiChecksCounter("google_dlp").inc();
-  const [text, remaining] = [
-    currentObject[lastKey].slice(0, 250_000),
-    currentObject[lastKey].slice(250_000),
-  ];
+  const [text, remaining] = [value.slice(0, 250_000), value.slice(250_000)];
 
-  const findings = await dlpCheck(text, piiRedactionLevel);
+  const findings = await dlpCheck(transport, transport.getConfig(), text, piiRedactionLevel);
   const { redacted, masked } = maskDlpFindings({
     text,
     findings,
     exceptions: compilePiiExceptPatterns(exceptPatterns ?? []),
   });
   if (masked > 0) {
-    currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
+    return redacted.replace(/✳+/g, "[REDACTED]") + remaining;
   }
+  return null;
 };
 
 /**
@@ -324,8 +341,7 @@ function presidioEntitiesSetting(
   entities?: readonly string[],
 ): Record<string, boolean> {
   const names =
-    entities ??
-    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes).presidio;
+    entities ?? (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes).presidio;
   return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
 }
 
@@ -335,7 +351,8 @@ function presidioEntitiesSetting(
  *
  * @returns Array of anonymized strings (null when text was unchanged).
  */
-export const batchPresidioClearPII = async (
+const clearPresidio = async (
+  config: TracePrivacyRuntimeConfig,
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
   entities?: readonly string[],
@@ -343,7 +360,7 @@ export const batchPresidioClearPII = async (
   if (texts.length === 0) return [];
 
   getPiiChecksCounter("presidio").inc();
-  const timeout = 60_000;
+  const timeout = config.presidio.timeoutMs;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -357,7 +374,7 @@ export const batchPresidioClearPII = async (
 
   let response: Response;
   try {
-    response = await fetch(`${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`, {
+    response = await fetch(`${config.presidio.endpoint}/presidio/pii_detection/evaluate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

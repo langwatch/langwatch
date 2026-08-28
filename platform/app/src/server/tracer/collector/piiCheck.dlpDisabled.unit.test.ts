@@ -7,17 +7,6 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-// DLP opted out via env, even though credentials are present.
-vi.mock("~/env.mjs", () => ({
-  env: {
-    LANGWATCH_DISABLE_GOOGLE_DLP: true,
-    GOOGLE_APPLICATION_CREDENTIALS: JSON.stringify({
-      project_id: "test-project",
-      client_email: "svc@test-project.iam.gserviceaccount.com",
-    }),
-  },
-}));
-
 vi.mock("~/server/metrics", () => ({
   getPiiChecksCounter: () => ({ inc: () => undefined }),
   getEvaluationStatusCounter: () => ({ inc: () => undefined }),
@@ -48,7 +37,26 @@ vi.mock("@google-cloud/dlp", () => {
   };
 });
 
-import { googleDLPClearPII } from "./piiCheck";
+import { AppPiiRedactionTransport } from "./piiCheck";
+import { resolveTracePrivacyRuntimeConfig } from "~/runtime/trace-privacy.config";
+
+const transport = AppPiiRedactionTransport.create(
+  resolveTracePrivacyRuntimeConfig({
+    googleDlpDisabled: true,
+    googleApplicationCredentials: JSON.stringify({ project_id: "test-project" }),
+  }),
+);
+const googleDLPClearPII = async ({
+  currentObject,
+  lastKey,
+  piiRedactionLevel,
+}: {
+  currentObject: Record<string, string>;
+  lastKey: string;
+  piiRedactionLevel: "STRICT";
+}) => {
+  await transport.clearGoogleDlp({ text: currentObject[lastKey]!, piiRedactionLevel });
+};
 
 describe("googleDLPClearPII", () => {
   describe("when LANGWATCH_DISABLE_GOOGLE_DLP is set", () => {

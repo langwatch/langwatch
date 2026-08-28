@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { CanonicalMetricAdapter, MetricService } from "@langwatch/metric-server/testing";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service";
 import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
+import { DataPrivacyServiceFake } from "./data-privacy.service.fake";
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -28,7 +30,18 @@ function makeService(
   >(async () => {});
   const metrics = MetricService.create({
     preparation: CanonicalMetricAdapter.create({
-      redaction: new OtlpSpanPiiRedactionService(),
+      redaction: new OtlpSpanPiiRedactionService({
+        transport: {
+          clearGoogleDlp: async () => null,
+          clearPresidio: async () => [],
+          close: async () => undefined,
+        },
+        isLangevalsConfigured: false,
+        isProduction: false,
+        nativePolicyEnforced: false,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+      }),
     }),
   });
   const service = new MetricRequestCollectionService({

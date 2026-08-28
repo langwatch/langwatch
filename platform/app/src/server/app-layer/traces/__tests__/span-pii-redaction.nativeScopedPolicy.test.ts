@@ -10,23 +10,11 @@ import {
 import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import {
   type BatchClearPIIFunction,
-  type DataPrivacyResolver,
   OtlpSpanPiiRedactionService,
 } from "../span-pii-redaction.service";
 
-// Mocked only for the strict-only-entities exception-scoping tests below,
-// which need the REAL defaultBatchClearPII wiring (mainMethod selection,
-// entity narrowing) rather than the batchClearPII-level mock the rest of this
-// file uses — batchPresidioClearPII is the actual external call that
-// mainMethod: "presidio" reaches.
-vi.mock("~/server/tracer/collector/piiCheck", () => ({
-  batchPresidioClearPII: vi.fn(),
-  googleDLPClearPII: vi.fn(),
-  PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
-}));
-
 import { createTenantId } from "@langwatch/eventing";
-import { batchPresidioClearPII } from "~/server/tracer/collector/piiCheck";
+import { DataPrivacyServiceFake } from "./data-privacy.service.fake";
 
 const TENANT = createTenantId("project-web-app");
 
@@ -53,8 +41,25 @@ function mkPolicy({
   };
 }
 
-function resolverFor(policy: ResolvedDataPrivacy): DataPrivacyResolver {
-  return { getResolvedForProject: async () => policy };
+function resolverFor(policy: ResolvedDataPrivacy) {
+  return new DataPrivacyServiceFake(policy);
+}
+
+function transportFor(batch: BatchClearPIIFunction) {
+  return {
+    clearGoogleDlp: async ({ text }: { text: string }) => (await batch([text]))[0] ?? null,
+    clearPresidio: async (
+      texts: string[],
+      piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED",
+      entities?: readonly string[],
+    ) =>
+      await batch(texts, {
+        piiRedactionLevel,
+        mainMethod: "presidio",
+        ...(entities ? { entities } : {}),
+      }),
+    close: async () => undefined,
+  };
 }
 
 function spanWith(attributes: Record<string, string>): OtlpSpan {
@@ -86,10 +91,12 @@ function attr(span: OtlpSpan, key: string): string | undefined {
 function makeService(policy: ResolvedDataPrivacy) {
   const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
   const service = new OtlpSpanPiiRedactionService({
-    batchClearPII: batchSpy,
+    transport: transportFor(batchSpy),
     isLangevalsConfigured: true,
     isProduction: false,
-    dataPrivacyResolver: resolverFor(policy),
+    nativePolicyEnforced: true,
+    piiRedactionMaxAttributeLength: 250_000,
+    dataPrivacy: resolverFor(policy),
   });
   return { service, batchSpy };
 }
@@ -97,7 +104,6 @@ function makeService(policy: ResolvedDataPrivacy) {
 describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT;
   });
 
   describe("given the default policy (essential PII, secrets on)", () => {
@@ -263,10 +269,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // null, so the strict batch is never sent. The native floor is all that
       // runs, and it must still scrub the pattern-based entities.
       const service = new OtlpSpanPiiRedactionService({
-        batchClearPII: batchSpy,
+        transport: transportFor(batchSpy),
         isLangevalsConfigured: false,
         isProduction: false,
-        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+        nativePolicyEnforced: true,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: resolverFor(mkPolicy({ piiLevel: "strict" })),
       });
       const span = spanWith({
         input: "email jane@example.com card 4242424242424242 name Alexander Hamilton",
@@ -372,10 +380,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       batchClearPII: BatchClearPIIFunction;
     }) {
       return new OtlpSpanPiiRedactionService({
-        batchClearPII,
+        transport: transportFor(batchClearPII),
         isLangevalsConfigured,
         isProduction,
-        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+        nativePolicyEnforced: true,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: resolverFor(mkPolicy({ piiLevel: "strict" })),
         featureFlags: MemoryFeatureFlagService.create(),
       });
     }
@@ -427,8 +437,10 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const service = new OtlpSpanPiiRedactionService({
         isLangevalsConfigured: true,
         isProduction: false,
-        batchClearPII: batchSpy,
-        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+        transport: transportFor(batchSpy),
+        nativePolicyEnforced: true,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: resolverFor(mkPolicy({ piiLevel: "strict" })),
         featureFlags,
       });
       const span = spanWith({ input: "mail a@b.com, I am John from New York" });
@@ -485,7 +497,8 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
       expect(options.entities).toBeDefined();
       expect(options.entities).not.toContain("CREDIT_CARD");
       expect(options.entities).toContain("PERSON");
-      expect(options.exceptPatterns).toEqual(["00\\d{12}"]);
+      // Presidio receives only its supported entity selection; policy
+      // exceptions remain on the native DLP-capable fallback path.
     });
   });
 
@@ -638,19 +651,21 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
  */
 describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
   function makeServiceWithRealBatch(policy: ResolvedDataPrivacy) {
+    const presidio = vi.fn<BatchClearPIIFunction>();
+    presidio.mockImplementation(async (texts) =>
+      texts.map((text) => (text.includes("reservation") ? null : "[ANONYMIZED]")),
+    );
     return new OtlpSpanPiiRedactionService({
       isLangevalsConfigured: true,
       isProduction: false,
-      dataPrivacyResolver: resolverFor(policy),
+      transport: transportFor(presidio),
+      nativePolicyEnforced: true,
+      piiRedactionMaxAttributeLength: 250_000,
+      dataPrivacy: resolverFor(policy),
     });
   }
 
-  beforeEach(() => {
-    vi.mocked(batchPresidioClearPII).mockReset();
-  });
-
   it("still redacts a name/location match even when it fully matches an exception", async () => {
-    vi.mocked(batchPresidioClearPII).mockResolvedValue(["[ANONYMIZED]"]);
     const service = makeServiceWithRealBatch(
       mkPolicy({
         piiLevel: "strict",
@@ -664,11 +679,9 @@ describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
     // exactly like the production endpoint, because exceptPatterns never
     // reaches it. The exception configured above does not save this value.
     expect(attr(span, "conversation.text")).toBe("[ANONYMIZED]");
-    expect(batchPresidioClearPII).toHaveBeenCalledTimes(1);
   });
 
   it("still keeps a native essential-entity match under the same strict policy", async () => {
-    vi.mocked(batchPresidioClearPII).mockResolvedValue([null]);
     const service = makeServiceWithRealBatch(
       mkPolicy({
         piiLevel: "strict",

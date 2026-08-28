@@ -1,7 +1,6 @@
 import type { TenantId } from "@langwatch/eventing";
-import { env } from "~/env.mjs";
+import type { DataPrivacyService } from "@langwatch/data-privacy-contract";
 import type { PiiLevel, ResolvedDataPrivacy } from "~/server/data-privacy/dataPrivacy.types";
-import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import {
   compilePolicyPiiExceptions,
@@ -12,8 +11,7 @@ import {
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
 import {
-  batchPresidioClearPII as defaultBatchPresidioClearPII,
-  googleDLPClearPII,
+  type PiiRedactionTransport,
   type PIICheckOptions,
   PRESIDIO_STRICT_ENTITIES,
 } from "~/server/tracer/collector/piiCheck";
@@ -54,20 +52,14 @@ export type BatchClearPIIFunction = (
  * The slice of the data-privacy service the redactor needs: resolving a
  * project's effective policy to drive the native secrets + essential-PII pass.
  */
-export type DataPrivacyResolver = {
-  getResolvedForProject(args: { projectId: string }): Promise<ResolvedDataPrivacy>;
-};
-
 /**
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
-  /** Batch function to clear PII from multiple text values in one call */
-  batchClearPII: BatchClearPIIFunction;
-  /** Whether LANGEVALS_ENDPOINT is configured (truthy check) */
+  transport: PiiRedactionTransport;
   isLangevalsConfigured: boolean;
-  /** Whether running in production (NODE_ENV === "production") */
   isProduction: boolean;
+  nativePolicyEnforced: boolean;
   /** Maximum attribute value length for PII redaction; values exceeding this are skipped */
   piiRedactionMaxAttributeLength: number;
   /**
@@ -75,7 +67,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * lazily defaulted to the process-wide service, so callers that never pass a
    * tenant (and most tests) don't need to provide it.
    */
-  dataPrivacyResolver?: DataPrivacyResolver;
+  dataPrivacy: DataPrivacyService;
   featureFlags?: FeatureFlagService;
 }
 
@@ -83,51 +75,47 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
 const runGoogleDlpBatch = (
+  transport: PiiRedactionTransport,
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
   exceptPatterns?: readonly string[],
 ): Promise<(string | null)[]> =>
   Promise.all(
     texts.map(async (text) => {
-      const wrapper = { value: text };
-      await googleDLPClearPII({
-        currentObject: wrapper,
-        lastKey: "value",
+      return await transport.clearGoogleDlp({
+        text,
         piiRedactionLevel,
         exceptPatterns,
       });
-      return wrapper.value !== text ? wrapper.value : null;
     }),
   );
 
-const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
+const batchClearPII = async (
+  transport: PiiRedactionTransport,
+  texts: string[],
+  options: PIICheckOptions,
+): Promise<(string | null)[]> => {
   const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
 
   if (mainMethod === "google_dlp") {
-    return runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    return await runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
   }
 
   try {
-    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel, entities);
+    return await transport.clearPresidio(texts, piiRedactionLevel, entities);
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
     // re-redact a value an exception kept.
-    return await runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
+    return await runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
   }
 };
 
 /**
  * Static defaults for PII service deps (no lazy caching, no mutable state).
  */
-const PII_DEFAULTS: OtlpSpanPiiRedactionServiceDependencies = {
-  batchClearPII: defaultBatchClearPII,
-  isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
-  isProduction: env.NODE_ENV === "production",
-  piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
-};
 
 function requestLevelToPiiLevel(level: PIIRedactionLevel): PiiLevel {
   switch (level) {
@@ -192,8 +180,8 @@ export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
   private readonly logger = createLogger("langwatch:trace-processing:span-pii-redaction-service");
 
-  constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
-    const merged = { ...PII_DEFAULTS, ...deps };
+  constructor(deps: OtlpSpanPiiRedactionServiceDependencies) {
+    const merged = { ...deps };
     const maxLen = merged.piiRedactionMaxAttributeLength;
     merged.piiRedactionMaxAttributeLength =
       Number.isFinite(maxLen) && maxLen >= 0
@@ -213,12 +201,11 @@ export class OtlpSpanPiiRedactionService {
     tenantId: TenantId | undefined,
     requestLevel: PIIRedactionLevel,
   ): Promise<{ policy: ResolvedDataPrivacy; level: PiiLevel } | null> {
-    if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT === "off") return null;
+    if (!this.deps.nativePolicyEnforced) return null;
     if (!tenantId) return null;
     let resolved: ResolvedDataPrivacy;
     try {
-      const service = this.deps.dataPrivacyResolver ?? getDataPrivacyPolicyService();
-      resolved = await service.getResolvedForProject({ projectId: tenantId });
+      resolved = await this.deps.dataPrivacy.getResolvedForProject({ projectId: tenantId });
     } catch (error) {
       this.logger.warn(
         { error, tenantId },
@@ -589,7 +576,8 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.deps.batchClearPII(
+    const results = await batchClearPII(
+      this.deps.transport,
       entries.map((e) => e.text),
       options,
     );
@@ -822,7 +810,7 @@ export class OtlpSpanPiiRedactionService {
   ): Promise<void> {
     if (batch.texts.length === 0) return;
 
-    const results = await this.deps.batchClearPII(batch.texts, options);
+    const results = await batchClearPII(this.deps.transport, batch.texts, options);
 
     if (results.length !== batch.refs.length) {
       throw new Error(
