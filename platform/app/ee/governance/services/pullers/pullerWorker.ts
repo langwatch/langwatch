@@ -724,6 +724,7 @@ async function recordPulledUsageFor({
         organizationId: source.organizationId,
         teamId: source.teamId,
       },
+      governanceProjectId: govProjectId,
       observedAt,
     });
   } catch (error) {

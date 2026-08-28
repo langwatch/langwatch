@@ -71,9 +71,16 @@ export async function findHiddenGovernanceProject({
 
 /**
  * Resolve the org's hidden Governance Project, creating one on first
- * call. Idempotent — concurrent callers may briefly race; the
- * org-scoped composite-unique guard on (teamId, kind) collapses the
- * race to a single row at the next read.
+ * call.
+ *
+ * Idempotent, but by the slug and not by a constraint on (teamId, kind):
+ * that pair carries an @@index, not an @@unique, so the database will
+ * happily hold two governance rows for one team. What collapses a race is
+ * the globally unique `slug` — `governance-<orgId>`, derived from the org
+ * rather than generated — so two concurrent ensures produce the same slug,
+ * one create wins, and the loser's P2002 is caught below and re-reads the
+ * winner. Anything that mints a governance project by another route, or
+ * changes the slug, loses that guarantee.
  *
  * The project is attached to the org's oldest team (any team works for
  * routing — RBAC is enforced via project membership, which the Layer-1
