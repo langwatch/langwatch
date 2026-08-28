@@ -99,30 +99,57 @@ export async function refuseIfItClosesTheLastDoor({
   if (!userId) return;
 
   if (pathname === LAST_WAY_IN_PATHS.disableTwoFactor) {
-    const requiring = await requiringOrganizations({ userId });
-    if (requiring.length > 0) {
-      throw APIError.from("BAD_REQUEST", {
-        code: "MFA_REQUIRED_BY_ORGANIZATION",
-        message:
-          "Your organization requires a second step to sign in, so it cannot be turned off here.",
-      });
-    }
+    await refuseDisablingRequiredTwoStep({ userId, requiringOrganizations });
     return;
   }
 
   if (pathname === LAST_WAY_IN_PATHS.deletePasskey) {
-    const passkeyId =
-      typeof body === "object" && body !== null
-        ? (body as { id?: unknown }).id
-        : undefined;
-    if (typeof passkeyId !== "string" || passkeyId.length === 0) return;
-
-    if (await passkeyRemovalStrandsUser({ prisma, userId, passkeyId })) {
-      throw APIError.from("BAD_REQUEST", {
-        code: "LAST_WAY_IN",
-        message:
-          "This is the only way you can sign in. Add another sign-in method first, then remove this one.",
-      });
-    }
+    await refuseRemovingTheLastPasskey({ userId, body, prisma });
   }
+}
+
+/** An organization that requires a second step requires it of its members. */
+async function refuseDisablingRequiredTwoStep({
+  userId,
+  requiringOrganizations,
+}: {
+  userId: string;
+  requiringOrganizations: (args: {
+    userId: string;
+  }) => Promise<readonly { slug: string }[]>;
+}): Promise<void> {
+  const requiring = await requiringOrganizations({ userId });
+  if (requiring.length === 0) return;
+  throw APIError.from("BAD_REQUEST", {
+    code: "MFA_REQUIRED_BY_ORGANIZATION",
+    message:
+      "Your organization requires a second step to sign in, so it cannot be turned off here.",
+  });
+}
+
+/**
+ * A body naming no passkey decides nothing: better-auth refuses it on its own
+ * terms, and there is no removal here to weigh.
+ */
+async function refuseRemovingTheLastPasskey({
+  userId,
+  body,
+  prisma,
+}: {
+  userId: string;
+  body: unknown;
+  prisma: PrismaClient;
+}): Promise<void> {
+  const passkeyId =
+    typeof body === "object" && body !== null
+      ? (body as { id?: unknown }).id
+      : undefined;
+  if (typeof passkeyId !== "string" || passkeyId.length === 0) return;
+
+  if (!(await passkeyRemovalStrandsUser({ prisma, userId, passkeyId }))) return;
+  throw APIError.from("BAD_REQUEST", {
+    code: "LAST_WAY_IN",
+    message:
+      "This is the only way you can sign in. Add another sign-in method first, then remove this one.",
+  });
 }

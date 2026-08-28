@@ -304,41 +304,72 @@ export const declaredNoPermission = ({
       // scope field to smuggle past the check.
       const declaredInput =
         typeof input === "object" && input !== null ? input : {};
-      for (const key of SENSITIVE_SCOPE_FIELDS) {
-        if (key in declaredInput && !allowedKeys.includes(key)) {
-          throw new Error(
-            `${key} is not allowed to be used without permission check`,
-          );
-        }
-      }
 
-      // NO PERMISSION IS NOT NO CONDITION. These procedures are deliberately
-      // unchecked for permission — the reason is declared and reviewed — but
-      // an organization that requires a second factor requires it of anybody
-      // reaching its data, and this branch reaches it by an ALLOWED scope
-      // field. Without this, a member who could not prove one was refused by
-      // every `.permission()` procedure and then minted a durable API key for
-      // the same organization through `apiKey.create`.
-      if (ctx.session?.user) {
-        for (const key of allowedKeys) {
-          const named = (declaredInput as Record<string, unknown>)[key];
-          const tier = SCOPE_TIER_BY_FIELD[key as ScopeTierField];
-          if (tier === undefined || typeof named !== "string" || !named) {
-            continue;
-          }
-          await assertSecondFactorSatisfied({
-            deps: mfaGateDepsFor(ctx),
-            userId: ctx.session.user.id,
-            sessionId: ctx.session.sessionId,
-            scope: { tier, id: named },
-          });
-        }
-      }
+      refuseUndeclaredScopeFields({ declaredInput, allowedKeys });
+      await assertSecondFactorOnAllowedScopes({
+        ctx,
+        declaredInput,
+        allowedKeys,
+      });
 
       ctx.permissionChecked = true;
       return next();
     },
   );
+
+/**
+ * A scoped field the declaration did not individually allow is refused, which
+ * is the runtime half of what the type layer already forbids.
+ */
+function refuseUndeclaredScopeFields({
+  declaredInput,
+  allowedKeys,
+}: {
+  declaredInput: object;
+  allowedKeys: string[];
+}): void {
+  for (const key of SENSITIVE_SCOPE_FIELDS) {
+    if (key in declaredInput && !allowedKeys.includes(key)) {
+      throw new Error(
+        `${key} is not allowed to be used without permission check`,
+      );
+    }
+  }
+}
+
+/**
+ * NO PERMISSION IS NOT NO CONDITION. These procedures are deliberately
+ * unchecked for permission — the reason is declared and reviewed — but an
+ * organization that requires a second factor requires it of anybody reaching
+ * its data, and this branch reaches it by an ALLOWED scope field. Without
+ * this, a member who could not prove one was refused by every `.permission()`
+ * procedure and then minted a durable API key for the same organization
+ * through `apiKey.create`.
+ */
+async function assertSecondFactorOnAllowedScopes({
+  ctx,
+  declaredInput,
+  allowedKeys,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  declaredInput: object;
+  allowedKeys: string[];
+}): Promise<void> {
+  if (!ctx.session?.user) return;
+  for (const key of allowedKeys) {
+    const named = (declaredInput as Record<string, unknown>)[key];
+    const tier = SCOPE_TIER_BY_FIELD[key as ScopeTierField];
+    if (tier === undefined || typeof named !== "string" || !named) {
+      continue;
+    }
+    await assertSecondFactorSatisfied({
+      deps: mfaGateDepsFor(ctx),
+      userId: ctx.session.user.id,
+      sessionId: ctx.session.sessionId,
+      scope: { tier, id: named },
+    });
+  }
+}
 
 /**
  * `.authorizeInService({ reason, permissions })` — the scope is data the

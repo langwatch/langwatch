@@ -8,7 +8,7 @@ import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
 vi.mock("~/server/better-auth", () => ({ auth: {} }));
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaTwoStepAccount } from "../two-step-verification-adapters";
+import { PrismaTwoStepAccount } from "../two-step-account.adapter";
 
 /**
  * The organizations that require two-step verification, read through the REAL

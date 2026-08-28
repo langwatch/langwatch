@@ -1,10 +1,8 @@
 import { prisma } from "../../db";
 import { deploymentOffersTwoStepVerification } from "./signin-method-policy";
+import { PrismaTwoStepAccount } from "./two-step-account.adapter";
 import { TwoStepVerificationService } from "./two-step-verification.service";
-import {
-  BetterAuthTwoStepProtocol,
-  PrismaTwoStepAccount,
-} from "./two-step-verification-adapters";
+import { BetterAuthTwoStepProtocol } from "./two-step-verification-adapters";
 
 /**
  * The account side of two-step verification, composed.

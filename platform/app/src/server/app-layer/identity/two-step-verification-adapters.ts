@@ -1,12 +1,7 @@
 import { IdentityMfaPasswordInvalidError } from "@langwatch/identity";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { auth } from "~/server/better-auth";
 import { handledErrorForBetterAuthCode } from "~/server/better-auth/handled-errors";
-import type {
-  RequiringOrganization,
-  TwoStepAccountPort,
-  TwoStepProtocolPort,
-} from "./two-step-verification.service";
+import type { TwoStepProtocolPort } from "./two-step-verification.service";
 
 /**
  * What the account side reads, and how it reaches the two-factor plugin.
@@ -16,48 +11,6 @@ import type {
  * guard reads the same field, so an operator and an organization can never
  * disagree about the same person.
  */
-export class PrismaTwoStepAccount implements TwoStepAccountPort {
-  constructor(private readonly prisma: PrismaClient) {}
-
-  async enrollmentEnabled({ userId }: { userId: string }): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { twoFactorEnabled: true },
-    });
-    return user?.twoFactorEnabled ?? false;
-  }
-
-  async passkeyCount({ userId }: { userId: string }): Promise<number> {
-    return this.prisma.passkey.count({ where: { userId } });
-  }
-
-  async requiringOrganizations({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<readonly RequiringOrganization[]> {
-    // Asked of ORGANIZATION rather than of the membership rows, which is the
-    // repo's established shape for "the organizations this person belongs to"
-    // (see `authz-read.prisma.repository.ts`). A `findMany` over
-    // `OrganizationUser` keyed only by `userId` spans every organization at
-    // once, so the org-tenancy guard refuses it — and that refusal is a plain
-    // Error, which reached this page as an unknown failure and took the whole
-    // two-step section down with it.
-    const organizations = await this.prisma.organization.findMany({
-      where: {
-        mfaRequired: true,
-        members: { some: { userId, disabledAt: null } },
-      },
-      select: { id: true, name: true, slug: true },
-    });
-    return organizations.map((organization) => ({
-      organizationId: organization.id,
-      name: organization.name,
-      slug: organization.slug,
-    }));
-  }
-}
-
 /**
  * The two-factor plugin's endpoints, called server-side and answered in our
  * vocabulary.

@@ -54,7 +54,6 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { env } from "~/env.mjs";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../db";
-import { PrismaTwoStepAccount } from "./two-step-verification-adapters";
 import { featureFlagService } from "../../featureFlag";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
@@ -163,6 +162,7 @@ import {
   PrismaSsoTestSignInLookup,
   SsoSelfServeContextResolver,
 } from "./sso-self-serve-adapters";
+import { PrismaTwoStepAccount } from "./two-step-account.adapter";
 import {
   forgetIdentityWriteGate,
   isAnyoneOnIdentityWrites,
