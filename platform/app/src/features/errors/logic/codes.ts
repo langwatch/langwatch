@@ -239,6 +239,7 @@ export const APP_ERROR_CODES = [
   "migration_rollback_blocked_by_dependent",
   "migration_rollback_cutover_not_started",
   "migration_run_requires_enrollment",
+  "migration_state_not_found",
   "migration_unknown",
   "missing_annotator",
   "missing_credentials",

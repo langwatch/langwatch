@@ -227,6 +227,26 @@ export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
   }
 }
 
+/**
+ * An operator acted on an organization the named migration has never
+ * processed, in a place that needs the record itself rather than the pin.
+ * The rollback deliberately accepts a missing record (it pins the
+ * organization out of the rollout ahead of the pass); the drain proof cannot,
+ * because the proof is written ONTO the migration's own report.
+ */
+export class MigrationStateNotFoundError extends HandledError {
+  declare readonly code: "migration_state_not_found";
+
+  constructor() {
+    super(
+      "migration_state_not_found",
+      "No migration state exists for that organization",
+      { httpStatus: 404, fault: "customer" },
+    );
+    this.name = "MigrationStateNotFoundError";
+  }
+}
+
 export class MigrationDrainProofRequiresMigratedError extends HandledError {
   declare readonly code: "migration_drain_proof_requires_migrated";
 

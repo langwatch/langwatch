@@ -38,7 +38,7 @@ export class PrismaSsoConnectionProjectionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async load(
+  async tryLoad(
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<SsoConnectionFoldState> | null> {

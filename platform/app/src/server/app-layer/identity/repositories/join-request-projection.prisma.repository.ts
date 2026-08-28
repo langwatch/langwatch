@@ -32,7 +32,7 @@ export class PrismaJoinRequestProjectionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async load(
+  async tryLoad(
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<JoinRequestFoldState> | null> {

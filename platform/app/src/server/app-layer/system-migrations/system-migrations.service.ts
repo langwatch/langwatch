@@ -6,11 +6,13 @@ import type {
 } from "@langwatch/system-migrations";
 import {
   MigrationDrainProofRequiresMigratedError,
+  MigrationEnrolledAutomaticallyError,
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
+  MigrationStateNotFoundError,
   MigrationUnknownError,
 } from "./errors";
 
@@ -291,7 +293,13 @@ export class SystemMigrationsService {
        */
       rollbackGuards?: Record<
         string,
-        (args: { tenantId: string; record: TenantMigrationRecord }) => Promise<void>
+        (args: {
+          tenantId: string;
+          /** Null when nothing has run for this tenant yet - the operator is
+           *  pinning it OUT of a rollout ahead of the pass, and a guard that
+           *  needs a record has to say so itself rather than assume one. */
+          record: TenantMigrationRecord | null;
+        }) => Promise<void>
       >;
     },
   ) {}
@@ -331,13 +339,20 @@ export class SystemMigrationsService {
           description: migration.description,
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation: isSaaS || migration.runsAutomaticallyOnSelfHosted,
+          enrolledAutomatically: migration.enrolledAutomatically,
           counts,
-          enrollment: enrolledByMigration
-            ? {
-                enrolledCount,
-                notEnrolledCount: Math.max(0, totalOrganizations - enrolledCount),
-              }
-            : null,
+          // Null for a migration that admits every organization automatically:
+          // the gauge would describe rows that decide nothing. That is what
+          // `MigrationOverview.enrollment` documents, and the guard was lost in
+          // the same merge that dropped D04 — leaving the code contradicting
+          // its own type's doc comment, with the test that pinned it gone too.
+          enrollment:
+            enrolledByMigration && !migration.enrolledAutomatically
+              ? {
+                  enrolledCount,
+                  notEnrolledCount: Math.max(0, totalOrganizations - enrolledCount),
+                }
+              : null,
           attention,
         };
       }),
@@ -925,8 +940,16 @@ export class SystemMigrationsService {
     // against the old event).
     const isRetry = record?.status === "rolled_back";
     const decidedAt =
-      (record.status === "rolled_back" ? rollbackDecidedAt(priorReport) : null) ??
-      new Date().toISOString();
+      (isRetry ? rollbackDecidedAt(priorReport) : null) ?? new Date().toISOString();
+    const pin = {
+      migrationName,
+      tenantId,
+      status: "rolled_back" as const,
+      report: {
+        ...priorReport,
+        rolledBack: { by: actorUserId, at: decidedAt },
+      },
+    };
 
     // The pin FIRST, its effects after — deliberately in that order. The
     // stored `rolled_back` status is what stops the next pass re-finalizing

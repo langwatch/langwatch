@@ -216,7 +216,7 @@ export class JoinRequestLedgerWriter implements JoinRequestLedger {
     last: JoinRequestEvent;
   }): Promise<boolean> {
     try {
-      const stored = await this.projectionStore.load(joinRequestId, context);
+      const stored = await this.projectionStore.tryLoad(joinRequestId, context);
       const cursor = stored?.cursor;
       if (!cursor) return false;
       return (

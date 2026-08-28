@@ -87,7 +87,7 @@ const ledger: SsoConnectionLedger = {
       aggregateId: connectionId,
       tenantId: createTenantId(tenantId),
     };
-    const loaded = await projectionStore.load(connectionId, context);
+    const loaded = await projectionStore.tryLoad(connectionId, context);
     let state: SsoConnectionFoldState =
       loaded?.state ??
       ({
@@ -306,14 +306,14 @@ describe("the sso connection grandfather migration against Postgres", () => {
         aggregateId: connectionId,
         tenantId: createTenantId(ORG),
       };
-      const loaded = await projectionStore.load(connectionId, context);
+      const loaded = await projectionStore.tryLoad(connectionId, context);
 
       // Store it again unchanged and read it back: a column the mapping
       // loses, or one the database writes from its own clock, would come back
       // different — which is the failure a replay would otherwise introduce
       // silently. Every column here is event-derived, so it does not.
       await projectionStore.store(loaded!, context);
-      const reloaded = await projectionStore.load(connectionId, context);
+      const reloaded = await projectionStore.tryLoad(connectionId, context);
 
       expect(reloaded).toEqual(loaded);
     });

@@ -139,13 +139,16 @@ export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
 
 /** Portable compatibility vocabulary for the existing grant mutation
  * consumers. These operations remain methods on AuthzGrantsService; this is
- * not a third public ledger-writer capability. */
-export const authzLedgerWriteSourceSchema = z.enum([
-  "grants-service",
-  "scim",
-  "invite",
-  "read-through-mint",
-]);
+ * not a third public ledger-writer capability.
+ *
+ * It is `GRANT_EVENT_SOURCES` itself and not a subset of it: the ledger
+ * writer types its own `source` as `GrantEventSource`, the persisted fact
+ * validates against `grantEventSourceSchema`, and the audit adapter decides
+ * auditability by naming `migration` and `read-through-mint` out of that same
+ * list. A narrower input vocabulary here would refuse a source the writer
+ * below it accepts, and would silently strand `join-request` — the one
+ * source whose whole point is that it IS audited. */
+export const authzLedgerWriteSourceSchema = grantEventSourceSchema;
 export type AuthzLedgerWriteSource = z.infer<typeof authzLedgerWriteSourceSchema>;
 
 export const authzLedgerBindingPrincipalSchema = z.union([

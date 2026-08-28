@@ -32,7 +32,7 @@ export class PrismaMfaEnrollmentProjectionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async load(
+  async tryLoad(
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<MfaFoldState> | null> {

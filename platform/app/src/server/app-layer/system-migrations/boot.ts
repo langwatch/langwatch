@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { SystemMigration } from "@langwatch/system-migrations";
+import type {
+  MigrationPassSummary,
+  SystemMigration,
+} from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
 import { runSystemMigrationPass } from "./runtime";
 
@@ -92,13 +95,20 @@ export function startSystemMigrations(args?: {
 async function driveUntilConverged({
   signal,
   redis,
+  additionalMigrations,
 }: {
   signal: AbortSignal;
   redis?: Redis | Cluster | null;
+  additionalMigrations?: readonly SystemMigration[];
 }): Promise<void> {
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
     if (signal.aborted) return;
-    const summary = await passOrNull({ signal, redis, pass });
+    const summary = await passOrNull({
+      signal,
+      redis,
+      additionalMigrations,
+      pass,
+    });
     if (summary === null) return;
     // Checked before the stop decision as well as before the next pass: an
     // aborted pass returns whatever it managed, and reading that as
@@ -133,14 +143,16 @@ async function driveUntilConverged({
 async function passOrNull({
   signal,
   redis,
+  additionalMigrations,
   pass,
 }: {
   signal: AbortSignal;
   redis?: Redis | Cluster | null;
+  additionalMigrations?: readonly SystemMigration[];
   pass: number;
 }): Promise<MigrationPassSummary | null> {
   try {
-    return await runSystemMigrationPass({ signal, redis });
+    return await runSystemMigrationPass({ signal, redis, additionalMigrations });
   } catch (error) {
     logger.error(
       { error, pass },

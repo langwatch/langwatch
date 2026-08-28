@@ -123,8 +123,7 @@ const USES_REACT_HOOK_FORM =
  * compositional spelling puts the copy in the children:
  * `<Alert.Description>{error.message}</Alert.Description>` reads the same slug
  * to the same customer as `description: error.message` does, and every
- * attribute-anchored pattern — in this file and in the Biome plugin — walked
- * straight past it.
+ * attribute-anchored pattern walked straight past it.
  */
 const ERROR_COMPONENT =
   /(?:^|\.)(?:HandledErrorAlert|ErrorAlert|ErrorCard)$|^(?:Toast|Alert)\.(?:Title|Description)$/;

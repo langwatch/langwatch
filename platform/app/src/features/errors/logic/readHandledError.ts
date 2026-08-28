@@ -331,7 +331,7 @@ function docsOrigins(): Set<string> {
  * the app's own origin the moment a customer clicked "Read the docs". A
  * `typeof === "string"` check is not enough for a field that becomes a link.
  *
- * The value is server-authored today (`app-layer/error-remediation.ts` builds
+ * The value is server-authored today (`@langwatch/handled-error`'s remediation registry builds
  * it from a static registry), but it does not stay that way: a handled error
  * relayed from a Go service arrives via `nlpgo/goHandledError.ts`, which parses
  * `docs_url` out of an upstream response body with a plain `z.string()`, and a

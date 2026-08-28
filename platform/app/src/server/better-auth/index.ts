@@ -16,7 +16,8 @@ import {
 } from "@langwatch/enterprise-sso-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AuthService } from "@langwatch/auth-contract";
-import type { PrismaClient } from "@langwatch/prisma-client";
+import type { SignInMethodPolicy } from "@langwatch/identity";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { UserService } from "@langwatch/user-contract";
 import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import { RedisConfigService, type RedisConnection } from "@langwatch/redis-client";
@@ -186,7 +187,15 @@ function refusesCredentialRoute({
  * construction. Factor plugins are selected for that instance so importing
  * this module cannot register process behavior.
  */
-const createAuthOptions = (prisma: PrismaClient): BetterAuthOptions => ({
+const createAuthOptions = (
+  prisma: PrismaClient,
+): BetterAuthOptions & {
+  // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
+  // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
+  // spread below from degrading the credentials gate to "unset", which
+  // better-auth would then have to guess at.
+  emailAndPassword: NonNullable<BetterAuthOptions["emailAndPassword"]>;
+} => ({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
   trustedOrigins: isBuildTime
     ? []

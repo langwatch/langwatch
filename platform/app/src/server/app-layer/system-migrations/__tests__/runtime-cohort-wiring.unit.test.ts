@@ -36,7 +36,7 @@ vi.mock("../../../clickhouse/clickhouseClient", () => ({
     new Map([["org_private_dataplane", "http://private:8123"]]),
 }));
 
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "@langwatch/authz-contract";
 import { systemMigrationsService } from "../runtime";
 
 describe("the cohort's private-dataplane exclusion wiring", () => {

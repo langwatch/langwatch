@@ -351,7 +351,7 @@ describe("PrismaIdentityProjectionRepository", () => {
 
   describe("when no fold has ever stored the user", () => {
     it("loads null, so the fold starts from init", async () => {
-      expect(await repository.load(USER, context)).toBeNull();
+      expect(await repository.tryLoad(USER, context)).toBeNull();
     });
   });
 
@@ -366,7 +366,7 @@ describe("PrismaIdentityProjectionRepository", () => {
         context,
       );
 
-      const first = await repository.load(USER, context);
+      const first = await repository.tryLoad(USER, context);
       expect(first?.cursor).toEqual({ acceptedAt: 10, eventId: "evt_1" });
       expect(first?.state.identifiers[id]).toMatchObject({
         state: "ATTACHED",
@@ -381,7 +381,7 @@ describe("PrismaIdentityProjectionRepository", () => {
         context,
       );
 
-      const second = await repository.load(USER, context);
+      const second = await repository.tryLoad(USER, context);
       expect(second?.cursor).toEqual({ acceptedAt: 20, eventId: "evt_2" });
       expect(second?.state.identifiers[id]).toMatchObject({
         state: "VERIFIED",

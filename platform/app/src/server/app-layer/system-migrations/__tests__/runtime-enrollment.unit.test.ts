@@ -85,7 +85,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "@langwatch/authz-contract";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
 import {
   migrationPassCohort,

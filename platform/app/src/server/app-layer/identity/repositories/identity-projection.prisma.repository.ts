@@ -68,7 +68,7 @@ export class PrismaIdentityProjectionRepository
     private readonly reservations: IdentityReservationRepository,
   ) {}
 
-  async load(
+  async tryLoad(
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<IdentityFoldState> | null> {

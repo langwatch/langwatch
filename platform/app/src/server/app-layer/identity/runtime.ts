@@ -109,8 +109,6 @@ import {
  */
 export { deploymentIsFederationCapable, resolveSignInMethodPolicy } from "./signin-method-policy";
 
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
@@ -422,10 +420,11 @@ export function joinRequestsService({
     autoJoinLicensed: () => platformSSOAllowed(),
     enabled: ({ userId }) =>
       featureFlags.isEnabled("join_requests", {
-        distinctId: userId,
-        // A person asks to join before they belong to anything.
-        projectId: NOT_TARGETED,
-        organizationId: NOT_TARGETED,
+        // A person asks to join before they belong to anything, so the read
+        // names the person and no tenant at all. A rule that names a project
+        // or an organization cannot match this target, which is the point.
+        kind: "user",
+        userId,
       }),
   });
 }

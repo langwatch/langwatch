@@ -26,6 +26,11 @@ export {
   NoopSchedulerWakeService,
   SchedulerWakeService,
 } from "./ports/scheduler-wake.service";
+export {
+  type AdminAccess,
+  AdminAccessService,
+  type AdminAccessServiceOptions,
+} from "./services/admin-access.service";
 export { AdminAuditSink } from "./services/impersonation.service";
 export * from "./ops.error-normalizer";
 export * from "./ops.redis-engine-cpu";

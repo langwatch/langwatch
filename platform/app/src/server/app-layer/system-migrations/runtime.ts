@@ -18,7 +18,14 @@ import { env } from "~/env.mjs";
 import { getPrivateClickHouseUrls } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
+import {
+  connectionGrandfatherMigration,
+  identifierBackfillMigration,
+  identityNewbornReconciliation,
+  identitySecretHealMigration,
+} from "../identity/runtime";
 import { migrationRunsOnThisInstallation, organizationMigrates } from "./cohort";
+import { MigrationNotAvailableOnInstallationError } from "./errors";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -106,10 +113,36 @@ export function registeredMigrations(
   const migrations = [
     ...(runtimeMigration ? [runtimeMigration] : []),
     ...additionalMigrations,
+    // D04 (ADR-117 §5): the organization's legacy SSO strings become connection
+    // history, proved by routing. Dark — the connection projection decides
+    // nothing until `SSOCONN_ROUTING` is flipped, and this record carries the
+    // routing proof's verdict, which is what that flip's exit gate reads.
+    //
+    // Registered here rather than arriving through composition because no
+    // composition passes it. It was dropped by the merge that resolved this
+    // directory (5770224e31) by taking main's call sites against the branch's
+    // definitions, and nothing caught it: the factory is still exported, its
+    // two tests mock it, so there was no type error and no failing test — only
+    // a migration that never runs for any tenant.
+    connectionGrandfatherMigration(),
   ];
   return [
     ...new Map(migrations.map((migration) => [migration.name, migration])).values(),
   ];
+}
+
+/**
+ * The USER-rooted migrations (ADR-101 §6): their tenant is the user, so they
+ * ride a second runner over the user tenant source rather than joining
+ * `registeredMigrations`. Same state table, same lease, same ops page — only
+ * the tenant axis differs.
+ */
+export function registeredUserMigrations(): SystemMigration[] {
+  // The heal pass rides beside the backfill rather than inside it: the user
+  // it repairs is FINALIZED, and the runner skips a terminal record, so a
+  // step inside the backfill would never run for exactly the population that
+  // needs it (ADR-116 §4).
+  return [identifierBackfillMigration(), identitySecretHealMigration()];
 }
 
 /**

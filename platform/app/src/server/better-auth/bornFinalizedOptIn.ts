@@ -2,7 +2,6 @@ import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/enterp
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { prisma } from "~/server/db";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in");
 
@@ -80,14 +79,17 @@ export async function isBornFinalizedSignUp({
 
   try {
     const organizationId = await organizationForDomain(email);
-    return await featureFlags.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, {
-      distinctId: email,
-      defaultValue: false,
-      // Sign-up time: the person has no project yet, and an organization
-      // only when their email domain matches one.
-      projectId: NOT_TARGETED,
-      organizationId: organizationId ?? NOT_TARGETED,
-    });
+    // Sign-up time: the person has no project and no user id yet, and an
+    // organization only when their email domain matches one. With no
+    // organization the read carries no targeting identity at all, so no rule
+    // naming a project or an organization can match it and the registry
+    // default (off) stands — which is the safe direction this gate wants.
+    return await featureFlags.isEnabled(
+      BORN_FINALIZED_SIGNUP_FLAG,
+      organizationId === null
+        ? { kind: "system" }
+        : { kind: "organization", organizationId },
+    );
   } catch (error) {
     // Never fail the sign-up over the flag itself: an unreadable flag means
     // the user is created the way every user was created before this

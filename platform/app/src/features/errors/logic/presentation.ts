@@ -37,7 +37,7 @@ import {
  *     "This search took too long" is the same fact, told to a customer.
  *
  * `tips` and `docsUrl` are NOT here — they ride on the error itself from the
- * server's remediation registry (`src/server/app-layer/error-remediation.ts`)
+ * server's remediation registry (`@langwatch/handled-error`)
  * because agents driving the API and CLI need them without a UI.
  */
 export interface ErrorPresentation {
@@ -1180,6 +1180,11 @@ const presentations = {
     title: "This migration is not available here yet",
     describe: () =>
       "It arrives in a later release and will run automatically then — nothing to do until that release.",
+  },
+  migration_state_not_found: {
+    title: "No migration state for that organization",
+    describe: () =>
+      "Check the organization id — only organizations a migration has already processed have state to act on.",
   },
   migration_rollback_blocked_by_dependent: {
     title: "Another migration still stands on this one",

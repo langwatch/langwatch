@@ -251,7 +251,7 @@ export class IdentityLedgerWriter implements IdentityLedger {
     last: IdentityEvent;
   }): Promise<boolean> {
     try {
-      const stored = await this.projectionStore.load(userId, context);
+      const stored = await this.projectionStore.tryLoad(userId, context);
       const cursor = stored?.cursor;
       if (!cursor) return false;
       return (
