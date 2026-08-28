@@ -66,7 +66,22 @@ function useRunNameList({
   // A name that matches nothing is the new plan path: a plain field, no list.
   const isListOpen = isOpen && shown.length > 0;
 
+  /**
+   * Drops a close the field is still waiting on. Every path that opens the
+   * list calls this first: a blur arms a close for 140ms, so a person who
+   * moves from the caret into the field and types would otherwise watch the
+   * list they just opened close under them.
+   */
+  const cancelClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+
+  // The armed close also outlives the field, so it is dropped on unmount.
+  useEffect(() => cancelClose, []);
+
   const take = (option: RunNameOption) => {
+    cancelClose();
     setIsOpen(false);
     setIsFiltering(false);
     onPick(option.key);
@@ -74,12 +89,13 @@ function useRunNameList({
 
   /** The list closes on blur, late enough for a click on a row to land. */
   const closeSoon = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
+    cancelClose();
     closeTimer.current = setTimeout(() => setIsOpen(false), 140);
   };
 
   /** The caret shows the whole list whatever is typed in the field. */
   const toggleAll = () => {
+    cancelClose();
     setIsFiltering(false);
     setActiveIndex(0);
     setIsOpen((open) => !open);
@@ -87,6 +103,7 @@ function useRunNameList({
 
   /** Typing narrows the list and opens it. */
   const filterBy = (typed: string) => {
+    cancelClose();
     setIsFiltering(true);
     setActiveIndex(0);
     if (options.length > 0 && typed.trim() !== "") setIsOpen(true);
@@ -94,6 +111,7 @@ function useRunNameList({
 
   const moveBy = (step: number) => {
     if (!isListOpen && step > 0) {
+      cancelClose();
       setIsFiltering(false);
       setActiveIndex(0);
       setIsOpen(true);

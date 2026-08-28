@@ -1411,7 +1411,7 @@ describe("the run name", () => {
     await user.click(screen.getByTestId("run-dialog-name-caret"));
 
     const options = within(
-      screen.getByTestId("run-dialog-name-options"),
+      await screen.findByTestId("run-dialog-name-options"),
     ).getAllByRole("button");
     expect(options.map((option) => option.textContent)).toEqual([
       expect.stringContaining("Nightly refunds"),
@@ -1451,7 +1451,7 @@ describe("the run name", () => {
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
-    const list = screen.getByTestId("run-dialog-name-options");
+    const list = await screen.findByTestId("run-dialog-name-options");
     expect(list).not.toHaveTextContent("stricter criterion");
 
     await user.click(within(list).getAllByRole("button")[0]!);
@@ -1474,7 +1474,7 @@ describe("the run name", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
     await user.click(
-      within(screen.getByTestId("run-dialog-name-options")).getAllByRole(
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
         "button",
       )[0]!,
     );
@@ -1507,7 +1507,7 @@ describe("the run name", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
     await user.click(
-      within(screen.getByTestId("run-dialog-name-options")).getAllByRole(
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
         "button",
       )[0]!,
     );
@@ -1560,16 +1560,18 @@ describe("the run name", () => {
     await user.type(field, "Nightly");
 
     const shown = within(
-      screen.getByTestId("run-dialog-name-options"),
+      await screen.findByTestId("run-dialog-name-options"),
     ).getAllByRole("button");
     expect(shown).toHaveLength(1);
     expect(shown[0]).toHaveTextContent("Nightly refunds");
 
     await user.clear(field);
     await user.type(field, "Something else entirely");
-    expect(
-      screen.queryByTestId("run-dialog-name-options"),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("run-dialog-name-options"),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   /** @scenario "The arrow keys move and Enter takes the highlighted entry" */
@@ -1614,7 +1616,9 @@ describe("the run name", () => {
     // Opened from the caret, which is where the key lands: the caret took the
     // focus off the field.
     await user.click(screen.getByTestId("run-dialog-name-caret"));
-    expect(screen.getByTestId("run-dialog-name-options")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("run-dialog-name-options"),
+    ).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
