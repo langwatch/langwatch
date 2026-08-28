@@ -15,8 +15,12 @@
       "default": "./src/index.ts"
     },
     "./runtime": {
-      "types": "./src/worker.runtime.ts",
-      "default": "./src/worker.runtime.ts"
+      "types": "./src/platform/lifecycle/worker.runtime.ts",
+      "default": "./src/platform/lifecycle/worker.runtime.ts"
+    },
+    "./liveness": {
+      "types": "./src/platform/liveness/worker.liveness.ts",
+      "default": "./src/platform/liveness/worker.liveness.ts"
     }
   },
   "scripts": {
@@ -25,7 +29,14 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/config": "workspace:*",
+    "@langwatch/enterprise-worker": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/topic-server": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

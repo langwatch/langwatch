@@ -284,7 +284,7 @@ export interface TopicClusteringDispatchDeps {
    * exist after `.build()`. The registry supplies a getter it resolves
    * post-build; dispatch happens long after that.
    */
-  commands: () => TopicClusteringOutcomeCommands;
+  commands: TopicClusteringOutcomeCommands;
   classifyError: TopicClusteringErrorClassifier;
   metrics: TopicClusteringMetricsPort;
   maxAttempts?: number;
@@ -355,7 +355,7 @@ async function recordClusteringFailure(params: {
   occurredAt: number;
   error: unknown;
   /** Classified by the caller, which already had to ask to pick its branch. */
-  classified: ReturnType<typeof classifyClusteringError>;
+  classified: ClassifiedClusteringError;
 }): Promise<void> {
   const { projectId, runId, page, attempt } = params.context;
   const errorMessage = errorText(params.error);
@@ -477,7 +477,7 @@ export function createTopicClusteringRunHandler(
   const clock = deps.clock ?? (() => Date.now());
 
   return async (payload: TopicClusteringRunIntent, intentContext: IntentContext) => {
-    const commands = deps.commands();
+    const commands = deps.commands;
     const context: PageContext = {
       projectId: intentContext.projectId,
       runId: payload.runId,

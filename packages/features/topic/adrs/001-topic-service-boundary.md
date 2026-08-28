@@ -53,12 +53,21 @@ executor (`intents/topic-clustering.intent.ts`), the three fold projections
 (`projections/`), the `topicClustering` process manager
 (`processes/topic-clustering.process.ts`), and the pipeline factory
 (`adapters/eventing.topic-clustering.adapter.ts`). It also owns the clustering
-runner, boot migration, and private Prisma projection adapters. Registration
-remains app composition: `pipelineRegistry.ts` supplies the package pipeline
-with its private stores, the app-owned ClickHouse/model-provider/langevals
-ports, metrics, and late-bound outcome commands. The full-stack lifecycle
-integration test stays app-side because it composes the application event-log
-and Prisma infrastructure.
+runner, boot migration, and private Prisma projection adapters.
+`TopicServerInstaller` constructs that graph and connects the pipeline's own
+commands after registration. API and worker roots supply named technical ports
+(ClickHouse, Model Provider execution, Langevals, metrics, and Trace
+assignment), install the pipeline, and decide when boot seeds run. Manual
+invocation dispatches `requestClustering`; it never calls the page runner
+outside Topic's retry-safe Eventing intent.
+
+The active worker consumer remains the complete application Eventing registry.
+`apps/worker` composes Topic with consumer activation disabled because the
+shared `event-sourcing/jobs` queue also carries every other pipeline, and a
+Topic-only registry would reject them. It also cannot claim end-to-end Topic
+execution until it mounts the Trace `assignTopic` consumer and its required
+Trace projections. The full-stack lifecycle integration test stays app-side
+because it composes the application event-log and Prisma infrastructure.
 
 ## Environment and configuration
 

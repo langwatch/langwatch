@@ -9,6 +9,8 @@ import {
   type TopicClusteringTopic,
   type TopicClusteringTrace,
 } from "@langwatch/topic-contract";
+import type { TopicClusteringModelsPort } from "@langwatch/topic-contract";
+import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { z } from "zod";
 import type {
   TopicClusteringClickHousePort,
@@ -19,11 +21,11 @@ import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevalsPort,
 } from "../ports/topic-clustering-langevals.port";
-import type { TopicClusteringModelsPort } from "../ports/topic-clustering-models.port";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
+  type TopicClusteringRunPort,
 } from "./topic-clustering.intent";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -124,9 +126,32 @@ export interface TopicClusteringRunnerDeps {
   repository: TopicClusteringRepository;
   /** The legacy import, for the write-path topic-model seed guard. */
   migration: TopicClusteringWritePathSeed;
-  commands: Pick<TopicClusteringCommandsPort, "recordTopics" | "assignTopic">;
+  commands: TopicClusteringCommandsPort;
+  traceAssignments: TraceTopicAssignmentPort;
   /** Payload-size histogram observation per langevals call kind. */
   observePayloadSize: (kind: TopicClusteringLangevalsKind, sizeBytes: number) => void;
+}
+
+/** One process-owned runner instance for Eventing intents and manual tasks. */
+export class TopicClusteringRunner implements TopicClusteringRunPort {
+  static create(deps: TopicClusteringRunnerDeps): TopicClusteringRunner {
+    return new TopicClusteringRunner(deps);
+  }
+
+  private constructor(private readonly deps: TopicClusteringRunnerDeps) {}
+
+  runClusteringPage(params: {
+    projectId: string;
+    searchAfter: [number, string] | null;
+    runId: string;
+    page: number;
+  }): Promise<TopicClusteringPageOutcome> {
+    return clusterTopicsForProject(this.deps, {
+      projectId: params.projectId,
+      searchAfter: params.searchAfter ?? undefined,
+      runContext: { runId: params.runId, page: params.page },
+    });
+  }
 }
 
 /**
@@ -661,19 +686,16 @@ export const incrementalClustering = async (
   traces: TopicClusteringTrace[],
   runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
-  logger.info(
-    { tracesLength: traces.length, projectId },
-    "incremental topic clustering",
-  );
+  logger.info({ tracesLength: traces.length, projectId }, "incremental topic clustering");
 
-  const topics: TopicClusteringTopic[] = (
-    await deps.repository.findModelTopics(projectId)
-  ).map((topic) => ({
-    id: topic.id,
-    name: topic.name,
-    centroid: topic.centroid,
-    p95_distance: topic.p95Distance,
-  }));
+  const topics: TopicClusteringTopic[] = (await deps.repository.findModelTopics(projectId)).map(
+    (topic) => ({
+      id: topic.id,
+      name: topic.name,
+      centroid: topic.centroid,
+      p95_distance: topic.p95Distance,
+    }),
+  );
 
   const subtopics: TopicClusteringSubtopic[] = (
     await deps.repository.findModelSubtopics(projectId)
@@ -813,7 +835,7 @@ export const storeResults = async (
       // Send commands in parallel (queue handles batching internally)
       await Promise.all(
         tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          deps.commands.assignTopic({
+          deps.traceAssignments.assignTopic({
             tenantId: projectId,
             traceId: trace_id,
             topicId: topic_id,

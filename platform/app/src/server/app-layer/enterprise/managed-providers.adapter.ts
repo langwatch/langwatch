@@ -3,6 +3,7 @@ import {
   ManagedProviderConfigurationReporter,
   EnvironmentManagedProviderConfigurationAdapter,
   PostgresManagedProviderAdapter,
+  PrismaManagedProviderProjectRepository,
 } from "~/runtime/app/features/managed-providers";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -37,7 +38,7 @@ export class ManagedProvidersAppAdapter {
   }): ManagedProvidersAppAdapter {
     return new ManagedProvidersAppAdapter(
       PostgresManagedProviderAdapter.create({
-        database: options.prisma,
+        projects: PrismaManagedProviderProjectRepository.create(options.prisma),
         configuration: EnvironmentManagedProviderConfigurationAdapter.create({
           source: options.environment,
           reporter: AppManagedProviderConfigurationReporter.create(),

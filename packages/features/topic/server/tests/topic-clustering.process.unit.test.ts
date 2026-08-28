@@ -29,8 +29,10 @@ const definition = buildProcessDefinition(
     name: TOPIC_CLUSTERING_PROCESS_NAME,
     applier: topicClusteringPM({
       runPort: { runClusteringPage: () => Promise.reject(new Error("unused")) },
-      commands: () => {
-        throw new Error("unused in evolve tests");
+      commands: {
+        recordClusteringRunStarted: () => Promise.reject(new Error("unused in evolve tests")),
+        recordClusteringRunCompleted: () => Promise.reject(new Error("unused in evolve tests")),
+        recordClusteringRunFailed: () => Promise.reject(new Error("unused in evolve tests")),
       },
       classifyError: () => ({ code: "internal", isUserActionable: false }),
       metrics: {

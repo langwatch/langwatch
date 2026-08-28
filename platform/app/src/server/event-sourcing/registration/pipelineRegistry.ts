@@ -72,10 +72,6 @@ import type { DatasetNormalizePayload } from "@langwatch/dataset-server";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import type { GatewaySpendEventsPort } from "@langwatch/gateway-server";
 import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
-import {
-  incrementTopicClusteringPageTotal,
-  observeTopicClusteringPageDuration,
-} from "~/server/metrics";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "~/runtime/app/features/billing";
 import { AppTraceRecordSpanAdapter } from "~/runtime/app/trace-record-span.adapter";
@@ -200,17 +196,12 @@ import {
   createSuiteRunProcessingPipeline,
   SUITE_RUN_PROJECTION_VERSIONS,
 } from "@langwatch/suite-server";
+import { TopicServerInstaller } from "@langwatch/topic-server";
 import {
-  classifyClusteringError,
-  createTopicClusteringProcessingPipeline,
-  RedisTopicClusteringBootstrapAdapter,
-  type TopicClusteringOutcomeCommands,
-  type TopicClusteringRunHistoryData,
-  type TopicClusteringRunPort,
-  type TopicClusteringRunStatusData,
-  type TopicModelData,
-} from "@langwatch/topic-server";
-import { resolveSpanCommandShardCount } from "@langwatch/trace-server";
+  EventingTraceTopicAssignmentPort,
+  resolveSpanCommandShardCount,
+} from "@langwatch/trace-server";
+import { AppTraceTopicAssignmentCommandAdapter } from "~/runtime/app/trace-topic-assignment-command.adapter";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
@@ -378,12 +369,6 @@ export interface PipelineRepositories {
    * domain's dispatcher scopes its leases via `processNames`).
    */
   processStore: ProcessStore;
-  /** Per-project topic clustering run status (ADR-051, Postgres). */
-  topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
-  /** Per-project topic clustering run history (audit; bounded). */
-  topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
-  /** Write-through topic model store (the Topic table + cursor row). */
-  topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionCapability;
 }
@@ -414,10 +399,7 @@ export interface PipelineRegistryDeps {
     titleGenerator: LangyTitleGenerator;
     sessionKeys: LangySessionKeyService;
   };
-  topicClustering: {
-    /** Runs one clustering page (the ADR-051 effect's domain function). */
-    runPort: TopicClusteringRunPort;
-  };
+  topicClustering: { installer: TopicServerInstaller };
   enterprisePipelines: AppGovernanceEventingRuntime;
   projects: ProjectService;
   monitors: MonitorService;
@@ -692,7 +674,9 @@ export class PipelineRegistry {
       wireExperimentDeps,
     });
     const { pipeline: langyConversationPipeline } = this.registerLangyConversationPipeline();
-    const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline();
+    const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline(
+      tracePipeline.commands.assignTopic,
+    );
     const enterprisePipelines = AppGovernanceEventingAdapter.create(
       this.deps.eventSourcing,
       this.deps.enterprisePipelines,
@@ -738,67 +722,18 @@ export class PipelineRegistry {
 
   private readonly governanceSubscriberRuntime = new AppGovernanceSubscriberRuntime();
 
-  /**
-   * ADR-051: topic clustering scheduling as a builder-mounted process
-   * manager (ADR-052) — the pipeline declares the whole topology (events,
-   * projection, commands, process manager, outbox tuning); the shared
-   * ProcessRuntime owns the manager, outbox and wake workers. The registry
-   * only injects executor dependencies and late-binds the outcome commands,
-   * which are this same pipeline's own write surface and exist only after
-   * `.build()`.
-   */
-  private registerTopicClusteringPipeline() {
-    let outcomeCommands: TopicClusteringOutcomeCommands | null = null;
-
-    const pipeline = this.deps.eventSourcing.register(
-      createTopicClusteringProcessingPipeline({
-        topicClusteringRunStatusStore: this.deps.repositories.topicClusteringRunStatus,
-        topicClusteringRunHistoryStore: this.deps.repositories.topicClusteringRunHistory,
-        topicModelStore: this.deps.repositories.topicModel,
-        dispatch: {
-          runPort: this.deps.topicClustering.runPort,
-          commands: () => {
-            if (!outcomeCommands) {
-              throw new Error(
-                "Topic clustering outcome commands used before the pipeline finished registering",
-              );
-            }
-            return outcomeCommands;
-          },
-          // The failure taxonomy lives with the clustering execution; the
-          // intent executor only consumes its verdict.
-          classifyError: classifyClusteringError,
-          metrics: {
-            incrementPageTotal: incrementTopicClusteringPageTotal,
-            observePageDuration: observeTopicClusteringPageDuration,
-          },
-        },
-      }),
+  private registerTopicClusteringPipeline(traceAssignTopic: {
+    send(input: import("@langwatch/trace-contract").AssignTopicCommandData): Promise<unknown>;
+  }) {
+    const traceAssignments = EventingTraceTopicAssignmentPort.create(
+      AppTraceTopicAssignmentCommandAdapter.create({ command: traceAssignTopic }),
     );
-
-    const commands = mapCommands(pipeline.commands);
-    outcomeCommands = {
-      recordClusteringRunStarted: (args) => commands.recordClusteringRunStarted(args),
-      recordClusteringRunCompleted: (args) => commands.recordClusteringRunCompleted(args),
-      recordClusteringRunFailed: (args) => commands.recordClusteringRunFailed(args),
-    };
-    // Level-triggered bootstrap: the projectMetadata subscriber asks on every
-    // real ingest, and this claim keeps that to one commit per project per
-    // window. See RedisTopicClusteringBootstrapAdapter for why re-asking is safe.
-    const topicClusteringBootstrap = RedisTopicClusteringBootstrapAdapter.create({
-      redis: this.deps.redis,
-      bootstrap: (projectId) =>
-        commands.requestClustering({
-          tenantId: projectId,
-          occurredAt: Date.now(),
-          trigger: "bootstrap",
-        }),
+    const installed = this.deps.topicClustering.installer.install({
+      eventSourcing: this.deps.eventSourcing,
+      traceAssignments,
     });
-    this.bootstrapTopicClustering.resolve((projectId) =>
-      topicClusteringBootstrap.claimAndBootstrap(projectId),
-    );
-
-    return { pipeline };
+    this.bootstrapTopicClustering.resolve(installed.claimAndBootstrap);
+    return { pipeline: installed.pipeline };
   }
 
   /** Langy writes its low-latency operational projections directly to Postgres. */

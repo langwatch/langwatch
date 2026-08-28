@@ -54,10 +54,7 @@ export class LegacyImportTopicClusteringMigration {
   private constructor(
     private readonly repository: TopicClusteringRepository,
     private readonly redis: Redis | Cluster | null,
-    private readonly commands: Pick<
-      TopicClusteringCommandsPort,
-      "recordTopics" | "requestClustering"
-    >,
+    private readonly commands: TopicClusteringCommandsPort,
     private readonly schedulePageSize?: number,
   ) {}
 
@@ -65,7 +62,7 @@ export class LegacyImportTopicClusteringMigration {
     repository: TopicClusteringRepository;
     /** Coordination only — without Redis both seeds still run safely. */
     redis: Redis | Cluster | null;
-    commands: Pick<TopicClusteringCommandsPort, "recordTopics" | "requestClustering">;
+    commands: TopicClusteringCommandsPort;
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {
@@ -180,9 +177,7 @@ export class LegacyImportTopicClusteringMigration {
       // signed up after the cutover always carry a cursor row (the projection
       // writes it with their first topics), so they cost nothing here.
       const owned = new Set(
-        await this.repository.findOwnedTopicModelProjectIds(
-          page.map((project) => project.id),
-        ),
+        await this.repository.findOwnedTopicModelProjectIds(page.map((project) => project.id)),
       );
 
       for (const { id: projectId } of page) {
@@ -279,9 +274,7 @@ export class LegacyImportTopicClusteringMigration {
       if (page.length === 0) break;
 
       const alreadyScheduled = new Set(
-        await this.repository.findAlreadyScheduledProjectIds(
-          page.map((project) => project.id),
-        ),
+        await this.repository.findAlreadyScheduledProjectIds(page.map((project) => project.id)),
       );
 
       for (const project of page) {
@@ -315,10 +308,7 @@ export class LegacyImportTopicClusteringMigration {
     return summary;
   }
 
-  private async claimSeed(
-    claimKey: string,
-    log: typeof logger,
-  ): Promise<boolean> {
+  private async claimSeed(claimKey: string, log: typeof logger): Promise<boolean> {
     if (!this.redis) return true;
     try {
       const claimed = await this.redis.set(

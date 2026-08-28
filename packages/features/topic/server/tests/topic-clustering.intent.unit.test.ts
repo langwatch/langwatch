@@ -57,7 +57,7 @@ function makeDeps(overrides: {
 }): TopicClusteringDispatchDeps {
   return {
     runPort: { runClusteringPage: overrides.runClusteringPage },
-    commands: () => overrides.commands,
+    commands: overrides.commands,
     classifyError: overrides.classifyError ?? classifyAsInternal,
     metrics: overrides.metrics ?? makeMetrics(),
     ...(overrides.clock ? { clock: overrides.clock } : {}),

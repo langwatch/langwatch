@@ -12,10 +12,16 @@ the private Prisma repository, the service implementation, and the
 topic-clustering-processing pipeline: event envelopes, commands, fold
 projections, the `topicClustering` process manager, and its run intent
 executor (`adapters/eventing.topic-clustering.adapter.ts`). Pipeline
-registration, the clustering execution, boot seeds, and the Prisma
-projection stores remain app composition (a named residual). Malformed
-history JSON is treated as an empty rebuildable history, and topic lists
-preserve database order. No caller imports the repository or Prisma rows.
+registration, the clustering execution, boot seeds, and the Prisma projection
+stores enter process composition as named ports. Every manual trigger dispatches
+the Topic Eventing command; no task calls the page runner directly.
+
+The active application registry remains a deliberate residual. The new worker
+composition is producer-only until it can mount the complete shared Eventing
+registry, including Trace's `assignTopic` consumer; a Topic-only consumer
+would retry unrelated jobs from `event-sourcing/jobs`. Malformed history JSON
+is treated as an empty rebuildable history, and topic lists preserve database
+order. No caller imports the repository or Prisma rows.
 
 Specs live in `specs/` (event-sourced scheduling, run history, topics source
 of truth, trace assignment, read surface).

@@ -13,6 +13,7 @@ export {
 } from "./ports/model-provider.port";
 export { ModelProviderKeysService } from "./services/model-provider-keys.service";
 export { resolveMaxTokensCeiling } from "./adapters/resolve-max-tokens-ceiling.adapter";
+export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter";
 export {
   isKnownModelId,
   isRankableByPrice,

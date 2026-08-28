@@ -5,12 +5,6 @@ import type {
   WorkerTransportPort,
 } from "./worker-runtime.port";
 
-export {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
-} from "./worker-runtime.port";
-
 export type WorkerRuntimeOptions = {
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
@@ -44,42 +38,36 @@ export class WorkerRuntime {
     if (this.closed) {
       throw new Error("Worker runtime is closed.");
     }
-
     if (this.handle) {
       return;
     }
-
-    const starting = this.starting;
-    if (starting) {
-      return starting;
+    if (this.starting) {
+      return this.starting;
     }
 
-    const nextStart = this.startTransport();
-    this.starting = nextStart;
-    return nextStart;
+    const starting = this.startTransport();
+    this.starting = starting;
+    return starting;
   }
 
   close(): Promise<void> {
-    const closing = this.closing;
-    if (closing) {
-      return closing;
+    if (this.closing) {
+      return this.closing;
     }
 
     this.closed = true;
-    const nextClose = this.closeRuntime();
-    this.closing = nextClose;
-    return nextClose;
+    const closing = this.closeRuntime();
+    this.closing = closing;
+    return closing;
   }
 
   private async startTransport(): Promise<void> {
     try {
       const handle = await this.transport.start();
-
       if (this.closed) {
         await handle.shutdown();
         return;
       }
-
       this.handle = handle;
     } finally {
       this.starting = void 0;
@@ -87,16 +75,27 @@ export class WorkerRuntime {
   }
 
   private async closeRuntime(): Promise<void> {
-    const starting = this.starting;
-    if (starting) {
-      await starting.catch(() => void 0);
+    await this.starting?.catch(() => void 0);
+    let firstError: unknown;
+    try {
+      await this.handle?.shutdown();
+    } catch (error) {
+      firstError = error;
     }
-
-    await this.handle?.shutdown();
-    await this.lifecycle.close();
-
+    try {
+      await this.lifecycle.close();
+    } catch (error) {
+      firstError ??= error;
+    }
     if (this.ownsResources) {
-      await this.resources.close();
+      try {
+        await this.resources.close();
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError) {
+      throw firstError;
     }
   }
 }

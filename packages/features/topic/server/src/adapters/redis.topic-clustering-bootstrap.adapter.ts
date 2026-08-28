@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
+import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 
@@ -43,18 +44,18 @@ function buildKey(projectId: string): string {
 export class RedisTopicClusteringBootstrapAdapter {
   private constructor(
     private readonly redis: Redis | Cluster,
-    private readonly bootstrap: (projectId: string) => Promise<void>,
+    private readonly commands: TopicClusteringCommandsPort,
     private readonly ttlSeconds: number,
   ) {}
 
   static create(options: {
     redis: Redis | Cluster;
-    bootstrap: (projectId: string) => Promise<void>;
+    commands: TopicClusteringCommandsPort;
     ttlSeconds?: number;
   }): RedisTopicClusteringBootstrapAdapter {
     return new RedisTopicClusteringBootstrapAdapter(
       options.redis,
-      options.bootstrap,
+      options.commands,
       options.ttlSeconds ?? BOOTSTRAP_CLAIM_TTL_SECONDS,
     );
   }
@@ -62,13 +63,7 @@ export class RedisTopicClusteringBootstrapAdapter {
   async claimAndBootstrap(projectId: string): Promise<void> {
     let claimed = true;
     try {
-      const result = await this.redis.set(
-        buildKey(projectId),
-        "1",
-        "EX",
-        this.ttlSeconds,
-        "NX",
-      );
+      const result = await this.redis.set(buildKey(projectId), "1", "EX", this.ttlSeconds, "NX");
       claimed = result === "OK";
     } catch (error) {
       logger.warn(
@@ -79,6 +74,10 @@ export class RedisTopicClusteringBootstrapAdapter {
 
     if (!claimed) return;
 
-    await this.bootstrap(projectId);
+    await this.commands.requestClustering({
+      tenantId: projectId,
+      occurredAt: Date.now(),
+      trigger: "bootstrap",
+    });
   }
 }

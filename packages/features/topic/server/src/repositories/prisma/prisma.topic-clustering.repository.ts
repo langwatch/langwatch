@@ -7,14 +7,18 @@ import {
   type TopicClusteringSeedTopicRow,
   type TopicClusteringTopicIndexRow,
 } from "../topic-clustering.repository";
+import type { TopicDatabase } from "./prisma.topic.repository";
+
+/** Complete Prisma capability consumed by Topic's private persistence adapters. */
+export type TopicClusteringDatabase = PrismaClient & TopicDatabase;
 
 /** Prisma-backed {@link TopicClusteringRepository}. */
 export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: TopicClusteringDatabase) {
     super();
   }
 
-  static create(options: { database: PrismaClient }): PrismaTopicClusteringRepository {
+  static create(options: { database: TopicClusteringDatabase }): PrismaTopicClusteringRepository {
     return new PrismaTopicClusteringRepository(options.database);
   }
 

@@ -11,6 +11,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import superjson from "superjson";
+import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 
 export type ApiActor = Readonly<{ id: string }>;
 export type ApiServices = Readonly<{ agents: AgentService; secrets: SecretService }>;
@@ -169,9 +170,15 @@ export class ApiApplication {
   static create(options: {
     agents?: AgentService;
     secrets: SecretService;
+    topic?: TopicApiFeature;
     http?: ApiHttpOptions;
   }): ApiApplication {
-    return new ApiApplication({ agents: options.agents, secrets: options.secrets }, options.http);
+    options.topic?.install();
+    return new ApiApplication(
+      { agents: options.agents, secrets: options.secrets },
+      options.http,
+      options.topic,
+    );
   }
 
   readonly hono: Hono | undefined;
@@ -185,6 +192,7 @@ export class ApiApplication {
       secrets: SecretService;
     }>,
     private readonly http: ApiHttpOptions | undefined,
+    readonly topic: TopicApiFeature | undefined,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();

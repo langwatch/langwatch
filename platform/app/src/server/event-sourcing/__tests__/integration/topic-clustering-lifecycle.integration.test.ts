@@ -7,6 +7,7 @@ import {
 } from "@langwatch/topic-contract";
 import {
   createTopicClusteringProcessingPipeline,
+  EventingTopicClusteringScheduleAdapter,
   LegacyImportTopicClusteringMigration,
   PostgresTopicAdapter,
 } from "@langwatch/topic-server";
@@ -17,7 +18,6 @@ import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/pr
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
 import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
-import { AppTopicRuntime } from "~/runtime/app/features/topic";
 
 /**
  * Full-stack lifecycle tests (specs: packages/features/topic/specs/
@@ -148,10 +148,12 @@ describe.skipIf(!hasTestcontainers)(
   "topic clustering lifecycle (commands → event log → Postgres projections)",
   () => {
     let eventSourcing: EventSourcing;
-    const topics = AppTopicRuntime.create({
+    const topics = PostgresTopicAdapter.create({
       database: prisma,
-      processStore: new PrismaProcessStore(prisma),
-    }).build();
+      schedule: EventingTopicClusteringScheduleAdapter.create({
+        processStore: new PrismaProcessStore(prisma),
+      }),
+    });
     // The registered pipeline's command handles (send-capable), assigned in
     // beforeAll once the pipeline is registered.
     let commands: TopicClusteringCommands;
@@ -192,8 +194,13 @@ describe.skipIf(!hasTestcontainers)(
             runPort: {
               runClusteringPage: () => Promise.reject(new Error("run port unused in this test")),
             },
-            commands: () => {
-              throw new Error("outcome commands unused in this test");
+            commands: {
+              recordClusteringRunStarted: () =>
+                Promise.reject(new Error("outcome commands unused in this test")),
+              recordClusteringRunCompleted: () =>
+                Promise.reject(new Error("outcome commands unused in this test")),
+              recordClusteringRunFailed: () =>
+                Promise.reject(new Error("outcome commands unused in this test")),
             },
             classifyError: () => ({ code: "internal", isUserActionable: false }),
             metrics: {

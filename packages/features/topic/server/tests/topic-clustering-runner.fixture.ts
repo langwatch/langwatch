@@ -8,7 +8,7 @@ export function makeProject(overrides: Record<string, unknown> = {}) {
     team: { organizationId: "org-1" },
     ...overrides,
   };
-};
+}
 
 /**
  * Fake runner boundaries: the production composition wires these to the
@@ -33,8 +33,7 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
         ok: true,
         statusText: "OK",
         text: () => Promise.resolve(""),
-        json: () =>
-          Promise.resolve({ topics: [], subtopics: [], traces: [], cost: null }),
+        json: () => Promise.resolve({ topics: [], subtopics: [], traces: [], cost: null }),
       }),
     },
     langevalsEndpoint: "http://langevals.test" as string | null,
@@ -56,6 +55,9 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
     },
     commands: {
       recordTopics: vi.fn().mockResolvedValue(undefined),
+      requestClustering: vi.fn().mockResolvedValue(undefined),
+    },
+    traceAssignments: {
       assignTopic: vi.fn().mockResolvedValue(undefined),
     },
     observePayloadSize: vi.fn(),

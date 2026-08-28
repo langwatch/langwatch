@@ -29,10 +29,7 @@ const projectionSchema = z.object({
 
 const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
-export type TopicDatabase = Pick<
-  PrismaClient,
-  "topic" | "topicClusteringRunProjection" | "topicClusteringRunHistoryProjection"
->;
+export type TopicDatabase = PrismaClient;
 
 export class PrismaTopicRepository extends TopicRepository {
   static create(database: TopicDatabase): PrismaTopicRepository {

@@ -4,8 +4,8 @@ import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../src/worker-runtime.port";
-import { WorkerRuntime } from "../src/worker.runtime";
+} from "../src/platform/lifecycle/worker-runtime.port";
+import { WorkerRuntime } from "../src/platform/lifecycle/worker.runtime";
 
 class TestWorkerHandle extends WorkerHandlePort {
   readonly shutdown = vi.fn(async (): Promise<void> => void 0);
@@ -149,6 +149,40 @@ describe("WorkerRuntime", () => {
     await runtime.close();
 
     expect(phases).toEqual(["transport", "lifecycle", "resource"]);
+  });
+
+  it("continues lifecycle and resource cleanup after transport shutdown fails", async () => {
+    const lifecycle = new TestWorkerLifecycle();
+    const transport = new TestWorkerTransport();
+    const resources = new ResourceScope();
+    const closeResource = vi.fn();
+    const transportError = new Error("transport shutdown failed");
+    transport.handle.shutdown.mockRejectedValueOnce(transportError);
+    resources.own("worker-resource", closeResource);
+    const runtime = WorkerRuntime.create({ lifecycle, transport, resources });
+
+    await runtime.start();
+    await expect(runtime.close()).rejects.toBe(transportError);
+
+    expect(lifecycle.close).toHaveBeenCalledOnce();
+    expect(closeResource).toHaveBeenCalledOnce();
+  });
+
+  it("continues resource cleanup after lifecycle close fails", async () => {
+    const lifecycle = new TestWorkerLifecycle();
+    const transport = new TestWorkerTransport();
+    const resources = new ResourceScope();
+    const closeResource = vi.fn();
+    const lifecycleError = new Error("lifecycle close failed");
+    lifecycle.close.mockRejectedValueOnce(lifecycleError);
+    resources.own("worker-resource", closeResource);
+    const runtime = WorkerRuntime.create({ lifecycle, transport, resources });
+
+    await runtime.start();
+    await expect(runtime.close()).rejects.toBe(lifecycleError);
+
+    expect(transport.handle.shutdown).toHaveBeenCalledOnce();
+    expect(closeResource).toHaveBeenCalledOnce();
   });
 
   it("leaves a shared resource scope to its parent", async () => {

@@ -7,12 +7,8 @@ import type {
 
 /**
  * The pipeline command boundary for the clustering runner and the boot
- * migration: the topic pipeline's own `recordTopics` / `requestClustering`,
- * and the trace pipeline's `assignTopic` as a narrow port — the topic feature
- * never imports the trace contract.
- *
- * Composition late-binds these to the registered pipelines' commands (they
- * exist only after the pipelines build).
+ * migration. Composition binds these to the registered Topic pipeline after
+ * it exists; Trace assignment is a separate Trace-owned contract port.
  */
 export abstract class TopicClusteringCommandsPort {
   abstract recordTopics(args: {
@@ -29,16 +25,5 @@ export abstract class TopicClusteringCommandsPort {
     occurredAt: number;
     trigger: TopicClusteringTrigger;
     requestedByUserId?: string;
-  }): Promise<void>;
-
-  abstract assignTopic(args: {
-    tenantId: string;
-    traceId: string;
-    topicId: string | null;
-    topicName: string | null;
-    subtopicId: string | null;
-    subtopicName: string | null;
-    isIncremental: boolean;
-    occurredAt: number;
   }): Promise<void>;
 }

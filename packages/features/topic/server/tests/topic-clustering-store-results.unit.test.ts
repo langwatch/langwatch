@@ -42,8 +42,8 @@ describe("storeResults", () => {
       const deps = fakeRunnerDeps();
       await storeResults(deps, "project_regression", sampleClusteringResult, false);
 
-      expect(deps.commands.assignTopic).toHaveBeenCalledTimes(2);
-      expect(deps.commands.assignTopic).toHaveBeenCalledWith(
+      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledTimes(2);
+      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "project_regression",
           traceId: "trace_1",
@@ -51,7 +51,7 @@ describe("storeResults", () => {
           topicName: "Greetings",
         }),
       );
-      expect(deps.commands.assignTopic).toHaveBeenCalledWith(
+      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "project_regression",
           traceId: "trace_2",

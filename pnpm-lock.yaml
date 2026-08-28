@@ -119,6 +119,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../packages/eventing
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../packages/handled-error
@@ -134,6 +137,15 @@ importers:
       '@langwatch/secret-server':
         specifier: workspace:*
         version: link:../../packages/features/secret/server
+      '@langwatch/topic-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/topic/contract
+      '@langwatch/topic-server':
+        specifier: workspace:*
+        version: link:../../packages/features/topic/server
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/trace/contract
       '@langwatch/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
@@ -251,9 +263,30 @@ importers:
 
   apps/worker:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@langwatch/enterprise-worker':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/composition/worker
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../packages/eventing
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition
+      '@langwatch/topic-server':
+        specifier: workspace:*
+        version: link:../../packages/features/topic/server
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/trace/contract
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -3029,6 +3062,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/topic-contract':
+        specifier: workspace:*
+        version: link:../../topic/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -4068,6 +4104,9 @@ importers:
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       ioredis:
         specifier: 5.10.1
         version: 5.10.1

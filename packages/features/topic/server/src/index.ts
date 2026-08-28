@@ -9,7 +9,16 @@ export {
   type TopicClusteringRunStatusData,
   type TopicModelData,
 } from "./adapters/eventing.topic-clustering.adapter";
-export { PostgresTopicAdapter, type TopicClusteringPersistence } from "./adapters/postgres.topic.adapter";
+export {
+  PostgresTopicAdapter,
+  type TopicClusteringPersistence,
+} from "./adapters/postgres.topic.adapter";
+export {
+  TopicServerInstaller,
+  type TopicClusteringExecutionDependencies,
+  type TopicServerInstallerDependencies,
+} from "./adapters/topic-server.adapter";
+export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter";
 export {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
   RedisTopicClusteringBootstrapAdapter,
@@ -45,6 +54,7 @@ export {
   TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
   type TopicClusteringRunnerDeps,
   type TopicClusteringWritePathSeed,
+  TopicClusteringRunner,
 } from "./intents/topic-clustering-runner.intent";
 export {
   LegacyImportTopicClusteringMigration,
@@ -62,10 +72,7 @@ export {
   type TopicClusteringLangevalsKind,
   type TopicClusteringLangevalsResponse,
 } from "./ports/topic-clustering-langevals.port";
-export {
-  type TopicClusteringProviderConfig,
-  TopicClusteringModelsPort,
-} from "./ports/topic-clustering-models.port";
+export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent";
 export { TopicClusteringSchedulePort } from "./ports/topic-clustering-schedule.port";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,

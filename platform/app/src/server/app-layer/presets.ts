@@ -378,15 +378,14 @@ import {
 } from "~/runtime/app/features/suite-execution.adapter";
 import { startSystemMigrations } from "./system-migrations/boot";
 import {
-  type ClusteringPageOutcome,
-  type ClusteringRunContext,
-  clusterTopicsForProject,
-  LegacyImportTopicClusteringMigration,
+  EventingTopicClusteringScheduleAdapter,
   PostgresTopicAdapter,
-  type TopicClusteringCommandsPort,
-  type TopicClusteringRunnerDeps,
+  TopicServerInstaller,
 } from "@langwatch/topic-server";
-import { AppTopicRuntime, createAppTopicClusteringRunnerDeps } from "~/runtime/app/features/topic";
+import {
+  AppTopicClusteringMetricsAdapter,
+  createAppTopicClusteringExecutionDependencies,
+} from "~/runtime/app/features/topic";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "@langwatch/trace-server";
@@ -450,15 +449,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   };
 
   const processStore = new PrismaProcessStore(prisma);
-
-  // Bind the clustering page runner once for the Eventing process. The
-  // package runner's deps are assembled below, after the model providers and
-  // Redis exist; the closure only dereferences them at dispatch time.
-  const runClusteringPage = (params: {
-    projectId: string;
-    searchAfter?: [number, string];
-    runContext?: ClusteringRunContext;
-  }): Promise<ClusteringPageOutcome> => clusterTopicsForProject(topicClusteringRunnerDeps, params);
 
   // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
@@ -575,31 +565,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     permissions: authzFeature.permissions,
   }).build();
 
-  // Topic clustering (ADR-051): the runner, boot migration, and projection
-  // stores live in @langwatch/topic-server; composition supplies the ports —
-  // the model-provider cascade, the staged langevals fetch, the ClickHouse
-  // resolver, the guarded Prisma client, and the pipelines' late-bound
-  // commands (dispatched long after registration, via getApp()).
-  const topicClusteringPersistence = PostgresTopicAdapter.createClusteringPersistence({
+  const topic = TopicServerInstaller.create({
     database: prisma,
-  });
-  const topicClusteringCommandsPort: TopicClusteringCommandsPort = {
-    recordTopics: (args) => getApp().topicClustering.recordTopics(args),
-    requestClustering: (args) => getApp().topicClustering.requestClustering(args),
-    assignTopic: (args) => getApp().traces.assignTopic(args),
-  };
-  const topicClusteringMigration = LegacyImportTopicClusteringMigration.create({
-    repository: topicClusteringPersistence.repository,
-    redis: redis ?? null,
-    commands: topicClusteringCommandsPort,
-  });
-  const topicClusteringRunnerDeps: TopicClusteringRunnerDeps = createAppTopicClusteringRunnerDeps({
-    resolveClickHouseClient,
-    modelProviders,
-    managedProviders,
-    repository: topicClusteringPersistence.repository,
-    migration: topicClusteringMigration,
-    commands: topicClusteringCommandsPort,
+    processStore,
+    redis,
+    execution: createAppTopicClusteringExecutionDependencies({
+      resolveClickHouseClient,
+      modelProviders,
+      langevalsEndpoint: config.langevalsEndpoint ?? null,
+    }),
+    metrics: new AppTopicClusteringMetricsAdapter(),
   });
   const prompts = AppPromptRuntime.create({
     database: prisma,
@@ -696,13 +671,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceSummaryService",
   );
-  const topics = traced(
-    AppTopicRuntime.create({
-      database: prisma,
-      processStore,
-    }).build(),
-    "TopicService",
-  );
+  const topics = traced(topic.service, "TopicService");
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
   // the TraceListService constructor lean (the null/test preset below
   // doesn't need a broadcaster — refreshes that never get an SSE push
@@ -1214,9 +1183,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
     }),
     processStore,
-    topicClusteringRunStatus: topicClusteringPersistence.topicClusteringRunStatus,
-    topicClusteringRunHistory: topicClusteringPersistence.topicClusteringRunHistory,
-    topicModel: topicClusteringPersistence.topicModel,
     langyTurnAdmission: langyPersistence.langyTurnAdmission,
   };
 
@@ -1697,16 +1663,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       process: (payload) => datasetRuntime.processNormalization(payload),
       connect: (sender) => datasetRuntime.connectNormalization(sender),
     },
-    topicClustering: {
-      runPort: {
-        runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
-          runClusteringPage({
-            projectId,
-            searchAfter: searchAfter ?? undefined,
-            runContext: { runId, page },
-          }),
-      },
-    },
+    topicClustering: { installer: topic },
     enterprisePipelines: AppGovernanceEventingRuntime.create(
       AppIngestionPullExecutionRuntime.create(
         ingestionPullWorker,
@@ -1806,7 +1763,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     // history onto the event stream, and daily-wake schedules for
     // pre-cutover projects. The migration owns its own wiring, coordination,
     // and error handling — a failure is logged and the next boot retries.
-    topicClusteringMigration.startBootSeeds();
+    topic.startBootSeeds();
   }
 
   // The organization's GitHub connection: the install/webhook lifecycle, and
@@ -2566,10 +2523,12 @@ export function createTestApp(
     executor: null,
     database: DEFAULT_LWQL_DATABASE,
   });
-  const testTopics = AppTopicRuntime.create({
+  const testTopics = PostgresTopicAdapter.create({
     database: testPrisma,
-    processStore: new PrismaProcessStore(testPrisma),
-  }).build();
+    schedule: EventingTopicClusteringScheduleAdapter.create({
+      processStore: new PrismaProcessStore(testPrisma),
+    }),
+  });
   const testDataRetention: DataRetentionDependencies = testDataRetentionService;
   const testScim = PostgresScimAdapter.create({
     database: testPrisma,

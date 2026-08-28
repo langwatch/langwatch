@@ -27,6 +27,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "ioredis": "5.10.1",
     "nanoid": "^6.0.0",
     "zod": "^4.4.3"

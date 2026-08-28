@@ -76,9 +76,11 @@ function harness(options?: {
         ({
           runClusteringPage: () => Promise.reject(new Error("unused")),
         } as TopicClusteringDispatchDeps["runPort"]),
-      commands: () => {
-        if (!options?.commands) throw new Error("commands unused in this test");
-        return options.commands;
+      commands: options?.commands ?? {
+        recordClusteringRunStarted: () => Promise.reject(new Error("commands unused in this test")),
+        recordClusteringRunCompleted: () =>
+          Promise.reject(new Error("commands unused in this test")),
+        recordClusteringRunFailed: () => Promise.reject(new Error("commands unused in this test")),
       },
       classifyError: () => ({ code: "internal", isUserActionable: false }),
       metrics: {
