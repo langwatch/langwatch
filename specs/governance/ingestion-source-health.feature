@@ -24,7 +24,11 @@ Feature: A broken puller is visible, a flaky one is not
   Scenario: A successful run records its time and resets the failure count
     Given the source has two consecutive failed runs
     When a run succeeds
-    Then the time of that success is recorded on the source
+    # The success time is a NEW field on the source, distinct from the
+    # existing last-event time. A test satisfiable by writing lastEventAt
+    # proves nothing — ADR-128 disqualifies that field by name, because it
+    # only moves when events arrive.
+    Then the source's last-successful-run time is updated
     And the consecutive-failure count starts over
 
   @unit
@@ -32,6 +36,8 @@ Feature: A broken puller is visible, a flaky one is not
     Given the provider reports no new usage for the period
     When the run completes without error
     Then it counts as a successful run, not a failure
+    And the last-successful-run time is updated
+    And the last-event time stays unchanged
 
   @integration
   Scenario: A day with no data is shown as unknown, never as zero
