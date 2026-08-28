@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentTypeSelectorDrawer } from "../src/agent-type-selector-drawer";
+import { AgentTypeSelectorDrawer } from "../src/features/editor/ui/sections/agent-type-selector-drawer";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -17,10 +17,9 @@ afterEach(() => {
 function renderDrawer(onSelect = vi.fn()) {
   return {
     onSelect,
-    ...render(
-      <AgentTypeSelectorDrawer open={true} onClose={vi.fn()} onSelect={onSelect} />,
-      { wrapper: Wrapper },
-    ),
+    ...render(<AgentTypeSelectorDrawer open={true} onClose={vi.fn()} onSelect={onSelect} />, {
+      wrapper: Wrapper,
+    }),
   };
 }
 

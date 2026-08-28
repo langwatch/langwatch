@@ -1,5 +1,14 @@
 {
   "version": 0,
-  "governedWebPackages": ["@langwatch/prompt-web"],
-  "features": []
+  "governedWebPackages": ["@langwatch/agent-web", "@langwatch/prompt-web"],
+  "features": [
+    {
+      "id": "agent-management",
+      "root": "agent",
+      "uses": {
+        "screens": ["@langwatch/agent-web/screens/agent-management"],
+        "surfaces": ["@langwatch/agent-web/surfaces/browser-port"]
+      }
+    }
+  ]
 }

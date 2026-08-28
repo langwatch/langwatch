@@ -38,10 +38,7 @@ function RootLayout() {
 
   return (
     <InnerProviders>
-      <ErrorBoundary
-        FallbackComponent={PageErrorFallback}
-        resetKeys={[location.pathname]}
-      >
+      <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[location.pathname]}>
         <Suspense>
           <Outlet />
         </Suspense>
@@ -251,12 +248,7 @@ const routes: RouteObject[] = [
         // /settings/governance/cost-centers address chains through here,
         // and /governance/departments redirects via legacyRedirectRoutes).
         path: "/governance/cost-centers",
-        element: (
-          <LegacyPrefixRedirect
-            from="/governance/cost-centers"
-            to="/governance/people"
-          />
-        ),
+        element: <LegacyPrefixRedirect from="/governance/cost-centers" to="/governance/people" />,
       },
       {
         // View-all teams listing - bird's-eye `View all teams →` lands here.
@@ -397,7 +389,7 @@ const routes: RouteObject[] = [
       },
       {
         path: "/:project/agents",
-        ...page(() => import("./pages/[project]/agents")),
+        ...page(() => import("./runtime/ui/features/agent-ui-host.adapter")),
       },
 
       // Coding-agent activity, project scope

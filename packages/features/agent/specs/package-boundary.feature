@@ -110,6 +110,21 @@ Feature: Agents package boundary
     And it depends on Agents contract and the design system
     And it imports no Agents server, Prisma, Node runtime or app source
 
+  @architecture @web @typecheck
+  Scenario: Agent web private presentation has named ownership
+    Given Agent browser presentation is not part of a public screen or surface
+    Then package-wide browser ports and portable model remain under model
+    And management, history, editor, and HTTP presentation remain in named private features
+    And their model, behavior, elements, blocks, and sections follow the governed web dependency direction
+    And no flat root source or generic components bucket is present
+
+  @architecture @web
+  Scenario: Remaining Agent drawers are recorded as incomplete migration work
+    Given the Agent Management screen, history drawer, and HTTP editor are package-owned
+    Then the platform host composes their project, route, drawer, RPC, and generic-dialog actions
+    And Agent list, code-editor, workflow-editor, workflow-target-editor, workflow-selector, and type-selector drawers remain platform-owned behaviour
+    And those retained drawers are explicit next vertical slices rather than compatibility-only adapters
+
   @web @http-agent
   Scenario: HTTP editor preserves stored and default scenario mappings
     Given an existing HTTP agent has persisted scenario mappings

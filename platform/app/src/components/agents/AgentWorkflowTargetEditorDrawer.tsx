@@ -4,17 +4,8 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  VariablesSection,
-} from "~/components/variables";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
+import { type AvailableSource, type FieldMapping, VariablesSection } from "~/components/variables";
+import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -43,9 +34,7 @@ export type AgentWorkflowTargetEditorDrawerProps = {
  * below it, the mapping UI that every other agent target type already gets
  * (dataset columns -> the workflow's real input fields).
  */
-export function AgentWorkflowTargetEditorDrawer(
-  props: AgentWorkflowTargetEditorDrawerProps,
-) {
+export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
@@ -58,13 +47,10 @@ export function AgentWorkflowTargetEditorDrawer(
   const isOpen = props.open !== false && props.open !== undefined;
 
   const availableSources =
-    props.availableSources ??
-    (complexProps.availableSources as AvailableSource[] | undefined);
+    props.availableSources ?? (complexProps.availableSources as AvailableSource[] | undefined);
   const inputMappings =
-    props.inputMappings ??
-    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
-  const onInputMappingsChange =
-    props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
+    props.inputMappings ?? (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
+  const onInputMappingsChange = props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
 
   const { workflowQuery, variablesForUI, editorHref, isLoading, hasLookupFailed } =
     useWorkflowTargetAgentData({
@@ -108,14 +94,7 @@ export function AgentWorkflowTargetEditorDrawer(
               <Spinner size="md" />
             </HStack>
           ) : (
-            <VStack
-              gap={4}
-              align="stretch"
-              flex={1}
-              paddingX={6}
-              paddingY={4}
-              overflowY="auto"
-            >
+            <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
               {workflowQuery.data && (
                 <Field.Root>
                   <Field.Label>Workflow</Field.Label>
@@ -131,10 +110,10 @@ export function AgentWorkflowTargetEditorDrawer(
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}
                         icon={workflowQuery.data.icon}
-                        updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
-                        action={
-                          <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
-                        }
+                        updatedAtLabel={formatTimeAgo(
+                          new Date(workflowQuery.data.updatedAt).getTime(),
+                        )}
+                        action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                         width="300px"
                       />
                     </Link>
@@ -142,7 +121,9 @@ export function AgentWorkflowTargetEditorDrawer(
                     <WorkflowCardDisplay
                       name={workflowQuery.data.name}
                       icon={workflowQuery.data.icon}
-                      updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
+                      updatedAtLabel={formatTimeAgo(
+                        new Date(workflowQuery.data.updatedAt).getTime(),
+                      )}
                       width="300px"
                     />
                   )}
@@ -151,9 +132,8 @@ export function AgentWorkflowTargetEditorDrawer(
 
               {hasLookupFailed ? (
                 <Text fontSize="sm" color="fg.error" data-testid="workflow-lookup-error">
-                  Couldn't load this workflow's agent or its linked workflow, so its real
-                  input fields aren't known. Mapping is unavailable until it loads
-                  successfully.
+                  Couldn't load this workflow's agent or its linked workflow, so its real input
+                  fields aren't known. Mapping is unavailable until it loads successfully.
                 </Text>
               ) : (
                 <VariablesSection

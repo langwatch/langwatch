@@ -29,13 +29,13 @@ import type {
   Field as DSLField,
   StudioWorkflow,
 } from "@langwatch/workflow-contract";
+import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import {
-  getMappingSurfaceInputs,
-  parseStudioWorkflow,
-} from "@langwatch/workflow-contract";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+  type AgentConfig as AgentComponentConfig,
+  type AgentWithFields,
+  linkedWorkflowId,
+} from "@langwatch/agent-contract";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
-import { type AgentWithFields, linkedWorkflowId } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 import { workflowApi } from "~/utils/workflow-api";
 
@@ -105,12 +105,8 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
 
   // Form state
   const [name, setName] = useState("");
-  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
-    {},
-  );
-  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(
-    undefined,
-  );
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
+  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track whether form has been initialized for this drawer session
@@ -165,9 +161,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
 
       setName(agentQuery.data.name);
       const effectiveInputs =
-        workflowInputs.length > 0
-          ? workflowInputs
-          : [{ identifier: "input", type: "str" }];
+        workflowInputs.length > 0 ? workflowInputs : [{ identifier: "input", type: "str" }];
       const mappings = hasExistingMappings
         ? existingMappings
         : computeBestMatchMappings({ inputs: effectiveInputs });
@@ -208,8 +202,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
     const config: CustomComponentConfig = {
       ...existingConfig,
       name: name.trim(),
-      scenarioMappings:
-        Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
+      scenarioMappings: Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
       scenarioOutputField,
     };
     updateMutation.mutate({
@@ -269,8 +262,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
   const scenarioInputsForUI: Variable[] =
     workflowInputs.length > 0 ? workflowInputs : [{ identifier: "input", type: "str" }];
 
-  const editorHref =
-    project && workflowId ? `/${project.slug}/studio/${workflowId}` : undefined;
+  const editorHref = project && workflowId ? `/${project.slug}/studio/${workflowId}` : undefined;
 
   return (
     <Drawer.Root
@@ -306,14 +298,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
               <Spinner size="md" />
             </HStack>
           ) : (
-            <VStack
-              gap={4}
-              align="stretch"
-              flex={1}
-              paddingX={6}
-              paddingY={4}
-              overflowY="auto"
-            >
+            <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
               {/* Name */}
               <Field.Root required>
                 <Field.Label>Agent Name</Field.Label>
@@ -337,18 +322,14 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                     // previously swallowed data-testid — Chakra's asChild
                     // slot only forwards style-related props to the
                     // composed child, not arbitrary data attributes.
-                    <Link
-                      href={editorHref}
-                      isExternal
-                      data-testid="open-workflow-editor-link"
-                    >
+                    <Link href={editorHref} isExternal data-testid="open-workflow-editor-link">
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}
                         icon={workflowQuery.data.icon}
-                        updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
-                        action={
-                          <ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />
-                        }
+                        updatedAtLabel={formatTimeAgo(
+                          new Date(workflowQuery.data.updatedAt).getTime(),
+                        )}
+                        action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                         width="300px"
                       />
                     </Link>
@@ -356,29 +337,31 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                     <WorkflowCardDisplay
                       name={workflowQuery.data.name}
                       icon={workflowQuery.data.icon}
-                      updatedAtLabel={formatTimeAgo(workflowQuery.data.updatedAt.getTime())}
+                      updatedAtLabel={formatTimeAgo(
+                        new Date(workflowQuery.data.updatedAt).getTime(),
+                      )}
                       width="300px"
                     />
                   )}
                   <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                    Edit the workflow&apos;s nodes and logic in the studio. The mappings
-                    below control how scenario data flows into its entry inputs and which
-                    end output is returned.
+                    Edit the workflow&apos;s nodes and logic in the studio. The mappings below
+                    control how scenario data flows into its entry inputs and which end output is
+                    returned.
                   </Text>
                 </Field.Root>
               )}
 
               {workflowInputs.length === 0 && (
                 <Text fontSize="xs" color="fg.error">
-                  This workflow has no entry inputs yet. Publish a version with at least
-                  one entry input before running it as a scenario target.
+                  This workflow has no entry inputs yet. Publish a version with at least one entry
+                  input before running it as a scenario target.
                 </Text>
               )}
 
               {workflowOutputs.length === 0 && (
                 <Text fontSize="xs" color="fg.error">
-                  This workflow has no end outputs yet. Publish a version with at least
-                  one end output before running it as a scenario target.
+                  This workflow has no end outputs yet. Publish a version with at least one end
+                  output before running it as a scenario target.
                 </Text>
               )}
 

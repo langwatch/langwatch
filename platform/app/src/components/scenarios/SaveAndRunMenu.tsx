@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { agentHasDevTunnel } from "@langwatch/agent-web";
+import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

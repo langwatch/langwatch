@@ -2,7 +2,7 @@ import {
   AgentTypeSelectorDrawer as AgentTypeSelector,
   type AgentTypeSelectorDrawerProps as PresentationalProps,
   type AgentType,
-} from "@langwatch/agent-web";
+} from "@langwatch/agent-web/screens/agent-management";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 export type { AgentType };

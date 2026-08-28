@@ -1,11 +1,8 @@
 import { useMemo } from "react";
 import type { Variable } from "~/components/variables";
+import { linkedWorkflowId } from "@langwatch/agent-contract";
 import type { Field as DSLField, StudioWorkflow } from "@langwatch/workflow-contract";
-import {
-  getMappingSurfaceInputs,
-  parseStudioWorkflow,
-} from "@langwatch/workflow-contract";
-import { linkedWorkflowId } from "~/server/agents/agent-fields";
+import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import { workflowApi } from "~/utils/workflow-api";
 
@@ -80,8 +77,7 @@ export function useWorkflowTargetAgentData({
       ? workflowInputs
       : [{ identifier: "input", type: "str" }];
 
-  const editorHref =
-    projectSlug && workflowId ? `/${projectSlug}/studio/${workflowId}` : undefined;
+  const editorHref = projectSlug && workflowId ? `/${projectSlug}/studio/${workflowId}` : undefined;
 
   const isLoading = !!agentId && (agentQuery.isLoading || workflowQuery.isLoading);
 

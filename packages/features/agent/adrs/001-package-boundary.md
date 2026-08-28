@@ -41,6 +41,16 @@ current-project data/actions and small render ports for cross-feature Scenario
 mapping and Variables presentation. It does not receive tRPC hooks or a hidden
 application context.
 
+Its private browser implementation uses the governed two-scope web layout.
+`model/agent-browser.port.ts` and the development-tunnel model are genuine
+package-wide portable collaborators; all other browser work is owned by named
+`management`, `history`, `editor`, or `http` private features. Their UI uses
+elements, blocks, and sections by responsibility: sections coordinate the
+editor and management flows, blocks compose visual elements, and elements use
+only model and the Design System. The public Agent Management screen and
+browser-port surface retain their exact subpaths. Private features declare any
+cross-feature dependency in `feature.json`; Agent currently has none.
+
 ## Persistence
 
 Generated Prisma remains private to the Agent Prisma repository adapter. The
@@ -75,6 +85,17 @@ fields, stored scenario mappings and default mapping behaviour.
 ## Consequences
 
 Agent has one definition and persistence owner and one reusable browser owner.
-The app retains route, drawer, project, tRPC and cross-feature rendering
-composition only. Compatibility adapters may remain at old import paths while
-callers move, but contain no Agent presentation or business policy.
+The package now owns the Agent Management screen, card, history drawer, HTTP
+editor, browser port, and their package tests. The platform host supplies route,
+project, RPC, dialog, toast, drawer, navigation, and cross-feature render
+composition; its integration test covers the observable editor/history/copy/
+push wiring and the real generic dialogs.
+
+The extraction is not complete. `platform/app/src/components/agents` still owns
+Agent UI behaviour in `AgentListDrawer`, `AgentCodeEditorDrawer`,
+`AgentWorkflowEditorDrawer`, `AgentWorkflowTargetEditorDrawer`,
+`WorkflowSelectorDrawer`, and `AgentTypeSelectorDrawer`, together with their
+drawer URL adapters and workflow-target data helper. These are explicit next
+vertical slices, not compatibility-only composition. The retained code may use
+the package's narrow screen or browser-port entry while it moves, but it must
+not be described as presentation-free or as a completed Agent web migration.

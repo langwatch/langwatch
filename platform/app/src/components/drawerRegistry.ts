@@ -60,7 +60,7 @@ const ViewAutomationDrawer = lazyDefault({
   key: "ViewAutomationDrawer",
 });
 const AgentHistoryDrawer = lazyDefault({
-  factory: () => import("./agents/AgentHistoryDrawer"),
+  factory: () => import("~/runtime/ui/features/agent-ui-host.adapter"),
   key: "AgentHistoryDrawer",
 });
 const AgentListDrawer = lazyDefault({

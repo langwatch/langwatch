@@ -19,8 +19,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
+import type { AgentWithFields } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
 
 export type AgentListDrawerProps = {
@@ -55,13 +54,11 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     (complexProps.onSelect as AgentListDrawerProps["onSelect"]);
   const onEdit = props.onEdit ?? (complexProps.onEdit as AgentListDrawerProps["onEdit"]);
   const onCreateNew =
-    props.onCreateNew ??
-    flowCallbacks?.onCreateNew ??
-    (() => openDrawer("agentTypeSelector"));
+    props.onCreateNew ?? flowCallbacks?.onCreateNew ?? (() => openDrawer("agentTypeSelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   // State for tracking which agent is being deleted
-  const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
+  const [agentToDelete, setAgentToDelete] = useState<AgentWithFields | null>(null);
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -122,7 +119,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     openDrawer("agentCodeEditor", { agentId: agent.id });
   };
 
-  const handleDeleteAgent = (agent: TypedAgent) => {
+  const handleDeleteAgent = (agent: AgentWithFields) => {
     setAgentToDelete(agent);
   };
 
@@ -186,12 +183,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
               </Button>
             </HStack>
           </Drawer.Header>
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
-            padding={0}
-          >
+          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
             <VStack gap={4} align="stretch" flex={1} overflow="hidden">
               <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
                 Select an existing agent or create a new one.
@@ -270,11 +262,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
           Create your first agent to get started
         </Text>
       </VStack>
-      <Button
-        colorPalette="blue"
-        onClick={onCreateNew}
-        data-testid="create-first-agent-button"
-      >
+      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-agent-button">
         <Plus size={16} />
         Create your first agent
       </Button>
@@ -301,7 +289,7 @@ const agentTypeLabels: Record<string, string> = {
 };
 
 type AgentCardProps = {
-  agent: TypedAgent;
+  agent: AgentWithFields;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;

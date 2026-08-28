@@ -7,16 +7,14 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "./screens/agent-management": {
+      "types": "./src/screens/agent-management/index.ts",
+      "default": "./src/screens/agent-management/index.ts"
     },
-    "./testing": {
-      "types": "./src/testing.ts",
-      "default": "./src/testing.ts"
+    "./surfaces/browser-port": {
+      "types": "./src/surfaces/browser-port/index.ts",
+      "default": "./src/surfaces/browser-port/index.ts"
     }
   },
   "scripts": {

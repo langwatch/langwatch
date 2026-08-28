@@ -18,17 +18,7 @@
     },
     {
       "feature": "agent",
-      "file": "platform/app/src/components/agents/AgentCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
       "file": "platform/app/src/components/agents/AgentCodeEditorDrawer.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/AgentHistoryDrawer.tsx",
       "kind": "page-shell"
     },
     {
@@ -58,77 +48,12 @@
     },
     {
       "feature": "agent",
-      "file": "platform/app/src/components/agents/CopyAgentDialog.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
       "file": "platform/app/src/components/agents/drawerFromUrl.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "agent",
-      "file": "platform/app/src/components/agents/getAgentEditorDrawer.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/AuthConfigSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/BodyTemplateEditor.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/HeadersConfigSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/HttpConfigEditor.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/HttpMethodSelector.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/HttpTestPanel.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
       "file": "platform/app/src/components/agents/http/index.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/OutputPathInput.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/TestMessagesBuilder.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/http/useHttpTest.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/LocalTunnelBadge.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/components/agents/PushToCopiesDialog.tsx",
       "kind": "page-shell"
     },
     {
@@ -139,11 +64,6 @@
     {
       "feature": "agent",
       "file": "platform/app/src/components/agents/WorkflowSelectorDrawer.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/pages/[project]/agents.tsx",
       "kind": "page-shell"
     },
     {
@@ -159,11 +79,6 @@
     {
       "feature": "agent",
       "file": "platform/app/src/server/agents/agent-fields.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "agent",
-      "file": "platform/app/src/server/agents/http-node.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -3439,11 +3354,6 @@
     {
       "feature": "project",
       "file": "platform/app/src/components/projects/projectFormValidation.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "project",
-      "file": "platform/app/src/pages/[project]/agents.tsx",
       "kind": "page-shell"
     },
     {

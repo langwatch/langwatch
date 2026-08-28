@@ -23,7 +23,7 @@ export {
   type TestMessage,
   TestMessagesBuilder,
   type TestMessagesBuilderProps,
-} from "@langwatch/agent-web";
+} from "@langwatch/agent-web/screens/agent-management";
 
 export function useHttpTest({
   url,
@@ -87,17 +87,7 @@ export function useHttpTest({
         };
       }
     },
-    [
-      auth,
-      bodyTemplate,
-      headers,
-      method,
-      mutation,
-      outputPath,
-      project?.id,
-      timeoutMs,
-      url,
-    ],
+    [auth, bodyTemplate, headers, method, mutation, outputPath, project?.id, timeoutMs, url],
   );
 
   return { handleTest, isPending: mutation.isPending };

@@ -5,7 +5,7 @@ import {
   type ScenarioTarget,
   type ScenarioTargetAgent,
 } from "@langwatch/scenario-web";
-import { agentHasDevTunnel } from "@langwatch/agent-web";
+import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -15,14 +15,8 @@ export type TargetValue = ScenarioTarget;
 
 export { isScenarioAgentTarget as isAgentTarget };
 
-export function useFilteredAgents(
-  agents: ScenarioTargetAgent[] | undefined,
-  searchValue: string,
-) {
-  return useMemo(
-    () => filterScenarioTargetAgents(agents, searchValue),
-    [agents, searchValue],
-  );
+export function useFilteredAgents(agents: ScenarioTargetAgent[] | undefined, searchValue: string) {
+  return useMemo(() => filterScenarioTargetAgents(agents, searchValue), [agents, searchValue]);
 }
 
 export function TargetSelector({

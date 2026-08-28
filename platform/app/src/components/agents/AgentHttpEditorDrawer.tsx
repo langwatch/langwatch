@@ -1,7 +1,9 @@
 import {
   AgentHttpEditorDrawer as AgentHttpEditor,
-  type AgentHttpEditorPresentation,
-} from "@langwatch/agent-web";
+  AgentHttpEditorPresentationPort,
+  type RenderAgentVariablesInput,
+  type RenderScenarioMappingsInput,
+} from "@langwatch/agent-web/screens/agent-management";
 import {
   agentInputBindingSchema,
   FIELD_TYPES,
@@ -15,18 +17,9 @@ import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  VariablesSection,
-} from "~/components/variables";
+import { type AvailableSource, type FieldMapping, VariablesSection } from "~/components/variables";
 import { showErrorToast } from "~/features/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { explainExecutionStateError } from "~/optimization_studio/utils/executionStateError";
 import { api } from "~/utils/api";
@@ -89,6 +82,60 @@ function tryParse<T>(schema: z.ZodType<T>, value: unknown): T | undefined {
   return parsed.success ? parsed.data : void 0;
 }
 
+class PlatformAgentHttpEditorPresentation extends AgentHttpEditorPresentationPort {
+  constructor(private readonly availableSources: AvailableSource[]) {
+    super();
+  }
+
+  renderScenarioMappings({ inputs, mappings, onMappingChange }: RenderScenarioMappingsInput) {
+    return (
+      <ScenarioInputMappingSection
+        inputs={inputs}
+        mappings={mappings}
+        onMappingChange={onMappingChange}
+      />
+    );
+  }
+
+  renderVariables({
+    variables,
+    mappings,
+    onChange,
+    onMappingChange,
+    missingMappingIds,
+    lockedVariableIds,
+  }: RenderAgentVariablesInput) {
+    return (
+      <VariablesSection
+        title="Input Variables"
+        variables={variables}
+        onChange={onChange}
+        showMappings
+        availableSources={this.availableSources}
+        mappings={mappings}
+        onMappingChange={onMappingChange}
+        canAddRemove
+        readOnly={false}
+        lockedVariables={lockedVariableIds}
+        missingMappingIds={missingMappingIds}
+        showMissingMappingsError={false}
+        optionalHighlighting
+      />
+    );
+  }
+
+  explainTestError({ errorCode, error }: { errorCode?: string; error?: string }) {
+    return explainExecutionStateError({
+      state: { error_type: errorCode, error },
+      fallbackTitle: "The request failed",
+    });
+  }
+
+  showSaveError(input: { error: unknown; fallbackTitle: string }) {
+    showErrorToast(input);
+  }
+}
+
 export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
@@ -110,11 +157,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     props.inputMappings ?? tryParse(inputMappingsSchema, complexProps.inputMappings);
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
-    props.onSave ??
-    flowCallbacks?.onSave ??
-    tryParse(saveCallbackSchema, complexProps.onSave);
-  const onInputMappingsChange =
-    props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
+    props.onSave ?? flowCallbacks?.onSave ?? tryParse(saveCallbackSchema, complexProps.onSave);
+  const onInputMappingsChange = props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId: project?.id ?? "" },
     { enabled: Boolean(agentId && project?.id && props.open !== false) },
@@ -136,12 +180,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   );
 
   const handleUpdate = useCallback(
-    async (input: {
-      id: string;
-      projectId: string;
-      name: string;
-      config: HttpAgentConfig;
-    }) => {
+    async (input: { id: string; projectId: string; name: string; config: HttpAgentConfig }) => {
       const agent = await updateAgent.mutateAsync(input);
 
       void utils.agents.getAll.invalidate({ projectId: input.projectId });
@@ -208,55 +247,13 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
 
   const defaultScenarioMappings = useMemo(() => {
     const mappings = computeBestMatchMappings({
-      inputs: [
-        { identifier: "threadId" },
-        { identifier: "input" },
-        { identifier: "messages" },
-      ],
+      inputs: [{ identifier: "threadId" }, { identifier: "input" }, { identifier: "messages" }],
     });
     return tryParse(inputMappingsSchema, mappings) ?? {};
   }, []);
 
-  const presentation = useMemo<AgentHttpEditorPresentation>(
-    () => ({
-      renderScenarioMappings: ({ inputs, mappings, onMappingChange }) => (
-        <ScenarioInputMappingSection
-          inputs={inputs}
-          mappings={mappings}
-          onMappingChange={onMappingChange}
-        />
-      ),
-      renderVariables: ({
-        variables,
-        mappings,
-        onChange,
-        onMappingChange,
-        missingMappingIds,
-        lockedVariableIds,
-      }) => (
-        <VariablesSection
-          title="Input Variables"
-          variables={variables}
-          onChange={onChange}
-          showMappings
-          availableSources={availableSources}
-          mappings={mappings}
-          onMappingChange={onMappingChange}
-          canAddRemove
-          readOnly={false}
-          lockedVariables={lockedVariableIds}
-          missingMappingIds={missingMappingIds}
-          showMissingMappingsError={false}
-          optionalHighlighting
-        />
-      ),
-      explainTestError: ({ errorCode, error }) =>
-        explainExecutionStateError({
-          state: { error_type: errorCode, error },
-          fallbackTitle: "The request failed",
-        }),
-      showSaveError: showErrorToast,
-    }),
+  const presentation = useMemo(
+    () => new PlatformAgentHttpEditorPresentation(availableSources),
     [availableSources],
   );
 

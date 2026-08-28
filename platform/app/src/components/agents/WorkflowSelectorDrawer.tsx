@@ -14,18 +14,14 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "~/features/errors";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "~/features/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
 import { blankTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
+import type { AgentWithFields } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
@@ -152,15 +148,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         });
       }
     },
-    [
-      project,
-      defaultIcon,
-      createWorkflowMutation,
-      createAgentMutation,
-      onClose,
-      router,
-      form,
-    ],
+    [project, defaultIcon, createWorkflowMutation, createAgentMutation, onClose, router, form],
   );
 
   const isValid = name?.trim().length > 0;
@@ -192,16 +180,11 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               <Heading>Create Workflow Agent</Heading>
             </HStack>
           </Drawer.Header>
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
-            padding={0}
-          >
+          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
             <VStack gap={4} align="stretch" flex={1} overflow="hidden">
               <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-                Create a new workflow to use as a custom agent. You&apos;ll be taken to
-                the workflow editor to configure the agent logic.
+                Create a new workflow to use as a custom agent. You&apos;ll be taken to the workflow
+                editor to configure the agent logic.
               </Text>
 
               <Box paddingX={6}>
@@ -219,11 +202,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                     />
                     <Field.Label>Name and Icon</Field.Label>
                     <HStack>
-                      <Button
-                        variant="outline"
-                        onClick={emojiPicker.onOpen}
-                        fontSize="18px"
-                      >
+                      <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
                         {icon}
                       </Button>
                       <Input
@@ -239,10 +218,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
 
                   <Field.Root invalid={!!errors.description}>
                     <Field.Label>Description (optional)</Field.Label>
-                    <Textarea
-                      {...register("description")}
-                      placeholder="What does this agent do?"
-                    />
+                    <Textarea {...register("description")} placeholder="What does this agent do?" />
                     <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
                   </Field.Root>
                 </VStack>

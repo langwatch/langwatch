@@ -30,26 +30,16 @@ import {
   VariablesSection,
 } from "~/components/variables";
 import { showErrorToast } from "~/features/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditorModal } from "~/optimization_studio/components/code/workflow-code-editor.transport";
+import type { CodeComponentConfig, Field as DSLField } from "@langwatch/workflow-contract";
+import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "@langwatch/workflow-web";
 import type {
-  CodeComponentConfig,
-  Field as DSLField,
-} from "@langwatch/workflow-contract";
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "@langwatch/workflow-web";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+  AgentConfig as AgentComponentConfig,
+  AgentWithFields,
+} from "@langwatch/agent-contract";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
@@ -108,11 +98,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   // Props from drawer params or direct props (for Evaluations V3)
   const availableSources =
-    props.availableSources ??
-    (complexProps.availableSources as AvailableSource[] | undefined);
+    props.availableSources ?? (complexProps.availableSources as AvailableSource[] | undefined);
   const inputMappings =
-    props.inputMappings ??
-    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
+    props.inputMappings ?? (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
   const onInputMappingsChange =
     props.onInputMappingsChange ??
     (flowCallbacks?.onInputMappingsChange as
@@ -127,12 +115,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
   const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
-  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>(
-    {},
-  );
-  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(
-    undefined,
-  );
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
+  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
@@ -201,8 +185,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid =
-    name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings });
+  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -385,25 +368,13 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
               <Heading>{agentId ? "Edit Code Agent" : "New Code Agent"}</Heading>
             </HStack>
           </Drawer.Header>
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
-            padding={0}
-          >
+          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
             {agentId && agentQuery.isLoading ? (
               <HStack justify="center" paddingY={8}>
                 <Spinner size="md" />
               </HStack>
             ) : (
-              <VStack
-                gap={4}
-                align="stretch"
-                flex={1}
-                paddingX={6}
-                paddingY={4}
-                overflowY="auto"
-              >
+              <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
                 {/* Name field */}
                 <Field.Root required>
                   <Field.Label>Agent Name</Field.Label>
@@ -420,8 +391,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                      Define a Python class with a `__call__` method that takes inputs and
-                      returns outputs.
+                      Define a Python class with a `__call__` method that takes inputs and returns
+                      outputs.
                     </Text>
                     <CodeBlockEditor
                       code={code}

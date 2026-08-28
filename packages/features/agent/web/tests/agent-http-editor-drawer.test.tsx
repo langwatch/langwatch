@@ -7,8 +7,9 @@ import { describe, expect, it } from "vitest";
 import {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,
-} from "../src/agent-http-editor-drawer";
-import type { AgentHttpEditorPresentation } from "../src/agent-http-editor.presentation";
+} from "../src/features/http/ui/sections/agent-http-editor-drawer";
+import { AgentHttpEditorPresentationPort } from "../src/features/http/ui/sections/agent-http-editor.presentation";
+import type { RenderScenarioMappingsInput } from "../src/features/http/ui/sections/agent-http-editor.presentation";
 
 const agent: AgentWithFields = {
   id: "agent_1",
@@ -32,14 +33,23 @@ const agent: AgentWithFields = {
   fieldsResolved: true,
 };
 
-const presentation: AgentHttpEditorPresentation = {
-  renderScenarioMappings: ({ mappings }) => (
-    <output data-testid="scenario-mapping-count">{Object.keys(mappings).length}</output>
-  ),
-  renderVariables: () => null,
-  explainTestError: () => ({ title: "Request failed" }),
-  showSaveError: () => void 0,
-};
+class TestPresentation extends AgentHttpEditorPresentationPort {
+  renderScenarioMappings({ mappings }: RenderScenarioMappingsInput) {
+    return <output data-testid="scenario-mapping-count">{Object.keys(mappings).length}</output>;
+  }
+
+  renderVariables() {
+    return null;
+  }
+
+  explainTestError() {
+    return { title: "Request failed" };
+  }
+
+  showSaveError() {}
+}
+
+const presentation = new TestPresentation();
 
 function renderEditor(props: Partial<AgentHttpEditorDrawerProps>) {
   const defaults: AgentHttpEditorDrawerProps = {
