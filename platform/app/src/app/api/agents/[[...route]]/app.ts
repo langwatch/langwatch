@@ -1,5 +1,4 @@
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { ZodError, z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
