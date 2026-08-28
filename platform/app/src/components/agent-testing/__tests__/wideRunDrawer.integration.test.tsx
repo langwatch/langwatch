@@ -23,6 +23,7 @@ import {
   vi,
 } from "vitest";
 import { ScenarioRunDetailDrawer } from "~/components/simulations/ScenarioRunDetailDrawer";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import {
   ScenarioRunStatus,
   Verdict,
@@ -212,6 +213,14 @@ function setRunState(
   error?: unknown,
 ) {
   mockGetRunState.mockReturnValue({ data: state, error: error ?? null });
+}
+
+/**
+ * The CSS variable Chakra emits for a colour token, so a test can state the
+ * colour it wants by the token the code holds rather than by a literal.
+ */
+function cssVarOfToken(token: string) {
+  return `var(--chakra-colors-${token.replace(".", "-")})`;
 }
 
 function setWindowWidth(width: number) {
@@ -609,6 +618,26 @@ describe("the wide run detail drawer", () => {
     expect(panel).not.toHaveTextContent("6.3s");
     // The terminal log box is gone.
     expect(screen.queryByText("test-results.log")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The verdict reads the colour every other surface gives the status" */
+  it("draws the verdict in the colour the status config holds", () => {
+    renderWide();
+
+    const passedColor = cssVarOfToken(
+      SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
+    );
+    const panel = screen.getByTestId("run-verdict-panel");
+    expect(within(panel).getByTestId("run-verdict-status-passed")).toHaveStyle({
+      color: passedColor,
+    });
+
+    const passedSection = within(panel).getByTestId(
+      "run-verdict-passed-criteria",
+    );
+    expect(
+      within(passedSection).getByText("Passed criteria").parentElement,
+    ).toHaveStyle({ color: passedColor });
   });
 
   /** @scenario "A failed run reads FAILED in the Status line" */

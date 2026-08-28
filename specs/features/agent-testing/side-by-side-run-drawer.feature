@@ -100,6 +100,13 @@ Feature: The wide run detail drawer
     And there is no terminal log box
 
   @integration
+  Scenario: The verdict reads the colour every other surface gives the status
+    Given a finished run open in the drawer
+    When the results panel is read
+    Then "PASSED" reads the colour the product gives a passed run
+    And the passed criteria heading reads that same colour
+
+  @integration
   Scenario: A failed run reads FAILED in the Status line
     Given a failed run open in the drawer
     When the results panel is read

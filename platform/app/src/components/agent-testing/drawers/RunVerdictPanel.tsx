@@ -11,10 +11,21 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { CircleCheck, CircleX, XCircle } from "lucide-react";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { JsonHighlight } from "~/features/onboarding/components/sections/shared/JsonHighlight";
 import { safePrettyJson } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { FG_MUTED } from "../shared/design";
+
+/**
+ * The colour a passed and a failed verdict read in, taken from the status
+ * config every other surface reads, so one run says the same thing in the
+ * list, in the drawer and on the verdict panel.
+ */
+const PASSED_COLOR =
+  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor;
+const FAILED_COLOR =
+  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor;
 
 /**
  * The criteria of a run split into passed and failed, each list held in the
@@ -112,7 +123,7 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
         ? "FAILED"
         : null;
   if (!word) return null;
-  const color = word === "PASSED" ? "green.600" : "red.600";
+  const color = word === "PASSED" ? PASSED_COLOR : FAILED_COLOR;
   return (
     <HStack gap={2} alignItems="baseline" data-testid="run-verdict-status-line">
       <Text fontSize="12px" color={FG_MUTED}>
@@ -310,14 +321,14 @@ export function RunVerdictPanel({
         ) : null}
         <CriteriaSection
           heading="Passed criteria"
-          headingColor="green.600"
+          headingColor={PASSED_COLOR}
           criteria={orderedMet}
           passed={true}
           testId="run-verdict-passed-criteria"
         />
         <CriteriaSection
           heading="Failed criteria"
-          headingColor="red.600"
+          headingColor={FAILED_COLOR}
           criteria={orderedUnmet}
           passed={false}
           testId="run-verdict-failed-criteria"
