@@ -13,6 +13,7 @@ import {
 } from "@langwatch/redis-client";
 import { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
 import { ResourceScope } from "@langwatch/runtime-composition";
+import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter";
 
 /** Named construction port for the storage implementation owned by a host. */
 export type WorkerStorageLease = {
@@ -56,6 +57,7 @@ export type WorkerInfrastructureAdapterOptions = {
   outboundProxy: OutboundProxyResolverPort;
   storage?: WorkerStorageFactoryPort;
   storageRuntime?: StoredObjectStorageRuntime;
+  storedObjectStorage?: WorkerStoredObjectStorageRuntimeFactory;
 };
 
 /**
@@ -77,8 +79,10 @@ export class WorkerInfrastructureAdapter {
     try {
       const storageFactory =
         options.storage ??
-        (options.storageRuntime
-          ? WorkerStoredObjectStorageFactory.create({ runtime: options.storageRuntime })
+        (options.storageRuntime || options.storedObjectStorage
+          ? WorkerStoredObjectStorageFactory.create({
+              runtime: options.storageRuntime ?? options.storedObjectStorage!.createRuntime(),
+            })
           : undefined);
       storage = storageFactory?.create({ aws });
       const queue = GroupQueueDependenciesAdapter.create({

@@ -13,6 +13,14 @@ export {
   type WorkerInfrastructureAdapterOptions,
   type WorkerStorageLease,
 } from "./platform/infrastructure/worker-foundation.adapter";
+export {
+  WorkerAzureStorageFactoryPort,
+  WorkerProjectS3SourcePort,
+  WorkerStoredObjectStorageRuntimeFactory,
+  type WorkerProjectS3Target,
+  type WorkerS3Credentials,
+  type WorkerStoredObjectStorageConfig,
+} from "./platform/infrastructure/worker-stored-object-storage.adapter";
 export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer";
 export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer";
 export {

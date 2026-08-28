@@ -287,6 +287,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1080.0
+        version: 3.1108.0
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../packages/aws-client
@@ -308,12 +311,15 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
-      '@langwatch/stored-object-server':
-        specifier: workspace:*
-        version: link:../../packages/features/stored-object/server
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/stored-object/contract
+      '@langwatch/stored-object-server':
+        specifier: workspace:*
+        version: link:../../packages/features/stored-object/server
       '@langwatch/topic-server':
         specifier: workspace:*
         version: link:../../packages/features/topic/server

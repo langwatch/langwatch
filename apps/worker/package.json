@@ -29,6 +29,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1080.0",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",
@@ -37,6 +38,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

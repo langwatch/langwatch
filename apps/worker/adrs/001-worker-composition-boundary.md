@@ -32,3 +32,11 @@ Eventing graph and owns unrelated worker jobs. The executable can switch only
 when a package-composed full registry mounts Trace (including `assignTopic`)
 and every other shared-queue pipeline, with its durable stores, Group Queue,
 typed execution/configuration, observability, transport, and drain lifecycle.
+
+`WorkerStoredObjectStorageRuntimeFactory` is an injectable production
+composition boundary for Group Queue storage, not a live cutover. It receives
+typed storage selection, a current-project BYOC source, and a lazy Azure
+factory from the physical host; its S3 driver borrows the Worker process AWS
+runtime. Final activation remains blocked on that complete registry and its
+physical launcher supplying those ports, so this boundary must not enable
+consumers or replace the legacy executable yet.
