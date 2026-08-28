@@ -13,23 +13,29 @@ cannot silently acquire API routes or browser feature dependencies.
 
 `@langwatch/enterprise-worker` exports a class with `static create` and
 Enterprise-owned worker installers. Workers receive their process-owned
-database and service dependencies explicitly at boot.
+service dependencies explicitly at boot. The composition also builds the
+managed-provider capability from an explicit project/organisation read port
+and typed configuration and credential ports.
 
 ## Public surfaces and transports
 
-The package exposes composition state and worker installers. Queue consumers,
-jobs, and event handlers remain feature-owned and are started only by the
-physical worker application.
+The package exposes composition state, the portable managed-provider service,
+and worker installers. Queue consumers, jobs, and event handlers remain
+feature-owned and are started only by the physical worker application.
 
 ## Dependencies
 
 The worker composition may depend on portable contracts and Enterprise server
-surfaces, but never API, web, React, or browser implementation packages.
+surfaces, but never API, web, React, or browser implementation packages. Core
+worker callers consume the managed-provider contract exposed by this
+composition and do not import the Enterprise server implementation.
 
 ## Persistence
 
-Not applicable. Feature persistence remains behind injected repositories and
-is constructed by the physical worker application when eventually required.
+Managed-provider project persistence remains behind the Enterprise server's
+private Prisma adapter. The physical worker application supplies the complete
+project/organisation read port to composition; it does not construct a
+repository or service per job.
 
 ## Runtime and registration
 
@@ -38,8 +44,9 @@ perform no queue subscription, feature registration, or background startup.
 
 ## Environment and configuration
 
-The package reads no environment variables. Physical worker configuration will
-be validated before feature dependencies are supplied to composition.
+The package reads no environment variables. Physical worker configuration is
+validated before a typed managed-provider configuration port and credentials
+port are supplied to composition.
 
 ## Errors
 
@@ -48,8 +55,9 @@ errors must retain their feature-owned handled error contracts.
 
 ## Contracts and validation
 
-The portable catalogue provides the available feature vocabulary; future
-worker options will use explicit typed feature server capabilities.
+The portable catalogue provides the available feature vocabulary. Worker
+options use explicit typed feature server capabilities, and the managed
+provider is exposed as its portable contract service.
 
 ## Consequences
 

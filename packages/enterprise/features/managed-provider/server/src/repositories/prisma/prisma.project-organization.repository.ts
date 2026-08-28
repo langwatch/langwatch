@@ -1,13 +1,21 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ManagedProviderProjectRepository } from "../../ports/managed-provider-project.port";
 
+type ManagedProviderProjectDatabase = {
+  project: {
+    findUnique(input: {
+      where: { id: string };
+      select: { team: { select: { organizationId: true } } };
+    }): Promise<{ team: { organizationId: string } } | null>;
+  };
+};
+
 export class PrismaManagedProviderProjectRepository extends ManagedProviderProjectRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: ManagedProviderProjectDatabase) {
     super();
   }
 
-  static create(database: object): PrismaManagedProviderProjectRepository {
-    return new PrismaManagedProviderProjectRepository(database as PrismaClient);
+  static create(database: ManagedProviderProjectDatabase): PrismaManagedProviderProjectRepository {
+    return new PrismaManagedProviderProjectRepository(database);
   }
 
   async tryGetOrganizationId(projectId: string): Promise<string | null> {

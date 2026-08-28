@@ -620,6 +620,12 @@ importers:
       '@langwatch/enterprise-governance-server':
         specifier: workspace:*
         version: link:../../features/governance/server
+      '@langwatch/enterprise-managed-provider-contract':
+        specifier: workspace:*
+        version: link:../../features/managed-provider/contract
+      '@langwatch/enterprise-managed-provider-server':
+        specifier: workspace:*
+        version: link:../../features/managed-provider/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability

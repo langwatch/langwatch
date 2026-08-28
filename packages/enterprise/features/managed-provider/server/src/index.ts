@@ -10,4 +10,5 @@ export {
   ManagedProviderCredentialsPort,
 } from "./ports/managed-provider-credentials.port";
 export { ManagedProviderProjectRepository } from "./ports/managed-provider-project.port";
+export { PrismaManagedProviderProjectRepository } from "./repositories/prisma/prisma.project-organization.repository";
 export { ManagedProviderService } from "./services/managed-provider.service";

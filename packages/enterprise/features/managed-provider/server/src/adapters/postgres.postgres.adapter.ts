@@ -1,21 +1,21 @@
 import type { ManagedProviderService as ManagedProviderServiceContract } from "@langwatch/enterprise-managed-provider-contract";
 import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port";
 import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port";
-import { PrismaManagedProviderProjectRepository } from "../repositories/prisma/prisma.project-organization.repository";
+import type { ManagedProviderProjectRepository } from "../ports/managed-provider-project.port";
 import { ManagedProviderService } from "../services/managed-provider.service";
 
-/** Composes the managed-provider capability around its private project read. */
+/** Composes the managed-provider capability around its private project read port. */
 export class PostgresManagedProviderAdapter {
   private constructor(
     private readonly options: {
-      database: object;
+      projects: ManagedProviderProjectRepository;
       configuration: ManagedProviderConfigurationPort;
       credentials: ManagedProviderCredentialsPort;
     },
   ) {}
 
   static create(options: {
-    database: object;
+    projects: ManagedProviderProjectRepository;
     configuration: ManagedProviderConfigurationPort;
     credentials: ManagedProviderCredentialsPort;
   }): PostgresManagedProviderAdapter {
@@ -26,7 +26,7 @@ export class PostgresManagedProviderAdapter {
     return ManagedProviderService.create({
       configuration: this.options.configuration,
       credentials: this.options.credentials,
-      projects: PrismaManagedProviderProjectRepository.create(this.options.database),
+      projects: this.options.projects,
     });
   }
 }
