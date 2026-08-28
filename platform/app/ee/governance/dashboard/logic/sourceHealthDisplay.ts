@@ -67,14 +67,22 @@ export function sourceBadge({
  * Returns null while the source is healthy, and null when it has never
  * pulled successfully -- there is no "since" to name in either case, and the
  * awaiting-first-event badge already covers the second.
+ *
+ * Disabled is checked first, for the reason the badge checks it first: a
+ * source nobody asked to run has not "stopped pulling". Retained failures
+ * from before it was switched off would otherwise put an outage notice under
+ * a source whose badge, correctly, reads Disabled.
  */
 export function noDataSinceNotice({
+  status,
   errorCount,
   lastSuccessAt,
 }: {
+  status: string;
   errorCount: number;
   lastSuccessAt: Date | string | null;
 }): { lastSuccessIso: string } | null {
+  if (status === "disabled") return null;
   if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "healthy") {
     return null;
   }
