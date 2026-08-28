@@ -1,5 +1,5 @@
 /**
- * The drawer keys the Agent Testing cases surface uses.
+ * The drawer keys the Agent Testing scenarios surface uses.
  *
  * The keys live in this component-free module so a static importer (a header
  * band, a row-handler hook, the drawer registry) can name a drawer without

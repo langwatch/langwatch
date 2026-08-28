@@ -77,8 +77,8 @@ export type BatchRunInput = RunDialogSubmitInput & {
  * is an ordinary plan run.
  */
 function soleScenarioOf(scope: RunScope): string | null {
-  if (scope.mode !== "cases" || scope.caseIds.length !== 1) return null;
-  return scope.caseIds[0] ?? null;
+  if (scope.mode !== "scenarios" || scope.scenarioIds.length !== 1) return null;
+  return scope.scenarioIds[0] ?? null;
 }
 
 /**
@@ -164,7 +164,9 @@ function useQueuePlanRun(input: BatchRunInput) {
           scope: toSuiteScope(scope),
           // Only a hand-picked scope names its scenarios; every other one
           // resolves against the project at run time.
-          ...(scope.mode === "cases" ? { scenarioIds: scopedScenarioIds } : {}),
+          ...(scope.mode === "scenarios"
+            ? { scenarioIds: scopedScenarioIds }
+            : {}),
           targets: suiteTargets ?? [],
           repeatCount,
           simulatorModel,

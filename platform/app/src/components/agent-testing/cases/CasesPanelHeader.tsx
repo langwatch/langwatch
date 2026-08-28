@@ -1,5 +1,5 @@
 /**
- * The line above the cases table: the suite that is open, how many scenarios
+ * The line above the scenarios table: the suite that is open, how many scenarios
  * it holds, the label filter and the entry points that write.
  *
  * The way into a recent run sits here too, between "New scenario" and

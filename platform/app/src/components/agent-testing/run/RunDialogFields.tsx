@@ -141,7 +141,7 @@ export function RunDialogFields({
       {form.isScopePicked && (
         <RunScopeSection
           scope={form.scope}
-          folders={form.folders}
+          testSuites={form.testSuites}
           scenarios={form.scopeScenarios}
           onChange={form.setScope}
         />

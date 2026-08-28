@@ -84,7 +84,7 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "Each tab name carries how many rows it holds" */
-    it("counts the cases and the run plans beside the tab names", () => {
+    it("counts the scenarios and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 
       expect(screen.getByRole("tab", { name: /Scenarios/ })).toHaveTextContent(

@@ -23,7 +23,7 @@ import { AgentTestingCaseEditorDrawer } from "../cases/AgentTestingCaseEditorDra
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockGetById = vi.hoisted(() => vi.fn());
-const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
@@ -57,7 +57,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -78,7 +78,7 @@ vi.mock("~/utils/api", () => ({
       update: { useMutation: onSuccessOf(mockUpdate) },
     },
     suites: {
-      folders: { getAll: { useQuery: mockFoldersGetAll } },
+      testSuites: { getAll: { useQuery: mockTestSuitesGetAll } },
       getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
@@ -163,7 +163,7 @@ function storedCase(overrides: Record<string, unknown> = {}) {
     criteria: ["Refunds the second charge"],
     labels: [],
     parameters: null,
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     simulatorModel: null,
     judgeModel: null,
     maxTurns: null,
@@ -175,7 +175,7 @@ function storedCase(overrides: Record<string, unknown> = {}) {
 
 function openDrawerAs(params: {
   scenarioId?: string;
-  folderId?: string;
+  testSuiteId?: string;
   showHistory?: string;
 }) {
   mockDrawerParams.current = { ...params } as Record<string, string>;
@@ -187,7 +187,7 @@ describe("the scenario dialog", () => {
     vi.clearAllMocks();
     mockDrawerParams.current = {};
     mockDrawerOpenFor.current = "";
-    mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
     mockGetById.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -198,7 +198,7 @@ describe("the scenario dialog", () => {
   afterEach(cleanup);
 
   const openNew = () => {
-    openDrawerAs({ folderId: REFUNDS.id });
+    openDrawerAs({ testSuiteId: REFUNDS.id });
     render(
       <>
         <AgentTestingCaseEditor />
@@ -208,7 +208,7 @@ describe("the scenario dialog", () => {
     );
   };
 
-  describe("when a new case is written", () => {
+  describe("when a new scenario is written", () => {
     /** @scenario "New scenario opens the scenario dialog straight away" */
     it("opens on the form itself, with no model-writing step first", async () => {
       openNew();
@@ -297,7 +297,7 @@ describe("the scenario dialog", () => {
         expect.objectContaining({
           name: "Angry customer",
           criteria: ["Keeps a calm tone"],
-          folderId: REFUNDS.id,
+          testSuiteId: REFUNDS.id,
         }),
       );
       await waitFor(() =>
@@ -306,9 +306,9 @@ describe("the scenario dialog", () => {
     });
   });
 
-  describe("when a stored case is edited", () => {
+  describe("when a stored scenario is edited", () => {
     /** @scenario "Editing a scenario opens the blocks it already uses" */
-    it("opens the blocks the stored case already carries", async () => {
+    it("opens the blocks the stored scenario already carries", async () => {
       mockGetById.mockReturnValue({
         data: storedCase({
           parameters: [{ name: "customer_plan", defaultValue: "free" }],
@@ -330,7 +330,7 @@ describe("the scenario dialog", () => {
         "customer_plan=free",
       );
       expect(screen.getByTestId("case-models-block")).toBeInTheDocument();
-      // Nothing the case does not use is opened: the turns stay on their chip.
+      // Nothing the scenario does not use is opened: the turns stay on their chip.
       expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument();
       expect(
         screen.getByTestId("customize-chip-case-turns"),
@@ -376,7 +376,7 @@ describe("the scenario dialog", () => {
 
       await user.click(history);
 
-      // The history reads in place, and the case dialog stays open under it.
+      // The history reads in place, and the scenario dialog stays open under it.
       expect(
         await screen.findByTestId("scenario-version-history"),
       ).toBeInTheDocument();

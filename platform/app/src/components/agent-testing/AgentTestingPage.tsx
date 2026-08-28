@@ -2,7 +2,7 @@
  * Agent Testing: one page with the scenarios and the results in tabs.
  *
  * The page is the only mount point of the live-run subscription and of the
- * case editor, and every move inside it is a shallow address push, so a run
+ * scenario editor, and every move inside it is a shallow address push, so a run
  * keeps streaming while a person moves between suites, plans and tabs.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -31,7 +31,7 @@ function useTabCounts(projectId: string) {
     { enabled: !!projectId },
   );
   const { data: suites } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["custom", "folder"] },
+    { projectId, kinds: ["run_plan", "test_suite"] },
     { enabled: !!projectId },
   );
 

@@ -1,6 +1,6 @@
 /**
  * The recent runs that covered a scenario of one test suite, read for the list
- * under the cases table.
+ * under the scenarios table.
  *
  * A run belongs to the run plan it was started under, and a run of one
  * scenario is a plan of its own, so a list keyed on a plan named after the
@@ -79,7 +79,7 @@ export function useSuiteRecentRuns({
   // The plans the runs belong to, for the name a row reads and the address it
   // opens. Read beside the runs, and just as lazily.
   const { data: suites } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["custom", "folder"] },
+    { projectId, kinds: ["run_plan", "test_suite"] },
     { enabled: isEnabled },
   );
 

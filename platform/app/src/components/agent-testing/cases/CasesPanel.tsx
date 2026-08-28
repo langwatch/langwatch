@@ -1,5 +1,5 @@
 /**
- * The right half of the Scenarios tab: the suite that is open, the cases in
+ * The right half of the Scenarios tab: the suite that is open, the scenarios in
  * it, and the way into a recent run of it.
  *
  * The panel is a view over what it is given, so the reads and the writes stay
@@ -30,7 +30,7 @@ export type CasesPanelProps = {
   title: string;
   /** The scenarios of the open suite, in order. */
   cases: TestCase[];
-  /** The cases of an external set, when one is selected. */
+  /** The scenarios of an external set, when one is selected. */
   externalCases: ExternalCaseRow[];
   isLoading: boolean;
   lastResults: Map<string, CaseLastResult>;

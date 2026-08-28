@@ -17,7 +17,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type { PromptEntry } from "./PromptPicker";
 import type { RunNameOption } from "./RunNameField";
-import type { ScopeFolder, ScopeScenario } from "./RunScopeSection";
+import type { ScopeScenario, ScopeTestSuite } from "./RunScopeSection";
 import type { RunDialogAgent } from "./RunTargetPicker";
 import {
   deriveRunName,
@@ -53,36 +53,37 @@ export function buildTargetLabels({
 export function scopeLabelOf({
   subject,
   scope,
-  folders,
+  testSuites,
   scenarios,
 }: {
   subject: RunDialogSubject;
   scope: RunScope;
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   scenarios: readonly ScopeScenario[];
 }): string {
   if (subject.kind === "suite" || subject.kind === "case") return subject.name;
   if (scope.mode === "all") return "All scenarios";
-  if (scope.mode === "folders") return folderScopeLabel({ scope, folders });
+  if (scope.mode === "test_suites")
+    return testSuiteScopeLabel({ scope, testSuites });
   if (scope.mode === "labels") {
     return scope.labels.length === 0
       ? "All scenarios"
       : scope.labels.join(", ");
   }
-  return caseScopeLabel({ scope, scenarios });
+  return scenarioScopeLabel({ scope, scenarios });
 }
 
 /** The test suites a scope names, or how many of them there are. */
-function folderScopeLabel({
+function testSuiteScopeLabel({
   scope,
-  folders,
+  testSuites,
 }: {
-  scope: Extract<RunScope, { mode: "folders" }>;
-  folders: readonly ScopeFolder[];
+  scope: Extract<RunScope, { mode: "test_suites" }>;
+  testSuites: readonly ScopeTestSuite[];
 }): string {
-  const names = scope.folderIds.flatMap((folderId) => {
-    const folder = folders.find((entry) => entry.id === folderId);
-    return folder ? [folder.name] : [];
+  const names = scope.testSuiteIds.flatMap((testSuiteId) => {
+    const testSuite = testSuites.find((entry) => entry.id === testSuiteId);
+    return testSuite ? [testSuite.name] : [];
   });
   if (names.length === 0) return "All scenarios";
   if (names.length <= 2) return names.join(", ");
@@ -97,20 +98,20 @@ function folderScopeLabel({
  * every single-scenario run of that agent the same thing and they all resolve
  * onto one run plan.
  */
-function caseScopeLabel({
+function scenarioScopeLabel({
   scope,
   scenarios,
 }: {
-  scope: Extract<RunScope, { mode: "cases" }>;
+  scope: Extract<RunScope, { mode: "scenarios" }>;
   scenarios: readonly ScopeScenario[];
 }): string {
-  if (scope.caseIds.length === 0) return "All scenarios";
-  if (scope.caseIds.length === 1) {
-    const only = scenarios.find((entry) => entry.id === scope.caseIds[0]);
+  if (scope.scenarioIds.length === 0) return "All scenarios";
+  if (scope.scenarioIds.length === 1) {
+    const only = scenarios.find((entry) => entry.id === scope.scenarioIds[0]);
     // The scenario list is still on its way, or holds no scenario of that id.
     return only?.name ?? "Selected scenario";
   }
-  return `${scope.caseIds.length} scenarios`;
+  return `${scope.scenarioIds.length} scenarios`;
 }
 
 /** The targets of the run, in the order the derived name reads them. */

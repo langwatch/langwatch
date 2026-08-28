@@ -10,16 +10,16 @@ import { storedPlanSubject } from "../run/plan-scope";
 const RUN_PLAN = {
   id: "suite_plan",
   name: "Refunds prod-agent",
-  kind: "custom",
-  scope: { mode: "cases" },
+  kind: "run_plan",
+  scope: { mode: "scenarios" },
   scenarioIds: ["case_1", "case_2"],
   targets: [{ type: "http", referenceId: "agent_1" }],
 };
 
 const FOLDER = {
-  id: "suite_folder",
+  id: "test_suite_refunds",
   name: "Refunds",
-  kind: "folder",
+  kind: "test_suite",
   scope: null,
   scenarioIds: ["case_1"],
   targets: [{ type: "http", referenceId: "agent_1" }],
@@ -34,8 +34,8 @@ describe("given a stored row opened from the Results tab", () => {
 
     it("carries the plan's own rule, with its hand-picked list inside it", () => {
       expect(storedPlanSubject(RUN_PLAN).scope).toEqual({
-        mode: "cases",
-        caseIds: ["case_1", "case_2"],
+        mode: "scenarios",
+        scenarioIds: ["case_1", "case_2"],
       });
     });
 
@@ -47,16 +47,16 @@ describe("given a stored row opened from the Results tab", () => {
     });
   });
 
-  describe("when the row is a folder", () => {
+  describe("when the row is a test suite", () => {
     /** @scenario "A test suite answers to no plan name, so its run still derives one" */
     it("names no plan, so the run name is derived", () => {
       expect(storedPlanSubject(FOLDER).planName).toBeUndefined();
     });
 
-    it("covers the scenarios filed in the folder", () => {
+    it("covers the scenarios filed in the test suite", () => {
       expect(storedPlanSubject(FOLDER).scope).toEqual({
-        mode: "folders",
-        folderIds: ["suite_folder"],
+        mode: "test_suites",
+        testSuiteIds: ["test_suite_refunds"],
       });
     });
   });

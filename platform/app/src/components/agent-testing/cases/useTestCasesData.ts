@@ -1,9 +1,9 @@
 /**
- * Everything the Scenarios tab reads: the test suites, the cases, the sets
- * that run from code, the last result of every case, and the names of the
+ * Everything the Scenarios tab reads: the test suites, the scenarios, the sets
+ * that run from code, the last result of every scenario, and the names of the
  * people who wrote them.
  *
- * The case list and the last results are two reads on purpose. The table is
+ * The scenario list and the last results are two reads on purpose. The table is
  * drawn from the list and the verdict cells fill in as the aggregate answers.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -22,7 +22,7 @@ import {
 } from "./test-cases";
 
 type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
-type FolderRows = RouterOutputs["suites"]["folders"]["getAll"];
+type TestSuiteRows = RouterOutputs["suites"]["testSuites"]["getAll"];
 type ExternalSetRows = RouterOutputs["scenarios"]["getExternalSetSummaries"];
 
 /**
@@ -60,8 +60,11 @@ function useTestCasesQueries(period: Period) {
   const endDate = period.endDate.getTime();
   const runWindow = { projectId, startDate, endDate };
 
-  const { data: folders, isLoading: isFoldersLoading } =
-    api.suites.folders.getAll.useQuery({ projectId }, { enabled: !!project });
+  const { data: testSuites, isLoading: isTestSuitesLoading } =
+    api.suites.testSuites.getAll.useQuery(
+      { projectId },
+      { enabled: !!project },
+    );
 
   const { data: scenarios, isLoading: isScenariosLoading } =
     api.scenarios.getAll.useQuery({ projectId }, { enabled: !!project });
@@ -80,7 +83,7 @@ function useTestCasesQueries(period: Period) {
     api.agents.getAll.useQuery({ projectId }, { enabled: !!project });
 
   return {
-    folders,
+    testSuites,
     scenarios,
     agents,
     externalSetSummaries,
@@ -89,7 +92,7 @@ function useTestCasesQueries(period: Period) {
     // The agent list gates the day-zero question, so a page that has not read
     // it yet holds the skeleton rather than asking to connect an agent that
     // is already there.
-    isLoading: isFoldersLoading || isScenariosLoading || isAgentsLoading,
+    isLoading: isTestSuitesLoading || isScenariosLoading || isAgentsLoading,
   };
 }
 
@@ -100,7 +103,7 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
         id: scenario.id,
         name: scenario.name,
         labels: scenario.labels,
-        folderId: scenario.folderId,
+        testSuiteId: scenario.testSuiteId,
         createdAt: new Date(scenario.createdAt),
         lastUpdatedById: scenario.lastUpdatedById,
         version: scenario.version,
@@ -110,30 +113,30 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
 }
 
 function useSuiteEntries({
-  folders,
+  testSuites,
   cases,
 }: {
-  folders: FolderRows | undefined;
+  testSuites: TestSuiteRows | undefined;
   cases: TestCase[];
 }): TestSuiteEntry[] {
   return useMemo<TestSuiteEntry[]>(() => {
-    const countByFolder = new Map<string, number>();
+    const countByTestSuite = new Map<string, number>();
     for (const testCase of cases) {
-      if (!testCase.folderId) continue;
-      countByFolder.set(
-        testCase.folderId,
-        (countByFolder.get(testCase.folderId) ?? 0) + 1,
+      if (!testCase.testSuiteId) continue;
+      countByTestSuite.set(
+        testCase.testSuiteId,
+        (countByTestSuite.get(testCase.testSuiteId) ?? 0) + 1,
       );
     }
     return orderSuitesDefaultFirst(
-      (folders ?? []).map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        slug: folder.slug,
-        caseCount: countByFolder.get(folder.id) ?? 0,
+      (testSuites ?? []).map((testSuite) => ({
+        id: testSuite.id,
+        name: testSuite.name,
+        slug: testSuite.slug,
+        caseCount: countByTestSuite.get(testSuite.id) ?? 0,
       })),
     );
-  }, [folders, cases]);
+  }, [testSuites, cases]);
 }
 
 function useExternalSetEntries(
@@ -185,7 +188,7 @@ function lastRunBySuite({
 }): Map<string, SuiteLastRun> {
   const bySuite = new Map<string, SuiteLastRun>();
   for (const testCase of cases) {
-    const suiteId = testCase.folderId;
+    const suiteId = testCase.testSuiteId;
     const lastResult = lastResults.get(testCase.id);
     if (!suiteId || !lastResult) continue;
     bySuite.set(
@@ -220,7 +223,7 @@ export function useTestCasesData({
 }): TestCasesData {
   const queries = useTestCasesQueries(period);
   const cases = useCaseEntries(queries.scenarios);
-  const suites = useSuiteEntries({ folders: queries.folders, cases });
+  const suites = useSuiteEntries({ testSuites: queries.testSuites, cases });
   const externalSets = useExternalSetEntries(queries.externalSetSummaries);
   const lastResults = useLastResultsByCase(queries.lastResultRows);
   const lastRunBySuiteId = useLastRunBySuite({ cases, lastResults });
@@ -238,7 +241,7 @@ export function useTestCasesData({
 }
 
 /**
- * The scenarios of a set that runs from code. The set holds no case records,
+ * The scenarios of a set that runs from code. The set holds no scenario records,
  * so the names come from the runs it produced.
  */
 export function useExternalSetCases({

@@ -4,7 +4,7 @@
  * A run plan is anything a person can open to read runs: a stored plan, or an
  * external set that a code run writes into. Both are addressed by a slug and
  * both point at one scenario set, so the rest of the Results tab reads one
- * shape. A test suite is a folder of scenarios and never a row of this list;
+ * shape. A test suite is a group of scenarios and never a row of this list;
  * the plans that run it are.
  *
  * Everything here is pure, so the list rules can be read and tested without a
@@ -43,9 +43,9 @@ export type RunPlanKind = "suite" | "external";
  */
 export type RunPlanScopeKind =
   | "all"
-  | "folders"
+  | "test_suites"
   | "labels"
-  | "cases"
+  | "scenarios"
   | "external";
 
 /** How the last run of a plan went, in the shape every source can supply. */
@@ -103,7 +103,7 @@ export type RunPlanSuite = {
 /**
  * What a run plan covers, in words.
  *
- * The plan reads its stored rule, with the suites of a `folders` scope named
+ * The plan reads its stored rule, with the suites of a `test_suites` scope named
  * rather than counted, because "Checkout, Refunds" answers the question and
  * "2 suites" does not.
  *
@@ -121,8 +121,8 @@ export function suiteScopeLabel({
   switch (scope.mode) {
     case "all":
       return "All scenarios";
-    case "folders": {
-      const named = scope.folderIds
+    case "test_suites": {
+      const named = scope.testSuiteIds
         .map((id) => suiteNames.get(id))
         .filter((name): name is string => !!name);
       if (named.length === 0) return "No suite";
@@ -132,7 +132,7 @@ export function suiteScopeLabel({
       if (scope.labels.length === 0) return "No label";
       return `Labelled ${scope.labels.join(", ")}`;
     }
-    case "cases": {
+    case "scenarios": {
       const count = suite.scenarioIds.length;
       return count === 1 ? "1 scenario" : `${count} scenarios`;
     }
@@ -227,7 +227,7 @@ export function buildRunPlans({
   suiteSummaries,
   externalSets,
 }: {
-  /** The stored run plans, which are the custom rows and never the folders. */
+  /** The stored run plans, which are the plan rows and never the test suites. */
   plans: RunPlanSuite[];
   /** Every suite name of the project, keyed by id. */
   suiteNames: ReadonlyMap<string, string>;

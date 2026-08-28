@@ -3,7 +3,7 @@
  *
  * The address holds everything a person can link to (tab, suite, plan, run,
  * period). This store holds what only this browser cares about: how the
- * results are drawn, whether the rail is folded, which folders are open, and
+ * results are drawn, whether the rail is folded, which test suites are open, and
  * the run that was just started but has no rows yet.
  *
  * The view mode is the exception: it is written to the address as `?view=` so
@@ -64,7 +64,7 @@ export type OpenPlanTitle = {
 export interface AgentTestingState {
   viewMode: AgentTestingViewMode;
   railCollapsed: boolean;
-  expandedFolderIds: Set<string>;
+  expandedTestSuiteIds: Set<string>;
   /** The target the last run used, so the run dialog opens on it again. */
   lastRunTarget: TargetValue;
   pendingRun: PendingRun | null;
@@ -76,8 +76,8 @@ export interface AgentTestingState {
   setViewMode: (value: AgentTestingViewMode) => void;
   setRailCollapsed: (isCollapsed: boolean) => void;
   toggleRailCollapsed: () => void;
-  setFolderExpanded: (folderId: string, expanded: boolean) => void;
-  toggleFolder: (folderId: string) => void;
+  setTestSuiteExpanded: (testSuiteId: string, expanded: boolean) => void;
+  toggleTestSuite: (testSuiteId: string) => void;
   setLastRunTarget: (target: TargetValue) => void;
   setPendingRun: (run: PendingRun | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
@@ -133,7 +133,7 @@ export function createAgentTestingStore() {
   return create<AgentTestingState>((set, get) => ({
     viewMode: "table",
     railCollapsed: readStoredRailCollapsed(),
-    expandedFolderIds: new Set<string>(),
+    expandedTestSuiteIds: new Set<string>(),
     lastRunTarget: null,
     pendingRun: null,
     cancellingJobId: null,
@@ -152,21 +152,21 @@ export function createAgentTestingStore() {
       set({ railCollapsed: next });
     },
 
-    setFolderExpanded: (folderId, expanded) => {
+    setTestSuiteExpanded: (testSuiteId, expanded) => {
       set((state) => {
-        const next = new Set(state.expandedFolderIds);
-        if (expanded) next.add(folderId);
-        else next.delete(folderId);
-        return { expandedFolderIds: next };
+        const next = new Set(state.expandedTestSuiteIds);
+        if (expanded) next.add(testSuiteId);
+        else next.delete(testSuiteId);
+        return { expandedTestSuiteIds: next };
       });
     },
 
-    toggleFolder: (folderId) => {
+    toggleTestSuite: (testSuiteId) => {
       set((state) => {
-        const next = new Set(state.expandedFolderIds);
-        if (next.has(folderId)) next.delete(folderId);
-        else next.add(folderId);
-        return { expandedFolderIds: next };
+        const next = new Set(state.expandedTestSuiteIds);
+        if (next.has(testSuiteId)) next.delete(testSuiteId);
+        else next.add(testSuiteId);
+        return { expandedTestSuiteIds: next };
       });
     },
 

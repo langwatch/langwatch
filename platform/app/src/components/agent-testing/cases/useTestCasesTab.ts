@@ -54,8 +54,8 @@ export type TestCasesTabBase = {
   periodPicker: PeriodPicker;
   isRailCollapsed: boolean;
   toggleRail: () => void;
-  /** Opens the create-a-case flow, filed in the suite it is given. */
-  onNewTestCase: (folderId: string | null) => void;
+  /** Opens the create-a-scenario flow, filed in the suite it is given. */
+  onNewTestCase: (testSuiteId: string | null) => void;
   /** Opens the flow that connects the agent to be tested. */
   onConnectAgent: () => void;
 };
@@ -69,8 +69,8 @@ function useTestCasesTabBase(): TestCasesTabBase {
   const toggleRail = useAgentTestingStore((state) => state.toggleRailCollapsed);
   const { openDrawer } = useDrawer();
   const onNewTestCase = useCallback(
-    (folderId: string | null) =>
-      openDrawer(CASE_EDITOR_DRAWER, { folderId: folderId ?? undefined }),
+    (testSuiteId: string | null) =>
+      openDrawer(CASE_EDITOR_DRAWER, { testSuiteId: testSuiteId ?? undefined }),
     [openDrawer],
   );
   const onConnectAgent = useCallback(

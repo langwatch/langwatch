@@ -1,6 +1,6 @@
 /**
  * The fixed band at the top of the run drawer: status, title, the version of
- * the case the run used, the actions, and the strip of chips under them.
+ * the scenario the run used, the actions, and the strip of chips under them.
  *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
@@ -37,10 +37,10 @@ type SectionProps = {
 };
 
 /**
- * The status, the name of the run, and the version of the case it ran.
+ * The status, the name of the run, and the version of the scenario it ran.
  *
- * The version is a fact of this run, not a way into the history of the case:
- * the history belongs to the case, and the case dialog is where it reads.
+ * The version is a fact of this run, not a way into the history of the scenario:
+ * the history belongs to the scenario, and the scenario dialog is where it reads.
  */
 function HeadingRow({
   scenarioState,

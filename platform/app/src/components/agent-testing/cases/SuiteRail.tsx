@@ -7,7 +7,7 @@
  * stay in the panel that owns them.
  *
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 
 import { VStack } from "@chakra-ui/react";

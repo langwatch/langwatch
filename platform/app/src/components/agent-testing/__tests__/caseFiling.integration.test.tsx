@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Filing a scenario into a test suite: where a new case lands, what the
- * editor offers, what archiving asks, and how a run plan picks cases.
+ * Filing a scenario into a test suite: where a new scenario lands, what the
+ * editor offers, what archiving asks, and how a run plan picks scenarios.
  *
- * @see specs/scenarios/scenario-folder-assignment.feature
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -31,7 +31,7 @@ import {
 import { TestCasesTab } from "../cases/TestCasesTab";
 
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
-const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockLastResults = vi.hoisted(() => vi.fn());
 const mockArchiveScenario = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
@@ -69,7 +69,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -86,11 +86,11 @@ vi.mock("~/utils/api", () => ({
       getScenarioSetBatchRunCount: { useQuery: emptyQuery },
       archive: { useMutation: mutation(mockArchiveScenario) },
       duplicate: { useMutation: mutation(vi.fn()) },
-      moveToFolder: { useMutation: mutation(vi.fn()) },
+      moveToTestSuite: { useMutation: mutation(vi.fn()) },
     },
     suites: {
-      folders: {
-        getAll: { useQuery: mockFoldersGetAll },
+      testSuites: {
+        getAll: { useQuery: mockTestSuitesGetAll },
         create: { useMutation: mutation(vi.fn()) },
         rename: { useMutation: mutation(vi.fn()) },
         archive: { useMutation: mutation(vi.fn()) },
@@ -158,7 +158,6 @@ const REFUNDS = {
   name: "Refunds",
   slug: "refunds",
   scenarioIds: ["case_1"],
-  caseIds: ["case_1"],
 };
 
 function scenarioRow(overrides: Record<string, unknown> = {}) {
@@ -166,7 +165,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     id: "case_1",
     name: "Double charge",
     labels: [],
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
     ...overrides,
@@ -176,7 +175,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
 describe("the Scenarios tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow()],
       isLoading: false,
@@ -191,7 +190,7 @@ describe("the Scenarios tab", () => {
   };
 
   /**
-   * The URL params the case editor drawer would have been opened with, from
+   * The URL params the scenario editor drawer would have been opened with, from
    * the last call site, so a test can assert on the target of a click.
    */
   const caseEditor = () => {
@@ -203,7 +202,7 @@ describe("the Scenarios tab", () => {
     return {
       open: true,
       scenarioId: params.scenarioId ?? null,
-      folderId: params.folderId ?? null,
+      testSuiteId: params.testSuiteId ?? null,
       showHistory: params.showHistory === "true",
     };
   };
@@ -249,7 +248,7 @@ describe("the Scenarios tab", () => {
   });
 
   /** @scenario "A scenario created from inside a suite is filed into that suite" */
-  it("files a case made inside a suite into that suite", async () => {
+  it("files a scenario made inside a suite into that suite", async () => {
     const user = userEvent.setup();
     renderTab();
 
@@ -264,12 +263,12 @@ describe("the Scenarios tab", () => {
     expect(caseEditor()).toEqual({
       open: true,
       scenarioId: null,
-      folderId: REFUNDS.id,
+      testSuiteId: REFUNDS.id,
       showHistory: false,
     });
     expect(mockOpenDrawer).toHaveBeenCalledWith(
       "agentTestingCaseEditor",
-      expect.objectContaining({ folderId: REFUNDS.id }),
+      expect.objectContaining({ testSuiteId: REFUNDS.id }),
     );
   });
 
@@ -288,7 +287,7 @@ describe("the Scenarios tab", () => {
   });
 
   /** @scenario "Archive asks for confirmation and names the scenario" */
-  it("names the case in the archive dialog and archives it on confirm", async () => {
+  it("names the scenario in the archive dialog and archives it on confirm", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow()],
@@ -313,7 +312,7 @@ describe("the Scenarios tab", () => {
   });
 
   /** @scenario "Running one scenario on its own starts a run plan of that scenario and target" */
-  it("runs one case as a run plan named after the case and the agent", async () => {
+  it("runs one scenario as a run plan named after the scenario and the agent", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow()],
@@ -339,7 +338,7 @@ describe("the Scenarios tab", () => {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
     expect(sent.name).toBe("Double charge prod-agent");
-    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scope).toEqual({ mode: "scenarios" });
     expect(sent.config.scenarioIds).toEqual(["case_1"]);
     // Nothing goes through the scenario runner, so nothing lands in the
     // project's internal run set.
@@ -349,14 +348,14 @@ describe("the Scenarios tab", () => {
   });
 });
 
-describe("the case editor", () => {
+describe("the scenario editor", () => {
   afterEach(cleanup);
 
   /** @scenario "The scenario editor offers the test suites of the project" */
   it("offers every test suite of the project and an option to file none", () => {
     render(
       <ScenarioForm
-        folderOptions={[
+        testSuiteOptions={[
           { id: "suite_refunds", name: "Refunds" },
           { id: "suite_checkout", name: "Checkout" },
         ]}
@@ -370,11 +369,11 @@ describe("the case editor", () => {
     expect(within(field).getByText(UNFILED_OPTION_LABEL)).toBeInTheDocument();
   });
 
-  it("opens on the suite the case is filed in", () => {
+  it("opens on the suite the scenario is filed in", () => {
     render(
       <ScenarioForm
-        defaultValues={{ folderId: "suite_checkout" }}
-        folderOptions={[
+        defaultValues={{ testSuiteId: "suite_checkout" }}
+        testSuiteOptions={[
           { id: "suite_refunds", name: "Refunds" },
           { id: "suite_checkout", name: "Checkout" },
         ]}
@@ -392,17 +391,17 @@ describe("the case editor", () => {
   });
 });
 
-describe("the case picker of a run plan", () => {
+describe("the scenario picker of a run plan", () => {
   afterEach(cleanup);
 
   const pickerProps = (
     overrides: Partial<React.ComponentProps<typeof ScenarioPicker>> = {},
   ): React.ComponentProps<typeof ScenarioPicker> => ({
     scenarios: [
-      { id: "case_1", name: "Double charge", labels: [], folderId: "f_1" },
-      { id: "case_2", name: "Late refund", labels: [], folderId: "f_1" },
-      { id: "case_3", name: "Card declined", labels: [], folderId: "f_2" },
-      { id: "case_4", name: "Login flow", labels: [], folderId: "f_2" },
+      { id: "case_1", name: "Double charge", labels: [], testSuiteId: "f_1" },
+      { id: "case_2", name: "Late refund", labels: [], testSuiteId: "f_1" },
+      { id: "case_3", name: "Card declined", labels: [], testSuiteId: "f_2" },
+      { id: "case_4", name: "Login flow", labels: [], testSuiteId: "f_2" },
     ],
     selectedIds: [],
     totalCount: 4,
@@ -419,10 +418,10 @@ describe("the case picker of a run plan", () => {
   });
 
   /** @scenario "A run plan can select single scenarios grouped by their test suite" */
-  it("lists the cases under their suite names and saves the ones picked", async () => {
+  it("lists the scenarios under their suite names and saves the ones picked", async () => {
     const user = userEvent.setup();
     const props = pickerProps({
-      folders: [
+      testSuites: [
         { id: "f_1", name: "Refunds" },
         { id: "f_2", name: "Checkout" },
       ],
@@ -440,7 +439,7 @@ describe("the case picker of a run plan", () => {
   });
 
   it("keeps the flat list where the project uses no test suite", () => {
-    render(<ScenarioPicker {...pickerProps({ folders: [] })} />, {
+    render(<ScenarioPicker {...pickerProps({ testSuites: [] })} />, {
       wrapper: Wrapper,
     });
 

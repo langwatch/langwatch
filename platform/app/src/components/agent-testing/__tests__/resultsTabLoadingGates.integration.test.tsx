@@ -46,7 +46,7 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
       // The row menu of a run plan archives it. Every row is a stored plan,
-      // so there is one call and no folder branch.
+      // so there is one call and no test suite branch.
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
@@ -162,12 +162,12 @@ describe("the Results tab loading gate", () => {
         mockSuitesGetAll.mockReturnValue({
           data: [
             {
-              id: "folder_checkout",
+              id: "test_suite_checkout",
               name: "Checkout",
               slug: "checkout",
               scenarioIds: ["scen_1"],
               labels: [],
-              kind: "folder",
+              kind: "test_suite",
               scope: null,
             },
             {
@@ -176,8 +176,11 @@ describe("the Results tab loading gate", () => {
               slug: "nightly-checkout",
               scenarioIds: [],
               labels: [],
-              kind: "custom",
-              scope: { mode: "folders", folderIds: ["folder_checkout"] },
+              kind: "run_plan",
+              scope: {
+                mode: "test_suites",
+                testSuiteIds: ["test_suite_checkout"],
+              },
             },
           ],
           isLoading: false,
@@ -185,7 +188,7 @@ describe("the Results tab loading gate", () => {
 
         render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
-        // The test suite is a folder of scenarios, so it is no row of its own.
+        // The test suite is a group of scenarios, so it is no row of its own.
         expect(
           screen.getByTestId("run-plan-row-nightly-checkout"),
         ).toBeInTheDocument();

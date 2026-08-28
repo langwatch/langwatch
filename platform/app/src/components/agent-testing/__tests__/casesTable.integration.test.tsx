@@ -6,7 +6,7 @@
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -106,7 +106,7 @@ function makeCase(overrides: Partial<TestCase> = {}): TestCase {
     id: "case_1",
     name: "Double charge",
     labels: [],
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
     ...overrides,
@@ -137,7 +137,7 @@ function panelProps(
     cases: [],
     externalCases: [],
     isLoading: false,
-    // A case with a run inside the period, which is what offers the recent
+    // A scenario with a run inside the period, which is what offers the recent
     // runs control under the table.
     lastResults: new Map([["case_1", makeResult()]]),
     isLastResultsLoading: false,
@@ -296,7 +296,7 @@ async function openRowMenu(caseName: string) {
   return user;
 }
 
-/** The view model for one address, with a fixed suite list and case list. */
+/** The view model for one address, with a fixed suite list and scenario list. */
 function renderView({
   selection,
   suites,
@@ -331,8 +331,8 @@ describe("the scenarios table", () => {
 
   describe("given an address and a rail of suites", () => {
     const cases = [
-      makeCase({ id: "case_default", folderId: DEFAULT_SUITE.id }),
-      makeCase({ id: "case_refunds", folderId: REFUNDS.id }),
+      makeCase({ id: "case_default", testSuiteId: DEFAULT_SUITE.id }),
+      makeCase({ id: "case_refunds", testSuiteId: REFUNDS.id }),
     ];
     const suites = [DEFAULT_SUITE, REFUNDS];
 
@@ -438,7 +438,7 @@ describe("the scenarios table", () => {
   });
 
   /** @scenario "A row carries no leading file icon" */
-  it("draws no file icon at the leading edge of a case row", () => {
+  it("draws no file icon at the leading edge of a scenario row", () => {
     renderPanel({ cases: [makeCase()] });
 
     const row = screen.getByTestId("case-row-Double charge");
@@ -453,7 +453,7 @@ describe("the scenarios table", () => {
     const critical = within(row).getByTestId("tag-pill-critical");
     const billing = within(row).getByTestId("tag-pill-billing");
     // Quieter than the name: the pill palette is a subtle surface, not the
-    // foreground the case name is drawn in.
+    // foreground the scenario name is drawn in.
     expect(critical.className).not.toEqual(billing.className);
   });
 
@@ -474,11 +474,11 @@ describe("the scenarios table", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("draws no folder row, because the rail is the only list of suites", () => {
+  it("draws no test suite row, because the rail is the only list of suites", () => {
     renderPanel({ cases: [makeCase()] });
 
     expect(
-      document.querySelector('[data-testid^="folder-header-row-"]'),
+      document.querySelector('[data-testid^="test-suite-header-row-"]'),
     ).toBeNull();
   });
 
@@ -536,7 +536,7 @@ describe("the scenarios table", () => {
   });
 
   /** @scenario "Open last run is not offered for a scenario that never ran" */
-  it("does not offer Open last run for a case that never ran", async () => {
+  it("does not offer Open last run for a scenario that never ran", async () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
     await openRowMenu("Double charge");
 
@@ -550,7 +550,7 @@ describe("the scenarios table", () => {
 
   /** @scenario "Duplicate creates a copy in the same suite" */
   /** @scenario "Duplicating a scenario copies its suite" */
-  it("puts the copy of a duplicated case in the same suite", async () => {
+  it("puts the copy of a duplicated scenario in the same suite", async () => {
     const original = makeCase({ labels: ["critical"] });
     const { props, view } = renderPanel({ cases: [original] });
     const user = await openRowMenu("Double charge");
@@ -631,7 +631,7 @@ describe("the scenarios table", () => {
   // --- Row click ---
 
   /** @scenario "Clicking a row opens the scenario editor" */
-  it("opens the case editor when the row is clicked", async () => {
+  it("opens the scenario editor when the row is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -646,7 +646,7 @@ describe("the scenarios table", () => {
   });
 
   /** @scenario "Clicking a row with no last run opens the scenario editor" */
-  it("opens the case editor when a row with no last run is clicked", async () => {
+  it("opens the scenario editor when a row with no last run is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -1067,7 +1067,7 @@ describe("the scenarios table", () => {
   // --- External sets ---
 
   /** @scenario "An external set lists its scenarios read-only with a last run column" */
-  it("lists the cases of an external set read-only", () => {
+  it("lists the scenarios of an external set read-only", () => {
     renderPanel({
       selection: { kind: "external", setId: "nightly-ci" },
       title: "nightly-ci",

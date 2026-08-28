@@ -41,7 +41,7 @@ export function RailSectionHeading({
 
 export type RailItemProps = {
   label: string;
-  /** The folder icon of a test suite, or the code icon of an external set. */
+  /** The test suite icon of a test suite, or the code icon of an external set. */
   icon?: React.ReactNode;
   selected: boolean;
   collapsed: boolean;

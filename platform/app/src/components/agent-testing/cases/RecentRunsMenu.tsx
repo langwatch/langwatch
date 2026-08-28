@@ -1,5 +1,5 @@
 /**
- * The way into a recent run of the open set, in the header of the cases panel
+ * The way into a recent run of the open set, in the header of the scenarios panel
  * between "New scenario" and "Run suite".
  *
  * A row holds the run plan the run belongs to, how long ago it started and how

@@ -23,19 +23,19 @@ import type { SuiteTarget } from "~/server/suites/types";
 /**
  * What a run covers, as the dialog holds it.
  *
- * The stored scope names no cases, because a plan keeps its hand-picked list
+ * The stored scope names no scenarios, because a plan keeps its hand-picked list
  * in its own `scenarioIds`. The dialog needs the list inside the rule, so two
  * hand-picked scopes over different scenarios are two scopes rather than one.
  */
 export type RunScope =
   | { mode: "all" }
-  | { mode: "folders"; folderIds: string[] }
+  | { mode: "test_suites"; testSuiteIds: string[] }
   | { mode: "labels"; labels: string[] }
-  | { mode: "cases"; caseIds: string[] };
+  | { mode: "scenarios"; scenarioIds: string[] };
 
 /** The scope as the server stores it: the rule, without the hand-picked list. */
 export function toSuiteScope(scope: RunScope): SuiteScope {
-  if (scope.mode === "cases") return { mode: "cases" };
+  if (scope.mode === "scenarios") return { mode: "scenarios" };
   return scope;
 }
 
@@ -47,14 +47,15 @@ export function toSuiteScope(scope: RunScope): SuiteScope {
  */
 export function normaliseRunScope({
   scope,
-  allFolderIds,
+  allTestSuiteIds,
 }: {
   scope: RunScope;
-  allFolderIds: readonly string[];
+  allTestSuiteIds: readonly string[];
 }): RunScope {
-  if (scope.mode !== "folders" || allFolderIds.length === 0) return scope;
-  const chosen = new Set(scope.folderIds);
-  const coversEverything = allFolderIds.every((id) => chosen.has(id));
+  if (scope.mode !== "test_suites" || allTestSuiteIds.length === 0)
+    return scope;
+  const chosen = new Set(scope.testSuiteIds);
+  const coversEverything = allTestSuiteIds.every((id) => chosen.has(id));
   return coversEverything ? { mode: "all" } : scope;
 }
 
@@ -95,7 +96,7 @@ export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
 function caseIdsOf(scope: RunScope): string[] | undefined {
-  return scope.mode === "cases" ? scope.caseIds : undefined;
+  return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
 /** A scope as one string, so two scopes can be compared. */

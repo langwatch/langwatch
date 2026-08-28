@@ -48,9 +48,9 @@ import type { RunPlan, RunPlanScopeKind } from "./run-plans";
  */
 const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
   all: Layers,
-  folders: Folder,
+  test_suites: Folder,
   labels: Tag,
-  cases: Crosshair,
+  scenarios: Crosshair,
   external: FolderCode,
 };
 

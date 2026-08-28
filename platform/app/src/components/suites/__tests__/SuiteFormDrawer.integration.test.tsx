@@ -106,7 +106,7 @@ vi.mock("~/utils/api", () => ({
       resolveArchivedNames: {
         useQuery: vi.fn(() => ({ data: undefined })),
       },
-      folders: {
+      testSuites: {
         getAll: {
           useQuery: vi.fn(() => ({ data: [] })),
         },
@@ -238,7 +238,7 @@ function makeSuiteConfig(
     projectId: "proj_1",
     name: "My Suite",
     slug: "my-suite",
-    kind: "custom",
+    kind: "run_plan",
     scope: null,
     description: "A test suite",
     scenarioIds: ["scen_1", "scen_2"],

@@ -81,9 +81,9 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined }) },
       // The row menu of a run plan archives it, through the suite call for a
-      // plan and the folder call for a test suite.
+      // plan and the test suite call for a test suite.
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      folders: {
+      testSuites: {
         archive: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },

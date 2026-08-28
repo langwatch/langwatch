@@ -12,7 +12,7 @@
  *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/suites/run-notes.feature
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
 import { useState } from "react";

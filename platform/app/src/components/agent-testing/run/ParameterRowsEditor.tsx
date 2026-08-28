@@ -3,7 +3,7 @@
  *
  * A row holds a key, a value and a lock. The lock hides the value while it is
  * typed and keeps it out of everything the suite writes down, so a credential
- * and a plain value sit in the same list. The secrets the cases declare are
+ * and a plain value sit in the same list. The secrets the scenarios declare are
  * rows of that list too: their key is fixed and their value is required.
  *
  * @see specs/features/agent-testing/run-dialog.feature
@@ -38,7 +38,7 @@ export function ParameterRowsEditor({
   onChangeRow: (index: number, patch: Partial<ParameterRow>) => void;
   onAddRow: () => void;
   onRemoveRow: (index: number) => void;
-  /** The secrets the cases declare, which are rows with a fixed key. */
+  /** The secrets the scenarios declare, which are rows with a fixed key. */
   declaredSecrets: ScenarioParameterDefinition[];
   secretValues: Record<string, string>;
   onChangeSecretValue: (name: string, value: string) => void;
@@ -174,7 +174,7 @@ function EditableRow({
   );
 }
 
-/** One secret the cases declare: the key is theirs, the value is this run's. */
+/** One secret the scenarios declare: the key is theirs, the value is this run's. */
 function DeclaredSecretRow({
   definition,
   value,

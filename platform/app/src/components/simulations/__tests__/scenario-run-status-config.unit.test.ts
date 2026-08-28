@@ -51,7 +51,7 @@ describe("scenario-run-status-config", () => {
 
     describe("when a run has not settled yet", () => {
       // A run still in flight once read in the same warm colour as a
-      // failure, so a list of running cases looked like a broken run.
+      // failure, so a list of running scenarios looked like a broken run.
       /** @scenario "A run that is still going does not read as a failure" */
       it("reads in the colour of a queued run, not of a failed one", () => {
         const queued = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.QUEUED];

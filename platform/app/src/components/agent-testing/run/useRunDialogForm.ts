@@ -3,7 +3,7 @@
  * offer, the parameter overrides, and the chips that add them.
  *
  * The fields reset once per subject, so opening the dialog on another suite
- * or case starts from that subject's remembered target.
+ * or scenario starts from that subject's remembered target.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/suites/run-notes.feature
@@ -54,7 +54,7 @@ function subjectKeyOf(subject: RunDialogSubject | null): string {
   return `case:${subject.scenarioId}`;
 }
 
-/** The cases a run of this subject covers. */
+/** The scenarios a run of this subject covers. */
 function scenarioIdsOfSubject(
   subject: RunDialogSubject | null,
   allScenarios: readonly { id: string }[],
@@ -197,7 +197,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
 
 export type RunDialogFields = ReturnType<typeof useRunDialogFields>;
 
-/** The agents, the published prompts and the cases the project holds. */
+/** The agents, the published prompts and the scenarios the project holds. */
 function useRunDialogChoices(subject: RunDialogSubject | null) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -215,7 +215,7 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
   );
   // Only the New run plan entry point names test suites, but the run name of
   // every entry point can read one, so the list is read whenever it is open.
-  const { data: folders } = api.suites.folders.getAll.useQuery(
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
     { projectId },
     { enabled: isDialogOpen },
   );
@@ -237,7 +237,7 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
       (allScenarios ?? []).map((scenario) => ({
         id: scenario.id,
         name: scenario.name,
-        folderId: scenario.folderId ?? null,
+        testSuiteId: scenario.testSuiteId ?? null,
         labels: scenario.labels ?? [],
       })),
     [allScenarios],
@@ -247,7 +247,7 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
     scenarioAgents,
     publishedPrompts,
     allScenarios,
-    folders: folders ?? [],
+    testSuites: testSuites ?? [],
     scopeScenarios,
   };
 }
@@ -352,7 +352,7 @@ function useParameterBlockToggle({
   const { setShowParams, setParameterLine } = fields;
   const { setParameterRows, setRowsRequested, setSecretValues } = fields;
 
-  /** Opens the overrides on the values the cases declare. */
+  /** Opens the overrides on the values the scenarios declare. */
   const showParameters = useCallback(() => {
     setParameterLine(formatParameterLine(parameterDefinitions));
     setParameterRows(null);
@@ -592,7 +592,7 @@ function buildCustomizeRunChips({
 }
 
 /**
- * How many scenarios a run of this subject covers, or nothing while the case
+ * How many scenarios a run of this subject covers, or nothing while the scenario
  * list a "run everything" subject needs is still on its way.
  */
 function caseCountOf(
@@ -659,9 +659,9 @@ function useRunDialogNaming({
     () =>
       normaliseRunScope({
         scope: planFields.scope,
-        allFolderIds: choices.folders.map((folder) => folder.id),
+        allTestSuiteIds: choices.testSuites.map((testSuite) => testSuite.id),
       }),
-    [planFields.scope, choices.folders],
+    [planFields.scope, choices.testSuites],
   );
 
   const history = useRunConfigurationHistory({
@@ -678,7 +678,7 @@ function useRunDialogNaming({
       ? scopeLabelOf({
           subject,
           scope: planFields.scope,
-          folders: choices.folders,
+          testSuites: choices.testSuites,
           scenarios: choices.scopeScenarios,
         })
       : "",

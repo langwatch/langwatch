@@ -1,5 +1,5 @@
 /**
- * The page-level bridge for the Agent Testing case editor drawer.
+ * The page-level bridge for the Agent Testing scenario editor drawer.
  *
  * The drawer itself is URL routed and lives in `drawerRegistry`. This shell
  * registers the flow callback the drawer calls on save, and mounts the run
