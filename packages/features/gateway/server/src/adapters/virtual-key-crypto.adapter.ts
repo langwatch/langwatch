@@ -40,104 +40,79 @@ export class VirtualKeyCryptoError extends Error {
 }
 
 /**
- * Generate a 26-char Crockford-base32 ULID. Format:
- *   - first 10 chars: millisecond timestamp (48 bits)
- *   - last 16 chars: random (80 bits)
- *
- * Produces the same layout as the `ulid` npm package but avoids the dep.
+ * Process-injected cryptographic material for virtual keys. The pepper stays
+ * optional so an unconfigured process retains the legacy operation-time
+ * `pepper_missing` failure; the feature never reads an ambient environment source.
  */
-export function mintUlid(now: number = Date.now()): string {
-  const out = Array.from({ length: 26 }, () => "");
-  let ts = BigInt(now);
-  for (let i = 9; i >= 0; i--) {
-    out[i] = CROCKFORD[Number(ts & 0x1fn)] ?? "0";
-    ts = ts >> 5n;
-  }
-  // 80 bits random → 16 base32 chars. Use a BigInt accumulator so bit-slicing
-  // is boring and correct rather than subtly off.
-  let rand = 0n;
-  for (const byte of randomBytes(10)) {
-    rand = (rand << 8n) | BigInt(byte);
-  }
-  for (let i = 15; i >= 0; i--) {
-    out[10 + i] = CROCKFORD[Number(rand & 0x1fn)] ?? "0";
-    rand = rand >> 5n;
-  }
-  return out.join("");
-}
+export type VirtualKeyCryptoConfig = {
+  pepper?: string;
+};
 
-/**
- * Mint a new virtual-key secret. The resulting string is shown once to the
- * user and never stored in plaintext.
- */
-export function mintVirtualKeySecret(now: number = Date.now()): string {
-  return `${VK_PREFIX}${mintUlid(now)}`;
-}
+export class VirtualKeyCryptoAdapter {
+  static readonly displayPrefixLength = 13;
 
-/**
- * Parse `vk-lw-<ulid>` and return its components. Throws on any deviation
- * from the canonical shape.
- */
-export function parseVirtualKey(secret: string): {
-  ulid: string;
-  displayPrefix: string;
-} {
-  if (!secret.startsWith(VK_PREFIX)) {
-    throw new VirtualKeyCryptoError("malformed_key", "missing vk-lw- prefix");
+  static create(config: VirtualKeyCryptoConfig): VirtualKeyCryptoAdapter {
+    return new VirtualKeyCryptoAdapter(config.pepper);
   }
-  const ulid = secret.slice(VK_PREFIX.length);
-  if (ulid.length !== 26) {
-    throw new VirtualKeyCryptoError("malformed_key", "ulid must be 26 chars");
+
+  private constructor(private readonly pepper: string | undefined) {}
+
+  hashSecret(secret: string): string {
+    const pepper = this.pepper;
+    if (!pepper) {
+      throw new VirtualKeyCryptoError(
+        "pepper_missing",
+        "LW_VIRTUAL_KEY_PEPPER is required to hash virtual-key secrets",
+      );
+    }
+    return createHmac("sha256", pepper).update(secret).digest("hex");
   }
-  if (!/^[0-9A-Z]+$/.test(ulid)) {
-    throw new VirtualKeyCryptoError(
-      "malformed_key",
-      "ulid must be uppercase Crockford base32",
-    );
+
+  verifySecret(presented: string, stored: string): boolean {
+    const computed = this.hashSecret(presented);
+    const a = Buffer.from(computed, "hex");
+    const b = Buffer.from(stored, "hex");
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
-  // 13-char prefix: "vk-lw-" (6) + first 7 ulid chars = 13.
-  const displayPrefix = secret.slice(0, 13);
-  return { ulid, displayPrefix };
-}
 
-// Reads pepper from process.env at call time. env.mjs also validates
-// LW_VIRTUAL_KEY_PEPPER at startup (see env.mjs) — that guard is the
-// production fail-fast path. Here we re-read process.env so tests can
-// mutate it between calls without re-loading the env module. Historically
-// this was `process.env.LW_VIRTUAL_KEY_PEPPER ?? env.LW_VIRTUAL_KEY_PEPPER`
-// — the fallback to the module-level env snapshot made the pepper-missing
-// branch untestable because env.mjs had already snapshotted it at module
-// load. Removed now that the tests stub process.env in beforeEach.
-function getPepper(): string {
-  const pepper = process.env.LW_VIRTUAL_KEY_PEPPER;
-  if (!pepper) {
-    throw new VirtualKeyCryptoError(
-      "pepper_missing",
-      "LW_VIRTUAL_KEY_PEPPER is required to hash virtual-key secrets",
-    );
+  /** Generates a sortable 26-character Crockford-base32 ULID. */
+  static mintUlid(now: number = Date.now()): string {
+    const out = Array.from({ length: 26 }, () => "");
+    let ts = BigInt(now);
+    for (let i = 9; i >= 0; i--) {
+      out[i] = CROCKFORD[Number(ts & 0x1fn)] ?? "0";
+      ts = ts >> 5n;
+    }
+    let rand = 0n;
+    for (const byte of randomBytes(10)) {
+      rand = (rand << 8n) | BigInt(byte);
+    }
+    for (let i = 15; i >= 0; i--) {
+      out[10 + i] = CROCKFORD[Number(rand & 0x1fn)] ?? "0";
+      rand = rand >> 5n;
+    }
+    return out.join("");
   }
-  return pepper;
-}
 
-/**
- * Peppered hash of a virtual-key secret. Deterministic so the control-plane
- * can look up a presented secret with a single indexed SELECT.
- */
-export function hashVirtualKeySecret(secret: string): string {
-  const pepper = getPepper();
-  return createHmac("sha256", pepper).update(secret).digest("hex");
-}
+  /** Mints a virtual-key secret that is shown once and never stored plaintext. */
+  static mintSecret(now: number = Date.now()): string {
+    return `${VK_PREFIX}${VirtualKeyCryptoAdapter.mintUlid(now)}`;
+  }
 
-/**
- * Constant-time comparison of a presented secret against the hashed form
- * stored in the database.
- */
-export function verifyVirtualKeySecret(presented: string, stored: string): boolean {
-  const computed = hashVirtualKeySecret(presented);
-  const a = Buffer.from(computed, "hex");
-  const b = Buffer.from(stored, "hex");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  /** Parses the canonical virtual-key format. */
+  static parseSecret(secret: string): { ulid: string; displayPrefix: string } {
+    if (!secret.startsWith(VK_PREFIX)) {
+      throw new VirtualKeyCryptoError("malformed_key", "missing vk-lw- prefix");
+    }
+    const ulid = secret.slice(VK_PREFIX.length);
+    if (ulid.length !== 26) {
+      throw new VirtualKeyCryptoError("malformed_key", "ulid must be 26 chars");
+    }
+    if (!/^[0-9A-Z]+$/.test(ulid)) {
+      throw new VirtualKeyCryptoError("malformed_key", "ulid must be uppercase Crockford base32");
+    }
+    const displayPrefix = secret.slice(0, VirtualKeyCryptoAdapter.displayPrefixLength);
+    return { ulid, displayPrefix };
+  }
 }
-
-export const VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH = 13;

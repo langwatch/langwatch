@@ -212,6 +212,7 @@ import {
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
@@ -1293,7 +1294,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Governance is composed once after its event-sourcing command ports have
   // registered. Request transports then receive that one capability through
   // `ctx.app`; the worker uses the same project service directly.
-  const governanceVirtualKeys = VirtualKeyService.create(prisma, projects);
+  const gatewayVirtualKeyCrypto = createProcessVirtualKeyCrypto(config);
+  const governanceVirtualKeys = VirtualKeyService.create(prisma, projects, gatewayVirtualKeyCrypto);
   const governanceIngestionPullHost = AppGovernanceIngestionPullHost.create(featureFlags);
   const governanceOptions = {
     organizations,
@@ -2356,7 +2358,11 @@ export function createTestApp(
     deriveBindingId: AuthzFeature.deriveGrantId,
     diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
   }).build();
-  const testGovernanceVirtualKeys = VirtualKeyService.create(testPrisma, testProjects);
+  const testGovernanceVirtualKeys = VirtualKeyService.create(
+    testPrisma,
+    testProjects,
+    createProcessVirtualKeyCrypto({ virtualKeyPepper: "test-virtual-key-pepper" }),
+  );
   const testGatewayBudgetDecisions = PrismaGatewayAdapter.create({
     database: testPrisma,
     projects: testProjects,

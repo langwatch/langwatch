@@ -763,7 +763,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
   describe("given a budget attached to the key itself", () => {
     /** @scenario "Creating a key with a budget creates both or neither" */
     it("creates the key and its budget in one transaction", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `budgeted-${suffix}`,
@@ -797,7 +797,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Revoking a key retires its budget instead of deleting it" */
     it("archives the key's budget on revoke and keeps the row", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `revoked-${suffix}`,
@@ -830,7 +830,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // key. It is not drawer-managed, so the key never owned it, but its
       // scope is that key and nothing else. Once the key is REVOKED, which is
       // terminal, it can never count spend again.
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `standalone-budget-${suffix}`,
@@ -870,7 +870,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // ATTRIBUTED_USER hangs one allowance off each end user the anchor's
       // traffic is attributed to. When the anchor is the key, a dead key
       // means a template that can never open another bucket.
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `per-user-anchor-${suffix}`,
@@ -909,7 +909,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The boundary the case above must not cross. A project outlives any
       // one key, so its cap is still a live control the moment another key
       // is scoped there.
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `project-budget-survivor-${suffix}`,
@@ -948,7 +948,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // The permission boundary the revoke change must not widen: the key is
       // still alive here, so an independently created cap on it is still an
       // enforcement control and virtualKeys:update must not retire it.
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `drawer-clear-keeps-${suffix}`,
@@ -987,7 +987,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Removing a key's budget from the drawer archives it" */
     it("archives rather than deletes when the budget field is cleared", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `cleared-${suffix}`,
@@ -1121,7 +1121,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           },
         },
       });
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -1140,7 +1140,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     /** @scenario "Unticking every provider is refused rather than saved" */
     /** @scenario "A key cannot be saved with no providers at all" */
     it("rejects an empty provider allowlist", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,
@@ -1166,7 +1166,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
         },
       });
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       try {
         // Anthropic is scope-reachable but omitted by the policy. The save must
         // succeed: the policy blocks it at dispatch, not at save.
@@ -1196,7 +1196,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "A new key defaults to no fallback" */
     it("defaults a newly created key to routing mode NONE", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_ID,
         name: `default-routing-${suffix}`,
@@ -1209,7 +1209,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "Routing mode and routing policy cannot contradict each other" */
     it("refuses POLICY without a policy and NONE with one", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       await expect(
         service.create({
           organizationId: ORG_ID,

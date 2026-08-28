@@ -39,7 +39,7 @@ function codeOf(error: unknown): string | null {
 }
 
 describe("virtual key expiration dates (real PG)", () => {
-  const service = VirtualKeyService.create(prisma, projects);
+  const service = VirtualKeyService.createForTest(prisma, projects);
 
   beforeAll(async () => {
     await startTestContainers();

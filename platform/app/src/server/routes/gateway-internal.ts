@@ -50,11 +50,7 @@ import {
   reportRealtimeSessionUsage,
   reserveRealtimeSession,
 } from "~/server/gateway/realtimeSession.service";
-import {
-  hashVirtualKeySecret,
-  parseVirtualKey,
-  VirtualKeyCryptoError,
-} from "@langwatch/gateway-server";
+import { VirtualKeyCryptoAdapter, VirtualKeyCryptoError } from "@langwatch/gateway-server";
 import { gatewayRoutingPolicySelect } from "@langwatch/gateway-server";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
@@ -328,7 +324,7 @@ function rejectionBody(rejection: KeyAuthRejection) {
  *  credential, so it rethrows. */
 function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   try {
-    parseVirtualKey(presented);
+    VirtualKeyCryptoAdapter.parseSecret(presented);
     return null;
   } catch (err) {
     if (!(err instanceof VirtualKeyCryptoError)) throw err;
@@ -411,7 +407,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   }
 
   const service = c.app.gateway.virtualKeys;
-  const vk = await service.getByHashedSecretInternal(hashVirtualKeySecret(presented));
+  const vk = await service.getBySecretInternal(presented);
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
     return c.json(

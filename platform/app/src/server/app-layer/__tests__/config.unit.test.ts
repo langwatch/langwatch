@@ -1,10 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { initializeEnvironmentConfig, resetEnvironmentConfigForTests } from "../../../env.mjs";
 import {
+  createAppConfigFromEnv,
   type ProcessRole,
   resolveLangyWorkerConfig,
   roleRunsWorkers,
   roleSatisfiesRunIn,
 } from "../config";
+
+describe("Gateway virtual-key process configuration", () => {
+  beforeEach(() => {
+    resetEnvironmentConfigForTests();
+  });
+
+  afterEach(() => {
+    resetEnvironmentConfigForTests();
+    initializeEnvironmentConfig(process.env);
+  });
+
+  it("projects only LW_VIRTUAL_KEY_PEPPER into the composed app configuration", () => {
+    initializeEnvironmentConfig({
+      NODE_ENV: "test",
+      BUILD_TIME: "1",
+      SKIP_ENV_VALIDATION: "1",
+      LW_VIRTUAL_KEY_PEPPER: "configured-virtual-key-pepper-32-bytes",
+      CREDENTIALS_SECRET: "must-not-be-used-as-a-virtual-key-pepper",
+      NEXTAUTH_SECRET: "must-not-be-used-as-a-virtual-key-pepper",
+    });
+
+    expect(createAppConfigFromEnv().virtualKeyPepper).toBe(
+      "configured-virtual-key-pepper-32-bytes",
+    );
+  });
+});
 
 describe("resolveLangyWorkerConfig", () => {
   it("returns no worker config when both values are absent", () => {

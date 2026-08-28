@@ -91,6 +91,8 @@ export interface AppConfig {
   databaseUrl: string;
   clickhouseUrl?: string;
   redisUrl?: string;
+  /** Process-composed HMAC pepper for the Gateway virtual-key control plane. */
+  virtualKeyPepper?: string;
   redisClusterEndpoints?: string;
   /** Raw `REDIS_DB_INDEX`; `@langwatch/redis-client` validates and applies it. */
   redisDbIndex?: string;
@@ -196,6 +198,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisDbIndex: env.REDIS_DB_INDEX,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     scenarioExecution: {
+    virtualKeyPepper: env.LW_VIRTUAL_KEY_PEPPER,
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       legacyDefaultModel: DEFAULT_MODEL,

@@ -1,123 +1,120 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  hashVirtualKeySecret,
-  mintUlid,
-  mintVirtualKeySecret,
-  parseVirtualKey,
-  VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH,
-  VirtualKeyCryptoError,
-  verifyVirtualKeySecret,
-} from "../src";
+import { VirtualKeyCryptoAdapter, VirtualKeyCryptoError } from "../src";
 
-beforeEach(() => {
-  process.env.LW_VIRTUAL_KEY_PEPPER = "unit-test-pepper-32-bytes-exactly!";
+const crypto = VirtualKeyCryptoAdapter.create({
+  pepper: "unit-test-pepper-32-bytes-exactly!",
 });
 
 describe("virtual key crypto", () => {
   describe("mintUlid", () => {
     it("returns 26 Crockford base32 characters", () => {
-      const ulid = mintUlid();
+      const ulid = VirtualKeyCryptoAdapter.mintUlid();
       expect(ulid).toHaveLength(26);
       expect(ulid).toMatch(/^[0-9A-HJKMNP-TV-Z]+$/);
     });
 
     it("is time-sortable — later timestamps produce lexically larger IDs", () => {
-      const a = mintUlid(1_000_000);
-      const b = mintUlid(2_000_000);
+      const a = VirtualKeyCryptoAdapter.mintUlid(1_000_000);
+      const b = VirtualKeyCryptoAdapter.mintUlid(2_000_000);
       expect(a.slice(0, 10) < b.slice(0, 10)).toBe(true);
     });
   });
 
-  describe("mintVirtualKeySecret", () => {
+  describe("mintSecret", () => {
     it("produces vk-lw-<26-ulid> (32 chars)", () => {
-      const secret = mintVirtualKeySecret();
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
       expect(secret).toMatch(/^vk-lw-[0-9A-HJKMNP-TV-Z]{26}$/);
       expect(secret).toHaveLength(32);
     });
 
     it("does not encode env in the token (env is metadata on the row)", () => {
-      const secret = mintVirtualKeySecret();
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
       expect(secret).not.toMatch(/live|test/);
     });
   });
 
-  describe("parseVirtualKey", () => {
+  describe("parseSecret", () => {
     it("extracts ulid and displayPrefix", () => {
-      const secret = mintVirtualKeySecret(1_735_000_000_000);
-      const parsed = parseVirtualKey(secret);
+      const secret = VirtualKeyCryptoAdapter.mintSecret(1_735_000_000_000);
+      const parsed = VirtualKeyCryptoAdapter.parseSecret(secret);
       expect(parsed.ulid).toHaveLength(26);
-      expect(parsed.displayPrefix).toHaveLength(VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH);
+      expect(parsed.displayPrefix).toHaveLength(VirtualKeyCryptoAdapter.displayPrefixLength);
       expect(parsed.displayPrefix.startsWith("vk-lw-")).toBe(true);
     });
 
     describe("when the key is malformed", () => {
       it("rejects a secret without the vk-lw- prefix", () => {
-        expect(() => parseVirtualKey("sk-live-abcdef")).toThrow(VirtualKeyCryptoError);
+        expect(() => VirtualKeyCryptoAdapter.parseSecret("sk-live-abcdef")).toThrow(
+          VirtualKeyCryptoError,
+        );
       });
 
       it("rejects a legacy lw_vk_ token (clean break, no backcompat)", () => {
-        expect(() => parseVirtualKey("lw_vk_live_01H000000000000000000000")).toThrow(
-          VirtualKeyCryptoError,
-        );
+        expect(() =>
+          VirtualKeyCryptoAdapter.parseSecret("lw_vk_live_01H000000000000000000000"),
+        ).toThrow(VirtualKeyCryptoError);
       });
 
       it("rejects a ulid shorter than 26 chars", () => {
-        expect(() => parseVirtualKey("vk-lw-ABC")).toThrow(VirtualKeyCryptoError);
+        expect(() => VirtualKeyCryptoAdapter.parseSecret("vk-lw-ABC")).toThrow(
+          VirtualKeyCryptoError,
+        );
       });
 
       it("rejects a ulid with non-Crockford characters", () => {
-        expect(() => parseVirtualKey("vk-lw-!!!!!!!!!!!!!!!!!!!!!!!!!!")).toThrow(
-          VirtualKeyCryptoError,
-        );
+        expect(() =>
+          VirtualKeyCryptoAdapter.parseSecret("vk-lw-!!!!!!!!!!!!!!!!!!!!!!!!!!"),
+        ).toThrow(VirtualKeyCryptoError);
       });
     });
   });
 
-  describe("hashVirtualKeySecret", () => {
+  describe("hashSecret", () => {
     /** @scenario Virtual key secret is stored as peppered HMAC-SHA256 hash */
     it("produces a 64-char hex sha256 hash", () => {
-      const secret = mintVirtualKeySecret();
-      const hash = hashVirtualKeySecret(secret);
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
+      const hash = crypto.hashSecret(secret);
       expect(hash).toMatch(/^[0-9a-f]{64}$/);
     });
 
     it("is deterministic — same input always yields same hash", () => {
-      const secret = mintVirtualKeySecret();
-      expect(hashVirtualKeySecret(secret)).toBe(hashVirtualKeySecret(secret));
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
+      expect(crypto.hashSecret(secret)).toBe(crypto.hashSecret(secret));
     });
 
     it("changes with the pepper", () => {
-      const secret = mintVirtualKeySecret();
-      const first = hashVirtualKeySecret(secret);
-      process.env.LW_VIRTUAL_KEY_PEPPER = "totally-different-pepper-32-bytes!";
-      const second = hashVirtualKeySecret(secret);
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
+      const first = crypto.hashSecret(secret);
+      const second = VirtualKeyCryptoAdapter.create({
+        pepper: "totally-different-pepper-32-bytes!",
+      }).hashSecret(secret);
       expect(first).not.toBe(second);
     });
 
     describe("when the pepper is missing", () => {
       it("throws pepper_missing", () => {
-        delete process.env.LW_VIRTUAL_KEY_PEPPER;
-        expect(() => hashVirtualKeySecret("vk-lw-x")).toThrow(/LW_VIRTUAL_KEY_PEPPER/);
+        const unconfigured = VirtualKeyCryptoAdapter.create({});
+        expect(() => unconfigured.hashSecret("vk-lw-x")).toThrow(/LW_VIRTUAL_KEY_PEPPER/);
       });
     });
   });
 
-  describe("verifyVirtualKeySecret", () => {
+  describe("verifySecret", () => {
     it("returns true for a matching secret / hash pair", () => {
-      const secret = mintVirtualKeySecret();
-      const hash = hashVirtualKeySecret(secret);
-      expect(verifyVirtualKeySecret(secret, hash)).toBe(true);
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
+      const hash = crypto.hashSecret(secret);
+      expect(crypto.verifySecret(secret, hash)).toBe(true);
     });
 
     it("returns false for a non-matching secret", () => {
-      const hash = hashVirtualKeySecret(mintVirtualKeySecret());
-      expect(verifyVirtualKeySecret(mintVirtualKeySecret(), hash)).toBe(false);
+      const hash = crypto.hashSecret(VirtualKeyCryptoAdapter.mintSecret());
+      expect(crypto.verifySecret(VirtualKeyCryptoAdapter.mintSecret(), hash)).toBe(false);
     });
 
     it("returns false for a mismatched hex length", () => {
-      const secret = mintVirtualKeySecret();
-      expect(verifyVirtualKeySecret(secret, "abcd")).toBe(false);
+      const secret = VirtualKeyCryptoAdapter.mintSecret();
+      expect(crypto.verifySecret(secret, "abcd")).toBe(false);
     });
   });
 });

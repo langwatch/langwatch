@@ -279,7 +279,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
   /** @scenario "A key owned above a project is refused until its traces have a home" */
   it("refuses creating an org- or team-owned key when no trace project resolves", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
 
     await expect(
       service.create({
@@ -319,7 +319,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   describe("when the organization has projects the key could have named", () => {
     /** @scenario "A shared key must say where its traces land once there is a choice" */
     it("refuses an org- or team-owned key that names no destination", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       for (const scope of [
         { scopeType: "ORGANIZATION" as const, scopeId: ORG_CHOICE_ID },
@@ -350,7 +350,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
     /** @scenario "A key that reaches several projects must pick one for its traces" */
     it("refuses a key scoped to two projects with no destination named", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const refusal = await service
         .create({
@@ -371,7 +371,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     });
 
     it("accepts the same key once it names where its traces land", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const { virtualKey } = await service.create({
         organizationId: ORG_CHOICE_ID,
@@ -388,7 +388,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   describe("given the destination a key names is not one of this organization's", () => {
     /** @scenario "A destination that is named has to be one that exists" */
     it("refuses a project belonging to another organization, and writes nothing", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const name = `foreign-destination-${suffix}`;
 
       const refusal = await service
@@ -417,7 +417,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     });
 
     it("refuses a project that does not exist at all", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const refusal = await service
         .create({
@@ -438,7 +438,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   describe("given a project the customer has deleted", () => {
     /** @scenario "A project that was deleted is no longer a destination" */
     it("refuses a create that names it, and writes nothing", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const name = `deleted-destination-${suffix}`;
 
       const refusal = await service
@@ -462,7 +462,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     /** @scenario "A key whose destination is deleted later keeps sending traces there" */
     /** @scenario "A deleted destination is badged wherever the key is read" */
     it("keeps a key pointed at a destination deleted afterwards, and says it is gone", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const repo = new VirtualKeyRepository(prisma);
       const { virtualKey } = await service.create({
         organizationId: ORG_ARCH_ID,
@@ -505,7 +505,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   describe("given an organization whose projects have all been deleted", () => {
     /** @scenario "An organization whose projects were all deleted can still create a shared key" */
     it("creates a shared key rather than demanding it choose between none", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const { virtualKey } = await service.create({
         organizationId: ORG_GOVARCH_ID,
@@ -522,7 +522,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
     /** @scenario "A key scoped only to a deleted project cannot take it as a destination" */
     it("passes over a single project scope naming a deleted project", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const { virtualKey } = await service.create({
         organizationId: ORG_GOVARCH_ID,
@@ -537,7 +537,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
   /** @scenario "The governance inbox is a home for a shared key's traces" */
   it("stores the governance project on org- and team-owned keys", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
 
     const { virtualKey: orgKey } = await service.create({
       organizationId: ORG_GOV_ID,
@@ -559,7 +559,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
   /** @scenario "Moving a key above the project it was scoped to keeps its traces there" */
   it("keeps the destination when the key is re-scoped above its project", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_BARE_ID,
       name: `projected-${suffix}`,
@@ -586,7 +586,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
   /** @scenario "Clearing a key's destination is refused when it leaves nowhere for its traces" */
   it("refuses clearing the destination of a shared key that has projects to choose from", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_CHOICE_ID,
       name: `cleared-${suffix}`,
@@ -637,7 +637,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         },
       });
     }
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
 
     // A plain rename is refused: the next touch has to close the hole.
     await expect(
@@ -674,7 +674,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     /** @scenario "A key that names a destination stores the one it names" */
     /** @scenario "A key owned by one project stores that project as its destination" */
     it("stores the answer rather than leaving it to be worked out per read", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
 
       const named = await service.create({
         organizationId: ORG_CHOICE_ID,
@@ -705,7 +705,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
     /** @scenario "A live destination reads back as present, not deleted" */
     it("reads a live destination back without the deleted flag", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const repo = new VirtualKeyRepository(prisma);
       const { virtualKey } = await service.create({
         organizationId: ORG_CHOICE_ID,
@@ -730,7 +730,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
   describe("when a key is edited after it has a destination", () => {
     /** @scenario "Changing which teams a key is scoped to leaves its destination alone" */
     it("leaves the destination where it is when the scopes change", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_CHOICE_ID,
         name: `rescoped-${suffix}`,
@@ -758,7 +758,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
 
     /** @scenario "Naming a new destination on an update moves it, and is validated the same way" */
     it("moves the destination when one is named, and refuses one that is not live here", async () => {
-      const service = VirtualKeyService.create(prisma, projects);
+      const service = VirtualKeyService.createForTest(prisma, projects);
       const { virtualKey } = await service.create({
         organizationId: ORG_CHOICE_ID,
         name: `removed-${suffix}`,

@@ -50,11 +50,7 @@ import {
   type VirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "@langwatch/gateway-contract";
-import {
-  hashVirtualKeySecret,
-  mintVirtualKeySecret,
-  parseVirtualKey,
-} from "@langwatch/gateway-server";
+import { VirtualKeyCryptoAdapter } from "@langwatch/gateway-server";
 import {
   type ScopeInput,
   type GatewayVirtualKeysPort,
@@ -232,17 +228,31 @@ export class VirtualKeyService {
     private readonly repository: GatewayVirtualKeysPort,
     private readonly changeEvents: GatewayChangeEventsPort,
     private readonly auditLog: GatewayAuditPort,
+    private readonly crypto: VirtualKeyCryptoAdapter,
   ) {
     this.governanceSignals = AppGovernanceSignalsService.disabled();
   }
 
-  static create(prisma: PrismaClient, projects: ProjectService): VirtualKeyService {
+  static create(
+    prisma: PrismaClient,
+    projects: ProjectService,
+    crypto: VirtualKeyCryptoAdapter,
+  ): VirtualKeyService {
     return new VirtualKeyService(
       prisma,
       projects,
       createGatewayVirtualKeysPort(prisma),
       createGatewayChangeEventsPort(prisma),
       createGatewayAuditPort(prisma),
+      crypto,
+    );
+  }
+
+  static createForTest(prisma: PrismaClient, projects: ProjectService): VirtualKeyService {
+    return VirtualKeyService.create(
+      prisma,
+      projects,
+      VirtualKeyCryptoAdapter.create({ pepper: "test-virtual-key-pepper" }),
     );
   }
 
@@ -296,6 +306,11 @@ export class VirtualKeyService {
     return this.repository.tryFindByHashedSecret(hashedSecret);
   }
 
+  /** Used by internal Gateway transports after their format check succeeds. */
+  async getBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
+    return this.getByHashedSecretInternal(this.crypto.hashSecret(secret));
+  }
+
   async create(input: CreateVirtualKeyInput): Promise<CreatedVirtualKey> {
     if (input.scopes.length === 0) {
       throw new TRPCError({
@@ -307,9 +322,9 @@ export class VirtualKeyService {
       ...defaultVirtualKeyConfig(),
       ...(input.config ?? {}),
     });
-    const secret = mintVirtualKeySecret();
-    const { displayPrefix } = parseVirtualKey(secret);
-    const hashedSecret = hashVirtualKeySecret(secret);
+    const secret = VirtualKeyCryptoAdapter.mintSecret();
+    const { displayPrefix } = VirtualKeyCryptoAdapter.parseSecret(secret);
+    const hashedSecret = this.crypto.hashSecret(secret);
 
     if (input.routingPolicyId) {
       await this.assertRoutingPolicyBelongsToOrg(
@@ -577,9 +592,9 @@ export class VirtualKeyService {
       });
     }
     const before = serialiseForAudit(existing);
-    const newSecret = mintVirtualKeySecret();
-    const { displayPrefix: newDisplayPrefix } = parseVirtualKey(newSecret);
-    const newHashedSecret = hashVirtualKeySecret(newSecret);
+    const newSecret = VirtualKeyCryptoAdapter.mintSecret();
+    const { displayPrefix: newDisplayPrefix } = VirtualKeyCryptoAdapter.parseSecret(newSecret);
+    const newHashedSecret = this.crypto.hashSecret(newSecret);
     const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);
 
     const rotated = await this.prisma.$transaction(async (tx) => {

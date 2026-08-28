@@ -64,7 +64,7 @@ async function resolveCode(secret: string): Promise<{
 describe("virtual key expiry (real PG + internal route)", () => {
   let previousSecret: string | undefined;
   let previousJwtSecret: string | undefined;
-  const service = VirtualKeyService.create(prisma, projects);
+  const service = VirtualKeyService.createForTest(prisma, projects);
 
   beforeAll(async () => {
     await startTestContainers();

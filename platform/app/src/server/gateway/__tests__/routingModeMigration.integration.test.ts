@@ -254,7 +254,7 @@ describe("keys that predate the routing choice keep falling back against real PG
 
   /** @scenario Keys that existed before the routing choice keep failing over */
   it("a key in the migrated state materialises the full fallback chain", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_ID,
       name: `rmm-migrated-${suffix}`,
@@ -277,7 +277,7 @@ describe("keys that predate the routing choice keep falling back against real PG
   });
 
   it("a new key created without a routing choice does not fall back", async () => {
-    const service = VirtualKeyService.create(prisma, projects);
+    const service = VirtualKeyService.createForTest(prisma, projects);
     const { virtualKey } = await service.create({
       organizationId: ORG_ID,
       name: `rmm-new-${suffix}`,

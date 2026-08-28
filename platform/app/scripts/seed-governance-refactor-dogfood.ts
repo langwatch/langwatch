@@ -54,11 +54,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { nextResetAt } from "@langwatch/gateway-server";
-import {
-  hashVirtualKeySecret,
-  mintVirtualKeySecret,
-} from "@langwatch/gateway-server";
+import { nextResetAt, VirtualKeyCryptoAdapter } from "@langwatch/gateway-server";
 import {
   credentialWriteLog,
   decideCredentialWrite,
@@ -79,6 +75,9 @@ const SHOULD_FORCE_KEYS =
 
 const prisma = new PrismaClient({
   adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
+const virtualKeyCrypto = VirtualKeyCryptoAdapter.create({
+  pepper: process.env.LW_VIRTUAL_KEY_PEPPER,
 });
 
 const DOGFOOD_USER_EMAIL = "dogfood@acme.test";
@@ -485,8 +484,8 @@ async function mintVk(input: {
       scopes: existing.scopes.map((s) => `${s.scopeType}:${s.scopeId}`),
     };
   }
-  const secret = mintVirtualKeySecret();
-  const hashedSecret = hashVirtualKeySecret(secret);
+  const secret = VirtualKeyCryptoAdapter.mintSecret();
+  const hashedSecret = virtualKeyCrypto.hashSecret(secret);
   const created = await prisma.virtualKey.create({
     data: {
       organizationId: input.organizationId,

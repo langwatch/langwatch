@@ -6,7 +6,6 @@
 import { prisma } from "~/server/db";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
-import { hashVirtualKeySecret } from "@langwatch/gateway-server";
 
 async function main() {
   const presented = process.env.VK_SECRET;
@@ -17,12 +16,9 @@ async function main() {
     process.exit(2);
   }
 
-  const hashed = hashVirtualKeySecret(presented);
-  console.log("hashed length:", hashed.length);
-
   const app = initializeDefaultApp({ processRole: "web" });
   const service = app.gateway.virtualKeys;
-  const vk = await service.getByHashedSecretInternal(hashed);
+  const vk = await service.getBySecretInternal(presented);
   console.log("vk:", vk ? `${vk.id} (${vk.name})` : "null");
   if (!vk) return;
 

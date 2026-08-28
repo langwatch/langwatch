@@ -283,7 +283,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
       const before = await fetchConfig(VK_EXPIRING_ID);
       const shortened = new Date(Date.now() + DAY_MS);
 
-      await VirtualKeyService.create(prisma, projects).update({
+      await VirtualKeyService.createForTest(prisma, projects).update({
         id: VK_EXPIRING_ID,
         organizationId: ORG_ID,
         actorUserId: USER_ID,

@@ -11,23 +11,18 @@ import { prisma } from "~/server/db";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { eligibleModelProvidersForVk } from "~/server/gateway/scopeResolver";
-import { hashVirtualKeySecret } from "@langwatch/gateway-server";
 
 const VK_SECRETS = process.env.VK_SECRETS?.split(",") ?? [];
 
 async function probe(secret: string) {
-  const hashed = hashVirtualKeySecret(secret);
-  const vk = await prisma.virtualKey.findFirst({
-    where: { hashedSecret: hashed },
-    include: { scopes: true },
-  });
+  const app = initializeDefaultApp({ processRole: "web" });
+  const vk = await app.gateway.virtualKeys.getBySecretInternal(secret);
   if (!vk) {
     console.log(`✗ ${secret.slice(0, 18)}… → unknown VK`);
     return;
   }
 
   const eligibleMPs = await eligibleModelProvidersForVk(prisma, vk);
-  const app = initializeDefaultApp({ processRole: "web" });
   const traceProject = vk.traceProjectId
     ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
     : null;
