@@ -21,6 +21,7 @@ describe("AppBootConfigService", () => {
       developmentHttpsPrivateKeyPath: undefined,
       developmentCertificateDirectory: undefined,
       gatewaySecretsConfigured: false,
+      trpcWebSocket: { allowedOrigins: [] },
     });
     expect(config).not.toHaveProperty("UNRELATED_SECRET");
   });

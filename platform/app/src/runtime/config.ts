@@ -1,5 +1,9 @@
 import { z } from "zod";
 import type { RuntimeConfigResolver } from "@langwatch/runtime-composition";
+import {
+  resolveTrpcWebSocketRuntimeConfig,
+  type TrpcWebSocketRuntimeConfig,
+} from "../server/websockets/trpc-ws.config";
 
 export const appBootConfigSchema = z
   .object({
@@ -33,7 +37,9 @@ export const appBootConfigSchema = z
     }
   });
 
-export type AppBootConfig = z.infer<typeof appBootConfigSchema>;
+export type AppBootConfig = z.infer<typeof appBootConfigSchema> & {
+  trpcWebSocket: TrpcWebSocketRuntimeConfig;
+};
 
 export class InvalidAppBootConfigError extends Error {
   readonly name = "InvalidAppBootConfigError";
@@ -76,7 +82,12 @@ export class AppBootConfigService {
       ].every(Boolean),
     });
     if (!result.success) throw new InvalidAppBootConfigError(result.error);
-    return result.data;
+    return {
+      ...result.data,
+      trpcWebSocket: resolveTrpcWebSocketRuntimeConfig({
+        NEXTAUTH_URL: source.NEXTAUTH_URL,
+      }),
+    };
   }
 }
 

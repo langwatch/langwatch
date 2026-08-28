@@ -31,8 +31,7 @@ async function loadDevHttpsCredentials(
     };
   }
 
-  const cacheDir =
-    config.developmentCertificateDirectory ?? path.join(repoDir, ".dev-certs");
+  const cacheDir = config.developmentCertificateDirectory ?? path.join(repoDir, ".dev-certs");
   const certPath = path.join(cacheDir, "dev.pem");
   const keyPath = path.join(cacheDir, "dev-key.pem");
 
@@ -79,11 +78,7 @@ import { createApiRouter } from "./server/api-router";
 import { initializeInProcessApp, initializeWebApp } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
-import {
-  getWorkerMetricsPort,
-  isMetricsAuthorized,
-  normalizeMetricsPath,
-} from "./server/metrics";
+import { getWorkerMetricsPort, isMetricsAuthorized, normalizeMetricsPath } from "./server/metrics";
 import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
 import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
@@ -92,7 +87,7 @@ import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
-import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { TrpcWebSocketRuntime } from "./server/websockets/trpc-ws";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
@@ -159,8 +154,7 @@ export const startApp = async (options: StartAppOptions) => {
   // `!== "production"`) so this matches scripts/start.sh's lane-skip predicate.
   // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
   // standalone workers lane AND the in-process stack — duplicate consumers.
-  const isInProcessWorkerModeEnabled =
-    config.nodeEnv === "development" && config.workersInProcess;
+  const isInProcessWorkerModeEnabled = config.nodeEnv === "development" && config.workersInProcess;
 
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
   // This was previously done by Next.js instrumentation hook. In-process mode
@@ -169,9 +163,7 @@ export const startApp = async (options: StartAppOptions) => {
   const appRuntime =
     options.appRuntime ??
     (await createLegacyAppRuntime({
-      composeApp: isInProcessWorkerModeEnabled
-        ? initializeInProcessApp
-        : initializeWebApp,
+      composeApp: isInProcessWorkerModeEnabled ? initializeInProcessApp : initializeWebApp,
     }));
   // The explicit boot path supplies the composed runtime here. Starting it at
   // this single seam keeps graph initialization ahead of readiness checks and
@@ -380,10 +372,11 @@ export const startApp = async (options: StartAppOptions) => {
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(
-    server as ReturnType<typeof createServer>,
-    appRuntime.app,
-  );
+  const wsHandle = TrpcWebSocketRuntime.create({
+    server: server as ReturnType<typeof createServer>,
+    app: appRuntime.app,
+    config: config.trpcWebSocket,
+  }).start();
 
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
@@ -391,10 +384,7 @@ export const startApp = async (options: StartAppOptions) => {
     // process.exit(1) below, so without this a bind failure (e.g.
     // EADDRINUSE when two dev processes race for the same port) is an
     // exit(1) with zero output anywhere — stdout, Loki, or otherwise.
-    writeSync(
-      2,
-      `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`,
-    );
+    writeSync(2, `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`);
     logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
@@ -587,11 +577,7 @@ export function honoFetchForNode(
       return response;
     }
 
-    if (
-      !response.body &&
-      ![204, 205, 304].includes(response.status) &&
-      request.method !== "HEAD"
-    ) {
+    if (!response.body && ![204, 205, 304].includes(response.status) && request.method !== "HEAD") {
       const headers = new Headers(response.headers);
       if (!headers.get("Content-Type")) {
         headers.set("Content-Type", "application/json");
