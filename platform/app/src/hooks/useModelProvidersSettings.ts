@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ModelMetadataForFrontend } from "../server/api/routers/modelProviders.utils";
+import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import { api } from "../utils/api";
 
 export type { ModelMetadataForFrontend };

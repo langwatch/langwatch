@@ -13,7 +13,7 @@ import { api } from "~/utils/api";
 import {
   type CompactStreamingEvent,
   isCompactStreamingEvent,
-} from "~/utils/streaming-event-codec";
+} from "@langwatch/scenario-contract";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 

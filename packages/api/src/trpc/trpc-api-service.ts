@@ -200,7 +200,7 @@ export function appTrpcCustomPolicy(middlewares: AppTrpcPolicyMiddlewares) {
  * what the client sees.
  */
 export type TrpcApiMount<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
@@ -216,7 +216,7 @@ export type TrpcApiMount<
  * from a process that never supplied it.
  */
 export type TrpcApiPublicMount<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
@@ -243,7 +243,7 @@ type TrpcApiPolicyDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
  * which shape its package declared.
  */
 export type TrpcApiService<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
@@ -283,7 +283,7 @@ export type TrpcApiService<
  * exactly what its mount declared.
  */
 export type TrpcApiPublicService<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 > = TrpcApiService<TContext, TOptions, TRoot> &
@@ -305,19 +305,19 @@ export type TrpcApiPublicService<
  *     }
  */
 export function createTrpcApiService<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 >(
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>,
 ): TrpcApiPublicService<TContext, TOptions, TRoot>;
 export function createTrpcApiService<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 >(mount: TrpcApiMount<TContext, TOptions, TRoot>): TrpcApiService<TContext, TOptions, TRoot>;
 export function createTrpcApiService<
-  TContext,
+  TContext extends object,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
 >(

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { type FrontendFeatureFlag, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { PRODUCTS, type ProductId } from "./products";
 
 /**

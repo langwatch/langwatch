@@ -1,9 +1,11 @@
 import { useMemo } from "react";
-import { modelProviders as serverModelProviders } from "@langwatch/model-provider-contract";
+import {
+  getSchemaShape,
+  modelProviders as serverModelProviders,
+} from "@langwatch/model-provider-contract";
 import {
   getDisplayKeysForProvider,
   getRequiredCredentialKeys,
-  getSchemaShape,
   isSecretCredentialField,
 } from "../utils/modelProviderHelpers";
 

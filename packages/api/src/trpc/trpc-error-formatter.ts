@@ -9,7 +9,7 @@
  * because those payloads are browser contracts rather than API framework
  * policy.
  */
-import type { DefaultErrorShape } from "@trpc/server";
+import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { TrpcFailureTraceIds } from "./trpc-failure-trace.js";
 
@@ -54,7 +54,7 @@ export function createTrpcErrorFormatter(
     shape,
     error,
   }: {
-    shape: DefaultErrorShape;
+    shape: TRPCDefaultErrorShape;
     error: { cause?: unknown; message?: string; code?: string };
   }) {
     const handled = HandledError.isHandled(error.cause)

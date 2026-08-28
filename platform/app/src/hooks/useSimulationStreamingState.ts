@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import type { CompactStreamingEvent } from "~/utils/streaming-event-codec";
+import type { CompactStreamingEvent } from "@langwatch/scenario-contract";
 
 export interface StreamingMessage {
   messageId: string;

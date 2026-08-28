@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { hasLangyAccess } from "../langy-access.adapter";
 

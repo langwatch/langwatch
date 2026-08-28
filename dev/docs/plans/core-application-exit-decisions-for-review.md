@@ -6733,6 +6733,59 @@ before a move and is green after. Green is not evidence here.
 
 ---
 
+## 276. REST and tRPC do not enforce scope consistency the same way — NOT FIXED
+
+Found while checking the standing instruction that auth logic be shared between
+the two boundaries with only thin layers on top. The two have diverged, and the
+divergence is in the enforcement mechanism rather than in the logic, which is
+why it is invisible from either side alone.
+
+**tRPC** applies the scope-lineage guard inside the permission builder itself —
+`trpc-permission-builder.ts:341`, `trpc-api-service.ts:90` and `:180`, and
+`apps/api/src/app-trpc/app-trpc.policy-kit.ts:91`. Every declared procedure gets
+it by construction. A developer cannot forget it, because they never write it.
+
+**REST** has no lineage check in its pipeline. What it has is
+`assertAuthorizedProjectInput` (`packages/api/src/rest/pipeline.ts:713`), which
+compares the input's `projectId` against the authorized project for equality —
+and it opens with `if (!required) return`, where `required` is
+`serviceConfig.projectIdInput === true`.
+
+**Three services set that flag.** `apps/api/src/api-secret-rest.feature.ts:81`
+and two in `platform/app/src/server/api/project-service.ts`. Around thirty REST
+families are mounted.
+
+So the two boundaries differ in kind (applied by construction vs opted into per
+service) and in strength (scope LINEAGE vs project-id EQUALITY).
+
+**The one place the shared capability is reachable from a feature is inert by
+default.** `apps/api` supplies `authorizeScopeLineage`
+(`api-request.policy.ts:116`), it is declared optional on the application
+context (`api.application.ts:26`), and it has exactly one caller —
+`packages/features/agent/server/src/api/app-trpc/agent.api.ts:62` — invoked with
+optional chaining, so a process that does not supply it silently skips the
+check. That file's own comment already records a related instance of
+`scopeLineageGuard` having been left inert by middleware ordering.
+
+**Stated honestly: this is a finding, not a confirmed vulnerability.** A REST
+credential is resolved at the app's scope — a project API key authorizes one
+project — so the credential may already constrain what a handler can reach in a
+way a session-based tRPC caller is not constrained. Establishing real exposure
+means asking, per REST family, whether a handler can act on a scope other than
+the one its credential authorized. That is the work this entry is asking for.
+
+**Not fixed here, deliberately.** Adding a lineage check to every REST route
+would start refusing requests that succeed today, on the authorization path, on
+a branch that does not yet compile. That is a change to make deliberately, with
+its own verification, not as a side effect of a typecheck sweep.
+
+**Review:** decide whether `projectIdInput` should default to on, and whether
+REST should run the lineage check rather than the equality check. If the answer
+to either is yes, the three services that already opt in are the reference for
+what the rest have to satisfy.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the

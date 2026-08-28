@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  getSchemaShape,
   modelProviders as modelProvidersRegistry,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
 import {
   buildCustomKeyState,
   getDisplayKeysForProvider,
-  getSchemaShape,
 } from "../utils/modelProviderHelpers";
 
 export type UseCredentialKeysState = {
