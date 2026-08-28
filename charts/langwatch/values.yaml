@@ -1123,6 +1123,14 @@ langwatch_nlp:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
 
+  # Ceiling on how long a workflow code block may run inside the sandboxed
+  # Python subprocess before nlpgo kills it. Held below the engine's stream
+  # idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS, 720s default and
+  # not yet exposed here) on purpose — a code-block ceiling at or above the
+  # idle timeout races the stream shutting down.
+  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep below the engine's stream idle timeout (default 720s).
+  codeBlockTimeoutSeconds: 600
+
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
   # user code blocks, so it has a small footprint.

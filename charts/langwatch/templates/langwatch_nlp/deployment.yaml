@@ -119,6 +119,12 @@ spec:
               value: {{ join "," . | quote }}
             {{- end }}
 
+            # Ceiling on how long a workflow code block may run before nlpgo
+            # kills it. Kept below the engine's stream idle timeout by default
+            # so the code-block ceiling can't race the stream shutting down.
+            - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+              value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
