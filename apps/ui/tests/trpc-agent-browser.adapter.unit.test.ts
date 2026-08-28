@@ -1,7 +1,7 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import { RpcClientPort } from "../src/features/agent/rpc-client.port";
-import { TrpcAgentBrowserAdapter } from "../src/features/agent/trpc-agent-browser.adapter";
+import { RpcClientPort } from "../src/features/agent/behavior/rpc-client.port";
+import { TrpcAgentBrowserAdapter } from "../src/features/agent/behavior/trpc-agent-browser.adapter";
 
 type RpcCall = {
   kind: "query" | "mutation";

@@ -118,11 +118,11 @@ describe("frontend UI architecture boundaries", () => {
       },
     ]);
     write(
-      "apps/ui/src/features/prompt-studio/route.tsx",
+      "apps/ui/src/features/prompt-studio/index.ts",
       'import { PromptStudio } from "@langwatch/prompt-web/screens/prompt-studio"; export { PromptStudio };',
     );
     write(
-      "apps/ui/src/features/trace-explorer/prompt-cell.tsx",
+      "apps/ui/src/features/trace-explorer/index.ts",
       'import { PromptReference } from "@langwatch/prompt-web/surfaces/prompt-reference"; export { PromptReference };',
     );
     write(
@@ -195,18 +195,18 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([])).toEqual(
       expect.arrayContaining(["ui-root-catch-all", "ui-feature-catalogue"]),
     );
-    expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toHaveLength(3);
+    expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toHaveLength(4);
   });
 
-  it("enforces app, platform, and frontend feature dependency direction", () => {
+  it("enforces global, screen, and frontend feature dependency direction", () => {
     writeCatalogue([{ id: "prompt-studio" }, { id: "trace-explorer" }]);
-    write("apps/ui/src/platform/api/client.ts", 'import "../../features/prompt-studio/route";');
+    write("apps/ui/src/behavior/api/client.ts", 'import "../../features/prompt-studio/route";');
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      'import "../../app/router"; import "../trace-explorer/route";',
+      'import "../../screens/router"; import "../trace-explorer/route";',
     );
     write("apps/ui/src/features/trace-explorer/route.ts", 'import "../prompt-studio/route";');
-    write("apps/ui/src/app/router.ts", "export const router = true;");
+    write("apps/ui/src/screens/router.ts", "export const router = true;");
 
     expect(policies([])).toEqual(
       expect.arrayContaining([
@@ -217,6 +217,93 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  it("keeps global layers and private features below composition boundaries", () => {
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write(
+      "apps/ui/src/model/model.ts",
+      'import "../features/prompt-studio/route"; import "../screens/prompt";',
+    );
+    write(
+      "apps/ui/src/behavior/behavior.ts",
+      'import "../features/prompt-studio/route"; import "../surfaces/prompt";',
+    );
+    write(
+      "apps/ui/src/ui/elements/element.ts",
+      'import "../../features/prompt-studio/route"; import "../../screens/prompt";',
+    );
+    write("apps/ui/src/features/prompt-studio/route.ts", 'import "../../screens/prompt";');
+    write("apps/ui/src/screens/prompt.ts", "export const PromptScreen = true;");
+    write("apps/ui/src/surfaces/prompt.ts", "export const PromptSurface = true;");
+
+    expect(policies([]).filter((policy) => policy === "ui-dependency-direction")).toHaveLength(7);
+  });
+
+  it("enforces dependency direction between global model, behavior, and UI layers", () => {
+    writeCatalogue([{ id: "agent-management" }]);
+    write(
+      "apps/ui/src/model/model.ts",
+      'import "../behavior/behavior"; import "../ui/elements/element";',
+    );
+    write(
+      "apps/ui/src/behavior/behavior.ts",
+      'import "../ui/elements/element"; import "../ui/blocks/block"; import "../model/model";',
+    );
+    write(
+      "apps/ui/src/ui/elements/element.ts",
+      'import "../../behavior/behavior"; import "../blocks/block"; import "../../model/model";',
+    );
+    write(
+      "apps/ui/src/ui/blocks/block.ts",
+      'import "../sections/section"; import "../elements/element";',
+    );
+    write(
+      "apps/ui/src/ui/sections/section.ts",
+      'import "../blocks/block"; import "../../behavior/behavior";',
+    );
+
+    expect(policies([]).filter((policy) => policy === "ui-dependency-direction")).toHaveLength(7);
+  });
+
+  it("requires global presentation to use an atomic UI layer", () => {
+    writeCatalogue([{ id: "agent-management" }]);
+    write("apps/ui/src/ui/loose.ts", "export const loose = true;");
+    write("apps/ui/src/ui/cards/card.ts", "export const card = true;");
+    write("apps/ui/src/ui/elements/element.ts", "export const element = true;");
+    write("apps/ui/src/ui/blocks/block.ts", "export const block = true;");
+    write("apps/ui/src/ui/sections/section.ts", "export const section = true;");
+
+    expect(policies([]).filter((policy) => policy === "ui-global-layout")).toHaveLength(2);
+  });
+
+  it("requires private features to use model, behavior, and layered ui roots", () => {
+    writeCatalogue([{ id: "agent-management" }]);
+    write("apps/ui/src/features/agent-management/route.ts", "export const route = true;");
+    write("apps/ui/src/features/agent-management/model/model.ts", 'import "../behavior/behavior";');
+    write(
+      "apps/ui/src/features/agent-management/behavior/behavior.ts",
+      'import "../ui/elements/element";',
+    );
+    write(
+      "apps/ui/src/features/agent-management/ui/elements/element.ts",
+      'import "../blocks/block";',
+    );
+    write(
+      "apps/ui/src/features/agent-management/ui/blocks/block.ts",
+      'import "../sections/section";',
+    );
+    write(
+      "apps/ui/src/features/agent-management/ui/sections/section.ts",
+      "export const section = true;",
+    );
+
+    expect(policies([])).toEqual(
+      expect.arrayContaining(["ui-feature-layout", "ui-feature-dependency-direction"]),
+    );
+    expect(
+      policies([]).filter((policy) => policy === "ui-feature-dependency-direction"),
+    ).toHaveLength(4);
+  });
+
   it("accepts global browser behaviour under the apps/ui behavior root", () => {
     writeCatalogue([{ id: "agent-management" }]);
     write(
@@ -224,12 +311,21 @@ describe("frontend UI architecture boundaries", () => {
       "export function registerChunkReloadListener(): void {}",
     );
     write(
-      "apps/ui/src/app/shell.tsx",
+      "apps/ui/src/screens/shell.tsx",
       'import { registerChunkReloadListener } from "../behavior/chunk-reload"; registerChunkReloadListener();',
     );
 
     expect(policies([])).not.toContain("ui-root-catch-all");
     expect(policies([])).not.toContain("ui-dependency-direction");
+  });
+
+  it("rejects the former app, platform, and testing roots", () => {
+    writeCatalogue([{ id: "agent-management" }]);
+    write("apps/ui/src/app/legacy-shell.tsx", "export const LegacyShell = true;");
+    write("apps/ui/src/platform/legacy-navigation.ts", "export const legacyNavigation = true;");
+    write("apps/ui/src/testing/legacy-fixture.ts", "export const legacyFixture = true;");
+
+    expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toHaveLength(3);
   });
 
   it("rejects file-path imports that escape apps/ui source", () => {
@@ -514,7 +610,7 @@ describe("frontend UI architecture boundaries", () => {
       "export abstract class AgentBrowserPort {}",
     );
     write(
-      "apps/ui/src/features/agent-management/route.tsx",
+      "apps/ui/src/features/agent-management/index.ts",
       'import "@langwatch/agent-web/screens/agent-management"; import "@langwatch/agent-web/surfaces/browser-port";',
     );
 

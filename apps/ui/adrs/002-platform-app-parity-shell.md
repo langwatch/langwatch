@@ -11,8 +11,8 @@ and [the platform exit ledger](../../../dev/docs/plans/core-application-feature-
 
 ## Context
 
-`platform/app` still owns the live outer providers, route tree, router
-compatibility setup and chunk-reload registration. Replacing the visual shell
+`platform/app` still owns the live outer providers, route tree and router
+compatibility setup. Replacing the visual shell
 while extracting feature UI would combine an architecture migration with a UI
 redesign and make parity failures difficult to isolate.
 

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { UiApplicationShell } from "../src/app/ui-application-shell";
+import { UiApplicationShell } from "../src/ui/sections/ui-application-shell";
 
 let root: Root | undefined;
 

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { useChakraContext } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { createDesignSystem } from "@langwatch/design-system/system";
-import { UiDesignSystemShell } from "../src/app/ui-design-system-shell";
+import { UiDesignSystemShell } from "../src/ui/sections/ui-design-system-shell";
 
 let root: Root | undefined;
 

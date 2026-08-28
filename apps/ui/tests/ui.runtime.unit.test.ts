@@ -1,7 +1,7 @@
 import { act, createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UiShellPort } from "../src/app/ui-runtime.port";
-import { UiRuntime } from "../src/app/ui.runtime";
+import { UiShellPort } from "../src/behavior/ui-runtime.port";
+import { UiRuntime } from "../src/behavior/ui.runtime";
 
 class TestUiShell extends UiShellPort {
   readonly prepare = vi.fn();

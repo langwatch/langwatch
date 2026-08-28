@@ -13,16 +13,15 @@ const NODE_BUILTIN_SPECIFIERS = new Set(
   builtinModules.flatMap((specifier) => [specifier, `node:${specifier.replace(/^node:/, "")}`]),
 );
 const UI_SOURCE_DIRECTORIES = new Set([
-  "app",
   "behavior",
   "features",
   "model",
-  "platform",
   "screens",
   "surfaces",
-  "testing",
   "ui",
 ]);
+const UI_GLOBAL_DIRECTORIES = new Set(["behavior", "model", "ui"]);
+const UI_COMPOSITION_DIRECTORIES = new Set(["screens", "surfaces"]);
 const SURFACE_FORBIDDEN_DIRECTORIES = new Set([
   "internal",
   "queries",
@@ -34,6 +33,13 @@ const SURFACE_FORBIDDEN_DIRECTORIES = new Set([
 ]);
 const WEB_FEATURE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const WEB_UI_LAYERS = new Set(["elements", "blocks", "sections"]);
+const UI_LAYER_DEPENDENCIES: Record<string, readonly string[]> = {
+  model: ["model"],
+  behavior: ["model", "behavior"],
+  elements: ["model", "elements"],
+  blocks: ["model", "elements", "blocks"],
+  sections: ["model", "behavior", "elements", "blocks", "sections"],
+};
 
 const featureUseSchema = z
   .object({
@@ -326,6 +332,56 @@ function featureForFile(uiFeaturesRoot: string, file: string): string | undefine
   return path[0];
 }
 
+type UiFeatureModule =
+  | { kind: "entry"; feature: string }
+  | {
+      kind: "implementation";
+      feature: string;
+      layer: "model" | "behavior" | "ui";
+      uiLayer?: string;
+    };
+
+function uiFeatureModuleForFile(uiFeaturesRoot: string, file: string): UiFeatureModule | undefined {
+  const feature = featureForFile(uiFeaturesRoot, file);
+  if (!feature) return void 0;
+
+  const featureRoot = join(uiFeaturesRoot, feature);
+  const segments = relative(featureRoot, file).split(sep);
+  const [first, second] = segments;
+  if (segments.length === 1 && first === "index.ts") {
+    return { kind: "entry", feature };
+  }
+  if (first === "model" || first === "behavior") {
+    return { kind: "implementation", feature, layer: first };
+  }
+  if (first === "ui" && second !== void 0 && WEB_UI_LAYERS.has(second)) {
+    return { kind: "implementation", feature, layer: "ui", uiLayer: second };
+  }
+  return void 0;
+}
+
+function uiFeatureLayer(module: Extract<UiFeatureModule, { kind: "implementation" }>): string {
+  return module.layer === "ui" ? module.uiLayer! : module.layer;
+}
+
+function canUiLayerDependOn(sourceLayer: string, targetLayer: string): boolean {
+  return UI_LAYER_DEPENDENCIES[sourceLayer]?.includes(targetLayer) ?? false;
+}
+
+function canUiFeatureDependOn(source: UiFeatureModule, target: UiFeatureModule): boolean {
+  if (source.kind === "entry") return target.kind === "implementation";
+  if (target.kind === "entry") return false;
+
+  return canUiLayerDependOn(uiFeatureLayer(source), uiFeatureLayer(target));
+}
+
+function uiGlobalLayerForFile(sourceRoot: string, file: string): string | undefined {
+  const [first, second] = relative(sourceRoot, file).split(sep);
+  if (first === "model" || first === "behavior") return first;
+  if (first === "ui" && second !== void 0 && WEB_UI_LAYERS.has(second)) return second;
+  return void 0;
+}
+
 function declaredUses(feature: UiFeature): Set<string> {
   return new Set([...feature.uses.screens, ...feature.uses.surfaces]);
 }
@@ -415,9 +471,30 @@ function lintUiRootDirectories(root: string): ArchitectureViolation[] {
       {
         policy: "ui-root-catch-all",
         file,
-        message: `apps/ui production source must live in global model, behavior, ui, screens, surfaces, a private feature, or a transitional app/platform/testing root; ${JSON.stringify(segments[0])} has no architectural owner.`,
+        message: `apps/ui production source must live in global model, behavior, ui, screens, surfaces, or a private feature; ${JSON.stringify(segments[0])} has no architectural owner.`,
         allowed:
-          "Keep only the package entry at src/index.ts; place implementation in an approved source root.",
+          "Keep only the package entry at src/index.ts; place implementation in a governed global or named feature root.",
+      },
+    ];
+  });
+}
+
+function lintUiGlobalStructure(root: string): ArchitectureViolation[] {
+  const sourceRoot = join(root, "apps", "ui", "src");
+  const uiRoot = join(sourceRoot, "ui");
+  if (!existsSync(uiRoot)) return [];
+
+  return sourceFiles(uiRoot).flatMap((file) => {
+    const [rootDirectory = "", layer = ""] = relative(sourceRoot, file).split(sep);
+    if (rootDirectory === "ui" && WEB_UI_LAYERS.has(layer)) return [];
+
+    return [
+      {
+        policy: "ui-global-layout",
+        file,
+        message:
+          "Global apps/ui presentation must live under ui/{elements,blocks,sections}; unlayered ui files have no architectural owner.",
+        allowed: "Place global presentation in ui/elements, ui/blocks, or ui/sections.",
       },
     ];
   });
@@ -447,6 +524,51 @@ function lintUiFeatureRoots(root: string, catalogue: UiFeatureCatalogue): Archit
       });
     }
   }
+  return violations;
+}
+
+function lintUiFeatureStructure(root: string): ArchitectureViolation[] {
+  const sourceRoot = join(root, "apps", "ui", "src");
+  const featuresRoot = join(sourceRoot, "features");
+  const violations: ArchitectureViolation[] = [];
+
+  for (const file of sourceFiles(featuresRoot)) {
+    const feature = featureForFile(featuresRoot, file);
+    if (!feature) continue;
+
+    const module = uiFeatureModuleForFile(featuresRoot, file);
+    if (!module) {
+      violations.push({
+        policy: "ui-feature-layout",
+        file,
+        message:
+          "Private apps/ui feature code must live in model, behavior, or ui/{elements,blocks,sections}; only features/<feature>/index.ts may live at the feature root.",
+      });
+      continue;
+    }
+    if (module.kind === "entry") continue;
+
+    for (const sourceImport of importsIn(file)) {
+      if (sourceImport.nonLiteral) continue;
+      const target = resolveUiSourceImport(sourceImport, sourceRoot);
+      if (!target || !isWithin(featuresRoot, target)) continue;
+
+      const targetFeature = featureForFile(featuresRoot, target);
+      if (targetFeature !== feature) continue;
+      const targetModule = uiFeatureModuleForFile(featuresRoot, target);
+      if (!targetModule || canUiFeatureDependOn(module, targetModule)) continue;
+
+      violations.push({
+        policy: "ui-feature-dependency-direction",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `Feature ${JSON.stringify(feature)} ${uiFeatureLayer(module)} code may not depend on ${targetModule.kind === "entry" ? "its feature entry" : `${uiFeatureLayer(targetModule)} code`}.`,
+        allowed: "Keep dependencies flowing from model to behavior to the allowed UI layers.",
+      });
+    }
+  }
+
   return violations;
 }
 
@@ -650,24 +772,47 @@ function lintUiSourceBoundaries(
         });
       }
       if (target && isWithin(sourceRoot, target)) {
-        const importerArea = relative(sourceRoot, file).split(sep)[0];
-        const targetArea = relative(sourceRoot, target).split(sep)[0];
-        if (importerArea === "platform" && (targetArea === "app" || targetArea === "features")) {
+        const [importerArea = ""] = relative(sourceRoot, file).split(sep);
+        const [targetArea = ""] = relative(sourceRoot, target).split(sep);
+        const importerGlobalLayer = uiGlobalLayerForFile(sourceRoot, file);
+        const targetGlobalLayer = uiGlobalLayerForFile(sourceRoot, target);
+        const globalLayerImportsPrivateFeature =
+          UI_GLOBAL_DIRECTORIES.has(importerArea) && targetArea === "features";
+        const globalLayerImportsCompositionBoundary =
+          UI_GLOBAL_DIRECTORIES.has(importerArea) && UI_COMPOSITION_DIRECTORIES.has(targetArea);
+        const privateFeatureImportsCompositionBoundary =
+          importerArea === "features" && UI_COMPOSITION_DIRECTORIES.has(targetArea);
+        if (globalLayerImportsPrivateFeature || globalLayerImportsCompositionBoundary) {
           violations.push({
             policy: "ui-dependency-direction",
             file,
             line: sourceImport.line,
             specifier: sourceImport.specifier,
-            message: "platform may not import app composition or product frontend features.",
+            message:
+              "Global UI layers may not import private frontend features or composition boundaries.",
           });
         }
-        if (importerArea === "features" && targetArea === "app") {
+        if (privateFeatureImportsCompositionBoundary) {
           violations.push({
             policy: "ui-dependency-direction",
             file,
             line: sourceImport.line,
             specifier: sourceImport.specifier,
-            message: "A frontend feature may not import app composition.",
+            message: "A private frontend feature may not import a composition boundary.",
+          });
+        }
+        if (
+          importerGlobalLayer !== void 0 &&
+          targetGlobalLayer !== void 0 &&
+          !canUiLayerDependOn(importerGlobalLayer, targetGlobalLayer)
+        ) {
+          violations.push({
+            policy: "ui-dependency-direction",
+            file,
+            line: sourceImport.line,
+            specifier: sourceImport.specifier,
+            message: `Global UI ${importerGlobalLayer} code may not depend on ${targetGlobalLayer} code.`,
+            allowed: "Keep dependencies flowing from model to behavior to the allowed UI layers.",
           });
         }
         if (importerFeatureRoot) {
@@ -1430,7 +1575,9 @@ export function lintFrontendUiBoundaries(
   return [
     ...violations,
     ...lintUiRootDirectories(root),
+    ...lintUiGlobalStructure(root),
     ...lintUiFeatureRoots(root, catalogue),
+    ...lintUiFeatureStructure(root),
     ...lintGovernedWebPackages(root, catalogue, webPackages),
     ...lintDeclaredCapabilities(root, catalogue, webPackages),
     ...lintWebPublicExports(selectedWebPackages),

@@ -1,11 +1,14 @@
-export { UiShellPort } from "./app/ui-runtime.port";
-export { UiRuntime, type UiRuntimeOptions } from "./app/ui.runtime";
+export { UiShellPort } from "./behavior/ui-runtime.port";
+export { UiRuntime, type UiRuntimeOptions } from "./behavior/ui.runtime";
 export {
   UiApplicationShell,
   type UiApplicationShellProps,
   type UiOuterProvider,
-} from "./app/ui-application-shell";
-export { UiDesignSystemShell, type UiDesignSystemShellProps } from "./app/ui-design-system-shell";
+} from "./ui/sections/ui-application-shell";
+export {
+  UiDesignSystemShell,
+  type UiDesignSystemShellProps,
+} from "./ui/sections/ui-design-system-shell";
 export {
   forceReloadOnce,
   isChunkLoadError,
@@ -14,5 +17,5 @@ export {
   RELOAD_AT_KEY,
   warmChunk,
 } from "./behavior/chunk-reload";
-export { RpcClientPort } from "./features/agent/rpc-client.port";
-export { TrpcAgentBrowserAdapter } from "./features/agent/trpc-agent-browser.adapter";
+export { RpcClientPort } from "./features/agent/behavior/rpc-client.port";
+export { TrpcAgentBrowserAdapter } from "./features/agent/behavior/trpc-agent-browser.adapter";
