@@ -10,8 +10,8 @@ import {
   type UsageStatsProjectDatabase,
   type UsageStatsProjectCounts,
 } from "../src/ports/usage-stats-worker.ports";
-import { ClickHouseUsageStatsRepository } from "../src/repositories/clickhouse/clickhouse-usage-stats.repository";
-import { PrismaUsageStatsProjectRepository } from "../src/repositories/prisma/prisma-usage-stats-project.repository";
+import { ClickHouseUsageStatsRepository } from "../src/repositories/clickhouse/clickhouse.usage-stats.repository";
+import { PrismaUsageStatsProjectRepository } from "../src/repositories/prisma/prisma.usage-stats-project.repository";
 import { UsageStatsCollectionService } from "../src/services/usage-stats-collection.service";
 
 const projectCounts: UsageStatsProjectCounts = {

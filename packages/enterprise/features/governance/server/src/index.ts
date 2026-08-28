@@ -2,7 +2,7 @@ export { GovernanceService } from "@langwatch/enterprise-governance-contract";
 export {
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
-} from "./adapters/postgres-governance-installation.adapter";
+} from "./adapters/postgres.governance-installation.adapter";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
@@ -42,15 +42,15 @@ export * from "./ports/spend-spike-anomaly.port";
 export * from "./ports/governance-subscriber.port";
 
 export { IngestionPullEventingAdapter } from "./adapters/ingestion-pull.adapter";
-export { PostgresAnomalyRuleAdapter } from "./adapters/postgres-anomaly-rule.adapter";
-export { PostgresDepartmentAdapter } from "./adapters/postgres-department.adapter";
-export { PostgresSpendSpikeAnomalyAdapter } from "./adapters/postgres-spend-spike-anomaly.adapter";
-export { PostgresIngestionSourceActivityAdapter } from "./adapters/postgres-ingestion-source-activity.adapter";
-export { PostgresIngestionSourceAdapter } from "./adapters/postgres-ingestion-source.adapter";
-export { PostgresIngestionPullLifecycleAdapter } from "./adapters/postgres-ingestion-pull-lifecycle.adapter";
-export { PostgresIngestionPullSourceAdapter } from "./adapters/postgres-ingestion-pull-source.adapter";
-export { PostgresIngestionPullRunProjectionAdapter } from "./adapters/postgres-ingestion-pull-run-projection.adapter";
-export { PostgresIngestionTemplateAdapter } from "./adapters/postgres-ingestion-template.adapter";
+export { PostgresAnomalyRuleAdapter } from "./adapters/postgres.anomaly-rule.adapter";
+export { PostgresDepartmentAdapter } from "./adapters/postgres.department.adapter";
+export { PostgresSpendSpikeAnomalyAdapter } from "./adapters/postgres.spend-spike-anomaly.adapter";
+export { PostgresIngestionSourceActivityAdapter } from "./adapters/postgres.ingestion-source-activity.adapter";
+export { PostgresIngestionSourceAdapter } from "./adapters/postgres.ingestion-source.adapter";
+export { PostgresIngestionPullLifecycleAdapter } from "./adapters/postgres.ingestion-pull-lifecycle.adapter";
+export { PostgresIngestionPullSourceAdapter } from "./adapters/postgres.ingestion-pull-source.adapter";
+export { PostgresIngestionPullRunProjectionAdapter } from "./adapters/postgres.ingestion-pull-run-projection.adapter";
+export { PostgresIngestionTemplateAdapter } from "./adapters/postgres.ingestion-template.adapter";
 export { PulledUsageEventingAdapter } from "./adapters/pulled-usage.adapter";
 
 export {

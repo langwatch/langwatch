@@ -31,7 +31,7 @@ import { AdminBackofficeService } from "../services/admin-backoffice.service";
 import type { SchedulerOpsRepository } from "../ports/scheduler-ops.repository";
 import type { SchedulerWakeService } from "../ports/scheduler-wake.service";
 import { SchedulerOpsService } from "../services/scheduler-ops.service";
-import { RedisAnomalyStateRepository } from "../repositories/redis/redis-anomaly-state.repository";
+import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository";
 import { QueueAuditRepository } from "../repositories/prisma/queue-audit.repository";
 import { NullQueueRepository } from "../repositories/queue.repository";
@@ -40,7 +40,7 @@ import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.por
 import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
-} from "../repositories/prisma/prisma-scheduler-audit.repository";
+} from "../repositories/prisma/prisma.scheduler-audit.repository";
 
 export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   database: AdminDatabase & SchedulerAuditDatabase;

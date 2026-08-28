@@ -1,4 +1,4 @@
-export { PrismaScenarioAdapter } from "./repositories/prisma/prisma.scenario.adapter";
+export { PrismaScenarioAdapter } from "./adapters/prisma.scenario.adapter";
 export * from "./ports/cancellation-channel.port";
 export * from "./ports/scenario-clock.port";
 export * from "./ports/scenario-child-bootstrap.port";
@@ -23,8 +23,8 @@ export * from "./adapters/litellm-model.adapter";
 export * from "./adapters/node-scenario-child-process.adapter";
 export * from "./adapters/prompt-template.adapter";
 export * from "./adapters/remote-trace-run.adapter";
-export * from "./adapters/redis-cancellation-channel.adapter";
-export * from "./adapters/redis-scenario-tab-store.adapter";
+export * from "./adapters/redis.cancellation-channel.adapter";
+export * from "./adapters/redis.scenario-tab-store.adapter";
 export * from "./adapters/scenario-child-execution.adapter";
 export * from "./adapters/scenario-role-model.adapter";
 export * from "./adapters/scenario-secret-reference.adapter";

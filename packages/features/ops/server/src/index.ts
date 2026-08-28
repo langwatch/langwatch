@@ -5,11 +5,11 @@ export {
 export {
   RedisOpsSnapshotAdapter,
   type RedisOpsSnapshotAdapterOptions,
-} from "./adapters/redis-ops-snapshot.adapter";
+} from "./adapters/redis.ops-snapshot.adapter";
 export {
   RedisSchedulerWakeAdapter,
   type SchedulerWakeRedis,
-} from "./adapters/redis-scheduler-wake.adapter";
+} from "./adapters/redis.scheduler-wake.adapter";
 export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port";
 export { NoopSchedulerAuditSink, SchedulerAuditSink } from "./ports/scheduler-audit.sink";
 export {

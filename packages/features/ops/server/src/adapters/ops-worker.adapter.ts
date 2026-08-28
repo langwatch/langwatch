@@ -14,17 +14,17 @@ import type {
   UsageStatsTelemetryClient,
   UsageStatsWorkerDatabase,
 } from "../ports/usage-stats-worker.ports";
-import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse-usage-stats.repository";
-import { PrismaUsageStatsOrganizationRepository } from "../repositories/prisma/prisma-usage-stats-organization.repository";
-import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma-usage-stats-project.repository";
-import { RedisAnomalyStateRepository } from "../repositories/redis/redis-anomaly-state.repository";
+import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository";
+import { PrismaUsageStatsOrganizationRepository } from "../repositories/prisma/prisma.usage-stats-organization.repository";
+import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository";
+import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service";
 import {
   AnomalyWorkerContribution,
   UsageStatsWorkerContribution,
 } from "../workers/ops-worker.contribution";
-import { RedisTenantRateTrackerAdapter } from "./redis-tenant-rate-tracker.adapter";
+import { RedisTenantRateTrackerAdapter } from "./redis.tenant-rate-tracker.adapter";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
 

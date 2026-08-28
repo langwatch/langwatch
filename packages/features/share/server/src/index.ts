@@ -1,1 +1,1 @@
-export { PostgresShareAdapter } from "./adapters/postgres-share.adapter";
+export { PostgresShareAdapter } from "./adapters/postgres.share.adapter";

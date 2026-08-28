@@ -45,8 +45,8 @@ import {
   ShareVisibility,
   type Team,
 } from "@langwatch/prisma-client/generated";
-import { LedgerShareRepository } from "../src/repositories/ledger/ledger-share.repository";
-import { PrismaShareRepository } from "../src/repositories/prisma/prisma-share.repository";
+import { LedgerShareRepository } from "../src/repositories/ledger/ledger.share.repository";
+import { PrismaShareRepository } from "../src/repositories/prisma/prisma.share.repository";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

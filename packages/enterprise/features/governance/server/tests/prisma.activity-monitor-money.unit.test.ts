@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const query = vi.fn();
 
 import { GovernanceClickHouseResolverPort } from "../src/ports/ingestion-source-activity.port";
-import { PrismaActivityMonitorRepository } from "../src/repositories/prisma/prisma-ingestion-source-activity.repository";
+import { PrismaActivityMonitorRepository } from "../src/repositories/prisma/prisma.ingestion-source-activity.repository";
 
 class FakeClickHouseResolver extends GovernanceClickHouseResolverPort {
   async tryResolve() {

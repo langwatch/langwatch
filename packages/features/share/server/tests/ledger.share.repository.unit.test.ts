@@ -2,7 +2,7 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ShareLink } from "@langwatch/share-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LedgerShareRepository } from "../src/repositories/ledger/ledger-share.repository";
+import { LedgerShareRepository } from "../src/repositories/ledger/ledger.share.repository";
 import type { ShareRepository } from "../src/repositories/share.repository";
 
 /**

@@ -1,7 +1,7 @@
 export {
   PostgresWorkflowAdapter,
   type PostgresWorkflowAdapterOptions,
-} from "./adapters/postgres-workflow.adapter";
+} from "./adapters/postgres.workflow.adapter";
 export {
   WorkflowDslMigrationPort,
   WorkflowLlmParametersPort,
