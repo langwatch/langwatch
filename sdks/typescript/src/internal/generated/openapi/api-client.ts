@@ -3269,7 +3269,7 @@ export interface paths {
         };
         /**
          * @deprecated
-         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.
          */
         get: operations["getApiSuites"];
         put?: never;
@@ -22344,6 +22344,11 @@ export interface operations {
                         name?: string;
                         description?: string;
                         note?: string;
+                        agents?: {
+                            name: string;
+                            /** @enum {string} */
+                            role: "agent" | "user" | "judge";
+                        }[];
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
@@ -23031,8 +23036,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
-                        folderId?: string | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -23111,8 +23116,8 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
-                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
-                    folderId?: string | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null unfiles the scenario. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -23135,8 +23140,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
-                        folderId?: string | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23221,8 +23226,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
-                        folderId?: string | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23313,8 +23318,8 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
-                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
-                    folderId?: string | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null unfiles the scenario. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -23337,8 +23342,8 @@ export interface operations {
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
-                        folderId?: string | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23516,7 +23521,7 @@ export interface operations {
                         versions: {
                             /** @description The version number, counting from 1. */
                             version: number;
-                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
                             authorLabel: string | null;
                             /** @description The user who saved the version. Null when the save came from an API key. */
                             authorId: string | null;
@@ -23525,7 +23530,7 @@ export interface operations {
                             changedFields: string[];
                             /** @description When the version was written, in ISO 8601. */
                             createdAt: string;
-                            /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                            /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
                             isSynthesized: boolean;
                         }[];
                         /** @description Pass as cursor to read the page below this one. Null on the last page. */
@@ -23616,7 +23621,7 @@ export interface operations {
                     "application/json": {
                         /** @description The version number, counting from 1. */
                         version: number;
-                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
                         authorLabel: string | null;
                         /** @description The user who saved the version. Null when the save came from an API key. */
                         authorId: string | null;
@@ -23625,11 +23630,11 @@ export interface operations {
                         changedFields: string[];
                         /** @description When the version was written, in ISO 8601. */
                         createdAt: string;
-                        /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                        /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
                         isSynthesized: boolean;
                         /** @description The shape the snapshot was written in. */
                         schemaVersion: number;
-                        /** @description The editable content of the case as this version saved it. */
+                        /** @description The editable content of the scenario as this version saved it. */
                         snapshot: {
                             name: string;
                             situation: string;
@@ -24917,7 +24922,7 @@ export interface operations {
     getApiSuites: {
         parameters: {
             query?: {
-                /** @description Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did. */
+                /** @description Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did. */
                 kind?: "custom" | "folder";
             };
             header?: never;
@@ -24943,7 +24948,7 @@ export interface operations {
                         kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope?: {
                             /** @constant */
                             mode: "all";
@@ -25047,7 +25052,7 @@ export interface operations {
                     description?: string;
                     /** @default [] */
                     scenarioIds?: string[];
-                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -25098,7 +25103,7 @@ export interface operations {
                         kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope?: {
                             /** @constant */
                             mode: "all";
@@ -25210,7 +25215,7 @@ export interface operations {
                         kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope?: {
                             /** @constant */
                             mode: "all";
@@ -25409,7 +25414,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -25458,7 +25463,7 @@ export interface operations {
                         kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope?: {
                             /** @constant */
                             mode: "all";
@@ -25584,7 +25589,7 @@ export interface operations {
                         kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope?: {
                             /** @constant */
                             mode: "all";
@@ -25844,21 +25849,21 @@ export interface operations {
                         name: string;
                         /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
                         slug: string;
-                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
                         } | {
                             /** @constant */
-                            mode: "folders";
-                            folderIds: string[];
+                            mode: "test_suites";
+                            testSuiteIds: string[];
                         } | {
                             /** @constant */
                             mode: "labels";
                             labels: string[];
                         } | {
                             /** @constant */
-                            mode: "cases";
+                            mode: "scenarios";
                         };
                         /** @description The scenarios the last run of this plan covered. */
                         scenarioIds: string[];
@@ -25910,21 +25915,21 @@ export interface operations {
                     name?: string;
                     /** @description What this run covers and what it runs against. Written onto the run plan the name resolves. */
                     config: {
-                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
                         } | {
                             /** @constant */
-                            mode: "folders";
-                            folderIds: string[];
+                            mode: "test_suites";
+                            testSuiteIds: string[];
                         } | {
                             /** @constant */
                             mode: "labels";
                             labels: string[];
                         } | {
                             /** @constant */
-                            mode: "cases";
+                            mode: "scenarios";
                         };
                         /** @description The prompts, agents or workflows every scenario runs against. */
                         targets: {
@@ -25942,7 +25947,7 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
                         judgeModel?: string | null;
-                        /** @description The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time. */
+                        /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
@@ -26039,21 +26044,21 @@ export interface operations {
                         name: string;
                         /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
                         slug: string;
-                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
                         } | {
                             /** @constant */
-                            mode: "folders";
-                            folderIds: string[];
+                            mode: "test_suites";
+                            testSuiteIds: string[];
                         } | {
                             /** @constant */
                             mode: "labels";
                             labels: string[];
                         } | {
                             /** @constant */
-                            mode: "cases";
+                            mode: "scenarios";
                         };
                         /** @description The scenarios the last run of this plan covered. */
                         scenarioIds: string[];
