@@ -245,11 +245,6 @@
         "~/server/annotations/annotationAnchorLabel",
         "~/server/tracer/types"
       ],
-      "platform/app/src/components/CheckPassing.tsx": [
-        "../server/evaluations/evaluators",
-        "../server/evaluations/getEvaluator",
-        "../server/tracer/types"
-      ],
       "platform/app/src/components/checks/CheckConfigForm.tsx": [
         "../../server/evaluations/evaluationMappings",
         "../../server/evaluations/evaluatorDisplayNames",
@@ -1231,9 +1226,6 @@
         "~/server/prompt-config"
       ],
       "platform/app/src/prompts/forms/prompt-config-form/components/VersionHistoryButton.tsx": [
-        "~/server/prompt-config"
-      ],
-      "platform/app/src/prompts/forms/prompt-config-form/PromptConfigForm.tsx": [
         "~/server/prompt-config"
       ],
       "platform/app/src/prompts/forms/schemas/change-handle-form.schema.ts": [

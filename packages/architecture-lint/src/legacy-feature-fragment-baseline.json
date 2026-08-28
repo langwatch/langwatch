@@ -673,11 +673,6 @@
     },
     {
       "feature": "evaluation",
-      "file": "platform/app/src/components/evaluations/AskIfUserWantsToContinueDraftDialog.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "evaluation",
       "file": "platform/app/src/components/evaluations/CopyMonitorDialog.tsx",
       "kind": "page-shell"
     },
@@ -724,11 +719,6 @@
     {
       "feature": "evaluation",
       "file": "platform/app/src/components/evaluations/utils/deserializeMappingStateToUI.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "evaluation",
-      "file": "platform/app/src/components/evaluations/utils/misc.tsx",
       "kind": "page-shell"
     },
     {
@@ -2528,11 +2518,6 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/projections/index.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/projections/OpsReplayDrawer.tsx",
       "kind": "page-shell"
     },
@@ -2668,27 +2653,12 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/scheduler/SchedulerHeader.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/scheduler/SchedulerRecentActions.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/scheduler/SchedulerRowActions.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "ops",
       "file": "platform/app/src/components/ops/scheduler/schedulerStatus.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/scheduler/SchedulerStatusBadge.tsx",
       "kind": "page-shell"
     },
     {
@@ -3783,11 +3753,6 @@
     },
     {
       "feature": "prompt",
-      "file": "platform/app/src/prompts/forms/fields/message-history-fields/AddRemoveMessageFieldButton.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "prompt",
       "file": "platform/app/src/prompts/forms/fields/message-history-fields/EditingModeTitle.tsx",
       "kind": "legacy-implementation"
     },
@@ -3830,11 +3795,6 @@
       "feature": "prompt",
       "file": "platform/app/src/prompts/forms/prompt-config-form/components/VersionSaveButton.tsx",
       "kind": "page-shell"
-    },
-    {
-      "feature": "prompt",
-      "file": "platform/app/src/prompts/forms/prompt-config-form/PromptConfigForm.tsx",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "prompt",
@@ -4059,11 +4019,6 @@
     {
       "feature": "prompt",
       "file": "platform/app/src/prompts/prompt-playground/components/sidebar/PublishedPromptsList.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "prompt",
-      "file": "platform/app/src/prompts/prompt-playground/components/sidebar/SidebarHeader.tsx",
       "kind": "page-shell"
     },
     {
