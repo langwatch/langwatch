@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { Button, Container, Heading, Html, Section, Text } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 const logger = createLogger("langwatch:mailer:automationLimitEmail");
 
@@ -55,14 +56,10 @@ function LimitBody({
           margin: "0 0 16px 0",
         }}
       >
-        {paused
-          ? `We paused "${automationName}"`
-          : `"${automationName}" reached its daily limit`}
+        {paused ? `We paused "${automationName}"` : `"${automationName}" reached its daily limit`}
       </Heading>
       <Text style={paragraph}>{lead}</Text>
-      <Text style={paragraph}>
-        {skippedToday.toLocaleString()} matches were skipped today.
-      </Text>
+      <Text style={paragraph}>{skippedToday.toLocaleString()} matches were skipped today.</Text>
       <Text style={{ ...paragraph, margin: 0 }}>{advice}</Text>
     </Section>
   );
@@ -100,10 +97,7 @@ function LimitFooter({ actionUrl }: { actionUrl: string }) {
           }}
         >
           Questions? Visit the{" "}
-          <a
-            href="https://docs.langwatch.ai"
-            style={{ color: "#ED8926", textDecoration: "none" }}
-          >
+          <a href="https://docs.langwatch.ai" style={{ color: "#ED8926", textDecoration: "none" }}>
             Help Center
           </a>{" "}
           or reach out to us. Our support engineers are here to help.
@@ -113,11 +107,7 @@ function LimitFooter({ actionUrl }: { actionUrl: string }) {
   );
 }
 
-const AutomationLimitEmailTemplate = ({
-  kind,
-  actionUrl,
-  ...body
-}: AutomationLimitEmailProps) => (
+const AutomationLimitEmailTemplate = ({ kind, actionUrl, ...body }: AutomationLimitEmailProps) => (
   <Html lang="en" dir="ltr">
     <Container
       style={{
@@ -146,16 +136,20 @@ export const automationLimitEmailSubject = ({
     : `Automation reached its daily limit: ${automationName}`;
 
 export const sendAutomationLimitEmail = async ({
+  mailer,
   to,
   ...props
-}: AutomationLimitEmailProps & { to: string[] }) => {
+}: AutomationLimitEmailProps & { to: string[]; mailer: EmailDeliveryPort }) => {
   const html = await renderAutomationLimitEmail(props);
   const results = await Promise.allSettled(
     to.map((recipient) =>
       sendEmail({
-        to: recipient,
-        subject: automationLimitEmailSubject(props),
-        html,
+        mailer,
+        content: {
+          to: recipient,
+          subject: automationLimitEmailSubject(props),
+          html,
+        },
       }),
     ),
   );
@@ -168,9 +162,7 @@ export const sendAutomationLimitEmail = async ({
   // landed is a failure worth reporting upward, because the caller answers that
   // by trying again, and trying again would mail the admins who did receive it
   // a second time.
-  const kinds = [
-    ...new Set(failures.map((failure) => failureKind(failure.reason))),
-  ].sort();
+  const kinds = [...new Set(failures.map((failure) => failureKind(failure.reason)))].sort();
   if (failures.length === to.length) {
     throw new Error(
       `Could not send the automation limit email to any of its ${to.length} ` +

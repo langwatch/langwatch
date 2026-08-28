@@ -1,19 +1,18 @@
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
-import {
-  EmailAlreadyRegisteredError,
-  UserAvatarRateLimitedError,
-} from "@langwatch/user-contract";
+import { passwordProblem } from "@langwatch/identity";
+import { EmailAlreadyRegisteredError, UserAvatarRateLimitedError } from "@langwatch/user-contract";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import { Auth0ApiError, changeAuth0Password } from "~/server/auth0/passwordService";
-import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
+import { trackServerEvent } from "~/server/posthog";
 import { getClientIp } from "~/utils/getClientIp";
 import { env } from "../../../env.mjs";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -140,12 +139,12 @@ export const userRouter = createTRPCRouter({
         throw new EmailAlreadyRegisteredError();
       }
 
-      const newUser = await createCredentialUser({
-        prisma: ctx.prisma,
+      const newUser = await ctx.app.users.createCredentialUser({
         name: name ?? null,
         email,
         passwordHash: await hash(password, 10),
       });
+      trackServerEvent({ userId: newUser.id, event: "signed_up" });
 
       return { id: newUser.id };
     }),
@@ -316,7 +315,7 @@ export const userRouter = createTRPCRouter({
     })
     .query(async ({ ctx }) => {
       return {
-        hasPassword: await UserService.create(ctx.prisma).hasPassword({
+        hasPassword: await ctx.app.users.hasPassword({
           id: ctx.session.user.id,
         }),
       };
@@ -424,8 +423,7 @@ export const userRouter = createTRPCRouter({
       // same reason `changePassword` skips it: the session id in hand is the
       // operator's, not the subject's.
       if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
+        await ctx.app.auth.revokeOtherBrowserSessions({
           userId: ctx.session.user.id,
           keepSessionId: ctx.session.sessionId,
         });
@@ -575,8 +573,7 @@ export const userRouter = createTRPCRouter({
         // devices' app sessions so a stolen session token cannot outlive a
         // password rotation. Same impersonation safeguard as the email path.
         if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-          await revokeOtherSessionsForUser({
-            prisma: ctx.prisma,
+          await ctx.app.auth.revokeOtherBrowserSessions({
             userId: ctx.session.user.id,
             keepSessionId: ctx.session.sessionId,
           });
@@ -627,8 +624,7 @@ export const userRouter = createTRPCRouter({
       // admin's tab open. In an impersonation context, password change
       // shouldn't be exposed in the UI, but be defensive.
       if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
+        await ctx.app.auth.revokeOtherBrowserSessions({
           userId: ctx.session.user.id,
           keepSessionId: ctx.session.sessionId,
         });
@@ -639,28 +635,27 @@ export const userRouter = createTRPCRouter({
   deactivate: protectedProcedure
     .input(z.object({ userId: z.string() }))
     .noPermission({
-      reason:
-        "self-service for the named user; the handler enforces self-or-instance-admin itself",
+      reason: "self-service for the named user; the handler enforces self-or-instance-admin itself",
     })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
-      if (
-        input.userId !== ctx.session.user.id &&
-        !ctx.app.ops.isAdmin({ email: user.email })
-      ) {
+      if (input.userId !== ctx.session.user.id && !ctx.app.ops.isAdmin({ email: user.email })) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      // UserService.deactivate also force-revokes all the user's sessions
-      // (Redis cache + DB) — see iter-24 progress notes for why.
+      // User owns the durable state transition. The process-level lifecycle
+      // services own the effects that follow it: browser sessions and CLI
+      // credentials must be revoked without injecting Auth or Governance
+      // callback ports into User (which would create a service cycle).
       await ctx.app.users.deactivate({ id: input.userId });
+      await ctx.app.auth.revokeAllBrowserSessions({ userId: input.userId });
+      await ctx.app.governance.cliTokenRevokeForUser({ userId: input.userId });
       return { success: true };
     }),
   reactivate: protectedProcedure
     .input(z.object({ userId: z.string() }))
     .noPermission({
-      reason:
-        "self-service for the named user; the handler enforces self-or-instance-admin itself",
+      reason: "self-service for the named user; the handler enforces self-or-instance-admin itself",
     })
     .mutation(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
@@ -1123,6 +1118,7 @@ export const userRouter = createTRPCRouter({
       ]);
       try {
         await sendBudgetIncreaseRequestEmail({
+          mailer: ctx.app.mailer,
           to: adminEmail,
           requesterEmail: requester?.email ?? ctx.session.user.email ?? "",
           requesterName: requester?.name ?? undefined,
@@ -1187,7 +1183,7 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const [lastHomePath, firstProject] = await Promise.all([
-        ctx.app.users.getLastHomePath({ id: userId }),
+        ctx.app.users.tryGetLastHomePath({ id: userId }),
         ctx.prisma.project.findFirst({
           where: {
             team: {

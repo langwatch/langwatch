@@ -26,10 +26,7 @@ vi.mock("@aws-sdk/client-ses", () => {
   const SESClient = vi.fn(function (this: { send: typeof sesClientSendMock }) {
     this.send = sesClientSendMock;
   });
-  const SendEmailCommand = vi.fn(function (
-    this: { type: string; input: unknown },
-    input: unknown,
-  ) {
+  const SendEmailCommand = vi.fn(function (this: { type: string; input: unknown }, input: unknown) {
     this.type = "SendEmailCommand";
     this.input = input;
   });
@@ -43,8 +40,29 @@ vi.mock("@aws-sdk/client-ses", () => {
   return { SESClient, SendEmailCommand, SendRawEmailCommand };
 });
 
-import { sendEmail } from "../emailSender";
+import { sendEmail as sendEmailWithMailer } from "../emailSender";
 import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime";
+import { AppMailerRuntime } from "~/runtime/app/mailer.runtime";
+import { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
+import type { EmailContent } from "../providers/types";
+
+let mailer: AppMailerRuntime;
+
+beforeEach(() => {
+  mailer = AppMailerRuntime.create({
+    configuration: {
+      defaultFrom: "LangWatch <contact@langwatch.ai>",
+      ses: { enabled: true, region: "us-east-1" },
+      sendgrid: {},
+      smtp: {},
+      resend: {},
+    },
+    aws: AppAwsClientConfiguration.create({}),
+    outboundProxy: {},
+  });
+});
+
+const sendEmail = (content: EmailContent) => sendEmailWithMailer({ mailer, content });
 
 // ── helper ────────────────────────────────────────────────────────────────────
 
@@ -168,10 +186,7 @@ describe("buildRawMimeMessage", () => {
         });
 
         // Body section starts after the blank line following Content-Transfer-Encoding header
-        const bodyStart = msg.indexOf(
-          "\r\n\r\n",
-          msg.indexOf("Content-Transfer-Encoding: base64"),
-        );
+        const bodyStart = msg.indexOf("\r\n\r\n", msg.indexOf("Content-Transfer-Encoding: base64"));
         const bodySection = msg.slice(bodyStart + 4); // skip the blank line
 
         // All characters in body must be valid base64 or CRLF/boundary chars
@@ -206,10 +221,7 @@ describe("buildRawMimeMessage", () => {
         }
 
         // Base64 body lines should be ≤76 chars
-        const bodyStart = msg.indexOf(
-          "\r\n\r\n",
-          msg.indexOf("Content-Transfer-Encoding: base64"),
-        );
+        const bodyStart = msg.indexOf("\r\n\r\n", msg.indexOf("Content-Transfer-Encoding: base64"));
         const bodySection = msg.slice(bodyStart + 4);
         const bodyLines = bodySection
           .split("\r\n")
@@ -291,9 +303,7 @@ describe("buildRawMimeMessage", () => {
         const headerLines = msg
           .split("\r\n")
           .filter(
-            (l) =>
-              l.startsWith("Content-Type: text/csv") ||
-              l.startsWith("Content-Disposition:"),
+            (l) => l.startsWith("Content-Type: text/csv") || l.startsWith("Content-Disposition:"),
           );
         expect(headerLines).toHaveLength(2);
 

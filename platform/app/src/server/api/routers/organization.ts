@@ -584,7 +584,7 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      const inviteService = InviteService.create(ctx.prisma);
+      const inviteService = InviteService.create(ctx.prisma, { mailer: ctx.app.mailer });
 
       let created: Awaited<ReturnType<typeof inviteService.createInvites>>;
       try {
@@ -640,6 +640,7 @@ export const organizationRouter = createTRPCRouter({
               await joinRequestsService({
                 authzGrants: ctx.app.authzGrants,
                 featureFlags: ctx.app.featureFlags,
+                mailer: ctx.app.mailer,
               }).resolveByInvitation({
                 userId: invited.id,
                 organizationId: record.invite.organizationId,
@@ -675,7 +676,7 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
-      const inviteService = InviteService.create(ctx.prisma);
+      const inviteService = InviteService.create(ctx.prisma, { mailer: ctx.app.mailer });
       await inviteService.revokeInvite({
         organizationId: input.organizationId,
         inviteId: input.inviteId,
@@ -693,7 +694,7 @@ export const organizationRouter = createTRPCRouter({
       // and a throttled click must not quietly break the link already sent.
       await assertInviteSendAllowed({ inviteId: input.inviteId });
 
-      const inviteService = InviteService.create(ctx.prisma);
+      const inviteService = InviteService.create(ctx.prisma, { mailer: ctx.app.mailer });
       const { invite, emailNotSent } = await inviteService.resendInvite({
         organizationId: input.organizationId,
         inviteId: input.inviteId,
@@ -716,7 +717,7 @@ export const organizationRouter = createTRPCRouter({
     // (settings/members, SubscriptionPage) are admin-only surfaces.
     .permission("organization:manage")
     .query(async ({ input, ctx }) => {
-      const inviteService = InviteService.create(ctx.prisma);
+      const inviteService = InviteService.create(ctx.prisma, { mailer: ctx.app.mailer });
       return inviteService.listInvites({
         organizationId: input.organizationId,
       });
@@ -766,7 +767,7 @@ export const organizationRouter = createTRPCRouter({
       }
 
       const prisma = ctx.prisma;
-      const inviteService = InviteService.create(prisma);
+      const inviteService = InviteService.create(prisma, { mailer: ctx.app.mailer });
 
       try {
         // Check license limits for all invites at once
@@ -898,7 +899,7 @@ export const organizationRouter = createTRPCRouter({
         );
 
         const results = await prisma.$transaction(async (tx) => {
-          const transactionalInviteService = InviteService.create(tx);
+          const transactionalInviteService = InviteService.create(tx, { mailer: ctx.app.mailer });
           return Promise.all(
             preparedInvites.map((invite) =>
               transactionalInviteService.createMemberInviteRequest(invite),
@@ -942,7 +943,7 @@ export const organizationRouter = createTRPCRouter({
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      const inviteService = InviteService.create(prisma);
+      const inviteService = InviteService.create(prisma, { mailer: ctx.app.mailer });
 
       try {
         // Re-validate license limits before approving (org may have reached cap since request)
@@ -1063,7 +1064,7 @@ export const organizationRouter = createTRPCRouter({
       // membership row has to be committed before they are emitted, and the
       // invite is only marked ACCEPTED once everything before it has landed
       // (a still-PENDING invite is one still to apply).
-      await InviteService.create(prisma).applyInvite({
+      await InviteService.create(prisma, { mailer: ctx.app.mailer }).applyInvite({
         userId: session.user.id,
         invite,
         viaIdentifierId,
@@ -1078,6 +1079,7 @@ export const organizationRouter = createTRPCRouter({
         await joinRequestsService({
           authzGrants: ctx.app.authzGrants,
           featureFlags: ctx.app.featureFlags,
+          mailer: ctx.app.mailer,
         }).withdrawOnInvitationAccepted({
           userId: session.user.id,
           organizationId: invite.organizationId,
@@ -1132,7 +1134,7 @@ export const organizationRouter = createTRPCRouter({
         organizationName: invite.organization.name,
       });
 
-      const inviteService = InviteService.create(prisma);
+      const inviteService = InviteService.create(prisma, { mailer: ctx.app.mailer });
       const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
       return {

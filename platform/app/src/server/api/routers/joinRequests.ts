@@ -208,6 +208,7 @@ function joinRequests(ctx: Pick<TRPCContext, "app">) {
   return joinRequestsService({
     authzGrants: ctx.app.authzGrants,
     featureFlags: ctx.app.featureFlags,
+    mailer: ctx.app.mailer,
   });
 }
 

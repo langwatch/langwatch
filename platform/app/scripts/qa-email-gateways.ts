@@ -8,9 +8,48 @@
  *     pnpm tsx scripts/qa-email-gateways.ts
  */
 import { sendEmail } from "../src/server/mailer/emailSender";
+import { AppAwsClientConfiguration } from "../src/runtime/app/aws-client.composition";
+import { AppMailerRuntime } from "../src/runtime/app/mailer.runtime";
+import { resolveMailerConfiguration } from "../src/server/mailer/mailer.config";
+import { parseOutboundProxyConfig } from "../src/server/outboundProxy";
 import { sendRenderedTriggerEmail } from "../src/server/mailer/triggerEmail";
 
 const MAILPIT = "http://127.0.0.1:8025";
+
+const outboundProxy = parseOutboundProxyConfig(process.env);
+const aws = AppAwsClientConfiguration.create(outboundProxy);
+const mailer = AppMailerRuntime.create({
+  configuration: resolveMailerConfiguration({
+    baseHost: process.env.BASE_HOST ?? "http://localhost",
+    emailDefaultFrom: process.env.EMAIL_DEFAULT_FROM,
+    emailProvider: process.env.EMAIL_PROVIDER,
+    useAwsSes: process.env.USE_AWS_SES,
+    awsRegion: process.env.AWS_REGION,
+    awsSesEndpoint: process.env.AWS_SES_ENDPOINT,
+    sendgridApiKey: process.env.SENDGRID_API_KEY,
+    smtpUrl: process.env.SMTP_URL,
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT,
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+    smtpSecure: process.env.SMTP_SECURE,
+    resendApiKey: process.env.RESEND_API_KEY,
+  }),
+  aws,
+  outboundProxy,
+});
+
+const closeMailerGraph = async (): Promise<void> => {
+  let firstFailure: unknown;
+  for (const close of [() => mailer.close(), () => aws.close()]) {
+    try {
+      await close();
+    } catch (error) {
+      firstFailure ??= error;
+    }
+  }
+  if (firstFailure) throw firstFailure;
+};
 
 /**
  * Only the scheme and host of an SMTP URL. Credentials are dropped entirely
@@ -71,6 +110,7 @@ async function scenarioPlainAlert() {
   await reset();
 
   await sendRenderedTriggerEmail({
+    mailer,
     triggerEmails: ["gabriel@example.com"],
     triggerId: "trigger-qa-1",
     projectId: "project-qa",
@@ -100,11 +140,7 @@ async function scenarioPlainAlert() {
     JSON.stringify(detail.Bcc ?? []).includes("gabriel@example.com"),
     JSON.stringify(detail.Bcc),
   );
-  check(
-    "alert body rendered",
-    (detail.HTML ?? "").includes("476"),
-    "value missing from body",
-  );
+  check("alert body rendered", (detail.HTML ?? "").includes("476"), "value missing from body");
 
   const raw = await rawSource(first.ID);
   check("List-Unsubscribe header delivered through SMTP", /List-Unsubscribe:/i.test(raw));
@@ -115,19 +151,22 @@ async function scenarioFullSurface() {
   await reset();
 
   await sendEmail({
-    to: ["primary@example.com", "second@example.com"],
-    bcc: ["hidden@example.com"],
-    replyTo: "support@langwatch.ai",
-    subject: "Relatório semanal",
-    html: "<p>Segue o relatório.</p>",
-    headers: { "X-LangWatch-QA": "gateway-smoke" },
-    attachments: [
-      {
-        filename: "report.csv",
-        content: "metric,value\ntransbordos,476",
-        contentType: "text/csv",
-      },
-    ],
+    mailer,
+    content: {
+      to: ["primary@example.com", "second@example.com"],
+      bcc: ["hidden@example.com"],
+      replyTo: "support@langwatch.ai",
+      subject: "Relatório semanal",
+      html: "<p>Segue o relatório.</p>",
+      headers: { "X-LangWatch-QA": "gateway-smoke" },
+      attachments: [
+        {
+          filename: "report.csv",
+          content: "metric,value\ntransbordos,476",
+          contentType: "text/csv",
+        },
+      ],
+    },
   });
 
   const list = await messages();
@@ -141,9 +180,7 @@ async function scenarioFullSurface() {
 
   check(
     "attachment present",
-    (detail.Attachments ?? []).some(
-      (a: { FileName: string }) => a.FileName === "report.csv",
-    ),
+    (detail.Attachments ?? []).some((a: { FileName: string }) => a.FileName === "report.csv"),
     JSON.stringify(detail.Attachments),
   );
   check("reply-to set", /Reply-To:\s*support@langwatch\.ai/i.test(raw));
@@ -170,9 +207,12 @@ async function scenarioUnicode() {
   await reset();
 
   await sendEmail({
-    to: "acentos@example.com",
-    subject: "Transbordo para humano: atenção à média não prevista",
-    html: "<p>Configuração validada.</p>",
+    mailer,
+    content: {
+      to: "acentos@example.com",
+      subject: "Transbordo para humano: atenção à média não prevista",
+      html: "<p>Configuração validada.</p>",
+    },
   });
 
   const list = await messages();
@@ -196,13 +236,13 @@ async function main() {
   await scenarioFullSurface();
   await scenarioUnicode();
 
-  console.log(
-    failures === 0 ? "\nAll gateway checks passed." : `\n${failures} check(s) FAILED.`,
-  );
+  console.log(failures === 0 ? "\nAll gateway checks passed." : `\n${failures} check(s) FAILED.`);
   process.exit(failures === 0 ? 0 : 1);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => closeMailerGraph());

@@ -2339,7 +2339,7 @@ secured.access(CLI_POLICY).get("/governance/ingestion-keys", async (c: CliContex
 // outstanding device codes.
 // ---------------------------------------------------------------------------
 secured.access(CLI_POLICY).get("/lookup", async (c: CliContext) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (!session?.user) {
     return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }
@@ -2427,7 +2427,7 @@ const approveRequestSchema = z.object({
 });
 
 secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (!session?.user) {
     return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }
@@ -2664,7 +2664,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
 const denyRequestSchema = z.object({ user_code: z.string().min(1) });
 
 secured.access(CLI_POLICY).post("/deny", async (c: CliContext) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (!session?.user) {
     return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }

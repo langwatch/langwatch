@@ -3,9 +3,9 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { SlackPayload } from "@langwatch/automation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
-  AutomationClock,
+  type AutomationClock,
   AutomationDispatchErrorPort,
-  AutomationGraphDeliveryPort,
+  type AutomationGraphDeliveryPort,
   AutomationGraphNotifierPort,
   AutomationLoggerPort,
   AutomationHeartbeatPort,
@@ -34,6 +34,7 @@ import {
   incrementAutomationContainmentFailedTotal,
 } from "~/server/metrics";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendRenderedTriggerEmail, sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import {
@@ -173,6 +174,10 @@ async function releaseClaim({
 }
 
 class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDeliveryPort {
+  constructor(private readonly mailer: EmailDeliveryPort) {
+    super();
+  }
+
   sendLegacyEmail(input: {
     recipients: string[];
     triggerData: TriggerData[];
@@ -186,6 +191,7 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
     recordRecipientSent(recipientHash: string): Promise<void>;
   }): Promise<void> {
     return sendTriggerEmail({
+      mailer: this.mailer,
       triggerEmails: input.recipients,
       triggerData: input.triggerData,
       triggerName: input.triggerName,
@@ -209,6 +215,7 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
     recordRecipientSent(recipientHash: string): Promise<void>;
   }): Promise<void> {
     return sendRenderedTriggerEmail({
+      mailer: this.mailer,
       triggerEmails: input.recipients,
       triggerId: input.triggerId,
       projectId: input.projectId,
@@ -266,8 +273,10 @@ class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDel
 }
 
 /** One named host adapter shared by graph and settled-trace delivery. */
-export function createAutomationNotificationDeliveryPort(): AutomationNotificationDeliveryPort {
-  return new AppAutomationNotificationDeliveryAdapter();
+export function createAutomationNotificationDeliveryPort(
+  mailer: EmailDeliveryPort,
+): AutomationNotificationDeliveryPort {
+  return new AppAutomationNotificationDeliveryAdapter(mailer);
 }
 
 class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
@@ -282,6 +291,7 @@ class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
 
 /** Complete process capability set for the constructed AutomationService. */
 export function createAutomationGraphPorts(input: {
+  mailer: EmailDeliveryPort;
   redis: Redis | Cluster | null;
   clock: AutomationClock;
   emailCaps: AutomationEmailCapService;
@@ -299,7 +309,7 @@ export function createAutomationGraphPorts(input: {
   const notifier = GraphAlertDispatchService.create({
     persistence: input.delivery,
     emailCaps: input.emailCaps,
-    delivery: createAutomationNotificationDeliveryPort(),
+    delivery: createAutomationNotificationDeliveryPort(input.mailer),
     webhooks: WebhookProviderAdapter.create({ encrypt, decrypt }),
     clock: input.clock,
     emailHourlyCap: input.emailHourlyCap,
@@ -322,6 +332,7 @@ export function createAutomationGraphPorts(input: {
       projects: input.projects,
       authz: input.authz,
       baseHost: input.baseHost,
+      mailer: input.mailer,
       resolveClickHouseClient: input.resolveClickHouseClient,
     }),
   };
@@ -338,6 +349,7 @@ class AppAutomationRunawayAdapter extends AutomationRunawayPort {
       authz: AuthzService;
       baseHost: string;
       resolveClickHouseClient: ClickHouseClientResolver;
+      mailer: EmailDeliveryPort;
     },
   ) {
     super();
@@ -391,7 +403,7 @@ class AppAutomationRunawayAdapter extends AutomationRunawayPort {
     skippedToday: number;
     actionUrl: string;
   }): Promise<void> {
-    return sendAutomationLimitEmail(params);
+    return sendAutomationLimitEmail({ mailer: this.input.mailer, ...params });
   }
 
   tryClaimOnce(key: string, ttlSeconds?: number): Promise<{ key: string; token: string } | null> {

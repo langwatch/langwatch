@@ -90,7 +90,7 @@ export async function authorizeDirectUpload(
   projectId: string,
 ): Promise<DirectUploadAuthResult> {
   // 1. Session cookie (the upload UI).
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (session) {
     // CSRF: a cookie-authed state change must originate same-site. Reject a
     // cross-site request before any permission check / mutation.

@@ -25,6 +25,16 @@ throw. A newly minted key is born revoked, its private role and grants are
 attached first, and it is activated last. A replacement attaches the new grant
 set before revoking the old set.
 
+### Target selection compatibility
+
+A deprecated project credential remains bound to the project resolved from its
+token: a Basic-auth project id or `X-Project-Id` does not replace that target.
+A current API key accepts a selected project in its own organization, with its
+scope and permission ceiling checked at the route boundary. Organization-token
+resolution does not inspect a project target. These existing wire semantics are
+characterised in the server tests; stricter target validation needs its own
+compatibility decision rather than a migration-side behaviour change.
+
 ### Public surfaces and transports
 
 The contract exports portable Zod 4 values, API-key errors, and the one

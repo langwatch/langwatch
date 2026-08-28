@@ -4,6 +4,10 @@ import {
   userProfileSchema,
   userSsoStatusSchema,
   userTourPreferenceSchema,
+  userTourPreferenceRowSchema,
+  userHomePathSchema,
+  createdUserSchema,
+  userCredentialAccountRowSchema,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
@@ -11,9 +15,27 @@ import {
   type UserProfile,
   type UserSsoStatus,
   type UserTourPreference,
+  type CreateCredentialUserInput,
+  type CreatePasskeyUserInput,
+  type CreatedUser,
 } from "@langwatch/user-contract";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import { UserRepository } from "../user.repository";
+
+export type UserDatabase = {
+  user: {
+    findMany(args: Prisma.UserFindManyArgs): PromiseLike<Record<string, unknown>[]>;
+    findUnique(args: Prisma.UserFindUniqueArgs): PromiseLike<Record<string, unknown> | null>;
+    findUniqueOrThrow(args: Prisma.UserFindUniqueOrThrowArgs): PromiseLike<Record<string, unknown>>;
+    create(args: Prisma.UserCreateArgs): PromiseLike<Record<string, unknown>>;
+    update(args: Prisma.UserUpdateArgs): PromiseLike<Record<string, unknown>>;
+  };
+  account: {
+    create(args: Prisma.AccountCreateArgs): PromiseLike<Record<string, unknown>>;
+    findFirst(args: Prisma.AccountFindFirstArgs): PromiseLike<Record<string, unknown> | null>;
+  };
+  $transaction<T>(callback: (transaction: UserDatabase) => Promise<T>): Promise<T>;
+};
 
 const userProfileSelect = {
   id: true,
@@ -35,12 +57,15 @@ const userFullProfileSelect = {
 } satisfies Prisma.UserSelect;
 
 export class PrismaUserRepository extends UserRepository {
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(
+    private readonly database: UserDatabase,
+    private readonly credentialIssuer: string,
+  ) {
     super();
   }
 
-  static create(database: PrismaClient): PrismaUserRepository {
-    return new PrismaUserRepository(database);
+  static create(database: UserDatabase, credentialIssuer: string): PrismaUserRepository {
+    return new PrismaUserRepository(database, credentialIssuer);
   }
 
   async getProfiles(userIds: string[]): Promise<UserFullProfile[]> {
@@ -73,6 +98,56 @@ export class PrismaUserRepository extends UserRepository {
     );
   }
 
+  async createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    const created = await this.database.$transaction(async (transaction) => {
+      const user = await transaction.user.create({
+        data: { name: input.name, email: input.email },
+      });
+      const parsedUser = createdUserSchema.parse(user);
+      await transaction.account.create({
+        data: {
+          userId: parsedUser.id,
+          type: "credential",
+          provider: "credential",
+          issuer: this.credentialIssuer,
+          providerAccountId: parsedUser.id,
+          password: input.passwordHash,
+        },
+      });
+      return { id: parsedUser.id };
+    });
+    return createdUserSchema.parse(created);
+  }
+
+  async createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
+    const created = await this.database.$transaction(async (transaction) => {
+      const user = await transaction.user.create({
+        data: { name: null, email: input.email },
+      });
+      const parsedUser = createdUserSchema.parse(user);
+      await transaction.account.create({
+        data: {
+          userId: parsedUser.id,
+          type: "credential",
+          provider: "credential",
+          issuer: this.credentialIssuer,
+          providerAccountId: parsedUser.id,
+          password: null,
+        },
+      });
+      return { id: parsedUser.id };
+    });
+    return createdUserSchema.parse(created);
+  }
+
+  async hasPassword(id: string): Promise<boolean> {
+    const row = await this.database.account.findFirst({
+      where: { userId: id, provider: "credential" },
+      select: { password: true },
+    });
+    return row ? userCredentialAccountRowSchema.parse(row).password !== null : false;
+  }
+
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const data: { name?: string; email?: string } = {};
     if (input.name !== undefined) data.name = input.name;
@@ -99,8 +174,9 @@ export class PrismaUserRepository extends UserRepository {
       where: { id },
       select: { pendingSsoSetup: true },
     });
+    const parsed = row ? userSsoStatusSchema.safeParse(row) : null;
     return userSsoStatusSchema.parse({
-      pendingSsoSetup: row?.pendingSsoSetup ?? false,
+      pendingSsoSetup: parsed?.success ? parsed.data.pendingSsoSetup : false,
     });
   }
 
@@ -109,9 +185,10 @@ export class PrismaUserRepository extends UserRepository {
       where: { id },
       select: { tracesExplorerTourDismissedAt: true },
     });
+    const parsed = userTourPreferenceRowSchema.parse(row);
     return userTourPreferenceSchema.parse({
-      dismissed: row.tracesExplorerTourDismissedAt !== null,
-      dismissedAt: row.tracesExplorerTourDismissedAt,
+      dismissed: parsed.tracesExplorerTourDismissedAt !== null,
+      dismissedAt: parsed.tracesExplorerTourDismissedAt,
     });
   }
 
@@ -126,7 +203,7 @@ export class PrismaUserRepository extends UserRepository {
     });
     return userTourPreferenceSchema.parse({
       dismissed: true,
-      dismissedAt: row.tracesExplorerTourDismissedAt,
+      dismissedAt: userTourPreferenceRowSchema.parse(row).tracesExplorerTourDismissedAt,
     });
   }
 
@@ -137,12 +214,12 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  async getLastHomePath(id: string): Promise<string | null> {
+  async tryGetLastHomePath(id: string): Promise<string | null> {
     const row = await this.database.user.findUnique({
       where: { id },
       select: { lastHomePath: true },
     });
-    return row?.lastHomePath ?? null;
+    return row ? userHomePathSchema.parse(row).lastHomePath : null;
   }
 
   async setLastHomePath(id: string, path: string | null): Promise<void> {
@@ -169,11 +246,11 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  private map(row: UserProfile | null): UserProfile | null {
+  private map(row: unknown | null): UserProfile | null {
     return row ? userProfileSchema.parse(row) : null;
   }
 
-  private mapRequired(row: UserProfile): UserProfile {
+  private mapRequired(row: unknown): UserProfile {
     return userProfileSchema.parse(row);
   }
 }

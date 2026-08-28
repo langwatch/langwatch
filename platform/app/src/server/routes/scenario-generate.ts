@@ -27,9 +27,7 @@ const scenarioSchema = z.object({
     ),
   criteria: z
     .array(z.string())
-    .describe(
-      "3-6 specific, observable success criteria that can be judged from the conversation",
-    ),
+    .describe("3-6 specific, observable success criteria that can be judged from the conversation"),
 });
 
 const requestSchema = z.object({
@@ -109,12 +107,9 @@ secured
     }),
   )
   .post("/generate", async (c) => {
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
+      return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
 
     let body;
@@ -127,11 +122,7 @@ secured
 
     const { prompt, currentScenario, projectId } = body;
 
-    const hasPermission = await probeProjectPermission(
-      { session },
-      projectId,
-      "scenarios:manage",
-    );
+    const hasPermission = await probeProjectPermission({ session }, projectId, "scenarios:manage");
     if (!hasPermission) {
       return c.json(
         { error: "You do not have permission to access this endpoint." },
@@ -167,10 +158,7 @@ secured
       // the browser can react (e.g. missing_provider → settings link).
       const handled = nlpgoHandledErrorFrom(error);
       if (handled) {
-        logger.warn(
-          { error: handled.serialize() },
-          "Scenario generation rejected by LLM gateway",
-        );
+        logger.warn({ error: handled.serialize() }, "Scenario generation rejected by LLM gateway");
         // The code, never `handled.message` — server copy stays server-side
         // (ADR-045); the client keys its copy off `error.code`.
         return c.json(
@@ -195,8 +183,7 @@ secured
 
       logger.error({ error }, "Error generating scenario");
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to generate scenario";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate scenario";
 
       return c.json({ error: errorMessage }, { status: 500 });
     }

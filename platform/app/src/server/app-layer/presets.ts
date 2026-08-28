@@ -10,6 +10,9 @@ import {
   type DataFormat,
 } from "@clickhouse/client";
 import type { PrismaConnection } from "@langwatch/prisma-client";
+import { PostgresAuthAdapter } from "@langwatch/auth-server";
+import { identityEmail, signUpVerification } from "~/server/app-layer/identity/runtime";
+import { createAuth } from "~/server/better-auth";
 import {
   REPORT_SCHEDULER_TARGET_TYPE,
   type AutomationService,
@@ -250,7 +253,6 @@ import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composi
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
   getLangyGithubPrUsage,
@@ -271,8 +273,10 @@ import {
   closeAwsClientConfiguration,
   configureAwsClientConfiguration,
 } from "~/runtime/app/aws-client.composition";
+import { AppMailerRuntime } from "~/runtime/app/mailer.runtime";
 import { AppLangevalsRuntime } from "~/runtime/app/langevals.runtime";
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
+import { resolveMailerConfiguration } from "~/server/mailer/mailer.config";
 import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerLookupRuntime } from "@langwatch/stored-object-server";
@@ -328,7 +332,6 @@ import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "~/runtime/app/licensing";
-import { sendLicenseEmail } from "~/server/mailer/licenseEmail";
 import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
@@ -714,6 +717,11 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   configureClickHouseRuntime(clickhouseRuntime);
   configureProcessOutboundProxy(config.outboundProxy);
   const aws = configureAwsClientConfiguration(config.outboundProxy);
+  const mailer = AppMailerRuntime.create({
+    configuration: config.mailer,
+    aws,
+    outboundProxy: config.outboundProxy,
+  });
   const clickhouseEnabled = !config.buildTime && isClickHouseEnabled();
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
@@ -1322,7 +1330,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       seatEventFns: seatEventService,
     });
     const licensePurchaseService = createLicensePurchaseService({
-      sendLicenseEmail,
+      mailer,
       notifyLicensePurchase: (input) => getApp().notifications.sendSlackLicensePurchase(input),
     });
     webhookService = EEWebhookService.create({
@@ -1336,6 +1344,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         planProvider,
         authzGrants: authzFeature.grants,
         roleService: roles,
+        mailer,
       }),
       licensePurchaseHandler: licensePurchaseService,
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
@@ -1369,6 +1378,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     redis: redis ?? null,
   });
   const graphPorts = createAutomationGraphPorts({
+    mailer,
     redis: redis ?? null,
     clock: automationClock,
     emailCaps: automationEmailCaps,
@@ -1386,7 +1396,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     redis,
     graph: graphPorts,
     clock: automationClock,
-    testFire: AppAutomationTestFireAdapter.create(),
+    testFire: AppAutomationTestFireAdapter.create(mailer),
     persistCaps: automationPersistCaps,
   }).build();
   const billingErrorReporter = AppBillingErrorReporter.create();
@@ -1794,7 +1804,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
             loadTrigger: ({ projectId, triggerId }) =>
               automation.tryGetById({ triggerId, projectId }),
             loadProject: (projectId) => prisma.project.findUnique({ where: { id: projectId } }),
-            sendEmail: sendRenderedTriggerEmail,
+            mailer,
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
             filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
@@ -2058,10 +2068,23 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   });
   const users = AppUserRuntimeAdapter.create({
     database: prisma,
-    redis,
     organizations,
-    governance,
     storedObjects: userAvatarStoredObjects,
+  });
+  const auth = PostgresAuthAdapter.create({
+    database: prisma,
+    redis,
+    identityEmails: identityEmail(),
+    users,
+  }).build();
+  const betterAuth = createAuth({
+    auth,
+    database: prisma,
+    mailer,
+    passkeyHandleSecret: env.NEXTAUTH_SECRET,
+    redis,
+    signUpVerification: signUpVerification(mailer, users),
+    users,
   });
   const scim = PostgresScimAdapter.create({
     database: prisma,
@@ -2330,6 +2353,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     // every migration is idempotent and the next boot resumes the sweep.
     shutdownResources.register("subscriber", "system-migrations", () => systemMigrations.stop());
   }
+  shutdownResources.register("subscriber", "mailer", () => mailer.close());
   shutdownResources.register("subscriber", "sqs-webhook-clients", async () => {
     resetSqsClientCache();
     await closeAwsClientConfiguration();
@@ -2347,7 +2371,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       hubspotFormId: config.hubspotFormId,
     },
     errorReporter: billingErrorReporter,
-    usageLimitEmail: AppUsageLimitEmailAdapter.create(),
+    usageLimitEmail: AppUsageLimitEmailAdapter.create(mailer),
   });
   const notificationRecords = billingPersistence.notifications;
   const usageLimits = UsageLimitService.create({
@@ -2500,6 +2524,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     webhookService,
     stripeClient,
     notifications,
+    mailer,
+    auth,
+    betterAuth,
     apiKeys,
     managedProviders,
     scim,
@@ -2608,6 +2635,9 @@ export function createTestApp(
       payloadCodec: "json",
     },
     outboundProxy: {},
+    mailer: resolveMailerConfiguration({
+      baseHost: "http://localhost:5560",
+    }),
     langevals: resolveLangevalsRuntimeConfig({}),
     tracePrivacy: resolveTracePrivacyRuntimeConfig({
       googleDlpDisabled: true,
@@ -2632,6 +2662,11 @@ export function createTestApp(
     ...overrides?.config,
   };
   const testAws = AppAwsClientConfiguration.create(config.outboundProxy);
+  const testMailer = AppMailerRuntime.create({
+    configuration: config.mailer,
+    aws: testAws,
+    outboundProxy: config.outboundProxy,
+  });
   const evaluationInputsOffloadConfig = config.evaluationInputsOffload;
   const testFeatureFlags =
     overrides?.featureFlags ??
@@ -2792,10 +2827,23 @@ export function createTestApp(
   });
   const testUsers = AppUserRuntimeAdapter.create({
     database: testPrisma,
-    redis: null,
     organizations: nullOrganizations,
-    governance: testGovernance,
     storedObjects: userAvatarStoredObjects,
+  });
+  const testAuth = PostgresAuthAdapter.create({
+    database: testPrisma,
+    redis: null,
+    identityEmails: identityEmail(),
+    users: testUsers,
+  }).build();
+  const testBetterAuth = createAuth({
+    auth: testAuth,
+    database: testPrisma,
+    mailer: overrides?.mailer ?? testMailer,
+    passkeyHandleSecret: env.NEXTAUTH_SECRET,
+    redis: null,
+    signUpVerification: signUpVerification(overrides?.mailer ?? testMailer, testUsers),
+    users: testUsers,
   });
   const testBroadcast = new BroadcastService(null);
   // Pull-request linkage against an unconfigured App and null stores: every
@@ -2968,6 +3016,7 @@ export function createTestApp(
   });
   const shutdownResources = new AppShutdownResources();
   shutdownResources.register("subscriber", "trace-privacy", () => testTracePrivacy.close());
+  shutdownResources.register("subscriber", "mailer", () => testMailer.close());
   shutdownResources.register("subscriber", "governance-s3-aws", () => testAws.close());
   shutdownResources.register("database", "prisma", closePrismaConnection);
 
@@ -3248,6 +3297,9 @@ export function createTestApp(
     subscription: undefined,
     billingCustomer: undefined,
     notifications: NotificationService.createNull(),
+    mailer: overrides?.mailer ?? testMailer,
+    auth: testAuth,
+    betterAuth: testBetterAuth,
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: Object.assign(testOpsService, {

@@ -19,12 +19,8 @@ import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
-import { auth as betterAuth } from "~/server/better-auth";
 
-import type {
-  AppContextBindings,
-  AppContextVariables,
-} from "~/app/api/middleware/app-context";
+import type { AppContextBindings, AppContextVariables } from "~/app/api/middleware/app-context";
 
 type AdminEnv = {
   Bindings: AppContextBindings;
@@ -72,15 +68,11 @@ class AdminMalformedBodyError extends HandledError {
   }
 }
 
-secured
-  .access(adminAuth)
-  .post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
-secured
-  .access(adminAuth)
-  .delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
+secured.access(adminAuth).post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
+secured.access(adminAuth).delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
 async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
-  const session = await getServerAuthSession({ req: c.req.raw });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   const user = session?.user.impersonator ?? session?.user;
   const ops = c.app.ops;
 
@@ -92,7 +84,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
   for (const [name, value] of c.req.raw.headers.entries()) {
     rawHeaders.append(name, value);
   }
-  const rawBetterAuth = await betterAuth.api.getSession({
+  const rawBetterAuth = await c.app.betterAuth.api.getSession({
     headers: rawHeaders,
   });
   if (!rawBetterAuth) throw new AdminSessionExpiredError();
@@ -112,9 +104,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
     ];
     throw new ValidationError("Impersonation request is missing fields", {
       meta: {
-        fieldErrors: Object.fromEntries(
-          missing.map((field) => [field, ["This is required."]]),
-        ),
+        fieldErrors: Object.fromEntries(missing.map((field) => [field, ["This is required."]])),
       },
     });
   }
@@ -130,7 +120,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
 }
 
 secured.access(adminAuth).post("/admin/:resource", async (c: AdminContext) => {
-  const session = await getServerAuthSession({ req: c.req.raw });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   const user = session?.user.impersonator ?? session?.user;
   const ops = c.app.ops;
   if (!session || !user || !ops.isAdmin(user)) {

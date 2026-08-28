@@ -1,17 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  signInRouter,
-  signUpVerification,
-} from "~/server/app-layer/identity/runtime";
-import {
-  InviteExpiredError,
-  InviteNotFoundError,
-} from "~/server/invites/errors";
-import {
-  InviteService,
-  resolveInviteDisplayStatus,
-} from "~/server/invites/invite.service";
+import { signInRouter, signUpVerification } from "~/server/app-layer/identity/runtime";
+import { InviteExpiredError, InviteNotFoundError } from "~/server/invites/errors";
+import { InviteService, resolveInviteDisplayStatus } from "~/server/invites/invite.service";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
@@ -110,7 +101,7 @@ export const frontDoorRouter = createTRPCRouter({
         });
       }
 
-      const verification = signUpVerification();
+      const verification = signUpVerification(ctx.app.mailer, ctx.app.users);
       if (await verification.addressIsRegistered({ email: input.email })) {
         throw new EmailAlreadyRegisteredError();
       }
@@ -139,8 +130,7 @@ export const frontDoorRouter = createTRPCRouter({
   sendMyAddressConfirmation: protectedProcedure
     .input(z.object({}))
     .noPermission({
-      reason:
-        "sends the session user's own address confirmation; no tenant scope is involved",
+      reason: "sends the session user's own address confirmation; no tenant scope is involved",
     })
     .mutation(async ({ ctx }) => {
       const email = ctx.session.user.email;
@@ -163,7 +153,7 @@ export const frontDoorRouter = createTRPCRouter({
         });
       }
 
-      await signUpVerification().requestVerification({ email });
+      await signUpVerification(ctx.app.mailer, ctx.app.users).requestVerification({ email });
       return { sent: true as const };
     }),
 
@@ -193,7 +183,9 @@ export const frontDoorRouter = createTRPCRouter({
         });
       }
 
-      return signUpVerification().completeVerification({ token: input.token });
+      return signUpVerification(ctx.app.mailer, ctx.app.users).completeVerification({
+        token: input.token,
+      });
     }),
 
   /**
@@ -290,7 +282,7 @@ export const frontDoorRouter = createTRPCRouter({
         });
       }
 
-      await InviteService.create(ctx.prisma).requestFreshInvite({
+      await InviteService.create(ctx.prisma, { mailer: ctx.app.mailer }).requestFreshInvite({
         inviteCode: input.inviteCode,
         membersSettingsUrl: buildMembersSettingsUrl(),
       });

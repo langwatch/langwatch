@@ -1,6 +1,7 @@
 import { Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 interface SendLicenseEmailParams {
   email: string;
@@ -26,13 +27,14 @@ function sanitizeFilenamePrefix(name: string): string {
 }
 
 export const sendLicenseEmail = async ({
+  mailer,
   email,
   licenseKey,
   planType,
   maxMembers,
   expiresAt,
   organizationName,
-}: SendLicenseEmailParams) => {
+}: SendLicenseEmailParams & { mailer: EmailDeliveryPort }) => {
   const expirationDate = new Date(expiresAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -49,11 +51,7 @@ export const sendLicenseEmail = async ({
           paddingBottom: "12px",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1">Your LangWatch License</Heading>
         <p>Thank you for purchasing a LangWatch license! Your license details:</p>
         <table
@@ -82,8 +80,8 @@ export const sendLicenseEmail = async ({
           How to activate
         </Heading>
         <p>
-          A <code>.langwatch-license</code> file is attached to this email. To activate
-          your license:
+          A <code>.langwatch-license</code> file is attached to this email. To activate your
+          license:
         </p>
         <ol>
           <li>
@@ -122,15 +120,18 @@ export const sendLicenseEmail = async ({
   );
 
   await sendEmail({
-    to: email,
-    subject: "Your LangWatch License Key",
-    html: emailHtml,
-    attachments: [
-      {
-        filename: `${sanitizeFilenamePrefix(organizationName)}.langwatch-license`,
-        content: licenseKey,
-        contentType: "application/octet-stream",
-      },
-    ],
+    mailer,
+    content: {
+      to: email,
+      subject: "Your LangWatch License Key",
+      html: emailHtml,
+      attachments: [
+        {
+          filename: `${sanitizeFilenamePrefix(organizationName)}.langwatch-license`,
+          content: licenseKey,
+          contentType: "application/octet-stream",
+        },
+      ],
+    },
   });
 };

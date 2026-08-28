@@ -1,24 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The three boundaries the registration callbacks reach for: the directory
-// they ask "does this address have an account", the writer that creates one,
-// and the mailer the confirmation follows through. The callbacks under test
-// are the real ones handed to the plugin.
-const findFirst = vi.fn();
-vi.mock("~/server/db", () => ({
-  prisma: { user: { findFirst: (...args: unknown[]) => findFirst(...args) } },
-}));
-
-const createPasskeyUser = vi.fn();
-vi.mock("~/server/users/credential-user", () => ({
-  createPasskeyUser: (...args: unknown[]) => createPasskeyUser(...args),
-}));
-
 const requestVerification = vi.fn();
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  signUpVerification: () => ({
-    requestVerification: (...args: unknown[]) => requestVerification(...args),
-  }),
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: vi.fn(),
 }));
 
 import {
@@ -26,6 +11,13 @@ import {
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
 } from "../passkey-signup";
+import type { UserService } from "@langwatch/user-contract";
+import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
+
+const createPasskeyUser = vi.fn();
+const tryFindByEmail = vi.fn();
+const users = { createPasskeyUser, tryFindByEmail } as UserService;
+const verification = { requestVerification } as SignUpVerificationService;
 
 /** A plugin context with just the pieces the callbacks touch. */
 const fakeContext = () => {
@@ -42,13 +34,18 @@ const fakeContext = () => {
   };
 };
 
-const resolveUser = passkeySignUpRegistration.resolveUser;
-const afterVerification = passkeySignUpRegistration.afterVerification;
+const registration = passkeySignUpRegistration({
+  handleSecret: "test-secret",
+  users,
+  verification,
+});
+const resolveUser = registration.resolveUser;
+const afterVerification = registration.afterVerification;
 
 describe("given passkey sign-up, which creates an account with no session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    findFirst.mockResolvedValue(null);
+    tryFindByEmail.mockResolvedValue(null);
     createPasskeyUser.mockResolvedValue({ id: "user_1" });
     requestVerification.mockResolvedValue(void 0);
   });
@@ -62,7 +59,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      */
     /** @scenario A passkey is never registered against an address that already has an account */
     it("refuses to start a ceremony for somebody else's address", async () => {
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
 
       await expect(
         resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
@@ -73,35 +70,29 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
     it("refuses again after the ceremony, in case it was taken in between", async () => {
       const { ctx } = fakeContext();
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
 
-      await expect(
-        afterVerification({ ctx, context: "victim@corp.com" }),
-      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
+      await expect(afterVerification({ ctx, context: "victim@corp.com" })).rejects.toMatchObject({
+        body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN },
+      });
       expect(createPasskeyUser).not.toHaveBeenCalled();
     });
 
     it("matches the address whatever case it was stored in", async () => {
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
 
       await resolveUser({
         ctx: fakeContext().ctx,
         context: "victim@corp.com",
       }).catch(() => void 0);
 
-      expect(findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { email: { equals: "victim@corp.com", mode: "insensitive" } },
-        }),
-      );
+      expect(tryFindByEmail).toHaveBeenCalledWith({ email: "victim@corp.com" });
     });
   });
 
   describe("when no address was carried at all", () => {
     it("refuses rather than minting a handle for nobody", async () => {
-      await expect(
-        resolveUser({ ctx: fakeContext().ctx, context: null }),
-      ).rejects.toMatchObject({
+      await expect(resolveUser({ ctx: fakeContext().ctx, context: null })).rejects.toMatchObject({
         body: { code: PASSKEY_SIGNUP_EMAIL_INVALID },
       });
     });

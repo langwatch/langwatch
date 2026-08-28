@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EmailDeliveryPort } from "~/server/mailer/providers/types";
 
 const { sendEmail } = vi.hoisted(() => ({
   sendEmail: vi.fn(),
@@ -26,7 +27,16 @@ describe("AppAutomationTestFireAdapter", () => {
   });
 
   it("keeps test-fire recipients in bcc behind a trigger no-reply address", async () => {
-    const adapter = AppAutomationTestFireAdapter.create();
+    const mailer = new (class extends EmailDeliveryPort {
+      defaultFrom(): string {
+        return "LangWatch Triggers <no-reply@langwatch.ai>";
+      }
+
+      async send(): Promise<unknown> {
+        return undefined;
+      }
+    })();
+    const adapter = AppAutomationTestFireAdapter.create(mailer);
 
     await adapter.sendEmail({
       recipients: ["author@acme.test"],
@@ -35,10 +45,13 @@ describe("AppAutomationTestFireAdapter", () => {
     });
 
     expect(sendEmail).toHaveBeenCalledWith({
-      to: expect.stringMatching(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/),
-      bcc: ["author@acme.test"],
-      subject: "test fire",
-      html: "<p>test</p>",
+      mailer,
+      content: {
+        to: expect.stringMatching(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/),
+        bcc: ["author@acme.test"],
+        subject: "test fire",
+        html: "<p>test</p>",
+      },
     });
   });
 });

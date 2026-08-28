@@ -49,9 +49,7 @@ secured
     const request = c.req.valid("json");
 
     // Authenticate
-    const session = await getServerAuthSession({
-      req: c.req.raw as NextRequest,
-    });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw as NextRequest });
     if (!session) {
       // Thrown, not hand-rolled: `createServiceApp`'s onError serialises a
       // HandledError with its code, which is what lets the browser render the

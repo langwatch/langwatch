@@ -67,8 +67,7 @@ class MemoryApiKeys extends ApiKeyRepository {
     organizationId: string;
   }): Promise<StoredApiKey | null> {
     return Promise.resolve(
-      this.rows.find((row) => row.id === id && row.organizationId === organizationId) ??
-        null,
+      this.rows.find((row) => row.id === id && row.organizationId === organizationId) ?? null,
     );
   }
   listForUser({
@@ -83,20 +82,13 @@ class MemoryApiKeys extends ApiKeyRepository {
         (row) =>
           row.organizationId === organizationId &&
           row.revokedAt === null &&
-          (row.userId === userId ||
-            (row.userId === null && row.ingestSourceType === null)),
+          (row.userId === userId || (row.userId === null && row.ingestSourceType === null)),
       ),
     );
   }
-  listForOrganization({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<StoredApiKey[]> {
+  listForOrganization({ organizationId }: { organizationId: string }): Promise<StoredApiKey[]> {
     return Promise.resolve(
-      this.rows.filter(
-        (row) => row.organizationId === organizationId && row.revokedAt === null,
-      ),
+      this.rows.filter((row) => row.organizationId === organizationId && row.revokedAt === null),
     );
   }
   update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
@@ -116,13 +108,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {
     await this.update({ id, lastUsedAt: new Date() });
   }
-  async upgradeHash({
-    id,
-    hashedSecret,
-  }: {
-    id: string;
-    hashedSecret: string;
-  }): Promise<void> {
+  async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id, hashedSecret });
   }
   get(id: string): StoredApiKey | undefined {
@@ -274,9 +260,7 @@ describe("API-key service", () => {
       bindings: [{ scopeType: "PROJECT", scopeId: "project-1", role: "VIEWER" }],
     });
 
-    await expect(
-      service.tryResolveToken({ token: created.token }),
-    ).resolves.toMatchObject({
+    await expect(service.tryResolveToken({ token: created.token })).resolves.toMatchObject({
       type: "apiKey",
       apiKeyId: created.apiKey.id,
       organizationId: "org-1",
@@ -298,6 +282,39 @@ describe("API-key service", () => {
       project: { id: "project-1" },
     });
     expect(projects.tryGetWithTeam).toHaveBeenCalledWith(resolvedProject.id);
+  });
+
+  it("keeps a deprecated project credential bound to its resolved project", async () => {
+    const repository = new MemoryApiKeys();
+    repository.legacyProjectId = resolvedProject.id;
+    const service = createService(repository);
+
+    await expect(
+      service.tryResolveToken({ token: "sk-lw-legacy-token", projectId: "other-project" }),
+    ).resolves.toMatchObject({
+      type: "legacyProjectKey",
+      project: { id: resolvedProject.id },
+    });
+  });
+
+  it("allows a current organization-scoped key to select a project target", async () => {
+    const targetProject = { ...resolvedProject, id: "project-2" };
+    const deps = dependencies();
+    const projects = deps.projects;
+    const tryGetWithTeam = vi.fn().mockResolvedValue(targetProject);
+    projects.tryGetWithTeam = tryGetWithTeam;
+    const service = createService(new MemoryApiKeys(), { ...deps, projects });
+    const created = await service.create({
+      name: "organization key",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }],
+    });
+
+    await expect(
+      service.tryResolveToken({ token: created.token, projectId: targetProject.id }),
+    ).resolves.toMatchObject({ type: "apiKey", project: { id: targetProject.id } });
+    expect(tryGetWithTeam).toHaveBeenCalledWith(targetProject.id);
   });
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
@@ -456,9 +473,7 @@ describe("API-key service", () => {
     const repository = new MemoryApiKeys();
     (
       repository as unknown as { tryFindPersonalWorkspaceOwner: ReturnType<typeof vi.fn> }
-    ).tryFindPersonalWorkspaceOwner = vi
-      .fn()
-      .mockResolvedValue({ ownerUserId: "owner-1" });
+    ).tryFindPersonalWorkspaceOwner = vi.fn().mockResolvedValue({ ownerUserId: "owner-1" });
     const service = createService(repository);
     await expect(
       service.create({

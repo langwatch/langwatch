@@ -16,10 +16,48 @@
  */
 import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
+import { AppAwsClientConfiguration } from "../src/runtime/app/aws-client.composition";
+import { AppMailerRuntime } from "../src/runtime/app/mailer.runtime";
+import { resolveMailerConfiguration } from "../src/server/mailer/mailer.config";
 import { EmailProviderConfigurationError } from "../src/server/mailer/providers/types";
-import { isProxyBypassed } from "../src/server/outboundProxy";
+import { isProxyBypassed, parseOutboundProxyConfig } from "../src/server/outboundProxy";
 
 const PROXY_PORT = 8888;
+
+const outboundProxy = parseOutboundProxyConfig(process.env);
+const aws = AppAwsClientConfiguration.create(outboundProxy);
+const mailer = AppMailerRuntime.create({
+  configuration: resolveMailerConfiguration({
+    baseHost: process.env.BASE_HOST ?? "http://localhost",
+    emailDefaultFrom: process.env.EMAIL_DEFAULT_FROM,
+    emailProvider: process.env.EMAIL_PROVIDER,
+    useAwsSes: process.env.USE_AWS_SES,
+    awsRegion: process.env.AWS_REGION,
+    awsSesEndpoint: process.env.AWS_SES_ENDPOINT,
+    sendgridApiKey: process.env.SENDGRID_API_KEY,
+    smtpUrl: process.env.SMTP_URL,
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT,
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+    smtpSecure: process.env.SMTP_SECURE,
+    resendApiKey: process.env.RESEND_API_KEY,
+  }),
+  aws,
+  outboundProxy,
+});
+
+const closeMailerGraph = async (): Promise<void> => {
+  let firstFailure: unknown;
+  for (const close of [() => mailer.close(), () => aws.close()]) {
+    try {
+      await close();
+    } catch (error) {
+      firstFailure ??= error;
+    }
+  }
+  if (firstFailure) throw firstFailure;
+};
 
 /** Minimal CONNECT proxy that records tunnelled hosts and refuses the tunnel. */
 const startLoggingProxy = async (tunnelled: string[]) => {
@@ -51,9 +89,12 @@ async function main() {
 
   try {
     await sendEmail({
-      to: "someone@example.com",
-      subject: "proxy routing probe",
-      html: "<p>probe</p>",
+      mailer,
+      content: {
+        to: "someone@example.com",
+        subject: "proxy routing probe",
+        html: "<p>probe</p>",
+      },
     });
     console.log("send succeeded (unexpected with probe credentials)");
   } catch (error) {
@@ -86,12 +127,12 @@ const egressHost = (): string => {
 };
 
 /** Whether the observed routing matches what the proxy settings asked for. */
-function report(tunnelled: string[]): never {
+function report(tunnelled: string[]): void {
   // Ask the shared proxy matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
   // leaves the gateway host proxied, and treating that as a bypass would invert
   // the verdict.
   const host = egressHost();
-  const bypassing = isProxyBypassed(host);
+  const bypassing = isProxyBypassed(outboundProxy, host);
   console.log(
     tunnelled.length > 0
       ? `tunnelled through the proxy: ${tunnelled.join(", ")}`
@@ -105,10 +146,12 @@ function report(tunnelled: string[]): never {
       : `PASS: ${host} egress went through the proxy`
     : "FAIL: routing did not match the configured proxy settings";
   console.log(verdict);
-  process.exit(ok ? 0 : 1);
+  process.exitCode = ok ? 0 : 1;
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => closeMailerGraph());

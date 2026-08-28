@@ -100,6 +100,9 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
+import type { EmailDeliveryPort } from "../mailer/providers/types";
+import type { AuthService } from "@langwatch/auth-contract";
+import type { Auth as BetterAuth } from "../better-auth";
 
 export type DataRetentionDependencies = DataRetentionService;
 
@@ -327,6 +330,12 @@ export interface AppDependencies {
    *  verify signatures before handing events to the service. */
   stripeClient?: Stripe;
   notifications: NotificationService;
+  /** One process-owned outbound mail delivery capability. */
+  mailer: EmailDeliveryPort;
+  /** One process-owned browser session lifecycle capability. */
+  auth: AuthService;
+  /** The Better Auth transport composed over the lifecycle and mailer. */
+  betterAuth: BetterAuth;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   dataRetention: DataRetentionDependencies;

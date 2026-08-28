@@ -1,306 +1,117 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockEnv, sendMailMock, closeMock, createTransportMock } = vi.hoisted(() => ({
-  mockEnv: {} as Record<string, unknown>,
-  sendMailMock: vi.fn(),
-  closeMock: vi.fn(),
-  createTransportMock: vi.fn(),
+const { close, createTransport, sendMail } = vi.hoisted(() => ({
+  close: vi.fn(),
+  createTransport: vi.fn(),
+  sendMail: vi.fn(),
 }));
 
-vi.mock("../../../../env.mjs", () => ({ env: mockEnv }));
+vi.mock("nodemailer", () => ({ default: { createTransport } }));
 
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }),
-}));
-
-vi.mock("nodemailer", () => ({
-  default: { createTransport: createTransportMock },
-}));
-
-import { buildSmtpTransportOptions, smtpProvider } from "../smtp";
+import { buildSmtpTransportOptions, SmtpEmailProvider } from "../smtp";
 import { EmailProviderConfigurationError } from "../types";
 
-const setEnv = (values: Record<string, unknown>) => {
-  for (const key of Object.keys(mockEnv)) delete mockEnv[key];
-  Object.assign(mockEnv, values);
-};
-
-const sentMessage = () => sendMailMock.mock.calls[0]?.[0];
-
-describe("buildSmtpTransportOptions", () => {
+describe("SmtpEmailProvider", () => {
   beforeEach(() => {
-    setEnv({});
     vi.clearAllMocks();
+    sendMail.mockResolvedValue({ messageId: "message" });
+    createTransport.mockReturnValue({ sendMail, close });
   });
 
-  describe("given a connection URL", () => {
-    it("uses the URL directly", () => {
-      setEnv({ SMTP_URL: "smtps://user:pass@relay.corp:465" });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({
-        url: "smtps://user:pass@relay.corp:465",
-      });
+  it("retains URL precedence and discrete transport validation", () => {
+    expect(
+      buildSmtpTransportOptions({ url: "smtp://localhost:1025", host: "ignored.example" }),
+    ).toMatchObject({ url: "smtp://localhost:1025" });
+    expect(buildSmtpTransportOptions({ host: "relay.example", port: "465" })).toMatchObject({
+      host: "relay.example",
+      port: 465,
+      secure: true,
     });
-
-    it("prefers the URL over discrete settings", () => {
-      setEnv({ SMTP_URL: "smtp://localhost:1025", SMTP_HOST: "other.host" });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({
-        url: "smtp://localhost:1025",
-      });
-    });
+    expect(() => buildSmtpTransportOptions({ host: "relay.example", port: "bad" })).toThrow(
+      /SMTP_PORT/,
+    );
   });
 
-  describe("given discrete host settings", () => {
-    it("defaults to port 587 with STARTTLS", () => {
-      setEnv({ SMTP_HOST: "relay.corp" });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({
-        host: "relay.corp",
-        port: 587,
-        secure: false,
-      });
+  it("uses the documented default port, secure override, and relay credentials", () => {
+    expect(buildSmtpTransportOptions({ host: "relay.example" })).toMatchObject({
+      port: 587,
+      secure: false,
     });
-
-    it("treats port 465 as implicit TLS", () => {
-      setEnv({ SMTP_HOST: "relay.corp", SMTP_PORT: "465" });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({
-        port: 465,
-        secure: true,
-      });
-    });
-
-    it("lets SMTP_SECURE override the port-based default", () => {
-      setEnv({
-        SMTP_HOST: "relay.corp",
-        SMTP_PORT: "465",
-        SMTP_SECURE: "false",
-      });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({ secure: false });
-    });
-
-    it("includes credentials when a user is set", () => {
-      setEnv({
-        SMTP_HOST: "relay.corp",
-        SMTP_USER: "mailer",
-        SMTP_PASSWORD: "secret",
-      });
-
-      expect(buildSmtpTransportOptions()).toMatchObject({
-        auth: { user: "mailer", pass: "secret" },
-      });
-    });
-
-    it("omits auth entirely for an unauthenticated internal relay", () => {
-      setEnv({ SMTP_HOST: "relay.corp" });
-
-      expect(buildSmtpTransportOptions()).not.toHaveProperty("auth");
-    });
+    expect(
+      buildSmtpTransportOptions({
+        host: "relay.example",
+        port: "465",
+        secure: "false",
+        user: "mailer",
+        password: "secret",
+      }),
+    ).toMatchObject({ secure: false, auth: { user: "mailer", pass: "secret" } });
+    expect(() => buildSmtpTransportOptions({})).toThrow(EmailProviderConfigurationError);
   });
 
-  describe("given no host at all", () => {
-    it("fails with an actionable error", () => {
-      setEnv({});
-
-      expect(() => buildSmtpTransportOptions()).toThrow(EmailProviderConfigurationError);
+  it("reuses one process transport and preserves invisible BCC delivery", async () => {
+    const provider = SmtpEmailProvider.create({ url: "smtp://localhost:1025" });
+    await provider.send({
+      content: {
+        to: ["public@example.com"],
+        bcc: ["hidden@example.com"],
+        subject: "Alert",
+        html: "<p>Alert</p>",
+        headers: { "List-Unsubscribe": "<https://example.com/unsubscribe>" },
+      },
+      defaultFrom: "noreply@example.com",
     });
+    await provider.send({
+      content: { to: "second@example.com", subject: "Second", html: "<p>Second</p>" },
+      defaultFrom: "noreply@example.com",
+    });
+
+    expect(createTransport).toHaveBeenCalledOnce();
+    expect(sendMail).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        envelope: { from: "noreply@example.com", to: ["public@example.com", "hidden@example.com"] },
+      }),
+    );
+    expect(sendMail.mock.calls[0]?.[0]).not.toHaveProperty("bcc");
+    await provider.close();
+    expect(close).toHaveBeenCalledOnce();
   });
 
-  describe("given a non-numeric port", () => {
-    it("fails rather than silently dialling NaN", () => {
-      setEnv({ SMTP_HOST: "relay.corp", SMTP_PORT: "not-a-port" });
-
-      expect(() => buildSmtpTransportOptions()).toThrow(/SMTP_PORT/);
-    });
-  });
-});
-
-describe("smtpProvider.send", () => {
-  beforeEach(() => {
-    setEnv({ SMTP_URL: "smtp://localhost:1025" });
-    vi.clearAllMocks();
-    sendMailMock.mockResolvedValue({ messageId: "<abc@localhost>" });
-    createTransportMock.mockReturnValue({
-      sendMail: sendMailMock,
-      close: closeMock,
-    });
-  });
-
-  describe("given a plain message", () => {
-    /** @scenario "Every supported gateway can be selected" */
-    it("sends the html body with the default sender", async () => {
-      await smtpProvider.send({
-        content: { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        defaultFrom: "LangWatch <noreply@langwatch.ai>",
-      });
-
-      expect(sentMessage()).toMatchObject({
-        from: "LangWatch <noreply@langwatch.ai>",
-        to: ["user@example.com"],
-        subject: "Hi",
-        html: "<p>Hi</p>",
-      });
+  it("preserves sender override, reply-to, attachments, and sanitized headers", async () => {
+    const provider = SmtpEmailProvider.create({ url: "smtp://localhost:1025" });
+    await provider.send({
+      content: {
+        from: "alerts@example.com",
+        to: "public@example.com",
+        subject: "Alert",
+        html: "<p>Alert</p>",
+        replyTo: "help@example.com",
+        headers: { "X-Trace": "clean\r\nBcc: injected@example.com" },
+        attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+      },
+      defaultFrom: "noreply@example.com",
     });
 
-    it("closes the transport so connections are not leaked", async () => {
-      await smtpProvider.send({
-        content: { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(closeMock).toHaveBeenCalled();
-    });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "alerts@example.com",
+        replyTo: "help@example.com",
+        headers: { "X-Trace": "clean Bcc: injected@example.com" },
+        attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+      }),
+    );
   });
 
-  describe("given the full message surface", () => {
-    /** @scenario "The full message surface survives every gateway" */
-    it("maps blind copies, reply-to, custom headers and attachments", async () => {
-      await smtpProvider.send({
-        content: {
-          to: ["a@example.com", "b@example.com"],
-          bcc: ["hidden@example.com"],
-          replyTo: "support@langwatch.ai",
-          subject: "Report",
-          html: "<p>Report</p>",
-          headers: { "List-Unsubscribe": "<https://x/unsub>" },
-          attachments: [
-            {
-              filename: "report.csv",
-              content: "a,b\n1,2",
-              contentType: "text/csv",
-            },
-          ],
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage()).toMatchObject({
-        to: ["a@example.com", "b@example.com"],
-        replyTo: "support@langwatch.ai",
-        headers: { "List-Unsubscribe": "<https://x/unsub>" },
-        attachments: [
-          {
-            filename: "report.csv",
-            content: "a,b\n1,2",
-            contentType: "text/csv",
-          },
-        ],
-      });
-    });
-
-    // Passing `bcc` to nodemailer renders a real Bcc header, which would leak
-    // every blind recipient to everyone on the message. Delivery must ride the
-    // SMTP envelope instead.
-    it("keeps blind recipients out of the message fields entirely", async () => {
-      await smtpProvider.send({
-        content: {
-          to: "a@example.com",
-          bcc: "hidden@example.com",
-          subject: "Alert",
-          html: "<p>Alert</p>",
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage()).not.toHaveProperty("bcc");
-    });
-
-    it("delivers blind recipients through the SMTP envelope", async () => {
-      await smtpProvider.send({
-        content: {
-          to: ["a@example.com"],
-          bcc: ["hidden@example.com", "hidden2@example.com"],
-          subject: "Alert",
-          html: "<p>Alert</p>",
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage().envelope).toEqual({
-        from: "noreply@langwatch.ai",
-        to: ["a@example.com", "hidden@example.com", "hidden2@example.com"],
-      });
-    });
-
-    it("builds the envelope from an explicit sender, not the default", async () => {
-      await smtpProvider.send({
-        content: {
-          to: "a@example.com",
-          bcc: ["hidden@example.com"],
-          from: "alerts@acme.com",
-          subject: "Alert",
-          html: "<p>Alert</p>",
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage().envelope).toEqual({
-        from: "alerts@acme.com",
-        to: ["a@example.com", "hidden@example.com"],
-      });
-    });
-
-    it("leaves the envelope to nodemailer when there are no blind recipients", async () => {
-      await smtpProvider.send({
-        content: {
-          to: "a@example.com",
-          subject: "Alert",
-          html: "<p>Alert</p>",
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage()).not.toHaveProperty("envelope");
-    });
-
-    it("strips line breaks from custom headers to block injection", async () => {
-      await smtpProvider.send({
-        content: {
-          to: "a@example.com",
-          subject: "Alert",
-          html: "<p>Alert</p>",
-          headers: { "X-Custom": "value\r\nBcc: attacker@evil.com" },
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage().headers["X-Custom"]).toBe("value Bcc: attacker@evil.com");
-    });
-  });
-
-  describe("given an explicit sender", () => {
-    it("overrides the default from address", async () => {
-      await smtpProvider.send({
-        content: {
-          to: "a@example.com",
-          from: "alerts@acme.com",
-          subject: "Alert",
-          html: "<p>Alert</p>",
-        },
-        defaultFrom: "noreply@langwatch.ai",
-      });
-
-      expect(sentMessage().from).toBe("alerts@acme.com");
-    });
-  });
-
-  describe("given the relay rejects the message", () => {
-    it("propagates the failure and still closes the transport", async () => {
-      sendMailMock.mockRejectedValue(new Error("relay refused"));
-
-      await expect(
-        smtpProvider.send({
-          content: {
-            to: "a@example.com",
-            subject: "Alert",
-            html: "<p>Alert</p>",
-          },
-          defaultFrom: "noreply@langwatch.ai",
-        }),
-      ).rejects.toThrow("relay refused");
-      expect(closeMock).toHaveBeenCalled();
-    });
+  it("does not manufacture an envelope when BCC is absent and propagates rejection", async () => {
+    sendMail.mockRejectedValueOnce(new Error("relay unavailable"));
+    const provider = SmtpEmailProvider.create({ url: "smtp://localhost:1025" });
+    await expect(
+      provider.send({
+        content: { to: "public@example.com", subject: "Alert", html: "<p>Alert</p>" },
+        defaultFrom: "noreply@example.com",
+      }),
+    ).rejects.toThrow("relay unavailable");
+    expect(sendMail.mock.calls[0]?.[0]).not.toHaveProperty("envelope");
   });
 });

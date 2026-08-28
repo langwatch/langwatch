@@ -163,6 +163,7 @@ export {
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
 } from "./errors";
+export { IdentityEmailService } from "./identity-email.service";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -292,13 +293,8 @@ export {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
-
 } from "./facts";
-export {
-  identifierDomain,
-  normalizeDomain,
-  normalizeIdentifierValue,
-} from "./identifier";
+export { identifierDomain, normalizeDomain, normalizeIdentifierValue } from "./identifier";
 export {
   type IdentifierHead,
   type IdentityStream,
@@ -307,10 +303,7 @@ export {
   reduceIdentifier,
   userErasureFacts,
 } from "./identifier-aggregate";
-export {
-  type MatchableEmail,
-  matchableEmailsOf,
-} from "./matchable-emails";
+export { type MatchableEmail, matchableEmailsOf } from "./matchable-emails";
 export {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,

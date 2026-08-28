@@ -168,6 +168,9 @@ export class App {
   readonly webhookService?: AppDependencies["webhookService"];
   readonly stripeClient?: AppDependencies["stripeClient"];
   readonly notifications: AppDependencies["notifications"];
+  readonly mailer: AppDependencies["mailer"];
+  readonly auth: AppDependencies["auth"];
+  readonly betterAuth: AppDependencies["betterAuth"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops: OpsDependencies;
@@ -225,6 +228,9 @@ export class App {
     this.webhookService = deps.webhookService;
     this.stripeClient = deps.stripeClient;
     this.notifications = deps.notifications;
+    this.mailer = deps.mailer;
+    this.auth = deps.auth;
+    this.betterAuth = deps.betterAuth;
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;

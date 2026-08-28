@@ -16,14 +16,15 @@ import type { sendRenderedSlackMessage } from "~/runtime/app/features/automation
 import type { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
-import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
 const logger = createLogger("langwatch:report-dispatch");
 
 export interface ReportDispatchDeps {
   loadTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
   loadProject(projectId: string): Promise<Project | null>;
-  sendEmail: typeof sendRenderedTriggerEmail;
+  mailer: EmailDeliveryPort;
   sendSlack: typeof sendRenderedSlackMessage;
   sendSlackBot: typeof postSlackChatMessage;
   filterSuppressedRecipients: (params: {
@@ -255,7 +256,8 @@ export async function dispatchScheduledReport({
         context,
         defaults: REPORT_TRIGGER_DEFAULTS,
       });
-      await deps.sendEmail({
+      await sendRenderedTriggerEmail({
+        mailer: deps.mailer,
         triggerEmails: allowed,
         triggerId: trigger.id,
         projectId: project.id,

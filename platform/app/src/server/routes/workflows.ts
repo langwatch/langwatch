@@ -45,12 +45,9 @@ secured
   .post("/code-completion", async (c) => {
     const body = await c.req.json();
 
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
+      return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
 
     const { projectId } = c.req.query();
@@ -58,11 +55,7 @@ secured
       return c.json({ error: "Project ID is required." }, { status: 400 });
     }
 
-    const hasPermission = await probeProjectPermission(
-      { session },
-      projectId,
-      "workflows:manage",
-    );
+    const hasPermission = await probeProjectPermission({ session }, projectId, "workflows:manage");
     if (!hasPermission) {
       return c.json(
         { error: "You do not have permission to access this endpoint." },
@@ -145,12 +138,9 @@ secured
       const { event: eventWithoutEnvs, projectId } = await c.req.json();
       logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
 
-      const session = await getServerAuthSession({ req: c.req.raw as any });
+      const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
       if (!session) {
-        return c.json(
-          { error: "You must be logged in to access this endpoint." },
-          { status: 401 },
-        );
+        return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
       }
 
       const hasPermission = await probeProjectPermission(

@@ -1,15 +1,19 @@
 import { createLogger } from "@langwatch/observability";
+import type { AuthService, BrowserSession, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import type { IncomingHttpHeaders } from "http";
-import { identityEmail } from "~/server/app-layer/identity/runtime";
-import { auth } from "~/server/better-auth";
-import { prisma } from "~/server/db";
-import type {
-  GetServerSidePropsContext,
-  NextApiRequest,
-  NextRequest,
-} from "~/types/next-stubs";
 
 const logger = createLogger("langwatch:auth");
+
+type BrowserSessionLookup = {
+  api: {
+    getSession(input: { headers: Headers }): Promise<VerifiedBrowserSession | null>;
+  };
+};
+
+export type BrowserSessionApplication = {
+  auth: AuthService;
+  betterAuth: BrowserSessionLookup;
+};
 
 /**
  * The session shape consumers across the codebase rely on.
@@ -83,125 +87,29 @@ const toHeaders = (input: IncomingHttpHeaders | Headers | undefined): Headers =>
  * `{ req }` (App Router — pass a NextRequest).
  */
 export const getServerAuthSession = async (ctx: {
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest;
+  app: BrowserSessionApplication;
+  req: { headers?: IncomingHttpHeaders | Headers };
   res?: unknown;
 }): Promise<Session | null> => {
   try {
-    const headers = toHeaders(
-      (ctx.req as { headers?: IncomingHttpHeaders | Headers }).headers,
-    );
-    const result = await auth.api.getSession({ headers });
+    const headers = toHeaders(ctx.req.headers);
+    const result = await ctx.app.betterAuth.api.getSession({ headers });
     if (!result) return null;
-
-    // ADR-101 §5, the read fork: for a user whose backfill is finalized the
-    // identifiers own their email and `User.email` is a stale copy, so the
-    // session carries the identifier's answer. null keeps the column's.
-    const identityResolvedEmail = await identityEmail().resolveEmail({
-      userId: result.user.id,
-    });
-
-    const baseSession: Session = {
-      user: {
-        id: result.user.id,
-        name: result.user.name ?? null,
-        email: identityResolvedEmail ?? result.user.email ?? null,
-        image: result.user.image ?? null,
-        pendingSsoSetup:
-          ((result.user as Record<string, unknown>).pendingSsoSetup as
-            | boolean
-            | undefined) ?? false,
-      },
-      expires:
-        result.session.expiresAt instanceof Date
-          ? result.session.expiresAt.toISOString()
-          : new Date(result.session.expiresAt).toISOString(),
-      sessionId: result.session.id,
-    };
-
-    // Admin impersonation compat: read Session.impersonating JSON directly.
-    // We keep this legacy column (added in migration 20260406120000) so the
-    // existing impersonate endpoint + UI banner keep working unchanged.
-    const dbSession = await prisma.session.findUnique({
-      where: { id: result.session.id },
-      select: { impersonating: true },
-    });
-
-    // Fail closed when BetterAuth returns a cached session but the DB row
-    // is gone. This happens when a session was revoked (either via the
-    // tRPC `user.deactivate`/`changePassword` flow or the admin panel)
-    // and the Redis cache deletion failed or the cache entry outlived the
-    // DB row for any other reason. Without this guard, a revoked session
-    // would keep authenticating server-side callers until the cache TTL
-    // expired (up to 30 days). Caught by CodeRabbit in PR review (bug 38).
-    if (!dbSession) {
-      logger.warn(
-        { sessionId: result.session.id, userId: result.user.id },
-        "BetterAuth returned a cached session that no longer exists in the DB; treating it as revoked",
-      );
-      return null;
-    }
-
-    const impersonating = dbSession.impersonating as
-      | {
-          id?: string;
-          name?: string | null;
-          email?: string | null;
-          image?: string | null;
-          expires?: string | Date;
-        }
-      | null
-      | undefined;
-
-    if (
-      impersonating &&
-      typeof impersonating === "object" &&
-      impersonating.id &&
-      impersonating.expires &&
-      new Date(impersonating.expires) > new Date()
-    ) {
-      // Verify the impersonation target still exists and isn't deactivated.
-      // If the target was deleted or deactivated AFTER impersonation started,
-      // fall through to the real admin session rather than acting on behalf
-      // of a stale / banned user. The cost is a single findUnique per
-      // impersonated request — acceptable for a flow used only by admins.
-      const targetStillValid = await prisma.user.findUnique({
-        where: { id: impersonating.id },
-        select: { id: true, deactivatedAt: true },
-      });
-      const isTargetActive = targetStillValid && !targetStillValid.deactivatedAt;
-
-      if (isTargetActive) {
-        // The impersonated user takes the same fork as anyone else; the
-        // impersonator's own email rides in already resolved.
-        const impersonatedEmail = await identityEmail().resolveEmail({
-          userId: impersonating.id,
-        });
-        return {
-          ...baseSession,
-          user: {
-            id: impersonating.id,
-            name: impersonating.name ?? null,
-            email: impersonatedEmail ?? impersonating.email ?? null,
-            image: impersonating.image ?? null,
-            impersonator: {
-              id: baseSession.user.id,
-              name: baseSession.user.name ?? null,
-              email: baseSession.user.email ?? null,
-              image: baseSession.user.image ?? null,
-            },
-          },
-        };
-      }
-      logger.warn(
-        {
-          adminId: baseSession.user.id,
-          impersonatedUserId: impersonating.id,
+    return await ctx.app.auth.tryResolveBrowserSession({
+      verified: {
+        session: {
+          id: result.session.id,
+          expiresAt: result.session.expiresAt,
         },
-        "Impersonation target is deleted or deactivated — falling back to admin session",
-      );
-    }
-
-    return baseSession;
+        user: {
+          id: result.user.id,
+          name: result.user.name ?? null,
+          email: result.user.email ?? null,
+          image: result.user.image ?? null,
+          pendingSsoSetup: result.user.pendingSsoSetup ?? false,
+        },
+      },
+    });
   } catch (error) {
     // Most common cause: Redis (better-auth secondary store) is down and the
     // session lookup times out. Symptom for the user is an endless

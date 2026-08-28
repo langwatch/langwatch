@@ -6,14 +6,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../mailer/resetPasswordEmail", () => ({
   sendResetPasswordEmail: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../revokeSessions", () => ({
-  revokeAllSessionsForUser: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { env } from "~/env.mjs";
+import { prisma } from "~/server/db";
+import { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
-import { auth } from "../index";
-import { revokeAllSessionsForUser } from "../revokeSessions";
+import { createAuth } from "../index";
+import type { AuthService } from "@langwatch/auth-contract";
+import type { UserService } from "@langwatch/user-contract";
+import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
 
 type EmailAndPasswordOptions = {
   sendResetPassword?: (args: {
@@ -25,8 +25,32 @@ type EmailAndPasswordOptions = {
   resetPasswordTokenExpiresIn?: number;
 };
 
+class TestMailer extends EmailDeliveryPort {
+  defaultFrom(): string {
+    return "test@example.com";
+  }
+  async send(): Promise<unknown> {
+    return void 0;
+  }
+}
+
+const mailer = new TestMailer();
+const revokeAllBrowserSessions = vi.fn().mockResolvedValue(undefined);
+const auth = { revokeAllBrowserSessions } as AuthService;
+const users = {} as UserService;
+const signUpVerification = {} as SignUpVerificationService;
+const createTestAuth = () =>
+  createAuth({
+    auth,
+    database: prisma,
+    mailer,
+    passkeyHandleSecret: "test-secret",
+    redis: null,
+    signUpVerification,
+    users,
+  });
 const getEmailAndPassword = (): EmailAndPasswordOptions =>
-  (auth as any).options.emailAndPassword as EmailAndPasswordOptions;
+  (createTestAuth() as any).options.emailAndPassword as EmailAndPasswordOptions;
 
 describe("better-auth password reset wiring", () => {
   beforeEach(() => {
@@ -47,6 +71,7 @@ describe("better-auth password reset wiring", () => {
 
       expect(sendResetPasswordEmail).toHaveBeenCalledTimes(1);
       expect(sendResetPasswordEmail).toHaveBeenCalledWith({
+        mailer,
         email: "forgot@acme.test",
         resetUrl: `${env.BASE_HOST}/auth/reset-password?token=tok_test_123`,
       });
@@ -62,6 +87,7 @@ describe("better-auth password reset wiring", () => {
       });
 
       expect(sendResetPasswordEmail).toHaveBeenCalledWith({
+        mailer,
         email: "special@acme.test",
         resetUrl: `${env.BASE_HOST}/auth/reset-password?token=tok%2Bwith%3Dspecial`,
       });
@@ -78,10 +104,8 @@ describe("better-auth password reset wiring", () => {
         user: { id: "user_1", email: "forgot@acme.test" },
       });
 
-      expect(revokeAllSessionsForUser).toHaveBeenCalledTimes(1);
-      expect(revokeAllSessionsForUser).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "user_1" }),
-      );
+      expect(revokeAllBrowserSessions).toHaveBeenCalledTimes(1);
+      expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user_1" });
     });
   });
 
@@ -95,7 +119,7 @@ describe("better-auth password reset wiring", () => {
   describe("when the rate-limit configuration is inspected", () => {
     /** @scenario Password reset endpoints are rate-limited to five attempts per hour */
     it("caps /request-password-reset and /reset-password at 5 per hour", () => {
-      const customRules = (auth as any).options.rateLimit.customRules as Record<
+      const customRules = (createTestAuth() as any).options.rateLimit.customRules as Record<
         string,
         { window: number; max: number }
       >;

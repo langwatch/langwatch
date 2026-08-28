@@ -1,56 +1,32 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const { buildAwsClientConfigMock, mockEnv } = vi.hoisted(() => ({
-  buildAwsClientConfigMock: vi.fn(() => ({ requestHandler: {} })),
-  mockEnv: {} as Record<string, unknown>,
-}));
-
-vi.mock("../../../../env.mjs", () => ({ env: mockEnv }));
-
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }),
-}));
-
-vi.mock("~/runtime/app/aws-client.composition", () => ({
-  buildAwsClientConfig: buildAwsClientConfigMock,
-}));
-
-vi.mock("@aws-sdk/client-ses", () => ({
-  SESClient: vi.fn(),
-  SendEmailCommand: vi.fn(),
-  SendRawEmailCommand: vi.fn(),
-}));
-
+import { describe, expect, it, vi } from "vitest";
 import { buildSesClientConfig } from "../ses";
 
+const aws = { build: vi.fn(() => ({ requestHandler: {} })) };
+
 describe("buildSesClientConfig", () => {
-  beforeEach(() => {
-    buildAwsClientConfigMock.mockClear();
-    for (const key of Object.keys(mockEnv)) delete mockEnv[key];
-  });
+  it("uses the China SES host for the China AWS partition", () => {
+    buildSesClientConfig({
+      configuration: { enabled: true, region: "cn-north-1" },
+      aws,
+    });
 
-  it("uses the regional SES host when no endpoint override is configured", () => {
-    mockEnv.AWS_REGION = "eu-central-1";
-
-    buildSesClientConfig();
-
-    expect(buildAwsClientConfigMock).toHaveBeenCalledWith({
-      region: "eu-central-1",
-      targetHost: "email.eu-central-1.amazonaws.com",
+    expect(aws.build).toHaveBeenCalledWith({
+      region: "cn-north-1",
+      targetHost: "email.cn-north-1.amazonaws.com.cn",
       endpoint: undefined,
     });
   });
 
-  it("passes a custom endpoint as both the SDK endpoint and proxy target", () => {
-    mockEnv.AWS_REGION = "eu-central-1";
-    mockEnv.AWS_SES_ENDPOINT = "mail-relay.internal.corp:465";
+  it("uses an endpoint override for both the SDK and proxy decision", () => {
+    buildSesClientConfig({
+      configuration: { enabled: true, region: "eu-central-1", endpoint: "mail-relay.internal:465" },
+      aws,
+    });
 
-    buildSesClientConfig();
-
-    expect(buildAwsClientConfigMock).toHaveBeenCalledWith({
+    expect(aws.build).toHaveBeenCalledWith({
       region: "eu-central-1",
-      targetHost: "mail-relay.internal.corp:465",
-      endpoint: "mail-relay.internal.corp:465",
+      targetHost: "mail-relay.internal:465",
+      endpoint: "mail-relay.internal:465",
     });
   });
 });

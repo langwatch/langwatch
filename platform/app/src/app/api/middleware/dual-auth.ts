@@ -103,7 +103,7 @@ export const dualAuth: MiddlewareHandler<{
   // stable "this kind is in play" test. A stale or absent cookie abstains,
   // which also keeps an expired leftover cookie from contesting a valid
   // API-key request.
-  const session = await getServerAuthSession({ req: c.req.raw });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   const sessionUserId = session?.user?.id;
   const apiKeyClaimed = apiKeyClaims({
     token: apiKeyCredentials?.token ?? null,

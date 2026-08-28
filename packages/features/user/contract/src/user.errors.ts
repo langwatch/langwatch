@@ -1,10 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { USER_AVATAR_ALLOWED_MEDIA_TYPES, USER_AVATAR_MAX_BYTES } from "./user";
 
-export type UserAvatarUnreadableReason =
-  | "invalid_data_url"
-  | "empty"
-  | "content_mismatch";
+export type UserAvatarUnreadableReason = "invalid_data_url" | "empty" | "content_mismatch";
 
 export abstract class UserAvatarValidationError extends HandledError {}
 

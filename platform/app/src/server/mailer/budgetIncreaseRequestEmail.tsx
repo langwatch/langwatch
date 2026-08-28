@@ -2,6 +2,7 @@ import { Button, Container, Heading, Html, Img, Section } from "@react-email/com
 import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 export interface SendBudgetIncreaseRequestEmailInput {
   to: string;
@@ -33,7 +34,7 @@ const valueCellStyle: React.CSSProperties = {
 };
 
 export const sendBudgetIncreaseRequestEmail = async (
-  input: SendBudgetIncreaseRequestEmailInput,
+  input: SendBudgetIncreaseRequestEmailInput & { mailer: EmailDeliveryPort },
 ): Promise<void> => {
   const dashboardUrl = `${env.BASE_HOST.replace(/\/$/, "")}/gateway/budgets`;
   const periodLabel = input.period ?? "current period";
@@ -50,18 +51,14 @@ export const sendBudgetIncreaseRequestEmail = async (
           fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1" style={{ fontSize: "20px", marginTop: "8px" }}>
           Budget increase request
         </Heading>
         <p style={{ fontSize: "14px", lineHeight: 1.6 }}>
           <strong>{input.requesterName ?? input.requesterEmail}</strong> (
-          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>) has
-          requested a budget increase in <strong>{input.organizationName}</strong>.
+          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>) has requested a
+          budget increase in <strong>{input.organizationName}</strong>.
         </p>
         <Section style={{ paddingTop: "8px" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
@@ -126,12 +123,12 @@ export const sendBudgetIncreaseRequestEmail = async (
             color: "#5f6c7b",
           }}
         >
-          You're receiving this because you're an organization admin in LangWatch. If this
-          is unexpected, you can reply directly to {input.requesterEmail}.
+          You're receiving this because you're an organization admin in LangWatch. If this is
+          unexpected, you can reply directly to {input.requesterEmail}.
         </p>
       </Container>
     </Html>,
   );
 
-  await sendEmail({ to: input.to, subject, html: emailHtml });
+  await sendEmail({ mailer: input.mailer, content: { to: input.to, subject, html: emailHtml } });
 };

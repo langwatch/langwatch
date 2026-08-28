@@ -1,16 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
-import { env } from "../../../env.mjs";
-import {
-  getProcessOutboundProxyConfig,
-  hostnameOf,
-  resolveProxyForHost,
-} from "../../outboundProxy";
+import { hostnameOf, resolveProxyForHost, type OutboundProxyConfig } from "../../outboundProxy";
 import { sanitizeHeaders } from "./mime";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
   type EmailProviderPort,
+  type MailerConfiguration,
   toArray,
 } from "./types";
 
@@ -22,23 +18,16 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * The dispatcher receives the parsed process configuration explicitly, so it
- * cannot observe a later environment mutation.
- *
- * The agent owns a connection pool and is created once: building one per send
- * would accumulate pools and file descriptors under a burst of alerts.
+ * The dispatcher is process-owned: building one per send would accumulate
+ * pools and file descriptors under a burst of alerts.
  */
-let sharedDispatcher: EnvHttpProxyAgent | undefined;
-
-const proxyDispatcher = (): EnvHttpProxyAgent | undefined => {
-  const proxyConfig = getProcessOutboundProxyConfig();
+const proxyDispatcher = (proxyConfig: OutboundProxyConfig): EnvHttpProxyAgent | undefined => {
   if (!resolveProxyForHost(proxyConfig, hostnameOf(RESEND_API_URL))) return undefined;
-  sharedDispatcher ??= new EnvHttpProxyAgent({
+  return new EnvHttpProxyAgent({
     httpProxy: proxyConfig.httpProxy ?? "",
     httpsProxy: proxyConfig.httpsProxy ?? "",
     noProxy: proxyConfig.noProxy ?? "",
   });
-  return sharedDispatcher;
 };
 
 const encodeAttachments = (attachments: EmailContent["attachments"]) => {
@@ -71,10 +60,28 @@ const buildPayload = (content: EmailContent, defaultFrom: string) => {
   };
 };
 
-export const resendProvider: EmailProviderPort = {
-  name: "resend",
+export class ResendEmailProvider implements EmailProviderPort {
+  readonly name = "resend" as const;
+
+  static create(input: {
+    configuration: MailerConfiguration["resend"];
+    outboundProxy: OutboundProxyConfig;
+  }): ResendEmailProvider {
+    return new ResendEmailProvider(input.configuration, input.outboundProxy);
+  }
+
+  private dispatcher: EnvHttpProxyAgent | undefined;
+
+  private closed = false;
+
+  private constructor(
+    private readonly configuration: MailerConfiguration["resend"],
+    private readonly outboundProxy: OutboundProxyConfig,
+  ) {}
+
   async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
-    const apiKey = env.RESEND_API_KEY;
+    if (this.closed) throw new Error("Resend email provider is closed.");
+    const apiKey = this.configuration.apiKey;
     if (!apiKey) {
       throw new EmailProviderConfigurationError(
         "EMAIL_PROVIDER is 'resend' but RESEND_API_KEY is not set.",
@@ -84,7 +91,8 @@ export const resendProvider: EmailProviderPort = {
     logger.info("Sending email using Resend");
     const bccAddresses = toArray(content.bcc);
     const payload = buildPayload(content, defaultFrom);
-    const dispatcher = proxyDispatcher();
+    this.dispatcher ??= proxyDispatcher(this.outboundProxy);
+    const dispatcher = this.dispatcher;
 
     try {
       // undici's own fetch, not the global one: Node's global fetch is bound to
@@ -124,5 +132,12 @@ export const resendProvider: EmailProviderPort = {
       logger.error({ error }, "Error sending email with Resend");
       throw error;
     }
-  },
-};
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+    const dispatcher = this.dispatcher;
+    this.dispatcher = undefined;
+    await dispatcher?.close();
+  }
+}

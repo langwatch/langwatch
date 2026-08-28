@@ -5,6 +5,7 @@ import {
   sendAutomationLimitEmail,
 } from "../automationLimitEmail";
 import { sendEmail } from "../emailSender";
+import { TestMailer } from "./mailer.test-double";
 
 vi.mock("../emailSender", () => ({
   sendEmail: vi.fn(),
@@ -21,6 +22,7 @@ const baseProps = {
 
 const ceilingProps = { ...baseProps, kind: "ceiling_reached" as const };
 const pausedProps = { ...baseProps, kind: "paused" as const };
+const mailer = new TestMailer();
 
 describe("automationLimitEmail", () => {
   beforeEach(() => {
@@ -123,25 +125,29 @@ describe("automationLimitEmail", () => {
       it("sends one mail per recipient with the matching subject", async () => {
         await sendAutomationLimitEmail({
           ...pausedProps,
+          mailer,
           to: ["a@example.com", "b@example.com"],
         });
 
         expect(sendEmail).toHaveBeenCalledTimes(2);
         expect(sendEmail).toHaveBeenCalledWith(
           expect.objectContaining({
-            to: "a@example.com",
-            subject: "Automation paused: Failed traces to dataset",
+            mailer,
+            content: expect.objectContaining({
+              to: "a@example.com",
+              subject: "Automation paused: Failed traces to dataset",
+            }),
           }),
         );
         expect(sendEmail).toHaveBeenCalledWith(
-          expect.objectContaining({ to: "b@example.com" }),
+          expect.objectContaining({ content: expect.objectContaining({ to: "b@example.com" }) }),
         );
       });
     });
 
     describe("when there are no recipients", () => {
       it("sends nothing", async () => {
-        await sendAutomationLimitEmail({ ...pausedProps, to: [] });
+        await sendAutomationLimitEmail({ ...pausedProps, mailer, to: [] });
 
         expect(sendEmail).not.toHaveBeenCalled();
       });
@@ -158,6 +164,7 @@ describe("automationLimitEmail", () => {
         await expect(
           sendAutomationLimitEmail({
             ...pausedProps,
+            mailer,
             to: ["a@example.com", "b@example.com"],
           }),
         ).resolves.toBeUndefined();
@@ -174,6 +181,7 @@ describe("automationLimitEmail", () => {
         await expect(
           sendAutomationLimitEmail({
             ...pausedProps,
+            mailer,
             to: ["a@example.com", "b@example.com"],
           }),
         ).rejects.toThrow(/any of its 2 recipients/);
@@ -191,6 +199,7 @@ describe("automationLimitEmail", () => {
 
         const error = await sendAutomationLimitEmail({
           ...pausedProps,
+          mailer,
           to: ["a@example.com"],
         }).then(
           () => null,

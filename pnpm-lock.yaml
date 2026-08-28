@@ -1697,6 +1697,44 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/features/auth/contract:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/auth/server:
+    dependencies:
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/identity':
+        specifier: workspace:*
+        version: link:../../../identity
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../redis-client
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/features/authz/contract:
     dependencies:
       '@langwatch/actor':
@@ -4938,6 +4976,12 @@ importers:
       '@langwatch/api-key-server':
         specifier: workspace:*
         version: link:../../packages/features/api-key/server
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/auth/contract
+      '@langwatch/auth-server':
+        specifier: workspace:*
+        version: link:../../packages/features/auth/server
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract

@@ -28,6 +28,31 @@ export const EMAIL_PROVIDER_NAMES = ["ses", "sendgrid", "smtp", "resend"] as con
 export type EmailProviderName = (typeof EMAIL_PROVIDER_NAMES)[number];
 
 /**
+ * Private process configuration for the one selected outbound mail gateway.
+ * It is resolved at executable boot and never read from the environment by a
+ * provider, which keeps credentials stable for the lifetime of the process.
+ */
+export type MailerConfiguration = Readonly<{
+  defaultFrom: string;
+  provider?: string;
+  ses: Readonly<{
+    enabled: boolean;
+    region?: string;
+    endpoint?: string;
+  }>;
+  sendgrid: Readonly<{ apiKey?: string }>;
+  smtp: Readonly<{
+    url?: string;
+    host?: string;
+    port?: string;
+    user?: string;
+    password?: string;
+    secure?: string;
+  }>;
+  resend: Readonly<{ apiKey?: string }>;
+}>;
+
+/**
  * One outbound email gateway. Implementations receive the already-normalized
  * `EmailContent` plus the resolved default `from`, and are responsible for
  * mapping the shared surface (bcc, reply-to, custom headers, attachments) onto
@@ -35,13 +60,15 @@ export type EmailProviderName = (typeof EMAIL_PROVIDER_NAMES)[number];
  */
 export interface EmailProviderPort {
   name: EmailProviderName;
-  send({
-    content,
-    defaultFrom,
-  }: {
-    content: EmailContent;
-    defaultFrom: string;
-  }): Promise<unknown>;
+  send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }): Promise<unknown>;
+  close?(): Promise<void>;
+}
+
+/** A composed mail delivery capability, injected into application adapters. */
+export abstract class EmailDeliveryPort {
+  abstract defaultFrom(): string;
+
+  abstract send(content: EmailContent): Promise<unknown>;
 }
 
 /**

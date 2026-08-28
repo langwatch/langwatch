@@ -8,13 +8,7 @@
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { createLogger } from "@langwatch/observability";
-import {
-  convertToModelMessages,
-  smoothStream,
-  stepCountIs,
-  streamText,
-  type UIMessage,
-} from "ai";
+import { convertToModelMessages, smoothStream, stepCountIs, streamText, type UIMessage } from "ai";
 import { tools } from "~/app/api/dataset/generate/tools";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
@@ -34,12 +28,9 @@ secured
     }),
   )
   .post("/generate", async (c) => {
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
+      return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
 
     const { messages, dataset, projectId } = (await c.req.json()) as {
@@ -52,11 +43,7 @@ secured
       return c.json({ error: "Missing projectId header" }, { status: 400 });
     }
 
-    const hasPermission = await probeProjectPermission(
-      { session },
-      projectId,
-      "datasets:manage",
-    );
+    const hasPermission = await probeProjectPermission({ session }, projectId, "datasets:manage");
     if (!hasPermission) {
       return c.json(
         { error: "You do not have permission to access this endpoint." },

@@ -1,5 +1,8 @@
 import type {
   CreateUserInput,
+  CreateCredentialUserInput,
+  CreatePasskeyUserInput,
+  CreatedUser,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserFullProfile,
@@ -14,6 +17,9 @@ export abstract class UserRepository {
   abstract tryFindById(id: string): Promise<UserProfile | null>;
   abstract tryFindByEmail(email: string): Promise<UserProfile | null>;
   abstract create(input: CreateUserInput): Promise<UserProfile>;
+  abstract createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
+  abstract createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
+  abstract hasPassword(id: string): Promise<boolean>;
   abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   abstract tryGetAccountInfo(id: string): Promise<UserAccountInfo | null>;
   abstract getSsoStatus(id: string): Promise<UserSsoStatus>;
@@ -23,7 +29,7 @@ export abstract class UserRepository {
     dismissedAt: Date,
   ): Promise<UserTourPreference>;
   abstract setLastLoginAt(id: string, lastLoginAt: Date): Promise<void>;
-  abstract getLastHomePath(id: string): Promise<string | null>;
+  abstract tryGetLastHomePath(id: string): Promise<string | null>;
   abstract setLastHomePath(id: string, path: string | null): Promise<void>;
   abstract setDeactivatedAt(id: string, deactivatedAt: Date | null): Promise<UserProfile>;
   abstract setAvatar(id: string, image: string | null): Promise<void>;

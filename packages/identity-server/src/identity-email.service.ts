@@ -1,4 +1,5 @@
 import {
+  IdentityEmailService as IdentityEmailCapability,
   type MatchableEmail,
   matchableEmailsOf,
   primaryEmailOf,
@@ -29,11 +30,13 @@ const logger = createLogger("langwatch:identity:email");
  * ceremonies emit events is exactly the user whose identifiers are proven
  * against their legacy rows, so reads and writes flip together.
  */
-export class IdentityEmailService {
+export class IdentityEmailService extends IdentityEmailCapability {
   constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly isOnIdentity: IdentityUserGate,
-  ) {}
+  ) {
+    super();
+  }
 
   /**
    * The user's email according to their identifiers — PRIMARY, else the
@@ -65,11 +68,7 @@ export class IdentityEmailService {
    * runs on the invite-acceptance path a brand-new member's first session
    * walks through.
    */
-  async verifiedEmailsOf({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<MatchableEmail[] | null> {
+  async verifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
     try {
       if (!(await this.isOnIdentity({ userId }))) return null;
       const heads = await this.heads.findHeads({ userId });

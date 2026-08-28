@@ -28,12 +28,9 @@ secured
     }),
   )
   .post("/playground", async (c) => {
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
+      return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
 
     const projectId = c.req.header("x-project-id");
@@ -41,11 +38,7 @@ secured
       return c.json({ error: "Missing projectId header" }, { status: 400 });
     }
 
-    const hasPermission = await probeProjectPermission(
-      { session },
-      projectId,
-      "playground:manage",
-    );
+    const hasPermission = await probeProjectPermission({ session }, projectId, "playground:manage");
     if (!hasPermission) {
       return c.json(
         { error: "You do not have permission to access this endpoint." },
@@ -64,19 +57,13 @@ secured
     // legacy `{provider}/{model}`. For mp-id values we look up the MP by
     // id; for legacy values we resolve to the single accessible MP for
     // that provider (today always narrowest-wins) exactly as before.
-    const modelProviders = await getProjectModelProviders(
-      c.app.modelProviders,
-      projectId,
-    );
+    const modelProviders = await getProjectModelProviders(c.app.modelProviders, projectId);
     const providerKey = model.split("/")[0] ?? "";
     const modelProvider = providerKey.startsWith("mp_")
       ? Object.values(modelProviders).find((provider) => provider.id === providerKey)
       : modelProviders[providerKey];
     if (!modelProvider) {
-      return c.json(
-        { error: `Provider not configured: ${providerKey}` },
-        { status: 400 },
-      );
+      return c.json({ error: `Provider not configured: ${providerKey}` }, { status: 400 });
     }
 
     if (!modelProvider.enabled) {

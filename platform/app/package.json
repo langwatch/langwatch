@@ -100,6 +100,8 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/api-key-server": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/auth-server": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",

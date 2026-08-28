@@ -4,8 +4,7 @@ export const USER_FEATURE_ID = "user" as const;
 export const USER_AVATAR_PURPOSE = "user_avatar" as const;
 export const USER_AVATAR_OWNER_KIND = "user" as const;
 export const USER_AVATAR_MAX_BYTES = 8 * 1024 * 1024;
-export const USER_AVATAR_MAX_DATA_URL_LENGTH =
-  Math.ceil(USER_AVATAR_MAX_BYTES / 3) * 4 + 256;
+export const USER_AVATAR_MAX_DATA_URL_LENGTH = Math.ceil(USER_AVATAR_MAX_BYTES / 3) * 4 + 256;
 export const USER_AVATAR_ALLOWED_MEDIA_TYPES = [
   "image/png",
   "image/jpeg",
@@ -49,9 +48,7 @@ export type UserFullProfile = z.infer<typeof userFullProfileSchema>;
 export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
 
-export const userProfilesInputSchema = z
-  .object({ userIds: z.array(z.string().min(1)) })
-  .strict();
+export const userProfilesInputSchema = z.object({ userIds: z.array(z.string().min(1)) }).strict();
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
 
 export const userEmailSchema = z.string().trim().pipe(z.email());
@@ -62,6 +59,25 @@ export const createUserInputSchema = z
   .object({ name: z.string(), email: userEmailSchema })
   .strict();
 export type CreateUserInput = z.infer<typeof createUserInputSchema>;
+
+export const createCredentialUserInputSchema = z
+  .object({
+    name: z.string().nullable(),
+    email: userEmailSchema,
+    passwordHash: z.string().min(1),
+  })
+  .strict();
+export type CreateCredentialUserInput = z.infer<typeof createCredentialUserInputSchema>;
+
+export const createPasskeyUserInputSchema = z.object({ email: userEmailSchema }).strict();
+export type CreatePasskeyUserInput = z.infer<typeof createPasskeyUserInputSchema>;
+
+export const createdUserSchema = z.object({ id: z.string().min(1) }).strict();
+export type CreatedUser = z.infer<typeof createdUserSchema>;
+
+export const userCredentialAccountRowSchema = z
+  .object({ password: z.string().nullable() })
+  .strict();
 
 export const updateUserProfileInputSchema = z
   .object({
@@ -86,6 +102,11 @@ export const userTourPreferenceSchema = z
   .strict();
 export type UserTourPreference = z.infer<typeof userTourPreferenceSchema>;
 
+export const userTourPreferenceRowSchema = z
+  .object({ tracesExplorerTourDismissedAt: z.date().nullable() })
+  .strict();
+export const userHomePathSchema = z.object({ lastHomePath: z.string().nullable() }).strict();
+
 export const setUserHomePathInputSchema = z
   .object({
     id: z.string().min(1),
@@ -105,9 +126,7 @@ export const setUserAvatarInputSchema = z
   .strict();
 export type SetUserAvatarInput = z.infer<typeof setUserAvatarInputSchema>;
 
-export const removeUserAvatarInputSchema = z
-  .object({ userId: z.string().min(1) })
-  .strict();
+export const removeUserAvatarInputSchema = z.object({ userId: z.string().min(1) }).strict();
 export type RemoveUserAvatarInput = z.infer<typeof removeUserAvatarInputSchema>;
 
 export const userAvatarResultSchema = z.object({ image: z.string() }).strict();

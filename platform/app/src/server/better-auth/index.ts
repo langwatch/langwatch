@@ -1,8 +1,5 @@
 import { passkey } from "@better-auth/passkey";
-import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
-} from "~/runtime/app/features/sso";
+import { buildGenericOAuthConfigs, buildSocialProviders } from "~/runtime/app/features/sso";
 import {
   platformSSOAllowed,
   resolveAuthProvider,
@@ -18,14 +15,17 @@ import {
   requestPathname,
 } from "@langwatch/enterprise-sso-contract";
 import { createLogger } from "@langwatch/observability";
-import { RedisConfigService } from "@langwatch/redis-client";
+import type { AuthService } from "@langwatch/auth-contract";
+import type { PrismaClient } from "@langwatch/prisma-client";
+import type { UserService } from "@langwatch/user-contract";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
+import { RedisConfigService, type RedisConnection } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
-import { tryGetApp } from "~/server/app-layer/app";
 import {
   deploymentIsFederationCapable,
   identityBridgeCeremonies,
@@ -33,10 +33,10 @@ import {
   identityStorageAdapter,
   resolveSignInMethodPolicy,
 } from "~/server/app-layer/identity/runtime";
-import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../app-layer/billing/nurturing/activityTracking";
 import { ensureUserSyncedToCio } from "../app-layer/billing/nurturing/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
+import type { SignUpVerificationService } from "../app-layer/identity/signup-verification.service";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -47,7 +47,6 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { passkeySignUpRegistration } from "./passkey-signup";
-import { revokeAllSessionsForUser } from "./revokeSessions";
 import { runSignInRouterShadow } from "./signInRouterShadow";
 
 const logger = createLogger("langwatch:better-auth");
@@ -104,120 +103,47 @@ const redisEnv = {
   skip: env.SKIP_REDIS || !!process.env.BUILD_TIME,
 };
 
-/**
- * The App's connection at the moment a storage callback runs.
- *
- * Null wherever env advertises Redis but the App has none, which is three
- * states, not one: a test app, a callback firing before boot completes, and —
- * for the whole life of the process — anything that never builds an App at all
- * (a task, a bare `tsx scripts/*.ts`). `start.ts` boots before it listens, so
- * the web entrypoint only ever sees the first two.
- *
- * Resolving per call rather than once at import is what makes this possible,
- * and it is deliberate: the alternative needs a live client at module load.
- * See the ADR's note on where the old singleton's behaviour is and is not
- * reproduced.
- */
-const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
-
-/**
- * How many writes this process has dropped for want of a connection.
- *
- * Carried in the log line because the *first* drop and the ten-thousandth mean
- * different things: one is a request that raced boot, a climbing count is a
- * process serving auth with no secondary storage at all.
- */
-let droppedSecondaryWrites = 0;
-
-/**
- * Reports a write that went nowhere.
- *
- * A dropped read is a cache miss and better-auth recovers it from the database.
- * A dropped WRITE has no such recovery, and one of its tenants is the
- * credential sign-in rate-limit counter, which lives only in secondary storage:
- * dropping the `set` is a rate limit that fails OPEN. That is a security-
- * relevant degradation, so it does not get to be silent (#6950).
- *
- * The key is deliberately not logged. Better-auth keys secondary storage by
- * session token, so the key IS a credential.
- */
-const reportDroppedSecondaryWrite = (
-  operation: "set" | "delete" | "increment",
-): void => {
-  droppedSecondaryWrites += 1;
-  logger.warn(
-    { operation, droppedSecondaryWrites },
-    "better-auth secondary storage write dropped: Redis is configured but the application has no connection. Rate limiting and session revocation degrade to fail-open until it does.",
-  );
-};
-
-/**
- * The storage better-auth is configured with — `undefined` when this deployment
- * has no Redis, in which case sessions stay in the database.
- *
- * Exported for unit testing, the same way `isEmailPasswordEnabled` is: ADR-093
- * moved this from "decided once against a live singleton" to "resolved per
- * call", which opened a window where the callbacks run with no connection.
- * That window is the contract now, so it is asserted rather than merely
- * commented (#6950).
- */
-export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
-  new RedisConfigService().isConfigured(redisEnv)
-    ? {
-        get: async (key) => {
-          const redis = secondaryStorageConnection();
-          // A miss, not a failure: better-auth falls through to the database.
-          if (!redis) return null;
-          return await redis.get(`better-auth:${key}`);
-        },
-        // Read-and-clear in one round trip, so two callers racing for a
-        // single-use value cannot both be handed it. `GETDEL` is what the
-        // rest of the app already uses for exactly this (the scenario tab
-        // registry, the GitHub install nonce).
-        getAndDelete: async (key) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return null;
-          return await redis.getdel(`better-auth:${key}`);
-        },
-        // The counter behind distributed rate limiting. Required by
-        // better-auth 1.7 — before it, the limiter read and wrote a serialized
-        // record, which two pods could interleave.
-        //
-        // The TTL is applied ONLY on creation, which is the whole shape of a
-        // fixed window: extending it on every hit would mean a key under
-        // sustained traffic never expires, and the limit becomes permanent
-        // rather than per-window.
-        increment: async (key, ttl) => {
-          const redis = secondaryStorageConnection();
-          // No Redis, no counter. Answering "first hit in the window" leaves
-          // the limiter open rather than closed, which is the same call every
-          // other callback here makes: this store is an accelerator, and a
-          // deployment that loses it must not lose the ability to sign in.
-          if (!redis) {
-            reportDroppedSecondaryWrite("increment");
-            return 1;
-          }
-          const namespaced = `better-auth:${key}`;
-          const count = await redis.incr(namespaced);
-          if (count === 1) await redis.expire(namespaced, ttl);
-          return count;
-        },
-        set: async (key, value, ttl) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return reportDroppedSecondaryWrite("set");
-          if (ttl) {
-            await redis.set(`better-auth:${key}`, value, "EX", ttl);
-          } else {
-            await redis.set(`better-auth:${key}`, value);
-          }
-        },
-        delete: async (key) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return reportDroppedSecondaryWrite("delete");
-          await redis.del(`better-auth:${key}`);
-        },
+function createSecondaryStorage(
+  redis: RedisConnection | null,
+): BetterAuthOptions["secondaryStorage"] {
+  if (!new RedisConfigService().isConfigured(redisEnv) || !redis) return undefined;
+  return {
+    get: async (key) => {
+      return await redis.get(`better-auth:${key}`);
+    },
+    // Read-and-clear in one round trip, so two callers racing for a
+    // single-use value cannot both be handed it. `GETDEL` is what the
+    // rest of the app already uses for exactly this (the scenario tab
+    // registry, the GitHub install nonce).
+    getAndDelete: async (key) => {
+      return await redis.getdel(`better-auth:${key}`);
+    },
+    // The counter behind distributed rate limiting. Required by
+    // better-auth 1.7 — before it, the limiter read and wrote a serialized
+    // record, which two pods could interleave.
+    //
+    // The TTL is applied ONLY on creation, which is the whole shape of a
+    // fixed window: extending it on every hit would mean a key under
+    // sustained traffic never expires, and the limit becomes permanent
+    // rather than per-window.
+    increment: async (key, ttl) => {
+      const namespaced = `better-auth:${key}`;
+      const count = await redis.incr(namespaced);
+      if (count === 1) await redis.expire(namespaced, ttl);
+      return count;
+    },
+    set: async (key, value, ttl) => {
+      if (ttl) {
+        await redis.set(`better-auth:${key}`, value, "EX", ttl);
+      } else {
+        await redis.set(`better-auth:${key}`, value);
       }
-    : undefined;
+    },
+    delete: async (key) => {
+      await redis.del(`better-auth:${key}`);
+    },
+  };
+}
 
 const isBuildTime = !!process.env.BUILD_TIME;
 
@@ -253,7 +179,14 @@ function refusesCredentialRoute({
   return policy.defaultMethods.some((method) => method.kind === "federated");
 }
 
-export const auth = betterAuth({
+/**
+ * Builds the Better Auth transport around the process-owned mailer.
+ *
+ * The API composition root supplies the process dependencies during
+ * construction. Factor plugins are selected for that instance so importing
+ * this module cannot register process behavior.
+ */
+const createAuthOptions = (prisma: PrismaClient): BetterAuthOptions => ({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
   trustedOrigins: isBuildTime
     ? []
@@ -444,21 +377,12 @@ export const auth = betterAuth({
      * (ADR-027), so that a user whose account was born through that IdP can
      * still recover through their inbox. It closes again once the gate allows.
      */
-    sendResetPassword: async ({ user, token }) => {
-      await sendResetPasswordEmail({
-        email: user.email,
-        resetUrl: `${env.BASE_HOST}/auth/reset-password?token=${encodeURIComponent(token)}`,
-      });
-    },
     /**
      * After a successful reset, force-logout every existing session for the
      * user. The self-service change-password flow revokes *other* sessions
      * (keeping the current tab); here the user isn't signed in, and a reset is
      * the recovery path for a possibly-compromised account, so we revoke all.
      */
-    onPasswordReset: async ({ user }) => {
-      await revokeAllSessionsForUser({ prisma, userId: user.id });
-    },
   },
 
   /**
@@ -471,7 +395,7 @@ export const auth = betterAuth({
     enabled: true,
     window: 60,
     max: 100,
-    storage: secondaryStorage ? "secondary-storage" : "memory",
+    storage: "memory",
     customRules: {
       "/sign-in/email": { window: 60 * 15, max: 30 },
       "/sign-up/email": { window: 60 * 60, max: 50 },
@@ -498,7 +422,7 @@ export const auth = betterAuth({
     },
   },
 
-  secondaryStorage,
+  secondaryStorage: undefined,
   socialProviders,
   plugins,
 
@@ -612,7 +536,13 @@ export const auth = betterAuth({
   logger: {
     disabled: false,
     log: (level, message, ...args) => {
-      (logger as any)[level]?.({ args }, message);
+      if (level === "error") {
+        logger.error({ args }, message);
+      } else if (level === "warn") {
+        logger.warn({ args }, message);
+      } else {
+        logger.info({ args }, message);
+      }
     },
   },
 
@@ -702,4 +632,67 @@ export const auth = betterAuth({
   },
 });
 
-export type Auth = typeof auth;
+export const createAuth = ({
+  auth,
+  database,
+  factorPlugins,
+  mailer,
+  passkeyHandleSecret,
+  redis,
+  signUpVerification,
+  users,
+}: {
+  auth: AuthService;
+  database: PrismaClient;
+  factorPlugins?: { mfaEnrollmentOpen: boolean; passkeysEnabled: boolean };
+  mailer: EmailDeliveryPort;
+  passkeyHandleSecret: string;
+  redis: RedisConnection | null;
+  signUpVerification: SignUpVerificationService;
+  users: UserService;
+}) => {
+  const secondaryStorage = createSecondaryStorage(redis);
+  const authOptions = createAuthOptions(database);
+  const enabledFactorPlugins = factorPlugins ?? {
+    mfaEnrollmentOpen: env.MFA_ENROLLMENT_OPEN === "on",
+    passkeysEnabled: env.PASSKEYS_ENABLED === "on",
+  };
+  return betterAuth({
+    ...authOptions,
+    plugins: [
+      ...plugins,
+      ...(enabledFactorPlugins.mfaEnrollmentOpen ? [twoFactor()] : []),
+      ...(enabledFactorPlugins.passkeysEnabled
+        ? [
+            passkey({
+              registration: passkeySignUpRegistration({
+                handleSecret: passkeyHandleSecret,
+                users,
+                verification: signUpVerification,
+              }),
+            }),
+          ]
+        : []),
+    ],
+    secondaryStorage,
+    rateLimit: {
+      ...authOptions.rateLimit,
+      storage: secondaryStorage ? "secondary-storage" : "memory",
+    },
+    emailAndPassword: {
+      ...authOptions.emailAndPassword,
+      sendResetPassword: async ({ user, token }) => {
+        await sendResetPasswordEmail({
+          mailer,
+          email: user.email,
+          resetUrl: `${env.BASE_HOST}/auth/reset-password?token=${encodeURIComponent(token)}`,
+        });
+      },
+      onPasswordReset: async ({ user }) => {
+        await auth.revokeAllBrowserSessions({ userId: user.id });
+      },
+    },
+  });
+};
+
+export type Auth = ReturnType<typeof createAuth>;

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendEmail } from "../emailSender";
 import { sendResetPasswordEmail } from "../resetPasswordEmail";
+import { TestMailer } from "./mailer.test-double";
 
 vi.mock("../emailSender", () => ({
   sendEmail: vi.fn(),
 }));
 
 const baseParams = {
+  mailer: new TestMailer(),
   email: "user@acme.test",
   resetUrl: "https://app.langwatch.ai/auth/reset-password?token=tok_abc123def456",
 };
@@ -23,9 +25,9 @@ describe("sendResetPasswordEmail", () => {
 
       expect(sendEmail).toHaveBeenCalledTimes(1);
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].to).toBe("user@acme.test");
-      expect(call[0].subject).toContain("LangWatch");
-      expect(call[0].subject.toLowerCase()).toContain("password");
+      expect(call[0].content.to).toBe("user@acme.test");
+      expect(call[0].content.subject).toContain("LangWatch");
+      expect(call[0].content.subject.toLowerCase()).toContain("password");
     });
   });
 
@@ -35,9 +37,9 @@ describe("sendResetPasswordEmail", () => {
       await sendResetPasswordEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("/auth/reset-password");
-      expect(call[0].html).toContain("tok_abc123def456");
-      expect(call[0].html).toContain("Reset password");
+      expect(call[0].content.html).toContain("/auth/reset-password");
+      expect(call[0].content.html).toContain("tok_abc123def456");
+      expect(call[0].content.html).toContain("Reset password");
     });
 
     /** @scenario The reset email tells the user it expires and is safe to ignore */
@@ -45,15 +47,15 @@ describe("sendResetPasswordEmail", () => {
       await sendResetPasswordEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("expires");
-      expect(call[0].html).toContain("ignore");
+      expect(call[0].content.html).toContain("expires");
+      expect(call[0].content.html).toContain("ignore");
     });
 
     it("addresses the email to the account it was requested for", async () => {
       await sendResetPasswordEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("user@acme.test");
+      expect(call[0].content.html).toContain("user@acme.test");
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 /**
  * The email that carries a sign-up address's confirmation link (D13,
@@ -9,11 +10,13 @@ import { sendEmail } from "./emailSender";
  * the address until the link comes back).
  */
 export const sendSignUpVerificationEmail = async ({
+  mailer,
   email,
   verificationUrl,
 }: {
   email: string;
   verificationUrl: string;
+  mailer: EmailDeliveryPort;
 }) => {
   const emailHtml = await render(
     <Html lang="en" dir="ltr">
@@ -25,15 +28,11 @@ export const sendSignUpVerificationEmail = async ({
           paddingBottom: "12px",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1">Confirm your email address</Heading>
         <p>
-          Someone started creating a LangWatch account with this address (
-          <b>{email}</b>). Click the button below to confirm it and carry on:
+          Someone started creating a LangWatch account with this address (<b>{email}</b>). Click the
+          button below to confirm it and carry on:
         </p>
         <Button
           href={verificationUrl}
@@ -48,16 +47,19 @@ export const sendSignUpVerificationEmail = async ({
           Confirm my email address
         </Button>
         <p>
-          This link expires in 1 hour and can be used once. If this was not you,
-          you can ignore this email: nothing has been created.
+          This link expires in 1 hour and can be used once. If this was not you, you can ignore this
+          email: nothing has been created.
         </p>
       </Container>
     </Html>,
   );
 
   await sendEmail({
-    to: email,
-    subject: "Confirm your email address for LangWatch",
-    html: emailHtml,
+    mailer,
+    content: {
+      to: email,
+      subject: "Confirm your email address for LangWatch",
+      html: emailHtml,
+    },
   });
 };

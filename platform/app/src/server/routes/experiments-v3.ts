@@ -278,7 +278,7 @@ secured.access(sessionAuth).post(
 
     logger.info({ projectId, scope: request.scope }, "Starting experiment execution");
 
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
       return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
@@ -457,7 +457,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
     );
   }
 
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (!session) {
     return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
   }

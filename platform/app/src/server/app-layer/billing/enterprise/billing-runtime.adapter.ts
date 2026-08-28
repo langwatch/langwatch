@@ -4,6 +4,7 @@ import {
   type UsageLimitEmailData,
 } from "~/runtime/app/features/billing";
 import { sendUsageLimitEmail } from "~/server/mailer/usageLimitEmail";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 export class AppBillingErrorReporter extends BillingErrorReporter {
@@ -21,12 +22,12 @@ export class AppBillingErrorReporter extends BillingErrorReporter {
 }
 
 export class AppUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
-  private constructor() {
+  private constructor(private readonly mailer: EmailDeliveryPort) {
     super();
   }
 
-  static create(): AppUsageLimitEmailAdapter {
-    return new AppUsageLimitEmailAdapter();
+  static create(mailer: EmailDeliveryPort): AppUsageLimitEmailAdapter {
+    return new AppUsageLimitEmailAdapter(mailer);
   }
 
   async send(input: {
@@ -35,6 +36,7 @@ export class AppUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
     usage: UsageLimitEmailData;
   }): Promise<void> {
     await sendUsageLimitEmail({
+      mailer: this.mailer,
       to: input.to,
       ...input.usage,
     });

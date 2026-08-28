@@ -14,7 +14,6 @@ import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
-import { auth } from "~/server/better-auth";
 import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
@@ -49,7 +48,7 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
 secured.access(authPolicy()).get("/auth/session", async (c) => {
   c.header("Cache-Control", "no-store, must-revalidate");
 
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
 
   if (!session) {
     return c.json(null);
@@ -87,29 +86,10 @@ const logoutHandler = async (c: Context) => {
     try {
       const headers = new Headers();
       headers.set("cookie", cookies);
-      const session = await auth.api.getSession({ headers });
+      const session = await c.app.betterAuth.api.getSession({ headers });
 
       if (session) {
-        const token = session.session.token;
-
-        try {
-          await prisma.session.delete({
-            where: { sessionToken: token },
-          });
-        } catch {
-          // Session may already be deleted
-        }
-
-        const redisConnection = c.app.redis;
-        if (redisConnection) {
-          try {
-            await redisConnection.del(`better-auth:${token}`);
-            const listKey = `better-auth:active-sessions-${session.user.id}`;
-            await redisConnection.del(listKey);
-          } catch {
-            // Redis cleanup is best-effort
-          }
-        }
+        await c.app.auth.revokeBrowserSession({ sessionId: session.session.id });
       }
     } catch {
       // Session lookup failed — still clear cookies below
@@ -186,11 +166,11 @@ const betterAuthCatchAll = async (c: Context) => {
   // entrance is never reached — which is what makes deploying it a no-op
   // until an operator targets an organization.
   if (await isBornFinalizedSignUp({ featureFlags: c.app.featureFlags, request: c.req.raw })) {
-    return runWithIdentityBirth(() => auth.handler(c.req.raw));
+    return runWithIdentityBirth(() => c.app.betterAuth.handler(c.req.raw));
   }
 
   // BetterAuth's auth.handler is fetch-compatible (Request => Response)
-  return auth.handler(c.req.raw);
+  return c.app.betterAuth.handler(c.req.raw);
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

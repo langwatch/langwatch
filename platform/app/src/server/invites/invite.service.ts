@@ -18,10 +18,7 @@ import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import type { RoleService } from "@langwatch/role-contract";
-import {
-  CustomRoleIdRequiredError,
-  CustomRoleNotAssignableError,
-} from "../role-bindings/errors";
+import { CustomRoleIdRequiredError, CustomRoleNotAssignableError } from "../role-bindings/errors";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
@@ -65,10 +62,7 @@ import { env } from "~/env.mjs";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { LiteMemberViewerOnlyError } from "@langwatch/organization-contract";
 import { getApp } from "../app-layer/app";
-import type {
-  PlanProvider,
-  PlanProviderUser,
-} from "../app-layer/subscription/plan-provider";
+import type { PlanProvider, PlanProviderUser } from "../app-layer/subscription/plan-provider";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -76,6 +70,7 @@ import {
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { sendInviteReRequestEmail } from "../mailer/inviteReRequestEmail";
+import type { EmailDeliveryPort } from "../mailer/providers/types";
 import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
 import { buildInviteAcceptUrl } from "./invite-link";
 import { assertInviteSendAllowed } from "./invite-send-throttle";
@@ -102,11 +97,7 @@ export function resolveInviteDisplayStatus(
   invite: Pick<OrganizationInvite, "status" | "expiration">,
   now: Date = new Date(),
 ): InviteDisplayStatus {
-  if (
-    invite.status === "PENDING" &&
-    invite.expiration !== null &&
-    invite.expiration <= now
-  ) {
+  if (invite.status === "PENDING" && invite.expiration !== null && invite.expiration <= now) {
     return "EXPIRED";
   }
   return invite.status;
@@ -138,9 +129,7 @@ export function matchInviteToAcceptor({
     };
   }
   const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
-  const hit = matchable.find(
-    (candidate) => candidate.value === normalizedInviteEmail,
-  );
+  const hit = matchable.find((candidate) => candidate.value === normalizedInviteEmail);
   return {
     matches: hit !== undefined,
     viaIdentifierId: hit?.identifierId ?? null,
@@ -264,10 +253,7 @@ export function classifyInvitesByMemberType(
   let liteMembers = 0;
 
   for (const invite of invites) {
-    if (
-      invite.role === OrganizationUserRole.ADMIN ||
-      invite.role === OrganizationUserRole.MEMBER
-    ) {
+    if (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER) {
       fullMembers++;
     } else if (invite.role === OrganizationUserRole.EXTERNAL) {
       const hasNonViewRole = invite.teams?.some((t) => {
@@ -348,6 +334,7 @@ export class InviteService {
     private readonly planProvider: PlanProvider,
     private readonly roleService?: RoleService,
     writer?: AuthzGrantsService,
+    private readonly mailer?: EmailDeliveryPort,
   ) {
     this.writerOverride = writer;
   }
@@ -373,6 +360,7 @@ export class InviteService {
       planProvider?: PlanProvider;
       authzGrants?: AuthzGrantsService;
       roleService?: RoleService;
+      mailer?: EmailDeliveryPort;
     },
   ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
@@ -385,6 +373,7 @@ export class InviteService {
       provider,
       options?.roleService,
       options?.authzGrants,
+      options?.mailer,
     );
   }
 
@@ -508,11 +497,7 @@ export class InviteService {
 
     if (!subscriptionLimits.overrideAddingLimitations) {
       if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
-        throw new LimitExceededError(
-          "members",
-          currentFullMembers,
-          subscriptionLimits.maxMembers,
-        );
+        throw new LimitExceededError("members", currentFullMembers, subscriptionLimits.maxMembers);
       }
       if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
         throw new LimitExceededError(
@@ -574,9 +559,7 @@ export class InviteService {
    * interactive transaction holding one connection, where fifty invites meant
    * fifty redundant reads of a row the caller was already holding.
    */
-  private async createInviteRow(
-    input: CreateAdminInviteInput,
-  ): Promise<OrganizationInvite> {
+  private async createInviteRow(input: CreateAdminInviteInput): Promise<OrganizationInvite> {
     // Every writer of a pending invite passes through here, including the
     // batch path, so the seat rule is checked here rather than once per
     // caller: a Lite Member invited through the batch endpoint would
@@ -613,11 +596,12 @@ export class InviteService {
     organization: Organization;
     inviteCode: string;
   }): Promise<{ emailNotSent: boolean }> {
+    if (!this.mailer) return { emailNotSent: true };
     if (!env.SENDGRID_API_KEY) {
       return { emailNotSent: true };
     }
     try {
-      await sendInviteEmail({ email, organization, inviteCode });
+      await sendInviteEmail({ mailer: this.mailer, email, organization, inviteCode });
       return { emailNotSent: false };
     } catch (error) {
       logger.error({ error }, "Failed to send invite email");
@@ -762,6 +746,7 @@ export class InviteService {
   }): Promise<Array<{ invite: OrganizationInvite; organization: Organization }>> {
     const txInviteService = InviteService.create(tx, {
       planProvider: this.planProvider,
+      mailer: this.mailer,
     });
     const records: Array<{
       invite: OrganizationInvite;
@@ -829,9 +814,7 @@ export class InviteService {
       organizationId,
       teamIds: resolvedTeams.teamIdsString,
       teamAssignments:
-        resolvedTeams.teamAssignments.length > 0
-          ? resolvedTeams.teamAssignments
-          : undefined,
+        resolvedTeams.teamAssignments.length > 0 ? resolvedTeams.teamAssignments : undefined,
     };
   }
 
@@ -967,9 +950,7 @@ export class InviteService {
     requestedTeamIds: string[];
     validTeamIds: string[];
   }): void {
-    const invalidTeamId = requestedTeamIds.find(
-      (teamId) => !validTeamIds.includes(teamId),
-    );
+    const invalidTeamId = requestedTeamIds.find((teamId) => !validTeamIds.includes(teamId));
     if (invalidTeamId) {
       throw new TeamNotInOrganizationError(invalidTeamId);
     }
@@ -1216,6 +1197,7 @@ export class InviteService {
     inviteCode: string;
     membersSettingsUrl: string;
   }): Promise<{ notifiedAdmins: number }> {
+    if (!this.mailer) return { notifiedAdmins: 0 };
     const existing = await this.prisma.organizationInvite.findUnique({
       where: { inviteCode },
       include: { organization: true },
@@ -1241,12 +1223,15 @@ export class InviteService {
     const adminEmails = admins
       .map((admin) => admin.user.email)
       .filter((email): email is string => Boolean(email));
+    const mailer = this.mailer;
+    if (!mailer) return { notifiedAdmins: 0 };
 
     // One failing address must not silence the rest: an organization whose
     // first admin has a bouncing address still has the others to ask.
     const results = await Promise.allSettled(
       adminEmails.map((adminEmail) =>
         sendInviteReRequestEmail({
+          mailer,
           adminEmail,
           organizationName: existing.organization?.name ?? "",
           invitedEmail: existing.email,
@@ -1266,9 +1251,7 @@ export class InviteService {
    */
   private requireRootClient(): PrismaClient {
     if (!isRootPrismaClient(this.prisma)) {
-      throw new Error(
-        "This orchestration requires a root Prisma client, not a transaction client",
-      );
+      throw new Error("This orchestration requires a root Prisma client, not a transaction client");
     }
     return this.prisma;
   }
@@ -1329,8 +1312,7 @@ export class InviteService {
           })
         : null) ??
       // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
-      (invite.role === OrganizationUserRole.ADMIN ||
-      invite.role === OrganizationUserRole.MEMBER
+      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
         ? await this.prisma.project.findFirst({
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },

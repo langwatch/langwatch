@@ -1,5 +1,10 @@
 import { hash } from "bcrypt";
 import { describe, expect, it, vi } from "vitest";
+import type { AuthService } from "@langwatch/auth-contract";
+import type { PrismaClient } from "@langwatch/prisma-client";
+import type { UserService } from "@langwatch/user-contract";
+import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
+import { createAuth } from "../index";
 
 // Must be mocked before importing ../index — both create persistent handles
 // (Redis socket, Prisma connection pool) that prevent Vite from closing after
@@ -7,19 +12,33 @@ import { describe, expect, it, vi } from "vitest";
 // Established pattern: see fallbackName.test.ts line 17-18.
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
+const authService = { revokeAllBrowserSessions: vi.fn() } as AuthService;
+const users = {} as UserService;
+const signUpVerification = {} as SignUpVerificationService;
+const createTestAuth = (factorPlugins?: { mfaEnrollmentOpen: boolean; passkeysEnabled: boolean }) =>
+  createAuth({
+    auth: authService,
+    database: {} as PrismaClient,
+    factorPlugins,
+    mailer: { defaultFrom: () => "test@example.com", send: vi.fn() },
+    passkeyHandleSecret: "test-secret",
+    redis: null,
+    signUpVerification,
+    users,
+  });
+
 describe("better-auth config", () => {
   describe("when imported", () => {
     /** @scenario BetterAuth is the live handler */
-    it("exports an auth instance without throwing", async () => {
-      const module = await import("../index");
-      expect(module.auth).toBeDefined();
-      expect(typeof module.auth.handler).toBe("function");
+    it("creates an auth instance without throwing", () => {
+      expect(createTestAuth()).toBeDefined();
+      expect(typeof createTestAuth().handler).toBe("function");
     });
   });
 
   describe("when inspected", () => {
     it("has the email-and-password API enabled", async () => {
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       // Sanity check: the api object has the signIn endpoint group
       expect(auth.api).toBeDefined();
       expect(typeof (auth.api as any).signInEmail).toBe("function");
@@ -34,7 +53,7 @@ describe("better-auth config", () => {
       // auth. Enabling accountLinking lets BetterAuth attach the new Account
       // to the existing email-verified User. SSO-domain enforcement still
       // runs in beforeAccountCreate, so wrong providers are rejected.
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       expect(options?.account?.accountLinking?.enabled).toBe(true);
     });
@@ -46,7 +65,7 @@ describe("better-auth config", () => {
       // breaks `Session.impersonating` reads/writes (impersonation flow)
       // because the row only exists in Redis. This assertion locks the
       // option in so it can't be silently removed.
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       expect(options?.session?.storeSessionInDatabase).toBe(true);
     });
@@ -55,7 +74,7 @@ describe("better-auth config", () => {
     /** @scenario The BetterAuth admin plugin is intentionally omitted */
     // Verifies that impersonation stays in Session.impersonating, not the admin() plugin.
     it("does not register the BetterAuth admin plugin", async () => {
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       const pluginIds = (options?.plugins ?? []).map((p: { id?: string }) => p?.id);
       expect(pluginIds).not.toContain("admin");
@@ -74,49 +93,23 @@ describe("better-auth config", () => {
       }
     });
 
-    /** @scenario "With the flag off nothing about two-step verification exists" */
-    /** @scenario "With the flag off, passkeys do not exist" */
-    it("registers a factor plugin only when its flag is on", async () => {
-      // Both flags default off, so re-importing the module under each
-      // setting is what makes this a real check rather than one that
-      // happens to pass because nothing was ever turned on.
-      const pluginIdsUnder = async (flags: {
-        MFA_ENROLLMENT_OPEN: string;
-        PASSKEYS_ENABLED: string;
-      }): Promise<string[]> => {
-        vi.resetModules();
-        const { env } = await import("~/env.mjs");
-        vi.spyOn(env, "MFA_ENROLLMENT_OPEN", "get").mockReturnValue(
-          flags.MFA_ENROLLMENT_OPEN as never,
-        );
-        vi.spyOn(env, "PASSKEYS_ENABLED", "get").mockReturnValue(
-          flags.PASSKEYS_ENABLED as never,
-        );
-        const { auth } = await import("../index");
-        return ((auth as any).options?.plugins ?? []).map(
-          (p: { id?: string }) => p?.id,
-        );
+    it("registers factor plugins only when explicitly enabled", () => {
+      const pluginIds = (factorPlugins: {
+        mfaEnrollmentOpen: boolean;
+        passkeysEnabled: boolean;
+      }): Array<string | undefined> => {
+        const auth = createTestAuth(factorPlugins) as {
+          options: { plugins: Array<{ id?: string }> };
+        };
+        return auth.options.plugins.map((plugin) => plugin.id);
       };
+      const off = pluginIds({ mfaEnrollmentOpen: false, passkeysEnabled: false });
+      const on = pluginIds({ mfaEnrollmentOpen: true, passkeysEnabled: true });
 
-      // Not registered means the routes are not mounted, so nothing about
-      // the feature is reachable — the flag governs the surface, not just
-      // whether a screen renders.
-      const off = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "off",
-        PASSKEYS_ENABLED: "off",
-      });
       expect(off).not.toContain("two-factor");
       expect(off).not.toContain("passkey");
-
-      const on = await pluginIdsUnder({
-        MFA_ENROLLMENT_OPEN: "on",
-        PASSKEYS_ENABLED: "on",
-      });
       expect(on).toContain("two-factor");
       expect(on).toContain("passkey");
-
-      vi.restoreAllMocks();
-      vi.resetModules();
     });
 
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email or self-hosted (ADR-027)", async () => {
@@ -134,7 +127,7 @@ describe("better-auth config", () => {
       // site #3, tested in `ssoGate.hook.test.ts`) is the load-bearing
       // guard that stops a licensed install from minting password
       // accounts through these routes. SaaS is unchanged.
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       const { env } = await import("~/env.mjs");
       const expected = env.NEXTAUTH_PROVIDER === "email" || !env.IS_SAAS;
@@ -149,7 +142,7 @@ describe("better-auth config", () => {
       // LINKING_DIFFERENT_EMAILS_NOT_ALLOWED (surfaced in /auth/error as
       // DIFFERENT_EMAIL_NOT_ALLOWED). The config guard is the single line
       // that enforces this — it must not be changed to `true`.
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       expect(options?.account?.accountLinking?.allowDifferentEmails).toBeFalsy();
     });
@@ -159,7 +152,7 @@ describe("better-auth config", () => {
       // `emailAndPassword.password.verify` is wired to `compare(password, storedHash)`
       // from the bcrypt package. This locks the wiring in: a maintainer removing
       // or replacing the verify function would need to update this test.
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       const verifyFn = options?.emailAndPassword?.password?.verify as
         | ((args: { password: string; hash: string }) => Promise<boolean>)
@@ -171,15 +164,13 @@ describe("better-auth config", () => {
 
     /** @scenario Wrong password is rejected */
     it("rejects a wrong password via the credentials verify function", async () => {
-      const { auth } = await import("../index");
+      const auth = createTestAuth();
       const options = (auth as any).options;
       const verifyFn = options?.emailAndPassword?.password?.verify as
         | ((args: { password: string; hash: string }) => Promise<boolean>)
         | undefined;
       const legacyHash = await hash("hunter2", 10);
-      expect(await verifyFn!({ password: "wrong-password", hash: legacyHash })).toBe(
-        false,
-      );
+      expect(await verifyFn!({ password: "wrong-password", hash: legacyHash })).toBe(false);
     });
   });
 
@@ -221,13 +212,9 @@ describe("better-auth config", () => {
       const auth0Config = configs.find(
         (c) => (c as { providerId?: string }).providerId === "auth0",
       ) as { redirectURI?: string } | undefined;
-      expect(auth0Config?.redirectURI).toBe(
-        "http://localhost:3000/api/auth/callback/auth0",
-      );
+      expect(auth0Config?.redirectURI).toBe("http://localhost:3000/api/auth/callback/auth0");
       // SSO-only enforcement on SaaS: no email/password bypass of the IdP.
-      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: true })).toBe(
-        false,
-      );
+      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: true })).toBe(false);
     });
 
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
@@ -238,9 +225,7 @@ describe("better-auth config", () => {
       // unlicensed deployment can sign in, and a licensed one keeps password
       // reset reachable; the `before` hook is what refuses the email routes
       // when the gate allows.
-      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false })).toBe(
-        true,
-      );
+      expect(isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false })).toBe(true);
     });
   });
 

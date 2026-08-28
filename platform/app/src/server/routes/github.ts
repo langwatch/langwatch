@@ -31,16 +31,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
-import type {
-  GithubInstallStatePayload,
-  GithubService,
-} from "@langwatch/github-contract";
+import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
 import { GithubInstallationConflictError } from "@langwatch/github-contract";
-import {
-  createServiceApp,
-  handlerManagedAuth,
-  publicEndpoint,
-} from "~/server/api/security";
+import { createServiceApp, handlerManagedAuth, publicEndpoint } from "~/server/api/security";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 
@@ -142,6 +135,7 @@ async function handleInstall(c: Context): Promise<Response> {
     );
   }
   const session = await getServerAuthSession({
+    app: c.app,
     req: c.req.raw,
   });
   if (!session?.user) {
@@ -164,13 +158,7 @@ async function handleInstall(c: Context): Promise<Response> {
   // Connecting GitHub grants repository access to the whole organization, so it
   // takes organization management: the same permission the tRPC surface demands
   // for every write to the connection.
-  if (
-    !(await probeOrganizationPermission(
-      { session },
-      organizationId,
-      "organization:manage",
-    ))
-  ) {
+  if (!(await probeOrganizationPermission({ session }, organizationId, "organization:manage"))) {
     return c.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -261,6 +249,7 @@ async function rejectUnauthorizedSetup({
 }): Promise<Response | null> {
   // Re-bind the session to the state's user.
   const session = await getServerAuthSession({
+    app: c.app,
     req: c.req.raw,
   });
   if (!session?.user || session.user.id !== state.userId) {
@@ -304,11 +293,7 @@ async function rejectUnauthorizedSetup({
   // lowered between /install and GitHub's redirect back here, and recording
   // the installation is the write the permission exists to gate.
   if (
-    !(await probeOrganizationPermission(
-      { session },
-      state.organizationId,
-      "organization:manage",
-    ))
+    !(await probeOrganizationPermission({ session }, state.organizationId, "organization:manage"))
   ) {
     return setupError({ c, state, errorMessage: "Forbidden", status: 403 });
   }
@@ -463,13 +448,7 @@ async function handleWebhook(c: Context): Promise<Response> {
   }
   // Read the RAW body — the HMAC is over the exact bytes GitHub sent.
   const rawBody = await c.req.text();
-  if (
-    !verifyWebhookSignature(
-      rawBody,
-      c.req.header("x-hub-signature-256"),
-      config.webhookSecret,
-    )
-  ) {
+  if (!verifyWebhookSignature(rawBody, c.req.header("x-hub-signature-256"), config.webhookSecret)) {
     return c.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -497,9 +476,7 @@ async function handleWebhook(c: Context): Promise<Response> {
   const installationEvent = installationEnvelopeSchema.safeParse(payload).data;
   const action = webhookActionSchema.safeParse(installationEvent?.action).data;
   const installationId =
-    installationEvent?.installation?.id != null
-      ? String(installationEvent.installation.id)
-      : null;
+    installationEvent?.installation?.id != null ? String(installationEvent.installation.id) : null;
 
   if (
     (eventType !== "installation" && eventType !== "installation_repositories") ||
@@ -535,9 +512,7 @@ secured
 
 secured.access(publicEndpoint(SETUP_PUBLIC_REASON)).get("/github/setup", handleSetup);
 
-secured
-  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-  .post("/github/webhook", handleWebhook);
+secured.access(publicEndpoint(WEBHOOK_PUBLIC_REASON)).post("/github/webhook", handleWebhook);
 
 // `/api/github-langy/setup` and `/api/github-langy/webhook` are an external
 // contract, held by two sets of App registrations: the hosted App, and every
@@ -546,12 +521,8 @@ secured
 // aliases stay mounted on the same handlers until there is a deprecation path
 // that can move a registration we do not own. /install needs no alias: it is
 // ours to call, and every caller in this repo uses the canonical path.
-secured
-  .access(publicEndpoint(SETUP_PUBLIC_REASON))
-  .get("/github-langy/setup", handleSetup);
+secured.access(publicEndpoint(SETUP_PUBLIC_REASON)).get("/github-langy/setup", handleSetup);
 
-secured
-  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-  .post("/github-langy/webhook", handleWebhook);
+secured.access(publicEndpoint(WEBHOOK_PUBLIC_REASON)).post("/github-langy/webhook", handleWebhook);
 
 export const app = secured.hono;

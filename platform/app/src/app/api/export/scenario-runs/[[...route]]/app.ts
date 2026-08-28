@@ -49,7 +49,7 @@ secured
   .post("/download", zValidator("json", scenarioRunExportRequestSchema), async (c) => {
     const request = c.req.valid("json");
 
-    const session = await getServerAuthSession({ req: c.req.raw });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session) {
       throw new ScenarioRunExportUnauthenticatedError();
     }
@@ -186,9 +186,7 @@ function buildExportStream({
       "export_progress",
     );
 
-  const runs = service
-    .exportRuns({ request, signal, total: totalCount })
-    [Symbol.asyncIterator]();
+  const runs = service.exportRuns({ request, signal, total: totalCount })[Symbol.asyncIterator]();
 
   // One page per pull() rather than the whole sweep in start().
   //
@@ -215,10 +213,7 @@ function buildExportStream({
           total: progress.total,
         });
       } catch (error) {
-        logger.error(
-          { error, projectId: request.projectId },
-          "Scenario run export stream error",
-        );
+        logger.error({ error, projectId: request.projectId }, "Scenario run export stream error");
         publish({ type: "error", message: "Export failed" });
         controller.error(error);
       }

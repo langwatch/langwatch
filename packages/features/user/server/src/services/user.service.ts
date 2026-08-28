@@ -2,6 +2,8 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   UserService as UserServiceContract,
   UserNotFoundError,
+  createCredentialUserInputSchema,
+  createPasskeyUserInputSchema,
   createUserInputSchema,
   removeUserAvatarInputSchema,
   setUserAvatarInputSchema,
@@ -11,6 +13,9 @@ import {
   userIdInputSchema,
   userProfilesInputSchema,
   type CreateUserInput,
+  type CreateCredentialUserInput,
+  type CreatePasskeyUserInput,
+  type CreatedUser,
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
   type SetUserHomePathInput,
@@ -25,21 +30,14 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
-import type {
-  UserAvatarStoragePort,
-  UserCliTokenRevocationPort,
-  UserSessionRevocationPort,
-} from "../ports/user.port";
-import { UserAvatarCodec } from "../codecs/user-avatar.codec";
+import type { UserAvatarStoragePort } from "../ports/user.port";
 import type { UserRepository } from "../repositories/user.repository";
+import { UserAvatarCodec } from "./user-avatar.service";
 
 export class UserService extends UserServiceContract {
   private readonly avatars = UserAvatarCodec.create();
-
   private constructor(
     private readonly repository: UserRepository,
-    private readonly sessions: UserSessionRevocationPort,
-    private readonly cliTokens: UserCliTokenRevocationPort,
     private readonly organizations: OrganizationService,
     private readonly avatarStorage: UserAvatarStoragePort,
     private readonly now: () => Date,
@@ -49,16 +47,12 @@ export class UserService extends UserServiceContract {
 
   static create(options: {
     repository: UserRepository;
-    sessions: UserSessionRevocationPort;
-    cliTokens: UserCliTokenRevocationPort;
     organizations: OrganizationService;
     avatarStorage: UserAvatarStoragePort;
     now?: () => Date;
   }): UserService {
     return new UserService(
       options.repository,
-      options.sessions,
-      options.cliTokens,
       options.organizations,
       options.avatarStorage,
       options.now ?? (() => new Date()),
@@ -84,6 +78,19 @@ export class UserService extends UserServiceContract {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
+  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    return this.repository.createCredentialUser(createCredentialUserInputSchema.parse(input));
+  }
+
+  createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
+    return this.repository.createPasskeyUser(createPasskeyUserInputSchema.parse(input));
+  }
+
+  hasPassword(input: UserIdInput): Promise<boolean> {
+    const parsed = userIdInputSchema.parse(input);
+    return this.repository.hasPassword(parsed.id);
+  }
+
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const parsed = updateUserProfileInputSchema.parse(input);
     const normalizedEmail =
@@ -93,16 +100,10 @@ export class UserService extends UserServiceContract {
     if (normalizedEmail !== undefined && !current) {
       throw new UserNotFoundError(parsed.id);
     }
-    const emailChanged =
-      normalizedEmail !== undefined &&
-      (current?.email ?? "").toLowerCase() !== normalizedEmail;
     const update: UpdateUserProfileInput = { id: parsed.id };
     if (parsed.name !== undefined) update.name = parsed.name;
     if (normalizedEmail !== undefined) update.email = normalizedEmail;
     const updated = await this.repository.updateProfile(update);
-    if (emailChanged) {
-      await this.sessions.revokeForUser({ userId: parsed.id });
-    }
     return updated;
   }
 
@@ -133,9 +134,9 @@ export class UserService extends UserServiceContract {
     await this.repository.setLastLoginAt(parsed.id, this.now());
   }
 
-  getLastHomePath(input: UserIdInput): Promise<string | null> {
+  tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
     const parsed = userIdInputSchema.parse(input);
-    return this.repository.getLastHomePath(parsed.id);
+    return this.repository.tryGetLastHomePath(parsed.id);
   }
 
   async setLastHomePath(input: SetUserHomePathInput): Promise<void> {
@@ -146,8 +147,6 @@ export class UserService extends UserServiceContract {
   async deactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
     const user = await this.repository.setDeactivatedAt(parsed.id, this.now());
-    await this.sessions.revokeForUser({ userId: parsed.id });
-    await this.cliTokens.revokeForUser({ userId: parsed.id });
     return user;
   }
 

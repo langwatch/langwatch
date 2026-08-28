@@ -3,8 +3,10 @@ import { render } from "@react-email/render";
 import type { Organization } from "~/generated/prisma/client";
 import { buildInviteAcceptUrl } from "../invites/invite-link";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 export const sendInviteEmail = async ({
+  mailer,
   email,
   organization,
   inviteCode,
@@ -12,6 +14,7 @@ export const sendInviteEmail = async ({
   email: string;
   organization: Organization;
   inviteCode: string;
+  mailer: EmailDeliveryPort;
 }) => {
   const acceptInviteUrl = buildInviteAcceptUrl(inviteCode);
 
@@ -25,16 +28,12 @@ export const sendInviteEmail = async ({
           paddingBottom: "12px",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1">LangWatch Invite</Heading>
         <p>
           You have been invited to join the <strong>{organization.name}</strong>
-          Organization on LangWatch. Please click the button below to create your account
-          or login with the email <b>{email}</b>:
+          Organization on LangWatch. Please click the button below to create your account or login
+          with the email <b>{email}</b>:
         </p>
         <Button
           href={acceptInviteUrl}
@@ -54,8 +53,11 @@ export const sendInviteEmail = async ({
   );
 
   await sendEmail({
-    to: email,
-    subject: `You were added to ${organization.name} on LangWatch`,
-    html: emailHtml,
+    mailer,
+    content: {
+      to: email,
+      subject: `You were added to ${organization.name} on LangWatch`,
+      html: emailHtml,
+    },
   });
 };

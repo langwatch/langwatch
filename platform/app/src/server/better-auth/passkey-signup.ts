@@ -1,12 +1,11 @@
 import { createHmac } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
+import type { UserService } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import { env } from "~/env.mjs";
-import { signUpVerification } from "~/server/app-layer/identity/runtime";
-import { prisma } from "~/server/db";
-import { createPasskeyUser } from "~/server/users/credential-user";
+import type { SignUpVerificationService } from "~/server/app-layer/identity/signup-verification.service";
+import { trackServerEvent } from "~/server/posthog";
 
 const logger = createLogger("langwatch:better-auth:passkey-signup");
 
@@ -64,8 +63,14 @@ export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
  * its credential rather than accumulating one per attempt, and the handle is
  * not the address written down in a credential store we do not control.
  */
-function provisionalHandle(email: string): string {
-  return `signup_${createHmac("sha256", env.NEXTAUTH_SECRET)
+function provisionalHandle({
+  email,
+  handleSecret,
+}: {
+  email: string;
+  handleSecret: string;
+}): string {
+  return `signup_${createHmac("sha256", handleSecret)
     .update(email)
     .digest("base64url")
     .slice(0, 32)}`;
@@ -89,14 +94,17 @@ function requireEmail(context: string | null | undefined): string {
   return email;
 }
 
-async function refuseIfRegistered(email: string): Promise<void> {
+async function refuseIfRegistered({
+  users,
+  email,
+}: {
+  users: UserService;
+  email: string;
+}): Promise<void> {
   // Case-insensitive for the same reason `user.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
-  const existing = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
-  });
+  const existing = await users.tryFindByEmail({ email });
   if (!existing) return;
 
   throw new APIError("BAD_REQUEST", {
@@ -114,16 +122,20 @@ async function refuseIfRegistered(email: string): Promise<void> {
  * later, so it is the address and not an id.
  */
 async function resolveUser({
+  handleSecret,
+  users,
   context,
 }: {
   ctx: GenericEndpointContext;
+  handleSecret: string;
+  users: UserService;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
   const email = requireEmail(context);
-  await refuseIfRegistered(email);
+  await refuseIfRegistered({ users, email });
 
   return {
-    id: provisionalHandle(email),
+    id: provisionalHandle({ email, handleSecret }),
     name: email,
     displayName: email,
   };
@@ -147,47 +159,54 @@ async function resolveUser({
  * to, and the way in would be a second system prompt straight after the first,
  * which reads as the first one having failed.
  */
-async function afterVerification({
-  context,
+function createAfterVerification({
+  users,
+  verification,
 }: {
-  ctx: GenericEndpointContext;
-  context?: string | null | undefined;
-}): Promise<{ userId: string; name: string }> {
-  const email = requireEmail(context);
-  // Again, because the check in `resolveUser` was one network round trip ago
-  // and an account can be created in that window. The unique index on the
-  // address is the real backstop; this is the one that answers in words.
-  await refuseIfRegistered(email);
+  users: UserService;
+  verification: SignUpVerificationService;
+}) {
+  return async function afterVerification({
+    context,
+  }: {
+    ctx: GenericEndpointContext;
+    context?: string | null | undefined;
+  }): Promise<{ userId: string; name: string }> {
+    const email = requireEmail(context);
+    // Again, because the check in `resolveUser` was one network round trip ago
+    // and an account can be created in that window. The unique index on the
+    // address is the real backstop; this is the one that answers in words.
+    await refuseIfRegistered({ users, email });
 
-  const user = await createPasskeyUser({ prisma, email });
+    const user = await users.createPasskeyUser({ email });
+    trackServerEvent({ userId: user.id, event: "signed_up" });
 
-  // The address confirmation follows them in, exactly as it does on the
-  // password path (ADR-117 §6, revised). Sent from HERE rather than from the
-  // screen because the screen navigates away the moment this returns, and a
-  // send that races a navigation is a send that sometimes does not happen.
-  //
-  // Not awaited and not allowed to fail the ceremony: the account is made and
-  // the person is signed in, so a mailer that is down is not theirs to solve
-  // on the way through the door. It is recoverable from inside the app.
-  //
-  // It can outlive a transaction that then rolls back, in which case a link
-  // arrives for an address with no account behind it. That link does not
-  // break anything — it confirms an address, finds nothing to mark, and lands
-  // on the same "pick a way in" step an unspent link always lands on.
-  void signUpVerification()
-    .requestVerification({ email })
-    .catch((failure: unknown) => {
+    // The address confirmation follows them in, exactly as it does on the
+    // password path (ADR-117 §6, revised). Sent from HERE rather than from the
+    // screen because the screen navigates away the moment this returns, and a
+    // send that races a navigation is a send that sometimes does not happen.
+    //
+    // Not awaited and not allowed to fail the ceremony: the account is made and
+    // the person is signed in, so a mailer that is down is not theirs to solve
+    // on the way through the door. It is recoverable from inside the app.
+    //
+    // It can outlive a transaction that then rolls back, in which case a link
+    // arrives for an address with no account behind it. That link does not
+    // break anything — it confirms an address, finds nothing to mark, and lands
+    // on the same "pick a way in" step an unspent link always lands on.
+    void verification.requestVerification({ email }).catch((failure: unknown) => {
       logger.warn(
         { error: failure, userId: user.id },
         "passkey sign-up could not send the address confirmation",
       );
     });
 
-  return {
-    userId: user.id,
-    // The stored label, where the browser did not supply one. The address is
-    // what somebody scanning a list of passkeys recognises.
-    name: email,
+    return {
+      userId: user.id,
+      // The stored label, where the browser did not supply one. The address is
+      // what somebody scanning a list of passkeys recognises.
+      name: email,
+    };
   };
 }
 
@@ -195,8 +214,15 @@ async function afterVerification({
  * The plugin's `registration` block. Exported whole so the flag that mounts
  * the plugin is the only thing deciding whether any of it exists.
  */
-export const passkeySignUpRegistration = {
-  requireSession: false,
-  resolveUser,
-  afterVerification,
-};
+export function passkeySignUpRegistration(options: {
+  handleSecret: string;
+  users: UserService;
+  verification: SignUpVerificationService;
+}) {
+  return {
+    requireSession: false,
+    resolveUser: ({ ctx, context }: { ctx: GenericEndpointContext; context?: string | null }) =>
+      resolveUser({ ctx, context, users: options.users, handleSecret: options.handleSecret }),
+    afterVerification: createAfterVerification(options),
+  };
+}

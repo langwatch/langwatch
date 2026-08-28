@@ -14,6 +14,8 @@ import { platformSSOAllowed } from "~/runtime/app/features/sso";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
+import type { UserService } from "@langwatch/user-contract";
+import { trackServerEvent } from "~/server/posthog";
 import {
   IdentityBackfillService,
   IdentityEmailService,
@@ -43,7 +45,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { env } from "~/env.mjs";
 import { prisma } from "../../db";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
-import { createCredentialUser } from "../../users/credential-user";
+import type { EmailDeliveryPort } from "../../mailer/providers/types";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { IdentityBirthService } from "./birth";
 import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
@@ -398,16 +400,18 @@ export function joinRequests(): JoinRequestService {
 export function joinRequestsService({
   authzGrants,
   featureFlags,
+  mailer,
 }: {
   authzGrants: AuthzGrantsService;
   featureFlags: FeatureFlagService;
+  mailer: EmailDeliveryPort;
 }): JoinRequestsService {
   return new JoinRequestsService({
     requests: joinRequests(),
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
     membership: new PrismaJoinMembership(prisma, authzGrants),
-    notifier: new EmailJoinRequestNotifier(prisma),
+    notifier: new EmailJoinRequestNotifier(prisma, mailer),
     settings: new PrismaJoinSettings(prisma),
     // The licence asymmetry, stated once: the gate that has always held
     // single sign-on holds AUTOMATIC joining, because that is federation —
@@ -458,24 +462,27 @@ export function connectionGrandfatherMigration(): IdentitySsoConnectionGrandfath
  * the write surface above: it reaches the mailer, and the mailer is the one
  * dependency a test routinely replaces.
  */
-export function signUpVerification(): SignUpVerificationService {
+export function signUpVerification(
+  mailer: EmailDeliveryPort,
+  users: UserService,
+): SignUpVerificationService {
   return new SignUpVerificationService({
     tokens: new PrismaSignUpVerificationTokenStore(prisma),
     directory: new PrismaSignUpAccountDirectory(prisma),
     mailer: {
       sendVerificationLink: ({ email, verificationUrl }) =>
-        sendSignUpVerificationEmail({ email, verificationUrl }),
+        sendSignUpVerificationEmail({ mailer, email, verificationUrl }),
     },
     accounts: {
       createCredentialAccount: async ({ email, passwordHash }) => {
         // Nobody has been asked for a name on this path: the person typed an
         // address and a password into a log-in form. Onboarding asks.
-        await createCredentialUser({
-          prisma,
+        const created = await users.createCredentialUser({
           name: null,
           email,
           passwordHash,
         });
+        trackServerEvent({ userId: created.id, event: "signed_up" });
       },
       markAddressConfirmed: async ({ email }) => {
         // Case-insensitive for the same reason the lookup beside it is: rows

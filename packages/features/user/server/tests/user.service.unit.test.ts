@@ -1,11 +1,7 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  UserAvatarStoragePort,
-  UserCliTokenRevocationPort,
-  UserSessionRevocationPort,
-} from "../src/ports/user.port";
+import { UserAvatarStoragePort } from "../src/ports/user.port";
 import { UserRepository } from "../src/repositories/user.repository";
 import { UserService } from "../src/services/user.service";
 
@@ -31,6 +27,9 @@ class StubRepository extends UserRepository {
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   tryGetAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
+  createCredentialUser = vi.fn(async () => ({ id: user.id }));
+  createPasskeyUser = vi.fn(async () => ({ id: user.id }));
+  hasPassword = vi.fn(async () => true);
   getSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
   getTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
@@ -41,18 +40,10 @@ class StubRepository extends UserRepository {
     dismissedAt,
   }));
   setLastLoginAt = vi.fn(async () => undefined);
-  getLastHomePath = vi.fn(async () => null);
+  tryGetLastHomePath = vi.fn(async () => null);
   setLastHomePath = vi.fn(async () => undefined);
   setDeactivatedAt = vi.fn(async () => user);
   setAvatar = vi.fn(async () => undefined);
-}
-
-class StubSessions extends UserSessionRevocationPort {
-  revokeForUser = vi.fn(async () => undefined);
-}
-
-class StubCliTokens extends UserCliTokenRevocationPort {
-  revokeForUser = vi.fn(async () => undefined);
 }
 
 class StubAvatarStorage extends UserAvatarStoragePort {
@@ -64,8 +55,6 @@ const PNG =
 
 function createService() {
   const repository = new StubRepository();
-  const sessions = new StubSessions();
-  const cliTokens = new StubCliTokens();
   const avatarStorage = new StubAvatarStorage();
   const organizations = {
     ensurePersonalWorkspace: vi.fn(async () => ({
@@ -75,15 +64,11 @@ function createService() {
   return {
     service: UserService.create({
       repository,
-      sessions,
-      cliTokens,
       organizations,
       avatarStorage,
       now: () => new Date(42),
     }),
     repository,
-    sessions,
-    cliTokens,
     avatarStorage,
   };
 }
@@ -92,9 +77,9 @@ describe("UserService", () => {
   it("loads requested profiles through one batched repository read", async () => {
     const { service, repository } = createService();
 
-    await expect(
-      service.getProfiles({ userIds: ["user-1", "user-1", "user-2"] }),
-    ).resolves.toEqual([user]);
+    await expect(service.getProfiles({ userIds: ["user-1", "user-1", "user-2"] })).resolves.toEqual(
+      [user],
+    );
     expect(repository.getProfiles).toHaveBeenCalledWith(["user-1", "user-2"]);
   });
 
@@ -109,25 +94,50 @@ describe("UserService", () => {
     });
   });
 
-  it("revokes browser and CLI sessions after deactivation", async () => {
-    const { service, sessions, cliTokens } = createService();
-    await service.deactivate({ id: "user-1" });
-    expect(sessions.revokeForUser).toHaveBeenCalledWith({ userId: "user-1" });
-    expect(cliTokens.revokeForUser).toHaveBeenCalledWith({ userId: "user-1" });
+  it("creates credential and passkey accounts through its private repository", async () => {
+    const { service, repository } = createService();
+
+    await service.createCredentialUser({
+      name: "Grace",
+      email: "grace@example.com",
+      passwordHash: "hash",
+    });
+    await service.createPasskeyUser({ email: "passkey@example.com" });
+
+    expect(repository.createCredentialUser).toHaveBeenCalledWith({
+      name: "Grace",
+      email: "grace@example.com",
+      passwordHash: "hash",
+    });
+    expect(repository.createPasskeyUser).toHaveBeenCalledWith({
+      email: "passkey@example.com",
+    });
   });
 
-  it("normalizes a changed email and revokes browser sessions", async () => {
-    const { service, repository, sessions } = createService();
+  it("checks whether a credential password exists through its private repository", async () => {
+    const { service, repository } = createService();
+
+    await expect(service.hasPassword({ id: "user-1" })).resolves.toBe(true);
+    expect(repository.hasPassword).toHaveBeenCalledWith("user-1");
+  });
+
+  it("marks a user deactivated", async () => {
+    const { service, repository } = createService();
+    await service.deactivate({ id: "user-1" });
+    expect(repository.setDeactivatedAt).toHaveBeenCalledWith("user-1", new Date(42));
+  });
+
+  it("normalizes a changed email", async () => {
+    const { service, repository } = createService();
     await service.updateProfile({ id: "user-1", email: "NEW@Example.com " });
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
       email: "new@example.com",
     });
-    expect(sessions.revokeForUser).toHaveBeenCalledOnce();
   });
 
-  it("does not revoke sessions for a name-only update", async () => {
-    const { service, repository, sessions } = createService();
+  it("updates a name without changing email", async () => {
+    const { service, repository } = createService();
 
     await service.updateProfile({ id: "user-1", name: "Ada Lovelace" });
 
@@ -135,11 +145,10 @@ describe("UserService", () => {
       id: "user-1",
       name: "Ada Lovelace",
     });
-    expect(sessions.revokeForUser).not.toHaveBeenCalled();
   });
 
-  it("does not revoke sessions for an email case-only update", async () => {
-    const { service, repository, sessions } = createService();
+  it("normalizes an email case-only update", async () => {
+    const { service, repository } = createService();
 
     await service.updateProfile({ id: "user-1", email: "ADA@EXAMPLE.COM" });
 
@@ -147,16 +156,14 @@ describe("UserService", () => {
       id: "user-1",
       email: "ada@example.com",
     });
-    expect(sessions.revokeForUser).not.toHaveBeenCalled();
   });
 
   it("rejects a blank normalized email before writing", async () => {
-    const { service, repository, sessions } = createService();
+    const { service, repository } = createService();
 
     await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow();
 
     expect(repository.updateProfile).not.toHaveBeenCalled();
-    expect(sessions.revokeForUser).not.toHaveBeenCalled();
   });
 
   it("stores avatars through the injected storage capability", async () => {
@@ -182,10 +189,7 @@ describe("UserService", () => {
     await service.dismissTraceExplorerTour({ id: "user-1" });
     await service.updateLastLogin({ id: "user-1" });
     await service.setLastHomePath({ id: "user-1", path: "/me/usage" });
-    expect(repository.setTraceExplorerTourDismissedAt).toHaveBeenCalledWith(
-      "user-1",
-      new Date(42),
-    );
+    expect(repository.setTraceExplorerTourDismissedAt).toHaveBeenCalledWith("user-1", new Date(42));
     expect(repository.setLastLoginAt).toHaveBeenCalledWith("user-1", new Date(42));
     expect(repository.setLastHomePath).toHaveBeenCalledWith("user-1", "/me/usage");
   });

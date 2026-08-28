@@ -1,14 +1,7 @@
-import {
-  Button,
-  Container,
-  Heading,
-  Html,
-  Img,
-  Section,
-  Text,
-} from "@react-email/components";
+import { Button, Container, Heading, Html, Img, Section, Text } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 interface ProjectUsageData {
   id: string;
@@ -373,8 +366,8 @@ const UsageLimitEmailTemplate = ({
             >
               Help Center
             </a>{" "}
-            for more information or feel free to reach out to us. Our support engineers
-            are here to help.
+            for more information or feel free to reach out to us. Our support engineers are here to
+            help.
           </Text>
         </Section>
       </Container>
@@ -383,6 +376,7 @@ const UsageLimitEmailTemplate = ({
 };
 
 export const sendUsageLimitEmail = async ({
+  mailer,
   to,
   organizationName,
   usagePercentage,
@@ -397,6 +391,7 @@ export const sendUsageLimitEmail = async ({
 }: UsageLimitEmailProps & {
   to: string;
   severity: string;
+  mailer: EmailDeliveryPort;
 }) => {
   const subject = `Usage Limit ${severity} - ${usagePercentageFormatted}% of limit reached`;
 
@@ -415,8 +410,7 @@ export const sendUsageLimitEmail = async ({
   );
 
   await sendEmail({
-    to,
-    subject,
-    html: emailHtml,
+    mailer,
+    content: { to, subject, html: emailHtml },
   });
 };

@@ -1,6 +1,7 @@
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 /**
  * "The person you invited says their link expired" (D11).
@@ -13,6 +14,7 @@ import { sendEmail } from "./emailSender";
  * second, unauthenticated way to mint a bearer token.
  */
 export const sendInviteReRequestEmail = async ({
+  mailer,
   adminEmail,
   organizationName,
   invitedEmail,
@@ -22,6 +24,7 @@ export const sendInviteReRequestEmail = async ({
   organizationName: string;
   invitedEmail: string;
   membersSettingsUrl: string;
+  mailer: EmailDeliveryPort;
 }) => {
   const emailHtml = await render(
     <Html lang="en" dir="ltr">
@@ -33,20 +36,16 @@ export const sendInviteReRequestEmail = async ({
           paddingBottom: "12px",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1">An invitation expired</Heading>
         <p>
           <strong>{invitedEmail}</strong> tried to accept their invitation to{" "}
-          <strong>{organizationName}</strong> on LangWatch, but it had already
-          expired. They asked for a new one.
+          <strong>{organizationName}</strong> on LangWatch, but it had already expired. They asked
+          for a new one.
         </p>
         <p>
-          Resending takes one click and sends them a fresh link. The expired one
-          stops working when you do.
+          Resending takes one click and sends them a fresh link. The expired one stops working when
+          you do.
         </p>
         <Button
           href={membersSettingsUrl}
@@ -61,16 +60,19 @@ export const sendInviteReRequestEmail = async ({
           Open members settings
         </Button>
         <p>
-          If you did not mean to invite them, you can ignore this — their
-          expired link already does nothing.
+          If you did not mean to invite them, you can ignore this — their expired link already does
+          nothing.
         </p>
       </Container>
     </Html>,
   );
 
   await sendEmail({
-    to: adminEmail,
-    subject: `${invitedEmail} needs a fresh invitation to ${organizationName}`,
-    html: emailHtml,
+    mailer,
+    content: {
+      to: adminEmail,
+      subject: `${invitedEmail} needs a fresh invitation to ${organizationName}`,
+      html: emailHtml,
+    },
   });
 };

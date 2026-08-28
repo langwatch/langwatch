@@ -78,9 +78,7 @@ function logSseError(err: unknown, logData: Record<string, unknown>, msg: string
   logger[level](
     {
       ...logData,
-      ...(handled
-        ? { handledErrorCode: handled.code, handledErrorFault: handled.fault }
-        : {}),
+      ...(handled ? { handledErrorCode: handled.code, handledErrorFault: handled.fault } : {}),
     },
     msg,
   );
@@ -148,12 +146,14 @@ secured
     // Build context
     const reqShim = buildReqShim(raw);
     const session = await getServerAuthSession({
-      req: raw as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
+      app: c.app,
+      req: raw,
     });
     const ctx = createInnerTRPCContext({
       req: reqShim,
       res: undefined,
       session,
+      app: c.app,
       permissionChecked: false,
       publiclyShared: false,
       // Subscriptions await an event that may never come; without this they stay

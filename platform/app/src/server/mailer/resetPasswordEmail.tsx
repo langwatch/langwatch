@@ -1,13 +1,16 @@
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 export const sendResetPasswordEmail = async ({
+  mailer,
   email,
   resetUrl,
 }: {
   email: string;
   resetUrl: string;
+  mailer: EmailDeliveryPort;
 }) => {
   const emailHtml = await render(
     <Html lang="en" dir="ltr">
@@ -19,15 +22,11 @@ export const sendResetPasswordEmail = async ({
           paddingBottom: "12px",
         }}
       >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
+        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
         <Heading as="h1">Reset your password</Heading>
         <p>
-          We received a request to reset the password for your LangWatch account (
-          <b>{email}</b>). Click the button below to choose a new password:
+          We received a request to reset the password for your LangWatch account (<b>{email}</b>).
+          Click the button below to choose a new password:
         </p>
         <Button
           href={resetUrl}
@@ -42,16 +41,19 @@ export const sendResetPasswordEmail = async ({
           Reset password
         </Button>
         <p>
-          This link expires in 1 hour. If you did not request a password reset, you can
-          safely ignore this email and your password will stay the same.
+          This link expires in 1 hour. If you did not request a password reset, you can safely
+          ignore this email and your password will stay the same.
         </p>
       </Container>
     </Html>,
   );
 
   await sendEmail({
-    to: email,
-    subject: "Reset your LangWatch password",
-    html: emailHtml,
+    mailer,
+    content: {
+      to: email,
+      subject: "Reset your LangWatch password",
+      html: emailHtml,
+    },
   });
 };

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendEmail } from "../emailSender";
 import { sendLicenseEmail } from "../licenseEmail";
+import { TestMailer } from "./mailer.test-double";
 
 vi.mock("../emailSender", () => ({
   sendEmail: vi.fn(),
 }));
 
 const baseParams = {
+  mailer: new TestMailer(),
   email: "buyer@acme.com",
   licenseKey: "dGVzdC1saWNlbnNlLWtleS1jb250ZW50",
   planType: "GROWTH",
@@ -27,7 +29,7 @@ describe("sendLicenseEmail", () => {
       expect(sendEmail).toHaveBeenCalledTimes(1);
       expect(sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: "buyer@acme.com",
+          content: expect.objectContaining({ to: "buyer@acme.com" }),
         }),
       );
     });
@@ -36,7 +38,7 @@ describe("sendLicenseEmail", () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].subject).toContain("LangWatch License");
+      expect(call[0].content.subject).toContain("LangWatch License");
     });
   });
 
@@ -45,36 +47,36 @@ describe("sendLicenseEmail", () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("dGVzdC1saWNlbnNlLWtleS1jb250ZW50");
+      expect(call[0].content.html).toContain("dGVzdC1saWNlbnNlLWtleS1jb250ZW50");
     });
 
     it("contains the plan type", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("Growth");
+      expect(call[0].content.html).toContain("Growth");
     });
 
     it("contains the seat count", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("5");
+      expect(call[0].content.html).toContain("5");
     });
 
     it("contains the expiration date", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("March 2, 2027");
+      expect(call[0].content.html).toContain("March 2, 2027");
     });
 
     it("contains activation instructions", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("Settings");
-      expect(call[0].html).toContain("License");
+      expect(call[0].content.html).toContain("Settings");
+      expect(call[0].content.html).toContain("License");
     });
   });
 
@@ -83,9 +85,9 @@ describe("sendLicenseEmail", () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments).toBeDefined();
-      expect(call[0].attachments).toHaveLength(1);
-      expect(call[0].attachments![0]!.filename).toBe("Acme_Corp.langwatch-license");
+      expect(call[0].content.attachments).toBeDefined();
+      expect(call[0].content.attachments).toHaveLength(1);
+      expect(call[0].content.attachments![0]!.filename).toBe("Acme_Corp.langwatch-license");
     });
 
     it("sanitizes dots in org name to avoid extension confusion", async () => {
@@ -95,7 +97,7 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toBe("acme_corp_inc.langwatch-license");
+      expect(call[0].content.attachments![0]!.filename).toBe("acme_corp_inc.langwatch-license");
     });
 
     it("sanitizes filesystem-unsafe characters from org name", async () => {
@@ -105,9 +107,7 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toBe(
-        "MyCompanyNametest.langwatch-license",
-      );
+      expect(call[0].content.attachments![0]!.filename).toBe("MyCompanyNametest.langwatch-license");
     });
 
     it("uses email as filename when org name is empty", async () => {
@@ -117,21 +117,21 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toBe("buyer@acme_com.langwatch-license");
+      expect(call[0].content.attachments![0]!.filename).toBe("buyer@acme_com.langwatch-license");
     });
 
     it("attaches the license key as file content", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.content).toBe("dGVzdC1saWNlbnNlLWtleS1jb250ZW50");
+      expect(call[0].content.attachments![0]!.content).toBe("dGVzdC1saWNlbnNlLWtleS1jb250ZW50");
     });
 
     it("uses application/octet-stream content type", async () => {
       await sendLicenseEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.contentType).toBe("application/octet-stream");
+      expect(call[0].content.attachments![0]!.contentType).toBe("application/octet-stream");
     });
 
     it("ensures filename always ends with .langwatch-license", async () => {
@@ -141,7 +141,7 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toMatch(/\.langwatch-license$/);
+      expect(call[0].content.attachments![0]!.filename).toMatch(/\.langwatch-license$/);
     });
   });
 });

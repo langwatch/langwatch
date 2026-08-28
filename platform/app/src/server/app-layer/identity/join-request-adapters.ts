@@ -21,6 +21,7 @@ import {
   sendJoinRequestRejectedEmail,
   sendJoinRequestReminderEmail,
 } from "~/server/mailer/joinRequestEmails";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   JoinMembershipPort,
@@ -158,7 +159,10 @@ export class PrismaJoinSettings implements JoinSettingPort {
  * request, not the notification.
  */
 export class EmailJoinRequestNotifier implements JoinRequestNotifier {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly mailer: EmailDeliveryPort,
+  ) {}
 
   async requestArrived({
     joinRequestId,
@@ -181,6 +185,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       what: "requestArrived",
       sends: admins.map((adminEmail) =>
         sendJoinRequestArrivedEmail({
+          mailer: this.mailer,
           adminEmail,
           organizationName,
           requesterName,
@@ -213,6 +218,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       what: "requestStillWaiting",
       sends: admins.map((adminEmail) =>
         sendJoinRequestReminderEmail({
+          mailer: this.mailer,
           adminEmail,
           organizationName,
           requesterName,
@@ -241,6 +247,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       what: "requestApproved",
       sends: [
         sendJoinRequestApprovedEmail({
+          mailer: this.mailer,
           requesterEmail,
           organizationName,
           organizationUrl: env.BASE_HOST,
@@ -266,7 +273,9 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestRejected",
-      sends: [sendJoinRequestRejectedEmail({ requesterEmail, organizationName })],
+      sends: [
+        sendJoinRequestRejectedEmail({ mailer: this.mailer, requesterEmail, organizationName }),
+      ],
     });
   }
 
@@ -287,7 +296,9 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestExpired",
-      sends: [sendJoinRequestExpiredEmail({ requesterEmail, organizationName })],
+      sends: [
+        sendJoinRequestExpiredEmail({ mailer: this.mailer, requesterEmail, organizationName }),
+      ],
     });
   }
 
@@ -312,6 +323,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       what: "joinedAutomatically",
       sends: admins.map((adminEmail) =>
         sendDomainAutoJoinedEmail({
+          mailer: this.mailer,
           adminEmail,
           organizationName,
           memberName,

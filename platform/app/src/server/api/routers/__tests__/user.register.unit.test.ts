@@ -46,7 +46,8 @@ vi.mock("~/utils/getClientIp", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
-vi.mock("~/runtime/app/features/sso", () => ({
+vi.mock("~/runtime/app/features/sso", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/runtime/app/features/sso")>()),
   resolveAuthProvider: resolveAuthProviderMock,
 }));
 
@@ -63,33 +64,31 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 describe("userRouter.register()", () => {
   let userFindFirstMock: ReturnType<typeof vi.fn>;
-  let userCreateMock: ReturnType<typeof vi.fn>;
-  let accountCreateMock: ReturnType<typeof vi.fn>;
+  let createCredentialUserMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     userFindFirstMock = vi.fn().mockResolvedValue(null);
-    userCreateMock = vi
+    createCredentialUserMock = vi
       .fn()
       .mockResolvedValue({ id: "user-1", name: "Alice", email: "a@x.com" });
-    accountCreateMock = vi.fn().mockResolvedValue(undefined);
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
   });
 
   const createCaller = () => {
-    const ctx = createInnerTRPCContext({ session: null });
+    const ctx = createInnerTRPCContext({
+      session: null,
+      app: {
+        users: { createCredentialUser: createCredentialUserMock },
+        permissions: {
+          checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+        },
+      } as never,
+    });
     const prismaMock = {
-      user: { findFirst: userFindFirstMock, create: userCreateMock },
-      account: { create: accountCreateMock },
-      $transaction: vi.fn(
-        async (cb: (tx: unknown) => unknown) =>
-          await cb({
-            user: { create: userCreateMock },
-            account: { create: accountCreateMock },
-          }),
-      ),
+      user: { findFirst: userFindFirstMock },
     };
     (ctx as any).prisma = prismaMock;
     return userRouter.createCaller(ctx);
@@ -127,9 +126,9 @@ describe("userRouter.register()", () => {
         password: "supersecret",
       });
 
-      expect(userCreateMock).toHaveBeenCalledWith({
-        data: { name: "Joel", email: "joel.during@example.com" },
-      });
+      expect(createCredentialUserMock).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Joel", email: "joel.during@example.com" }),
+      );
     });
 
     /** @scenario "A capitalised email creates an account sign-in can find" */
@@ -149,7 +148,7 @@ describe("userRouter.register()", () => {
           email: { equals: "joel.during@example.com", mode: "insensitive" },
         },
       });
-      expect(userCreateMock).not.toHaveBeenCalled();
+      expect(createCredentialUserMock).not.toHaveBeenCalled();
     });
   });
 
@@ -185,7 +184,7 @@ describe("userRouter.register()", () => {
           password: "password-123",
         }),
       ).resolves.toMatchObject({ id: "user-1" });
-      expect(userCreateMock).toHaveBeenCalled();
+      expect(createCredentialUserMock).toHaveBeenCalled();
     });
   });
 
@@ -201,7 +200,7 @@ describe("userRouter.register()", () => {
           password: "password-123",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(userCreateMock).not.toHaveBeenCalled();
+      expect(createCredentialUserMock).not.toHaveBeenCalled();
     });
   });
 });

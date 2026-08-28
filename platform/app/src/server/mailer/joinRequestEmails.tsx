@@ -1,6 +1,7 @@
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+import type { EmailDeliveryPort } from "./providers/types";
 
 /**
  * The four join-request emails (D12).
@@ -19,13 +20,7 @@ import { sendEmail } from "./emailSender";
  * turned them down has learned something that is not theirs.
  */
 
-const shell = ({
-  heading,
-  children,
-}: {
-  heading: string;
-  children: React.ReactNode;
-}) => (
+const shell = ({ heading, children }: { heading: string; children: React.ReactNode }) => (
   <Html lang="en" dir="ltr">
     <Container
       style={{
@@ -35,11 +30,7 @@ const shell = ({
         paddingBottom: "12px",
       }}
     >
-      <Img
-        src="https://app.langwatch.ai/images/logo-icon.png"
-        alt="LangWatch Logo"
-        width="36"
-      />
+      <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
       <Heading as="h1">{heading}</Heading>
       {children}
     </Container>
@@ -63,12 +54,14 @@ const actionButton = (href: string, label: string) => (
 
 /** Somebody on the company domain is waiting. Sent to every admin. */
 export const sendJoinRequestArrivedEmail = async ({
+  mailer,
   adminEmail,
   organizationName,
   requesterName,
   domain,
   membersSettingsUrl,
 }: {
+  mailer: EmailDeliveryPort;
   adminEmail: string;
   organizationName: string;
   requesterName: string;
@@ -81,37 +74,38 @@ export const sendJoinRequestArrivedEmail = async ({
       children: (
         <>
           <p>
-            <strong>{requesterName}</strong> has a verified{" "}
-            <strong>{domain}</strong> address and asked to join{" "}
-            <strong>{organizationName}</strong> on LangWatch.
+            <strong>{requesterName}</strong> has a verified <strong>{domain}</strong> address and
+            asked to join <strong>{organizationName}</strong> on LangWatch.
           </p>
           <p>
-            Approving adds them with your organization&apos;s default role. If
-            they need more than that, send them an invitation instead — that is
-            the flow that carries roles and teams.
+            Approving adds them with your organization&apos;s default role. If they need more than
+            that, send them an invitation instead — that is the flow that carries roles and teams.
           </p>
           {actionButton(membersSettingsUrl, "Open members settings")}
-          <p>
-            If nobody answers, the request lapses on its own after two weeks.
-          </p>
+          <p>If nobody answers, the request lapses on its own after two weeks.</p>
         </>
       ),
     }),
   );
   await sendEmail({
-    to: adminEmail,
-    subject: `${requesterName} asked to join ${organizationName}`,
-    html,
+    mailer,
+    content: {
+      to: adminEmail,
+      subject: `${requesterName} asked to join ${organizationName}`,
+      html,
+    },
   });
 };
 
 /** The one nudge, on the seventh day. */
 export const sendJoinRequestReminderEmail = async ({
+  mailer,
   adminEmail,
   organizationName,
   requesterName,
   membersSettingsUrl,
 }: {
+  mailer: EmailDeliveryPort;
   adminEmail: string;
   organizationName: string;
   requesterName: string;
@@ -123,32 +117,33 @@ export const sendJoinRequestReminderEmail = async ({
       children: (
         <>
           <p>
-            <strong>{requesterName}</strong> asked to join{" "}
-            <strong>{organizationName}</strong> a week ago and nobody has
-            answered yet.
+            <strong>{requesterName}</strong> asked to join <strong>{organizationName}</strong> a
+            week ago and nobody has answered yet.
           </p>
-          <p>
-            It lapses in another week. This is the only reminder we send about
-            it.
-          </p>
+          <p>It lapses in another week. This is the only reminder we send about it.</p>
           {actionButton(membersSettingsUrl, "Open members settings")}
         </>
       ),
     }),
   );
   await sendEmail({
-    to: adminEmail,
-    subject: `${requesterName} is still waiting to join ${organizationName}`,
-    html,
+    mailer,
+    content: {
+      to: adminEmail,
+      subject: `${requesterName} is still waiting to join ${organizationName}`,
+      html,
+    },
   });
 };
 
 /** You are in. Sent to the requester. */
 export const sendJoinRequestApprovedEmail = async ({
+  mailer,
   requesterEmail,
   organizationName,
   organizationUrl,
 }: {
+  mailer: EmailDeliveryPort;
   requesterEmail: string;
   organizationName: string;
   organizationUrl: string;
@@ -159,9 +154,8 @@ export const sendJoinRequestApprovedEmail = async ({
       children: (
         <>
           <p>
-            Your request to join <strong>{organizationName}</strong> on
-            LangWatch was approved. You are a member now, with the
-            organization&apos;s default role.
+            Your request to join <strong>{organizationName}</strong> on LangWatch was approved. You
+            are a member now, with the organization&apos;s default role.
           </p>
           {actionButton(organizationUrl, `Open ${organizationName}`)}
         </>
@@ -169,9 +163,8 @@ export const sendJoinRequestApprovedEmail = async ({
     }),
   );
   await sendEmail({
-    to: requesterEmail,
-    subject: `You are now a member of ${organizationName}`,
-    html,
+    mailer,
+    content: { to: requesterEmail, subject: `You are now a member of ${organizationName}`, html },
   });
 };
 
@@ -179,9 +172,11 @@ export const sendJoinRequestApprovedEmail = async ({
  * It was not approved. No reason, and nobody named — see the module docblock.
  */
 export const sendJoinRequestRejectedEmail = async ({
+  mailer,
   requesterEmail,
   organizationName,
 }: {
+  mailer: EmailDeliveryPort;
   requesterEmail: string;
   organizationName: string;
 }) => {
@@ -191,29 +186,33 @@ export const sendJoinRequestRejectedEmail = async ({
       children: (
         <>
           <p>
-            Your request to join <strong>{organizationName}</strong> on
-            LangWatch was not approved.
+            Your request to join <strong>{organizationName}</strong> on LangWatch was not approved.
           </p>
           <p>
-            If you think that is a mistake, the people who can change it are
-            your colleagues there — ask one of them for an invitation.
+            If you think that is a mistake, the people who can change it are your colleagues there —
+            ask one of them for an invitation.
           </p>
         </>
       ),
     }),
   );
   await sendEmail({
-    to: requesterEmail,
-    subject: `Your request to join ${organizationName} was not approved`,
-    html,
+    mailer,
+    content: {
+      to: requesterEmail,
+      subject: `Your request to join ${organizationName} was not approved`,
+      html,
+    },
   });
 };
 
 /** Nobody answered in time. Sent to the requester, who may ask again. */
 export const sendJoinRequestExpiredEmail = async ({
+  mailer,
   requesterEmail,
   organizationName,
 }: {
+  mailer: EmailDeliveryPort;
   requesterEmail: string;
   organizationName: string;
 }) => {
@@ -223,9 +222,8 @@ export const sendJoinRequestExpiredEmail = async ({
       children: (
         <>
           <p>
-            Nobody answered your request to join{" "}
-            <strong>{organizationName}</strong> on LangWatch within two weeks,
-            so it lapsed.
+            Nobody answered your request to join <strong>{organizationName}</strong> on LangWatch
+            within two weeks, so it lapsed.
           </p>
           <p>You can ask again whenever you like.</p>
         </>
@@ -233,9 +231,12 @@ export const sendJoinRequestExpiredEmail = async ({
     }),
   );
   await sendEmail({
-    to: requesterEmail,
-    subject: `Your request to join ${organizationName} lapsed`,
-    html,
+    mailer,
+    content: {
+      to: requesterEmail,
+      subject: `Your request to join ${organizationName} lapsed`,
+      html,
+    },
   });
 };
 
@@ -246,12 +247,14 @@ export const sendJoinRequestExpiredEmail = async ({
  * nobody in the loop.
  */
 export const sendDomainAutoJoinedEmail = async ({
+  mailer,
   adminEmail,
   organizationName,
   memberName,
   domain,
   membersSettingsUrl,
 }: {
+  mailer: EmailDeliveryPort;
   adminEmail: string;
   organizationName: string;
   memberName: string;
@@ -264,14 +267,13 @@ export const sendDomainAutoJoinedEmail = async ({
       children: (
         <>
           <p>
-            <strong>{memberName}</strong> verified a <strong>{domain}</strong>{" "}
-            address and joined <strong>{organizationName}</strong> on LangWatch
-            with the organization&apos;s default role.
+            <strong>{memberName}</strong> verified a <strong>{domain}</strong> address and joined{" "}
+            <strong>{organizationName}</strong> on LangWatch with the organization&apos;s default
+            role.
           </p>
           <p>
-            They were admitted by your automatic joining setting for that
-            domain, not by anybody clicking approve. You can change that
-            setting, or remove them, from members settings.
+            They were admitted by your automatic joining setting for that domain, not by anybody
+            clicking approve. You can change that setting, or remove them, from members settings.
           </p>
           {actionButton(membersSettingsUrl, "Open members settings")}
         </>
@@ -279,8 +281,11 @@ export const sendDomainAutoJoinedEmail = async ({
     }),
   );
   await sendEmail({
-    to: adminEmail,
-    subject: `${memberName} joined ${organizationName} automatically`,
-    html,
+    mailer,
+    content: {
+      to: adminEmail,
+      subject: `${memberName} joined ${organizationName} automatically`,
+      html,
+    },
   });
 };

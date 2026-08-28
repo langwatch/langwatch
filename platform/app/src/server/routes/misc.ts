@@ -31,10 +31,7 @@ import { AlertType, ExperimentType, TriggerAction } from "~/generated/prisma/cli
 import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import {
-  type TimeseriesInputType,
-  timeseriesSeriesInput,
-} from "~/server/analytics/registry";
+import { type TimeseriesInputType, timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { isDemoProject } from "~/server/api/rbac";
 import {
@@ -75,10 +72,7 @@ import {
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/tracer/collector/cost";
+import { estimateCost, matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
@@ -151,8 +145,7 @@ const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
 // One policy per grain, mirroring the `requireApiKeyPermission` middleware each
 // route applies. A single shared `inRouteAuth` reported nothing at all, so the
 // registry could not tell an analytics read from a trigger management call.
-const IN_ROUTE_REASON =
-  "project auth + permission ceiling enforced by in-route middleware";
+const IN_ROUTE_REASON = "project auth + permission ceiling enforced by in-route middleware";
 const analyticsViewAuth = handlerManagedAuth({
   reason: IN_ROUTE_REASON,
   permissions: ["analytics:view"],
@@ -337,10 +330,7 @@ secured
           userId,
           authToken as string,
         );
-        const expectedUserResponse = await userResponse(
-          userInput,
-          assistantResponse ?? "",
-        );
+        const expectedUserResponse = await userResponse(userInput, assistantResponse ?? "");
         await secondChatMessage(
           userInput,
           assistantResponse ?? "",
@@ -468,10 +458,7 @@ secured.access(experimentsManageAuth).post(
     }
 
     for (const param of params) {
-      if (
-        param.timestamps.created_at &&
-        param.timestamps.created_at.toString().length === 10
-      ) {
+      if (param.timestamps.created_at && param.timestamps.created_at.toString().length === 10) {
         logger.error(
           {
             stepId: param.index,
@@ -490,10 +477,7 @@ secured.access(experimentsManageAuth).post(
       }
     }
 
-    logger.info(
-      { stepCount: params.length, projectId: project.id },
-      "Processing DSPy steps",
-    );
+    logger.info({ stepCount: params.length, projectId: project.id }, "Processing DSPy steps");
 
     for (const param of params) {
       try {
@@ -703,10 +687,7 @@ secured.access(experimentsManageAuth).post(
             });
           }
         } catch {
-          logger.warn(
-            { projectId: project.id },
-            "Failed to build resource limit message",
-          );
+          logger.warn({ projectId: project.id }, "Failed to build resource limit message");
         }
         return c.json(
           {
@@ -745,7 +726,7 @@ secured
     }),
   )
   .post("/mcp/authorize", async (c) => {
-    const session = await getServerAuthSession({ req: c.req.raw as any });
+    const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
     if (!session?.user?.id) {
       return c.json({ error: "Not authenticated" }, 401);
     }
@@ -757,14 +738,8 @@ secured
       return c.json({ error: "Invalid body" }, 400);
     }
 
-    const {
-      projectId,
-      redirect_uri,
-      state,
-      code_challenge,
-      code_challenge_method,
-      client_id,
-    } = body;
+    const { projectId, redirect_uri, state, code_challenge, code_challenge_method, client_id } =
+      body;
 
     if (!projectId || !redirect_uri || !client_id) {
       return c.json({ error: "projectId, redirect_uri and client_id are required" }, 400);
@@ -796,8 +771,7 @@ secured
     if (!registeredClient.redirectUris.includes(redirect_uri)) {
       return c.json(
         {
-          error:
-            "redirect_uri does not match any redirect URI registered for this client_id",
+          error: "redirect_uri does not match any redirect URI registered for this client_id",
         },
         400,
       );
@@ -816,13 +790,7 @@ secured
     // the HandledError envelope nests its own shape, which those clients read
     // as a malformed response. This endpoint speaks the OAuth wire format, so
     // the shape below is the contract; do not "fix" it into the envelope.
-    const errorRedirect = ({
-      error,
-      description,
-    }: {
-      error: string;
-      description: string;
-    }) => {
+    const errorRedirect = ({ error, description }: { error: string; description: string }) => {
       const url = new URL(redirect_uri);
       url.searchParams.set("error", error);
       url.searchParams.set("error_description", description);
@@ -935,12 +903,7 @@ secured
       expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
     });
 
-    await redis.set(
-      `${REDIS_AUTH_CODE_PREFIX}${code}`,
-      authCodeEntry,
-      "EX",
-      AUTH_CODE_TTL_SECONDS,
-    );
+    await redis.set(`${REDIS_AUTH_CODE_PREFIX}${code}`, authCodeEntry, "EX", AUTH_CODE_TTL_SECONDS);
 
     const redirectUrl = new URL(redirect_uri);
     redirectUrl.searchParams.set("code", code);
@@ -966,8 +929,7 @@ const workflowRunResponses = {
     },
   },
   400: {
-    description:
-      "The request was not sent as application/json, or the body was not valid JSON",
+    description: "The request was not sent as application/json, or the body was not valid JSON",
     content: {
       "application/json": {
         schema: resolver(z.object({ message: z.string() })),
@@ -1008,8 +970,7 @@ const workflowRunRequestBody = {
       schema: {
         type: "object" as const,
         additionalProperties: true,
-        description:
-          "The workflow's input fields, named as the workflow's entry node names them",
+        description: "The workflow's input fields, named as the workflow's entry node names them",
       },
     },
   },
@@ -1106,10 +1067,7 @@ secured.access(tracesCreateAuth).post(
     try {
       body = trackEventRESTParamsValidatorSchema.parse(rawBody);
     } catch (error) {
-      logger.error(
-        { error, body: rawBody, projectId: project.id },
-        "invalid event received",
-      );
+      logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
       captureException(toError(error));
       return c.json({ error: zodErrorMessage(error) }, 400);
     }
@@ -1118,10 +1076,7 @@ secured.access(tracesCreateAuth).post(
       try {
         predefinedEventsSchemas.parse(rawBody);
       } catch (error) {
-        logger.error(
-          { error, body: rawBody, projectId: project.id },
-          "invalid event received",
-        );
+        logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
         captureException(toError(error));
         return c.json({ error: zodErrorMessage(error) }, 400);
       }
@@ -1203,10 +1158,7 @@ interface TrackUsageRateLimitVerdict {
   retryAfterSeconds: number;
 }
 
-function toVerdict(result: {
-  allowed: boolean;
-  resetAt: number;
-}): TrackUsageRateLimitVerdict {
+function toVerdict(result: { allowed: boolean; resetAt: number }): TrackUsageRateLimitVerdict {
   return {
     allowed: result.allowed,
     retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000)),
@@ -1218,9 +1170,7 @@ function toVerdict(result: {
  * influence, so a flood of malformed JSON is capped exactly like valid
  * traffic — an attacker can't dodge the limiter just by sending garbage.
  */
-async function enforceGlobalAndIpRateLimit(
-  ip: string,
-): Promise<TrackUsageRateLimitVerdict> {
+async function enforceGlobalAndIpRateLimit(ip: string): Promise<TrackUsageRateLimitVerdict> {
   const global = await rateLimit({
     key: "track_usage:global",
     windowSeconds: 60,
@@ -1236,9 +1186,7 @@ async function enforceGlobalAndIpRateLimit(
   return toVerdict(perIp);
 }
 
-async function enforceInstanceRateLimit(
-  instanceId: string,
-): Promise<TrackUsageRateLimitVerdict> {
+async function enforceInstanceRateLimit(instanceId: string): Promise<TrackUsageRateLimitVerdict> {
   const perInstance = await rateLimit({
     key: `track_usage:instance:${instanceId}`,
     windowSeconds: 3600,
@@ -1514,10 +1462,7 @@ secured
     const sig = c.req.header("stripe-signature");
     const secret = env.STRIPE_WEBHOOK_SECRET;
     if (!sig || !secret) {
-      logger.error(
-        { sig: !!sig, secret: !!secret },
-        "[stripeWebhook] Missing signature or secret",
-      );
+      logger.error({ sig: !!sig, secret: !!secret }, "[stripeWebhook] Missing signature or secret");
       return c.text("Webhook Error: Missing signature or secret", 400);
     }
 
@@ -1559,13 +1504,9 @@ const generateHash = (data: object) => {
 const extractLLMCallInfo =
   (llmModelCosts: MaybeStoredLLMModelCost[]) =>
   (call: DSPyLLMCall): DSPyLLMCall => {
-    if (
-      call.__class__ === "dsp.modules.gpt3.GPT3" ||
-      call.response?.object === "chat.completion"
-    ) {
+    if (call.__class__ === "dsp.modules.gpt3.GPT3" || call.response?.object === "chat.completion") {
       const model = call.response?.model;
-      const llmModelCost =
-        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
+      const llmModelCost = model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
       const promptTokens = call.response?.usage?.prompt_tokens;
       const completionTokens = call.response?.usage?.completion_tokens;
       const cost =
@@ -1809,15 +1750,7 @@ const ragMessage = async (authToken: string) => {
     )
   ).map((c) => c.choices[0]!.message.content ?? "");
 
-  await langwatchAPI(
-    completion,
-    userInput,
-    authToken,
-    threadId,
-    userId,
-    "rag",
-    completions,
-  );
+  await langwatchAPI(completion, userInput, authToken, threadId, userId, "rag", completions);
   return completion.choices[0]!.message.content;
 };
 

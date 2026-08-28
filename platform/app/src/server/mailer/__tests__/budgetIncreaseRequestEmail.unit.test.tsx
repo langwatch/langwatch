@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendBudgetIncreaseRequestEmail } from "../budgetIncreaseRequestEmail";
 import { sendEmail } from "../emailSender";
+import { TestMailer } from "./mailer.test-double";
 
 vi.mock("../emailSender", () => ({
   sendEmail: vi.fn(),
 }));
 
 const baseParams = {
+  mailer: new TestMailer(),
   to: "admin@acme.test",
   requesterEmail: "developer@acme.test",
   requesterName: "Jane Developer",
@@ -29,7 +31,7 @@ describe("sendBudgetIncreaseRequestEmail", () => {
 
       expect(sendEmail).toHaveBeenCalledTimes(1);
       expect(sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ to: "admin@acme.test" }),
+        expect.objectContaining({ content: expect.objectContaining({ to: "admin@acme.test" }) }),
       );
     });
 
@@ -37,8 +39,8 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].subject).toContain("Budget increase requested");
-      expect(call[0].subject).toContain("developer@acme.test");
+      expect(call[0].content.subject).toContain("Budget increase requested");
+      expect(call[0].content.subject).toContain("developer@acme.test");
     });
   });
 
@@ -47,19 +49,19 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("Jane Developer");
-      expect(call[0].html).toContain("developer@acme.test");
-      expect(call[0].html).toContain("ACME Corp");
+      expect(call[0].content.html).toContain("Jane Developer");
+      expect(call[0].content.html).toContain("developer@acme.test");
+      expect(call[0].content.html).toContain("ACME Corp");
     });
 
     it("includes the spend / limit / period context", async () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("usr_xyz");
-      expect(call[0].html).toContain("10.00");
-      expect(call[0].html).toContain("12.50");
-      expect(call[0].html).toContain("monthly");
+      expect(call[0].content.html).toContain("usr_xyz");
+      expect(call[0].content.html).toContain("10.00");
+      expect(call[0].content.html).toContain("12.50");
+      expect(call[0].content.html).toContain("monthly");
     });
 
     describe("when the user attached a free-form message", () => {
@@ -70,8 +72,8 @@ describe("sendBudgetIncreaseRequestEmail", () => {
         });
 
         const call = vi.mocked(sendEmail).mock.calls[0]!;
-        expect(call[0].html).toContain("Message from the user");
-        expect(call[0].html).toContain("Need it for the demo on Friday");
+        expect(call[0].content.html).toContain("Message from the user");
+        expect(call[0].content.html).toContain("Need it for the demo on Friday");
       });
     });
 
@@ -80,7 +82,7 @@ describe("sendBudgetIncreaseRequestEmail", () => {
         await sendBudgetIncreaseRequestEmail(baseParams);
 
         const call = vi.mocked(sendEmail).mock.calls[0]!;
-        expect(call[0].html).not.toContain("Message from the user");
+        expect(call[0].content.html).not.toContain("Message from the user");
       });
     });
 
@@ -88,8 +90,8 @@ describe("sendBudgetIncreaseRequestEmail", () => {
       await sendBudgetIncreaseRequestEmail(baseParams);
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].html).toContain("/gateway/budgets");
-      expect(call[0].html).toContain("Approve via LangWatch");
+      expect(call[0].content.html).toContain("/gateway/budgets");
+      expect(call[0].content.html).toContain("Approve via LangWatch");
     });
   });
 });

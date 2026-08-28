@@ -128,7 +128,8 @@ function createHandler(app: App) {
           const reqShim = buildReqShim(req);
 
           const session = await getServerAuthSession({
-            req: req as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
+            app,
+            req,
           });
 
           return createInnerTRPCContext({

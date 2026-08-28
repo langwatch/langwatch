@@ -5,8 +5,8 @@ import type {
   TestFireWebhook,
 } from "@langwatch/automation-server";
 import { AutomationTestFirePort } from "@langwatch/automation-server";
-import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
 import { computeDefaultFrom, sendEmail } from "~/server/mailer/emailSender";
+import type { EmailDeliveryPort } from "~/server/mailer/providers/types";
 import {
   buildTriggerNoReplyAddress,
   TEST_FIRE_TRIGGER_ID_SENTINEL,
@@ -14,27 +14,32 @@ import {
 import { assertWebhookDelivered, sendWebhook } from "~/server/webhooks/sendWebhook";
 import { isSlackWebhookUrl } from "@langwatch/automation-contract";
 import { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
+import { AppSlackWebhookClientAdapter } from "~/runtime/app/features/automation-adapters/delivery/slack-webhook.client.adapter";
 
 export class AppAutomationTestFireAdapter extends AutomationTestFirePort {
-  private constructor() {
+  private constructor(
+    private readonly mailer: EmailDeliveryPort,
+    private readonly slackWebhook: AppSlackWebhookClientAdapter,
+  ) {
     super();
   }
 
-  static create(): AppAutomationTestFireAdapter {
-    return new AppAutomationTestFireAdapter();
+  static create(
+    mailer: EmailDeliveryPort,
+    slackWebhook = AppSlackWebhookClientAdapter.create(),
+  ): AppAutomationTestFireAdapter {
+    return new AppAutomationTestFireAdapter(mailer, slackWebhook);
   }
 
   async sendEmail(input: TestFireEmail): Promise<void> {
     const to = buildTriggerNoReplyAddress({
-      defaultFrom: computeDefaultFrom(),
+      defaultFrom: computeDefaultFrom(this.mailer),
       triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
     });
 
     await sendEmail({
-      to,
-      bcc: input.recipients,
-      subject: input.subject,
-      html: input.html,
+      mailer: this.mailer,
+      content: { to, bcc: input.recipients, subject: input.subject, html: input.html },
     });
   }
 
@@ -43,7 +48,10 @@ export class AppAutomationTestFireAdapter extends AutomationTestFirePort {
       throw new Error("Slack webhook must be a valid https://hooks.slack.com/ URL.");
     }
 
-    await new IncomingWebhook(input.webhook).send(input.payload as IncomingWebhookSendArguments);
+    await this.slackWebhook.send({
+      webhook: input.webhook,
+      payload: input.payload,
+    });
   }
 
   async sendSlackBot(input: TestFireSlackBot): Promise<void> {

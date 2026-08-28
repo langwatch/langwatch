@@ -24,11 +24,15 @@ vi.mock("../../rbac", async (importOriginal) => {
 describe("userRouter", () => {
   let deactivate: ReturnType<typeof vi.fn>;
   let reactivate: ReturnType<typeof vi.fn>;
+  let revokeAllBrowserSessions: ReturnType<typeof vi.fn>;
+  let cliTokenRevokeForUser: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     deactivate = vi.fn().mockResolvedValue({ id: "user-1" });
     reactivate = vi.fn().mockResolvedValue({ id: "user-1" });
+    revokeAllBrowserSessions = vi.fn().mockResolvedValue(undefined);
+    cliTokenRevokeForUser = vi.fn().mockResolvedValue(undefined);
   });
 
   const createCaller = (email = "admin@example.com") => {
@@ -39,6 +43,11 @@ describe("userRouter", () => {
       },
       app: {
         users: { deactivate, reactivate },
+        auth: { revokeAllBrowserSessions },
+        governance: { cliTokenRevokeForUser },
+        permissions: {
+          checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+        },
         ops: { isAdmin: ({ email }: { email: string }) => email === "admin@example.com" },
       } as never,
     });
@@ -51,6 +60,8 @@ describe("userRouter", () => {
       it("delegates deactivation to the User service", async () => {
         await createCaller().deactivate({ userId: "user-1" });
         expect(deactivate).toHaveBeenCalledWith({ id: "user-1" });
+        expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
+        expect(cliTokenRevokeForUser).toHaveBeenCalledWith({ userId: "user-1" });
       });
     });
 
@@ -61,6 +72,8 @@ describe("userRouter", () => {
         });
 
         expect(deactivate).toHaveBeenCalledWith({ id: "caller-1" });
+        expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "caller-1" });
+        expect(cliTokenRevokeForUser).toHaveBeenCalledWith({ userId: "caller-1" });
       });
 
       it("rejects the request", async () => {

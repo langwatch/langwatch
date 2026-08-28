@@ -1,18 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { env } from "../../../env.mjs";
 import { sanitizeHeaders } from "./mime";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
   type EmailProviderPort,
+  type MailerConfiguration,
   toArray,
 } from "./types";
 
 const logger = createLogger("langwatch:mailer:smtp");
 
-export const isSmtpConfigured = (): boolean => Boolean(env.SMTP_URL ?? env.SMTP_HOST);
+export const isSmtpConfigured = (configuration: MailerConfiguration["smtp"]): boolean =>
+  Boolean(configuration.url ?? configuration.host);
 
 /**
  * Nodemailer's own defaults let a send hang for minutes (2m to connect, 10m of
@@ -33,29 +34,31 @@ const SMTP_TIMEOUTS = {
  * host reachable directly, so honouring a globally-set HTTPS_PROXY would break
  * deployments that set it for vendor API egress only.
  */
-export const buildSmtpTransportOptions = (): SMTPTransport.Options => {
-  if (env.SMTP_URL) return { url: env.SMTP_URL, ...SMTP_TIMEOUTS };
+export const buildSmtpTransportOptions = (
+  configuration: MailerConfiguration["smtp"],
+): SMTPTransport.Options => {
+  if (configuration.url) return { url: configuration.url, ...SMTP_TIMEOUTS };
 
-  const host = env.SMTP_HOST;
+  const host = configuration.host;
   if (!host) {
     throw new EmailProviderConfigurationError(
       "EMAIL_PROVIDER is 'smtp' but neither SMTP_URL nor SMTP_HOST is set.",
     );
   }
 
-  const port = env.SMTP_PORT ? Number(env.SMTP_PORT) : 587;
+  const port = configuration.port ? Number(configuration.port) : 587;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new EmailProviderConfigurationError(
-      `SMTP_PORT must be an integer between 1 and 65535, got "${env.SMTP_PORT}".`,
+      `SMTP_PORT must be an integer between 1 and 65535, got "${configuration.port}".`,
     );
   }
 
   // Implicit TLS is the norm on 465; everything else starts plaintext and
   // upgrades via STARTTLS, which nodemailer does automatically when offered.
-  const secure = env.SMTP_SECURE ? env.SMTP_SECURE === "true" : port === 465;
+  const secure = configuration.secure ? configuration.secure === "true" : port === 465;
 
-  const user = env.SMTP_USER;
-  const pass = env.SMTP_PASSWORD;
+  const user = configuration.user;
+  const pass = configuration.password;
 
   return {
     host,
@@ -67,11 +70,26 @@ export const buildSmtpTransportOptions = (): SMTPTransport.Options => {
   };
 };
 
-export const smtpProvider: EmailProviderPort = {
-  name: "smtp",
+/** A process-owned SMTP connection pool, reused across notification deliveries. */
+export class SmtpEmailProvider implements EmailProviderPort {
+  readonly name = "smtp" as const;
+
+  static create(configuration: MailerConfiguration["smtp"]): SmtpEmailProvider {
+    return new SmtpEmailProvider(configuration);
+  }
+
+  private transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
+
+  private closed = false;
+
+  private constructor(private readonly configuration: MailerConfiguration["smtp"]) {}
+
   async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
+    if (this.closed) throw new Error("SMTP email provider is closed.");
     logger.info("Sending email using SMTP");
-    const transporter = nodemailer.createTransport(buildSmtpTransportOptions());
+    const transporter = (this.transporter ??= nodemailer.createTransport(
+      buildSmtpTransportOptions(this.configuration),
+    ));
 
     const bccAddresses = toArray(content.bcc);
 
@@ -117,8 +135,12 @@ export const smtpProvider: EmailProviderPort = {
     } catch (error) {
       logger.error({ error }, "Error sending email with SMTP");
       throw error;
-    } finally {
-      transporter.close();
     }
-  },
-};
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+    this.transporter?.close();
+    this.transporter = undefined;
+  }
+}

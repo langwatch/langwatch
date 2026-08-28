@@ -16,9 +16,13 @@ vi.mock("../emailSender", () => ({
 
 import { injectFooterIntoBody, sendTriggerEmail } from "../triggerEmail";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../triggerNoReply";
+import { TestMailer } from "./mailer.test-double";
+
+const mailer = new TestMailer();
 
 function callEmailWithDedup(sent: Set<string>, overrides?: { triggerEmails?: string[] }) {
   return sendTriggerEmail({
+    mailer,
     triggerEmails: overrides?.triggerEmails ?? ["user@example.com", "other@example.com"],
     triggerData,
     triggerName: "Quality Alert",
@@ -46,6 +50,7 @@ const triggerData: TriggerData[] = [
 
 function callEmail(overrides?: { triggerId?: string }) {
   return sendTriggerEmail({
+    mailer,
     triggerEmails: ["user@example.com", "other@example.com"],
     triggerData,
     triggerName: "Quality Alert",
@@ -107,12 +112,12 @@ describe("sendTriggerEmail", () => {
       await callEmail();
       expect(sendEmailMock).toHaveBeenCalledTimes(2);
       const recipients = sendEmailMock.mock.calls.map(
-        (c) => (c[0] as { bcc: string[] }).bcc,
+        (c) => (c[0] as { content: { bcc: string[] } }).content.bcc,
       );
       expect(recipients).toEqual([["user@example.com"], ["other@example.com"]]);
       for (const call of sendEmailMock.mock.calls) {
-        const args = call[0] as { to: string };
-        expect(args.to).toMatch(
+        const args = call[0] as { content: { to: string } };
+        expect(args.content.to).toMatch(
           /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/,
         );
       }
@@ -127,19 +132,19 @@ describe("sendTriggerEmail", () => {
       const expectedRecipients = ["user@example.com", "other@example.com"];
       sendEmailMock.mock.calls.forEach((call, i) => {
         const args = call[0] as {
-          bcc: string[];
-          html: string;
-          headers: Record<string, string>;
+          content: {
+            bcc: string[];
+            html: string;
+            headers: Record<string, string>;
+          };
         };
-        expect(args.bcc).toEqual([expectedRecipients[i]]);
-        expect(args.html).toContain("Stop receiving this notification");
-        expect(args.html).toContain("Stop all notifications from this project");
-        expect(args.html).toContain("/unsubscribe?token=");
-        expect(args.headers["List-Unsubscribe"]).toMatch(
-          /^<.*\/api\/unsubscribe\?token=/,
-        );
-        expect(args.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
-        const match = args.headers["List-Unsubscribe"]!.match(/token=([^>&]+)/);
+        expect(args.content.bcc).toEqual([expectedRecipients[i]]);
+        expect(args.content.html).toContain("Stop receiving this notification");
+        expect(args.content.html).toContain("Stop all notifications from this project");
+        expect(args.content.html).toContain("/unsubscribe?token=");
+        expect(args.content.headers["List-Unsubscribe"]).toMatch(/^<.*\/api\/unsubscribe\?token=/);
+        expect(args.content.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+        const match = args.content.headers["List-Unsubscribe"]!.match(/token=([^>&]+)/);
         expect(match).not.toBeNull();
         tokens.push(match![1]!);
       });
@@ -155,17 +160,16 @@ describe("sendTriggerEmail", () => {
 
       for (const call of sendEmailMock.mock.calls) {
         const args = call[0] as {
-          html: string;
-          headers: Record<string, string>;
+          content: { html: string; headers: Record<string, string> };
         };
         // RFC 8058: the machine-readable POST endpoint is /api/unsubscribe
-        expect(args.headers["List-Unsubscribe"]).toMatch(
+        expect(args.content.headers["List-Unsubscribe"]).toMatch(
           /^<[^>]*\/api\/unsubscribe\?token=/,
         );
         // Human-readable footer link remains on the page route /unsubscribe
-        expect(args.html).toContain("/unsubscribe?token=");
+        expect(args.content.html).toContain("/unsubscribe?token=");
         // Footer must NOT point at the API endpoint
-        expect(args.html).not.toContain("/api/unsubscribe");
+        expect(args.content.html).not.toContain("/api/unsubscribe");
       }
     });
 
@@ -173,10 +177,10 @@ describe("sendTriggerEmail", () => {
       it("injects the footer inside the body, not after </body>", async () => {
         sendEmailMock.mockResolvedValue(undefined);
         await callEmail();
-        const args = sendEmailMock.mock.calls[0]![0] as { html: string };
-        if (/<\/body>/i.test(args.html)) {
-          const footerIdx = args.html.indexOf("Stop receiving this notification");
-          const bodyCloseIdx = args.html.search(/<\/body>/i);
+        const args = sendEmailMock.mock.calls[0]![0] as { content: { html: string } };
+        if (/<\/body>/i.test(args.content.html)) {
+          const footerIdx = args.content.html.indexOf("Stop receiving this notification");
+          const bodyCloseIdx = args.content.html.search(/<\/body>/i);
           expect(footerIdx).toBeGreaterThanOrEqual(0);
           expect(footerIdx).toBeLessThan(bodyCloseIdx);
         }
@@ -187,11 +191,10 @@ describe("sendTriggerEmail", () => {
       sendEmailMock.mockResolvedValue(undefined);
       await callEmail({ triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL });
       const args = sendEmailMock.mock.calls[0]![0] as {
-        html: string;
-        headers?: Record<string, string>;
+        content: { html: string; headers?: Record<string, string> };
       };
-      expect(args.html).not.toContain("/unsubscribe?token=");
-      expect(args.headers).toBeUndefined();
+      expect(args.content.html).not.toContain("/unsubscribe?token=");
+      expect(args.content.headers).toBeUndefined();
     });
 
     describe("given a malformed recipient address in the list", () => {
@@ -201,6 +204,7 @@ describe("sendTriggerEmail", () => {
         // sendPerRecipient must drop it before it reaches the provider's bcc
         // slot, so exactly one envelope (the valid address) is sent.
         await sendTriggerEmail({
+          mailer,
           triggerEmails: ["ok@x.com", "evil@x.com\nBcc: victim@y.com"],
           triggerData,
           triggerName: "Quality Alert",
@@ -212,7 +216,7 @@ describe("sendTriggerEmail", () => {
         });
 
         expect(sendEmailMock).toHaveBeenCalledTimes(1);
-        const bcc = (sendEmailMock.mock.calls[0]![0] as { bcc: string[] }).bcc;
+        const bcc = (sendEmailMock.mock.calls[0]![0] as { content: { bcc: string[] } }).content.bcc;
         expect(bcc).toEqual(["ok@x.com"]);
         // The smuggled address never reaches the provider in any form.
         const allArgs = JSON.stringify(sendEmailMock.mock.calls);
@@ -240,7 +244,7 @@ describe("sendTriggerEmail", () => {
           // Attempt 1 stopped at the failing recipient 2 — recipient 3 was
           // never reached.
           const firstAttemptBccs = sendEmailMock.mock.calls.map(
-            (c) => (c[0] as { bcc: string[] }).bcc,
+            (c) => (c[0] as { content: { bcc: string[] } }).content.bcc,
           );
           expect(firstAttemptBccs).toEqual([["a@x.com"], ["b@x.com"]]);
 
@@ -251,7 +255,7 @@ describe("sendTriggerEmail", () => {
           await callEmailWithDedup(sent, { triggerEmails: recipients });
 
           const retryBccs = sendEmailMock.mock.calls.map(
-            (c) => (c[0] as { bcc: string[] }).bcc,
+            (c) => (c[0] as { content: { bcc: string[] } }).content.bcc,
           );
           expect(retryBccs).toEqual([["b@x.com"], ["c@x.com"]]);
         });
@@ -281,7 +285,8 @@ describe("sendTriggerEmail", () => {
 
           // Only the second recipient should be sent on retry.
           expect(sendEmailMock).toHaveBeenCalledTimes(1);
-          const retrySentBcc = (sendEmailMock.mock.calls[0]![0] as { bcc: string[] }).bcc;
+          const retrySentBcc = (sendEmailMock.mock.calls[0]![0] as { content: { bcc: string[] } })
+            .content.bcc;
           expect(retrySentBcc).toEqual(["other@example.com"]);
         });
       });
