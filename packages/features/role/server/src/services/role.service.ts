@@ -41,10 +41,7 @@ export class RoleService extends RoleServiceContract {
     return role;
   }
 
-  async getForOrganization(input: {
-    roleId: string;
-    organizationId: string;
-  }): Promise<Role> {
+  async getForOrganization(input: { roleId: string; organizationId: string }): Promise<Role> {
     const role = await this.deps.repository.tryFindCustomByIdInOrganization(input);
     if (!role) throw new RoleNotFoundError(input.roleId);
     return role;
@@ -64,11 +61,7 @@ export class RoleService extends RoleServiceContract {
     return this.deps.repository.create(input);
   }
 
-  async update(input: {
-    roleId: string;
-    changes: RoleUpdate;
-    actor: LedgerActor;
-  }): Promise<Role> {
+  async update(input: { roleId: string; changes: RoleUpdate; actor: LedgerActor }): Promise<Role> {
     this.assertName(input.changes.name);
     const existing = await this.get({ roleId: input.roleId });
     return this.deps.repository.update({
@@ -94,8 +87,7 @@ export class RoleService extends RoleServiceContract {
       changes: input.changes,
       actor: input.actor,
     });
-    if (updated.organizationId !== input.organizationId)
-      throw new RoleNotFoundError(input.roleId);
+    if (updated.organizationId !== input.organizationId) throw new RoleNotFoundError(input.roleId);
     return updated;
   }
 
@@ -137,10 +129,7 @@ export class RoleService extends RoleServiceContract {
     return { success: true };
   }
 
-  async remove(input: {
-    roleId: string;
-    actor: LedgerActor;
-  }): Promise<{ success: true }> {
+  async remove(input: { roleId: string; actor: LedgerActor }): Promise<{ success: true }> {
     const role = await this.get({ roleId: input.roleId });
     return this.delete({
       roleId: role.id,
@@ -169,8 +158,7 @@ export class RoleService extends RoleServiceContract {
     ]);
     if (!role || role.kind !== "custom") throw new RoleNotFoundError(input.customRoleId);
     if (!team) throw new TeamNotFoundError();
-    if (role.organizationId !== team.organizationId)
-      throw new RoleOrganizationMismatchError();
+    if (role.organizationId !== team.organizationId) throw new RoleOrganizationMismatchError();
     const exclusivePermission = role.permissions.find((permission) =>
       this.deps.permission.isOrganizationExclusive(permission),
     );
@@ -205,6 +193,12 @@ export class RoleService extends RoleServiceContract {
     return { success: true };
   }
 
+  async getAssignmentOrganization(input: { teamId: string }): Promise<string> {
+    const team = await this.deps.repository.tryFindTeam(input.teamId);
+    if (!team) throw new TeamNotFoundError();
+    return team.organizationId;
+  }
+
   tryGetUserBinding(input: {
     userId: string;
     organizationId: string;
@@ -213,23 +207,14 @@ export class RoleService extends RoleServiceContract {
     return this.deps.repository.tryFindUserBinding(input);
   }
 
-  async validateAssignable(input: {
-    roleIds: string[];
-    organizationId: string;
-  }): Promise<void> {
+  async validateAssignable(input: { roleIds: string[]; organizationId: string }): Promise<void> {
     if (input.roleIds.length === 0) return;
-    const valid = await this.deps.repository.findAssignable(
-      input.roleIds,
-      input.organizationId,
-    );
+    const valid = await this.deps.repository.findAssignable(input.roleIds, input.organizationId);
     if (input.roleIds.some((id) => !valid.some((role) => role.id === id)))
       throw new RoleNotAssignableError();
   }
 
-  filterAssignable(input: {
-    roleIds: string[];
-    organizationId: string;
-  }): Promise<string[]> {
+  filterAssignable(input: { roleIds: string[]; organizationId: string }): Promise<string[]> {
     if (input.roleIds.length === 0) return Promise.resolve([]);
     return this.deps.repository
       .findAssignable(input.roleIds, input.organizationId)
@@ -240,9 +225,7 @@ export class RoleService extends RoleServiceContract {
     organizationId: string;
     customBindings: Array<{ customRoleId: string; scopeType: RoleBindingScopeType }>;
   }): Promise<void> {
-    const bindings = input.customBindings.filter(
-      (binding) => binding.scopeType !== "ORGANIZATION",
-    );
+    const bindings = input.customBindings.filter((binding) => binding.scopeType !== "ORGANIZATION");
     if (bindings.length === 0) return;
     const roles = await this.deps.repository.findAssignablePermissions(
       [...new Set(bindings.map((binding) => binding.customRoleId))],

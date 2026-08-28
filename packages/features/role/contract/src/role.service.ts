@@ -4,10 +4,7 @@ import type { Role, RoleCreate, RoleBindingScopeType, RoleUpdate } from "./role"
 export abstract class RoleService {
   abstract list(input: { organizationId: string }): Promise<Role[]>;
   abstract get(input: { roleId: string }): Promise<Role>;
-  abstract getForOrganization(input: {
-    roleId: string;
-    organizationId: string;
-  }): Promise<Role>;
+  abstract getForOrganization(input: { roleId: string; organizationId: string }): Promise<Role>;
   abstract tryGet(input: { roleId: string }): Promise<Role | null>;
   abstract create(input: { role: RoleCreate; actor: LedgerActor }): Promise<Role>;
   abstract update(input: {
@@ -21,10 +18,7 @@ export abstract class RoleService {
     changes: RoleUpdate;
     actor: LedgerActor;
   }): Promise<Role>;
-  abstract remove(input: {
-    roleId: string;
-    actor: LedgerActor;
-  }): Promise<{ success: true }>;
+  abstract remove(input: { roleId: string; actor: LedgerActor }): Promise<{ success: true }>;
   abstract removeForOrganization(input: {
     roleId: string;
     organizationId: string;
@@ -41,15 +35,13 @@ export abstract class RoleService {
     teamId: string;
     actor: LedgerActor;
   }): Promise<{ success: true }>;
+  abstract getAssignmentOrganization(input: { teamId: string }): Promise<string>;
   abstract tryGetUserBinding(input: {
     userId: string;
     organizationId: string;
     teamId: string;
   }): Promise<{ customRoleId: string } | null>;
-  abstract validateAssignable(input: {
-    roleIds: string[];
-    organizationId: string;
-  }): Promise<void>;
+  abstract validateAssignable(input: { roleIds: string[]; organizationId: string }): Promise<void>;
   abstract filterAssignable(input: {
     roleIds: string[];
     organizationId: string;
@@ -58,10 +50,7 @@ export abstract class RoleService {
     organizationId: string;
     customBindings: Array<{ customRoleId: string; scopeType: RoleBindingScopeType }>;
   }): Promise<void>;
-  abstract isExclusiveToApiKey(input: {
-    roleId: string;
-    apiKeyId: string;
-  }): Promise<boolean>;
+  abstract isExclusiveToApiKey(input: { roleId: string; apiKeyId: string }): Promise<boolean>;
   abstract removeExclusiveApiKeyRoles(input: {
     roleIds: string[];
     apiKeyId: string;

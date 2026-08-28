@@ -1,5 +1,6 @@
 import { ledgerActorFor } from "@langwatch/actor";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
+import { TeamNotFoundError } from "@langwatch/role-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { App } from "~/server/app-layer/app";
@@ -174,16 +175,20 @@ export const roleRouter = createTRPCRouter({
     // so plan detail is never revealed to a caller who couldn't manage.
     .permission("organization:manage", { via: "teamId" })
     .mutation(async ({ ctx, input }) => {
-      const team = await ctx.prisma.team.findUnique({
-        where: { id: input.teamId },
-        select: { organizationId: true },
-      });
-      if (!team) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      let organizationId: string;
+      try {
+        organizationId = await ctx.app.roles.getAssignmentOrganization({
+          teamId: input.teamId,
+        });
+      } catch (error) {
+        if (error instanceof TeamNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+        }
+        throw error;
       }
       await assertEnterprisePlan({
         planProvider: ctx.app.planProvider,
-        organizationId: team.organizationId,
+        organizationId,
         user: ctx.session.user,
         errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
       });

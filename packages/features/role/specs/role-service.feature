@@ -17,6 +17,11 @@ Feature: Custom role service
     When the caller assigns it to a team or project scope
     Then the Role service refuses before writing a grant
 
+  Scenario: A transport authorizes a team assignment
+    When it resolves the assignment organization from the team identifier
+    Then it calls the process-owned Role service instead of querying persistence
+    And an absent team produces the Role-owned team-not-found error
+
   Scenario: A role still has holders
     Given a user assignment or AuthZ binding references the role
     When the caller removes it

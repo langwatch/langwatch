@@ -4,6 +4,7 @@ import {
   ROLE_KIND,
   RoleInUseError,
   RoleNotFoundError,
+  TeamNotFoundError,
   type Role,
   type RoleCreate,
   type RoleUpdate,
@@ -40,9 +41,7 @@ class TestRoleRepository extends RoleRepository {
 
   findAll(organizationId: string): Promise<Role[]> {
     return Promise.resolve(
-      [...this.roles.values()].filter(
-        (candidate) => candidate.organizationId === organizationId,
-      ),
+      [...this.roles.values()].filter((candidate) => candidate.organizationId === organizationId),
     );
   }
 
@@ -111,11 +110,7 @@ class TestRoleRepository extends RoleRepository {
     return Promise.resolve(created);
   }
 
-  async update(input: {
-    roleId: string;
-    changes: RoleUpdate;
-    actor: LedgerActor;
-  }): Promise<Role> {
+  async update(input: { roleId: string; changes: RoleUpdate; actor: LedgerActor }): Promise<Role> {
     const current = this.roles.get(input.roleId);
     if (!current) throw new RoleNotFoundError(input.roleId);
     const updated = { ...current, ...input.changes };
@@ -220,6 +215,19 @@ describe("Role service", () => {
       }),
     ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
     expect(repository.assignCall).not.toHaveBeenCalled();
+  });
+
+  it("resolves the assignment organization without exposing Role persistence", async () => {
+    const repository = new TestRoleRepository();
+
+    await expect(
+      serviceWith(repository).getAssignmentOrganization({ teamId: "team-1" }),
+    ).resolves.toBe("org-1");
+
+    repository.team = null;
+    await expect(
+      serviceWith(repository).getAssignmentOrganization({ teamId: "missing-team" }),
+    ).rejects.toBeInstanceOf(TeamNotFoundError);
   });
 
   it("refuses deletion while a grant references the role", async () => {
