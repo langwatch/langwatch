@@ -12,10 +12,16 @@ import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
  * failure count (ADR-128) -- never stored as a fourth status, because a
  * provider outage must not be able to rewrite configuration.
  *
- * Health wins when the two disagree. A source configured "active" whose last
- * three runs all failed is not active in the sense any reader means, and
- * showing the green check there is how a broken integration goes unnoticed
- * for a week.
+ * Health wins when the two disagree, with one exception. A source configured
+ * "active" whose last three runs all failed is not active in the sense any
+ * reader means, and showing the green check there is how a broken integration
+ * goes unnoticed for a week.
+ *
+ * The exception is "disabled". A disabled source is not expected to be
+ * pulling, so "Not pulling" is not news about it — it is the state an admin
+ * chose, restated in red. Worse, it is unactionable: the reader clicks
+ * through to fix an outage and finds nothing wrong. Configuration wins here
+ * because health is only interesting about a source we are asking to run.
  */
 export interface SourceBadge {
   icon: typeof CircleCheck;
@@ -46,6 +52,9 @@ export function sourceBadge({
   status: string;
   errorCount: number;
 }): SourceBadge {
+  // Checked before health: a source nobody asked to run cannot be failing to
+  // run, so its configured state is the honest badge.
+  if (status === "disabled") return SOURCE_STATUS_META.disabled!;
   if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "unhealthy") {
     return SOURCE_UNHEALTHY_META;
   }
