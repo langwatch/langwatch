@@ -13,6 +13,7 @@ import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import superjson from "superjson";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
+import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 
 export type ApiActor = Readonly<{ id: string }>;
 export type ApiServices = Readonly<{ agents: AgentService; secrets: SecretService }>;
@@ -42,6 +43,7 @@ export type ApiHttpOptions = Readonly<{
   audit?(event: ApiAuditEvent): Promise<void>;
   endpoint?: string;
   logger?: Pick<Logger, "error" | "info">;
+  errorCapture?: ApiRequestFailureCapturePort;
   errorFormatter?: ApiErrorFormatter;
 }>;
 
@@ -279,6 +281,15 @@ export class ApiApplication {
         createContext: async () => this.withServices(await http.createContext(request)),
       });
     const hono = new Hono();
+    hono.onError(async (error, context) => {
+      try {
+        await http.errorCapture?.capture({ error, request: context.req.raw });
+      } catch (captureError) {
+        const logger = http.logger ?? createLogger("langwatch:api");
+        logger.error({ error: captureError }, "API HTTP error capture failed");
+      }
+      return context.text("internal server error", 500);
+    });
     hono.get(`${endpoint}/*`, (context) => handler(context.req.raw));
     hono.post(`${endpoint}/*`, (context) => handler(context.req.raw));
     if (rest) {

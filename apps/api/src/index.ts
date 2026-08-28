@@ -26,6 +26,14 @@ export {
 export { ApiProcess } from "./api.process";
 export { ApiProcessGraphPort } from "./api.process";
 export {
+  ApiMetricsPort,
+  ApiProcessLifecycleRoutes,
+  ApiReadinessPort,
+  ApiRequestFailureCapturePort,
+  ObservabilityApiRequestFailureCaptureAdapter,
+  type ApiRequestFailure,
+} from "./api-process.lifecycle";
+export {
   ApiRuntimeBootstrap,
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,

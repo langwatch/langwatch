@@ -32,6 +32,7 @@ vi.mock("../src/api-http.listener", () => ({
 
 import { ApiProcess } from "../src/api.process";
 import { ApiProcessGraphPort } from "../src/api.process";
+import { ApiReadinessPort } from "../src/api-process.lifecycle";
 
 class TestAgentService extends AgentService {
   getById() {
@@ -181,7 +182,31 @@ describe("ApiProcess", () => {
     expect(phases).toEqual(["listener", "telemetry", "graph"]);
     expect(graph.close).toHaveBeenCalledOnce();
   });
+
+  it("runs the boot readiness gate before opening HTTP intake", async () => {
+    const readiness = new TestReadiness();
+    const process = createProcess(undefined, readiness);
+
+    await process.start();
+
+    expect(readiness.assertReady).toHaveBeenCalledOnce();
+    expect(mocks.listenerStart).toHaveBeenCalledOnce();
+  });
+
+  it("does not open HTTP intake when boot readiness fails", async () => {
+    const readiness = new TestReadiness();
+    readiness.assertReady.mockRejectedValueOnce(new Error("redis unavailable"));
+    const process = createProcess(undefined, readiness);
+
+    await expect(process.start()).rejects.toThrow("redis unavailable");
+
+    expect(mocks.listenerStart).not.toHaveBeenCalled();
+  });
 });
+
+class TestReadiness extends ApiReadinessPort {
+  readonly assertReady = vi.fn(async () => undefined);
+}
 
 class TestGraph extends ApiProcessGraphPort {
   private readonly closeImpl: () => Promise<void>;
@@ -194,7 +219,7 @@ class TestGraph extends ApiProcessGraphPort {
   readonly close = vi.fn(async () => this.closeImpl());
 }
 
-function createProcess(graph?: ApiProcessGraphPort): ApiProcess {
+function createProcess(graph?: ApiProcessGraphPort, readiness?: ApiReadinessPort): ApiProcess {
   return ApiProcess.create({
     agents: new TestAgentService(),
     secrets: new TestSecretService(),
@@ -207,5 +232,6 @@ function createProcess(graph?: ApiProcessGraphPort): ApiProcess {
     observability: { serviceName: "langwatch:api-test" },
     listener: { port: 0 },
     graph,
+    readiness,
   });
 }

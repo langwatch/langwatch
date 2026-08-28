@@ -130,7 +130,7 @@ export class ApiRequestPolicy {
     await this.audit?.record(event);
   }
 
-  asHttpOptions(): Pick<ApiHttpOptions, "createContext" | "audit"> {
+  asHttpOptions(): ApiHttpOptions {
     return {
       createContext: (request) => this.createContext(request),
       audit: (event) => this.record(event),

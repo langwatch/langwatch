@@ -7,8 +7,15 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { ApiApplication, type ApiHttpOptions } from "./api.application";
 import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener";
+import {
+  ApiMetricsPort,
+  ApiProcessLifecycleRoutes,
+  ApiReadinessPort,
+  ObservabilityApiRequestFailureCaptureAdapter,
+} from "./api-process.lifecycle";
 import { ApiRequestPolicy } from "./api-request.policy";
 import type { Hono } from "hono";
+import { trace } from "@opentelemetry/api";
 
 /** Resources backing the composed service graph, closed after telemetry flushes. */
 export abstract class ApiProcessGraphPort {
@@ -31,6 +38,8 @@ export class ApiProcess {
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
     graph?: ApiProcessGraphPort;
+    readiness?: ApiReadinessPort;
+    metrics?: ApiMetricsPort;
   }): ApiProcess {
     if (options.http && options.requestPolicy) {
       throw new Error("API process composition accepts HTTP options or request policy, not both.");
@@ -44,8 +53,17 @@ export class ApiProcess {
     const application = ApiApplication.create({
       agents: options.agents,
       secrets: options.secrets,
-      http: { ...http, logger: observability.logger },
-      rest: options.rest,
+      http: {
+        ...http,
+        logger: observability.logger,
+        errorCapture:
+          http.errorCapture ??
+          ObservabilityApiRequestFailureCaptureAdapter.create({
+            logger: observability.logger,
+            tracer: trace.getTracer(options.observability.serviceName),
+          }),
+      },
+      rest: ApiProcessLifecycleRoutes.create({ metrics: options.metrics, rest: options.rest }),
     });
     const hono = application.hono;
     const listener = options.listener
@@ -55,7 +73,7 @@ export class ApiProcess {
           logger: observability.logger,
         })
       : undefined;
-    return new ApiProcess(application, observability, listener, options.graph);
+    return new ApiProcess(application, observability, listener, options.graph, options.readiness);
   }
 
   private closing: Promise<void> | undefined;
@@ -65,10 +83,12 @@ export class ApiProcess {
     private readonly observability: ProcessObservability,
     private readonly listener: ApiHttpListener | undefined,
     private readonly graph: ApiProcessGraphPort | undefined,
+    private readonly readiness: ApiReadinessPort | undefined,
   ) {}
 
-  start(): Promise<{ host: string; port: number } | undefined> {
-    return this.listener ? this.listener.start() : Promise.resolve(undefined);
+  async start(): Promise<{ host: string; port: number } | undefined> {
+    await this.readiness?.assertReady();
+    return this.listener ? this.listener.start() : undefined;
   }
 
   close(): Promise<void> {
