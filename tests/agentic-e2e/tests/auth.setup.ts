@@ -70,6 +70,7 @@ setup("authenticate", async ({ page, request }) => {
   // that step also proves the router resolved the seeded user before auth.
   const passwordField = page.getByLabel("Password", { exact: true });
   await expect(passwordField).toBeVisible();
+  await expect(page.getByTestId("routed-identifier")).toContainText(TEST_USER.email);
   await passwordField.fill(TEST_USER.password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
 
