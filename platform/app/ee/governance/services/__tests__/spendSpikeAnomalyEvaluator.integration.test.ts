@@ -329,41 +329,43 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
      */
     const HOUR = new Date("2026-03-15T10:00:00Z");
 
-    it("counts only the surviving version, not the sum of both", async () => {
-      const traceId = `tr-restated-${nanoid()}`;
-      const sourceId = `is-restated-${nanoid()}`;
-      const seed = {
-        sourceId,
-        sourceType: "otel_generic",
-        hourBucket: HOUR,
-        traceId,
-        promptTokens: 10,
-        completionTokens: 5,
-      };
-      // The same trace, twice, as the throttled writer would leave it.
-      await insertGovernanceKpiRow(ch, govProject.id, {
-        ...seed,
-        spendUsd: 2,
-        lastEventOccurredAt: new Date(HOUR.getTime() + 1_000),
-      });
-      await insertGovernanceKpiRow(ch, govProject.id, {
-        ...seed,
-        spendUsd: 9,
-        lastEventOccurredAt: new Date(HOUR.getTime() + 2_000),
-      });
+    describe("when reading the spend totals", () => {
+      it("counts only the surviving version, not the sum of both", async () => {
+        const traceId = `tr-restated-${nanoid()}`;
+        const sourceId = `is-restated-${nanoid()}`;
+        const seed = {
+          sourceId,
+          sourceType: "otel_generic",
+          hourBucket: HOUR,
+          traceId,
+          promptTokens: 10,
+          completionTokens: 5,
+        };
+        // The same trace, twice, as the throttled writer would leave it.
+        await insertGovernanceKpiRow(ch, govProject.id, {
+          ...seed,
+          spendUsd: 2,
+          lastEventOccurredAt: new Date(HOUR.getTime() + 1_000),
+        });
+        await insertGovernanceKpiRow(ch, govProject.id, {
+          ...seed,
+          spendUsd: 9,
+          lastEventOccurredAt: new Date(HOUR.getTime() + 2_000),
+        });
 
-      const totals = await kpisRepository.findSpendTotals({
-        tenantId: govProject.id,
-        windowStart: new Date("2026-03-15T09:00:00Z"),
-        windowEnd: new Date("2026-03-15T11:00:00Z"),
-        baselineStart: new Date("2026-03-15T08:00:00Z"),
-        sourceFilter: { sql: "", params: {} },
-      });
+        const totals = await kpisRepository.findSpendTotals({
+          tenantId: govProject.id,
+          windowStart: new Date("2026-03-15T09:00:00Z"),
+          windowEnd: new Date("2026-03-15T11:00:00Z"),
+          baselineStart: new Date("2026-03-15T08:00:00Z"),
+          sourceFilter: { sql: "", params: {} },
+        });
 
-      // 9, the running total the trace actually reached — not 11, which is
-      // that total added to the intermediate reading it superseded.
-      expect(totals.currentSpend).toBe(9);
-      expect(totals.baselineSpend).toBe(0);
+        // 9, the running total the trace actually reached — not 11, which is
+        // that total added to the intermediate reading it superseded.
+        expect(totals.currentSpend).toBe(9);
+        expect(totals.baselineSpend).toBe(0);
+      });
     });
   });
 });

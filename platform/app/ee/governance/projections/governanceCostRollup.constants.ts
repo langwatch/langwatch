@@ -8,8 +8,7 @@
  * own `schemas/`.
  */
 
-export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME =
-  "governanceCostRollup" as const;
+export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
 
 /**
  * Schema-snapshot version of the fold (calendar date). The projected row
@@ -19,8 +18,7 @@ export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME =
  */
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
 
-export const GOVERNANCE_COST_ROLLUP_TABLE =
-  "governance_cost_rollup_1d" as const;
+export const GOVERNANCE_COST_ROLLUP_TABLE = "governance_cost_rollup_1d";
 
 /**
  * Which lane the money came from.
@@ -42,4 +40,4 @@ export type GovernanceCostSource =
  * column so that the first non-USD producer is a new row rather than a new
  * sort key — changing a sort key means rebuilding the table.
  */
-export const GOVERNANCE_COST_CURRENCY_USD = "USD" as const;
+export const GOVERNANCE_COST_CURRENCY_USD = "USD";

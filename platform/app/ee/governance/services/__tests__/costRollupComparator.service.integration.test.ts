@@ -40,11 +40,15 @@ let repo: GovernanceCostRollupClickHouseRepository;
 let comparator: CostRollupComparatorService;
 let tenantId: string;
 
-function confirmedData(
-  costNanoUsd: number,
-  requestId: string,
-  occurredAt: number = DAY_MS,
-) {
+function confirmedData({
+  costNanoUsd,
+  requestId,
+  occurredAt = DAY_MS,
+}: {
+  costNanoUsd: number;
+  requestId: string;
+  occurredAt?: number;
+}) {
   return {
     gateway_request_id: requestId,
     occurred_at: occurredAt,
@@ -87,10 +91,13 @@ function confirmedData(
  * append clock lands on `EventTimestamp` instead. Seeding these two apart
  * would be testing a system we do not have.
  */
-async function appendConfirmed(
-  costNanoUsd: number,
-  occurredAt: number = DAY_MS,
-): Promise<void> {
+async function appendConfirmed({
+  costNanoUsd,
+  occurredAt = DAY_MS,
+}: {
+  costNanoUsd: number;
+  occurredAt?: number;
+}): Promise<void> {
   const requestId = `gwreq-${nanoid()}`;
   await ch.insert({
     table: "event_log",
@@ -105,7 +112,7 @@ async function appendConfirmed(
         EventVersion: "2026-07-29",
         EventTimestamp: Date.now(),
         EventPayload: JSON.stringify(
-          confirmedData(costNanoUsd, requestId, occurredAt),
+          confirmedData({ costNanoUsd, requestId, occurredAt }),
         ),
         EventOccurredAt: occurredAt,
       },
@@ -126,7 +133,7 @@ async function writeSummary(amountNanoUsd: number): Promise<void> {
     tenantId,
     aggregateId: "seed",
     occurredAt: DAY_MS,
-    data: confirmedData(amountNanoUsd, "seed"),
+    data: confirmedData({ costNanoUsd: amountNanoUsd, requestId: "seed" }),
   } as never);
   await repo.upsert(
     projectGovernanceCostRollupStateToRow({
@@ -170,8 +177,8 @@ describe("CostRollupComparatorService", () => {
   describe("given a summary row that no longer matches the sum of its events", () => {
     /** @scenario "The comparator counts a summary that drifted from its events" */
     it("counts the mismatch on the drift metric and names both figures in the log", async () => {
-      await appendConfirmed(5_000_000_000);
-      await appendConfirmed(7_340_000_000);
+      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
+      await appendConfirmed({ costNanoUsd: 7_340_000_000 });
       // The summary claims a figure the events do not add up to.
       await writeSummary(9_999_000_000);
 
@@ -192,7 +199,7 @@ describe("CostRollupComparatorService", () => {
     });
 
     it("leaves the drifted row exactly as it found it", async () => {
-      await appendConfirmed(5_000_000_000);
+      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
       await writeSummary(9_999_000_000);
 
       await comparator.compareDay({
@@ -210,8 +217,8 @@ describe("CostRollupComparatorService", () => {
     // The counter has to be quiet on the healthy path, or the alerting it
     // exists for is noise from the first day.
     it("counts nothing", async () => {
-      await appendConfirmed(5_000_000_000);
-      await appendConfirmed(7_340_000_000);
+      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
+      await appendConfirmed({ costNanoUsd: 7_340_000_000 });
       await writeSummary(12_340_000_000);
 
       const before = await mismatchCount();
@@ -245,8 +252,11 @@ describe("CostRollupComparatorService", () => {
     it("assigns each to the day its own business time falls in", async () => {
       const lastMs = Date.parse(`${DAY}T23:59:59.999Z`);
       const firstMsNextDay = Date.parse("2026-08-02T00:00:00.000Z");
-      await appendConfirmed(5_000_000_000, lastMs);
-      await appendConfirmed(7_340_000_000, firstMsNextDay);
+      await appendConfirmed({ costNanoUsd: 5_000_000_000, occurredAt: lastMs });
+      await appendConfirmed({
+        costNanoUsd: 7_340_000_000,
+        occurredAt: firstMsNextDay,
+      });
 
       // The summary for DAY claims only the event whose business day is DAY.
       await writeSummary(5_000_000_000);
@@ -293,7 +303,7 @@ describe("CostRollupComparatorService", () => {
 
   describe("when the comparator runs", () => {
     it("measures how far the summary is behind the log", async () => {
-      await appendConfirmed(5_000_000_000);
+      await appendConfirmed({ costNanoUsd: 5_000_000_000 });
 
       const comparison = await comparator.compareDay({
         tenantId,
