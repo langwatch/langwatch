@@ -1,11 +1,17 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import { LambdaClient } from "@aws-sdk/client-lambda";
+import {
+  LambdaClient,
+  UpdateFunctionCodeCommand,
+  UpdateFunctionConfigurationCommand,
+} from "@aws-sdk/client-lambda";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "../../../../env.mjs";
 import {
   clearLambdaArnCache,
   createLambdaClient,
   getProjectLambdaArn,
   LAMBDA_ARN_CACHE_TTL_MS,
+  LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
 } from "../index";
 
 const setConfig = (imageUri: string) => {
@@ -21,12 +27,28 @@ const setConfig = (imageUri: string) => {
   });
 };
 
+/** The env vars the module reconciles onto every per-project Lambda. Built from
+ *  `env.BASE_HOST` rather than a literal because that value is supplied by the
+ *  environment (unset locally, "localhost:3000" in CI), so a hardcoded string
+ *  would make the fixture drift in one of the two. */
+const desiredEnvVars = {
+  LANGWATCH_ENDPOINT: env.BASE_HOST,
+  STUDIO_RUNTIME: "async",
+  AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
+  CACHE_BUCKET: "test-bucket",
+};
+
 describe("getProjectLambdaArn", () => {
   const mockProjectId = "test-project-123";
+  // Already matches the desired configuration, so the reconcile path is a
+  // no-op for every test that doesn't deliberately introduce drift — keeping
+  // their exact AWS call counts intact.
   const mockLambdaConfig = {
     FunctionArn: "arn:aws:lambda:us-east-1:123456789012:function:test-function",
     State: "Active",
     LastUpdateStatus: "Successful",
+    MemorySize: 2048,
+    Environment: { Variables: { ...desiredEnvVars } },
   };
 
   beforeEach(async () => {
@@ -244,6 +266,10 @@ describe("getProjectLambdaArn", () => {
           FunctionArn: arn,
           State: "Active",
           LastUpdateStatus: "Successful",
+          // Matches the desired config so reconcile stays a no-op and the
+          // mock chain below keeps its 1:1 mapping to AWS calls.
+          MemorySize: 2048,
+          Environment: { Variables: { ...desiredEnvVars } },
         },
         Code: {
           ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
@@ -268,6 +294,163 @@ describe("getProjectLambdaArn", () => {
     it("exposes a TTL constant tuned for minute-scale burst absorption", () => {
       expect(LAMBDA_ARN_CACHE_TTL_MS).toBeGreaterThanOrEqual(60_000);
       expect(LAMBDA_ARN_CACHE_TTL_MS).toBeLessThanOrEqual(60 * 60_000);
+    });
+  });
+
+  describe("config reconcile", () => {
+    const currentImageUri =
+      "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest";
+
+    /** Indices of the UpdateFunctionConfiguration calls in send order. */
+    const configUpdateCalls = (send: any) =>
+      send.mock.calls.filter(
+        (call: any[]) => call[0] instanceof UpdateFunctionConfigurationCommand,
+      );
+
+    /** @scenario A pre-existing Lambda carrying a stale env var is reconciled,
+     *  without clobbering env vars this code does not manage */
+    it("updates drifted env vars and preserves unmanaged ones", async () => {
+      const drifted = {
+        ...mockLambdaConfig,
+        Environment: {
+          Variables: {
+            ...desiredEnvVars,
+            CACHE_BUCKET: "stale-bucket",
+            SOME_OTHER_VAR: "keep-me",
+          },
+        },
+      };
+
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        // checkLambdaExists
+        .mockResolvedValueOnce({ Configuration: drifted })
+        // GetFunction for image/config details
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: currentImageUri },
+        })
+        // UpdateFunctionConfiguration
+        .mockResolvedValueOnce(mockLambdaConfig)
+        // Final poll
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-env");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+      const updates = configUpdateCalls(send);
+      expect(updates).toHaveLength(1);
+      expect(updates[0][0].input.FunctionName).toBe(
+        "langwatch_nlp-reconcile-env",
+      );
+      expect(updates[0][0].input.Environment.Variables).toEqual({
+        ...desiredEnvVars,
+        SOME_OTHER_VAR: "keep-me",
+      });
+    });
+
+    /** @scenario A Lambda still on the old 1024 MB default is raised to 2048 */
+    it("raises a drifted MemorySize to the desired value", async () => {
+      const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
+
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: drifted })
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: currentImageUri },
+        })
+        .mockResolvedValueOnce(mockLambdaConfig)
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-memory");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+      const updates = configUpdateCalls(send);
+      expect(updates).toHaveLength(1);
+      expect(updates[0][0].input.MemorySize).toBe(
+        LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
+      );
+      expect(LANGWATCH_NLP_LAMBDA_MEMORY_SIZE).toBe(2048);
+    });
+
+    /** @scenario No drift means no AWS write at all — the common path */
+    it("issues no configuration update when nothing has drifted", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: currentImageUri },
+        })
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-none");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+      expect(configUpdateCalls(send)).toHaveLength(0);
+    });
+
+    /** @scenario AWS rejects a config update while a code update is in flight,
+     *  so the code update must land (poll) before the config update is sent */
+    it("waits for the code update to land before updating configuration", async () => {
+      const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
+
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: drifted })
+        // Image URI differs from the configured one, forcing a code update.
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: "ecr/foo:old" },
+        })
+        // UpdateFunctionCode
+        .mockResolvedValueOnce(mockLambdaConfig)
+        // Post-code-update poll
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        // UpdateFunctionConfiguration
+        .mockResolvedValueOnce(mockLambdaConfig)
+        // Final poll
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-ordering");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+      const commands = send.mock.calls.map((call: any[]) => call[0]);
+      const codeIdx = commands.findIndex(
+        (c: any) => c instanceof UpdateFunctionCodeCommand,
+      );
+      const configIdx = commands.findIndex(
+        (c: any) => c instanceof UpdateFunctionConfigurationCommand,
+      );
+      expect(codeIdx).toBeGreaterThanOrEqual(0);
+      expect(configIdx).toBeGreaterThan(codeIdx);
+      // At least one GetFunction poll sits between them.
+      const pollsBetween = commands
+        .slice(codeIdx + 1, configIdx)
+        .filter(
+          (c: any) =>
+            !(c instanceof UpdateFunctionCodeCommand) &&
+            !(c instanceof UpdateFunctionConfigurationCommand),
+        );
+      expect(pollsBetween.length).toBeGreaterThanOrEqual(1);
+    });
+
+    /** @scenario A concurrent update makes AWS reject the reconcile; the
+     *  resolution still succeeds rather than surfacing the error to Studio */
+    it("swallows an in-progress conflict on the configuration update", async () => {
+      const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
+
+      vi.spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: drifted })
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: currentImageUri },
+        })
+        .mockRejectedValueOnce(new Error("An update is in progress"))
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-conflict");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
     });
   });
 });
