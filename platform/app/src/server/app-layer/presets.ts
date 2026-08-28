@@ -133,8 +133,8 @@ import { PostgresSuiteAdapter, SuiteExecutionService } from "@langwatch/suite-se
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
+import { AppRedisRuntime } from "~/runtime/app/redis.runtime";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
 import { resolveNlpLambdaRuntimeConfig } from "~/runtime/api/nlp-lambda";
@@ -470,13 +470,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // and the `migrateObjectStorage` task, which boots no App at all. Both go
   // through the client package; neither is a second live connection in a
   // process this one is serving.
-  const redis = new RedisConnectionService({ logger: redisLogger }).connect({
-    url: config.redisUrl,
-    clusterEndpoints: config.redisClusterEndpoints,
-    dbIndex: config.redisDbIndex,
-    skip: config.skipRedis,
+  const redisRuntime = AppRedisRuntime.create({
+    config: {
+      url: config.redisUrl,
+      clusterEndpoints: config.redisClusterEndpoints,
+      dbIndex: config.redisDbIndex,
+      skip: config.skipRedis,
+    },
+    logger: redisLogger,
   });
-  const redisShutdown = RedisShutdownService.create();
+  const redis = redisRuntime.connection;
   const featureFlags = PostgresFeatureFlagAdapter.create({
     database: prisma,
     cache: RedisFeatureFlagCacheAdapter.create(redis),
@@ -2014,7 +2017,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ops.snapshots?.stop();
   });
   if (redis) {
-    shutdownResources.register("redis", "redis", () => redisShutdown.shutdown(redis));
+    shutdownResources.register("redis", "redis", () => redisRuntime.close());
   }
   shutdownResources.register("subscriber", "broadcast", async () => {
     await broadcast.close();
