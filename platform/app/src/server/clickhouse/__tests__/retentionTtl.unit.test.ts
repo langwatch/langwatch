@@ -157,3 +157,32 @@ describe("gateway_spend retention exemption", () => {
     expect(migration).not.toContain("_retention_days");
   });
 });
+
+describe("governance_cost_rollup_1d retention exemption", () => {
+  // The daily cost rollup follows `gateway_spend` for the same reason: it is
+  // a cost record, and a tenant policy a customer can shrink to weeks must
+  // never be able to hard-delete one. Fixed 13-month TTL in its own migration,
+  // absent from both reconciler maps so MODIFY TTL never rewrites the clause.
+  it("is absent from tenant retention and from the TTL reconciler config", () => {
+    expect(RETENTION_MANAGED_TABLES).not.toContain("governance_cost_rollup_1d");
+    expect(
+      TABLE_TTL_CONFIG.find((c) => c.table === "governance_cost_rollup_1d"),
+    ).toBeUndefined();
+  });
+
+  it("declares its fixed 13-month delete in the migration itself", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "src/server/clickhouse/migrations/00087_create_governance_cost_rollup_1d.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain(
+      "TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE",
+    );
+    expect(migration).not.toContain("_retention_days");
+  });
+});

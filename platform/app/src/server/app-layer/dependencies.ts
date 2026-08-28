@@ -16,6 +16,7 @@ import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.s
 import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
 import type { ActivityMonitorClickHouseRepository } from "../../../ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import type { GovernanceCostRollupClickHouseRepository } from "../../../ee/governance/services/governanceCostRollup.clickhouse.repository";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -292,6 +293,9 @@ export interface AppDependencies {
     /** The /governance activity-monitor read side (spend rollups, per-source
      *  events and health). Undefined on a deployment without ClickHouse. */
     activityMonitor: ActivityMonitorClickHouseRepository | undefined;
+    /** ADR-128's daily cost rollup — the fold's write side and the read both
+     *  the screen and the drift comparator go through. */
+    costRollup: GovernanceCostRollupClickHouseRepository | undefined;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
