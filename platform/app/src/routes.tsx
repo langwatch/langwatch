@@ -593,6 +593,18 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/analytics/custom/[id]")),
       },
 
+      // Dev-only: sandboxed custom-chart playground. Registered conditionally
+      // so the chunk never enters a production build (the page also gates on
+      // NODE_ENV itself).
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: "/:project/dev/custom-chart-playground",
+              ...page(() => import("./pages/dev/custom-chart-playground")),
+            },
+          ]
+        : []),
+
       // Experiments
       {
         path: "/:project/experiments",
