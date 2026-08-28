@@ -27,6 +27,37 @@ verification gates. The shorter operational restart notes remain in the
 
 ## Authorities and invariants
 
+### Nothing new goes in `platform/app`
+
+**Decided 2026-08-28.** No slice may add a file under `platform/app`. Editing an
+existing file there to repoint an import is fine, and deleting from it is the
+entire point, but the tree only shrinks.
+
+This corrects the transport pattern Wave 3 had been following. The mount for a
+moved tRPC or REST surface was going to
+`platform/app/src/runtime/app/internal-api/`, which meant every successful
+vertical made `platform/app` slightly larger while making a package larger too.
+Thirty-two mounts accumulated that way. They belong in `apps/api`
+(`@langwatch/platform-api`); worker installers belong in `apps/worker` and
+browser code in `apps/ui`.
+
+The dependency direction is already established — `platform/app` depends on
+`@langwatch/api`, `@langwatch/ui` and `@langwatch/worker` — so the old
+application importing the new owner is ordinary, and the reverse is what would
+be wrong.
+
+The test for a slice is not "did the package get better". It is "did
+`platform/app` get smaller". A slice that grows both has moved backwards however
+good the code is.
+
+### oxlint and oxfmt are the toolchain
+
+**Decided 2026-08-28.** Biome is removed. oxlint is the only linter and oxfmt
+the only formatter. The rules Biome carried move to oxlint rather than
+disappearing with it; a rule that cannot be expressed there is recorded as lost
+rather than quietly dropped.
+
+
 - `packages/features/catalogue.json` is the authority for the 49 singular
   feature owners.
 - Accepted repository ADRs and each feature ADR/spec define architecture and
