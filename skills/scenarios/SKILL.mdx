@@ -703,22 +703,22 @@ Use this when the user has no codebase. NOTE: If you have a codebase and want te
 
 <CliSetup />
 
-Then drive everything via `langwatch scenario --help`, `langwatch suite --help` and `langwatch run-plan --help`. What follows is the surface as it actually is; `--help` is the live source when in doubt.
+Then drive everything via `langwatch scenario --help`, `langwatch test-suite --help` and `langwatch run-plan --help`. What follows is the surface as it actually is; `--help` is the live source when in doubt.
 
 ### Four nouns, and mixing them up is what makes this API feel confusing
 
 | Noun | What it is | Commands |
 | --- | --- | --- |
-| **scenario** | One test case: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A folder of scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` suite, so no scenario is loose. | `langwatch suite …` |
+| **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
+| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
 A run plan's configuration is the scope (all scenarios, the scenarios of one or more test suites, the scenarios carrying given labels, or a hand-picked list), the targets, the repeat count and the two models. Parameters, the note and the idempotency key belong to one run, not to the plan.
 
-Running a test suite, and running a single scenario, are shorter forms of running a plan: the plan is named after the suite or the scenario and the target. Running is the only write; there is no separate save.
+Running a test suite, and running a single scenario, are shorter forms of running a plan: the plan is named after the test suite or the scenario and the target. Running is the only write; there is no separate save.
 
-The UI calls the two surfaces **Agent Testing > Scenarios** (the suites and their scenarios) and **Agent Testing > Results** (the run plans, their runs, and the results of a run). There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
+The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and their scenarios) and **Agent Testing > Results** (the run plans, their runs, and the results of a run). There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
 
 ### The flow
 
@@ -731,13 +731,13 @@ langwatch scenario create "Angry refund request" \
   --situation "A customer whose order arrived broken demands a full refund and is rude about it" \
   --criteria "Agent stays polite,Agent offers a refund or a replacement,Agent never promises a delivery date it cannot keep" \
   --labels "support,critical" \
-  --folder "Refunds" \
+  --test-suite "Refunds" \
   --format json
 ```
 
 - `<name>` (positional) and `--situation` are the only **required** inputs.
 - `--criteria` and `--labels` each take **one comma-separated string**, not repeated flags and not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
-- `--folder` files the scenario into a test suite, by name or by id. The suite must exist: create it with `langwatch suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --folder "<suite>"` moves it later.
+- `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 
@@ -746,12 +746,12 @@ langwatch scenario create "Angry refund request" \
 Two real answers, so name both: run this scenario now, or run the test suite it belongs to. Both record their runs, so neither is a throwaway.
 
 ```bash
-langwatch suite list --format json    # the suites, with the scenario count of each
-langwatch suite get <id|name> --format json    # one suite and the scenarios in it
+langwatch test-suite list --format json    # the test suites, with the scenario count of each
+langwatch test-suite get <id|name> --format json    # one test suite and the scenarios in it
 langwatch run-plan list --format json          # the plans the project already runs
 ```
 
-Filing a scenario into a suite is `langwatch scenario update <id> --folder "<suite>"`. A scenario lives in exactly one suite, so this moves it rather than adding it to a second one.
+Filing a scenario into a test suite is `langwatch scenario update <id> --test-suite "<test-suite>"`. A scenario lives in exactly one test suite, so this moves it rather than adding it to a second one.
 
 #### 3. List what can be tested
 
@@ -790,14 +790,14 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code
 #### 6. Run a test suite
 
 ```bash
-langwatch suite run <suiteId|name> --target http:<agentId> --format json
+langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
 
-langwatch suite run "Refund regression" \
+langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
   --repeat 2 --note "after the refund policy change" --format json
 ```
 
-- Every scenario in the suite runs against every target. The run count is `scenarios × targets × repeat`. Three scenarios × two targets × `--repeat 2` is twelve real LLM conversations. Say the number before launching anything large.
+- Every scenario in the test suite runs against every target. The run count is `scenarios × targets × repeat`. Three scenarios × two targets × `--repeat 2` is twelve real LLM conversations. Say the number before launching anything large.
 - `--name`, `--simulator-model`, `--judge-model`, `--param`, `--note` and `--wait` work as in step 5.
 - The answer carries `{ scheduled, batchRunId, setId, jobCount, runPlanId, planName, created, platformUrl, skippedArchived, items }`. `created: false` means the run joined a plan that already carried the name. `jobCount: 0` with entries in `skippedArchived` means everything referenced is archived and nothing ran.
 
@@ -807,7 +807,7 @@ langwatch suite run "Refund regression" \
 
 ```bash
 langwatch run-plan run --target http:<agentId> --all --name "Nightly" --repeat 3
-langwatch run-plan run --target http:<agentId> --suite "Refunds" --suite "Billing"
+langwatch run-plan run --target http:<agentId> --test-suite "Refunds" --test-suite "Billing"
 langwatch run-plan run --target http:<agentId> --label critical
 langwatch run-plan run --target http:<agentId> --scenario <scenarioId> --scenario <scenarioId2>
 
@@ -816,7 +816,7 @@ langwatch run-plan get <planId> --format json  # the configuration the next run 
 langwatch run-plan archive <planId>
 ```
 
-- Exactly one kind of scope per run: `--all`, or `--suite`, or `--label`, or `--scenario`. `--suite`, `--label` and `--scenario` repeat.
+- Exactly one kind of scope per run: `--all`, or `--test-suite`, or `--label`, or `--scenario`. `--test-suite`, `--label` and `--scenario` repeat.
 - `--name` is what makes the run reusable. Without it the platform names the plan itself.
 - `--idempotency-key <key>` makes a retried job join the first run instead of starting a second one. Use it in CI, where a re-run of the same job is normal.
 
@@ -893,10 +893,10 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
-- Do NOT pass `--folder` a suite that does not exist. The command refuses it. Create the suite with `langwatch suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
-- Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--suite`, `--label` or `--scenario` per run
-- Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between one scenario and the whole suite. Ask one short question and wait
+- Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
+- Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
+- Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between one scenario and the whole test suite. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, and let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point

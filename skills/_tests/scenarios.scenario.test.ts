@@ -465,7 +465,7 @@ describe("Scenarios Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used the `langwatch scenario create` CLI command (or related `langwatch scenario` / `langwatch suite` subcommands) to create scenarios",
+              "Agent used the `langwatch scenario create` CLI command (or related `langwatch scenario` / `langwatch test-suite` subcommands) to create scenarios",
               "Agent did NOT try to write code files",
             ],
           }),
@@ -492,8 +492,8 @@ describe("Scenarios Skill", () => {
             expect(
               allContent.includes("langwatch scenario create") ||
                 allContent.includes("langwatch scenario list") ||
-                allContent.includes("langwatch suite create"),
-              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch suite create` via the CLI"
+                allContent.includes("langwatch test-suite create"),
+              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch test-suite create` via the CLI"
             ).toBe(true);
           },
           scenario.judge(),
