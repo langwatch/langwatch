@@ -242,13 +242,13 @@ const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
 // override must stay below the Lambda's own Timeout (900s) or Lambda
 // terminates the invocation before nlpgo can report its own timeout to the
 // caller. Clamp rather than trust the raw env value.
-const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): number => {
+export const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): number => {
   const DEFAULT_SECONDS = 600;
   const MAX_SECONDS =
     LAMBDA_INVOCATION_TIMEOUT_SECONDS -
     CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
   const parsed = Number(rawValue);
-  if (!rawValue || !Number.isFinite(parsed) || parsed <= 0) {
+  if (!rawValue || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
     return DEFAULT_SECONDS;
   }
   return Math.min(parsed, MAX_SECONDS);

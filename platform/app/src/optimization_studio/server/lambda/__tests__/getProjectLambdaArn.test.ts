@@ -36,6 +36,7 @@ const desiredEnvVars = {
   STUDIO_RUNTIME: "async",
   AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
   CACHE_BUCKET: "test-bucket",
+  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "600",
 };
 
 describe("getProjectLambdaArn", () => {
