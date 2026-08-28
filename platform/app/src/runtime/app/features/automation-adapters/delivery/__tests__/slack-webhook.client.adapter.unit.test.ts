@@ -32,4 +32,31 @@ describe("AppSlackWebhookClientAdapter", () => {
     expect(send).toHaveBeenNthCalledWith(1, { text: "first" });
     expect(send).toHaveBeenNthCalledWith(2, { text: "second" });
   });
+
+  it("preserves Block Kit payloads while forwarding sender defaults", async () => {
+    send.mockResolvedValue(undefined);
+    const client = AppSlackWebhookClientAdapter.create();
+    const blocks = [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: "hello" },
+        custom: "retained",
+      },
+    ];
+
+    await client.send({
+      webhook: "https://hooks.slack.com/services/T/B/blocks",
+      payload: {
+        blocks,
+        username: "LangWatch",
+        icon_emoji: ":robot_face:",
+      },
+    });
+
+    expect(send).toHaveBeenCalledWith({
+      blocks,
+      username: "LangWatch",
+      icon_emoji: ":robot_face:",
+    });
+  });
 });

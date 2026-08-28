@@ -1,4 +1,3 @@
-import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
 import {
   SlackWebhookDeliveryAdapter,
   type RenderedSlackMessageRequest,
@@ -6,30 +5,52 @@ import {
   type SlackWebhookTransport,
 } from "@langwatch/automation-server";
 import type { SlackPayload } from "@langwatch/automation-contract";
-import { z } from "zod";
+import { AppSlackWebhookClientAdapter } from "./slack-webhook.client.adapter";
 
-const slackBlockSchema = z.looseObject({
-  type: z.string(),
-  block_id: z.string().optional(),
-});
-
-function transportFor(webhook: string): SlackWebhookTransport {
+function transportFor(
+  webhook: string,
+  client: AppSlackWebhookClientAdapter,
+): SlackWebhookTransport {
   return {
     send: async (payload: SlackPayload & { username?: string; icon_emoji?: string }) => {
-      const defaults = {
-        username: payload.username,
-        icon_emoji: payload.icon_emoji,
-      };
-      const request: IncomingWebhookSendArguments =
-        "text" in payload
-          ? { ...defaults, text: payload.text }
-          : { ...defaults, blocks: payload.blocks.map((block) => slackBlockSchema.parse(block)) };
-      await new IncomingWebhook(webhook).send(request);
+      await client.send({ webhook, payload });
     },
   };
 }
 
-const delivery = SlackWebhookDeliveryAdapter.create(transportFor);
+/**
+ * Process-local Slack delivery adapter. The adapter itself is process-owned,
+ * while each send builds a fresh SDK sender for its tenant-owned webhook URL.
+ */
+export class AppSlackWebhookDeliveryRuntime {
+  static create(
+    input: {
+      client?: AppSlackWebhookClientAdapter;
+    } = {},
+  ): AppSlackWebhookDeliveryRuntime {
+    return new AppSlackWebhookDeliveryRuntime(
+      input.client ?? AppSlackWebhookClientAdapter.create(),
+    );
+  }
+
+  private readonly delivery: SlackWebhookDeliveryAdapter;
+
+  private constructor(private readonly client: AppSlackWebhookClientAdapter) {
+    this.delivery = SlackWebhookDeliveryAdapter.create((webhook) =>
+      transportFor(webhook, this.client),
+    );
+  }
+
+  deliver(input: SlackWebhookRequest): Promise<void> {
+    return this.delivery.deliver(input);
+  }
+
+  deliverRendered(input: RenderedSlackMessageRequest): Promise<void> {
+    return this.delivery.deliverRendered(input);
+  }
+}
+
+const delivery = AppSlackWebhookDeliveryRuntime.create();
 
 export function sendSlackWebhook(input: SlackWebhookRequest): Promise<void> {
   return delivery.deliver(input);
