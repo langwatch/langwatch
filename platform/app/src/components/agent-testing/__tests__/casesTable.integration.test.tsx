@@ -158,13 +158,11 @@ function panelProps(
     onRowClick: vi.fn(),
     onRunCase: vi.fn(),
     onEdit: vi.fn(),
-    onHistory: vi.fn(),
     onDuplicate: vi.fn(),
     onMoveToSuite: vi.fn(),
     onOpenLastRun: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
-    onOpenExternalResults: vi.fn(),
     onRenameSuite: vi.fn(),
     ...overrides,
   };
@@ -495,8 +493,8 @@ describe("the scenarios table", () => {
     expect(runButton.querySelector("svg.lucide-play")).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order" */
-  it("offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order", async () => {
+  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order" */
+  it("offers Edit, Duplicate, Open last run, Move to suite... and Archive in order", async () => {
     renderPanel({
       cases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
@@ -511,8 +509,29 @@ describe("the scenarios table", () => {
       "Duplicate",
       "Open last run",
       "Move to suite...",
-      "History",
       "Archive",
+    ]);
+  });
+
+  /** @scenario "Every action of the row menu carries its icon" */
+  it("carries an icon on every action of the row menu", async () => {
+    renderPanel({
+      cases: [makeCase()],
+      lastResults: new Map([["case_1", makeResult()]]),
+    });
+    await openRowMenu("Double charge");
+
+    const items = await screen.findAllByRole("menuitem");
+    const icons = items.map((item) =>
+      item.querySelector("svg")?.getAttribute("class"),
+    );
+
+    expect(icons).toEqual([
+      expect.stringContaining("lucide-pencil"),
+      expect.stringContaining("lucide-copy"),
+      expect.stringContaining("lucide-list-checks"),
+      expect.stringContaining("lucide-folder-input"),
+      expect.stringContaining("lucide-archive"),
     ]);
   });
 
@@ -736,7 +755,7 @@ describe("the scenarios table", () => {
   // --- Recent runs ---
 
   describe("given a test suite whose scenarios ran in the period", () => {
-    /** @scenario "One button under the table opens a recent run of the suite" */
+    /** @scenario "One button above the table opens a recent run of the suite" */
     it("offers one Open recent run button and no last run line", () => {
       renderPanel({ cases: [makeCase()] });
 
@@ -749,7 +768,20 @@ describe("the scenarios table", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "A run of one scenario of the suite is offered under the table" */
+    /** @scenario "One button above the table opens a recent run of the suite" */
+    it("sits in the header between New scenario and Run suite", () => {
+      renderPanel({ cases: [makeCase()] });
+
+      const header = screen.getByTestId("recent-runs-trigger").parentElement;
+      // The rename control beside the suite name carries an icon and no words.
+      const labels = Array.from(header?.querySelectorAll("button") ?? [])
+        .map((button) => button.textContent)
+        .filter((label) => !!label);
+
+      expect(labels).toEqual(["New scenario", "Open recent run", "Run suite"]);
+    });
+
+    /** @scenario "A run of one scenario of the suite is offered above the table" */
     it("offers a run that a scenario of the suite made its own plan for", async () => {
       setRecentRuns([makeSuiteRun({ batchRunId: "batch_alone" })], {
         batch_alone: ONE_CASE_SET,
@@ -1084,5 +1116,23 @@ describe("the scenarios table", () => {
 
     expect(props.onOpenExternalCase).toHaveBeenCalledWith("s1");
     expect(props.onEdit).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A set that runs from code offers Open recent run and no View results" */
+  it("offers Open recent run and no View results on a set that runs from code", () => {
+    renderPanel({
+      selection: { kind: "external", setId: "nightly-ci" },
+      title: "nightly-ci",
+      externalCases: [
+        {
+          scenarioId: "s1",
+          name: "Refund flow",
+          lastRunAt: new Date("2026-07-08T09:30:00.000Z").getTime(),
+        },
+      ],
+    });
+
+    expect(screen.getByTestId("recent-runs-trigger")).toBeInTheDocument();
+    expect(screen.queryByText("View results")).not.toBeInTheDocument();
   });
 });

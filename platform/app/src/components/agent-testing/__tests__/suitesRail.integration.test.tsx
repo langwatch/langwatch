@@ -19,6 +19,7 @@ import {
   orderSuitesDefaultFirst,
   type TestSuiteEntry,
 } from "../cases/test-cases";
+import type { SuiteLastRun } from "../cases/useTestCasesData";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -41,6 +42,16 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const THIRTY_DAYS = computeRelativeWindow("30d", new Date());
 
+/** The last run of a suite, as the rail is handed it. */
+function makeLastRun(overrides: Partial<SuiteLastRun> = {}): SuiteLastRun {
+  return {
+    batchRunId: "batch_1",
+    scenarioSetId: "__internal__suite_refunds__suite",
+    lastRunAt: new Date("2026-07-08T09:30:00.000Z").getTime(),
+    ...overrides,
+  };
+}
+
 function makeSuite(overrides: Partial<TestSuiteEntry> = {}): TestSuiteEntry {
   return {
     id: "suite_1",
@@ -60,7 +71,9 @@ function renderRail(
     suites: [makeSuite()],
     externalSets: [],
     canManage: true,
-    suiteIdsWithRuns: new Set<string>(["suite_1"]),
+    lastRunBySuiteId: new Map<string, SuiteLastRun>([
+      ["suite_1", makeLastRun()],
+    ]),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     onSelect: vi.fn(),
@@ -183,7 +196,9 @@ describe("the test suites rail", () => {
       suites: [
         makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
       ],
-      suiteIdsWithRuns: new Set<string>(["suite_default"]),
+      lastRunBySuiteId: new Map<string, SuiteLastRun>([
+        ["suite_default", makeLastRun()],
+      ]),
     });
     await openSuiteMenu("Default");
 
@@ -271,16 +286,32 @@ describe("the test suites rail", () => {
       await screen.findByRole("menuitem", { name: "Open last run" }),
     );
 
-    // The tab answers this by opening the Results tab on that suite, where the
-    // newest run of the plan is the one selected.
     expect(props.onOpenLastRun).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "refunds" }),
     );
   });
 
+  /** @scenario "Every action of the rail row menu carries its icon" */
+  it("carries an icon on every action of the row menu", async () => {
+    renderRail();
+    await openSuiteMenu("Refunds");
+
+    const icons = (await screen.findAllByRole("menuitem")).map((item) =>
+      item.querySelector("svg")?.getAttribute("class"),
+    );
+
+    expect(icons).toEqual([
+      expect.stringContaining("lucide-plus"),
+      expect.stringContaining("lucide-play"),
+      expect.stringContaining("lucide-pencil"),
+      expect.stringContaining("lucide-list-checks"),
+      expect.stringContaining("lucide-archive"),
+    ]);
+  });
+
   /** @scenario "Open last run is not offered for a suite that never ran" */
   it("does not offer Open last run for a suite that never ran", async () => {
-    renderRail({ suiteIdsWithRuns: new Set<string>() });
+    renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
     await openSuiteMenu("Refunds");
 
     expect(

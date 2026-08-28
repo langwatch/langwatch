@@ -64,7 +64,6 @@ export type CasesPanelProps = {
   onRowClick: (testCase: TestCase) => void;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -72,8 +71,6 @@ export type CasesPanelProps = {
   onOpenExternalCase: (scenarioId: string) => void;
   /** Opens the name dialog on the open test suite. */
   onRenameSuite: () => void;
-  /** Opens the results of the selected set that runs from code. */
-  onOpenExternalResults: () => void;
 };
 
 export function CasesPanel(props: CasesPanelProps) {

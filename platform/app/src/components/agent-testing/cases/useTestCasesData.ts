@@ -24,7 +24,17 @@ import {
 type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
 type FolderRows = RouterOutputs["suites"]["folders"]["getAll"];
 type ExternalSetRows = RouterOutputs["scenarios"]["getExternalSetSummaries"];
-type SuiteSummaries = RouterOutputs["suites"]["getSummaries"];
+
+/**
+ * The newest run that covered a scenario of one test suite, which is what
+ * "Open last run" opens.
+ */
+export type SuiteLastRun = {
+  batchRunId: string;
+  /** The set the run landed in, which names the plan that holds it. */
+  scenarioSetId: string;
+  lastRunAt: number;
+};
 
 export type TestCasesData = {
   suites: TestSuiteEntry[];
@@ -34,8 +44,11 @@ export type TestCasesData = {
   externalSets: ExternalSetEntry[];
   lastResults: Map<string, CaseLastResult>;
   isLastResultsLoading: boolean;
-  /** The suites that have a run inside the period, so Open last run is offered. */
-  suiteIdsWithRuns: Set<string>;
+  /**
+   * The last run of every suite that ran inside the period. A suite missing
+   * from the map has nothing to open.
+   */
+  lastRunBySuiteId: Map<string, SuiteLastRun>;
   isLoading: boolean;
 };
 
@@ -63,10 +76,6 @@ function useTestCasesQueries(period: Period) {
       enabled: !!project,
     });
 
-  const { data: suiteSummaries } = api.suites.getSummaries.useQuery(runWindow, {
-    enabled: !!project,
-  });
-
   const { data: agents, isLoading: isAgentsLoading } =
     api.agents.getAll.useQuery({ projectId }, { enabled: !!project });
 
@@ -76,7 +85,6 @@ function useTestCasesQueries(period: Period) {
     agents,
     externalSetSummaries,
     lastResultRows,
-    suiteSummaries,
     isLastResultsLoading,
     // The agent list gates the day-zero question, so a page that has not read
     // it yet holds the skeleton rather than asking to connect an agent that
@@ -151,16 +159,58 @@ function useLastResultsByCase(
   }, [rows]);
 }
 
-function useSuiteIdsWithRuns(
-  summaries: SuiteSummaries | undefined,
-): Set<string> {
-  return useMemo(() => {
-    const withRuns = new Set<string>();
-    for (const [suiteId, summary] of Object.entries(summaries ?? {})) {
-      if (summary.lastRunTimestamp) withRuns.add(suiteId);
-    }
-    return withRuns;
-  }, [summaries]);
+/** The newer of two runs of the same suite. */
+function newerRun(
+  current: SuiteLastRun | undefined,
+  next: SuiteLastRun,
+): SuiteLastRun {
+  if (!current) return next;
+  return current.lastRunAt >= next.lastRunAt ? current : next;
+}
+
+/**
+ * The last run of every suite, read off the last result of each of its
+ * scenarios.
+ *
+ * A suite is a grouping, so a run of one of its scenarios counts whatever plan
+ * started it. Reading the runs from the scenarios is what makes a suite whose
+ * scenarios only ran one at a time still offer its last run.
+ */
+function lastRunBySuite({
+  cases,
+  lastResults,
+}: {
+  cases: TestCase[];
+  lastResults: Map<string, CaseLastResult>;
+}): Map<string, SuiteLastRun> {
+  const bySuite = new Map<string, SuiteLastRun>();
+  for (const testCase of cases) {
+    const suiteId = testCase.folderId;
+    const lastResult = lastResults.get(testCase.id);
+    if (!suiteId || !lastResult) continue;
+    bySuite.set(
+      suiteId,
+      newerRun(bySuite.get(suiteId), {
+        batchRunId: lastResult.batchRunId,
+        scenarioSetId: lastResult.scenarioSetId,
+        lastRunAt: lastResult.lastRunAt,
+      }),
+    );
+  }
+  return bySuite;
+}
+
+function useLastRunBySuite({
+  cases,
+  lastResults,
+}: {
+  cases: TestCase[];
+  lastResults: Map<string, CaseLastResult>;
+}): Map<string, SuiteLastRun> {
+  return useMemo(
+    () => lastRunBySuite({ cases, lastResults }),
+    [cases, lastResults],
+  );
 }
 
 export function useTestCasesData({
@@ -173,7 +223,7 @@ export function useTestCasesData({
   const suites = useSuiteEntries({ folders: queries.folders, cases });
   const externalSets = useExternalSetEntries(queries.externalSetSummaries);
   const lastResults = useLastResultsByCase(queries.lastResultRows);
-  const suiteIdsWithRuns = useSuiteIdsWithRuns(queries.suiteSummaries);
+  const lastRunBySuiteId = useLastRunBySuite({ cases, lastResults });
 
   return {
     cases,
@@ -182,7 +232,7 @@ export function useTestCasesData({
     externalSets,
     lastResults,
     isLastResultsLoading: queries.isLastResultsLoading,
-    suiteIdsWithRuns,
+    lastRunBySuiteId,
     isLoading: queries.isLoading,
   };
 }

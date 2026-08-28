@@ -168,6 +168,7 @@ Feature: The run dialog
     Given the run dialog is open on the agent section
     When the label line is read
     Then it offers "Configure" on the right
+    And "Configure" reads as words alone, with no icon after it
     And choosing it opens the agents page in another tab
     And the run dialog stays open
 

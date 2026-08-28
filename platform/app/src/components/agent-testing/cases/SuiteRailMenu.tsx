@@ -1,12 +1,17 @@
 /**
  * The row menu of one test suite in the rail.
  *
+ * Every action carries the icon it carries in the scenario row menu, so the
+ * same action reads the same way wherever the tab offers it.
+ *
  * @see specs/features/agent-testing/suites-rail.feature
+ * @see dev/docs/best_practices/row-actions-overflow-menu.md
  */
 
-import { Button, HStack, Icon } from "@chakra-ui/react";
-import { Archive, MoreVertical } from "lucide-react";
+import { Button } from "@chakra-ui/react";
+import { MoreVertical } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
+import { MenuActionLabel, type MenuActionName } from "./MenuActionLabel";
 import type { TestSuiteEntry } from "./test-cases";
 
 export type SuiteRailMenuProps = {
@@ -50,11 +55,13 @@ function MenuTrigger({ suiteName, ...rest }: { suiteName: string }) {
 /** One action of the menu, with the click kept off the row behind it. */
 function SuiteMenuItem({
   value,
+  action,
   color,
   onChoose,
   children,
 }: {
   value: string;
+  action: MenuActionName;
   color?: string;
   onChoose: () => void;
   children: React.ReactNode;
@@ -68,7 +75,7 @@ function SuiteMenuItem({
         onChoose();
       }}
     >
-      {children}
+      <MenuActionLabel action={action}>{children}</MenuActionLabel>
     </Menu.Item>
   );
 }
@@ -92,6 +99,7 @@ export function SuiteRailMenu({
         {canManage && (
           <SuiteMenuItem
             value="new-test-case"
+            action="newScenario"
             onChoose={() => onNewTestCase(suite.id)}
           >
             New scenario
@@ -100,6 +108,7 @@ export function SuiteRailMenu({
         {canManage && (
           <SuiteMenuItem
             value="run-suite"
+            action="runSuite"
             onChoose={() => onRunSuite(suite.id)}
           >
             Run suite
@@ -108,6 +117,7 @@ export function SuiteRailMenu({
         {canManage && (
           <SuiteMenuItem
             value="rename-suite"
+            action="rename"
             onChoose={() => onRenameSuite(suite.id)}
           >
             Rename
@@ -116,6 +126,7 @@ export function SuiteRailMenu({
         {hasRun && (
           <SuiteMenuItem
             value="open-last-run"
+            action="openLastRun"
             onChoose={() => onOpenLastRun(suite)}
           >
             Open last run
@@ -124,13 +135,11 @@ export function SuiteRailMenu({
         {canManage && (
           <SuiteMenuItem
             value="archive-suite"
+            action="archive"
             color="red.600"
             onChoose={() => onArchiveSuite()}
           >
-            <HStack gap={2}>
-              <Icon as={Archive} boxSize={3.5} />
-              Archive suite
-            </HStack>
+            Archive suite
           </SuiteMenuItem>
         )}
       </Menu.Content>

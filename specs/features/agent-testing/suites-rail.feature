@@ -84,15 +84,34 @@ Feature: The test suites rail
     Then the actions read, in order: "New scenario", "Run suite", "Rename", "Open last run", "Archive suite"
 
   @integration
+  Scenario: Every action of the rail row menu carries its icon
+    Given a test suite in the rail with a finished run
+    When its row menu is opened
+    Then every action carries its own icon before its words
+
+  @unit
+  Scenario: The rail menu and the scenario row menu read one list of icons
+    Given the actions the two menus share
+    When the icon of an action is read
+    Then both menus read it from the same list
+    And renaming a suite and editing a scenario carry the same pencil
+
+  @integration
   Scenario: Open last run goes straight to the last run of that suite
     Given a test suite with a finished run
     When "Open last run" is chosen from its row menu
-    Then the Results tab opens on that suite
-    And the last run is selected in the runs sidebar
+    Then the Results tab opens on the run plan that holds the run
+    And that run is the one selected
+
+  @integration
+  Scenario: Open last run opens the newest run of any scenario of the suite
+    Given a suite whose scenarios only ran one at a time, each on its own run plan
+    When "Open last run" is chosen from its row menu
+    Then the newest of those runs opens, under the plan it ran on
 
   @integration
   Scenario: Open last run is not offered for a suite that never ran
-    Given a test suite with no run
+    Given a test suite whose scenarios have no run inside the period
     When its row menu is opened
     Then "Open last run" is not offered
 

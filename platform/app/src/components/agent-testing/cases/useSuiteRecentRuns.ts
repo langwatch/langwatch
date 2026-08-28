@@ -23,10 +23,8 @@ import {
   groupRunsByBatchId,
 } from "~/components/suites/run-history-transforms";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isInternalSetId } from "~/server/scenarios/internal-set-id";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
-import { toExternalPlanSlug } from "../results/run-plans";
+import { type PlanIdentity, planOfSet } from "./plan-of-set";
 
 /** How many runs the list holds. It is a way into a run, not a run history. */
 export const RECENT_RUNS_SHOWN = 8;
@@ -56,30 +54,6 @@ export type SuiteRecentRuns = {
   runs: RecentRun[];
   isLoading: boolean;
 };
-
-/** The plan of one run set: the suite that owns it, or the code that wrote it. */
-type PlanIdentity = { planName: string; planSlug: string };
-
-function planOfSet({
-  scenarioSetId,
-  planBySuiteId,
-}: {
-  scenarioSetId: string | undefined;
-  planBySuiteId: Map<string, PlanIdentity>;
-}): PlanIdentity | null {
-  if (!scenarioSetId) return null;
-  const suiteId = extractSuiteId(scenarioSetId);
-  if (suiteId) return planBySuiteId.get(suiteId) ?? null;
-  // The reserved sets of the platform are not run plans and the Results tab
-  // lists none of them, so a run of one has nothing to open.
-  if (isInternalSetId(scenarioSetId)) return null;
-  // Any other set was written by a code run, and the Results tab lists it
-  // under the name the code gave it.
-  return {
-    planName: scenarioSetId,
-    planSlug: toExternalPlanSlug(scenarioSetId),
-  };
-}
 
 export function useSuiteRecentRuns({
   scenarioIds,

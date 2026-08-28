@@ -305,6 +305,8 @@ describe("<RunDialog/>", () => {
 
     const configure = screen.getByTestId("run-dialog-configure-agents");
     expect(configure).toHaveTextContent("Configure");
+    // The words carry the link, so no icon trails them.
+    expect(configure.querySelector("svg")).toBeNull();
     expect(configure).toHaveAttribute("href", "/test-project/agents");
     expect(configure).toHaveAttribute("target", "_blank");
     // The dialog is still the thing on screen.

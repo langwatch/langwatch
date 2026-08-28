@@ -1,6 +1,6 @@
 /**
- * Every way the Scenarios tab opens one case: the editor drawer, the version
- * history, and the run it last had.
+ * Every way the Scenarios tab opens one case: the editor drawer and the run it
+ * last had. The versions of a case read inside the editor drawer.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/drawers.md
@@ -15,7 +15,6 @@ import { useOpenLiveRun } from "./useOpenLiveRun";
 
 export type CaseOpenActions = {
   openEditor: (testCase: TestCase) => void;
-  openHistory: (testCase: TestCase) => void;
   openLastRun: (testCase: TestCase) => void;
   /** A row click always opens the case editor. */
   onRowClick: (testCase: TestCase) => void;
@@ -30,17 +29,6 @@ export function useCaseOpenActions(
   const openEditor = useCallback(
     (testCase: TestCase) =>
       openDrawer(CASE_EDITOR_DRAWER, { scenarioId: testCase.id }),
-    [openDrawer],
-  );
-
-  // The history reads inside the case drawer, beside the version it is the
-  // history of, so History opens the case with its versions already open.
-  const openHistory = useCallback(
-    (testCase: TestCase) =>
-      openDrawer(CASE_EDITOR_DRAWER, {
-        scenarioId: testCase.id,
-        showHistory: "true",
-      }),
     [openDrawer],
   );
 
@@ -68,5 +56,5 @@ export function useCaseOpenActions(
     [openDrawer],
   );
 
-  return { openEditor, openHistory, openLastRun, onRowClick };
+  return { openEditor, openLastRun, onRowClick };
 }

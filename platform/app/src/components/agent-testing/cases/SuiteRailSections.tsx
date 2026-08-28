@@ -89,7 +89,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
               <SuiteRailMenu
                 suite={suite}
                 canManage={canManage}
-                hasRun={props.suiteIdsWithRuns.has(suite.id)}
+                hasRun={props.lastRunBySuiteId.has(suite.id)}
                 onNewTestCase={props.onNewTestCase}
                 onRunSuite={props.onRunSuite}
                 onRenameSuite={props.onRenameSuite}

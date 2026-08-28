@@ -1,8 +1,7 @@
 /**
- * What sits under the cases panel header: the skeleton, an empty state, or
- * the table with the recent runs control beneath it. The bulk selection
- * action bar lives here too, so the selection state does not leak into the
- * tab model.
+ * What sits under the cases panel header: the skeleton, an empty state, or the
+ * table of scenarios. The bulk selection action bar lives here too, so the
+ * selection state does not leak into the tab model.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -22,7 +21,6 @@ import {
   ExternalCasesTable,
 } from "./CasesTable";
 import { MoveToSuiteSelectionBar } from "./MoveToSuiteSelectionBar";
-import { RecentRunsMenu } from "./RecentRunsMenu";
 import type { TestCase } from "./test-cases";
 
 export type CasesPanelBodyProps = CasesPanelProps & {
@@ -74,17 +72,6 @@ function useCaseSelection({
     clearSelection,
     handleMoveConfirm,
   };
-}
-
-/**
- * The one question the recent runs list answers, asked off the last results
- * the table already holds: has a scenario of this suite run inside the period.
- * The control under the table is never offered over a list with no rows.
- */
-function hasRunInPeriod(props: CasesPanelBodyProps): boolean {
-  return props.suiteScenarioIds.some((scenarioId) =>
-    props.lastResults.has(scenarioId),
-  );
 }
 
 /**
@@ -163,15 +150,9 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onRowClick={props.onRowClick}
         onRunCase={props.onRunCase}
         onEdit={props.onEdit}
-        onHistory={props.onHistory}
         onDuplicate={props.onDuplicate}
         onOpenLastRun={props.onOpenLastRun}
         onArchive={props.onArchive}
-      />
-      <RecentRunsMenu
-        period={props.period}
-        scenarioIds={props.suiteScenarioIds}
-        hasRun={hasRunInPeriod(props)}
       />
       <MoveToSuiteSelectionBar
         selectedCount={selectedIds.size}

@@ -10,7 +10,6 @@
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getRoutePath } from "~/utils/routes";
@@ -56,7 +55,6 @@ function ConfigureAgentsLink() {
       data-testid="run-dialog-configure-agents"
     >
       Configure
-      <ExternalLink size={11} />
     </chakra.a>
   );
 }

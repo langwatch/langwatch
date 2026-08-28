@@ -50,15 +50,11 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onRowClick={open.onRowClick}
       onRunCase={run.runCase}
       onEdit={open.openEditor}
-      onHistory={open.openHistory}
       onDuplicate={caseMutations.duplicateCase}
       onMoveToSuite={caseMutations.moveCaseToSuite}
       onOpenLastRun={open.openLastRun}
       onArchive={caseMutations.setCaseToArchive}
       onOpenExternalCase={() =>
-        base.selectPlan(toExternalPlanSlug(view.externalSetId))
-      }
-      onOpenExternalResults={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))
       }
       onRenameSuite={() => {

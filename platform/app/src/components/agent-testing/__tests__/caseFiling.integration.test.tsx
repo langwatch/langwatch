@@ -226,8 +226,8 @@ describe("the Scenarios tab", () => {
     expect(caseEditor().open).toBe(false);
   });
 
-  /** @scenario "History opens from the row menu of a scenario" */
-  it("opens the case editor with its history already open, from the row menu", async () => {
+  /** @scenario "The row menu of a scenario offers no History item" */
+  it("offers no History item, because the versions read inside the editor", async () => {
     const user = userEvent.setup();
     // Loose so the row reads at the root of the All scenarios surface.
     mockScenariosGetAll.mockReturnValue({
@@ -239,18 +239,13 @@ describe("the Scenarios tab", () => {
     await user.click(
       screen.getByRole("button", { name: "Actions for Double charge" }),
     );
-    await user.click(await screen.findByRole("menuitem", { name: "History" }));
 
-    expect(caseEditor()).toEqual({
-      open: true,
-      scenarioId: "case_1",
-      folderId: null,
-      showHistory: true,
-    });
-    expect(mockOpenDrawer).toHaveBeenCalledWith(
-      "agentTestingCaseEditor",
-      expect.objectContaining({ scenarioId: "case_1", showHistory: "true" }),
-    );
+    expect(
+      await screen.findByRole("menuitem", { name: "Edit" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "History" }),
+    ).not.toBeInTheDocument();
   });
 
   /** @scenario "A case created from inside a suite is filed into that suite" */

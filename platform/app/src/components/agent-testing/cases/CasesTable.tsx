@@ -34,6 +34,7 @@ import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
+import { MenuActionLabel } from "./MenuActionLabel";
 import { RunCaseButton } from "./RunCaseButton";
 import type { TestCase } from "./test-cases";
 
@@ -65,8 +66,6 @@ export type CasesTableProps = {
   /** Opens the run dialog for the case. */
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  /** Opens the version history drawer of the case. */
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
@@ -129,7 +128,6 @@ export function CasesTable({
   onRowClick,
   onRunCase,
   onEdit,
-  onHistory,
   onDuplicate,
   onOpenLastRun,
   onArchive,
@@ -168,7 +166,6 @@ export function CasesTable({
             onRowClick={onRowClick}
             onRunCase={onRunCase}
             onEdit={onEdit}
-            onHistory={onHistory}
             onDuplicate={onDuplicate}
             onOpenLastRun={onOpenLastRun}
             onArchive={onArchive}
@@ -191,7 +188,6 @@ function CaseRow({
   onRowClick,
   onRunCase,
   onEdit,
-  onHistory,
   onDuplicate,
   onOpenLastRun,
   onArchive,
@@ -207,7 +203,6 @@ function CaseRow({
   onRowClick: (testCase: TestCase) => void;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
@@ -270,7 +265,6 @@ function CaseRow({
         hasLastRun={hasLastRun}
         onRunCase={onRunCase}
         onEdit={onEdit}
-        onHistory={onHistory}
         onDuplicate={onDuplicate}
         onStartMoveToSuite={onStartMoveToSuite}
         onOpenLastRun={onOpenLastRun}
@@ -286,7 +280,6 @@ function CaseRowActions({
   hasLastRun,
   onRunCase,
   onEdit,
-  onHistory,
   onDuplicate,
   onStartMoveToSuite,
   onOpenLastRun,
@@ -297,7 +290,6 @@ function CaseRowActions({
   hasLastRun: boolean;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onStartMoveToSuite: (scenarioId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -320,7 +312,6 @@ function CaseRowActions({
         canManage={canManage}
         hasLastRun={hasLastRun}
         onEdit={onEdit}
-        onHistory={onHistory}
         onDuplicate={onDuplicate}
         onStartMoveToSuite={onStartMoveToSuite}
         onOpenLastRun={onOpenLastRun}
@@ -335,7 +326,6 @@ function CaseRowActionsMenu({
   canManage,
   hasLastRun,
   onEdit,
-  onHistory,
   onDuplicate,
   onStartMoveToSuite,
   onOpenLastRun,
@@ -345,7 +335,6 @@ function CaseRowActionsMenu({
   canManage: boolean;
   hasLastRun: boolean;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onStartMoveToSuite: (scenarioId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -377,7 +366,7 @@ function CaseRowActionsMenu({
               onEdit(testCase);
             }}
           >
-            Edit
+            <MenuActionLabel action="edit">Edit</MenuActionLabel>
           </Menu.Item>
         )}
         {canManage && (
@@ -388,7 +377,7 @@ function CaseRowActionsMenu({
               onDuplicate(testCase);
             }}
           >
-            Duplicate
+            <MenuActionLabel action="duplicate">Duplicate</MenuActionLabel>
           </Menu.Item>
         )}
         {hasLastRun && (
@@ -399,7 +388,9 @@ function CaseRowActionsMenu({
               onOpenLastRun(testCase);
             }}
           >
-            Open last run
+            <MenuActionLabel action="openLastRun">
+              Open last run
+            </MenuActionLabel>
           </Menu.Item>
         )}
         {canManage && (
@@ -410,18 +401,11 @@ function CaseRowActionsMenu({
               onStartMoveToSuite(testCase.id);
             }}
           >
-            Move to suite...
+            <MenuActionLabel action="moveToSuite">
+              Move to suite...
+            </MenuActionLabel>
           </Menu.Item>
         )}
-        <Menu.Item
-          value="history"
-          onClick={(event) => {
-            stop(event);
-            onHistory(testCase);
-          }}
-        >
-          History
-        </Menu.Item>
         {canManage && (
           <Menu.Item
             value="archive"
@@ -431,7 +415,7 @@ function CaseRowActionsMenu({
               onArchive(testCase);
             }}
           >
-            Archive
+            <MenuActionLabel action="archive">Archive</MenuActionLabel>
           </Menu.Item>
         )}
       </Menu.Content>

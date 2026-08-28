@@ -68,11 +68,11 @@ Feature: Scenario history in the interface
     And it carries the date the case was created
 
   @integration
-  Scenario: History opens from the row menu of a scenario
+  Scenario: The row menu of a scenario offers no History item
     Given a scenario with three versions in the table
-    When History is chosen on its row menu
-    Then the editor of that case opens
-    And its history popover is already open
+    When its row menu is opened
+    Then no "History" action is offered
+    And the versions read inside the editor of that scenario
 
   @integration
   Scenario: The run drawer offers no History control

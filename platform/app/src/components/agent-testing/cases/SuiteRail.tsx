@@ -23,6 +23,7 @@ import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { SuiteRailFooter } from "./SuiteRailFooter";
 import { SuiteRailSections } from "./SuiteRailSections";
 import type { ExternalSetEntry, TestSuiteEntry } from "./test-cases";
+import type { SuiteLastRun } from "./useTestCasesData";
 
 /** How wide the rail is when it is open. */
 export const SUITE_RAIL_WIDTH = 218;
@@ -46,8 +47,8 @@ export type SuiteRailProps = {
   isLoading?: boolean;
   /** False for a person who may read the project but not change it. */
   canManage: boolean;
-  /** The suites that have a run to open. */
-  suiteIdsWithRuns: ReadonlySet<string>;
+  /** The last run of every suite that has one, keyed by suite id. */
+  lastRunBySuiteId: ReadonlyMap<string, SuiteLastRun>;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelect: (selection: AgentTestingSelection) => void;

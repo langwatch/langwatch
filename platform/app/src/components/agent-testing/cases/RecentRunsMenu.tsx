@@ -1,12 +1,12 @@
 /**
- * The one control under the cases table: a way into a recent run of the open
- * test suite.
+ * The way into a recent run of the open set, in the header of the cases panel
+ * between "New scenario" and "Run suite".
  *
  * A row holds the run plan the run belongs to, how long ago it started and how
  * it did, and nothing more. The whole point is to reach a run in one click, so
  * the list stays scannable and the results themselves stay on the Results tab.
  *
- * The button is offered when the suite has a scenario that ran inside the
+ * The button is offered when the set has a scenario that ran inside the
  * period, which is the one question the list itself answers, so the control is
  * never offered over an empty list and never hidden over a full one.
  *
@@ -34,10 +34,10 @@ export const RUNNING_RUN_LABEL = "running";
 
 export type RecentRunsMenuProps = {
   period: Period;
-  /** The scenarios filed under the suite, which are what its runs covered. */
+  /** The scenarios filed under the set, which are what its runs covered. */
   scenarioIds: string[];
   /**
-   * False when no scenario of the suite ran inside the period, so there is
+   * False when no scenario of the set ran inside the period, so there is
    * nothing to open.
    */
   hasRun: boolean;
@@ -135,22 +135,20 @@ export function RecentRunsMenu(props: RecentRunsMenuProps) {
   if (!props.hasRun) return null;
 
   return (
-    <HStack justify="flex-end" paddingX={1} paddingTop={6}>
-      <Menu.Root
-        open={isOpen}
-        onOpenChange={({ open }: { open: boolean }) => setIsOpen(open)}
-      >
-        <Menu.Trigger asChild>
-          <SmallButton data-testid="recent-runs-trigger">
-            <History size={13} />
-            {OPEN_RECENT_RUN_LABEL}
-            <ChevronDown size={13} />
-          </SmallButton>
-        </Menu.Trigger>
-        <Menu.Content minWidth="240px" data-testid="recent-runs-list">
-          <RecentRunsList {...props} isOpen={isOpen} />
-        </Menu.Content>
-      </Menu.Root>
-    </HStack>
+    <Menu.Root
+      open={isOpen}
+      onOpenChange={({ open }: { open: boolean }) => setIsOpen(open)}
+    >
+      <Menu.Trigger asChild>
+        <SmallButton data-testid="recent-runs-trigger">
+          <History size={13} />
+          {OPEN_RECENT_RUN_LABEL}
+          <ChevronDown size={13} />
+        </SmallButton>
+      </Menu.Trigger>
+      <Menu.Content minWidth="240px" data-testid="recent-runs-list">
+        <RecentRunsList {...props} isOpen={isOpen} />
+      </Menu.Content>
+    </Menu.Root>
   );
 }

@@ -22,15 +22,19 @@ Feature: The scenarios table
     renames it. A test suite carries only a name, so renaming is the whole of
     editing one, and no "Edit suite" button is offered.
 
-    Under the table sits one button, "Open recent run". It drops a short list
-    of the recent runs that covered a scenario of the open suite, and choosing
-    one opens that run. A run belongs to the run plan it was started under, so
-    a row names that plan rather than a number: a run of one scenario is a plan
-    of its own, and the same suite is also covered by the plans that run all of
-    it.
+    The line above the table carries one button, "Open recent run", between
+    "New scenario" and "Run suite". It drops a short list of the recent runs
+    that covered a scenario of the open suite, and choosing one opens that run.
+    A run belongs to the run plan it was started under, so a row names that
+    plan rather than a number: a run of one scenario is a plan of its own, and
+    the same suite is also covered by the plans that run all of it.
 
     The button is offered when, and only when, that list has rows. Both ask the
     one question: has a scenario of this suite run inside the period.
+
+    A set that runs from code carries the same button and nothing else, because
+    the platform cannot write it. Its results stay one click away: a row of the
+    table opens them.
 
   # --- Which suite is open ---
 
@@ -97,10 +101,17 @@ Feature: The scenarios table
     And it carries the play icon
 
   @integration
-  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order
+  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order
     Given a scenario row with a finished run
     When its row menu is opened
-    Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Move to suite...", "History", "Archive"
+    Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Move to suite...", "Archive"
+    And no "History" action is offered, because the versions read inside the editor
+
+  @integration
+  Scenario: Every action of the row menu carries its icon
+    Given a scenario row with a finished run
+    When its row menu is opened
+    Then every action carries its own icon before its words
 
   @integration
   Scenario: Move to suite... on a row starts checkbox selection with that row pre-checked
@@ -263,18 +274,19 @@ Feature: The scenarios table
   # --- Recent runs ---
 
   @integration
-  Scenario: One button under the table opens a recent run of the suite
+  Scenario: One button above the table opens a recent run of the suite
     Given a test suite whose scenarios have a finished run
     When that suite is opened
-    Then a button under the table reads "Open recent run"
+    Then a button above the table reads "Open recent run"
+    And it sits between "New scenario" and "Run suite"
     And no line under the table reads "Last run on"
 
   @integration
-  Scenario: A run of one scenario of the suite is offered under the table
+  Scenario: A run of one scenario of the suite is offered above the table
     Given a scenario of the open suite that ran on its own run plan
     And no run was started on a plan named after the suite
     When that suite is opened
-    Then a button under the table reads "Open recent run"
+    Then a button above the table reads "Open recent run"
     And the list holds that run under the name of the plan it ran on
 
   @integration
@@ -361,3 +373,10 @@ Feature: The scenarios table
     When one of its rows is clicked
     Then the results of that run open
     And no editor opens
+
+  @integration
+  Scenario: A set that runs from code offers Open recent run and no View results
+    Given an external set with a finished run
+    When the line above its table is read
+    Then it offers "Open recent run"
+    And no button reads "View results"
