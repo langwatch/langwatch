@@ -33,6 +33,20 @@ Feature: Custom role service
     Then the guarded delete loses
     And the Role service reports that the role is in use
 
+  @unit
+  Scenario: The role transport moves without changing who may call it
+    Given the role and role-binding procedures are owned by the Role package
+    When the process mounts them on its own tRPC root
+    Then the browser calls the same procedure names as before
+    And every procedure declares the same access decision it declared before
+
+  @unit
+  Scenario: A caller the organization decision refuses reaches no role data
+    Given the caller may not manage the organization
+    When they list its roles
+    Then the refusal is forbidden and carries the permission-denied code
+    And the Role service is never called
+
   Scenario: Another feature needs custom-role behaviour
     When API Key, Organization, or Invite validates a custom role
     Then it calls the process-owned Role service

@@ -26,7 +26,9 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
-    "nanoid": "^5.1.5"
+    "@trpc/server": "^11.18.0",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
