@@ -90,7 +90,7 @@ import { type IdempotencyReceipt, Prisma } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { fingerprintJson, sha256 } from "~/utils/idempotency-fingerprint";
 
-import { RequestValidationError } from "./validation";
+import { RequestValidationError } from "@langwatch/platform-api/app-rest";
 
 const logger = createLogger("langwatch:api:idempotency");
 

@@ -18,8 +18,8 @@ import "~/server/api-router";
 import {
   isApiKeyReachable,
   policyPermissions,
-} from "~/server/api/security/access-policy";
-import { allRegisteredRoutes } from "~/server/api/security/route-registry";
+} from "@langwatch/api";
+import { allRegisteredRoutes } from "@langwatch/api";
 
 /**
  * Every RBAC permission the mounted API demands, mapped to the routes demanding

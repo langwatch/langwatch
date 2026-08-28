@@ -1,5 +1,4 @@
-import { createLogger } from "@langwatch/observability";
-import { createWarnThrottle } from "./observability/warnThrottle";
+import { createLogger, createWarnThrottle } from "@langwatch/observability";
 
 /**
  * Warns when a Postgres operation takes longer than its budget.

@@ -71,20 +71,14 @@ function reachableOnlyWithAnOrgScopedBinding(): {
   rendered: string;
 } {
   const demanded = [...permissionsDemandedByRoutes()]
-    .filter(
-      ([permission]) =>
-        classifyForLangy(permission).disposition === "unreachable",
-    )
+    .filter(([permission]) => classifyForLangy(permission).disposition === "unreachable")
     .sort(([a], [b]) => a.localeCompare(b));
   return {
     permissions: demanded.map(([permission]) => permission),
     // The routes render in the failure message, not the pin, so a failure
     // names the door that moved without making the pin churn on route renames.
     rendered: demanded
-      .map(
-        ([permission, routes]) =>
-          `${permission} — demanded by ${routes.join(", ")}`,
-      )
+      .map(([permission, routes]) => `${permission} — demanded by ${routes.join(", ")}`)
       .join("\n"),
   };
 }
@@ -93,9 +87,7 @@ function reachableOnlyWithAnOrgScopedBinding(): {
 function askedForButExcludedByPolicy(): string[] {
   return LANGY_CANDIDATE_PERMISSIONS.flatMap((permission) => {
     const verdict = classifyForLangy(permission);
-    return verdict.disposition === "excluded"
-      ? [`${permission} — ${verdict.reason}`]
-      : [];
+    return verdict.disposition === "excluded" ? [`${permission} — ${verdict.reason}`] : [];
   });
 }
 
@@ -158,9 +150,7 @@ describe("Langy permission coverage", () => {
     describe("when a family has not been classified for Langy", () => {
       it("fails here, so a new resource family cannot be granted by default nor refused in silence", async () => {
         expect(
-          ALL_PERMISSION_FAMILIES.filter(
-            (family) => !LANGY_CLASSIFIED_FAMILIES.has(family),
-          ),
+          ALL_PERMISSION_FAMILIES.filter((family) => !LANGY_CLASSIFIED_FAMILIES.has(family)),
           "These families exist in rbac.ts `Resources` but no Langy bucket " +
             "claims them. Put each in FULL_ACCESS_FAMILIES, " +
             "AUTH_SCOPE_FAMILIES, or FULLY_EXCLUDED_FAMILIES",
@@ -171,9 +161,7 @@ describe("Langy permission coverage", () => {
     describe("when an action has not been classified for Langy", () => {
       it("fails here, so a new action cannot be swept into the candidate list unassessed", async () => {
         expect(
-          ALL_PERMISSION_ACTIONS.filter(
-            (action) => !LANGY_CLASSIFIED_ACTIONS.has(action),
-          ),
+          ALL_PERMISSION_ACTIONS.filter((action) => !LANGY_CLASSIFIED_ACTIONS.has(action)),
           "These actions exist in rbac.ts `Actions` but no Langy bucket " +
             "claims them. Put each in DELEGABLE_ACTIONS or ACTION_EXCLUSIONS",
         ).toEqual([]);
@@ -187,14 +175,10 @@ describe("Langy permission coverage", () => {
     describe("when a classified name does not exist in rbac.ts", () => {
       it("fails here, so a typo'd or removed family cannot sit in a bucket classifying nothing", async () => {
         const families = new Set(ALL_PERMISSION_FAMILIES);
-        expect(
-          [...LANGY_CLASSIFIED_FAMILIES].filter((f) => !families.has(f)),
-        ).toEqual([]);
+        expect([...LANGY_CLASSIFIED_FAMILIES].filter((f) => !families.has(f))).toEqual([]);
 
         const actions = new Set(ALL_PERMISSION_ACTIONS);
-        expect(
-          [...LANGY_CLASSIFIED_ACTIONS].filter((a) => !actions.has(a)),
-        ).toEqual([]);
+        expect([...LANGY_CLASSIFIED_ACTIONS].filter((a) => !actions.has(a))).toEqual([]);
       });
     });
 
@@ -219,9 +203,7 @@ describe("Langy permission coverage", () => {
   describe("given the boundaries the owner drew", () => {
     describe("when the permission would read a stored secret", () => {
       it("is absent from the candidate list at every grain, including view", async () => {
-        expect(
-          LANGY_CANDIDATE_PERMISSIONS.filter((p) => p.startsWith("secrets:")),
-        ).toEqual([]);
+        expect(LANGY_CANDIDATE_PERMISSIONS.filter((p) => p.startsWith("secrets:"))).toEqual([]);
       });
     });
 
@@ -232,9 +214,7 @@ describe("Langy permission coverage", () => {
         // family added to the policy would have missed all of them silently.
         const authScopeWrites = LANGY_CANDIDATE_PERMISSIONS.filter((p) => {
           const [family, action] = p.split(":");
-          return (
-            LANGY_AUTH_SCOPE_FAMILY_NAMES.includes(family!) && action !== "view"
-          );
+          return LANGY_AUTH_SCOPE_FAMILY_NAMES.includes(family!) && action !== "view";
         });
         expect(authScopeWrites).toEqual([]);
 
@@ -262,10 +242,7 @@ describe("Langy permission coverage", () => {
         // makes rotation reachable again.
         expect(LANGY_CANDIDATE_PERMISSIONS).not.toContain("virtualKeys:manage");
         expect(
-          hasPermissionWithHierarchy(
-            [...LANGY_CANDIDATE_PERMISSIONS],
-            "virtualKeys:rotate",
-          ),
+          hasPermissionWithHierarchy([...LANGY_CANDIDATE_PERMISSIONS], "virtualKeys:rotate"),
         ).toBe(false);
       });
     });
@@ -274,9 +251,7 @@ describe("Langy permission coverage", () => {
       it("is absent, because 'the caller could have done it too' does not bound public disclosure or credential rotation", async () => {
         expect(
           LANGY_CANDIDATE_PERMISSIONS.filter((p) =>
-            [":share", ":rotate", ":viewOtherPersonal"].some((suffix) =>
-              p.endsWith(suffix),
-            ),
+            [":share", ":rotate", ":viewOtherPersonal"].some((suffix) => p.endsWith(suffix)),
           ),
         ).toEqual([]);
 
@@ -293,10 +268,7 @@ describe("Langy permission coverage", () => {
           if (!excludedSuffixes.some((s) => permission.endsWith(s))) continue;
           checked++;
           expect(
-            hasPermissionWithHierarchy(
-              [...LANGY_CANDIDATE_PERMISSIONS],
-              permission,
-            ),
+            hasPermissionWithHierarchy([...LANGY_CANDIDATE_PERMISSIONS], permission),
             `${permission} is reachable through the hierarchy`,
           ).toBe(false);
         }
@@ -318,9 +290,7 @@ describe("Langy permission coverage", () => {
         // invoke Langy recursively, and the intersection ceiling bounds
         // authority, not amplification.
         expect(
-          LANGY_CANDIDATE_PERMISSIONS.filter(
-            (p) => p.startsWith("langy:") || p.startsWith("ops:"),
-          ),
+          LANGY_CANDIDATE_PERMISSIONS.filter((p) => p.startsWith("langy:") || p.startsWith("ops:")),
         ).toEqual([]);
       });
     });
@@ -392,14 +362,13 @@ describe("Langy permission coverage", () => {
       it("gates creating a monitor on the grain the product's own create uses", () => {
         const demanded = permissionsDemandedByRoutes();
         const monitorRoutes = (permission: string) =>
-          (demanded.get(permission) ?? []).filter((route) =>
-            route.includes("/api/monitors"),
-          );
+          (demanded.get(permission) ?? []).filter((route) => route.includes("/api/monitors"));
 
         expect(
           monitorRoutes("evaluations:create").some((route) => route.startsWith("POST ")),
           "Creating a monitor must demand evaluations:create, matching " +
-            "server/api/routers/monitors.ts. Any coarser grain refuses every " +
+            "the monitors tRPC surface in @langwatch/monitor-server. Any coarser " +
+            "grain refuses every " +
             "least-privilege key while the UI creates the same enabled monitor",
         ).toBe(true);
 
@@ -409,18 +378,14 @@ describe("Langy permission coverage", () => {
         // so on its own it would go quietly green if someone widened DELETE to
         // `:create` too. That is the one change this pin exists to catch.
         expect(
-          monitorRoutes("evaluations:manage").filter((route) =>
-            route.startsWith("DELETE "),
-          ),
+          monitorRoutes("evaluations:manage").filter((route) => route.startsWith("DELETE ")),
           "No monitor DELETE route demands evaluations:manage. Destroying a " +
             "monitor is the destructive grain and must stay behind :manage, " +
             "which a least-privilege key holds only if its owner does",
         ).not.toEqual([]);
 
         expect(
-          monitorRoutes("evaluations:manage").filter(
-            (route) => !route.startsWith("DELETE "),
-          ),
+          monitorRoutes("evaluations:manage").filter((route) => !route.startsWith("DELETE ")),
           "A non-delete monitor route demands evaluations:manage — a coarser " +
             "grain than the action needs, so this is a 403 at the door for " +
             "an action the product allows on :create",

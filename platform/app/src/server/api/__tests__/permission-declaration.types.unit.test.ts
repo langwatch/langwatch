@@ -15,7 +15,7 @@ import type { Authorized } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
-import { requires } from "../security";
+import { requires } from "@langwatch/platform-api/app-rest";
 import { protectedProcedure } from "../trpc.permission-builder";
 
 const projectInput = z.object({ projectId: z.string() });

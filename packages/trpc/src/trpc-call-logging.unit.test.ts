@@ -5,7 +5,7 @@ import {
   handleTrpcCallLogging,
   recordTrpcCall,
   resetSlowCallThrottle,
-} from "../trpc.runtime-policy";
+} from "./trpc-call-logging.js";
 
 function createMockLog() {
   return {

@@ -1,100 +1,53 @@
-import type { DefaultErrorShape } from "@trpc/server";
-import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import {
+  createTrpcErrorFormatter,
+  trpcFailureTraceIds,
+  type TrpcErrorCausePayloadPort,
+} from "@langwatch/trpc";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
-import { trpcFailureTraceIds } from "./trpc.failure-trace";
-
-const MAX_CAUSE_DEPTH = 3;
-
-function donatedMessage(cause: unknown): string | undefined {
-  if (typeof cause !== "object" || cause === null) return undefined;
-  const message = (cause as { message?: unknown }).message;
-  return typeof message === "string" && message.length > 0 ? message : undefined;
-}
-
-function isInheritedFromCause(message: string, cause: unknown): boolean {
-  let current = cause;
-  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
-    if (current === null || current === undefined) return false;
-
-    const donated = donatedMessage(current);
-    if (donated !== undefined && message.includes(donated)) return true;
-    if (typeof current !== "object") return true;
-
-    current = (current as { cause?: unknown }).cause;
-  }
-  return current !== null && current !== undefined;
-}
 
 /**
- * App tRPC's handled-error wire boundary. It deliberately remains app-owned:
- * its model-provider compatibility payloads are browser contracts, not API
- * framework policy.
+ * The `data.cause` payloads this app's frontend interceptors read. They stay
+ * app-owned deliberately: the model-provider compatibility shapes are browser
+ * contracts, not API framework policy, so they reach the framework formatter
+ * as a port rather than being moved into it.
+ *
+ * Order matters only in that a cause is one of these or none of them; the
+ * plan-limit shape is last because it is the shapeless one, recognised by a
+ * field rather than by a class.
  */
-export function errorFormatter({
-  shape,
-  error,
-}: {
-  shape: DefaultErrorShape;
-  error: { cause?: unknown; message?: string; code?: string };
-}) {
-  const cause = error.cause as { limitType?: string; current?: number; max?: number } | undefined;
-  const limitInfo = cause?.limitType
-    ? { limitType: cause.limitType, current: cause.current, max: cause.max }
-    : null;
-  const handled = HandledError.isHandled(error.cause)
-    ? error.cause
-    : isZodLikeError(error.cause)
-      ? ValidationError.fromZodError(error.cause)
+const causePayload: TrpcErrorCausePayloadPort = {
+  payloadFor(cause) {
+    if (cause instanceof ModelNotConfiguredError) {
+      return {
+        code: cause.cause,
+        featureKey: cause.featureKey,
+        featureDisplayName: cause.featureDisplayName,
+        role: cause.role,
+        projectId: cause.projectId,
+      };
+    }
+    if (cause instanceof ModelProviderDisabledError) {
+      return cause.toResponseBody();
+    }
+    if (cause instanceof AiCallFailedError) {
+      return {
+        code: cause.cause,
+        featureKey: cause.featureKey,
+        featureDisplayName: cause.featureDisplayName,
+        role: cause.role,
+      };
+    }
+    const limit = cause as { limitType?: string; current?: number; max?: number } | undefined;
+    return limit?.limitType
+      ? { limitType: limit.limitType, current: limit.current, max: limit.max }
       : null;
-  const missingModelCause =
-    error.cause instanceof ModelNotConfiguredError
-      ? {
-          code: error.cause.cause,
-          featureKey: error.cause.featureKey,
-          featureDisplayName: error.cause.featureDisplayName,
-          role: error.cause.role,
-          projectId: error.cause.projectId,
-        }
-      : null;
-  const aiCallFailedCause =
-    error.cause instanceof AiCallFailedError
-      ? {
-          code: error.cause.cause,
-          featureKey: error.cause.featureKey,
-          featureDisplayName: error.cause.featureDisplayName,
-          role: error.cause.role,
-        }
-      : null;
-  const providerDisabledCause =
-    error.cause instanceof ModelProviderDisabledError ? error.cause.toResponseBody() : null;
-  const isInternalServerError =
-    error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
-  const message = handled
-    ? handled.code
-    : isInternalServerError
-      ? HandledError.toUserMessage(error.cause)
-      : shape.message;
-  const isAuthoredMessage =
-    !handled &&
-    !isInternalServerError &&
-    typeof shape.message === "string" &&
-    shape.message.length > 0 &&
-    shape.message !== error.code &&
-    !isInheritedFromCause(shape.message, error.cause);
-  const shapeData = { ...shape.data };
-  delete shapeData.stack;
+  },
+};
 
-  return {
-    ...shape,
-    message,
-    data: {
-      ...shapeData,
-      cause: missingModelCause ?? providerDisabledCause ?? aiCallFailedCause ?? limitInfo,
-      error: handled?.serialize() ?? null,
-      authored: isAuthoredMessage,
-      traceId: trpcFailureTraceIds.find(error),
-    },
-  };
-}
+/** App tRPC's handled-error wire boundary. */
+export const errorFormatter = createTrpcErrorFormatter({
+  causePayload,
+  traceIds: trpcFailureTraceIds,
+});

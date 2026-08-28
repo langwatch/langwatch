@@ -11,9 +11,9 @@ import {
   describeAccessPolicy,
   internalSecret,
   publicEndpoint,
-} from "../access-policy";
-import { getRoutePolicy } from "../route-registry";
-import { createProjectApp, createServiceApp } from "../secured-app";
+} from "@langwatch/api";
+import { getRoutePolicy } from "@langwatch/api";
+import { createProjectApp, createServiceApp } from "../index";
 
 const noopSecret: MiddlewareHandler = async (_c, next) => next();
 

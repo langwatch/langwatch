@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { handleError } from "~/app/api/middleware/error-handler";
-import { validator as zValidator } from "../validation";
+import { validator as zValidator } from "@langwatch/platform-api/app-rest";
 
 /**
  * These run against a REAL Hono app with the REAL error handler mounted, because

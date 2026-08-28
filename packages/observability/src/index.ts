@@ -43,3 +43,4 @@ export {
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta";
+export { createWarnThrottle, type WarnThrottle } from "./warn-throttle";

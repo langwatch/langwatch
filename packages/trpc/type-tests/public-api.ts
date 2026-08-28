@@ -1,4 +1,4 @@
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition, type PendingPermissionProcedureBuilder } from "@langwatch/trpc";
 import { z } from "zod";
 
 type Equal<Left, Right> =
@@ -18,4 +18,31 @@ const response = caller.project({ projectId: "project-1" });
 
 type _ContextAndInputRemainConcrete = Assert<
   Equal<Awaited<typeof response>, { actorId: string; projectId: string }>
+>;
+
+/**
+ * The structural guarantee: after `.input()` a pending builder offers the
+ * declaring methods and NOTHING else. No `.query`, no `.mutation`, no
+ * `.subscription` — so a procedure that declares no authorization cannot be
+ * built at all, rather than being caught later by a sweep. Widen this surface
+ * and roughly 800 procedures quietly lose the guarantee; this assertion is
+ * what refuses the widening.
+ */
+type Pending = PendingPermissionProcedureBuilder<
+  { permissionChecked: boolean },
+  { actor: { id: string } },
+  object,
+  object,
+  { projectId: string },
+  { projectId: string },
+  unknown,
+  unknown,
+  false
+>;
+
+type _DeclarationIsMandatoryByConstruction = Assert<
+  Equal<
+    keyof Pending,
+    "input" | "use" | "permission" | "permissionAny" | "noPermission" | "authorizeInService"
+  >
 >;

@@ -3,9 +3,10 @@
  *
  * The audit middlewares, end to end over a real procedure.
  *
- * `redactAuditArgs` is covered on its own next door. What this pins is that
- * both middlewares call it: the mutation one and the error one, which records
- * the calls the other does not and used to store the input raw.
+ * `redactAuditArgs` is covered on its own in `@langwatch/trpc`. What this pins
+ * is that both middlewares call it through this process's composition: the
+ * mutation one and the error one, which records the calls the other does not
+ * and used to store the input raw.
  *
  * @see specs/scenarios/secret-run-parameters.feature
  */

@@ -2,7 +2,7 @@
   "name": "@langwatch/trpc",
   "version": "0.1.0",
   "private": true,
-  "description": "Typed tRPC root and procedure framework without application policy.",
+  "description": "Typed tRPC root and the process-agnostic policy spine it runs: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",
@@ -19,6 +19,10 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
     "@trpc/server": "11.18.0"
   },
   "devDependencies": {

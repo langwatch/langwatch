@@ -24,7 +24,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "~/server/api/rbac";
-import { allRegisteredRoutes } from "../route-registry";
+import { allRegisteredRoutes } from "@langwatch/api";
 
 /**
  * The registry is populated as a side effect of the app modules loading, so

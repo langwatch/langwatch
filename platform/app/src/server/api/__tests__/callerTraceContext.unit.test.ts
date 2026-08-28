@@ -14,7 +14,7 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { callerTraceContext } from "../trpc.runtime-policy";
+import { callerTraceContext } from "@langwatch/trpc";
 
 const REMOTE_TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 const REMOTE_SPAN_ID = "b7ad6b7169203331";

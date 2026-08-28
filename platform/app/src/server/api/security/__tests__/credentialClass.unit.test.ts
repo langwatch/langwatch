@@ -14,19 +14,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import type { HandlerCredential } from "../access-policy";
-import {
-  anyAuthenticated,
-  apiKeyPermission,
-  credentialClassFor,
-  documentedPathOf,
-  handlerManagedAuth,
-  internalSecret,
-  isHttpMethod,
-  publicEndpoint,
-  requires,
-  securityForCredentialClass,
-} from "../index";
+import type { HandlerCredential } from "@langwatch/api";
+import { anyAuthenticated, apiKeyPermission, credentialClassFor, documentedPathOf, handlerManagedAuth, internalSecret, isHttpMethod, publicEndpoint, requires, securityForCredentialClass } from "@langwatch/platform-api/app-rest";
 
 const SPEC_PATH = join(
   dirname(fileURLToPath(import.meta.url)),

@@ -1,6 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
-import { remediation } from "~/server/app-layer/error-remediation";
 import type {
   PlanProvider,
   PlanProviderUser,

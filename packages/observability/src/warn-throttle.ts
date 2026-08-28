@@ -10,9 +10,9 @@
  * counted, and the next warning that gets through reports the count, so the
  * log understates how often a condition happened but never hides that it did.
  *
- * Imported directly rather than through the module barrel: the barrel reaches
- * the app layer, and the callers here (the Prisma client, the API logger) sit
- * below it.
+ * Lives in the observability package rather than in one application: both
+ * callers sit below any application layer — the Prisma client's slow-query
+ * warning, and the tRPC call logger.
  *
  * @see specs/observability/slow-work-warnings.feature
  */

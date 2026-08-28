@@ -35,15 +35,4 @@ export { errorFormatter } from "./trpc.error-formatter";
  */
 export const createTRPCRouter = appTrpcRoot.router;
 
-export {
-  callerTraceContext,
-  handleTrpcCallLogging,
-  loggerMiddleware,
-  recordTrpcCall,
-  redactAuditArgs,
-  resetSlowCallThrottle,
-  resolveSlowCallBudgetMs,
-  tracerMiddleware,
-} from "./trpc.runtime-policy";
-
 export { isPublicProcedure, protectedProcedure, publicProcedure } from "./trpc.permission-builder";

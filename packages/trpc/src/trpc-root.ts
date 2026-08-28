@@ -7,8 +7,10 @@ import {
 
 /**
  * Defines one typed tRPC root without choosing authentication, authorization,
- * audit, tracing, or error policy. A process root supplies those concrete
- * policies after construction.
+ * audit, tracing, or error policy. A process constructs the root and then
+ * builds the policy spine on it, supplying the concrete identity,
+ * authorization, audit, error-reporting and cause-translation ports the spine
+ * asks for.
  */
 export type TrpcRoot<
   TContext extends object,
@@ -16,7 +18,10 @@ export type TrpcRoot<
     TContext,
     object
   >,
-> = Pick<TRPCRootObject<TContext, object, TOptions, AnyTRPCRootTypes>, "procedure" | "router">;
+> = Pick<
+  TRPCRootObject<TContext, object, TOptions, AnyTRPCRootTypes>,
+  "procedure" | "router" | "middleware"
+>;
 
 export class TrpcRootDefinition<TContext extends object> {
   private constructor() {}

@@ -13,7 +13,7 @@
 import type { MiddlewareHandler } from "hono";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { getRoutePolicy } from "~/server/api/security";
+import { getRoutePolicy } from "@langwatch/platform-api/app-rest";
 
 const executionOrder: string[] = [];
 
