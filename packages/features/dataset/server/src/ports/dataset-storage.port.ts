@@ -26,8 +26,16 @@ export type PresignedUpload = { uploadId: string; key: string; url: string };
 
 export type DatasetS3Client = { s3Client: S3Client; s3Bucket: string };
 
+/** A per-operation S3 client lease. Callers release it once their I/O has settled. */
+export type DatasetS3ClientLease = DatasetS3Client & { release(): void };
+
 export abstract class DatasetS3ClientResolver {
-  abstract resolve(projectId: string): Promise<DatasetS3Client>;
+  /**
+   * Resolves the current tenant target and acquires its process-owned client
+   * for one storage operation. The release makes a target change safe while
+   * an earlier operation is still using the superseded client.
+   */
+  abstract acquire(projectId: string): Promise<DatasetS3ClientLease>;
 }
 
 export interface DatasetBlobDriver {
@@ -87,11 +95,7 @@ export interface DatasetStorage {
    * `readChunks` (a chunk `chunkCount` claims exists but is missing is
    * corruption, not emptiness — never silently truncate).
    */
-  readChunk(params: {
-    projectId: string;
-    datasetId: string;
-    index: number;
-  }): Promise<unknown[]>;
+  readChunk(params: { projectId: string; datasetId: string; index: number }): Promise<unknown[]>;
 
   /**
    * Overwrite `chunk-{index}.jsonl` with exactly these records as a single

@@ -1,6 +1,6 @@
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { env } from "~/env.mjs";
-import { getS3ConfigForProject } from "~/server/dataplane-s3";
+import { getS3ConfigForProject, type DataplaneS3Config } from "~/server/dataplane-s3";
 import { resolveAzureCredentials } from "./azure-credentials";
 
 export type ProjectStorageDestination = StoredObjectStorageDestination;
@@ -26,8 +26,11 @@ function resolveAzureDestination(): ProjectStorageDestination {
  */
 export async function resolveProjectStorageDestination(
   projectId: string,
+  resolved?: { privateS3Config: DataplaneS3Config | null },
 ): Promise<ProjectStorageDestination> {
-  const privateConfig = await getS3ConfigForProject(projectId);
+  const privateConfig = resolved
+    ? resolved.privateS3Config
+    : await getS3ConfigForProject(projectId);
   if (privateConfig?.bucket) {
     return { kind: "s3", bucket: privateConfig.bucket };
   }

@@ -1996,6 +1996,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Subscribers must settle before their transports disappear. The App owns
   // this sequence so every process role follows the same connection order.
   const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("subscriber", "dataset-s3-clients", () => datasetRuntime.close());
   shutdownResources.register("clickhouse", "langwatchql", () => langWatchQL.close());
   if (clickhouseEnabled) {
     shutdownResources.register("clickhouse", "clickhouse", async () => {

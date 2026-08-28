@@ -14,6 +14,7 @@ export {
   type DatasetStorage,
   type DatasetAzureConfig,
   type DatasetS3Client,
+  type DatasetS3ClientLease,
 } from "./ports/dataset-storage.port";
 export { S3DatasetStorage, S3DatasetStorageAdapter } from "./adapters/s3.dataset-storage.adapter";
 export {

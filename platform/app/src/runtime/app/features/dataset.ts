@@ -17,18 +17,23 @@ import { AppDatasetStorageResolver } from "./dataset-storage";
  */
 export class AppDatasetRuntime {
   private readonly adapter: PostgresDatasetAdapter;
+  private readonly ownedStorageResolver: AppDatasetStorageResolver | undefined;
 
-  private constructor(options: {
-    database: PrismaClient;
-    experiments?: DatasetExperimentPort;
-    storage?: DatasetUploadPort;
-    queue?: DatasetNormalizeQueuePort;
-    /** Object-backed dataset reads/mutations; selected by the composition root. */
-    content?: DatasetContentPort;
-    storageResolver?: DatasetStorageResolver;
-    generateId?: () => string;
-  }) {
+  private constructor(
+    options: {
+      database: PrismaClient;
+      experiments?: DatasetExperimentPort;
+      storage?: DatasetUploadPort;
+      queue?: DatasetNormalizeQueuePort;
+      /** Object-backed dataset reads/mutations; selected by the composition root. */
+      content?: DatasetContentPort;
+      storageResolver?: DatasetStorageResolver;
+      generateId?: () => string;
+    },
+    ownedStorageResolver: AppDatasetStorageResolver | undefined,
+  ) {
     this.adapter = PostgresDatasetAdapter.create(options);
+    this.ownedStorageResolver = ownedStorageResolver;
   }
 
   static create(options: {
@@ -41,10 +46,16 @@ export class AppDatasetRuntime {
     storageResolver?: DatasetStorageResolver;
     generateId?: () => string;
   }): AppDatasetRuntime {
-    return new AppDatasetRuntime({
-      ...options,
-      storageResolver: options.storageResolver ?? new AppDatasetStorageResolver(),
-    });
+    const ownedStorageResolver = options.storageResolver
+      ? undefined
+      : new AppDatasetStorageResolver();
+    return new AppDatasetRuntime(
+      {
+        ...options,
+        storageResolver: options.storageResolver ?? ownedStorageResolver,
+      },
+      ownedStorageResolver,
+    );
   }
 
   build(): DatasetService {
@@ -57,5 +68,9 @@ export class AppDatasetRuntime {
 
   processNormalization(payload: DatasetNormalizePayload): Promise<void> {
     return this.adapter.processNormalization(payload);
+  }
+
+  close(): Promise<void> {
+    return this.ownedStorageResolver?.close() ?? Promise.resolve();
   }
 }

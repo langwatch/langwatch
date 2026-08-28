@@ -56,10 +56,7 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
     try {
       parsed = JSON.parse(value);
     } catch {
-      logger.warn(
-        { orgId, envVar: key },
-        "Skipping private S3 config: invalid JSON in env var",
-      );
+      logger.warn({ orgId, envVar: key }, "Skipping private S3 config: invalid JSON in env var");
       continue;
     }
 
@@ -89,50 +86,31 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
   return map;
 }
 
-/** Cache of projectId -> organizationId to avoid repeated DB lookups. */
-const projectOrgCache = new Map<string, string>();
-
 /**
  * Returns the private S3 config for an organization, or null if the org
  * uses the shared S3 (caller falls back to shared env vars).
  */
-export function getS3ConfigForOrganization(
-  organizationId: string,
-): DataplaneS3Config | null {
+export function getS3ConfigForOrganization(organizationId: string): DataplaneS3Config | null {
   return privateS3Configs.get(organizationId) ?? null;
 }
 
 /**
  * Returns the private S3 config for a project's organization, or null if
- * the org uses the shared S3. Caches the projectId -> orgId mapping.
+ * the org uses the shared S3. This deliberately reads the current assignment
+ * on every resolution: projects may move organization, and retaining the old
+ * organization would retain the old tenant credentials and destination.
  */
-export async function getS3ConfigForProject(
-  projectId: string,
-): Promise<DataplaneS3Config | null> {
-  let orgId = projectOrgCache.get(projectId);
+export async function getS3ConfigForProject(projectId: string): Promise<DataplaneS3Config | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
 
-  if (!orgId) {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-
-    if (!project) {
-      return null;
-    }
-
-    orgId = project.team.organizationId;
-    projectOrgCache.set(projectId, orgId);
+  if (!project) {
+    return null;
   }
 
-  return getS3ConfigForOrganization(orgId);
-}
-
-/**
- * Clears the project -> org cache. Useful for testing.
- */
-export function clearS3ProjectOrgCache(): void {
-  projectOrgCache.clear();
+  return getS3ConfigForOrganization(project.team.organizationId);
 }
 
 /**

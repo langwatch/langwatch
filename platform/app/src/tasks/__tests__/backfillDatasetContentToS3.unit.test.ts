@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const migration = vi.hoisted(() => ({
   create: vi.fn(),
   run: vi.fn(),
+  closeStorage: vi.fn(async () => {}),
 }));
 
 vi.mock("../../server/db", () => ({ prisma: {} }));
@@ -10,7 +11,9 @@ vi.mock("@langwatch/dataset-server", () => ({
   PostgresDatasetMigrationAdapter: { create: migration.create },
 }));
 vi.mock("../../runtime/app/features/dataset-storage", () => ({
-  AppDatasetStorageResolver: class {},
+  AppDatasetStorageResolver: class {
+    close = migration.closeStorage;
+  },
 }));
 
 import execute from "../backfillDatasetContentToS3";
@@ -47,5 +50,6 @@ describe("backfillDatasetContentToS3 task", () => {
     await execute();
 
     expect(migration.run).toHaveBeenCalledWith({ dryRun: true });
+    expect(migration.closeStorage).toHaveBeenCalledOnce();
   });
 });

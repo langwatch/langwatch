@@ -9,9 +9,9 @@
  *     `s3-request-presigner`, HeadObject for the finalize size check, and a
  *     best-effort DeleteObject for staged objects).
  *
- * The S3 client is memoized per `projectId` (the "singleton client" goal)
- * without leaking across projects — each project resolves its own BYOC /
- * global bucket + credentials through `createS3Client`.
+ * Each operation resolves its project's current S3 destination and credentials
+ * through the injected resolver. A process may keep one adapter, but it must
+ * not pin a tenant's BYOC configuration without an invalidation contract.
  */
 
 import type { Readable } from "node:stream";
@@ -40,6 +40,7 @@ import type {
   DatasetStorage,
   PresignedUpload,
   DatasetS3ClientResolver,
+  DatasetS3Client,
 } from "../ports/dataset-storage.port";
 import {
   ChunkTooLargeError,
@@ -52,30 +53,18 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {
     return new S3DatasetStorageAdapter(resolver);
   }
-  /**
-   * Per-project memo of the resolved S3 client. Keyed by `projectId` so two
-   * projects never share a client (and thus never cross BYOC buckets or
-   * credentials). A single instance serving one request resolves each
-   * project's client once.
-   */
-  private readonly clients = new Map<
-    string,
-    Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>>
-  >();
-
   constructor(private readonly resolver: DatasetS3ClientResolver) {}
 
-  private client(
+  private async withClient<T>(
     projectId: string,
-  ): Promise<Awaited<ReturnType<DatasetS3ClientResolver["resolve"]>>> {
-    const cached = this.clients.get(projectId);
-    if (cached) return cached;
-    const created = this.resolver.resolve(projectId);
-    this.clients.set(projectId, created);
-    // Evict a transient resolution failure so the next call retries instead of
-    // caching a rejected promise forever (M4).
-    created.catch(() => this.clients.delete(projectId));
-    return created;
+    operation: (client: DatasetS3Client) => Promise<T>,
+  ): Promise<T> {
+    const lease = await this.resolver.acquire(projectId);
+    try {
+      return await operation(lease);
+    } finally {
+      lease.release();
+    }
   }
 
   async writeChunks({
@@ -96,17 +85,18 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
       ...c,
       index: c.index + fromIndex,
     }));
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    for (const chunk of chunks) {
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: s3Bucket,
-          Key: chunkKey(projectId, datasetId, chunk.index),
-          Body: chunk.jsonl,
-          ContentType: "application/x-ndjson",
-        }),
-      );
-    }
+    await this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
+      for (const chunk of chunks) {
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: s3Bucket,
+            Key: chunkKey(projectId, datasetId, chunk.index),
+            Body: chunk.jsonl,
+            ContentType: "application/x-ndjson",
+          }),
+        );
+      }
+    });
     return chunks;
   }
 
@@ -120,21 +110,22 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     fromIndex: number;
   }): Promise<void> {
     assertNoTraversal(projectId, datasetId);
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    // Chunks are contiguous from 0, so walk upward and stop at the first miss
-    // (the first gap) — no fixed cap needed.
-    for (let i = fromIndex; ; i++) {
-      const Key = chunkKey(projectId, datasetId, i);
-      try {
-        await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key }));
-      } catch (error: unknown) {
-        if (isMissingObjectError(error)) {
-          return;
+    await this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
+      // Chunks are contiguous from 0, so walk upward and stop at the first miss
+      // (the first gap) — no fixed cap needed.
+      for (let i = fromIndex; ; i++) {
+        const Key = chunkKey(projectId, datasetId, i);
+        try {
+          await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key }));
+        } catch (error: unknown) {
+          if (isMissingObjectError(error)) {
+            return;
+          }
+          throw error;
         }
-        throw error;
+        await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key }));
       }
-      await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key }));
-    }
+    });
   }
 
   async readChunks({
@@ -147,27 +138,28 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     chunkCount: number;
   }): Promise<unknown[]> {
     assertNoTraversal(projectId, datasetId);
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    const rows: unknown[] = [];
-    for (let i = 0; i < chunkCount; i++) {
-      const key = chunkKey(projectId, datasetId, i);
-      let jsonl: string;
-      try {
-        const { Body } = await s3Client.send(
-          new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
-        );
-        jsonl = (await Body?.transformToString()) ?? "";
-      } catch (error: unknown) {
-        if (isMissingObjectError(error)) {
-          throw new MissingChunkError(key);
+    return this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
+      const rows: unknown[] = [];
+      for (let i = 0; i < chunkCount; i++) {
+        const key = chunkKey(projectId, datasetId, i);
+        let jsonl: string;
+        try {
+          const { Body } = await s3Client.send(
+            new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
+          );
+          jsonl = (await Body?.transformToString()) ?? "";
+        } catch (error: unknown) {
+          if (isMissingObjectError(error)) {
+            throw new MissingChunkError(key);
+          }
+          throw error;
         }
-        throw error;
+        // An empty chunk parses to []; never silently skip (m2). The
+        // missing-chunk invariant is already enforced by the throw above.
+        rows.push(...parseJsonl(jsonl));
       }
-      // An empty chunk parses to []; never silently skip (m2). The
-      // missing-chunk invariant is already enforced by the throw above.
-      rows.push(...parseJsonl(jsonl));
-    }
-    return rows;
+      return rows;
+    });
   }
 
   async readChunk({
@@ -180,21 +172,20 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     index: number;
   }): Promise<unknown[]> {
     assertNoTraversal(projectId, datasetId);
-    const { s3Client, s3Bucket } = await this.client(projectId);
     const key = chunkKey(projectId, datasetId, index);
-    let jsonl: string;
-    try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
-      );
-      jsonl = (await Body?.transformToString()) ?? "";
-    } catch (error: unknown) {
-      if (isMissingObjectError(error)) {
-        throw new MissingChunkError(key);
+    return this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
+      let jsonl: string;
+      try {
+        const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: s3Bucket, Key: key }));
+        jsonl = (await Body?.transformToString()) ?? "";
+      } catch (error: unknown) {
+        if (isMissingObjectError(error)) {
+          throw new MissingChunkError(key);
+        }
+        throw error;
       }
-      throw error;
-    }
-    return parseJsonl(jsonl);
+      return parseJsonl(jsonl);
+    });
   }
 
   async rewriteChunk({
@@ -216,32 +207,28 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     if (byteSize > CHUNK_MAX_BYTES) {
       throw new ChunkTooLargeError({ byteSize, maxBytes: CHUNK_MAX_BYTES });
     }
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: chunkKey(projectId, datasetId, index),
-        Body: jsonl,
-        ContentType: "application/x-ndjson",
-      }),
+    await this.withClient(projectId, ({ s3Client, s3Bucket }) =>
+      s3Client.send(
+        new PutObjectCommand({
+          Bucket: s3Bucket,
+          Key: chunkKey(projectId, datasetId, index),
+          Body: jsonl,
+          ContentType: "application/x-ndjson",
+        }),
+      ),
     );
     // startRow/endRow are chunk-LOCAL here (0..rowCount); the caller recomputes
     // global offsets from prior chunks under the advisory lock (I-COUNT).
     return { index, startRow: 0, endRow: records.length, byteSize };
   }
 
-  async createPresignedUpload({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<PresignedUpload> {
+  async createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
     const uploadId = nanoid();
     const key = stagingUploadKey(projectId, uploadId);
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    const url = await getSignedUrl(
-      s3Client,
-      new PutObjectCommand({ Bucket: s3Bucket, Key: key }),
-      { expiresIn: UPLOAD_TTL_SECONDS },
+    const url = await this.withClient(projectId, ({ s3Client, s3Bucket }) =>
+      getSignedUrl(s3Client, new PutObjectCommand({ Bucket: s3Bucket, Key: key }), {
+        expiresIn: UPLOAD_TTL_SECONDS,
+      }),
     );
     return { uploadId, key, url };
   }
@@ -254,56 +241,57 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     key: string;
   }): Promise<number> {
     assertKeyWithinProject(projectId, key);
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    let head: HeadObjectCommandOutput;
-    try {
-      head = await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key: key }));
-    } catch (error: unknown) {
-      // A never-completed (or already-reaped) upload — distinct from a too-large
-      // one (M5). NoSuchKey / NotFound both surface here depending on the SDK.
-      if (isMissingObjectError(error)) {
+    return this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
+      let head: HeadObjectCommandOutput;
+      try {
+        head = await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key: key }));
+      } catch (error: unknown) {
+        // A never-completed (or already-reaped) upload — distinct from a too-large
+        // one (M5). NoSuchKey / NotFound both surface here depending on the SDK.
+        if (isMissingObjectError(error)) {
+          throw new StagedUploadNotFoundError();
+        }
+        throw error;
+      }
+      // A HEAD with no ContentLength means the object isn't a complete upload —
+      // treat as not-found rather than silently reporting 0 bytes (M5).
+      if (head.ContentLength == null) {
         throw new StagedUploadNotFoundError();
       }
-      throw error;
-    }
-    // A HEAD with no ContentLength means the object isn't a complete upload —
-    // treat as not-found rather than silently reporting 0 bytes (M5).
-    if (head.ContentLength == null) {
-      throw new StagedUploadNotFoundError();
-    }
-    return head.ContentLength;
+      return head.ContentLength;
+    });
   }
 
-  async deleteStaged({
-    projectId,
-    key,
-  }: {
-    projectId: string;
-    key: string;
-  }): Promise<void> {
+  async deleteStaged({ projectId, key }: { projectId: string; key: string }): Promise<void> {
     assertKeyWithinProject(projectId, key);
-    const { s3Client, s3Bucket } = await this.client(projectId);
-    await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }));
+    await this.withClient(projectId, ({ s3Client, s3Bucket }) =>
+      s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: key })),
+    );
   }
 
-  async streamStaged({
-    projectId,
-    key,
-  }: {
-    projectId: string;
-    key: string;
-  }): Promise<Readable> {
+  async streamStaged({ projectId, key }: { projectId: string; key: string }): Promise<Readable> {
     assertKeyWithinProject(projectId, key);
-    const { s3Client, s3Bucket } = await this.client(projectId);
+    const lease = await this.resolver.acquire(projectId);
     try {
-      const response = await s3Client.send(
-        new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
+      const response = await lease.s3Client.send(
+        new GetObjectCommand({ Bucket: lease.s3Bucket, Key: key }),
       );
       // SDK v3 streams the body as a Node Readable in the server runtime
       // (s3-driver relies on the same cast). Backpressure flows through it, so
       // the normalize job never buffers the whole staged file.
-      return response.Body as Readable;
+      const body = response.Body as Readable;
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        lease.release();
+      };
+      body.once("end", release);
+      body.once("error", release);
+      body.once("close", release);
+      return body;
     } catch (error: unknown) {
+      lease.release();
       if (isMissingObjectError(error)) {
         throw new StagedUploadNotFoundError();
       }

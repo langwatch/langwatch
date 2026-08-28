@@ -226,21 +226,24 @@ describe("dataplane-s3", () => {
       });
     });
 
-    describe("when called twice for the same project", () => {
-      it("caches the org lookup and does not query DB again", async () => {
+    describe("when a project changes organization", () => {
+      it("reads the current organization instead of retaining the old tenant credentials", async () => {
         process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
+        process.env.DATAPLANE_S3__beta__org456 = VALID_CONFIG_2;
 
         const { prisma } = await import("../db");
-        vi.mocked(prisma.project.findUnique).mockResolvedValue({
-          team: { organizationId: "org123" },
-        } as any);
+        vi.mocked(prisma.project.findUnique)
+          .mockResolvedValueOnce({ team: { organizationId: "org123" } } as any)
+          .mockResolvedValueOnce({ team: { organizationId: "org456" } } as any);
 
         const { getS3ConfigForProject } = await import("../dataplane-s3");
 
-        await getS3ConfigForProject("proj-cached");
-        await getS3ConfigForProject("proj-cached");
+        const before = await getS3ConfigForProject("proj-reassigned");
+        const after = await getS3ConfigForProject("proj-reassigned");
 
-        expect(prisma.project.findUnique).toHaveBeenCalledTimes(1);
+        expect(before!.bucket).toBe("langwatch-storage-acme");
+        expect(after!.bucket).toBe("langwatch-storage-beta");
+        expect(prisma.project.findUnique).toHaveBeenCalledTimes(2);
       });
     });
   });

@@ -1,4 +1,5 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createHash } from "node:crypto";
 import fs from "fs/promises";
 import path from "path";
 import { env } from "../env.mjs";
@@ -11,18 +12,13 @@ export class StorageService {
     if (projectId.includes("..") || key.includes("..")) {
       throw new Error("Invalid projectId or key: path traversal attempt detected");
     }
-    const storageDir =
-      process.env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
+    const storageDir = process.env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
     const fullPath = path.join(storageDir, projectId, key);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     return fullPath;
   }
 
-  async putObject(
-    projectId: string,
-    datasetId: string,
-    data: string | Buffer,
-  ): Promise<void> {
+  async putObject(projectId: string, datasetId: string, data: string | Buffer): Promise<void> {
     if (env.DATASET_STORAGE_LOCAL) {
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
       await fs.writeFile(filePath, data as string);
@@ -99,6 +95,35 @@ export class StorageService {
 }
 
 export const createS3Client = async (projectId: string) => {
+  const target = await resolveS3ClientTarget(projectId);
+  const s3Client = new S3Client({
+    ...(target.region !== undefined ? { region: target.region } : {}),
+    ...(target.endpoint ? { endpoint: target.endpoint } : {}),
+    ...(target.credentials ? { credentials: target.credentials } : {}),
+    forcePathStyle: true,
+  });
+
+  return { s3Client, s3Bucket: target.s3Bucket };
+};
+
+/**
+ * Current S3 wiring for one tenant. The opaque fingerprint changes whenever
+ * a destination or explicitly supplied credential identity changes, without
+ * retaining those credentials in a process cache.
+ */
+export type ResolvedS3ClientTarget = {
+  s3Bucket: string;
+  fingerprint: string;
+  endpoint?: string;
+  region?: string;
+  credentials?: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken?: string;
+  };
+};
+
+export const resolveS3ClientTarget = async (projectId: string): Promise<ResolvedS3ClientTarget> => {
   // Bucket selection routes through the shared
   // `resolveProjectStorageDestination` so dataset uploads and
   // stored-objects writes never drift on the BYOC → env → fallback
@@ -107,7 +132,10 @@ export const createS3Client = async (projectId: string) => {
   // file-destination return here means the operator asked for S3 without
   // configuring it, which we preserve as the historical hardcoded
   // "langwatch" bucket to avoid silently rebinding to /var/lib/langwatch.
-  const destination = await resolveProjectStorageDestination(projectId);
+  const privateConfig = await getS3ConfigForProject(projectId);
+  const destination = await resolveProjectStorageDestination(projectId, {
+    privateS3Config: privateConfig,
+  });
 
   // This factory only ever speaks the S3 wire protocol, and it serves two
   // different kinds of caller: URI-driven readers (S3Driver — bucket comes
@@ -138,8 +166,6 @@ export const createS3Client = async (projectId: string) => {
   // Endpoint + credentials still come from the BYOC config (per-project)
   // or env (global). The resolver above only commits to the bucket
   // choice; the rest of the connection details ride alongside.
-  const privateConfig = await getS3ConfigForProject(projectId);
-
   // Credentials precedence:
   //   1. BYOC config (per-project, set by tenant)
   //   2. env vars (S3_ACCESS_KEY_ID + S3_SECRET_ACCESS_KEY [+ S3_SESSION_TOKEN])
@@ -170,20 +196,31 @@ export const createS3Client = async (projectId: string) => {
   const region: string | undefined =
     env.S3_REGION ?? (isAwsEndpoint && !hasExplicitKeys ? undefined : "auto");
 
-  const s3Client = new S3Client({
-    ...(region !== undefined ? { region } : {}),
-    endpoint,
-    ...(hasExplicitKeys
-      ? {
-          credentials: {
-            accessKeyId: accessKeyId!,
-            secretAccessKey: secretAccessKey!,
-            ...(sessionToken ? { sessionToken } : {}),
-          },
-        }
-      : {}),
-    forcePathStyle: true,
-  });
+  const credentials = hasExplicitKeys
+    ? {
+        accessKeyId: accessKeyId!,
+        secretAccessKey: secretAccessKey!,
+        ...(sessionToken ? { sessionToken } : {}),
+      }
+    : undefined;
+  const fingerprint = createHash("sha256")
+    .update(
+      JSON.stringify({
+        s3Bucket,
+        endpoint: endpoint ?? null,
+        region: region ?? null,
+        accessKeyId: credentials?.accessKeyId ?? null,
+        secretAccessKey: credentials?.secretAccessKey ?? null,
+        sessionToken: credentials?.sessionToken ?? null,
+      }),
+    )
+    .digest("hex");
 
-  return { s3Client, s3Bucket };
+  return {
+    s3Bucket,
+    fingerprint,
+    ...(endpoint ? { endpoint } : {}),
+    ...(region !== undefined ? { region } : {}),
+    ...(credentials ? { credentials } : {}),
+  };
 };
