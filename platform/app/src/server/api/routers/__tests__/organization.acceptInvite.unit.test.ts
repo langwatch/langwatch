@@ -305,6 +305,34 @@ describe("organization.acceptInvite", () => {
     });
   });
 
+  describe("when the invitation has expired", () => {
+    it("refuses as recoverable rather than as a dead end", async () => {
+      findUniqueMock.mockResolvedValue(
+        makeInvite({ status: "PENDING", expiration: new Date(Date.now() - 86400000) }),
+      );
+
+      const caller = createCaller();
+
+      await expect(caller.acceptInvite({ inviteCode: "test-code" })).rejects.toMatchObject({
+        cause: { code: "invite_expired" },
+      });
+      expect(createManyMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the invitation was revoked", () => {
+    it("reads exactly like a missing invitation", async () => {
+      findUniqueMock.mockResolvedValue(makeInvite({ status: "REVOKED", expiration: null }));
+
+      const caller = createCaller();
+
+      await expect(caller.acceptInvite({ inviteCode: "test-code" })).rejects.toMatchObject({
+        cause: { code: "invite_not_found" },
+      });
+      expect(createManyMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when invite status is ACCEPTED", () => {
     it("rejects with the already-accepted message", async () => {
       findUniqueMock.mockResolvedValue(makeInvite({ status: "ACCEPTED" }));

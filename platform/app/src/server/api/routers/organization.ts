@@ -29,6 +29,7 @@ import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
   InviteExpiredError,
+  InviteNotFoundError,
   InviteWrongAccountError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
@@ -740,11 +741,12 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
-      if (!invite || (invite.expiration !== null && invite.expiration < new Date())) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Invite not found or has expired",
-        });
+      // A revoked invitation reads exactly like a missing one on purpose:
+      // the journey ends quietly, revealing nothing about the organization
+      // or the inviter. Expired is different — it is recoverable (the
+      // inviter resends in one click), so it gets its own named refusal.
+      if (!invite || invite.status === "REVOKED") {
+        throw new InviteNotFoundError("Invitation not found");
       }
 
       if (!session?.user?.email) {
