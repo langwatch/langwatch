@@ -28,6 +28,11 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { createBlankWorkbenchState } from "~/server/experiments-v3/blank-workbench-state";
+import {
+  createExperimentBodySchema,
+  createExperimentResponseSchema,
+  handledErrorEnvelopeSchema,
+} from "~/server/routes/experiments-v3.schemas";
 import { workbenchActorFrom } from "~/server/experiments-v3/workbench-actor";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";

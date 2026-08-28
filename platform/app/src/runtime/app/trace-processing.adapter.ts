@@ -14,6 +14,8 @@ import {
   graphTriggerActivityGroupKey,
 } from "@langwatch/automation-server";
 import {
+  ORIGIN_GATE_DEDUP_TTL_MS,
+  ORIGIN_GATE_DELAY_MS,
   RecordSpanCommand,
   TraceProcessingPipelinePort,
   createOriginGateHandler,
