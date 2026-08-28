@@ -2857,13 +2857,14 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
-  // The folder (a SimulationSuite with kind "folder") this scenario is filed
-  // in, or null for an unfiled scenario. This column is the source of truth
-  // for folder membership; the folder's scenarioIds is a denormalized copy
-  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
-  // See specs/suites/folder-membership-invariant.feature.
-  folderId        String?
-  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // The test suite (a SimulationSuite with kind "test_suite") this scenario is
+  // filed in, or null for an unfiled scenario. This column is the source of
+  // truth for test suite membership; the test suite's scenarioIds is a
+  // denormalized copy kept in step by reconcileTestSuiteMembership
+  // (server/suites/test-suite-membership.ts).
+  // See specs/suites/test-suite-membership-invariant.feature.
+  testSuiteId     String?
+  testSuite       SimulationSuite? @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -2877,7 +2878,7 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
-  @@index([projectId, folderId])
+  @@index([projectId, testSuiteId])
 }
 
 // One saved state of a scenario's editable fields. Append-only: a restore
@@ -2936,19 +2937,19 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
-  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
-  // is a suite that groups scenarios through Scenario.folderId; a custom suite
-  // is a hand-assembled run plan. String rather than a Prisma enum so a new
-  // kind needs no database migration.
-  kind            String     @default("custom")
+  // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
+  // test suite groups scenarios through Scenario.testSuiteId; a run plan is
+  // hand-assembled. String rather than a Prisma enum so a new kind needs no
+  // database migration.
+  kind            String     @default("run_plan")
   // What the plan covers, as { mode } plus the mode's own field: "all",
-  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
-  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
-  // keeps the list it already held. A folder carries none: its members come
-  // from Scenario.folderId. See server/suites/scope.ts and
-  // specs/suites/run-plan-dynamic-scopes.feature.
+  // "test_suites" with testSuiteIds, "labels" with labels, or "scenarios",
+  // which runs the stored scenarioIds. Null reads as "scenarios", so a plan
+  // written before scopes keeps the list it already held. A test suite carries
+  // none: its members come from Scenario.testSuiteId. See
+  // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
   scope           Json?
-  folderScenarios Scenario[] @relation("FolderScenarios")
+  testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
