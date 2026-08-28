@@ -137,13 +137,13 @@ describe("getProjectLambdaArn", () => {
 
       const first = await getProjectLambdaArn("projectA");
       expect(first).toBe(mockLambdaConfig.FunctionArn);
-      const callsAfterFirst = send.mock.calls.length;
+      const callsAfterFirst = _send.mock.calls.length;
 
       for (let i = 0; i < 50; i++) {
         const arn = await getProjectLambdaArn("projectA");
         expect(arn).toBe(mockLambdaConfig.FunctionArn);
       }
-      expect(send.mock.calls.length).toBe(callsAfterFirst);
+      expect(_send.mock.calls.length).toBe(callsAfterFirst);
     });
 
     /** @scenario Concurrent burst for one project collapses into a single AWS resolution */
@@ -183,7 +183,7 @@ describe("getProjectLambdaArn", () => {
       expect(new Set(arns)).toEqual(new Set([mockLambdaConfig.FunctionArn]));
       // Exactly one resolution flow: 1 GetFunction (existence) + 1 GetFunction
       // (image-URI check) + 1 GetFunction (poll). 3 total, NOT 300.
-      expect(send.mock.calls.length).toBeLessThanOrEqual(3);
+      expect(_send.mock.calls.length).toBeLessThanOrEqual(3);
     });
 
     /** @scenario A failed resolution does not poison the cache */
@@ -217,11 +217,11 @@ describe("getProjectLambdaArn", () => {
         .mockResolvedValueOnce({ Configuration: mockLambdaConfig });
 
       await expect(getProjectLambdaArn("projectA")).rejects.toThrow();
-      const callsAfterFailure = send.mock.calls.length;
+      const callsAfterFailure = _send.mock.calls.length;
 
       const arn = await getProjectLambdaArn("projectA");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
-      expect(send.mock.calls.length).toBeGreaterThan(callsAfterFailure);
+      expect(_send.mock.calls.length).toBeGreaterThan(callsAfterFailure);
     });
 
     /** @scenario Deploy bumps image_uri and the cache invalidates automatically */
@@ -338,7 +338,7 @@ describe("getProjectLambdaArn", () => {
       const arn = await getProjectLambdaArn("reconcile-env");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
 
-      const updates = configUpdateCalls(send);
+      const updates = configUpdateCalls(_send);
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.FunctionName).toBe(
         "langwatch_nlp-reconcile-env",
@@ -597,7 +597,7 @@ describe("getProjectLambdaArn", () => {
       const arn = await getProjectLambdaArn("reconcile-memory");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
 
-      const updates = configUpdateCalls(send);
+      const updates = configUpdateCalls(_send);
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.MemorySize).toBe(NLP_LAMBDA_MEMORY_SIZE_MB);
       expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
@@ -623,7 +623,7 @@ describe("getProjectLambdaArn", () => {
         const arn = await getProjectLambdaArn("reconcile-timeout");
         expect(arn).toBe(mockLambdaConfig.FunctionArn);
 
-        const updates = configUpdateCalls(send);
+        const updates = configUpdateCalls(_send);
         expect(updates).toHaveLength(1);
         expect(updates[0][0].input.Timeout).toBe(900);
       });
@@ -650,7 +650,7 @@ describe("getProjectLambdaArn", () => {
       const arn = await getProjectLambdaArn("reconcile-timeout");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
 
-      const updates = configUpdateCalls(send);
+      const updates = configUpdateCalls(_send);
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.Timeout).toBe(900);
     });
@@ -668,7 +668,7 @@ describe("getProjectLambdaArn", () => {
 
       const arn = await getProjectLambdaArn("reconcile-none");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
-      expect(configUpdateCalls(send)).toHaveLength(0);
+      expect(configUpdateCalls(_send)).toHaveLength(0);
     });
 
     /** @scenario The code update lands and is polled to completion before the config update is sent */
@@ -695,7 +695,7 @@ describe("getProjectLambdaArn", () => {
       const arn = await getProjectLambdaArn("reconcile-ordering");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
 
-      const commands = send.mock.calls.map((call: any[]) => call[0]);
+      const commands = _send.mock.calls.map((call: any[]) => call[0]);
       const codeIdx = commands.findIndex(
         (c: any) => c instanceof UpdateFunctionCodeCommand,
       );

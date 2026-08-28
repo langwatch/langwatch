@@ -126,3 +126,15 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     And AWS rejects the UpdateFunctionConfiguration call with "An update is in progress"
     When getProjectLambdaArn resolves that project
     Then the resolution still succeeds and returns a valid ARN
+
+  @integration @unit
+  Scenario: AWS errors are matched by exception name, not message text
+    Given the UpdateFunctionConfiguration call rejects with a ResourceConflictException by name
+    When getProjectLambdaArn resolves that project
+    Then the exception is recognized and resolution still succeeds
+    Given the UpdateFunctionConfiguration call rejects with an "An update is in progress" message and no recognized name
+    When getProjectLambdaArn resolves that project
+    Then the message is recognized as a fallback and resolution still succeeds
+    Given the UpdateFunctionConfiguration call rejects with an unrelated error
+    When getProjectLambdaArn resolves that project
+    Then the unrelated error is rethrown

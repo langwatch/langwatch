@@ -236,13 +236,20 @@ const createLogGroupWithRetention = async (
 // override must stay below the Lambda's own Timeout (900s) or Lambda
 // terminates the invocation before nlpgo can report its own timeout to the
 // caller. Clamp rather than trust the raw env value.
-export const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): number => {
+export const clampCodeBlockTimeoutSeconds = (
+  rawValue: string | undefined,
+): number => {
   const DEFAULT_SECONDS = 600;
   const MAX_SECONDS =
     LAMBDA_INVOCATION_TIMEOUT_SECONDS -
     CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
   const parsed = Number(rawValue);
-  if (!rawValue || !Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+  if (
+    !rawValue ||
+    !Number.isFinite(parsed) ||
+    !Number.isInteger(parsed) ||
+    parsed <= 0
+  ) {
     return DEFAULT_SECONDS;
   }
   return Math.min(parsed, MAX_SECONDS);
@@ -373,7 +380,7 @@ const updateProjectLambdaImage = async (
 
   const response = await lambda.send(command);
   return response;
-}
+};
 
 /**
  * Checks if an error is a Lambda update-in-progress conflict.
@@ -420,8 +427,7 @@ const reconcileProjectLambdaConfig = async ({
   const envDrifted = Object.entries(desiredEnv).some(
     ([key, value]) => currentEnv[key] !== value,
   );
-  const memoryDrifted =
-    currentConfig.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB;
+  const memoryDrifted = currentConfig.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB;
   const timeoutDrifted =
     currentConfig.Timeout !== LAMBDA_INVOCATION_TIMEOUT_SECONDS;
 
@@ -612,7 +618,13 @@ const reconcileProjectLambdaConfigSafely = async ({
   projectId: string;
 }): Promise<FunctionConfiguration | null> => {
   try {
-    return await reconcileProjectLambdaConfig({ lambda, functionName, config, currentConfig, projectId });
+    return await reconcileProjectLambdaConfig({
+      lambda,
+      functionName,
+      config,
+      currentConfig,
+      projectId,
+    });
   } catch (error) {
     if (isLambdaUpdateInProgressError(error)) {
       logger.info(
