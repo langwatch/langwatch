@@ -226,6 +226,33 @@ const createLogGroupWithRetention = async (
   }
 };
 
+// Lambda's own hard invocation ceiling (`Timeout` below). The code-block
+// timeout override must stay under this or Lambda kills the invocation
+// before nlpgo reports its own timeout — see clampCodeBlockTimeoutSeconds.
+const LAMBDA_INVOCATION_TIMEOUT_SECONDS = 900; // 15 minutes
+
+// Buffer subtracted from LAMBDA_INVOCATION_TIMEOUT_SECONDS so the clamp
+// lands strictly below the Lambda's own Timeout, not merely equal to it —
+// leaves nlpgo's own timeout-reporting a moment to run before Lambda kills
+// the invocation.
+const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
+
+// Operator-overridable via NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS, but the
+// override must stay below the Lambda's own Timeout (900s) or Lambda
+// terminates the invocation before nlpgo can report its own timeout to the
+// caller. Clamp rather than trust the raw env value.
+const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): number => {
+  const DEFAULT_SECONDS = 600;
+  const MAX_SECONDS =
+    LAMBDA_INVOCATION_TIMEOUT_SECONDS -
+    CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS;
+  const parsed = Number(rawValue);
+  if (!rawValue || !Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_SECONDS;
+  }
+  return Math.min(parsed, MAX_SECONDS);
+};
+
 const createProjectLambda = async (
   lambda: LambdaClient,
   functionName: string,
@@ -238,7 +265,7 @@ const createProjectLambda = async (
       ImageUri: config.image_uri,
     },
     PackageType: "Image",
-    Timeout: 900, // 15 minutes
+    Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS, // 15 minutes
     // 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS
     // headroom when the bundled image runs nlpgo + uvicorn + litellm in
     // the same container. At 1024 MB observed Max Memory Used hit
@@ -266,12 +293,17 @@ const createProjectLambda = async (
         // which killed legitimate long-running studio code blocks (raised
         // to 600s on the nlpgo side in #7640). Override it here too so
         // freshly-created per-project Lambdas don't fall back to the old
-        // 60s default. 600 stays under this Lambda's own 900s Timeout
-        // above. Operator-overridable via env, matching the raw
-        // process.env reads already used in this file (e.g.
+        // 60s default. Clamped below this Lambda's own 900s Timeout above
+        // (see clampCodeBlockTimeoutSeconds) — an unclamped override at or
+        // above 900 would let Lambda kill the invocation before nlpgo
+        // reports its own timeout. Operator-overridable via env, matching
+        // the raw process.env reads already used in this file (e.g.
         // LANGWATCH_NLP_LAMBDA_CONFIG, LANGWATCH_NLP_SERVICE).
-        NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS:
-          process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS ?? "600",
+        NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: String(
+          clampCodeBlockTimeoutSeconds(
+            process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
+          ),
+        ),
       },
     },
     Tags: {
