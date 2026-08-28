@@ -103,22 +103,25 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.ingestionPullRunProjection
-    .deleteMany({ where: { projectId: homeProjectId } })
-    .catch(() => undefined);
-  for (const org of [organization, otherOrganization].filter(Boolean)) {
-    await prisma.ingestionSource
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.project
-      .deleteMany({ where: { team: { organizationId: org.id } } })
-      .catch(() => undefined);
-    await prisma.team
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.organization
-      .delete({ where: { id: org.id } })
-      .catch(() => undefined);
+  // `homeProjectId` is the last thing setup assigns, so a `beforeAll` that
+  // threw partway leaves it undefined here — and Prisma drops an undefined
+  // filter rather than matching nothing, turning this into a deleteMany with
+  // no `where` at all: every projection row in the database, not this test's.
+  if (homeProjectId) {
+    await prisma.ingestionPullRunProjection.deleteMany({
+      where: { projectId: homeProjectId },
+    });
+  }
+  for (const org of [organization, otherOrganization]) {
+    if (!org) continue;
+    const organizationId = org.id;
+    // Not swallowed: a delete that fails leaves rows behind for every later
+    // run against this database, and a silent teardown is how that goes
+    // unnoticed until an unrelated suite starts failing.
+    await prisma.ingestionSource.deleteMany({ where: { organizationId } });
+    await prisma.project.deleteMany({ where: { team: { organizationId } } });
+    await prisma.team.deleteMany({ where: { organizationId } });
+    await prisma.organization.delete({ where: { id: organizationId } });
   }
 });
 
