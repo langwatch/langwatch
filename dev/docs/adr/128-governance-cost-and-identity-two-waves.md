@@ -177,8 +177,14 @@ budget ledger ─┘                                                    ▲
 (pulled bills)                              Postgres (names, price list) ┘
 ```
 
-- **`governance_cost_rollup_1d`** — one row per day × org × source ×
-  cost_source × model × raw-actor-id (see Schema). Filled by a **fold
+- **`governance_cost_rollup_1d`** — one row per day × org × ingestion
+  source × cost_source × provider × model × agent × currency ×
+  raw-actor-id (see Schema). **Every one of those dimensions is in the
+  table's dedup key** — in a ReplacingMergeTree the ORDER BY tuple *is*
+  the row's identity, and a dimension left out of it is not "stored for
+  drill-down", it is silently collapsed on merge (this codebase already
+  shipped that bug once: migration 00069's comment documents two budgets
+  sharing a scope collapsing into one aggregate). Filled by a **fold
   projection** (our own app code on the event stream, ADR-015), **not** a
   ClickHouse materialized view: a rebuild is a replay, and a correction
   event *updates* the affected old day instead of adding to it — the
@@ -188,8 +194,17 @@ budget ledger ─┘                                                    ▲
   department at time of spend). Summed rows cannot grow dimensions later.
 - **Thin service in front**: computes seat money at read (§6), attaches
   names from Postgres at read (app-layer join — the codebase's standard),
-  serves row-level drill-down from the raw tables (`gateway_spend`,
-  ledger), enforces §18's permissions.
+  serves per-*request* drill-down from the raw tables (`gateway_spend`,
+  ledger) — per-*person* aggregates come from the rollup itself, since
+  raw-actor-id is a rollup dimension — joins puller health (§4a) so a
+  missing day renders as "no data", and enforces §18's permissions.
+- **Every read of this table must be dedup-safe** (`argMax` by `Version`
+  or the IN-tuple pattern — ADR-015:98). ReplacingMergeTree dedups
+  eventually, in background merges, not on write: after a restatement,
+  the old and new row versions coexist until a merge runs, and a plain
+  `SUM … GROUP BY` double-counts the restated day for exactly that
+  window. This is an invariant with its own test anchor, not a
+  performance note.
 - Volume justifies the shape: pulled money arrives as daily buckets and
   per-statement rows — thousands per day, not the millions that forced
   the trace speed split. One daily grain suffices; hourly is an upgrade
@@ -197,9 +212,37 @@ budget ledger ─┘                                                    ▲
 
 Rejects: ClickHouse MV hybrid (the evidence pack's initial lean — reversed
 on correction semantics); querying raw tables with no rollup (Lago's
-pattern; fails cross-org dashboards, and Langfuse's dashboards fell over
-without a rollup); per-person pre-summed tables (person resolution is
-read-time, §10).
+pattern; fine per-tenant at today's volume — the research vault's own
+proposal recommended exactly this for v1 with a ~1s revisit trigger —
+but org-wide cross-*project* screens and Langfuse's precedent argue for
+the rollup; **the red-team round reopened this sequencing question and
+it is pending a ruling — see Revisions v2**); per-person pre-summed
+tables with resolved names (person resolution is read-time, §10 — the
+rollup's actor dimension carries only the raw id).
+
+### §4a. Somebody notices: the pipeline watches itself
+
+Automated pre-merge tests (Gates) catch bugs before ship; they do not
+catch a projection that falls behind or a filter that misclassifies in
+production. Wave 1 ships with, not after:
+
+- **Projection lag metric**: age of the newest event folded into the
+  rollup vs. the newest event in the log, per lane; alert when it
+  exceeds one pull cycle.
+- **Comparator tripwire, permanent**: a scheduled job re-sums the raw
+  ledger/`gateway_spend` directly and diffs against the rollup per
+  org/day/cost_source; any mismatch alerts. This is ADR-034's own
+  discipline (its comparator + tripwire flag stayed on after release),
+  imported along with its architecture.
+- **Puller health surfaced, not just logged**: the thin service joins
+  `IngestionSource` status so a day with no rows renders "no data since
+  [last successful pull]" — distinct from a genuine $0 day. Prerequisite
+  named in §20: the puller worker today never flips source status on
+  repeated failure (`pullerWorker.ts` `assertRunMadeProgress`), so
+  "unknown, never zero" is currently unimplementable without that fix.
+
+The variance line (§2) already gives bill-vs-metering drift a first-class
+UI; these three give the pipeline itself the same honesty.
 
 ### §5. One `cost_source` column carries channel and provider
 
@@ -223,6 +266,11 @@ screen heals, because the stored event only ever claimed a count, which
 stays true. Roster history is frozen: January's count lives in January's
 events after people leave in March.
 
+If a roster-reported licence type has **no matching price row**, the
+screen shows "N seats — price missing", never a silent zero: the count
+must not drop out of the sum through an inner join. (The failure
+red-team caught this as an unstated behaviour.)
+
 Rejects: storing seat dollars (bakes price-list mistakes into history);
 pure compute-at-read with no events (loses roster history — the count on
 a past date becomes unknowable).
@@ -245,10 +293,24 @@ two questions, two fields:
 
 - **Home** (`projectId`): every pulled row is stamped with the org's
   hidden governance project (ADR-018) on arrival — we pulled it; we know
-  where it lives. The governance space becomes **visible to admins** as
-  the home of pulled data.
+  where it lives. Pulled data's home is shown on **dedicated governance
+  screens gated by §18's permission verbs** — the hidden project itself
+  stays hidden. It never starts appearing in the project switcher, RBAC
+  pickers, CLI project lists, or any general listing: the six
+  `internal_governance` exclusion filters
+  (`organization.prisma.repository.ts:757`, `team.service.ts:316,368`,
+  `teams/[[...route]]/app.ts:301`, `cliAuthProjects.ts:78,132`,
+  `scopeResolver.ts:353`) and the `ui-contract.feature` invariants are
+  **unchanged**. (The second-order red-team caught the earlier wording
+  "becomes visible to admins" as ambiguous between these two readings;
+  this is the ruling: dedicated screen, filters untouched.)
 - **Spender** (person / team / department): empty until identity fills
   them, and **never inferred from the home**.
+
+Stamping the home cannot leak into enforcement: budget resolvers and
+personal-usage reads gate on the structural `Scope` column
+(`Scope='pulled'` excluded, migration 00082), not on `projectId` —
+verified by the red-team, unchanged here.
 
 ADR-088's "treat project as unattributed" conflated the two; this
 separation keeps its real goal (never lie about who spent) while giving
@@ -371,7 +433,12 @@ When a provider restates history, the affected day's number updates (bill
 is truth) and the row keeps a marker: **"revised [date], was $X."** Cheap
 because append-only events already hold both versions (the `argMax`
 pattern); the fold projection sets two extra fields when a correction
-touches an old day. Exports and API responses carry the revised flag so
+touches an old day. The marker is a **convenience for the summary row
+and holds only the latest revision**: a day restated twice shows only
+the most recent "was $X" — the full chain is recoverable from the event
+log, never from the rollup row. This is a deliberate, stated exception
+to the resolve-at-read philosophy (a denormalized display hint, not
+derived truth). Exports and API responses carry the revised flag so
 finance can explain a changed number. Not in v1: revision-history
 screens, diffs, notifications — the event log retains everything if ever
 needed. Rejects: silent recompute (unreconcilable exports);
@@ -428,6 +495,11 @@ then.
   becomes journal-backed on the infra track
   (`governance/pending/audit-single-copy-infra-track.md`); not an ADR
   risk.
+- **Puller status must flip on repeated failure** — today
+  `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but never
+  marks the `IngestionSource` unhealthy, so a silently-failing puller is
+  indistinguishable from a $0 day. §4a's "no data since [date]" render
+  depends on this fix; it ships with wave 1.
 - The broken `openai_compliance` / `claude_compliance` sources are
   replaced/retired per ADR-122's diagnosis, outside this document.
 
@@ -449,7 +521,9 @@ then.
 | Invariant | Meaning | Satisfied by / test anchor |
 |---|---|---|
 | Bill = total | per provider/day with a bill: displayed total equals the bill; gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over- and under-metered days |
-| No cross-currency sums | no query ever adds amounts with different currency codes | currency code in every group key; test: mixed EUR/USD seed renders two totals |
+| No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
+| Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
+| Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
 | One dollar, one home | a dollar appears in exactly one channel of the combined view | §7 exclusion filter, blocking prerequisite; test: gateway row covered by a pulled bill is excluded from the combined total once |
 | Pulled rows never enforce | no budget resolver ever reaches `Scope="pulled"` rows | structural, ADR-088 Decision 3 (unchanged) |
@@ -461,7 +535,7 @@ then.
 
 | Assumption | What breaks if false |
 |---|---|
-| Provider admin APIs stay pull-accessible at current auth scopes | that provider's billed lane goes dark; screens show "unknown", never zero — FR5 coverage shrinks, design survives |
+| Provider admin APIs stay pull-accessible at current auth scopes | that provider's billed lane goes dark; screens show "no data since [last pull]", never zero — backed by the §4a `IngestionSource` health join, not by hope; FR5 coverage shrinks, design survives |
 | Volume stays thousands of rows/day (daily buckets, per-statement rows) | millions/day would force hourly grain + ADR-034-style routing; upgrade path exists, fan-out not chaining |
 | One writer per money lane | a second writer stamping the same spend breaks one-dollar-one-home; guarded by the exclusion-filter invariant test |
 | `event_log` retention covers the replay horizon (ADR-022: retention is the durability ceiling) | rollup days older than retention keep their last projected values and cannot be rebuilt; restatement markers on those days freeze |
@@ -501,11 +575,21 @@ CREATE TABLE governance_cost_rollup_1d (
     BilledAmountNano   Int64,         -- provider-billed portion (0 for pure gateway rows)
     BillerUsdNano      Int64,         -- biller-provided USD conversion (Azure totalCostUSD), 0 if none
     ExactOrEstimate    LowCardinality(String),  -- ADR-088 Decision 6, carried through
-    RevisedAt          Nullable(DateTime),      -- §15 marker
-    PreviousAmountNano Nullable(Int64)          -- §15 "was $X"
+    RevisedAt          Nullable(DateTime),      -- §15 marker (latest revision only)
+    PreviousAmountNano Nullable(Int64),         -- §15 "was $X" (immediately-prior amount)
+    Version            UInt64                   -- projection write version; reads argMax on this
 ) ENGINE = ReplacingMergeTree(Version)   -- projection writes whole corrected rows
-ORDER BY (OrganizationId, Day, CostSource, Provider, Model, AgentId);
--- RawActorId deliberately NOT in ORDER BY (high cardinality; stored for drill-down)
+ORDER BY (OrganizationId, Day, CostSource, IngestionSourceId,
+          Provider, Model, AgentId, CurrencyCode, RawActorId);
+-- The ORDER BY is the dedup key and MUST equal the full dimension tuple:
+-- any dimension omitted here is silently collapsed on background merge
+-- (distinct actors' or currencies' money deleted, not just hidden — the
+-- 00069 bug class). Low-cardinality columns lead so chart scans read a
+-- cheap prefix; RawActorId sits last so per-person cardinality never
+-- widens the prefix. ActorKind stays out: it is determined by
+-- (provider, RawActorId), never a distinguishing dimension.
+-- ALL reads must be dedup-safe (argMax(col, Version) or IN-tuple,
+-- ADR-015:98) — dedup is eventual, plain SUM double-counts mid-merge.
 ```
 
 ```prisma
@@ -573,8 +657,10 @@ them like every other pull.
   unallocated remainder.
 - **ClickHouse MV for the rollup** — over-counts on corrections; fold
   projection replays instead (§4, ADR-034's own reasoning).
-- **Query raw tables, no rollup** — fine per-customer (Lago), fails
-  cross-org dashboards.
+- **Query raw tables, no rollup** — fine per-tenant at today's volume
+  (Lago's pattern, and the vault proposal's own v1 recommendation);
+  weaker for org-wide cross-project screens. **Reopened by the red-team;
+  pending ruling — see Revisions v2.**
 - **Store seat dollars** — bakes price mistakes into history (§6).
 - **Back-fill person/department onto old rows** — edits history to match
   today (§9).
@@ -606,9 +692,10 @@ numbers drift). Read-time identity resolution makes per-person queries
 join-heavy; acceptable at current volume, revisit if drill-downs slow.
 
 **Neutral.** ADR-088's machinery is untouched except Decision 4's
-attribution. The hidden governance project becomes admin-visible — a
-product change, not a data change. Wave 2 needs no new money tables, only
-the identity tables and read paths.
+attribution. Pulled data's home gets a dedicated, permission-gated
+governance screen; the hidden-project exclusion filters and
+`ui-contract.feature` invariants are unchanged (§8). Wave 2 needs no new
+money tables, only the identity tables and read paths.
 
 ## Open questions
 
@@ -623,6 +710,37 @@ the identity tables and read paths.
 
 ## Revisions
 
+- **v2 (2026-08-29, captain: Sergio Esteban).** Red-team round: five
+  independent adversarial reviews (correctness, scale, failure,
+  second-order effects, alternatives), each attacking the draft with
+  repo evidence; all five returned "dies" on specific findings, all
+  folded in:
+  - **The rollup's dedup key was wrong** (correctness + scale + failure
+    converged): `RawActorId` and `CurrencyCode` were payload columns,
+    not in ORDER BY — in ReplacingMergeTree that deletes one actor's (or
+    one currency's) money on background merge, the migration-00069 bug
+    class. Fixed: ORDER BY now equals the full dimension tuple;
+    `Version` declared; full-grain-key and dedup-safe-read invariants
+    added with test anchors (§4, Schema, Invariants).
+  - **"Unknown, never zero" had no mechanism** (failure): §4a adds the
+    `IngestionSource` health join and §20 names the puller status-flip
+    prerequisite; §6 adds the "price missing" render for unpriced seat
+    types.
+  - **Zero operability surface** (alternatives): §4a adds projection-lag
+    metric, permanent rollup-vs-raw comparator tripwire, and puller
+    health rendering — ADR-034's own release apparatus, imported.
+  - **§8's "visible to admins" was ambiguous** (second-order) against
+    six `internal_governance` exclusion filters in code: ruled as
+    dedicated permission-gated screens, filters untouched. Confirmed
+    safe: home-stamping cannot leak into enforcement (Scope column
+    gates, not projectId).
+  - **§15's marker limitation stated**: latest revision only; chain in
+    the event log.
+  - **One locked ruling reopened, pending the captain**: rollup-now vs
+    direct grouped queries first (the vault proposal's own v1
+    recommendation, with the rollup buildable losslessly later via
+    replay). Flagged in §4 and Rejected alternatives; not silently
+    re-decided.
 - **v1 (2026-08-29, captain: Sergio Esteban).** Initial draft from the
   parc-fermé ceremony: framing round (decision scope, forcing function =
   stack closure + Q3 commitment with a waiting POC, blast radius =
