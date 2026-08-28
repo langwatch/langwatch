@@ -3253,11 +3253,6 @@
     },
     {
       "feature": "organization",
-      "file": "platform/app/src/server/organizations/assertUsersInOrganization.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "organization",
       "file": "platform/app/src/server/organizations/resolveCallerProjectScope.ts",
       "kind": "legacy-implementation"
     },
@@ -4534,11 +4529,6 @@
     {
       "feature": "webhook",
       "file": "platform/app/src/server/webhooks/destinations/index.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "webhook",
-      "file": "platform/app/src/server/webhooks/destinations/sqsCredentials.ts",
       "kind": "legacy-implementation"
     },
     {
