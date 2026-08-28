@@ -1047,11 +1047,6 @@
       "kind": "page-shell"
     },
     {
-      "feature": "feature-flag",
-      "file": "platform/app/src/server/api/routers/featureFlag.ts",
-      "kind": "transport"
-    },
-    {
       "feature": "governance",
       "file": "platform/app/src/app/api/governance/[[...route]]/app.ts",
       "kind": "transport"

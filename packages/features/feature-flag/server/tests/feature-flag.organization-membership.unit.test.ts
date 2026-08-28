@@ -1,10 +1,16 @@
-/** @vitest-environment node */
-
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+/**
+ * The legacy per-organization procedures answer only for organizations the
+ * caller belongs to, and omit the rest rather than reporting them as false:
+ * a present-and-false entry would make the endpoint a membership oracle.
+ */
+import type { AuthzService } from "@langwatch/authz-contract";
+import { TrpcRootDefinition } from "@langwatch/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestApp } from "~/server/app-layer/presets";
-import { createInnerTRPCContext } from "../../trpc";
-import { featureFlagRouter } from "../featureFlag";
+import {
+  FeatureFlagTrpcApi,
+  type FeatureFlagTrpcContext,
+} from "../src/api/app-trpc/feature-flag.api";
+import { MemoryFeatureFlagService } from "../src/testing";
 
 const USER_ID = "user_1";
 const OWN_ORG_A = "org_own_a";
@@ -12,20 +18,39 @@ const OWN_ORG_B = "org_own_b";
 const FOREIGN_ORG = "org_foreign";
 const FLAG = "release_ui_ai_governance_enabled";
 
+const trpc = TrpcRootDefinition.forContext<FeatureFlagTrpcContext>().create({});
+const featureFlagRouter = FeatureFlagTrpcApi.create(trpc);
+
+type PermissionCheck = {
+  userId: string;
+  permission: string;
+  projectId?: string;
+  organizationId?: string;
+};
+
 function buildCaller(memberOf: Set<string>) {
   const featureFlags = MemoryFeatureFlagService.create();
-  const app = createTestApp({ featureFlags });
-  const isMember = vi
-    .spyOn(app.organizations, "isMember")
-    .mockImplementation(async ({ organizationId, userId }) => {
-      return userId === USER_ID && memberOf.has(organizationId);
-    });
-  const context = createInnerTRPCContext({
-    app,
-    session: { user: { id: USER_ID }, expires: "1" },
-    permissionChecked: true,
-    publiclyShared: false,
-  });
+  const hasPermission = vi.fn(async (_check: PermissionCheck): Promise<boolean> => true);
+  const getOrganizationId = vi.fn(async (_projectId: string): Promise<string> => OWN_ORG_A);
+  const isMember = vi.fn(
+    async ({
+      organizationId,
+      userId,
+    }: {
+      organizationId: string;
+      userId: string;
+    }): Promise<boolean> => userId === USER_ID && memberOf.has(organizationId),
+  );
+  const permissions: Pick<AuthzService, "hasPermission"> = { hasPermission };
+  const context: FeatureFlagTrpcContext = {
+    app: {
+      featureFlags,
+      permissions,
+      projects: { getOrganizationId },
+      organizations: { isMember },
+    },
+    actor: () => ({ id: USER_ID }),
+  };
 
   return {
     caller: featureFlagRouter.createCaller(context),
@@ -39,6 +64,7 @@ describe("featureFlag organization membership", () => {
     vi.restoreAllMocks();
   });
 
+  /** @scenario "Legacy organization maps do not reveal membership" */
   it("evaluates every organization the caller belongs to", async () => {
     const { caller, featureFlags } = buildCaller(new Set([OWN_ORG_A, OWN_ORG_B]));
     const isEnabled = vi
@@ -60,6 +86,7 @@ describe("featureFlag organization membership", () => {
     expect(organizationIds.sort()).toEqual([OWN_ORG_A, OWN_ORG_B].sort());
   });
 
+  /** @scenario "Legacy organization maps do not reveal membership" */
   it("silently drops organizations the caller does not belong to", async () => {
     const { caller, featureFlags } = buildCaller(new Set([OWN_ORG_A]));
     const isEnabled = vi.spyOn(featureFlags, "isEnabled").mockResolvedValue(true);
@@ -79,6 +106,7 @@ describe("featureFlag organization membership", () => {
     });
   });
 
+  /** @scenario "Legacy organization maps do not reveal membership" */
   it("preserves the per-organization response and omits foreign organizations", async () => {
     const { caller, featureFlags } = buildCaller(new Set([OWN_ORG_A, OWN_ORG_B]));
     vi.spyOn(featureFlags, "isEnabled").mockImplementation(async (_flag, target) => {

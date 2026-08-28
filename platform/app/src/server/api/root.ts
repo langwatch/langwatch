@@ -31,7 +31,7 @@ import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
-import { featureFlagRouter } from "./routers/featureFlag";
+import { featureFlagRouter } from "~/runtime/app/internal-api/feature-flag.router";
 import { frontDoorRouter } from "./routers/frontDoor";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";

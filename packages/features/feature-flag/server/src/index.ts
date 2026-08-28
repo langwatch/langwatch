@@ -1,3 +1,4 @@
+export { FeatureFlagTrpcApi, type FeatureFlagTrpcContext } from "./api/app-trpc/feature-flag.api";
 export {
   FeatureFlagCachePort,
   type FeatureFlagCacheSlot,

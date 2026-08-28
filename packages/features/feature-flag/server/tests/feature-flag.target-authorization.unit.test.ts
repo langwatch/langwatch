@@ -1,31 +1,56 @@
-/** @vitest-environment node */
-
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+/**
+ * The authenticated transport authorizes the exact tenant target it was
+ * asked for, derives the caller's identity from the session rather than the
+ * request body, and keeps tenant policy out of a viewer's catalogue.
+ */
+import type { AuthzService } from "@langwatch/authz-contract";
+import { TrpcRootDefinition } from "@langwatch/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestApp } from "~/server/app-layer/presets";
-import { createInnerTRPCContext } from "../../trpc";
-import { featureFlagRouter } from "../featureFlag";
+import {
+  FeatureFlagTrpcApi,
+  type FeatureFlagTrpcContext,
+} from "../src/api/app-trpc/feature-flag.api";
+import { MemoryFeatureFlagService } from "../src/testing";
 
 const USER_ID = "user_1";
 const PROJECT_ID = "project_1";
 const ORGANIZATION_ID = "organization_1";
 const FLAG = "release_ui_ai_governance_enabled";
 
+const trpc = TrpcRootDefinition.forContext<FeatureFlagTrpcContext>().create({});
+const featureFlagRouter = FeatureFlagTrpcApi.create(trpc);
+
+type PermissionCheck = {
+  userId: string;
+  permission: string;
+  projectId?: string;
+  organizationId?: string;
+};
+
 function buildCaller() {
   const featureFlags = MemoryFeatureFlagService.create();
   featureFlags.setFlag(FLAG, true);
-  const app = createTestApp({ featureFlags });
-  const context = createInnerTRPCContext({
-    app,
-    session: { user: { id: USER_ID }, expires: "1" },
-    permissionChecked: true,
-    publiclyShared: false,
-  });
+  const hasPermission = vi.fn(async (_check: PermissionCheck): Promise<boolean> => true);
+  const getOrganizationId = vi.fn(async (_projectId: string): Promise<string> => ORGANIZATION_ID);
+  const isMember = vi.fn(
+    async (_input: { organizationId: string; userId: string }): Promise<boolean> => true,
+  );
+  const permissions: Pick<AuthzService, "hasPermission"> = { hasPermission };
+  const context: FeatureFlagTrpcContext = {
+    app: {
+      featureFlags,
+      permissions,
+      projects: { getOrganizationId },
+      organizations: { isMember },
+    },
+    actor: () => ({ id: USER_ID }),
+  };
 
   return {
-    app,
     caller: featureFlagRouter.createCaller(context),
     featureFlags,
+    getOrganizationId,
+    hasPermission,
   };
 }
 
@@ -34,9 +59,10 @@ describe("featureFlag target authorization", () => {
     vi.restoreAllMocks();
   });
 
+  /** @scenario "A project cannot be paired with another organization" */
   it("rejects an organization target the caller cannot view", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(false);
+    const { caller, featureFlags, hasPermission } = buildCaller();
+    hasPermission.mockResolvedValue(false);
     const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 
     await expect(
@@ -45,10 +71,10 @@ describe("featureFlag target authorization", () => {
     expect(isEnabled).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A project cannot be paired with another organization" */
   it("rejects a project paired with a different organization", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(true);
-    vi.spyOn(app.projects, "getOrganizationId").mockResolvedValue("organization_2");
+    const { caller, featureFlags, getOrganizationId } = buildCaller();
+    getOrganizationId.mockResolvedValue("organization_2");
     const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 
     await expect(
@@ -62,8 +88,7 @@ describe("featureFlag target authorization", () => {
   });
 
   it("preserves the legacy response while evaluating an authorized organization", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(true);
+    const { caller, featureFlags } = buildCaller();
     const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 
     await expect(
@@ -79,10 +104,9 @@ describe("featureFlag target authorization", () => {
     });
   });
 
+  /** @scenario "Target rule context is derived from one canonical target" */
   it("derives a project's organization and buckets the rollout by the authenticated user", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(true);
-    vi.spyOn(app.projects, "getOrganizationId").mockResolvedValue(ORGANIZATION_ID);
+    const { caller, featureFlags } = buildCaller();
     const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 
     await expect(caller.isEnabled({ flag: FLAG, projectId: PROJECT_ID })).resolves.toEqual({
@@ -98,9 +122,8 @@ describe("featureFlag target authorization", () => {
   });
 
   it("does not expose tenant policy fields to a viewer", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValueOnce(true).mockResolvedValue(false);
-    vi.spyOn(app.projects, "getOrganizationId").mockResolvedValue(ORGANIZATION_ID);
+    const { caller, featureFlags, hasPermission } = buildCaller();
+    hasPermission.mockResolvedValueOnce(true).mockResolvedValue(false);
     vi.spyOn(featureFlags, "resolveExperimentCatalogue").mockResolvedValue([
       {
         key: FLAG,
@@ -127,10 +150,9 @@ describe("featureFlag target authorization", () => {
     expect(result.experiments[0]).not.toHaveProperty("organizationPolicy");
   });
 
+  /** @scenario "Target rule context is derived from one canonical target" */
   it("passes the exact authorized project target to evaluation and experiment reads", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(true);
-    vi.spyOn(app.projects, "getOrganizationId").mockResolvedValue(ORGANIZATION_ID);
+    const { caller, featureFlags } = buildCaller();
     const resolveFrontendFlags = vi.spyOn(featureFlags, "resolveFrontendFlags");
     const resolveExperimentCatalogue = vi.spyOn(featureFlags, "resolveExperimentCatalogue");
     const target = {
@@ -153,9 +175,7 @@ describe("featureFlag target authorization", () => {
   });
 
   it("stamps the authenticated target and actor onto experiment writes", async () => {
-    const { app, caller, featureFlags } = buildCaller();
-    vi.spyOn(app.permissions, "hasPermission").mockResolvedValue(true);
-    vi.spyOn(app.projects, "getOrganizationId").mockResolvedValue(ORGANIZATION_ID);
+    const { caller, featureFlags } = buildCaller();
     const setUserExperimentEnrolment = vi.spyOn(featureFlags, "setUserExperimentEnrolment");
     const setExperimentTenantPolicy = vi.spyOn(featureFlags, "setExperimentTenantPolicy");
     const target = {
