@@ -4,13 +4,17 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `a5c3d2013b`
+**Working checkpoint:** `6ec280aec8`
 
-**Current execution waves:** Wave 1 named foundations + Wave 2 identity/access
+**Current execution waves:** Wave 3 internal tRPC + strict-layout hygiene
 
-This is an explicit parallel-wave exception: only the named Wave 1 foundation
-scope below may run beside Wave 2. All other Wave 1 work and later waves remain
-frozen. Parallel work requires independent file ownership.
+Waves 1 and 2 are closed. Wave 3's internal-tRPC column is now the active
+front, running beside the architecture-lint hygiene the strict layout needs in
+order to mean anything. Parallel work still requires independent file
+ownership: the concurrent transport verticals each own their own routers and
+their own package, and none of them edits `server/api/root.ts` — the mount
+point is applied once, centrally, because four agents editing one import block
+would clobber each other.
 
 **Goal:** delete `platform/app` after its UI, API, worker, configuration,
 backend, tests, assets and deployment responsibilities have canonical owners.
@@ -174,6 +178,33 @@ The exit is complete only when all of the following are true:
 | `7862a1f545` | Revived the message-safety and raw-toast guards killed by the same stale root.   |
 | `285211fa94` | Gave Dashboard and its saved charts a package-owned, ceiling-compliant service.  |
 | `a5c3d2013b` | Imported the LangWatchQL granularity guard its own validate path calls.          |
+| `229ec52d93` | Recorded the working-tree slices a stray checkout destroyed.                      |
+| `6503ab7cae` | Restored invite identity matching and finished the approval retirement.           |
+| `9313817386` | Let an expired invitation say so, and a revoked one say nothing.                  |
+| `8a32e35208` | Deleted fourteen modules nothing imports.                                        |
+| `78bb655f3e` | Gave Presence a package-owned tRPC surface.                                       |
+| `2ab66c968f` | Gave Data Retention a package-owned tRPC surface.                                 |
+| `6249b5d23f` | Gave Feature Flag a package-owned tRPC surface.                                   |
+| `cbcaf76802` | Deleted twenty-seven modules nothing imports.                                     |
+| `3c6248f50d` | Imported the line differ from the package that exports it.                        |
+| `fe08bce3da` | Gave Role and role bindings a package-owned tRPC surface.                         |
+| `cc89c8d455` | Audited package-mounted mutations with their arguments, minus the secret.         |
+| `98e0376c20` | Imported the two symbols the target summary renders.                              |
+| `83f073afbc` | Deleted twenty-eight components nothing renders.                                  |
+| `a13dda55c7` | Made the hidden-admin denial one class again.                                     |
+| `1f0d17242e` | Deleted five modules the barrel removals stranded.                                |
+| `172b31e456` | Gave GitHub a package-owned tRPC surface, and with it the `policy` seam.           |
+| `06e14a1599` | Reconciled the lockfile for the five moved verticals.                             |
+| `ef4a2fad7b` | Taught the coding-agent fixture the two new GitHub service members.               |
+| `bbf269f9cd` | Made the tRPC router graph constructible again.                                   |
+| `8e58a414c4` | Let the public-surface tripwire read a procedure again.                           |
+| `69e4d737e6` | Gave Secret, Data Retention and Presence their authz declarations back.           |
+| `b6622a9717` | Read a schema the way zod 4 spells it, in the declaration sweep.                  |
+| `36ff148a41` | Gave Agent its authz declarations back.                                           |
+| `85b8a72f48` | Recorded what zod 4 says about a rejected value, on the 400 path.                 |
+| `794d28030b` | Imported five more symbols their modules never imported.                          |
+| `2365693d46` | Revived the LangWatchQL run path.                                                 |
+| `6ec280aec8` | Shrank the fragment and app-access baselines to what still exists.                |
 
 The seven commits from `9196a3f2f1` to `d80a016529` deleted no production file
 from `platform/app`. They moved lines — three direct Prisma reads out of live
@@ -183,6 +214,52 @@ adds a named compatibility adapter, `runtime/worker/legacy-worker.executable.ada
 so tracked `platform/app` grew by two files across that span. Under the counting
 rule below this is real boundary progress and zero file-count exit progress;
 both facts are recorded rather than netted against each other.
+
+The twenty-seven commits from `229ec52d93` to `6ec280aec8` did three things at
+once, and the order matters because each one was hiding the next.
+
+First, `HEAD` did not build. Five committed defects stopped `appRouter` from
+being constructed at all, which meant both authorization guard suites died on
+import and reported nothing. `bbf269f9cd` closes that. Then the guards
+themselves turned out to be broken: `isPublicProcedure` read a tRPC procedure as
+a plain object, but `createResolver` returns the invoker function, so 751 of
+roughly 800 procedures read as public and the tripwire was inert
+(`8e58a414c4`); and the declaration sweep read `_def.typeName`, which zod 4
+renamed to `_def.type`, disabling both its default-scope check and its union
+branch (`b6622a9717`). Only with all three repaired did the real finding
+surface — five package-mounted verticals had lost their authorization
+declarations in the move (`69e4d737e6`, `36ff148a41`). Both guards now pass
+14/14, and they are guards again rather than decoration.
+
+Second, five more transports moved to package-owned app-tRPC adapters: Presence,
+Data Retention, Feature Flag, Role and role bindings, and GitHub. GitHub
+established the seam the rest of Wave 3 should copy. tRPC appends its input
+middleware at the point `.input()` is called, so any middleware installed ahead
+of it sees `input === undefined` — which is what had silently emptied the audit
+rows, the scope-lineage guard and the declared permission check. The `policy`
+decorator in `runtime/app/internal-api/github.router.ts` is applied by the
+feature *after* its own input parser, which is the only ordering that works.
+`cc89c8d455` repairs the audit rows the earlier ordering had emptied; note that
+it needed scalar credential redaction landed first, because `secrets.create`
+carries the plaintext secret in a top-level `value` field that the existing
+object-walking redactor does not reach.
+
+Third, 74 orphaned modules were deleted across four sweeps, each proved three
+ways (no path reference, no exported-symbol reference, no string or dynamic
+reference). The near-misses are worth recording: `PassRateCoverageChip` is
+rendered without an import, `useTypewriterPlaceholder` is referenced only from a
+`vi.mock()` string, `scenario-child-process.ts` is an esbuild bundle entry, and
+`RequireCan` is specified in five ADRs. All four were kept.
+
+Moving code, rather than looking for bugs, is what found the bugs. Nine live
+defects on this branch are one class — a module using a name its own imports
+never bring in — including `LangWatchQLService.execute`, which threw
+`ReferenceError` on every call because a refactor moved
+`resolveRunGranularityOrRefuseUnfilled` out and left the call site behind
+(`2365693d46`, 20 failures to 1). A repo-wide scan for that class does not
+generalise cheaply: it returns 2,344 files because ordinary words like `route`
+and `api` are both exported somewhere and used as local parameters. The tool for
+this is a typechecker, and `F-BRANCH-01` is why one has not run.
 
 ### Active and residual slices
 
@@ -216,7 +293,7 @@ whole table and outranks it: none of these gates has been checked by CI.
 | Order | Slice                                        | Plan row                        | Readiness and gate                                                                                                                       |
 | ----- | -------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | 1     | ~~Repair references to deleted modules~~         | `F-HEAD-01`                     | Ready and unconditional. `HEAD` does not build until it lands.                                                                           |
-| 2     | Stale baseline refresh                       | Hygiene                         | Re-derive before staging. An earlier reading called these files whitespace-only; they are not — `git diff -w` leaves every one unchanged. |
+| 2     | Stale baseline refresh                       | Hygiene                         | Partly landed in `6ec280aec8`: the legacy-fragment and global-app-access baselines are regenerated from the intersection with what exists today. The three still in the shared tree — legacy-application-boundary, port-module and service-quality — carry other slices' hunks and must be re-derived per owning slice, not swept. |
 | 3     | ~~Evaluation stored-object marker inlined~~      | Wave 6 Evaluation               | Ready. Schema module deleted with zero remaining importers.                                                                              |
 | 4     | ~~UI public environment~~                        | UI physical activation, `F-UI-02` | Ready. Carry the deleted test's gateway assertions and drop the banned `PublicEnvironment` re-export.                                    |
 | 5     | ~~Telemetry projection into `packages/config`~~  | Configuration ownership         | Ready after repointing the one consumer and deleting both re-export shims.                                                               |
@@ -241,16 +318,16 @@ deferred.
 
 | ID                    | Finding and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Owning wave                         |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `F-HEAD-01`           | Two modules deleted by committed work still have live importers, so `HEAD` does not build. `server/clickhouse/safeClickhouseClient.ts`, deleted by `d9ab6ce909`, is still imported for `wrapWithDefaultSettings` by ten test files; `server/event-sourcing/index.ts`, deleted by `d7c18dd45e`, is still imported for `createTenantId` by six files including `src/test-utils/ssoConnection.ts`. `2923114cc0` also landed without updating `runtime/__tests__/entrypoint-import-safety.unit.test.ts`, which still asserts the pre-cut `@langwatch/worker/runtime` import. Repair this before any further slice; a red base makes every later slice check unreadable.                                                                                                                                                                               | Wave 0 repair                       |
+| `F-HEAD-01`           | **Closed by `bbf269f9cd`, `1f0d17242e`, `3c6248f50d`, `98e0376c20` and `a13dda55c7`.** The cause was wider than first recorded: five committed defects, not two, kept `appRouter` from being constructed, and while it could not be constructed both authorization guard suites died on import and reported nothing at all. The repair covers the two named deleted modules plus a differ imported from a package that does not export it, two symbols a rendered component never imported, and a denial class that existed in triplicate. `HEAD` builds and both guards read 14/14. | Wave 0 repair                       |
 | `F-LOCK-01`           | `pnpm-lock.yaml` carries no importer hunk for five changed package manifests — `features/gateway/server`, `features/dashboard/contract`, `features/dashboard/server`, `features/ops/server` and `enterprise/features/scim/server` — so `pnpm install --frozen-lockfile` fails in CI. Run one root install and attribute each importer block to its owning slice rather than staging the whole file.                                                                                                                                                                                                                                                                                                                                                                                                                                               | Wave 0 reconciliation               |
 | `F-LOST-01` | **Uncommitted work under `platform/app/src/server` was destroyed on 2026-08-28** by a `git checkout HEAD~1 -- platform/app/src/server` run to test whether a failure predated a change. The pathspec covered the whole server tree, not the two files intended, and reset every modified tracked file to committed content. Dirty files there went from about 90 to 4. Never staged, so unrecoverable: the application halves of the Analytics/Dashboard and Gateway persistence slices (including all 16 pending `platform/app` deletions), the mail runtime slice that closed `F-MAIL-01`, and the Organization, Stored Object, model-provider and Langevals caller edits. The package halves survived and Dashboard's is committed in `285211fa94`. These slices must be redone from their surviving package code and the rows below. Untracked files were unaffected. | Redo before the affected verticals |
 | `F-BRANCH-01` | The branch carries **119 unpushed commits** and `langwatch-app-ci` has **never run on it** — zero runs, while the same workflow runs normally on every other branch. PR #7536 is additionally a draft, so even once pushed it runs affected-tests-only on one shard with the `heavy` jobs gated off. No test, typecheck, lint or build has been executed against this work by CI. This single fact explains the broken imports, the unparseable merge resolution, the nine red AuthZ tests, the stale baselines, the missing lockfile importers and the unshipped distribution manifests found on 2026-08-28. Push and take the PR out of draft, or accept that every gate below is self-reported. | Wave 0, before anything else |
 | `F-CI-01` | Package suites are largely invisible to CI. Of fifteen feature/app packages checked, fourteen have **zero** workflow steps — `config`, `dashboard-contract`, `dashboard-server`, `gateway-server`, `organization-server`, `prompt-server`, `ops-server`, `enterprise-scim-server`, `evaluation-server`, `trace-server`, `workflow-server`, `stored-object-server`, `ui` and `platform-api` — and there is no recursive package-test step. `authz-server` **does** have one, so it is not an example of this gap; its nine red tests are explained by `F-BRANCH-01` instead. Tests this migration moves out of `platform/app` land in a lane that never executes, so coverage silently drops while the suite reports green. Every package slice must add a `--filter <pkg> run test:unit` step following the established pattern in `langwatch-app-ci.yml`. | Every wave that moves tests |
 | `F-API-01`            | The checked-in branch OpenAPI artefacts are stale. Against `main`, `openapidiff` reports 129 changed operations, 30 added and five removed. The public-doc and platform artefacts also differ from each other by 235 semantic operation changes. Both omit the deployed direct `/api/secret`, `/api/secrets` and `/api/v1/secrets` aliases even though runtime tests cover all four bases. Source/runtime parity is green; artefact parity is not.                                                                                                                                                                                                                                                                                                                                                                                                | Wave 3 and Wave 9                   |
-| `F-API-03`            | The global authz declaration sweep currently stops before discovery on an undefined analytics `lwqlTimeWindowSchema`. Agent/Secret focused policy tests are green, but the global sweep has not proved the new package mounts.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Wave 2 and Wave 3                   |
+| `F-API-03`            | **Closed by `b6622a9717`, `8e58a414c4`, `69e4d737e6` and `36ff148a41`.** The undefined `lwqlTimeWindowSchema` was only the first stop; behind it the sweep read `_def.typeName`, which zod 4 renamed to `_def.type`, so its default-scope check and its union branch had both been silently disabled, and the public-surface tripwire read a tRPC procedure as a plain object when `createResolver` returns the invoker function, reporting 751 of roughly 800 procedures as public. With all three repaired the real finding surfaced: five package-mounted verticals had lost their declarations in the move. Both guards now prove every package mount. | Wave 2 and Wave 3                   |
 | `F-API-04`            | OpenAPI generation constructs `signInDomainRoutingPort` before the generation task initialises environment/configuration, so the task fails before Secret route composition. Fix this in the OpenAPI ownership move rather than coupling Secret back to app boot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Wave 3 and Wave 9                   |
 | `F-API-06`            | `apps/api` owns a callable listener and injected runtime bootstrap that parses typed config/logger/telemetry once, retains one scope and drains listener → graph → telemetry. `ab64885d6f` requires the canonical Auth service and Better Auth transport for browser sessions. `f7e89e5200` and `bb541a9ac5` put project-key and current API-key authentication, ceiling refusal, `markUsed` and attributed mutation audit inside the graph, closing the earlier claim that those adapters remain outside it. It still deliberately has no `process.env` launcher or package start command, and PAT/admin (`resolveOrganizationToken` is unused by the adapter) and rate-limit adapters remain absent, so a launcher would still create an incomplete second API process. Port aliases remain `LANGWATCH_API_PORT`, then `API_PORT`, then `PORT`. | Wave 1, Wave 2 and Wave 3           |
-| `F-LINT-01`           | Full architecture lint remains red across the shared migration tree: the legacy-fragment baseline is unsorted/stale and the current dirty feature moves expose new legacy fragments. Test-quality review separately reports existing assertion gaps in Gateway Spend, Webhook and Analytics memory-safety integration tests. The focused Config, AuthZ and Entitlement/Licensing slices add no reported finding; reconcile the owning baseline/test rows with their verticals instead of widening foundation commits.                                                                                                                                                                                                                                                                                                                             | Owning Wave 2–10 verticals          |
+| `F-LINT-01`           | Full architecture lint remains red, but the reported total is now mostly real work rather than drift. `6ec280aec8` shrank the legacy-fragment baseline from 915 entries to 816 and the global-app-access baseline from 255 to 208, regenerating both through the lint's own formatters from the intersection of the checked-in baseline and what the collectors find today — an entry can leave and none can arrive, so the file cannot bless new code no matter what the working tree holds. That removed 146 violations that were work already done. What remains is genuine: 484 legacy feature fragments (the extraction itself), 138 feature-source-layout, 61 feature-source-filename, 51 fallible-result-naming, 34 global-app-access, 25 private-runtime-export, 18 prisma-containment, 17 service-quality, 13 test-quality, and small clusters in ports, Eventing purity, subscriber idempotency and Enterprise composition. Test-quality review separately reports existing assertion gaps in Gateway Spend, Webhook and Analytics memory-safety integration tests. | Owning Wave 2–10 verticals          |
 | `F-SECRET-01`         | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Wave 3 clients                      |
 | `F-SECRET-02`         | The standalone API proves all 20 CRUD operations across the four bases, but its `/api/secrets` alias uses the modern validated `projectId` and canonical error response. The live legacy route derives project from the credential and retains legacy payload/error/deprecation semantics; characterise and choose compatibility before retiring it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Wave 3 compatibility                |
 | `F-SECRET-03`         | The standalone API listener proves the four bases, omitted/latest/header selection, conflicts and response headers. The still-live platform `createApiRouter` lacks an equivalent all-mount regression, so its mount/order protection remains a recorded compatibility test gap.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Wave 3 compatibility                |
@@ -310,30 +387,39 @@ and blank scope IDs use the contract-owned validation error.
 
 ## Measured exit inventory
 
-At the working checkpoint, `platform/app` contains 6,361 tracked files,
-including 6,004 under `src`. Both counts rose by two across the seven commits
-since `52ec8f2a41`, which deleted no production file from the application. Counts include tests unless identified as
-production-only and will be refreshed after each committed wave. New focused
-coverage and named compatibility adapters still outweigh the reviewed
-production deletions; only displaced production code counts as exit progress.
+At working checkpoint `6443405af9`, `platform/app` contains 6,268 tracked files,
+including 5,911 under `src`. That is 93 fewer files than the last measured
+inventory, and unlike the seven commits before it the fall is real deletion: 74
+orphaned modules with no caller anywhere, five modules the barrel removals
+stranded, a denial class that existed in triplicate, and two re-export shims the
+`agents`/`secrets` mounts no longer need. Counts include tests unless identified
+as production-only and are refreshed after each committed wave; only displaced
+production code counts as exit progress.
 
 ### Source cohorts
 
 | Path cohort               |                                Files | Exit owner                                                                  |
 | ------------------------- | -----------------------------------: | --------------------------------------------------------------------------- |
-| `src/server`              |    1,925 total; about 927 production | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages |
-| `src/server/app-layer`    |      380 total; about 191 production | Deleted through explicit API/worker composition; never copied               |
-| `src/features`            |                                1,290 | Feature web/server packages and `apps/ui` composition                       |
-| `src/components`          |                                1,173 | Feature web packages, Design System or `apps/ui` global UI                  |
-| `src/pages`               |                                  260 | `apps/ui` screens/routes or API compatibility entries                       |
-| `src/runtime`             |                                  226 | `apps/api`, `apps/worker`, `apps/ui`, config/observability packages         |
-| `src/app`                 | 224; about 124 production API routes | Feature REST adapters and `apps/api` route composition                      |
-| `src/experiments-v3`      |                                  196 | Experiment/Evaluation feature web and server packages                       |
-| `src/utils`               |                                  175 | Owning feature or shared package, never a miscellaneous dump                |
-| `src/hooks`               |       137 total; about 85 production | Feature web behaviour or `apps/ui` browser adapters                         |
-| `src/prompts`             |                                  136 | Prompt feature web/server packages                                          |
-| `src/optimization_studio` |                                   70 | Agent/Workflow/Scenario/Evaluation web packages                             |
-| `src/tasks`               |        24 total; about 15 production | Worker task registry or explicit migration/tool packages                    |
+| `src/server`              |    1,886 total; about 908 production | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages     |
+| `src/server/app-layer`    |      370 total; about 186 production | Deleted through explicit API/worker composition; never copied                   |
+| `src/server/api`          |                                  312 | Feature app-tRPC adapters; 87 of 93 mounted routers still live here             |
+| `src/features`            |                                1,271 | Feature web/server packages and `apps/ui` composition                           |
+| `src/components`          |                                1,150 | Feature web packages, Design System or `apps/ui` global UI                      |
+| `src/runtime`             |                                  283 | `apps/api`, `apps/worker`, `apps/ui`, config/observability packages             |
+| `src/pages`               |                                  260 | `apps/ui` screens/routes or API compatibility entries                           |
+| `src/app`                 | 224; about 124 production API routes | Feature REST adapters and `apps/api` route composition                          |
+| `src/experiments-v3`      |                                  195 | Experiment/Evaluation feature web and server packages                           |
+| `src/utils`               |                                  168 | Owning feature or shared package, never a miscellaneous dump                    |
+| `src/hooks`               |       134 total; about 83 production | Feature web behaviour or `apps/ui` browser adapters                             |
+| `src/prompts`             |                                  131 | Prompt feature web/server packages                                              |
+| `src/optimization_studio` |                                   67 | Agent/Workflow/Scenario/Evaluation web packages                                 |
+| `src/tasks`               |        29 total; about 19 production | Worker task registry or explicit migration/tool packages                        |
+
+The four heaviest single directories are `src/features/traces-v2` (647),
+`src/server/app-layer` (370), `src/server/api` (312) and `src/features/langy`
+(224). Between them they are 1,553 files, a quarter of the application, and each
+belongs to a different wave: Wave 7, Wave 3/4 composition, Wave 3 transport and
+Wave 6 respectively. None of them shrinks as a side effect of the others.
 
 ### Non-source cohorts
 
@@ -345,12 +431,14 @@ production deletions; only displaced production code counts as exit progress.
 | `specs`     |                                      30 | Move feature behaviour to owning feature; keep true application specs with physical app |
 | `prisma`    | 3 plus generated/migration dependencies | `packages/prisma-client` and strict feature repositories                                |
 
-The architecture baseline currently classifies 935 legacy fragments across 892
-unique files: 558 page shells, 250 implementations, 99 transports, 26
-composition files and two infrastructure adapters. Refresh the baseline rather
-than using older forecast counts. Current source also has roughly 306
-`getApp`/`tryGetApp` matches across 91 non-test files and roughly 745 direct
-`prisma.` matches.
+After `6ec280aec8` the architecture baseline classifies 816 legacy fragments
+across 774 unique files: 500 page shells, 196 implementations, 93 transports, 25
+composition files and two infrastructure adapters. By feature the concentration
+is langy (137), prompt (109), ops (104), project (65) and organization (42) —
+between them half the inventory. The global-app-access baseline holds 208
+occurrences across 63 files, with a further 34 occurrences unbaselined and
+therefore currently failing. Refresh both from the collectors rather than using
+older forecast counts.
 
 ### Largest backend residuals
 
@@ -764,6 +852,16 @@ Gate: every later API handler can rely only on `context.app`/`ctx.app`,
 
 #### Internal tRPC
 
+**In progress — 8 of 95 mounted routers moved.** Agent, Secret, Presence, Data
+Retention, Feature Flag, Role, role bindings and GitHub are package-owned and
+mounted from `runtime/app/internal-api/`; 87 modules remain under
+`server/api/routers/**`.
+
+- [x] Establish the transport seam every vertical copies. GitHub
+      (`172b31e456`) is the reference: `<Feature>TrpcApi.create(root, {
+      protected, policy }, ports)` in the package, and a thin process mount that
+      supplies `appTrpcRoot`, the authenticated procedure, the policy chain and
+      the concrete ports.
 - [ ] Replace each module under `server/api/routers/**` with an owning feature
       app-tRPC adapter over the canonical service.
 - [ ] Keep exact procedure names, input/output shapes, transformer, errors,
@@ -771,6 +869,26 @@ Gate: every later API handler can rely only on `context.app`/`ctx.app`,
 - [ ] Move router integration/characterisation tests with each vertical.
 - [ ] Delete each old router immediately after the live root mounts its package
       adapter; delete `server/api/root.ts` when the final router moves.
+
+**The ordering rule this wave keeps rediscovering.** tRPC appends its input
+middleware at the point `.input()` is called, so any middleware installed ahead
+of it receives `input === undefined`. A `policy` composed onto the bare
+procedure therefore produces an authorization check that reads no scope id, a
+scope-lineage guard that compares nothing, and an audit row with no arguments,
+no project and no organization — and every one of those failures is silent. The
+policy must be applied by the feature *after* its own input parser:
+`policy(permission)(procedure.input(schema)).mutation(...)`. Two of the guards
+that should have caught this were themselves broken (`F-API-03`); assume a new
+vertical is wrong here until its authorization declaration appears in the sweep.
+
+**Every moved procedure keeps a declaration.** `permissionProcedureBuilder`
+makes that structural: after `.input()` it exposes only
+`input`/`use`/`permission`/`permissionAny`/`noPermission`/`authorizeInService`
+and no `.mutation`/`.query`, so an undeclared procedure cannot be built. Where
+the scope genuinely is not in the input — the caller names the scope and the
+service decides, or the project is read from stored data — use
+`authorizeInService` with an honest reason rather than inventing a permission
+the transport cannot check.
 
 #### Other transports and clients
 
@@ -1005,6 +1123,43 @@ green.
 | Architecture        | Architecture lint with no new baseline, residue search and dependency-direction proof              |
 | Hygiene             | Oxfmt, Oxc, `review:test-quality`, `review:comment-blocks`, `git diff --check`                     |
 | Deployment          | Built-artifact smoke, readiness, graceful shutdown and clean-start test                            |
+
+### Strict-layout lint ledger
+
+The strict layout only means something if its lint is enforceable, and until
+`6ec280aec8` a large share of the reported total was drift rather than work.
+This is the standing inventory, refreshed from
+`cd packages/architecture-lint && pnpm lint`. A row reaching zero must stay at
+zero; a row that grows in a slice is that slice's regression.
+
+| Policy                            | Open | Where it concentrates and what closes it                                                                                                             |
+| --------------------------------- | ---: | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `legacy-feature-fragment`         |  484 | This is the extraction itself. Closes feature by feature as Waves 3–8 land; the baseline may only shrink.                                              |
+| `feature-source-layout`           |  138 | trace/server (63), langy/streaming (13), metric/adapters (10), dataset/services (8), analytics (13). Directory roles inside a strict server package.  |
+| `feature-source-filename`         |   61 | Mostly Enterprise governance adapters using `postgres-x-y.adapter.ts` instead of the dotted role form. `rename-feature-sources.cli.ts` plans this.     |
+| `fallible-result-naming`          |   51 | A capability that can return absence must be named `try*` and declare it. Spread across dataset, ops, langy, experiment, trace and billing.           |
+| `global-app-access`               |   34 | Unbaselined `getApp`/`tryGetApp`. Closes with each process-composition cut; never add a baseline entry to silence one.                                |
+| `private-runtime-export`          |   25 | A feature server root exposing a repository/store/projection. 15 are `features/trace/server/src/index.ts`.                                            |
+| `prisma-containment`              |   18 | Generated Prisma imported outside a strict Prisma repository adapter — dataset, gateway, suite, notification, experiment, annotation, billing.        |
+| `service-quality`                 |   17 | Services over their line/method/complexity ceiling. Split private collaborators; an existing ceiling may only shrink.                                 |
+| `test-quality`                    |   13 | Callbacks with no recognised assertion: gateway-spend REST, webhooks, errors logic, analytics ClickHouse. Tracked as `F-WEBHOOK-01`.                  |
+| `architecture-record`             |   73 | Boundary ADRs missing required sections. Documentation, but the sections are how a boundary is reviewable at all.                                     |
+| `eventing-process-purity`         |    7 | Process definitions declaring async work. All seven are `platform/app` pipelines and close with Wave 4.                                                |
+| `eventing-subscriber-idempotency` |    4 | langy and scenario subscribers with no named redelivery contract test. Queue deduplication is explicitly not sufficient.                              |
+| `strict-port-module`              |    6 | Port modules exporting a concrete null object named `…Port`, or no `…Port` abstract class at all.                                                     |
+| `feature-source-subject`          |    6 | A module claiming a subject another feature owns — billing/organization, billing/notification, trace/topic, trace/analytics.                          |
+| `enterprise-composition`          |    2 | `composition/api` importing `@langwatch/gateway-server` instead of a contract or installer.                                                            |
+| `cross-feature`                   |    1 | billing depending on `@langwatch/notification-server`; it may depend only on the contract.                                                             |
+| `contract-build-config`           |    0 | Closed in `6443405af9`.                                                                                                                                 |
+| `feature-catalogue`               |    1 | Catalogue entries out of classification/id order.                                                                                                     |
+| `legacy-feature-fragment-baseline`|    0 | Closed in `6ec280aec8`.                                                                                                                                 |
+| `global-app-access-baseline`      |    0 | Closed in `6ec280aec8`.                                                                                                                                 |
+
+Two of these are not hygiene and should not be scheduled as such.
+`eventing-subscriber-idempotency` asks for proof that handling the same source
+event twice leaves one externally visible result, which is a correctness
+property of the worker the plan is building. `prisma-containment` is the
+enforceable half of the persistence boundary every Wave 6 vertical claims.
 
 ## Progress accounting
 
