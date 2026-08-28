@@ -26,7 +26,7 @@ Feature: Running a test suite reuses the run plan path
 
     So every caller sends the execution settings with the run. A caller that
     addresses a test suite by its id and starts a run without a dialog,
-    `langwatch suite run <test-suite-id>`, the MCP tool and the SDK, sends the
+    `langwatch test-suite run <test-suite-id>`, the MCP tool and the SDK, sends the
     targets in the request. A request that names none is refused with
     `suite_targets_required` rather than falling back to a stored row.
 

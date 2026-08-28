@@ -10,7 +10,7 @@ Feature: CLI commands address endpoints the app actually serves
   # CLI reaching for a route that was never registered is invisible from both
   # sides of that comparison.
   #
-  #   langwatch suite run --wait      polled GET /api/scenario-events?batchRunId=
+  #   langwatch test-suite run --wait      polled GET /api/scenario-events?batchRunId=
   #   langwatch scenario run --wait   the same
   #   langwatch governance ingestion-templates clone-from-platform
   #                                   posted .../ingestion-templates/clone-from-platform
