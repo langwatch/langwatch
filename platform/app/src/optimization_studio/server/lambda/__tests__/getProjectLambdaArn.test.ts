@@ -350,55 +350,60 @@ describe("getProjectLambdaArn", () => {
     });
 
     describe("error discrimination", () => {
-    it("recognizes ResourceConflictException by name", async () => {
-      const _send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
-        .mockResolvedValueOnce({
-          Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
-        })
-        .mockRejectedValueOnce({
-          name: "ResourceConflictException",
-          message: "An update is in progress",
-        });
+      it("recognizes ResourceConflictException by name", async () => {
+        const _send = vi
+          .spyOn(LambdaClient.prototype as any, "send")
+          .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+          .mockResolvedValueOnce({
+            Configuration: mockLambdaConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockRejectedValueOnce({
+            name: "ResourceConflictException",
+            message: "An update is in progress",
+          });
 
-      const arn = await getProjectLambdaArn("error-by-name");
-      expect(arn).toBe(mockLambdaConfig.FunctionArn);
-    });
+        const arn = await getProjectLambdaArn("error-by-name");
+        expect(arn).toBe(mockLambdaConfig.FunctionArn);
+      });
 
-    it("recognizes update-in-progress by message as fallback", async () => {
-      const _send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
-        .mockResolvedValueOnce({
-          Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
-        })
-        .mockRejectedValueOnce(
-          new Error("An update is in progress"),
+      it("recognizes update-in-progress by message as fallback", async () => {
+        const _send = vi
+          .spyOn(LambdaClient.prototype as any, "send")
+          .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+          .mockResolvedValueOnce({
+            Configuration: mockLambdaConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockRejectedValueOnce(new Error("An update is in progress"));
+
+        const arn = await getProjectLambdaArn("error-by-message");
+        expect(arn).toBe(mockLambdaConfig.FunctionArn);
+      });
+
+      it("throws unrelated errors", async () => {
+        const _send = vi
+          .spyOn(LambdaClient.prototype as any, "send")
+          .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+          .mockResolvedValueOnce({
+            Configuration: mockLambdaConfig,
+            Code: {
+              ImageUri:
+                "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
+            },
+          })
+          .mockRejectedValueOnce(new Error("Access Denied"));
+
+        await expect(getProjectLambdaArn("error-unrelated")).rejects.toThrow(
+          "Access Denied",
         );
-
-      const arn = await getProjectLambdaArn("error-by-message");
-      expect(arn).toBe(mockLambdaConfig.FunctionArn);
-    });
-
-    it("throws unrelated errors", async () => {
-      const _send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
-        .mockResolvedValueOnce({
-          Configuration: mockLambdaConfig,
-          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
-        })
-        .mockRejectedValueOnce(
-          new Error("Access Denied"),
-        );
-
-      await expect(getProjectLambdaArn("error-unrelated")).rejects.toThrow(
-        "Access Denied",
-      );
-    });
+      });
     });
 
     /** @scenario A Lambda still on the old 1024 MB default is raised to 2048 */
@@ -420,11 +425,36 @@ describe("getProjectLambdaArn", () => {
 
       const updates = configUpdateCalls(send);
       expect(updates).toHaveLength(1);
-      expect(updates[0][0].input.MemorySize).toBe(
-        NLP_LAMBDA_MEMORY_SIZE_MB,
-      );
+      expect(updates[0][0].input.MemorySize).toBe(NLP_LAMBDA_MEMORY_SIZE_MB);
       expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
 
+      it("updates drifted Timeout", async () => {
+        const drifted = {
+          ...mockLambdaConfig,
+          Timeout: 300, // Short timeout, needs update to 900
+        };
+
+        const _send = vi
+          .spyOn(LambdaClient.prototype as any, "send")
+          // checkLambdaExists
+          .mockResolvedValueOnce({ Configuration: drifted })
+          // GetFunction for image/config details
+          .mockResolvedValueOnce({
+            Configuration: drifted,
+            Code: { ImageUri: currentImageUri },
+          })
+          .mockResolvedValueOnce(mockLambdaConfig)
+          .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+        const arn = await getProjectLambdaArn("reconcile-timeout");
+        expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+        const updates = configUpdateCalls(send);
+        expect(updates).toHaveLength(1);
+        expect(updates[0][0].input.Timeout).toBe(900);
+      });
+    });
+
     it("updates drifted Timeout", async () => {
       const drifted = {
         ...mockLambdaConfig,
@@ -450,34 +480,6 @@ describe("getProjectLambdaArn", () => {
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.Timeout).toBe(900);
     });
-    });
-
-    it("updates drifted Timeout", async () => {
-      const drifted = {
-        ...mockLambdaConfig,
-        Timeout: 300, // Short timeout, needs update to 900
-      };
-
-      const _send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        // checkLambdaExists
-        .mockResolvedValueOnce({ Configuration: drifted })
-        // GetFunction for image/config details
-        .mockResolvedValueOnce({
-          Configuration: drifted,
-          Code: { ImageUri: currentImageUri },
-        })
-        .mockResolvedValueOnce(mockLambdaConfig)
-        .mockResolvedValue({ Configuration: mockLambdaConfig });
-
-      const arn = await getProjectLambdaArn("reconcile-timeout");
-      expect(arn).toBe(mockLambdaConfig.FunctionArn);
-
-      const updates = configUpdateCalls(send);
-      expect(updates).toHaveLength(1);
-      expect(updates[0][0].input.Timeout).toBe(900);
-    });
-
 
     /** @scenario No drift means no AWS write at all — the common path */
     it("issues no configuration update when nothing has drifted", async () => {
@@ -539,8 +541,6 @@ describe("getProjectLambdaArn", () => {
       expect(pollsBetween.length).toBeGreaterThanOrEqual(1);
     });
 
-
-
     /** @scenario A concurrent update makes AWS reject the reconcile but resolution still succeeds */
     it("swallows an in-progress conflict on the configuration update", async () => {
       const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
@@ -558,8 +558,4 @@ describe("getProjectLambdaArn", () => {
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
     });
   });
-
-
-
-
 });
