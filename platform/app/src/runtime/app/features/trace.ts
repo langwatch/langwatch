@@ -8,6 +8,7 @@ import type {
   TraceListRepository,
   TraceService,
   TraceSummaryData,
+  NormalizedSpan,
 } from "@langwatch/trace-contract";
 import { TraceNotFoundError, traceRecordSchema } from "@langwatch/trace-contract";
 import {
@@ -22,6 +23,8 @@ import {
   TraceSummaryReaderPort,
   TraceEventDerivationPort,
   TraceRecordPort,
+  TracePayloadReaderPort,
+  TraceFullIoPort,
   type TraceQueryFieldValuesPort,
   type TraceClickHouseResolver,
 } from "@langwatch/trace-server";
@@ -29,6 +32,8 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceService as LegacyTraceService } from "~/server/traces/trace.service";
 import type { Protections } from "~/server/traces/protections";
 
@@ -173,10 +178,61 @@ class AppTraceEventDerivationAdapter extends TraceEventDerivationPort {
   }
 }
 
+/** App-owned event_log adapter; the Trace package sees only its named read port. */
+class AppTracePayloadReaderAdapter extends TracePayloadReaderPort {
+  private constructor(private readonly blobStore: BlobStore) {
+    super();
+  }
+
+  static create(blobStore: BlobStore): AppTracePayloadReaderAdapter {
+    return new AppTracePayloadReaderAdapter(blobStore);
+  }
+
+  async tryRead(input: {
+    tenantId: string;
+    traceId: string;
+    eventId: string;
+    field: string;
+  }): Promise<string | null> {
+    try {
+      return await this.blobStore.getFromEventLog({
+        eventId: input.eventId,
+        field: input.field,
+        tenantId: input.tenantId,
+        aggregateType: "trace",
+        aggregateId: input.traceId,
+      });
+    } catch {
+      return null;
+    }
+  }
+}
+
+class AppTraceFullIoAdapter extends TraceFullIoPort {
+  private constructor(private readonly extraction: TraceIOExtractionService) {
+    super();
+  }
+
+  static create(extraction: TraceIOExtractionService): AppTraceFullIoAdapter {
+    return new AppTraceFullIoAdapter(extraction);
+  }
+
+  recompute(spans: NormalizedSpan[]) {
+    const input = this.extraction.extractFirstInput(spans);
+    const output = this.extraction.extractLastOutput(spans);
+    return {
+      input: input ? { type: "text", value: input.text } : null,
+      output: output ? { type: "text", value: output.text } : null,
+    };
+  }
+}
+
 export type AppTraceRuntimeOptions = {
   database: PrismaClient;
   records: LegacyTraceService;
   spans: SpanStorageService;
+  blobStore: BlobStore;
+  fullIo: TraceIOExtractionService;
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderService;
   queryFieldValues: TraceQueryFieldValuesPort;
@@ -232,6 +288,8 @@ export class AppTraceRuntime {
       summaryReader: AppTraceSummaryReaderAdapter.create(this.options.traceSummaryStore),
       records: AppTraceRecordAdapter.create(this.options.database, this.options.records),
       eventDerivation: AppTraceEventDerivationAdapter.create(this.options.spans),
+      payloads: AppTracePayloadReaderAdapter.create(this.options.blobStore),
+      fullIo: AppTraceFullIoAdapter.create(this.options.fullIo),
     }).build();
   }
 }

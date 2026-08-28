@@ -2,6 +2,7 @@ import {
   TraceNotFoundError,
   type TraceByIdInput,
   type TraceDerivedEventsInput,
+  type TraceFullReadInput,
   type TraceService as TraceServiceContract,
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -13,6 +14,10 @@ import { TraceQueryClassificationPort } from "../ports/trace-query-classificatio
 import { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port";
 import { TraceRecordPort } from "../ports/trace-record.port";
 import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port";
+import { TraceFullRecordPort } from "../ports/trace-full-record.port";
+import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port";
+import { TraceFullIoPort } from "../ports/trace-full-io.port";
+import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository";
 import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter";
 import {
   TraceRepository,
@@ -29,6 +34,8 @@ export type ClickHouseTraceAdapterOptions = {
   summaryReader?: TraceSummaryReaderPort;
   records?: TraceRecordPort;
   eventDerivation?: TraceEventDerivationPort;
+  payloads: TracePayloadReaderPort;
+  fullIo: TraceFullIoPort;
 };
 
 /** Composes the Trace service from its ClickHouse and query-value boundaries. */
@@ -49,14 +56,14 @@ export class ClickHouseTraceAdapter {
       summaryReader: new NullTraceSummaryReader(),
       records: new NullTraceRecordPort(),
       eventDerivation: new NullTraceEventDerivationPort(),
+      fullRecords: new NullTraceFullRecordPort(),
     });
   }
 
   build(): TraceServiceContract {
+    const clickhouse = ResolverTraceClickHousePort.create(this.options.resolveClient);
     return TraceService.create({
-      repository: ClickHouseTraceSpanRepository.create(
-        ResolverTraceClickHousePort.create(this.options.resolveClient),
-      ),
+      repository: ClickHouseTraceSpanRepository.create(clickhouse),
       modelProviders: this.options.modelProviders,
       queryFieldValues: this.options.queryFieldValues,
       queryClassification:
@@ -64,6 +71,11 @@ export class ClickHouseTraceAdapter {
       summaryReader: this.options.summaryReader ?? new NullTraceSummaryReader(),
       records: this.options.records ?? new NullTraceRecordPort(),
       eventDerivation: this.options.eventDerivation ?? new NullTraceEventDerivationPort(),
+      fullRecords: ClickHouseTraceFullRecordRepository.create(
+        clickhouse,
+        this.options.payloads,
+        this.options.fullIo,
+      ),
     });
   }
 }
@@ -118,6 +130,16 @@ class NullTraceRecordPort extends TraceRecordPort {
 
 class NullTraceEventDerivationPort extends TraceEventDerivationPort {
   async derive(_input: TraceDerivedEventsInput): Promise<[]> {
+    return [];
+  }
+}
+
+class NullTraceFullRecordPort extends TraceFullRecordPort {
+  async get(input: TraceFullReadInput): Promise<never> {
+    throw new TraceNotFoundError(input.traceId);
+  }
+
+  async getThread(): Promise<[]> {
     return [];
   }
 }

@@ -9,6 +9,9 @@ import {
   traceIngestWaitInputSchema,
   traceByIdInputSchema,
   traceDerivedEventsInputSchema,
+  traceFullReadInputSchema,
+  traceFullRecordSchema,
+  traceFullThreadReadInputSchema,
   traceRecordSchema,
   traceQueryClassificationInputSchema,
   traceQueryClassificationSchema,
@@ -33,6 +36,9 @@ import {
   type EvaluationTraceEvent,
   type EvaluationTraceReadInput,
   type EvaluationTraceSpan,
+  type TraceFullReadInput,
+  type TraceFullRecord,
+  type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
@@ -41,6 +47,7 @@ import type { TraceQueryClassificationPort } from "../ports/trace-query-classifi
 import type { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port";
 import type { TraceRecordPort } from "../ports/trace-record.port";
 import type { TraceEventDerivationPort } from "../ports/trace-event-derivation.port";
+import type { TraceFullRecordPort } from "../ports/trace-full-record.port";
 import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service";
 
@@ -52,6 +59,7 @@ type TraceComposition = {
   summaryReader: TraceSummaryReaderPort;
   records: TraceRecordPort;
   eventDerivation: TraceEventDerivationPort;
+  fullRecords: TraceFullRecordPort;
 };
 
 const DEFAULT_INGEST_WAIT_MS = 30_000;
@@ -86,6 +94,17 @@ export class TraceService extends TraceServiceContract {
     const trace = await this.composition.records.getById(parsed);
 
     return traceRecordSchema.parse(trace);
+  }
+
+  async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
+    const parsed = traceFullReadInputSchema.parse(input);
+    return traceFullRecordSchema.parse(await this.composition.fullRecords.get(parsed));
+  }
+
+  async getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
+    const parsed = traceFullThreadReadInputSchema.parse(input);
+    const records = await this.composition.fullRecords.getThread(parsed);
+    return traceFullRecordSchema.array().parse(records);
   }
 
   async deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {

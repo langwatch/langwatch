@@ -20,10 +20,19 @@ import type {
 import type { DerivedTraceEvent } from "./trace-derived-event";
 import type { TraceSummaryData } from "./trace-projection";
 import type { TraceRecord } from "./trace-record";
+import type {
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+} from "./trace-full-read.contract";
 
 /** Canonical trace reads closed under payload-parity review. */
 export abstract class TraceService {
   abstract getById(input: TraceByIdInput): Promise<TraceRecord>;
+
+  abstract getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord>;
+
+  abstract getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]>;
 
   abstract deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
 

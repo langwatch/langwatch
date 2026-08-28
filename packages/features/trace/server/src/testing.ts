@@ -7,6 +7,7 @@ import { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 import { TraceQueryClassificationPort } from "./ports/trace-query-classification.port";
 import { TraceRecordPort } from "./ports/trace-record.port";
 import { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
+import { TracePayloadReaderPort } from "./ports/trace-payload-reader.port";
 
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 export { boundedSubquery } from "./adapters/trace-query-subquery.clickhouse.adapter";
@@ -32,5 +33,11 @@ export class EmptyTraceSummaryReaderPort extends TraceSummaryReaderPort {
 export class EmptyTraceQueryClassificationPort extends TraceQueryClassificationPort {
   classify() {
     return { evaluations: false, events: false, spans: false };
+  }
+}
+
+export class EmptyTracePayloadReaderPort extends TracePayloadReaderPort {
+  async tryRead(): Promise<null> {
+    return null;
   }
 }

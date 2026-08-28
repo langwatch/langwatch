@@ -24,11 +24,13 @@ export * from "./trace-record";
 export * from "./trace.errors";
 export * from "./trace-projection";
 export * from "./trace-processing.commands";
+export * from "./trace-topic-assignment";
 export * from "./trace-processing.events";
 export * from "./trace-log-contribution";
 export * from "./trace-metric-correlation";
 export * from "./trace-message.schemas";
 export * from "./trace-evaluation.contract";
+export * from "./trace-full-read.contract";
 export * from "./trace-derived-event";
 export * from "./trace-list.repository";
 export {

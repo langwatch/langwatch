@@ -6,6 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import {
   assignTopicCommandDataSchema,
   type AssignTopicCommandData,
+  TraceTopicAssignmentPort,
 } from "@langwatch/trace-contract";
 import {
   ASSIGN_TOPIC_COMMAND_TYPE,
@@ -13,6 +14,7 @@ import {
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import type { TopicAssignedEvent } from "@langwatch/trace-contract";
+import { TraceTopicAssignmentCommandPort } from "../ports/trace-topic-assignment-command.port";
 
 /**
  * Command handler for assigning topics to traces in the trace processing pipeline.
@@ -104,5 +106,20 @@ export class EventingTraceTopicAdapter implements CommandHandler<
 
   static makeJobId(payload: AssignTopicCommandData): string {
     return `${payload.tenantId}:${payload.traceId}:topic`;
+  }
+}
+
+/** Thin Eventing transport adapter for another feature's Trace contract port. */
+export class EventingTraceTopicAssignmentPort extends TraceTopicAssignmentPort {
+  static create(command: TraceTopicAssignmentCommandPort): EventingTraceTopicAssignmentPort {
+    return new EventingTraceTopicAssignmentPort(command);
+  }
+
+  private constructor(private readonly command: TraceTopicAssignmentCommandPort) {
+    super();
+  }
+
+  async assignTopic(input: AssignTopicCommandData): Promise<void> {
+    await this.command.sendAssignTopic(assignTopicCommandDataSchema.parse(input));
   }
 }

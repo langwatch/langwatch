@@ -38,6 +38,10 @@ export {
   type TraceWindowedReadOutcome,
 } from "./ports/trace-windowed-read-metrics.port";
 export { TraceRecordPort } from "./ports/trace-record.port";
+export { TraceFullRecordPort } from "./ports/trace-full-record.port";
+export { TraceTopicAssignmentCommandPort } from "./ports/trace-topic-assignment-command.port";
+export { TracePayloadReaderPort } from "./ports/trace-payload-reader.port";
+export { TraceFullIoPort } from "./ports/trace-full-io.port";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";
 export { TraceQueryClassificationPort } from "./ports/trace-query-classification.port";
@@ -102,7 +106,10 @@ export {
   EventingRecordSpanAdapter as RecordSpanCommand,
   type RecordSpanCommandOptions,
 } from "./adapters/eventing.record-span.adapter";
-export { EventingTraceTopicAdapter as AssignTopicCommand } from "./adapters/eventing.trace-topic.adapter";
+export {
+  EventingTraceTopicAdapter as AssignTopicCommand,
+  EventingTraceTopicAssignmentPort,
+} from "./adapters/eventing.trace-topic.adapter";
 export { EventingTraceOriginAdapter as ResolveOriginCommand } from "./adapters/eventing.trace-origin.adapter";
 export { EventingTraceLogContributionAdapter as RecordLogContributionCommand } from "./adapters/eventing.trace-log-contribution.adapter";
 export { EventingTraceMetricCorrelationAdapter as RecordMetricCorrelationCommand } from "./adapters/eventing.trace-metric-correlation.adapter";

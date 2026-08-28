@@ -57,6 +57,28 @@ carried to every persistence call. Cost redaction happens after persistence and
 before DTO validation; missing positive stored cost delegates to the complete
 Model Provider service.
 
+Internal full-record and chronological thread reads use the package-owned
+ClickHouse repository over `trace_summaries` and `stored_spans`. The repository
+recalls claim-check payloads only through a process-composed, tenant-scoped
+payload port; a missing payload keeps the stored preview. Legacy app detail
+services remain deliberate transport/residual composition until their callers
+move to this internal contract, including caller-specific protections,
+annotations, Evaluation enrichment, and edit overlays.
+
+`TraceService.getFullRecord` and `getFullThread` are internal all-visible
+process reads: a caller supplies only a tenant and trace/thread identity, never
+a viewer. They apply the package's explicit internal all-visible policy after
+normalized span assembly. The same package rule also accepts a viewer-derived
+policy for the later public cutover, but no current public transport invokes
+these methods. Viewer-specific reads therefore remain in
+`platform/app/src/server/traces/trace.service.ts` and
+`platform/app/src/server/traces/clickhouse-trace.service.ts`; their protected
+detail, export and thread callers still require annotations, edit overlays and
+transport-specific authorization. Their characterization suites remain under
+`platform/app/src/server/traces/__tests__/trace-service-4888-full-flag.unit.test.ts`,
+`trace-service-blob-resolution.unit.test.ts`, and
+`clickhouse-trace.service-4991-bulk.unit.test.ts`.
+
 ## Compatibility gates
 
 Authenticated handlers use the composed service through `context.app` or

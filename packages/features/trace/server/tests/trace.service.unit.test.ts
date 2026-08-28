@@ -1,4 +1,4 @@
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+import type { SpanTreeNode, TraceFullRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,6 +13,7 @@ import {
 } from "../src/ports/trace.port";
 import { TraceSummaryReaderPort } from "../src/ports/trace-summary-reader.port";
 import { TraceService } from "../src/services/trace.service";
+import { TraceFullRecordPort } from "../src/ports/trace-full-record.port";
 import { TestModelProviderService } from "./support/model-provider.service.fake";
 import { TestTraceQueryClassification } from "./support/query-classification.fake";
 import { traceReadPorts } from "./support/trace-read-ports.fake";
@@ -93,6 +94,26 @@ class CapturingSummaryReader extends TraceSummaryReaderPort {
   }
 }
 
+class FullRecords extends TraceFullRecordPort {
+  readonly calls: string[] = [];
+
+  async get(): Promise<TraceFullRecord> {
+    this.calls.push("trace");
+    return {
+      trace_id: "trace_1",
+      project_id: "project_1",
+      metadata: {},
+      timestamps: { started_at: 1, inserted_at: 1 },
+      spans: [],
+    };
+  }
+
+  async getThread(): Promise<TraceFullRecord[]> {
+    this.calls.push("thread");
+    return [];
+  }
+}
+
 const service = (
   rows: SpanTreeNode[] = [node],
   queryFieldValues: TraceQueryFieldValuesPort = new EmptyQueryFieldValues(),
@@ -127,6 +148,27 @@ class CharacterizedQueryFieldValues extends TraceQueryFieldValuesPort {
 }
 
 describe("TraceService span-tree read", () => {
+  it("delegates full internal records only through the named Trace port", async () => {
+    const fullRecords = new FullRecords();
+    const traceService = TraceService.create({
+      repository: new FakeTraceRepository(),
+      modelProviders: new TestModelProviderService(),
+      queryFieldValues: new EmptyQueryFieldValues(),
+      queryClassification: new TestTraceQueryClassification(),
+      ...traceReadPorts(),
+      summaryReader: new CapturingSummaryReader(),
+      fullRecords,
+    });
+
+    await expect(
+      traceService.getFullRecord({ tenantId: "project_1", traceId: "trace_1" }),
+    ).resolves.toMatchObject({ trace_id: "trace_1" });
+    await expect(
+      traceService.getFullThread({ tenantId: "project_1", threadId: "thread_1" }),
+    ).resolves.toEqual([]);
+    expect(fullRecords.calls).toEqual(["trace", "thread"]);
+  });
+
   it("looks up a summary through the Trace-owned projection reader", async () => {
     const summaryReader = new CapturingSummaryReader();
     const traceService = TraceService.create({

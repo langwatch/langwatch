@@ -5,6 +5,7 @@ import {
   EmptyTraceEventDerivationPort,
   EmptyTraceQueryClassificationPort,
   EmptyTraceSummaryReaderPort,
+  EmptyTracePayloadReaderPort,
   MissingTraceRecordPort,
 } from "@langwatch/trace-server/testing";
 import { nanoid } from "nanoid";
@@ -121,6 +122,7 @@ beforeAll(async () => {
     summaryReader: new EmptyTraceSummaryReaderPort(),
     records: new MissingTraceRecordPort(),
     eventDerivation: new EmptyTraceEventDerivationPort(),
+    payloads: new EmptyTracePayloadReaderPort(),
   }).build();
 
   await insertRows(

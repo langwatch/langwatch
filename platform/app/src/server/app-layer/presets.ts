@@ -1442,6 +1442,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         database: prisma,
         records: traceService,
         spans: spanStorage,
+        blobStore,
+        fullIo: ioExtractionService,
         resolveClient: resolveClickHouseClient,
         modelProviders,
         queryFieldValues: AppTraceQueryFieldValuesAdapter.create(traceList),

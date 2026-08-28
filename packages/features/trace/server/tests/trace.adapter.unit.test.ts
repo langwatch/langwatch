@@ -1,5 +1,7 @@
 import {
   TraceQueryFieldValuesPort,
+  TracePayloadReaderPort,
+  TraceFullIoPort,
   TraceSummaryReaderPort,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
@@ -20,6 +22,18 @@ class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
 class NullSummaryReader extends TraceSummaryReaderPort {
   async tryGetSummary(): Promise<null> {
     return null;
+  }
+}
+
+class EmptyPayloads extends TracePayloadReaderPort {
+  async tryRead(): Promise<null> {
+    return null;
+  }
+}
+
+class EmptyFullIo extends TraceFullIoPort {
+  recompute() {
+    return { input: null, output: null };
   }
 }
 
@@ -63,6 +77,8 @@ describe("ClickHouseTraceAdapter", () => {
       queryFieldValues: new EmptyQueryFieldValues(),
       queryClassification: new TestTraceQueryClassification(),
       summaryReader: new NullSummaryReader(),
+      payloads: new EmptyPayloads(),
+      fullIo: new EmptyFullIo(),
       ...traceReadPorts(),
     }).build();
 
@@ -93,6 +109,8 @@ describe("ClickHouseTraceAdapter", () => {
       queryFieldValues: new EmptyQueryFieldValues(),
       queryClassification: new TestTraceQueryClassification(),
       summaryReader: new NullSummaryReader(),
+      payloads: new EmptyPayloads(),
+      fullIo: new EmptyFullIo(),
       ...traceReadPorts(),
     }).build();
 
