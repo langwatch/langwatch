@@ -122,6 +122,9 @@ spec:
             # Ceiling on how long a workflow code block may run before nlpgo
             # kills it. Kept below the engine's stream idle timeout by default
             # so the code-block ceiling can't race the stream shutting down.
+            {{- if ge (int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600)) 720 }}
+            {{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" }}
+            {{- end }}
             - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
               value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
 
