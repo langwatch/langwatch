@@ -1,4 +1,3 @@
-import { HandledError } from "@langwatch/handled-error";
 import type { OpsService } from "@langwatch/ops-contract";
 import { z } from "zod";
 import { auditLog } from "~/runtime/app/features/audit-log";
@@ -6,6 +5,7 @@ import { ssoConnections } from "~/server/app-layer/identity/runtime";
 import { SsoConnectionBackofficeService } from "~/server/app-layer/identity/sso-connection-backoffice.service";
 import { prisma } from "~/server/db";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { AdminSurfaceHiddenError } from "~/server/ops/adminSurfaceHidden";
 
 /**
  * The back office's SSO connection surface (D05 tier 1).
@@ -61,14 +61,6 @@ const NO_PERMISSION_FOR_ORGANIZATION = {
 } as const;
 
 /** The operator, or a 404 that says nothing about why. */
-class AdminSurfaceHiddenError extends HandledError {
-  declare readonly code: "not_found";
-
-  constructor() {
-    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
-    this.name = "AdminSurfaceHiddenError";
-  }
-}
 
 function requireOperator({
   ops,

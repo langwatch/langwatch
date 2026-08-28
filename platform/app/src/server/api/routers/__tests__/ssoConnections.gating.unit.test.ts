@@ -97,7 +97,13 @@ function buildCaller(email: string) {
     ops: {
       isAdmin: (identity: { email?: string | null }) => identity.email === "olive@langwatch.ai",
     },
-  } as RequestAppServices;
+    // The scope-lineage middleware runs ahead of every procedure here and
+    // reads this port, so without it each call dies in middleware before the
+    // surface is reached and the suite asserts nothing.
+    permissions: {
+      checkScopeLineage: vi.fn().mockResolvedValue({ kind: "consistent" }),
+    },
+  } as unknown as RequestAppServices;
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_olive", email }, expires: "1" },
     req: undefined,

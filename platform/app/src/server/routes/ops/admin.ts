@@ -21,6 +21,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 
 import type { AppContextBindings, AppContextVariables } from "~/app/api/middleware/app-context";
+import { AdminSurfaceHiddenError } from "~/server/ops/adminSurfaceHidden";
 
 type AdminEnv = {
   Bindings: AppContextBindings;
@@ -36,15 +37,6 @@ const adminAuth = handlerManagedAuth({
   permissions: [],
   credential: "session",
 });
-
-class AdminSurfaceHiddenError extends HandledError {
-  declare readonly code: "not_found";
-
-  constructor() {
-    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
-    this.name = "AdminSurfaceHiddenError";
-  }
-}
 
 class AdminSessionExpiredError extends HandledError {
   constructor() {
