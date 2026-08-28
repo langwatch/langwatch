@@ -20,6 +20,9 @@ import {
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
 import {
   groupForMode,
+  modeForSourceType,
+  needsIngestSecret,
+  PROTOCOL_LABEL,
   routesConversations,
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
@@ -466,8 +469,13 @@ function useGroupedSources(sources: Source[] | undefined) {
       scheduled: [],
     };
     for (const s of sources ?? []) {
-      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      out[groupForMode(meta?.mode ?? "push")].push(s);
+      out[
+        groupForMode(
+          modeForSourceType({
+            sourceType: (s.sourceType ?? "otel_generic") as SourceType,
+          }),
+        )
+      ].push(s);
     }
     return out;
   }, [sources]);
@@ -492,13 +500,17 @@ function useIngestionSourceMutations({
       void refetch();
       setComposing(false);
       setComposer(blankComposer());
-      setSecretModal({
-        title: "Source created - paste this secret upstream",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
+      if (data.ingestSecret) {
+        setSecretModal({
+          title: "Source created - paste this secret upstream",
+          secret: data.ingestSecret,
+          sourceId: data.source.id,
+          sourceName: data.source.name,
+          sourceType: data.source.sourceType as SourceType,
+        });
+      } else {
+        toaster.create({ title: "Source created", type: "success" });
+      }
     },
     onError: (e) =>
       showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
@@ -915,6 +927,12 @@ function SourceRow({
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
+  const mode = modeForSourceType({
+    sourceType: source.sourceType as SourceType,
+  });
+  const hasSecret = needsIngestSecret({
+    sourceType: source.sourceType as SourceType,
+  });
   return (
     <HStack
       borderWidth="1px"
@@ -925,6 +943,10 @@ function SourceRow({
     >
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
+          <SourceTypeIconGlyph
+            sourceType={source.sourceType as SourceType}
+            size="16px"
+          />
           <Link
             href={`/governance/inventory/${source.id}`}
             color="fg"
@@ -936,6 +958,9 @@ function SourceRow({
           </Link>
           <Badge size="sm" variant="surface">
             {typeLabel}
+          </Badge>
+          <Badge size="sm" variant="outline">
+            {PROTOCOL_LABEL[mode]}
           </Badge>
         </HStack>
         {source.description && (
@@ -967,15 +992,17 @@ function SourceRow({
           >
             <Pencil size={14} /> Edit
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onRotate}
-            loading={isPendingRotate}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
+          {hasSecret && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRotate}
+              loading={isPendingRotate}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -3490,7 +3517,8 @@ function secretModalTargets(details: SecretDetails | null) {
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
-    usesWebhookUrl: details?.sourceType === "workato",
+    usesWebhookUrl:
+      details?.sourceType === "workato" || details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }
