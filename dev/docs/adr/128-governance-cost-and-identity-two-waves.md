@@ -210,13 +210,21 @@ budget ledger ─┘                                                    ▲
   the trace speed split. One daily grain suffices; hourly is an upgrade
   path, fan-out from source, never chained.
 
+The projection is **one more class in the existing event-sourcing
+pipeline** — the exact shape of `TraceAnalyticsRollupMapProjection`
+(`trace-processing/projections/traceAnalyticsRollup.mapProjection.ts`),
+which fills `trace_analytics_rollup` from the same events the trace fold
+consumes and explicitly replaced a never-deployed MV. Nothing new is
+invented; replay, stores, and comparator patterns already exist.
+
 Rejects: ClickHouse MV hybrid (the evidence pack's initial lean — reversed
 on correction semantics); querying raw tables with no rollup (Lago's
 pattern; fine per-tenant at today's volume — the research vault's own
 proposal recommended exactly this for v1 with a ~1s revisit trigger —
-but org-wide cross-*project* screens and Langfuse's precedent argue for
-the rollup; **the red-team round reopened this sequencing question and
-it is pending a ruling — see Revisions v2**); per-person pre-summed
+the red-team reopened this sequencing question and the captain
+re-affirmed build-now with the corrected rationale above: the marginal
+cost is one projection class in a pipeline the team already operates
+and wants the control in, not new machinery); per-person pre-summed
 tables with resolved names (person resolution is read-time, §10 — the
 rollup's actor dimension carries only the raw id).
 
@@ -658,9 +666,10 @@ them like every other pull.
 - **ClickHouse MV for the rollup** — over-counts on corrections; fold
   projection replays instead (§4, ADR-034's own reasoning).
 - **Query raw tables, no rollup** — fine per-tenant at today's volume
-  (Lago's pattern, and the vault proposal's own v1 recommendation);
-  weaker for org-wide cross-project screens. **Reopened by the red-team;
-  pending ruling — see Revisions v2.**
+  (Lago's pattern, and the vault proposal's own v1 recommendation).
+  Reopened by the red-team, re-affirmed by the captain: the rollup is
+  one projection class in the pipeline we already operate, not new
+  machinery — build now (§4, Revisions v2).
 - **Store seat dollars** — bakes price mistakes into history (§6).
 - **Back-fill person/department onto old rows** — edits history to match
   today (§9).
@@ -736,11 +745,17 @@ money tables, only the identity tables and read paths.
     gates, not projectId).
   - **§15's marker limitation stated**: latest revision only; chain in
     the event log.
-  - **One locked ruling reopened, pending the captain**: rollup-now vs
-    direct grouped queries first (the vault proposal's own v1
-    recommendation, with the rollup buildable losslessly later via
-    replay). Flagged in §4 and Rejected alternatives; not silently
-    re-decided.
+  - **One locked ruling reopened and re-asked, not silently re-decided**:
+    rollup-now vs direct grouped queries first (the vault proposal's own
+    v1 recommendation, with the rollup buildable losslessly later via
+    replay). The captain re-affirmed **build now**, on a corrected
+    rationale: the draft's "cross-org dashboards" justification was a
+    drafting error (nothing in FR1–FR8 is cross-org), and the honest
+    case is that the projection is one more class in the existing
+    event-sourcing pipeline (the `TraceAnalyticsRollupMapProjection`
+    shape) — the team already operates that machinery and wants the
+    control in its own pipeline, so the waiting-saves-machinery argument
+    largely dissolves.
 - **v1 (2026-08-29, captain: Sergio Esteban).** Initial draft from the
   parc-fermé ceremony: framing round (decision scope, forcing function =
   stack closure + Q3 commitment with a waiting POC, blast radius =
