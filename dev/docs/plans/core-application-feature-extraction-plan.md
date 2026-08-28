@@ -4,12 +4,13 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `8f7dc3ab0f`
+**Working checkpoint:** `29c90932cc`
 
-**Current execution wave:** Wave 2, identity, tenancy and access
+**Current execution waves:** Wave 1 named foundations + Wave 2 identity/access
 
-Complete the current wave gate before starting work from a later wave. Parallel
-work is allowed only between independent items inside the current wave.
+This is an explicit parallel-wave exception: only the named Wave 1 foundation
+scope below may run beside Wave 2. All other Wave 1 work and later waves remain
+frozen. Parallel work requires independent file ownership.
 
 **Goal:** delete `platform/app` after its UI, API, worker, configuration,
 backend, tests, assets and deployment responsibilities have canonical owners.
@@ -392,9 +393,15 @@ independent. Do not start a later wave until the current wave gate is complete.
 
 ### Wave 1: process foundations
 
-**Paused at user direction on 2026-08-28. Do not resume or expand Wave 1 while
-Wave 2 is active.** The following uncommitted lanes remain shared-worktree
-residuals rather than completed gates:
+**Active only for the user-named foundation scope:** configuration authority and
+typed process projections; physical API/Worker/local boot and lifecycle;
+request/queue observability context, health and ordered drain; and explicit
+process construction for Group Queue, storage, mail, Stripe, Slack, AWS,
+WebSocket, NLP/Langevals and model clients. Do not pull persistence or feature
+verticals into this exception.
+
+The following uncommitted lanes remain shared-worktree residuals rather than
+completed gates and are outside the active Wave 1 scope:
 
 - Analytics/Dashboard persistence and its app adapters/tests;
 - Gateway cache-rule, guardrail and budget persistence and tests;
@@ -402,9 +409,9 @@ residuals rather than completed gates:
 - Mailer/runtime/provider work and tests.
 
 Their exact modified and untracked paths remain visible in `git status`; they
-must not be staged with Wave 2 commits. Reassess them only when execution
-returns to Wave 1 or an explicit Wave 2 dependency requires a narrowly owned
-hunk.
+must not be staged with foundation or Wave 2 commits. Reassess them only when
+the user expands the Wave 1 scope or a Wave 2 dependency requires a narrowly
+owned hunk.
 
 Current Wave 1 progress at `de578b0f66`:
 
