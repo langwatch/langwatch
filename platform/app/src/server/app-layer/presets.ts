@@ -2560,6 +2560,7 @@ export function createTestApp(
       legacyDefaultModel: "openai/gpt-5",
       childEnvironment: {},
     },
+    evaluationExecution: { defaultConcurrency: 10 },
     baseHost: "http://localhost:5560",
     codingAgentSpanFilterEnabled: true,
     evaluationInputsOffload: {

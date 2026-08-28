@@ -167,6 +167,7 @@ const runCandidateOnly = async (
     ],
     loadedPrompts: new Map(),
     loadedAgents: new Map(),
+    defaultConcurrency: 10,
     loadedEvaluators: new Map([
       [
         "db-compare-1",

@@ -30,6 +30,7 @@ export interface BackendActionContext {
   projectId: string;
   projectSlug: string;
   userId: string;
+  evaluationDefaultConcurrency: number;
   experimentSlug?: string;
 }
 
@@ -224,6 +225,7 @@ async function startSavedStateRun({
     loadedAgents: prepared.loadedAgents,
     loadedEvaluators: prepared.loadedEvaluators,
     loadedWorkflows: prepared.loadedWorkflows,
+    defaultConcurrency: context.evaluationDefaultConcurrency,
     // The saved cells the run reuses rather than recomputes. A comparison
     // judging this column against another one reads the other one from here.
     ...(seedTargetOutputs ? { seedTargetOutputs } : {}),

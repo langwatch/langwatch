@@ -32,6 +32,7 @@ const CONTEXT = {
   projectId: "project-1",
   projectSlug: "acme",
   userId: "user-1",
+  evaluationDefaultConcurrency: 10,
   experimentSlug: "my-exp",
 };
 
@@ -262,6 +263,7 @@ describe("executeBackendAction", () => {
       expect(result).toEqual({ runId: "run-1", status: "running", total: 1 });
       const scope = vi.mocked(startPollingRun).mock.calls[0]![0].scope;
       expect(scope).toEqual({ type: "rows", rowIndices: [0] });
+      expect(vi.mocked(startPollingRun).mock.calls[0]![0].defaultConcurrency).toBe(10);
     });
 
     /** @scenario A run started with no browser fills the cells the workbench shows */

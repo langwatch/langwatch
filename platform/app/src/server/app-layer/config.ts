@@ -5,6 +5,14 @@ import {
   resolveNlpLambdaRuntimeConfig,
   type NlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda.config";
+import {
+  resolveEvaluationExecutionConfig,
+  type EvaluationExecutionConfig,
+} from "~/runtime/evaluation-execution.config";
+import {
+  resolveScenarioChildParentEnvironment,
+  type ScenarioChildParentEnvironment,
+} from "~/runtime/worker/scenario-child-parent.config";
 import type { LangyWorkerHttpConfig } from "@langwatch/langy-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import {
@@ -149,19 +157,10 @@ export interface AppConfig {
     langwatchEndpoint: string;
     nlpServiceUrl: string;
     legacyDefaultModel: string;
-    childEnvironment: {
-      path?: string;
-      home?: string;
-      user?: string;
-      shell?: string;
-      lang?: string;
-      lcAll?: string;
-      term?: string;
-      nodeCompileCache?: string;
-      corepackEnableDownloadPrompt?: string;
-      nodeExtraCaCerts?: string;
-    };
+    childEnvironment: ScenarioChildParentEnvironment;
   };
+  /** Legacy parseInt-compatible limit injected into every evaluation execution path. */
+  evaluationExecution: EvaluationExecutionConfig;
   /** Public application origin used when rendering links in durable work. */
   baseHost: string;
   slackPlanLimitChannel?: string;
@@ -238,6 +237,8 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     tenantConcurrencyCap: env.LANGWATCH_DISPATCH_TENANT_CAP,
     globalConcurrencyBudget: env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
   });
+  const evaluationExecution = resolveEvaluationExecutionConfig(process.env);
+  const childEnvironment = resolveScenarioChildParentEnvironment(process.env);
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -260,19 +261,9 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       legacyDefaultModel: DEFAULT_MODEL,
-      childEnvironment: {
-        path: process.env.PATH,
-        home: process.env.HOME,
-        user: process.env.USER,
-        shell: process.env.SHELL,
-        lang: process.env.LANG,
-        lcAll: process.env.LC_ALL,
-        term: process.env.TERM,
-        nodeCompileCache: process.env.NODE_COMPILE_CACHE,
-        corepackEnableDownloadPrompt: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
-        nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
-      },
+      childEnvironment,
     },
+    evaluationExecution,
     langyWorker: resolveLangyWorkerConfig({
       agentUrl: env.OPENCODE_AGENT_URL,
       internalSecret: env.LANGY_INTERNAL_SECRET,

@@ -178,6 +178,7 @@ describe("backend run results in the workbench state", () => {
       loadedAgents: new Map(),
       loadedEvaluators: new Map(),
       loadedWorkflows: new Map(),
+      defaultConcurrency: 10,
       persistResults: {
         experiments: service,
         actor: { label: "api" },

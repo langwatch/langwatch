@@ -362,6 +362,7 @@ secured.access(sessionAuth).post(
           workflows: c.app.workflows,
           loadedEvaluators,
           loadedWorkflows,
+          defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
           concurrency: request.concurrency,
           seedTargetOutputs: request.seedTargetOutputs,
           // The board as the page had it, minus what this run produces. The
@@ -705,6 +706,7 @@ secured.access(apiKeyAuthRun).post(
             workflows: c.app.workflows,
             loadedEvaluators,
             loadedWorkflows,
+            defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
             ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
           });
 
@@ -755,6 +757,7 @@ secured.access(apiKeyAuthRun).post(
       workflows: c.app.workflows,
       loadedEvaluators,
       loadedWorkflows,
+      defaultConcurrency: c.app.config.evaluationExecution.defaultConcurrency,
       ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
       // A run of the saved dataset fills the cells the workbench shows. The
       // app-layer service is the one that tells the tenant the experiment

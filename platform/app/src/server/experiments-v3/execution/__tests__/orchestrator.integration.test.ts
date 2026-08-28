@@ -20,7 +20,7 @@ import type { EvaluationV3Event } from "../types";
 
 type OrchestratorInput = Omit<
   ProductionOrchestratorInput,
-  "modelProviders" | "nlpLambda" | "workflows"
+  "defaultConcurrency" | "modelProviders" | "nlpLambda" | "workflows"
 >;
 
 const runTestOrchestrator = (input: OrchestratorInput) =>
@@ -29,6 +29,7 @@ const runTestOrchestrator = (input: OrchestratorInput) =>
     modelProviders: getApp().modelProviders,
     nlpLambda: getApp().nlpLambda,
     workflows: getApp().workflows,
+    defaultConcurrency: 10,
   });
 
 /**

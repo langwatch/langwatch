@@ -80,9 +80,6 @@ import { buildCellWorkflow, buildEvaluatorCellWorkflow } from "./workflowBuilder
 
 const logger = createLogger("experiments-v3:orchestrator");
 
-// Default concurrency limit (can be overridden via environment variable or request)
-const DEFAULT_CONCURRENCY = parseInt(process.env.EVAL_V3_CONCURRENCY ?? "10", 10);
-
 /**
  * Input data required to run the orchestrator.
  */
@@ -105,7 +102,9 @@ export type OrchestratorInput = {
   loadedWorkflows?: Map<string, LoadedWorkflow>;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
-  /** Concurrency limit for parallel execution (default 10) */
+  /** Process-configured default used when the request does not choose a limit. */
+  defaultConcurrency: number;
+  /** Request-specific concurrency limit. */
   concurrency?: number;
   /**
    * Pre-existing target outputs keyed by `${rowIndex}:${targetId}`. Phase 2
@@ -2760,6 +2759,7 @@ export async function* runOrchestrator(
     loadedEvaluators,
     loadedWorkflows,
     runId: providedRunId,
+    defaultConcurrency,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
     modelProviders,
@@ -2767,8 +2767,7 @@ export async function* runOrchestrator(
     workflows,
   } = input;
 
-  // Use requested concurrency, environment variable, or default
-  const concurrency = requestedConcurrency ?? DEFAULT_CONCURRENCY;
+  const concurrency = requestedConcurrency ?? defaultConcurrency;
 
   // Use provided run ID or generate a human-readable one like "swift-fox-42"
   const runId = providedRunId ?? generateHumanReadableId();

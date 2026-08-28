@@ -335,6 +335,7 @@ secured.access(requires("workflows:create")).post(
         c.app.modelProviders,
         c.app.nlpLambda,
         c.app.workflows,
+        c.app.config.evaluationExecution.defaultConcurrency,
       ).triggerEvaluation({
         projectId: project.id,
         projectSlug: project.slug,

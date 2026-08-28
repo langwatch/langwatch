@@ -9,6 +9,8 @@ import {
   roleRunsWorkers,
   roleSatisfiesRunIn,
 } from "../config";
+import { resolveEvaluationExecutionConfig } from "~/runtime/evaluation-execution.config";
+import { resolveScenarioChildParentEnvironment } from "~/runtime/worker/scenario-child-parent.config";
 
 describe("Gateway virtual-key process configuration", () => {
   beforeEach(() => {
@@ -33,6 +35,76 @@ describe("Gateway virtual-key process configuration", () => {
     expect(createAppConfigFromEnv().virtualKeyPepper).toBe(
       "configured-virtual-key-pepper-32-bytes",
     );
+  });
+});
+
+describe("Evaluation execution process configuration", () => {
+  it("preserves the legacy default and parseInt handling", () => {
+    expect(resolveEvaluationExecutionConfig({}).defaultConcurrency).toBe(10);
+    expect(resolveEvaluationExecutionConfig({ EVAL_V3_CONCURRENCY: "0" }).defaultConcurrency).toBe(
+      0,
+    );
+    expect(resolveEvaluationExecutionConfig({ EVAL_V3_CONCURRENCY: "-1" }).defaultConcurrency).toBe(
+      -1,
+    );
+    expect(
+      resolveEvaluationExecutionConfig({ EVAL_V3_CONCURRENCY: " 12workers" }).defaultConcurrency,
+    ).toBe(12);
+    expect(
+      Number.isNaN(
+        resolveEvaluationExecutionConfig({ EVAL_V3_CONCURRENCY: "" }).defaultConcurrency,
+      ),
+    ).toBe(true);
+    expect(
+      Number.isNaN(
+        resolveEvaluationExecutionConfig({ EVAL_V3_CONCURRENCY: "not-a-number" })
+          .defaultConcurrency,
+      ),
+    ).toBe(true);
+  });
+
+  it.each(["web", "worker", "migration", "all"] as const)(
+    "projects the configured default for the %s process role",
+    (processRole) => {
+      const previous = process.env.EVAL_V3_CONCURRENCY;
+      process.env.EVAL_V3_CONCURRENCY = "17";
+
+      try {
+        expect(createAppConfigFromEnv({ processRole }).evaluationExecution).toEqual({
+          defaultConcurrency: 17,
+        });
+      } finally {
+        if (previous === undefined) {
+          delete process.env.EVAL_V3_CONCURRENCY;
+        } else {
+          process.env.EVAL_V3_CONCURRENCY = previous;
+        }
+      }
+    },
+  );
+});
+
+describe("Scenario child parent environment", () => {
+  it("projects only the child process allowlist", () => {
+    expect(
+      resolveScenarioChildParentEnvironment({
+        PATH: "/bin",
+        LANG: "en_US.UTF-8",
+        NODE_EXTRA_CA_CERTS: "/certs/extra.pem",
+        LANGWATCH_API_KEY: "must-not-pass-through",
+      }),
+    ).toEqual({
+      path: "/bin",
+      home: undefined,
+      user: undefined,
+      shell: undefined,
+      lang: "en_US.UTF-8",
+      lcAll: undefined,
+      term: undefined,
+      nodeCompileCache: undefined,
+      corepackEnableDownloadPrompt: undefined,
+      nodeExtraCaCerts: "/certs/extra.pem",
+    });
   });
 });
 

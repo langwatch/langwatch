@@ -133,7 +133,11 @@ function createService({
     backendRunner: ({ kind, definition, payload, experimentSlug }) =>
       executeBackendAction({
         experiments: app.experiments,
-        context: { ...context, experimentSlug },
+        context: {
+          ...context,
+          experimentSlug,
+          evaluationDefaultConcurrency: app.config.evaluationExecution.defaultConcurrency,
+        },
         kind,
         definition,
         payload,

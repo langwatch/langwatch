@@ -1,13 +1,13 @@
 import { createLogger } from "@langwatch/observability";
-import { ChildProcessJobDataSchema } from "@langwatch/scenario-contract";
 import {
-  decodeScenarioLogContext,
   executeScenarioChild,
   flushScenarioOtelTraces,
   formatScenarioChildError,
   ScenarioHttpPort,
 } from "@langwatch/scenario-server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { resolveScenarioChildProcessConfig } from "./scenario-child.config";
+import { parseScenarioChildInput } from "./scenario-child.input";
 
 class AppScenarioHttpPort extends ScenarioHttpPort {
   fetch(input: {
@@ -18,8 +18,7 @@ class AppScenarioHttpPort extends ScenarioHttpPort {
   }
 }
 
-const logContext = decodeScenarioLogContext(process.env.LANGWATCH_LOG_CONTEXT);
-const logger = createLogger("langwatch:scenarios:child").child(logContext);
+let logger = createLogger("langwatch:scenarios:child");
 
 async function readJobDataFromStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,22 +33,17 @@ async function readJobDataFromStdin(): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  const config = resolveScenarioChildProcessConfig(process.env);
+  logger = logger.child(config.logContext);
   const raw = await readJobDataFromStdin();
-  const jobData = ChildProcessJobDataSchema.parse(JSON.parse(raw));
-  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
-  if (!langwatchEndpoint || !langwatchApiKey) {
-    throw new Error(
-      "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
-    );
-  }
+  const { jobData, telemetry } = parseScenarioChildInput({ raw, config });
 
   const result = await executeScenarioChild({
     jobData,
     runtime: {
-      langwatchEndpoint,
-      langwatchApiKey,
-      verbose: process.env.SCENARIO_VERBOSE === "true",
+      langwatchEndpoint: telemetry.langwatchEndpoint,
+      langwatchApiKey: telemetry.langwatchApiKey,
+      verbose: config.verbose,
       httpPort: new AppScenarioHttpPort(),
       logger,
     },

@@ -64,6 +64,7 @@ export class WorkflowEvaluationService {
     private readonly modelProviders: ModelProviderService,
     private readonly nlpLambda: NlpLambdaRuntime,
     private readonly workflows: WorkflowService,
+    private readonly defaultConcurrency: number,
   ) {}
 
   static create(
@@ -72,6 +73,7 @@ export class WorkflowEvaluationService {
     modelProviders: ModelProviderService,
     nlpLambda: NlpLambdaRuntime,
     workflows: WorkflowService,
+    defaultConcurrency: number,
   ): WorkflowEvaluationService {
     return new WorkflowEvaluationService(
       prisma,
@@ -79,6 +81,7 @@ export class WorkflowEvaluationService {
       modelProviders,
       nlpLambda,
       workflows,
+      defaultConcurrency,
     );
   }
 
@@ -278,6 +281,7 @@ export class WorkflowEvaluationService {
       workflows: this.workflows,
       loadedEvaluators,
       loadedWorkflows,
+      defaultConcurrency: this.defaultConcurrency,
     });
 
     return {
