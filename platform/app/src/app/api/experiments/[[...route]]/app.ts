@@ -27,6 +27,7 @@ import type { Experiment } from "@langwatch/experiment-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { createBlankWorkbenchState } from "~/server/experiments-v3/blank-workbench-state";
 import {
   createExperimentBodySchema,

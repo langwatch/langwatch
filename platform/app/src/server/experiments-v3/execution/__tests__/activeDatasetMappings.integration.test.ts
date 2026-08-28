@@ -8,7 +8,7 @@
  * dispatched rather than what an engine answered.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 vi.mock("~/app/api/workflows/post_event/post-event", async () => ({
   studioBackendPostEvent: vi.fn(

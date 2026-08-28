@@ -21,7 +21,7 @@ import {
   createInitialResults,
   createInitialUIState,
 } from "~/experiments-v3/types";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 const scripted = vi.hoisted(() => ({
   dispatched: [] as Array<{ type: string; payload: Record<string, any> }>,

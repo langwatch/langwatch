@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import {
   COMPARISON_COLUMN_REFUSAL,
   type EvaluatorConfig,

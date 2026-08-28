@@ -12,7 +12,7 @@
  * with no test output at all.
  */
 
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 /** What the boundary is told to answer, and what it was asked. */
 export const scripted = {

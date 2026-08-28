@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Field } from "~/optimization_studio/types/dsl";
-import { fieldSchema } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
+import { fieldSchema } from "@langwatch/workflow-contract";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import {
   COMPARISON_COLUMN_REFUSAL,

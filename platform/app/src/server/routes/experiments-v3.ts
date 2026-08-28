@@ -33,6 +33,7 @@ import { getServerAuthSession } from "~/server/auth";
 import {
   ExperimentNotFoundError,
   ExperimentRunNotFoundError as RunNotFoundError,
+  ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
 } from "@langwatch/experiment-contract";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
@@ -594,19 +595,23 @@ secured.access(apiKeyAuthRun).post(
         status: authResult.status,
       });
     }
-    const { project, markUsed } = authResult;
+    const { project, resolved, markUsed } = authResult;
 
-    const experiment = await c.app.experiments.tryGetBySlugAndType({
+    // Read once here to validate the stored setup before any work starts, and
+    // named apart from the `experiment` that `prepareSavedStateExecution`
+    // returns below: that one is the authoritative record the run is built
+    // from, this one only answers "is this experiment runnable at all".
+    const savedExperiment = await c.app.experiments.tryGetBySlugAndType({
       projectId: project.id,
       slug,
       type: ExperimentType.EVALUATIONS_V3,
     });
 
-    if (!experiment) {
+    if (!savedExperiment) {
       throw new ExperimentNotFoundError(slug);
     }
 
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(experiment.workbenchState);
+    const parseResult = persistedEvaluationsV3StateSchema.safeParse(savedExperiment.workbenchState);
     if (!parseResult.success) {
       logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
       // The stored workbench state no longer matches its schema. The customer
