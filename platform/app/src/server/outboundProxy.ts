@@ -5,18 +5,49 @@
  * corporate HTTP proxy. The AWS SDK does not honour `HTTPS_PROXY` on its own,
  * so anything that talks HTTPS to a vendor consults these helpers and wires
  * the proxy into its own transport: the email gateways, and every AWS client
- * built through `server/aws/awsClientConfig`.
+ * built through the platform AWS client composition.
  *
  * Only vendor HTTPS calls opt in. An SMTP relay is usually an internal host
  * that is reachable directly, so applying a globally-set proxy to it would
  * break working deployments; the SMTP gateway deliberately does not.
  */
 
-const readEnv = (name: string): string | undefined => {
-  const value = process.env[name] ?? process.env[name.toLowerCase()];
+export interface OutboundProxyConfig {
+  httpsProxy?: string;
+  httpProxy?: string;
+  noProxy?: string;
+}
+
+let processOutboundProxyConfig: OutboundProxyConfig | undefined;
+
+const readProxyEnvironmentValue = (
+  source: Readonly<Record<string, string | undefined>>,
+  name: string,
+): string | undefined => {
+  const value = source[name] ?? source[name.toLowerCase()];
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
 };
+
+/** Parses proxy compatibility spellings once at process boot. */
+export function parseOutboundProxyConfig(
+  source: Readonly<Record<string, string | undefined>>,
+): OutboundProxyConfig {
+  return {
+    httpsProxy: readProxyEnvironmentValue(source, "HTTPS_PROXY"),
+    httpProxy: readProxyEnvironmentValue(source, "HTTP_PROXY"),
+    noProxy: readProxyEnvironmentValue(source, "NO_PROXY"),
+  };
+}
+
+/** Installs the config parsed by the process composition root. */
+export function configureProcessOutboundProxy(config: OutboundProxyConfig): void {
+  processOutboundProxyConfig = config;
+}
+
+export function getProcessOutboundProxyConfig(): Readonly<OutboundProxyConfig> {
+  return processOutboundProxyConfig ?? {};
+}
 
 /**
  * The proxy that applies to `targetHost`, or undefined when none is configured
@@ -24,10 +55,13 @@ const readEnv = (name: string): string | undefined => {
  *
  * `HTTPS_PROXY` wins over `HTTP_PROXY` because every gateway here uses TLS.
  */
-export const resolveProxyForHost = (targetHost: string): string | undefined => {
-  const proxy = readEnv("HTTPS_PROXY") ?? readEnv("HTTP_PROXY");
+export const resolveProxyForHost = (
+  config: OutboundProxyConfig,
+  targetHost: string,
+): string | undefined => {
+  const proxy = config.httpsProxy ?? config.httpProxy;
   if (!proxy) return undefined;
-  if (isProxyBypassed(targetHost)) return undefined;
+  if (isProxyBypassed(config, targetHost)) return undefined;
   return proxy;
 };
 
@@ -36,8 +70,8 @@ export const resolveProxyForHost = (targetHost: string): string | undefined => {
  * comma separated entries, `*` disables proxying entirely, a leading dot or
  * bare domain matches subdomains, and an optional `:port` suffix is ignored.
  */
-export const isProxyBypassed = (targetHost: string): boolean => {
-  const noProxy = readEnv("NO_PROXY");
+export const isProxyBypassed = (config: OutboundProxyConfig, targetHost: string): boolean => {
+  const noProxy = config.noProxy;
   if (!noProxy) return false;
 
   const host = targetHost.toLowerCase().replace(/:\d+$/, "");

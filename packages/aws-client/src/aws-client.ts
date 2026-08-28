@@ -1,72 +1,17 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { hostnameOf, resolveProxyForHost } from "../outboundProxy";
 
-/**
- * The one place an AWS SDK client is configured.
- *
- * Every AWS client we build wants the same things right, and each of them
- * has been wrong at least once:
- *
- * 1. **Credentials are omitted, not emptied.** Handing the SDK a
- *    `credentials` object built from unset environment variables produces
- *    `{ accessKeyId: "", secretAccessKey: "" }`, which the SDK treats as a
- *    real answer and stops looking. That is what broke IRSA on EKS: the pod
- *    had a role, and we told the SDK we had keys. Credentials are set ONLY
- *    when a complete pair is present and non-empty; otherwise the field is
- *    absent and the default chain (IRSA, instance profile, SSO) runs.
- * 2. **Retries belong to whoever counts them.** A caller sitting behind a
- *    retry ladder asks for `maxAttempts: 1`, because SDK-internal retries
- *    are invisible to the ladder and one recorded attempt would secretly be
- *    three. A caller with no ladder above it leaves the SDK's retries on.
- * 3. **The proxy is wired in.** The SDK ignores `HTTPS_PROXY` unless it is
- *    handed a request handler that dials through it.
- * 4. **One socket pool per proxy.** A `NodeHttpHandler` owns an agent, so
- *    building one per call accumulates pools and file descriptors. They are
- *    cached by proxy URL here, which is also what lets SES and SQS share
- *    one.
- * 5. **Every request is bounded.** `@smithy/node-http-handler` reads 0 as "no
- *    timeout", and 0 is its default. A caller that also turned the SDK's
- *    retries off has nothing left to end a request a silent proxy or a
- *    half-open socket never answers, so the timeouts are set here rather than
- *    left to each client.
- */
+export abstract class OutboundProxyResolverPort {
+  abstract tryResolveForHost(hostname: string): string | undefined;
+}
 
-/**
- * How long one AWS request may take. The connection budget is short because
- * failing to connect is a fast, local answer; the request budget covers a
- * queue or a mail send under load without letting one hang a delivery worker.
- */
+/** Shared SES/SQS policy: injected proxy routing, bounded pooled handlers, and optional retries. */
 const CONNECTION_TIMEOUT_MS = 5_000;
 const REQUEST_TIMEOUT_MS = 20_000;
 
-/**
- * A handler owns a socket pool, so building one per client would accumulate
- * pools and file descriptors under a burst. They are keyed by proxy URL and
- * reused; the set of distinct URLs in a process is effectively one, and the
- * empty key is the direct, unproxied handler.
- */
-const requestHandlers = new Map<string, NodeHttpHandler>();
-
-/** The direct path has no proxy URL to key on, and one shared pool is the
- *  same arrangement the proxied path already has. */
+/** The direct route shares one pool alongside the proxy-keyed pools. */
 const DIRECT_HANDLER_KEY = "";
-
-export function awsRequestHandler(proxyUrl?: string | null): NodeHttpHandler {
-  const key = proxyUrl ?? DIRECT_HANDLER_KEY;
-  const cached = requestHandlers.get(key);
-  if (cached) return cached;
-
-  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
-  const handler = new NodeHttpHandler({
-    ...(agent ? { httpAgent: agent, httpsAgent: agent } : {}),
-    connectionTimeout: CONNECTION_TIMEOUT_MS,
-    requestTimeout: REQUEST_TIMEOUT_MS,
-  });
-  requestHandlers.set(key, handler);
-  return handler;
-}
 
 /** Static credentials, as a caller holds them before they are validated. */
 export interface StaticAwsCredentials {
@@ -134,6 +79,18 @@ function present(value: string | null | undefined): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
 
+function hostnameOf(value: string): string {
+  try {
+    const hostname = new URL(value).hostname;
+    if (hostname) return hostname;
+  } catch {
+    // A bare hostname is a valid target for an AWS client.
+  }
+  const withoutScheme = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  const hostPort = withoutScheme.split("/")[0] ?? "";
+  return hostPort.replace(/:\d+$/, "") || value;
+}
+
 /**
  * Static credentials as the SDK wants them, or undefined when the pair is
  * incomplete. Never a half-filled object: see rule 1 above.
@@ -154,6 +111,103 @@ export function staticCredentialsOrUndefined(
 /** How long an assumed session lasts before the provider refreshes it. */
 const DEFAULT_ASSUME_ROLE_DURATION_SECONDS = 900;
 
+export class AwsClientConfiguration {
+  static create(options: { outboundProxy: OutboundProxyResolverPort }): AwsClientConfiguration {
+    return new AwsClientConfiguration(options.outboundProxy);
+  }
+
+  private readonly requestHandlers = new AwsRequestHandlerPool();
+
+  private readonly transport: AwsTransportPolicy;
+
+  private closePromise: Promise<void> | undefined;
+
+  private constructor(outboundProxy: OutboundProxyResolverPort) {
+    this.transport = new AwsTransportPolicy(outboundProxy, this.requestHandlers);
+  }
+
+  build(input: AwsClientConfigInput): AwsClientConfig {
+    if (this.closePromise) {
+      throw new Error("AwsClientConfiguration is closed");
+    }
+
+    return this.transport.build(input);
+  }
+
+  close(): Promise<void> {
+    if (this.closePromise) return this.closePromise;
+
+    this.closePromise = this.requestHandlers.close();
+    return this.closePromise;
+  }
+}
+
+class AwsRequestHandlerPool {
+  private readonly handlers = new Map<string, NodeHttpHandler>();
+
+  forProxy(proxyUrl?: string | null): NodeHttpHandler {
+    const key = proxyUrl ?? DIRECT_HANDLER_KEY;
+    const cached = this.handlers.get(key);
+    if (cached) return cached;
+    const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+    const handler = new NodeHttpHandler({
+      ...(agent ? { httpAgent: agent, httpsAgent: agent } : {}),
+      connectionTimeout: CONNECTION_TIMEOUT_MS,
+      requestTimeout: REQUEST_TIMEOUT_MS,
+    });
+    this.handlers.set(key, handler);
+    return handler;
+  }
+
+  close(): Promise<void> {
+    const handlers = [...this.handlers.values()];
+    this.handlers.clear();
+    return Promise.resolve().then(() => {
+      for (const handler of handlers) handler.destroy();
+    });
+  }
+}
+
+class AwsTransportPolicy {
+  constructor(
+    private readonly outboundProxy: OutboundProxyResolverPort,
+    private readonly requestHandlers: AwsRequestHandlerPool,
+  ) {}
+
+  build({
+    region,
+    targetHost,
+    endpoint,
+    staticCredentials,
+    assumeRole,
+    disableSdkRetries = false,
+  }: AwsClientConfigInput): AwsClientConfig {
+    const config: AwsClientConfig = {
+      requestHandler: this.requestHandlerForHost(hostnameOf(targetHost)),
+    };
+
+    if (present(region)) config.region = region;
+    if (present(endpoint)) config.endpoint = endpoint;
+    if (disableSdkRetries) config.maxAttempts = 1;
+
+    const credentials = resolveCredentials(
+      {
+        region,
+        staticCredentials,
+        assumeRole,
+      },
+      this,
+    );
+    if (credentials) config.credentials = credentials;
+
+    return config;
+  }
+
+  requestHandlerForHost(hostname: string): NodeHttpHandler {
+    return this.requestHandlers.forProxy(this.outboundProxy.tryResolveForHost(hostname));
+  }
+}
+
 /**
  * The credentials field, or undefined so the default chain runs.
  *
@@ -161,14 +215,14 @@ const DEFAULT_ASSUME_ROLE_DURATION_SECONDS = 900;
  * instance profile or an SSO session answer. An empty object would stop the
  * search with an answer of "" and fail.
  */
-function resolveCredentials({
-  region,
-  staticCredentials,
-  assumeRole,
-}: Pick<
-  AwsClientConfigInput,
-  "region" | "staticCredentials" | "assumeRole"
->): AwsClientConfig["credentials"] {
+function resolveCredentials(
+  {
+    region,
+    staticCredentials,
+    assumeRole,
+  }: Pick<AwsClientConfigInput, "region" | "staticCredentials" | "assumeRole">,
+  transport: AwsTransportPolicy,
+): AwsClientConfig["credentials"] {
   const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
   if (!assumeRole) return staticIdentity;
   // The STS call is a second request to a second host, and it gets the same
@@ -195,34 +249,8 @@ function resolveCredentials({
     },
     clientConfig: {
       ...(present(region) ? { region } : {}),
-      requestHandler: awsRequestHandler(resolveProxyForHost(stsHost)),
+      requestHandler: transport.requestHandlerForHost(stsHost),
     },
     ...(staticIdentity ? { masterCredentials: staticIdentity } : {}),
   });
-}
-
-export function buildAwsClientConfig({
-  region,
-  targetHost,
-  endpoint,
-  staticCredentials,
-  assumeRole,
-  disableSdkRetries = false,
-}: AwsClientConfigInput): AwsClientConfig {
-  const config: AwsClientConfig = {
-    requestHandler: awsRequestHandler(resolveProxyForHost(hostnameOf(targetHost))),
-  };
-
-  if (present(region)) config.region = region;
-  if (present(endpoint)) config.endpoint = endpoint;
-  if (disableSdkRetries) config.maxAttempts = 1;
-
-  const credentials = resolveCredentials({
-    region,
-    staticCredentials,
-    assumeRole,
-  });
-  if (credentials) config.credentials = credentials;
-
-  return config;
 }

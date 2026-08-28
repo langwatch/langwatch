@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-ses";
 import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
-import { buildAwsClientConfig } from "../../aws/awsClientConfig";
+import { buildAwsClientConfig } from "~/runtime/app/aws-client.composition";
 import { buildRawMimeMessage } from "./mime";
 import { type EmailContent, type EmailProviderPort, toArray } from "./types";
 

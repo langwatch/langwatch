@@ -227,6 +227,12 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
+import { resetSqsClientCache } from "~/server/webhooks/destinations/sqsWebhookDestination";
+import {
+  closeAwsClientConfiguration,
+  configureAwsClientConfiguration,
+} from "~/runtime/app/aws-client.composition";
+import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
@@ -443,6 +449,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const prisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma });
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
+  configureProcessOutboundProxy(config.outboundProxy);
+  configureAwsClientConfiguration(config.outboundProxy);
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
@@ -2018,6 +2026,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     // every migration is idempotent and the next boot resumes the sweep.
     shutdownResources.register("subscriber", "system-migrations", () => systemMigrations.stop());
   }
+  shutdownResources.register("subscriber", "sqs-webhook-clients", async () => {
+    resetSqsClientCache();
+    await closeAwsClientConfiguration();
+  });
   shutdownResources.register("database", "prisma", closePrismaConnection);
 
   const notifications = NotificationService.create({
@@ -2272,6 +2284,7 @@ export function createTestApp(
       compression: "gzip",
       payloadCodec: "json",
     },
+    outboundProxy: {},
     nlpLambda: resolveNlpLambdaRuntimeConfig({}),
     featureFlags: resolveFeatureFlagConfig({}),
     scenarioExecution: {

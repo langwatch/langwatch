@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("~/server/rateLimit", () => ({ rateLimit: vi.fn() }));
 
 import { rateLimit } from "~/server/rateLimit";
+import {
+  closeAwsClientConfiguration,
+  configureAwsClientConfiguration,
+} from "~/runtime/app/aws-client.composition";
 import { WEBHOOK_SIGNATURE_HEADER } from "../../signature";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../sqsQueueUrl";
 import {
@@ -65,7 +69,9 @@ function fakeQueue(behavior?: { rejectWith?: unknown }) {
 }
 
 describe("sqsWebhookDestination", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await closeAwsClientConfiguration();
+    configureAwsClientConfiguration({});
     mockedRateLimit.mockResolvedValue({
       allowed: true,
       remaining: 999,
@@ -73,7 +79,9 @@ describe("sqsWebhookDestination", () => {
     } as never);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    resetSqsClientCache();
+    await closeAwsClientConfiguration();
     vi.clearAllMocks();
   });
 
@@ -461,7 +469,15 @@ describe("queue URL admission", () => {
 });
 
 describe("the queue client", () => {
-  afterEach(() => resetSqsClientCache());
+  beforeEach(async () => {
+    await closeAwsClientConfiguration();
+    configureAwsClientConfiguration({});
+  });
+
+  afterEach(async () => {
+    resetSqsClientCache();
+    await closeAwsClientConfiguration();
+  });
 
   /**
    * A client per delivery would re-assume the role on every attempt, because
@@ -475,6 +491,21 @@ describe("the queue client", () => {
       secretAccessKey: "s3cr3t",
     };
     expect(sqsClientFor(config)).toBe(sqsClientFor({ ...config }));
+  });
+
+  it("destroys cached clients before dropping their process cache", () => {
+    const config = {
+      queueUrl: QUEUE_URL,
+      accessKeyId: "AKIA1",
+      secretAccessKey: "s3cr3t",
+    };
+    const first = sqsClientFor(config);
+    const destroy = vi.spyOn(first, "destroy");
+
+    resetSqsClientCache();
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(sqsClientFor(config)).not.toBe(first);
   });
 
   it("is rebuilt when a credential rotates, so it never authenticates as the old identity", () => {

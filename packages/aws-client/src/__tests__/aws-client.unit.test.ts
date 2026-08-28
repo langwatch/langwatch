@@ -1,6 +1,16 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildAwsClientConfig, staticCredentialsOrUndefined } from "../awsClientConfig";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AwsClientConfiguration,
+  OutboundProxyResolverPort,
+  staticCredentialsOrUndefined,
+  type AwsClientConfigInput,
+} from "../aws-client";
+
+type RecordedNodeHttpHandler = {
+  destroy: () => void;
+  options: unknown;
+};
 
 // The assume-role branch builds a provider whose shape nothing else can read
 // back: `fromTemporaryCredentials` returns an opaque function. Mocking it is
@@ -11,11 +21,25 @@ vi.mock("@aws-sdk/credential-providers", () => ({
 
 // A recorder of its own arguments, so the timeouts and the agent a handler was
 // built with are readable without touching the real class's private fields.
-vi.mock("@smithy/node-http-handler", () => ({
-  NodeHttpHandler: vi.fn(function (this: { options: unknown }, options: unknown) {
+const { createdHandlers, nodeHttpHandlerMock } = vi.hoisted(() => {
+  const createdHandlers: RecordedNodeHttpHandler[] = [];
+  const nodeHttpHandlerMock = vi.fn(function (this: RecordedNodeHttpHandler, options: unknown) {
     this.options = options;
+    this.destroy = vi.fn();
+    createdHandlers.push(this);
+  });
+  return { createdHandlers, nodeHttpHandlerMock };
+});
+
+vi.mock("@smithy/node-http-handler", () => ({ NodeHttpHandler: nodeHttpHandlerMock }));
+
+const { httpsProxyAgentMock } = vi.hoisted(() => ({
+  httpsProxyAgentMock: vi.fn(function (this: { url: string }, url: string) {
+    this.url = url;
   }),
 }));
+
+vi.mock("https-proxy-agent", () => ({ HttpsProxyAgent: httpsProxyAgentMock }));
 
 /**
  * The options a handler was built with. A real `NodeHttpHandler` resolves them
@@ -38,32 +62,36 @@ function handlerOptions(handler: unknown): {
  * answer and stops looking with. The pod had a role, and we told it we had
  * keys.
  */
-// Both cases matter: the resolver reads either, so clearing only the uppercase
-// names would leak the lowercase ones into the tests that follow.
-const PROXY_ENV_KEYS = [
-  "HTTPS_PROXY",
-  "HTTP_PROXY",
-  "NO_PROXY",
-  "https_proxy",
-  "http_proxy",
-  "no_proxy",
-] as const;
+class RecordingProxyResolver extends OutboundProxyResolverPort {
+  readonly hosts: string[] = [];
 
-const originalProxyEnv = Object.fromEntries(
-  PROXY_ENV_KEYS.map((key) => [key, process.env[key]]),
-);
+  constructor(private readonly proxyForHost: (hostname: string) => string | undefined) {
+    super();
+  }
+
+  tryResolveForHost(hostname: string): string | undefined {
+    this.hosts.push(hostname);
+    return this.proxyForHost(hostname);
+  }
+}
+
+let aws: AwsClientConfiguration;
+let outboundProxy: RecordingProxyResolver;
+let proxyUrl: string | undefined;
+
+function buildAwsClientConfig(input: AwsClientConfigInput) {
+  return aws.build(input);
+}
 
 describe("buildAwsClientConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const key of PROXY_ENV_KEYS) delete process.env[key];
-  });
-
-  afterEach(() => {
-    for (const [key, value] of Object.entries(originalProxyEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    createdHandlers.length = 0;
+    proxyUrl = undefined;
+    outboundProxy = new RecordingProxyResolver(() => proxyUrl);
+    aws = AwsClientConfiguration.create({
+      outboundProxy,
+    });
   });
 
   describe("given an incomplete credential pair", () => {
@@ -244,8 +272,10 @@ describe("buildAwsClientConfig", () => {
      * partition never matches, and the two legs take opposite proxy decisions.
      */
     it("resolves the proxy against the China partition's own STS host", () => {
-      process.env.HTTPS_PROXY = "http://proxy.corp:8080";
-      process.env.NO_PROXY = ".amazonaws.com.cn";
+      outboundProxy = new RecordingProxyResolver((hostname) =>
+        hostname.endsWith(".amazonaws.com.cn") ? undefined : "http://proxy.corp:8080",
+      );
+      aws = AwsClientConfiguration.create({ outboundProxy });
 
       buildAwsClientConfig({
         region: "cn-north-1",
@@ -257,6 +287,45 @@ describe("buildAwsClientConfig", () => {
 
       const stsHandler = paramsOfLastCall().clientConfig?.requestHandler;
       expect(handlerOptions(stsHandler).httpsAgent).toBeUndefined();
+      expect(outboundProxy.hosts).toContain("sts.cn-north-1.amazonaws.com.cn");
+    });
+  });
+
+  describe("when an outbound proxy applies", () => {
+    it("resolves the target hostname and uses one agent for both protocols", () => {
+      outboundProxy = new RecordingProxyResolver(() => "http://proxy.corp:8080");
+      aws = AwsClientConfiguration.create({ outboundProxy });
+
+      const config = buildAwsClientConfig({
+        targetHost: "https://email.eu-central-1.amazonaws.com/v2/email/outbound-emails",
+      });
+
+      expect(outboundProxy.hosts).toEqual(["email.eu-central-1.amazonaws.com"]);
+      expect(httpsProxyAgentMock).toHaveBeenCalledWith("http://proxy.corp:8080");
+      expect(handlerOptions(config.requestHandler)).toMatchObject({
+        httpAgent: expect.anything(),
+        httpsAgent: expect.anything(),
+      });
+      expect(handlerOptions(config.requestHandler).httpsAgent).toBe(
+        handlerOptions(config.requestHandler).httpAgent,
+      );
+    });
+
+    it("normalizes a scheme-less endpoint before resolving its proxy", () => {
+      buildAwsClientConfig({ targetHost: "mail-relay.internal.corp:465" });
+
+      expect(outboundProxy.hosts).toEqual(["mail-relay.internal.corp"]);
+    });
+
+    it("reuses the handler and socket pool for one proxy URL", () => {
+      outboundProxy = new RecordingProxyResolver(() => "http://reused.corp:8080");
+      aws = AwsClientConfiguration.create({ outboundProxy });
+
+      const first = buildAwsClientConfig({ targetHost: "email.eu-central-1.amazonaws.com" });
+      const second = buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
+
+      expect(second.requestHandler).toBe(first.requestHandler);
+      expect(httpsProxyAgentMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -287,6 +356,36 @@ describe("buildAwsClientConfig", () => {
       });
 
       expect(first.requestHandler).toBe(second.requestHandler);
+    });
+  });
+
+  describe("when the process shuts down", () => {
+    it("creates no request handler until a client config needs one", () => {
+      expect(nodeHttpHandlerMock).not.toHaveBeenCalled();
+    });
+
+    it("closes one handler pool once, even when shutdown races with itself", async () => {
+      buildAwsClientConfig({ targetHost: "email.eu-central-1.amazonaws.com" });
+      proxyUrl = "http://proxy.corp:8080";
+      buildAwsClientConfig({ targetHost: "sqs.eu-central-1.amazonaws.com" });
+
+      const [direct, proxied] = createdHandlers;
+      if (!direct || !proxied) throw new Error("Expected direct and proxied request handlers");
+
+      const firstClose = aws.close();
+      const concurrentClose = aws.close();
+
+      expect(concurrentClose).toBe(firstClose);
+      expect(() => buildAwsClientConfig({ targetHost: "sns.eu-central-1.amazonaws.com" })).toThrow(
+        "AwsClientConfiguration is closed",
+      );
+
+      await firstClose;
+      await concurrentClose;
+
+      expect(direct.destroy).toHaveBeenCalledTimes(1);
+      expect(proxied.destroy).toHaveBeenCalledTimes(1);
+      expect(nodeHttpHandlerMock).toHaveBeenCalledTimes(2);
     });
   });
 });

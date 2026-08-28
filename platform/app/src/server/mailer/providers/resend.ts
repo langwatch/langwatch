@@ -1,7 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import { env } from "../../../env.mjs";
-import { hostnameOf, resolveProxyForHost } from "../../outboundProxy";
+import {
+  getProcessOutboundProxyConfig,
+  hostnameOf,
+  resolveProxyForHost,
+} from "../../outboundProxy";
 import { sanitizeHeaders } from "./mime";
 import {
   type EmailContent,
@@ -18,8 +22,8 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * undici honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY itself once given this
- * dispatcher, so we only need to decide whether a proxy applies at all.
+ * The dispatcher receives the parsed process configuration explicitly, so it
+ * cannot observe a later environment mutation.
  *
  * The agent owns a connection pool and is created once: building one per send
  * would accumulate pools and file descriptors under a burst of alerts.
@@ -27,8 +31,13 @@ const REQUEST_TIMEOUT_MS = 30_000;
 let sharedDispatcher: EnvHttpProxyAgent | undefined;
 
 const proxyDispatcher = (): EnvHttpProxyAgent | undefined => {
-  if (!resolveProxyForHost(hostnameOf(RESEND_API_URL))) return undefined;
-  sharedDispatcher ??= new EnvHttpProxyAgent();
+  const proxyConfig = getProcessOutboundProxyConfig();
+  if (!resolveProxyForHost(proxyConfig, hostnameOf(RESEND_API_URL))) return undefined;
+  sharedDispatcher ??= new EnvHttpProxyAgent({
+    httpProxy: proxyConfig.httpProxy ?? "",
+    httpsProxy: proxyConfig.httpsProxy ?? "",
+    noProxy: proxyConfig.noProxy ?? "",
+  });
   return sharedDispatcher;
 };
 

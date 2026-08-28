@@ -487,6 +487,28 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/aws-client:
+    dependencies:
+      '@aws-sdk/credential-providers':
+        specifier: ^3.1080.0
+        version: 3.1108.0
+      '@smithy/node-http-handler':
+        specifier: ^4.9.11
+        version: 4.9.12
+      https-proxy-agent:
+        specifier: ^9.1.0
+        version: 9.1.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/clickhouse-client:
     devDependencies:
       typescript:
@@ -4826,12 +4848,6 @@ importers:
       '@aws-sdk/client-sqs':
         specifier: ^3.1080.0
         version: 3.1108.0
-      '@aws-sdk/client-sts':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/credential-providers':
-        specifier: ^3.1080.0
-        version: 3.1108.0
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1080.0
         version: 3.1108.0
@@ -4919,6 +4935,9 @@ importers:
       '@langwatch/automation-web':
         specifier: workspace:*
         version: link:../../packages/features/automation/web
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../packages/aws-client
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../packages/clickhouse-client
@@ -5393,9 +5412,6 @@ importers:
       '@slack/webhook':
         specifier: ^7.1.0
         version: 7.1.0
-      '@smithy/node-http-handler':
-        specifier: ^4.9.11
-        version: 4.9.12
       '@standard-community/standard-json':
         specifier: ^0.3.5
         version: 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
@@ -5462,9 +5478,6 @@ importers:
       hono-openapi:
         specifier: ^1.3.1
         version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
-      https-proxy-agent:
-        specifier: ^9.1.0
-        version: 9.1.0
       import-in-the-middle:
         specifier: 3.3.3
         version: 3.3.3

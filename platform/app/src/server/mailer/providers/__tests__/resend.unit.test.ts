@@ -22,6 +22,7 @@ vi.mock("undici", () => ({
 
 import { resendProvider } from "../resend";
 import { EmailProviderConfigurationError } from "../types";
+import { configureProcessOutboundProxy, parseOutboundProxyConfig } from "~/server/outboundProxy";
 
 const setEnv = (values: Record<string, unknown>) => {
   for (const key of Object.keys(mockEnv)) delete mockEnv[key];
@@ -37,9 +38,7 @@ const PROXY_ENV_KEYS = [
   "no_proxy",
 ] as const;
 
-const originalProxyEnv = Object.fromEntries(
-  PROXY_ENV_KEYS.map((key) => [key, process.env[key]]),
-);
+const originalProxyEnv = Object.fromEntries(PROXY_ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const clearProxyEnv = () => {
   for (const key of PROXY_ENV_KEYS) delete process.env[key];
@@ -52,6 +51,7 @@ describe("resendProvider.send", () => {
   beforeEach(() => {
     setEnv({ RESEND_API_KEY: "re_test_key" });
     clearProxyEnv();
+    configureProcessOutboundProxy(parseOutboundProxyConfig(process.env));
     vi.clearAllMocks();
     fetchMock.mockResolvedValue({
       ok: true,
@@ -181,6 +181,7 @@ describe("resendProvider.send", () => {
     /** @scenario "Email egress follows the configured outbound proxy" */
     it("routes the request through a proxy dispatcher", async () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
+      configureProcessOutboundProxy(parseOutboundProxyConfig(process.env));
 
       await resendProvider.send({
         content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
@@ -188,6 +189,11 @@ describe("resendProvider.send", () => {
       });
 
       expect(envHttpProxyAgentMock).toHaveBeenCalled();
+      expect(envHttpProxyAgentMock).toHaveBeenCalledWith({
+        httpProxy: "",
+        httpsProxy: "http://proxy.corp:8080",
+        noProxy: "",
+      });
       expect(sentInit().dispatcher).toBeDefined();
     });
 
@@ -195,6 +201,7 @@ describe("resendProvider.send", () => {
     it("goes direct when the API host is excluded from proxying", async () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "api.resend.com";
+      configureProcessOutboundProxy(parseOutboundProxyConfig(process.env));
 
       await resendProvider.send({
         content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },

@@ -4,7 +4,7 @@ import {
   SendMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { buildAwsClientConfig } from "~/server/aws/awsClientConfig";
+import { buildAwsClientConfig } from "~/runtime/app/aws-client.composition";
 import { assertDispatchBudget } from "../dispatchBudget";
 import { WEBHOOK_DELIVERY_ID_HEADER } from "../sendWebhook";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../signature";

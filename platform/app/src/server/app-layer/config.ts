@@ -1,4 +1,5 @@
 import { getEnvironmentConfig } from "../../env.mjs";
+import { parseOutboundProxyConfig, type OutboundProxyConfig } from "../outboundProxy";
 import { Config, RuntimeConfig, type ConfigValue } from "@langwatch/config";
 import {
   resolveNlpLambdaRuntimeConfig,
@@ -130,6 +131,8 @@ export interface AppConfig {
   redisDbIndex?: string;
   /** Validated policy supplied to Group Queue at process composition. */
   groupQueue: GroupQueueProcessConfig;
+  /** Parsed once at boot and injected into outbound transport composition. */
+  outboundProxy: OutboundProxyConfig;
 
   // Services
   langevalsEndpoint?: string;
@@ -239,6 +242,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     redisDbIndex: env.REDIS_DB_INDEX,
     groupQueue,
+    outboundProxy: parseOutboundProxyConfig(process.env),
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     scenarioExecution: {
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
