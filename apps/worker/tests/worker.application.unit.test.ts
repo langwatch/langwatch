@@ -10,6 +10,9 @@ import {
   WorkerLifecyclePort,
   WorkerTransportPort,
 } from "../src/platform/lifecycle/worker-runtime.port";
+import { WorkerEventingRuntime } from "../src/platform/eventing/worker-eventing.runtime";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 
 class Handle extends WorkerHandlePort {
   readonly shutdown = vi.fn(async (): Promise<void> => void 0);
@@ -32,6 +35,30 @@ class FeatureInstaller extends WorkerFeatureInstallerPort {
   readonly name = "topic";
   readonly handle = new FeatureHandle();
   readonly install = vi.fn(async () => this.handle);
+}
+
+class EventingQueue implements EventSourcedQueueProcessor<Record<string, unknown>> {
+  constructor(private readonly phases: string[]) {}
+
+  async send(): Promise<void> {}
+
+  async sendBatch(): Promise<void> {}
+
+  async waitUntilReady(): Promise<void> {}
+
+  async close(): Promise<void> {
+    this.phases.push("eventing");
+  }
+}
+
+function createEventing(phases: string[]): WorkerEventingRuntime {
+  return WorkerEventingRuntime.create({
+    eventStore: new EventStoreMemory(),
+    queueFactory: () => new EventingQueue(phases),
+    processStore: new InMemoryProcessStore(),
+    executionTarget: "worker",
+    consumersEnabled: false,
+  });
 }
 
 describe("WorkerApplication", () => {
@@ -102,5 +129,68 @@ describe("WorkerApplication", () => {
     await expect(application.close()).rejects.toThrow("second cleanup failed");
 
     expect(first.handle.close).toHaveBeenCalledOnce();
+  });
+
+  it("drains Eventing before releasing feature and runtime infrastructure", async () => {
+    const phases: string[] = [];
+    const feature = new FeatureInstaller();
+    feature.handle.close.mockImplementation(async () => {
+      phases.push("feature");
+    });
+    const lifecycle = new Lifecycle();
+    lifecycle.close.mockImplementation(async () => {
+      phases.push("lifecycle");
+    });
+    const transport = new Transport();
+    transport.handle.shutdown.mockImplementation(async () => {
+      phases.push("transport");
+    });
+    const application = WorkerApplication.create({
+      runtime: WorkerRuntime.create({ lifecycle, transport }),
+      eventing: createEventing(phases),
+      featureInstallers: [feature],
+    });
+
+    await application.start();
+    await application.close();
+
+    expect(phases).toEqual(["eventing", "feature", "transport", "lifecycle"]);
+  });
+
+  it("retains the first teardown error while completing later cleanup", async () => {
+    const eventingError = new Error("eventing drain failed");
+    const phases: string[] = [];
+    const feature = new FeatureInstaller();
+    feature.handle.close.mockImplementation(async () => {
+      phases.push("feature");
+      throw new Error("feature close failed");
+    });
+    const lifecycle = new Lifecycle();
+    lifecycle.close.mockImplementation(async () => {
+      phases.push("lifecycle");
+      throw new Error("lifecycle close failed");
+    });
+    const queue = new EventingQueue(phases);
+    queue.close = async () => {
+      phases.push("eventing");
+      throw eventingError;
+    };
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: new EventStoreMemory(),
+      queueFactory: () => queue,
+      processStore: new InMemoryProcessStore(),
+      executionTarget: "worker",
+      consumersEnabled: false,
+    });
+    const application = WorkerApplication.create({
+      runtime: WorkerRuntime.create({ lifecycle, transport: new Transport() }),
+      eventing,
+      featureInstallers: [feature],
+    });
+
+    await application.start();
+
+    await expect(application.close()).rejects.toBe(eventingError);
+    expect(phases).toEqual(["eventing", "feature", "lifecycle"]);
   });
 });

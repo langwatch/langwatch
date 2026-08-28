@@ -72,29 +72,26 @@ export class WorkerApplication {
   private async closeApplication(): Promise<void> {
     await this.starting?.catch(() => void 0);
 
-    let runtimeError: unknown;
+    let firstError: unknown;
     try {
-      await this.runtime.close();
+      // The Eventing runtime owns the shared queue consumer. Its close path
+      // first stops process work and drains the queue before the registry is
+      // released. Infrastructure must remain available for that drain.
+      await this.eventing?.close();
     } catch (error) {
-      runtimeError = error;
+      firstError = error;
     }
 
     const featureError = await this.closeFeatureHandlesBestEffort();
-    let eventingError: unknown;
+    firstError ??= featureError;
+
     try {
-      await this.eventing?.close();
+      await this.runtime.close();
     } catch (error) {
-      eventingError = error;
+      firstError ??= error;
     }
-    if (runtimeError) {
-      throw runtimeError;
-    }
-    if (featureError) {
-      throw featureError;
-    }
-    if (eventingError) {
-      throw eventingError;
-    }
+
+    if (firstError) throw firstError;
   }
 
   private async closeFeatureHandlesBestEffort(): Promise<unknown> {

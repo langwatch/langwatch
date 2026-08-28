@@ -21,6 +21,11 @@ Topic-only registry would reject every other pipeline's job for retry. It also
 does not mount the Trace `assignTopic` consumer, whose projections still live
 in the complete Trace processing pipeline.
 
+On shutdown, the worker drains and closes its Eventing runtime before releasing
+feature handles, worker transports, process infrastructure, or observability.
+That order is required before consumer activation: queued handlers retain their
+stores and diagnostics throughout the drain, while observability remains last.
+
 The physical `platform/app/src/workers.ts` executable therefore still selects
 `createLegacyWorkerPorts()` and `startWorkers()`: it registers the complete
 Eventing graph and owns unrelated worker jobs. The executable can switch only
