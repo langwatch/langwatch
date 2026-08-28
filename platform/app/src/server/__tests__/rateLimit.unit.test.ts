@@ -1,8 +1,18 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { tryGetAppMock } = vi.hoisted(() => ({
+  tryGetAppMock: vi.fn(),
+}));
+
+vi.mock("../app-layer/app", () => ({ tryGetApp: tryGetAppMock }));
+
 import { _resetMemoryRateLimitStore, rateLimit } from "../rateLimit";
 
 describe("rateLimit (in-memory fallback)", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
+    tryGetAppMock.mockReset();
+    tryGetAppMock.mockReturnValue(undefined);
     _resetMemoryRateLimitStore();
   });
 
@@ -124,6 +134,48 @@ describe("rateLimit (in-memory fallback)", () => {
       const { _getMemoryStoreSize } = await import("../rateLimit");
       const size = _getMemoryStoreSize();
       expect(size).toBeLessThan(1100);
+    });
+  });
+
+  describe("when Redis is available but a command fails", () => {
+    it.each([
+      "incr",
+      "expire",
+      "ttl",
+    ] as const)("falls through to the in-memory limiter after %s rejects", async (failingCommand) => {
+      vi.spyOn(Date, "now").mockReturnValue(1_000);
+      const incr = vi.fn().mockResolvedValue(1);
+      const expire = vi.fn().mockResolvedValue(1);
+      const ttl = vi.fn().mockResolvedValue(60);
+
+      if (failingCommand === "incr") {
+        incr.mockRejectedValue(new Error("redis incr unavailable"));
+      } else if (failingCommand === "expire") {
+        expire.mockRejectedValue(new Error("redis expire unavailable"));
+      } else {
+        ttl.mockRejectedValue(new Error("redis ttl unavailable"));
+      }
+
+      tryGetAppMock.mockReturnValue({ redis: { incr, expire, ttl } });
+      const options = {
+        key: `redis-failure:${failingCommand}`,
+        windowSeconds: 60,
+        max: 1,
+      };
+
+      const first = await rateLimit(options);
+      const second = await rateLimit(options);
+
+      expect(first).toEqual({
+        allowed: true,
+        remaining: 0,
+        resetAt: 61_000,
+      });
+      expect(second).toEqual({
+        allowed: false,
+        remaining: 0,
+        resetAt: 61_000,
+      });
     });
   });
 });

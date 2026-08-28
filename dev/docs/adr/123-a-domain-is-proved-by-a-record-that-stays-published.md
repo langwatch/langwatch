@@ -270,10 +270,15 @@ from the worker, not from a request. A deployment whose email provider is
 configured only for the web role will log a warn per administrator and carry
 on.
 
-**One migration**, `20260825070000_sso_connection_lapsed_domains`: adds
-`SsoConnection.lapsedDomains TEXT[]` and a GIN index on it. Additive, no
-backfill, no lock of consequence on a table this size. Safe to deploy ahead of
-the code — the column is simply unread until the projection writes it.
+**Two additive migrations.**
+`20260827120014_sso_connection_last_reproof_at` adds the separate operational
+cursor table used to revisit connections round-robin without giving the
+event projection a second writer.
+`20260827120017_sso_connection_lapsed_domains` adds
+`SsoConnection.lapsedDomains TEXT[]` and a GIN index on it. Neither needs a
+backfill or takes a lock of consequence on a table this size. Both are safe to
+deploy ahead of the code — the cursor stays empty and the column stays unread
+until the worker and projection use them.
 
 **Rollback** is deploying the previous image. The events remain in the log and
 fold to the same projection minus the new fields; the column stays and stops

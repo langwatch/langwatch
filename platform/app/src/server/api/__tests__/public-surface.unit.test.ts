@@ -22,9 +22,10 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // be a protectedProcedure without breaking sign-in itself. Each carries a
   // .noPermission reason at its definition and its own per-IP rate limit.
   //
-  // `route` is a mutation rather than a query on purpose: a per-address
-  // query cache is an account-existence oracle built out of network timing.
-  // It reads no user data — org-level routing only.
+  // `route` deliberately reads account existence and credential KINDS so it
+  // can send an unknown address to sign-up and offer a known account only the
+  // methods it holds. It reads no credential secret and spends both a direct-
+  // peer budget and a canonical per-address budget.
   //
   // `inviteLanding` is the only one that returns anything tenant-shaped (an
   // organization name and the inviter's name). The invite code IS the

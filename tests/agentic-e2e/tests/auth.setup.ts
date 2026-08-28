@@ -29,47 +29,50 @@ const TEST_USER = {
 
 setup("authenticate", async ({ page, request }) => {
   // Step 1: Try to register the test user (may already exist)
-  try {
-    const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
-      data: {
-        "0": {
-          json: {
-            name: TEST_USER.name,
-            email: TEST_USER.email,
-            password: TEST_USER.password,
-          },
+  const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
+    data: {
+      "0": {
+        json: {
+          name: TEST_USER.name,
+          email: TEST_USER.email,
+          password: TEST_USER.password,
         },
       },
-    });
+    },
+  });
+  const registerBody = await registerResponse.text();
+  const userAlreadyExists =
+    registerResponse.status() === 409 &&
+    /"code"\s*:\s*"email_already_registered"/.test(registerBody);
 
-    // 200 = created, other statuses may mean user already exists
-    if (registerResponse.ok()) {
-      console.log("Test user created successfully");
-    } else {
-      const body = await registerResponse.text();
-      if (body.includes("User already exists")) {
-        console.log("Test user already exists, proceeding with sign in");
-      } else {
-        console.log("Registration response:", registerResponse.status(), body);
-      }
-    }
-  } catch (error) {
-    // User might already exist from previous runs
-    console.log("Registration skipped (user may already exist):", error);
+  if (registerResponse.ok()) {
+    console.log("Test user created successfully");
+  } else if (userAlreadyExists) {
+    console.log("Test user already exists, proceeding with log in");
+  } else {
+    throw new Error(
+      `Test user registration failed (${registerResponse.status()}): ${registerBody.slice(0, 500)}`,
+    );
   }
 
-  // Step 2: Sign in through the UI (callbackUrl ensures redirect to app root after sign-in)
+  // Step 2: Log in through the identifier-first UI. callbackUrl ensures the
+  // successful credential ceremony redirects to the app root.
   await page.goto("/auth/signin?callbackUrl=%2F");
 
-  // Wait for the sign in form to be ready
-  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Log in to LangWatch", exact: true }),
+  ).toBeVisible();
 
-  // Fill in credentials - use label-based locators with fallback
-  await page.getByLabel(/email/i).fill(TEST_USER.email);
-  await page.getByLabel(/password/i).fill(TEST_USER.password);
+  await page.getByLabel("Email", { exact: true }).fill(TEST_USER.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  // Submit the form
-  await page.getByRole("button", { name: /sign in/i }).click();
+  // A registered password account routes to its credential step. Waiting for
+  // that step also proves the router resolved the seeded user before auth.
+  const passwordField = page.getByLabel("Password", { exact: true });
+  await expect(passwordField).toBeVisible();
+  await expect(page.getByTestId("routed-identifier")).toContainText(TEST_USER.email);
+  await passwordField.fill(TEST_USER.password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
 
   // Wait for successful authentication - should redirect away from signin
   await expect(page).not.toHaveURL(/\/auth\/signin/);

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { z } from "zod";
 import {
   signInRouter,
@@ -18,7 +20,7 @@ import {
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
-import { getClientIp } from "~/utils/getClientIp";
+import { getDirectPeerIp } from "~/utils/getClientIp";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 /**
@@ -45,6 +47,12 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
  */
 function secondsUntil(resetAt: number): number {
   return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+}
+
+function addressBudgetId(identifier: string): string {
+  return createHash("sha256")
+    .update(normalizeIdentifierValue(identifier))
+    .digest("hex");
 }
 
 export const authRouter = createTRPCRouter({
@@ -79,10 +87,10 @@ export const authRouter = createTRPCRouter({
     )
     .noPermission({
       reason:
-        "answers where a signed-out visitor should sign in; org-level routing only, and the engine reads no user data at all",
+        "reads whether an account exists and which credential kinds it holds so a signed-out visitor can be routed; reads no credential secrets and is deliberately address-throttled",
     })
     .mutation(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       // 200 an hour was a generous budget for a routing question nobody could
       // learn anything from. This one answers whether an address has an
       // account, so the budget is sized for a PERSON signing in — a handful of
@@ -91,7 +99,7 @@ export const authRouter = createTRPCRouter({
       // than anybody signing in has ever needed, and it turns enumerating a
       // user base into a job measured in months per address block.
       const limit = await rateLimit({
-        key: `auth.route:${ip}`,
+        key: `auth.route:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 60,
       });
@@ -101,10 +109,32 @@ export const authRouter = createTRPCRouter({
         });
       }
 
-      return signInRouter().route({
+      if (input.identifier !== null) {
+        const addressLimit = await rateLimit({
+          key: `auth.route:address:${addressBudgetId(input.identifier)}`,
+          windowSeconds: 60 * 60,
+          max: 5,
+        });
+        if (!addressLimit.allowed) {
+          throw new AuthRateLimitedError({
+            retryAfterSeconds: secondsUntil(addressLimit.resetAt),
+          });
+        }
+      }
+
+      const decision = await signInRouter().route({
         identifier: input.identifier,
         breakGlass: input.breakGlass ?? false,
       });
+
+      // `methodSet[0]` already carries the provider id the screen dials. The
+      // service keeps its connection id for its recorder, but the public wire
+      // response has no second, redundant connection identifier to reconcile.
+      return {
+        outcome: decision.outcome,
+        methodSet: decision.methodSet,
+        reasonCode: decision.reasonCode,
+      };
     }),
 
   /**
@@ -134,9 +164,9 @@ export const authRouter = createTRPCRouter({
         "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
     })
     .mutation(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `auth.requestSignUpVerification:${ip}`,
+        key: `auth.requestSignUpVerification:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 20,
       });
@@ -256,9 +286,9 @@ export const authRouter = createTRPCRouter({
         "spends a signed-out visitor's own emailed confirmation token; the token is the authorization",
     })
     .mutation(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `auth.completeSignUpVerification:${ip}`,
+        key: `auth.completeSignUpVerification:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 60,
       });
@@ -289,9 +319,9 @@ export const authRouter = createTRPCRouter({
         "reads the invitation the caller holds the code for; the code is the authorization, and the answer names no person and no address",
     })
     .query(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `auth.inviteLanding:${ip}`,
+        key: `auth.inviteLanding:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 60,
       });
@@ -351,9 +381,9 @@ export const authRouter = createTRPCRouter({
         "asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP",
     })
     .mutation(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `auth.requestFreshInvite:${ip}`,
+        key: `auth.requestFreshInvite:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 20,
       });

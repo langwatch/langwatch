@@ -257,14 +257,6 @@ async function recorded({
   targetId?: string;
 }): Promise<RecordedOperator> {
   const user = ctx.session.user.impersonator ?? ctx.session.user;
-  // THE GATE FIRST. A refused stranger has not looked anybody up, so there is
-  // nothing about them to record — and writing the row before the check made
-  // this an unauthenticated-by-permission writer into `AuditLog`: any signed-
-  // in customer could call `identityLookup.resolve` in a loop and fill the
-  // operator's own activity panel with strings they chose, since
-  // `findRecentOperatorActivity` reads those rows straight back by prefix.
-  // The sibling `scimOversight` recorder already does it in this order.
-  if (!checkIsAdmin(user)) throw adminSurfaceHidden();
   await auditLog({
     userId: user.id,
     action: `identityLookup.${action}`,
@@ -272,6 +264,11 @@ async function recorded({
     targetKind: "identityLookup",
     targetId,
   });
+  // THE RECORD FIRST. This cross-organization lookup is itself the act, and
+  // the refused attempt is the one the trail most needs to keep. The gate
+  // still runs before any identity service read, so the caller learns
+  // nothing about the address or even that this surface exists.
+  if (!checkIsAdmin(user)) throw adminSurfaceHidden();
   // Looking and repairing are one grant today. They are two fields because
   // they are two questions, and the surface asks the second one before it
   // renders a control rather than after somebody presses it.

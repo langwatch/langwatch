@@ -40,7 +40,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 vi.mock("~/utils/getClientIp", () => ({
-  getClientIp: vi.fn(() => "127.0.0.1"),
+  getDirectPeerIp: vi.fn(() => "127.0.0.1"),
 }));
 
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
@@ -48,6 +48,9 @@ const { resolveAuthProviderMock } = vi.hoisted(() => ({
 }));
 const { requestVerificationMock } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
+}));
+const { attachCredentialIdentifierMock } = vi.hoisted(() => ({
+  attachCredentialIdentifierMock: vi.fn(),
 }));
 
 // The account-creating call is what sends the confirmation link, so the
@@ -57,6 +60,9 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("~/server/app-layer/identity/runtime")
   >()),
+  signUpIdentifier: () => ({
+    attachCredentialIdentifier: attachCredentialIdentifierMock,
+  }),
   signUpVerification: () => ({
     claimAddressProof: vi.fn().mockResolvedValue(null),
     markAddressConfirmed: vi.fn().mockResolvedValue(undefined),
@@ -90,10 +96,14 @@ describe("userRouter.register()", () => {
     userCreateMock = vi
       .fn()
       .mockResolvedValue({ id: "user-1", name: "Alice", email: "a@x.com" });
-    accountCreateMock = vi.fn().mockResolvedValue(undefined);
+    accountCreateMock = vi.fn().mockResolvedValue({
+      id: "account-1",
+      createdAt: new Date("2026-08-28T00:00:00.000Z"),
+    });
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
+    attachCredentialIdentifierMock.mockResolvedValue(undefined);
     requestVerificationMock.mockResolvedValue(undefined);
   });
 
@@ -129,6 +139,12 @@ describe("userRouter.register()", () => {
         userId: "user-1",
         event: "signed_up",
       });
+      expect(attachCredentialIdentifierMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        email: "a@x.com",
+        accountId: "account-1",
+        occurredAtMs: new Date("2026-08-28T00:00:00.000Z").getTime(),
+      });
     });
   });
 
@@ -139,7 +155,7 @@ describe("userRouter.register()", () => {
      * the customer is locked out with "User already exists" forever.
      */
     /** @scenario "A capitalised email creates an account sign-in can find" */
-    it("stores the lowercased address", async () => {
+    it("stores the canonically normalized address", async () => {
       await createCaller().register({
         name: "Joel",
         email: "Joel.During@example.com",
@@ -148,6 +164,12 @@ describe("userRouter.register()", () => {
 
       expect(userCreateMock).toHaveBeenCalledWith({
         data: { name: "Joel", email: "joel.during@example.com" },
+      });
+      expect(attachCredentialIdentifierMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        email: "joel.during@example.com",
+        accountId: "account-1",
+        occurredAtMs: new Date("2026-08-28T00:00:00.000Z").getTime(),
       });
     });
 

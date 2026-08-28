@@ -149,8 +149,12 @@ describe("the legacy sso string columns", () => {
         join(REPO_ROOT, "platform/app/src"),
         join(REPO_ROOT, "platform/app/ee"),
       ];
+      // The fold writes inside a Prisma transaction (`tx.ssoConnection`),
+      // while an accidental second writer commonly holds the root client
+      // (`this.prisma.ssoConnection`). Match both receivers so the expected
+      // writer is proved present as well as every extra writer being refused.
       const writes =
-        /prisma\s*\.\s*ssoConnection\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)/;
+        /(?:prisma|tx)\s*\.\s*ssoConnection\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)/;
       const offenders: string[] = [];
       for (const root of roots) {
         for (const entry of readdirSync(root, { recursive: true })) {

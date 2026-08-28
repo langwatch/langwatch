@@ -311,13 +311,56 @@ export class DnsDomainProofLookup implements SsoDomainProofLookup {
  * is the platform's, and `SsoConnection` is exempt from the organization
  * guard on precisely that ground.
  */
+interface SsoDomainReproofPrisma {
+  ssoConnection: {
+    findMany(args: {
+      where: {
+        state: { in: ["VERIFIED", "ACTIVE"] };
+        NOT: { verifiedDomains: { isEmpty: true } };
+        reproofCursor: { is: null } | { isNot: null };
+      };
+      select: {
+        id: true;
+        organizationId: true;
+        verifiedDomains: true;
+        domainVerifications: true;
+      };
+      orderBy:
+        | { id: "asc" }
+        | [{ reproofCursor: { lastReproofAt: "asc" } }, { id: "asc" }];
+      take: number;
+    }): Promise<
+      {
+        id: string;
+        organizationId: string;
+        verifiedDomains: string[];
+        domainVerifications: unknown;
+      }[]
+    >;
+  };
+  ssoConnectionReproofCursor: {
+    createMany(args: {
+      data: { connectionId: string; lastReproofAt: Date }[];
+      skipDuplicates: true;
+    }): Promise<unknown>;
+    updateMany(args: {
+      where: {
+        connectionId: { in: string[] };
+        lastReproofAt: { lt: Date };
+      };
+      data: { lastReproofAt: Date };
+    }): Promise<unknown>;
+  };
+}
+
 export class PrismaSsoDomainReproofTargets
   implements SsoDomainReproofTargetRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: SsoDomainReproofPrisma) {}
 
-  /** The look is its own fact — see the port's note on why the sweep cannot
-   *  order by anything the re-read writes. */
+  /** The look is operational scheduling state, separate from the event-truth
+   *  connection head — see the port's note on why it cannot order by anything
+   *  the re-read writes. */
   async markSwept({
     connectionIds,
     atMs,
@@ -326,9 +369,18 @@ export class PrismaSsoDomainReproofTargets
     atMs: number;
   }): Promise<void> {
     if (connectionIds.length === 0) return;
-    await this.prisma.ssoConnection.updateMany({
-      where: { id: { in: [...connectionIds] } },
-      data: { lastReproofAt: new Date(atMs) },
+    const lastReproofAt = new Date(atMs);
+    const ids = [...new Set(connectionIds)];
+    await this.prisma.ssoConnectionReproofCursor.createMany({
+      data: ids.map((connectionId) => ({ connectionId, lastReproofAt })),
+      skipDuplicates: true,
+    });
+    await this.prisma.ssoConnectionReproofCursor.updateMany({
+      where: {
+        connectionId: { in: ids },
+        lastReproofAt: { lt: lastReproofAt },
+      },
+      data: { lastReproofAt },
     });
   }
 
@@ -337,10 +389,11 @@ export class PrismaSsoDomainReproofTargets
   }: {
     limit: number;
   }): Promise<SsoDomainReproofTarget[]> {
-    const rows = await this.prisma.ssoConnection.findMany({
+    const unswept = await this.prisma.ssoConnection.findMany({
       where: {
         state: { in: ["VERIFIED", "ACTIVE"] },
         NOT: { verifiedDomains: { isEmpty: true } },
+        reproofCursor: { is: null },
       },
       select: {
         id: true,
@@ -348,17 +401,40 @@ export class PrismaSsoDomainReproofTargets
         verifiedDomains: true,
         domainVerifications: true,
       },
-      // THE LOOK, NOT THE WRITE. `updatedAt` does not move on a healthy
-      // re-read (no facts are emitted), so ordering by it re-read the same
-      // prefix every cycle — and a domain that started wavering DID bump it,
-      // sorting the one domain in its grace window out of the batch and
-      // leaving it never to lapse. `lastReproofAt` is stamped on every
-      // target the sweep takes, whatever it finds, so coverage is genuinely
-      // round-robin. Null sorts first, so a connection never looked at is
-      // looked at soonest.
-      orderBy: [{ lastReproofAt: { sort: "asc", nulls: "first" } }],
+      orderBy: { id: "asc" },
       take: limit,
     });
+    const remaining = limit - unswept.length;
+    const swept =
+      remaining === 0
+        ? []
+        : await this.prisma.ssoConnection.findMany({
+            where: {
+              state: { in: ["VERIFIED", "ACTIVE"] },
+              NOT: { verifiedDomains: { isEmpty: true } },
+              reproofCursor: { isNot: null },
+            },
+            select: {
+              id: true,
+              organizationId: true,
+              verifiedDomains: true,
+              domainVerifications: true,
+            },
+            // THE LOOK, NOT THE WRITE. `updatedAt` does not move on a
+            // healthy re-read (no facts are emitted), so ordering by it
+            // re-read the same prefix every cycle — and a domain that
+            // started wavering DID bump it, sorting the one domain in its
+            // grace window out of the batch and leaving it never to lapse.
+            // The separate cursor is stamped for every target the sweep
+            // takes, whatever it finds, so coverage is genuinely round-robin
+            // without giving the event projection a second writer.
+            orderBy: [
+              { reproofCursor: { lastReproofAt: "asc" } },
+              { id: "asc" },
+            ],
+            take: remaining,
+          });
+    const rows = [...unswept, ...swept];
     return rows.flatMap((row) => {
       const proofs = Array.isArray(row.domainVerifications)
         ? (row.domainVerifications as unknown as SsoDomainVerification[])

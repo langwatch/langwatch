@@ -9,6 +9,9 @@
  * requests where procedure names are comma-separated in the path.
  */
 
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { createLogger } from "@langwatch/observability";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -16,6 +19,11 @@ import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { getServerAuthSession } from "~/server/auth";
+import type { NextApiRequest } from "~/types/next-stubs";
+
+type NodeServerEnv = {
+  Bindings: { incoming?: IncomingMessage };
+};
 
 const logger = createLogger("langwatch:trpc");
 
@@ -75,17 +83,21 @@ async function getAppRouter() {
   return _appRouter;
 }
 
-const secured = createServiceApp({ basePath: "/api" });
+const secured = createServiceApp<NodeServerEnv>({ basePath: "/api" });
 
 /**
  * Build a minimal NextApiRequest-shaped shim from a web Request.
  *
  * Several tRPC middlewares (auditLog, loggerMiddleware) read
  * `ctx.req.headers[...]` and `ctx.req.socket.remoteAddress`. We expose
- * just enough surface area for those consumers to work without pulling in
- * a real Node IncomingMessage.
+ * that surface on the Node incoming request, or a real in-memory
+ * `IncomingMessage` when a non-Node adapter did not supply one.
  */
-function buildReqShim(req: Request): any {
+export function buildReqShim(
+  req: Request,
+  directPeerAddress: string | undefined,
+  incoming = new IncomingMessage(new Socket()),
+): NextApiRequest {
   const url = new URL(req.url);
 
   // Convert web Headers to the Node-style { [key]: string | string[] } map
@@ -101,13 +113,37 @@ function buildReqShim(req: Request): any {
     }
   });
 
-  return {
-    headers,
-    method: req.method,
-    url: url.pathname + url.search,
+  incoming.headers = headers;
+  incoming.method = req.method;
+  incoming.url = url.pathname + url.search;
+  if (directPeerAddress !== undefined) {
+    Object.defineProperty(incoming.socket, "remoteAddress", {
+      configurable: true,
+      value: directPeerAddress,
+    });
+  }
+
+  return Object.assign(incoming, {
     query: Object.fromEntries(url.searchParams),
-    socket: { remoteAddress: undefined },
-  } as any;
+    cookies: {},
+    env: {},
+  });
+}
+
+/**
+ * Reads the direct Node socket peer exposed by Hono's Node adapter.
+ *
+ * `app.request()` and non-Node adapters do not populate `c.env.incoming`, so
+ * absence is an expected answer rather than a request failure.
+ */
+export function directPeerAddressOf(
+  c: Context<NodeServerEnv>,
+): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -118,7 +154,9 @@ function buildReqShim(req: Request): any {
  * Batched requests use comma-separated names (e.g. "foo,bar") which the
  * tRPC client sends as a single path segment, so the same pattern works.
  */
-const handler = async (c: Context) => {
+const handler = async (c: Context<NodeServerEnv>) => {
+  const directPeerAddress = directPeerAddressOf(c);
+
   // tRPC's fetch adapter serializes procedure-level errors into a JSON error
   // body itself. But an exception that escapes the adapter entirely — a throw
   // in `createContext`, or a synchronous throw like the ClickHouse "client not
@@ -133,7 +171,7 @@ const handler = async (c: Context) => {
       req: c.req.raw,
       router: await getAppRouter(),
       createContext: async ({ req }: FetchCreateContextFnOptions) => {
-        const reqShim = buildReqShim(req);
+        const reqShim = buildReqShim(req, directPeerAddress, c.env.incoming);
 
         const session = await getServerAuthSession({
           req: req as unknown as Parameters<

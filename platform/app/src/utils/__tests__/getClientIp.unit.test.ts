@@ -18,7 +18,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getConnInfo } = vi.hoisted(() => ({ getConnInfo: vi.fn() }));
 vi.mock("@hono/node-server/conninfo", () => ({ getConnInfo }));
 
-import { getClientIp, getClientIpFromHonoContext } from "../getClientIp";
+import {
+  getClientIp,
+  getClientIpFromHonoContext,
+  getDirectPeerIp,
+} from "../getClientIp";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,6 +76,27 @@ describe("getClientIp()", () => {
     it("returns undefined", () => {
       expect(getClientIp(undefined)).toBeUndefined();
     });
+  });
+});
+
+describe("getDirectPeerIp()", () => {
+  /** @scenario Public auth limits ignore caller-controlled forwarding headers */
+  it("uses the socket peer even when a forwarding header disagrees", () => {
+    const req = {
+      headers: { "x-forwarded-for": "198.51.100.77" },
+      socket: { remoteAddress: "203.0.113.9" },
+    };
+
+    expect(getDirectPeerIp(req)).toBe("203.0.113.9");
+  });
+
+  it("accepts compressed IPv6 socket addresses", () => {
+    const req = {
+      headers: {},
+      socket: { remoteAddress: "::1" },
+    };
+
+    expect(getDirectPeerIp(req)).toBe("::1");
   });
 });
 

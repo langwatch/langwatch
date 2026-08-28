@@ -358,7 +358,7 @@ behind that identity provider.
 
 ## Deployment Impact
 
-- **Migration:** `20260825060000_sso_idp_termination` adds two tables,
+- **Migration:** `20260827120016_sso_idp_termination` adds two tables,
   `SsoCredential` and `SsoProvider`. Both are empty on deploy; nothing
   backfills them, and the connection projection populates `SsoProvider` as
   connections are registered or replayed. Additive only — no column is

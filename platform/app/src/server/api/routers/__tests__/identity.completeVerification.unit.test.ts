@@ -95,6 +95,7 @@ vi.mock(
     looksLikeSsoConnectionId: () => false,
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
+    signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
     ssoConnections: () => ({}),
     // Wave 3's additions. Stubbed rather than omitted because the annotation

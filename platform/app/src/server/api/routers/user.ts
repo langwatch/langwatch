@@ -8,6 +8,7 @@ import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityDetachStrandsUserError,
+  normalizeIdentifierValue,
   passwordProblem,
 } from "@langwatch/identity";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
@@ -42,7 +43,7 @@ import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { createCredentialUser } from "~/server/users/credential-user";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
-import { getClientIp } from "~/utils/getClientIp";
+import { getDirectPeerIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -167,13 +168,10 @@ export const userRouter = createTRPCRouter({
           meta: { fieldErrors: { password: [problem] } },
         });
       }
-      // BetterAuth lowercases the email on every one of its lookups and
-      // writes, and sign-in goes through BetterAuth. An account stored as
-      // typed, capitals and all, is therefore one that sign-in can never find
-      // again, no matter the password. Store the shape sign-in will search
-      // for. Customer report: onboarding signups that autocapitalised the
-      // address were permanently locked out with "User already exists".
-      const email = input.email.toLowerCase();
+      // The same canonical normalization identity attach and sign-in use.
+      // Storing a different shape makes the new account unreachable by the
+      // identifier the front door resolves.
+      const email = normalizeIdentifierValue(input.email);
 
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the
@@ -184,12 +182,12 @@ export const userRouter = createTRPCRouter({
         throw new DirectRegistrationUnavailableError();
       }
 
-      // Per-IP rate limit. Mirrors BetterAuth's `/sign-up/email` 20-per-hour
-      // limit so the tRPC path can't be used as a side-channel for spam
-      // signups (iter 45/46 of the migration audit).
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      // Direct-peer rate limit. Mirrors BetterAuth's `/sign-up/email`
+      // 20-per-hour limit so the tRPC path can't be used as a side-channel for
+      // spam signups (iter 45/46 of the migration audit).
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `user.register:${ip}`,
+        key: `user.register:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 20,
       });
