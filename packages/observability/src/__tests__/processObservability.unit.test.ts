@@ -54,6 +54,40 @@ describe("createProcessObservability", () => {
     );
   });
 
+  it("preserves injected configured and disabled SDK behaviour", () => {
+    const configured = createProcessObservability({
+      serviceName: "langwatch:api",
+      setup: {
+        langwatch: {
+          apiKey: "process-api-key",
+          endpoint: "https://collector.example.test",
+        },
+        attributes: { "deployment.environment.name": "test" },
+      },
+    });
+    const disabled = createProcessObservability({
+      serviceName: "langwatch:worker",
+      setup: { langwatch: "disabled" },
+    });
+
+    expect(configured.tracer).toEqual({ name: "test-tracer" });
+    expect(disabled.tracer).toEqual({ name: "test-tracer" });
+    expect(mocks.setupObservability).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        langwatch: {
+          apiKey: "process-api-key",
+          endpoint: "https://collector.example.test",
+        },
+        attributes: { "deployment.environment.name": "test" },
+      }),
+    );
+    expect(mocks.setupObservability).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ langwatch: "disabled" }),
+    );
+  });
+
   it("makes shutdown idempotent so lifecycle retry cannot close the SDK twice", async () => {
     const observability = createProcessObservability({ serviceName: "langwatch:worker" });
 
@@ -63,5 +97,36 @@ describe("createProcessObservability", () => {
     expect(second).toBe(first);
     await first;
     expect(mocks.shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushes independent telemetry after the SDK and retains the first failure", async () => {
+    const phases: string[] = [];
+    const sdkFailure = new Error("sdk shutdown failed");
+    const profilerFailure = new Error("profiler shutdown failed");
+    mocks.shutdown.mockImplementation(async () => {
+      phases.push("sdk");
+      throw sdkFailure;
+    });
+    const observability = createProcessObservability({
+      serviceName: "langwatch:worker",
+      flushers: [
+        {
+          name: "metrics",
+          shutdown: async () => {
+            phases.push("metrics");
+          },
+        },
+        {
+          name: "profiling",
+          shutdown: async () => {
+            phases.push("profiling");
+            throw profilerFailure;
+          },
+        },
+      ],
+    });
+
+    await expect(observability.shutdown()).rejects.toBe(sdkFailure);
+    expect(phases).toEqual(["sdk", "metrics", "profiling"]);
   });
 });

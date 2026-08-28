@@ -29,6 +29,16 @@ export interface ProcessObservability {
   shutdown(): Promise<void>;
 }
 
+/**
+ * A process-owned telemetry signal that shares the process shutdown boundary
+ * with tracing. This keeps independently configured signals, such as a
+ * profiler, behind typed composition rather than their own signal handlers.
+ */
+export interface ProcessObservabilityFlusher {
+  readonly name: string;
+  shutdown(): Promise<void>;
+}
+
 export interface ProcessObservabilityOptions {
   /** Semantic process identity, also used as the tracer name. */
   serviceName: string;
@@ -36,6 +46,12 @@ export interface ProcessObservabilityOptions {
   loggerName?: string;
   /** Typed SDK setup supplied by the process configuration root. */
   setup?: SetupOptions;
+  /**
+   * Extra process-owned telemetry signals, flushed after the SDK. Metric
+   * readers belong in `setup`; this seam is for independently managed signals
+   * such as continuous profiling.
+   */
+  flushers?: readonly ProcessObservabilityFlusher[];
 }
 
 /**
@@ -66,7 +82,7 @@ export function createProcessObservability(
 
   let closing: Promise<void> | undefined;
   const shutdown = (): Promise<void> => {
-    closing ??= shutdownObservability(sdkHandle);
+    closing ??= shutdownObservability(sdkHandle, options.flushers ?? []);
     return closing;
   };
 
@@ -118,6 +134,25 @@ function writeError(logger: Logger, message: string, args: readonly unknown[]): 
   logger.error({ sdkArgs: args }, message);
 }
 
-async function shutdownObservability(handle: ObservabilityHandle): Promise<void> {
-  await handle.shutdown();
+async function shutdownObservability(
+  handle: ObservabilityHandle,
+  flushers: readonly ProcessObservabilityFlusher[],
+): Promise<void> {
+  let firstError: unknown;
+
+  try {
+    await handle.shutdown();
+  } catch (error) {
+    firstError = error;
+  }
+
+  for (const flusher of flushers) {
+    try {
+      await flusher.shutdown();
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+
+  if (firstError) throw firstError;
 }

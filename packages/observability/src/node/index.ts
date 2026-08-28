@@ -3,5 +3,6 @@
 export {
   createProcessObservability,
   type ProcessObservability,
+  type ProcessObservabilityFlusher,
   type ProcessObservabilityOptions,
 } from "./process-observability";
