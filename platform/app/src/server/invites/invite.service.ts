@@ -1,5 +1,6 @@
 import { ledgerActorFor } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";

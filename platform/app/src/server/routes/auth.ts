@@ -9,6 +9,7 @@
  */
 
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
+import { runWithIdentityBirth } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
