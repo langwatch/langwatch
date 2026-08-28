@@ -396,9 +396,9 @@ export const APP_ERROR_CODES = [
   "virtual_key_expiry_in_past",
   "virtual_key_not_found",
   // The webhook platform names its two endpoint failures itself, in
-  // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving
-  // them from the status: `not_found` alone would not say WHICH lookup
-  // missed, and an endpoint id is the only one those routes take.
+  // `@langwatch/platform-api`'s `features/webhook/webhook-rest.ts`, rather
+  // than deriving them from the status: `not_found` alone would not say WHICH
+  // lookup missed, and an endpoint id is the only one those routes take.
   "webhook_endpoint_invalid",
   "webhook_endpoint_not_found",
   "webhook_event_not_found",

@@ -85,7 +85,7 @@ digraph TraceArchitecture {
 
   // ────────────────────────── Server tRPC ──────────────────────────
   subgraph cluster_trpc {
-    label="tRPC router (server/api/routers/tracesV2.ts)";
+    label="tRPC router (@langwatch/trace-server api/app-trpc/traces-v2.api.ts)";
     style="rounded";
     color="#ddd6fe";
 

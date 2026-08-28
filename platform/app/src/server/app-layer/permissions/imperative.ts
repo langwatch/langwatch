@@ -96,7 +96,7 @@ async function requireAtTier<Tier extends "project" | "team" | "organization">({
     });
   }
   const permissions = (ctx.app ?? getApp()).permissions;
-  const scope = await permissions.resolveScope({
+  const scope = await permissions.tryResolveScope({
     ...(tier === "project"
       ? { projectId: id }
       : tier === "team"

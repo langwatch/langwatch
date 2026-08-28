@@ -108,7 +108,7 @@ import {
   requireVisibleVk,
   resolveVkProjectId,
 } from "~/server/gateway/virtualKey.authz";
-import { loadTraceDestinationFacts, toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { loadTraceDestinationFacts, toVirtualKeyCamelDto } from "@langwatch/gateway-server";
 import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
 import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { env } from "~/env.mjs";
