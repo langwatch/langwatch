@@ -40,10 +40,14 @@ let repo: GovernanceCostRollupClickHouseRepository;
 let comparator: CostRollupComparatorService;
 let tenantId: string;
 
-function confirmedData(costNanoUsd: number, requestId: string) {
+function confirmedData(
+  costNanoUsd: number,
+  requestId: string,
+  occurredAt: number = DAY_MS,
+) {
   return {
     gateway_request_id: requestId,
-    occurred_at: DAY_MS,
+    occurred_at: occurredAt,
     tenantId,
     organization_id: "org_acme",
     virtual_key_id: "vk_1",
@@ -53,7 +57,7 @@ function confirmedData(costNanoUsd: number, requestId: string) {
     request_type: "chat",
     labels: [],
     metadata: "",
-    admitted_at: DAY_MS,
+    admitted_at: occurredAt,
     team_id: "",
     model: "openai/gpt-5-mini",
     model_provider_id: "openai",
@@ -73,8 +77,20 @@ function confirmedData(costNanoUsd: number, requestId: string) {
   };
 }
 
-/** Puts one gateway outcome on the durable log, the way the ingest seam does. */
-async function appendConfirmed(costNanoUsd: number): Promise<void> {
+/**
+ * Puts one gateway outcome on the durable log, the way the ingest seam does.
+ *
+ * `EventOccurredAt` is set to the same value as the payload's `occurred_at`
+ * because that is what the write path does: spendCommands.ts passes
+ * `occurredAt: data.occurred_at` into every spend event, and
+ * eventStoreUtils.ts:71 writes that envelope field to the column verbatim. The
+ * append clock lands on `EventTimestamp` instead. Seeding these two apart
+ * would be testing a system we do not have.
+ */
+async function appendConfirmed(
+  costNanoUsd: number,
+  occurredAt: number = DAY_MS,
+): Promise<void> {
   const requestId = `gwreq-${nanoid()}`;
   await ch.insert({
     table: "event_log",
@@ -88,8 +104,10 @@ async function appendConfirmed(costNanoUsd: number): Promise<void> {
         EventType: "lw.gateway.spend.confirmed",
         EventVersion: "2026-07-29",
         EventTimestamp: Date.now(),
-        EventPayload: JSON.stringify(confirmedData(costNanoUsd, requestId)),
-        EventOccurredAt: DAY_MS,
+        EventPayload: JSON.stringify(
+          confirmedData(costNanoUsd, requestId, occurredAt),
+        ),
+        EventOccurredAt: occurredAt,
       },
     ],
     format: "JSONEachRow",
@@ -205,6 +223,51 @@ describe("CostRollupComparatorService", () => {
 
       expect(comparison.mismatches).toEqual([]);
       expect(await mismatchCount()).toBe(before);
+    });
+  });
+
+  describe("given two events either side of midnight", () => {
+    /**
+     * The comparator selects its events by `event_log.EventOccurredAt` while
+     * the fold buckets them by the payload's own `occurred_at`. That is only
+     * safe while the two carry the same value, and today they do: every spend
+     * command sets `occurredAt: data.occurred_at`
+     * (spendCommands.ts:81/129/177/224) and the store writes the envelope
+     * field to the column unchanged (eventStoreUtils.ts:71), with the append
+     * clock going to `EventTimestamp` instead. The puller lane matches
+     * (pullerWorker.ts:753).
+     *
+     * So this is a pin, not a repair. A producer that ever set the envelope to
+     * wall-clock time would put an event in one query's day and the other's
+     * neighbour, and the comparator would report drift that is entirely its
+     * own. That regression fails here.
+     */
+    it("assigns each to the day its own business time falls in", async () => {
+      const lastMs = Date.parse(`${DAY}T23:59:59.999Z`);
+      const firstMsNextDay = Date.parse("2026-08-02T00:00:00.000Z");
+      await appendConfirmed(5_000_000_000, lastMs);
+      await appendConfirmed(7_340_000_000, firstMsNextDay);
+
+      // The summary for DAY claims only the event whose business day is DAY.
+      await writeSummary(5_000_000_000);
+
+      const sameDay = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+      });
+      // The 00:00:00.000 event next door was not pulled into this day.
+      expect(sameDay.mismatches).toEqual([]);
+
+      // ...and it was not dropped on the floor either: it turns up on its own
+      // day, where no summary explains it.
+      const nextDay = await comparator.compareDay({
+        tenantId,
+        day: "2026-08-02",
+        costSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+      });
+      expect(nextDay.mismatches).toHaveLength(1);
+      expect(nextDay.mismatches[0]!.derivedNanoUsd).toBe(7_340_000_000);
     });
   });
 
