@@ -7,38 +7,28 @@ const mocks = vi.hoisted(() => ({
   rateLimit: vi.fn(),
 }));
 
-vi.mock("~/app/api/middleware/app-context", () => {
-  const app = { userAvatarObjects: { getById: mocks.getById } };
-  return {
-    appContextMiddleware: async (
-      context: {
-        app?: unknown;
-      },
-      next: () => Promise<void>,
-    ) => {
-      Object.defineProperty(context, "app", { configurable: true, value: app });
-      await next();
-    },
-  };
-});
-
-vi.mock("~/app/api/middleware/dual-auth", () => ({
-  dualAuth: async (
-    context: {
-      json: (value: unknown, status: number) => Response;
-      set: (key: "userId", value: string) => void;
-    },
-    next: () => Promise<void>,
-  ) => {
-    if (!state.authenticated) return context.json({ error: "unauthenticated" }, 401);
-    context.set("userId", "user_1");
+// The spine's app-context middleware resolves the process container, which a
+// unit test has no reason to build: the family reads its capabilities from the
+// injected providers below, not off the context.
+vi.mock("~/app/api/middleware/app-context", () => ({
+  appContextMiddleware: async (_context: unknown, next: () => Promise<void>) => {
     await next();
   },
 }));
 
-vi.mock("~/server/rateLimit", () => ({ rateLimit: mocks.rateLimit }));
+import { createUserAvatarRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
 
-import { app } from "../app";
+const { hono: app } = createUserAvatarRestApp({
+  security: appRestSecurity,
+  dualAuth: async (context, next) => {
+    if (!state.authenticated) return context.json({ error: "unauthenticated" }, 401);
+    context.set("userId", "user_1");
+    await next();
+  },
+  userAvatarObjects: () => ({ getById: mocks.getById }),
+  rateLimit: mocks.rateLimit,
+});
 
 function availableAvatar(input?: { purpose?: string; ownerKind?: string; bytes?: Uint8Array }) {
   const bytes = input?.bytes ?? new Uint8Array([0x61, 0x76, 0x61, 0x74, 0x61, 0x72]);

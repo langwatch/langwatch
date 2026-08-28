@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { App } from "~/server/app-layer/app";
+import type { SimulationService } from "@langwatch/scenario-contract";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -10,12 +10,12 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { archiveScenarioSetRuns } from "../[[...route]]/app";
+import { archiveScenarioSetRuns } from "@langwatch/platform-api";
 
 describe("archiveScenarioSetRuns()", () => {
   let mockGetRunIdsForSet: Mock;
   let mockDeleteRun: Mock;
-  let app: Pick<App, "simulations">;
+  let simulations: Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,12 +23,10 @@ describe("archiveScenarioSetRuns()", () => {
     mockGetRunIdsForSet = vi.fn();
     mockDeleteRun = vi.fn().mockResolvedValue(undefined);
 
-    app = {
-      simulations: {
-        getRunIdsForSet: mockGetRunIdsForSet,
-        deleteRun: mockDeleteRun,
-      },
-    } as Pick<App, "simulations">;
+    simulations = {
+      getRunIdsForSet: mockGetRunIdsForSet,
+      deleteRun: mockDeleteRun,
+    } as unknown as Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
   });
 
   describe("when getRunIdsForSet returns N runs", () => {
@@ -38,7 +36,7 @@ describe("archiveScenarioSetRuns()", () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
 
       const result = await archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "set-a",
       });
@@ -63,7 +61,7 @@ describe("archiveScenarioSetRuns()", () => {
         .mockResolvedValueOnce(undefined);
 
       const result = await archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "set-a",
       });
@@ -83,7 +81,7 @@ describe("archiveScenarioSetRuns()", () => {
       });
 
       const result = await archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "set-big",
       });
@@ -100,7 +98,7 @@ describe("archiveScenarioSetRuns()", () => {
       });
 
       const result = await archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "set-small",
       });
@@ -133,7 +131,7 @@ describe("archiveScenarioSetRuns()", () => {
 
       // Start archiving (will block until resolvers are called)
       const archivePromise = archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "set-32",
       });
@@ -162,7 +160,7 @@ describe("archiveScenarioSetRuns()", () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
 
       const result = await archiveScenarioSetRuns({
-        app,
+        simulations,
         projectId: "project-a",
         scenarioSetId: "ghost-set",
       });

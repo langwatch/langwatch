@@ -5,9 +5,22 @@ import type { Organization, Project, Scenario, Team } from "~/generated/prisma/c
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { createScenariosRestApp } from "@langwatch/platform-api";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import { platformUrl } from "~/app/api/shared/platform-url";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 
 wireDefaultTestApp();
+
+const { hono: app } = createScenariosRestApp({
+  security: appRestSecurity,
+  scenarios: () => getApp().scenarios,
+  platformUrl,
+});
+
+const request = (path: string, init?: RequestInit) =>
+  app.request(path, init, appContextBindingsFor(getApp()));
 
 describe("Scenarios API", () => {
   let testApiKey: string;
@@ -58,22 +71,21 @@ describe("Scenarios API", () => {
 
     helpers = {
       api: {
-        get: (path: string) =>
-          app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        get: (path: string) => request(path, { headers: { "X-Auth-Token": testApiKey } }),
         post: (path: string, body: unknown) =>
-          app.request(path, {
+          request(path, {
             method: "POST",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
         put: (path: string, body: unknown) =>
-          app.request(path, {
+          request(path, {
             method: "PUT",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
         delete: (path: string) =>
-          app.request(path, {
+          request(path, {
             method: "DELETE",
             headers: createAuthHeaders(testApiKey),
           }),
@@ -103,7 +115,7 @@ describe("Scenarios API", () => {
 
   describe("Authentication", () => {
     it("returns 401 with invalid API key", async () => {
-      const res = await app.request("/api/scenarios", {
+      const res = await request("/api/scenarios", {
         headers: { "X-Auth-Token": "invalid-key" },
       });
 
@@ -132,10 +144,7 @@ describe("Scenarios API", () => {
             projectId: testProjectId,
             name: "Login Flow",
             situation: "User attempts to log in with valid credentials",
-            criteria: [
-              "Responds with a welcome message",
-              "Includes user name in greeting",
-            ],
+            criteria: ["Responds with a welcome message", "Includes user name in greeting"],
             labels: ["auth", "happy-path"],
           },
         });
@@ -175,10 +184,7 @@ describe("Scenarios API", () => {
             projectId: testProjectId,
             name: "Login Flow",
             situation: "User attempts to log in with valid credentials",
-            criteria: [
-              "Responds with a welcome message",
-              "Includes user name in greeting",
-            ],
+            criteria: ["Responds with a welcome message", "Includes user name in greeting"],
             labels: ["auth", "happy-path"],
           },
         });
@@ -415,7 +421,7 @@ describe("Scenarios API", () => {
 
         /** @scenario "A save from the command line is recorded with the command line as its author" */
         it("records a save that declares the CLI surface with the command line as its author", async () => {
-          const res = await app.request(`/api/scenarios/${scenario.id}`, {
+          const res = await request(`/api/scenarios/${scenario.id}`, {
             method: "PUT",
             headers: {
               ...createAuthHeaders(testApiKey),
@@ -438,7 +444,7 @@ describe("Scenarios API", () => {
         });
 
         it("does not honor a surface value it does not know", async () => {
-          const res = await app.request(`/api/scenarios/${scenario.id}`, {
+          const res = await request(`/api/scenarios/${scenario.id}`, {
             method: "PUT",
             headers: {
               ...createAuthHeaders(testApiKey),
@@ -542,15 +548,11 @@ describe("Scenarios API", () => {
     it("lists the versions newest first, with author, date and changed fields", async () => {
       const scenario = await createScenarioWithSaves(2);
 
-      const res = await helpers.api.get(
-        `/api/scenarios/${scenario.id}/versions`,
-      );
+      const res = await helpers.api.get(`/api/scenarios/${scenario.id}/versions`);
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.versions.map((v: { version: number }) => v.version)).toEqual([
-        3, 2, 1,
-      ]);
+      expect(body.versions.map((v: { version: number }) => v.version)).toEqual([3, 2, 1]);
       expect(body.versions[0]).toMatchObject({
         authorLabel: "api",
         authorId: null,
@@ -564,28 +566,20 @@ describe("Scenarios API", () => {
     it("pages with limit and cursor", async () => {
       const scenario = await createScenarioWithSaves(3);
 
-      const first = await helpers.api.get(
-        `/api/scenarios/${scenario.id}/versions?limit=2`,
-      );
+      const first = await helpers.api.get(`/api/scenarios/${scenario.id}/versions?limit=2`);
       const firstBody = await first.json();
-      expect(
-        firstBody.versions.map((v: { version: number }) => v.version),
-      ).toEqual([4, 3]);
+      expect(firstBody.versions.map((v: { version: number }) => v.version)).toEqual([4, 3]);
       expect(firstBody.nextCursor).toBe(3);
 
       const second = await helpers.api.get(
         `/api/scenarios/${scenario.id}/versions?limit=2&cursor=${firstBody.nextCursor}`,
       );
       const secondBody = await second.json();
-      expect(
-        secondBody.versions.map((v: { version: number }) => v.version),
-      ).toEqual([2, 1]);
+      expect(secondBody.versions.map((v: { version: number }) => v.version)).toEqual([2, 1]);
     });
 
     it("returns 404 for a scenario that does not exist", async () => {
-      const res = await helpers.api.get(
-        "/api/scenarios/nonexistent-id/versions",
-      );
+      const res = await helpers.api.get("/api/scenarios/nonexistent-id/versions");
 
       expect(res.status).toBe(404);
     });
@@ -604,9 +598,7 @@ describe("Scenarios API", () => {
         situation: "Rewritten",
       });
 
-      const res = await helpers.api.get(
-        `/api/scenarios/${scenario.id}/versions/1`,
-      );
+      const res = await helpers.api.get(`/api/scenarios/${scenario.id}/versions/1`);
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -632,9 +624,7 @@ describe("Scenarios API", () => {
       });
       const scenario = (await created.json()) as { id: string };
 
-      const res = await helpers.api.get(
-        `/api/scenarios/${scenario.id}/versions/9`,
-      );
+      const res = await helpers.api.get(`/api/scenarios/${scenario.id}/versions/9`);
 
       expect(res.status).toBe(404);
       const body = await res.json();
@@ -642,9 +632,7 @@ describe("Scenarios API", () => {
     });
 
     it("returns 404 for a scenario that does not exist", async () => {
-      const res = await helpers.api.get(
-        "/api/scenarios/nonexistent-id/versions/1",
-      );
+      const res = await helpers.api.get("/api/scenarios/nonexistent-id/versions/1");
 
       expect(res.status).toBe(404);
     });
@@ -656,9 +644,7 @@ describe("Scenarios API", () => {
       });
       const scenario = (await created.json()) as { id: string };
 
-      const res = await helpers.api.get(
-        `/api/scenarios/${scenario.id}/versions/not-a-number`,
-      );
+      const res = await helpers.api.get(`/api/scenarios/${scenario.id}/versions/not-a-number`);
 
       expect(res.status).toBe(422);
     });

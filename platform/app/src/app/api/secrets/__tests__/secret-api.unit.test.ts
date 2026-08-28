@@ -51,7 +51,13 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => ({
   enforceApiKeyCeiling: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { app } from "../[[...route]]/app";
+import { createSecretLegacyRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+const { hono: app } = createSecretLegacyRestApp({
+  security: appRestSecurity,
+  secrets: () => langwatchApp.secrets as never,
+});
 
 describe("Secret legacy API compatibility", () => {
   beforeEach(() => {

@@ -11,11 +11,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import type { BatchSummary } from "@langwatch/scenario-contract";
-import { app } from "../[[...route]]/app";
+import { createSimulationRunsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
+
+const { hono: app } = createSimulationRunsRestApp({
+  security: appRestSecurity,
+  simulations: () => getApp().simulations,
+  scenarioRunPlatformUrl,
+});
 
 function makeSummary(overrides: Partial<BatchSummary> = {}): BatchSummary {
   return {
@@ -76,27 +84,18 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
   function withSummary(summary: BatchSummary | null) {
     const testApp = createTestApp();
     const summaryCalls: Array<{ projectId: string; batchRunId: string }> = [];
-    vi.spyOn(testApp.simulations, "tryGetBatchSummary").mockImplementation(
-      async (input) => {
-        summaryCalls.push(input);
-        return summary;
-      },
-    );
+    vi.spyOn(testApp.simulations, "tryGetBatchSummary").mockImplementation(async (input) => {
+      summaryCalls.push(input);
+      return summary;
+    });
     globalForApp.__langwatch_app = testApp;
     return { summaryCalls };
   }
 
-  const get = ({
-    path,
-    headers = {},
-  }: {
-    path: string;
-    headers?: Record<string, string>;
-  }) =>
+  const get = ({ path, headers = {} }: { path: string; headers?: Record<string, string> }) =>
     app.request(path, { headers }, appContextBindingsFor(globalForApp.__langwatch_app!));
 
-  const getAuthenticated = (path: string) =>
-    get({ path, headers: { "X-Auth-Token": testApiKey } });
+  const getAuthenticated = (path: string) => get({ path, headers: { "X-Auth-Token": testApiKey } });
 
   describe("when the batch still holds a queued run", () => {
     /** @scenario "A batch summary is addressable by its batch run id" */
@@ -124,9 +123,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
   describe("when every run of the batch reached a terminal status", () => {
     /** @scenario "A batch is complete when every run is terminal" */
     it("reports the batch as complete", async () => {
-      withSummary(
-        makeSummary({ settledCount: 2, runningCount: 0, allCompletedAt: 2000 }),
-      );
+      withSummary(makeSummary({ settledCount: 2, runningCount: 0, allCompletedAt: 2000 }));
 
       const res = await getAuthenticated("/api/simulation-runs/batches/batch_1");
       expect(res.status).toBe(200);
@@ -140,9 +137,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     it("serves the note as a field of its own", async () => {
       withSummary(makeSummary({ note: "nightly regression" }));
 
-      const res = await getAuthenticated(
-        "/api/simulation-runs/batches/batch_1",
-      );
+      const res = await getAuthenticated("/api/simulation-runs/batches/batch_1");
       expect(res.status).toBe(200);
       const body = (await res.json()) as { note: string | null };
 
@@ -152,9 +147,7 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     it("serves null for a batch run without one", async () => {
       withSummary(makeSummary());
 
-      const res = await getAuthenticated(
-        "/api/simulation-runs/batches/batch_1",
-      );
+      const res = await getAuthenticated("/api/simulation-runs/batches/batch_1");
       const body = (await res.json()) as { note: string | null };
 
       expect(body.note).toBeNull();

@@ -15,7 +15,17 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createGroupRestApp } from "@langwatch/platform-api";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
+import { appRestSecurity } from "~/server/api/security";
+
+const { hono: app } = createGroupRestApp({
+  security: appRestSecurity,
+  organizations: () => getApp().organizations,
+  enterpriseGate: requireEnterprisePlanRest("GROUPS"),
+  ledgerActor: orgRequestLedgerActor,
+});
 
 describe("Feature: Groups REST API", () => {
   const ns = `groups-api-${nanoid(8)}`;

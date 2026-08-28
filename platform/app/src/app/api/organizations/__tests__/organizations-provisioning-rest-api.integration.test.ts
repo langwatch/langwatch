@@ -21,7 +21,21 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
-import { app } from "../[[...route]]/app";
+import { createOrganizationsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { managementAuditPort } from "~/server/api/management/audit";
+import { instanceAdminApiKey } from "~/server/api/management/instance-admin-key";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+
+const { hono: app } = createOrganizationsRestApp({
+  security: appRestSecurity,
+  organizations: () => getApp().organizations,
+  apiKeys: () => getApp().apiKeys,
+  instanceAdminKey: instanceAdminApiKey,
+  isSaas: () => getApp().config.isSaas,
+  audit: managementAuditPort,
+  reportError: (error) => captureException(toError(error)),
+});
 
 describe("Feature: Organization provisioning REST API for self-hosted deployments", () => {
   // Slugs are lowercase-and-hyphens by contract, and nanoid's alphabet is

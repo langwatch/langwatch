@@ -1,13 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import type {
-  Organization,
-  Project,
-  Team,
-  User,
-  Workflow,
-} from "~/generated/prisma/client";
+import type { Organization, Project, Team, User, Workflow } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
@@ -20,10 +14,35 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockStudioBackendPostEvent(args),
 }));
 
+import { createWorkflowsRestApp } from "@langwatch/platform-api";
+import { platformUrl } from "~/app/api/shared/platform-url";
+import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { WorkflowEvaluationService } from "~/server/workflows/workflowEvaluation.service";
 
 wireDefaultTestApp();
+
+// The family is package-owned; this is the same composition `api-router.ts`
+// mounts, so the test exercises the real ports rather than a stand-in.
+const { hono: app } = createWorkflowsRestApp({
+  security: appRestSecurity,
+  workflows: () => getApp().workflows,
+  ports: {
+    platformUrl,
+    requireApiKeyPermission: (permission) => requireApiKeyPermission({ permission }),
+    triggerEvaluation: (input) =>
+      WorkflowEvaluationService.create(
+        prisma,
+        getApp().experiments,
+        getApp().modelProviders,
+        getApp().nlpLambda,
+        getApp().workflows,
+        getApp().config.evaluationExecution.defaultConcurrency,
+      ).triggerEvaluationForRest(input),
+  },
+});
 
 describe("Workflows REST API", () => {
   let testApiKey: string;
@@ -67,8 +86,7 @@ describe("Workflows REST API", () => {
 
     helpers = {
       api: {
-        get: (path: string) =>
-          app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        get: (path: string) => app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
         delete: (path: string) =>
           app.request(path, {
             method: "DELETE",

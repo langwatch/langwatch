@@ -18,7 +18,14 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestProject } from "~/utils/testUtils";
-import { app as publicApp } from "../[[...route]]/app";
+import { createExperimentsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+/** The family as the API router mounts it. */
+const publicApp = createExperimentsRestApp({
+  security: appRestSecurity,
+  experiments: () => getApp().experiments,
+}).hono;
 
 wireDefaultTestApp();
 

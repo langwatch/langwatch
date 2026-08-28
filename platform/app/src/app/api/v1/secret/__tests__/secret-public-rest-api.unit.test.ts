@@ -1,4 +1,4 @@
-import { generateApiSpecs } from "@langwatch/api";
+import { generateApiSpecs } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { SecretReservedNameError } from "@langwatch/secret-contract";
 import type { MiddlewareHandler } from "hono";

@@ -24,7 +24,7 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 
-import { isPermissionDenial } from "../[[...route]]/app";
+import { isPermissionDenial } from "@langwatch/platform-api";
 
 describe("isPermissionDenial", () => {
   describe("given a refusal from the permission layer", () => {

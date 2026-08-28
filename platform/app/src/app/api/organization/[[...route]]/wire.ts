@@ -8,7 +8,7 @@
  * the orchestration, and from `app.ts` so registration stays a list of
  * endpoints.
  */
-import type { EndpointVariables, ServiceContext } from "@langwatch/api";
+import type { EndpointVariables, ServiceContext } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import { z } from "zod";

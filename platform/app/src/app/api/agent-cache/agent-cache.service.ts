@@ -1,21 +1,10 @@
 import { createLogger } from "@langwatch/observability";
+import { DEFAULT_TTL_SECONDS } from "@langwatch/platform-api";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { CacheEntryNotFoundError } from "./agent-cache.errors";
 import { AgentCacheRepository } from "./agent-cache.repository";
 
 const logger = createLogger("langwatch:agent-cache");
-
-/** How long an entry lives when the caller names no lifetime. */
-export const DEFAULT_TTL_SECONDS = 15 * 60;
-/** Below this an entry expires before a second row can read it. */
-export const MIN_TTL_SECONDS = 5;
-/** A day. Anything a run needs for longer belongs in a secret or a dataset. */
-export const MAX_TTL_SECONDS = 24 * 60 * 60;
-/** 32 KB, which holds a session envelope and refuses a payload. */
-export const MAX_VALUE_BYTES = 32 * 1024;
-/** Same shape as an environment variable name, so agent code reads the same. */
-export const CACHE_ENTRY_NAME_REGEX = /^[A-Z][A-Z0-9_]*$/;
-export const MAX_NAME_LENGTH = 64;
 
 export type CacheEntry = { name: string; value: string };
 
@@ -34,13 +23,7 @@ export class AgentCacheService {
    * the caller produces the value again exactly as they would after an
    * expiry.
    */
-  async getByName({
-    projectId,
-    name,
-  }: {
-    projectId: string;
-    name: string;
-  }): Promise<CacheEntry> {
+  async getByName({ projectId, name }: { projectId: string; name: string }): Promise<CacheEntry> {
     const encryptedValue = await this.repository.findByName({
       projectId,
       name,
@@ -119,13 +102,7 @@ export class AgentCacheService {
 
   /** Idempotent: a name the project does not hold deletes nothing and is not
    * an error, so a caller can clear an entry without reading it first. */
-  async delete({
-    projectId,
-    name,
-  }: {
-    projectId: string;
-    name: string;
-  }): Promise<void> {
+  async delete({ projectId, name }: { projectId: string; name: string }): Promise<void> {
     await this.repository.delete({ projectId, name });
   }
 }

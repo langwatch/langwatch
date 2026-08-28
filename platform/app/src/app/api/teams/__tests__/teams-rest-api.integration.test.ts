@@ -12,7 +12,17 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createTeamsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
+
+const { hono: app } = createTeamsRestApp({
+  security: appRestSecurity,
+  organizations: () => getApp().organizations,
+  permissions: () => getApp().permissions,
+  projects: () => getApp().projects,
+  ledgerActor: orgRequestLedgerActor,
+});
 
 wireDefaultTestApp();
 

@@ -69,12 +69,28 @@ vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
   };
 });
 
-import { app } from "~/app/api/scenario-events/[[...route]]/app";
+import { createScenarioEventsRestApp } from "@langwatch/platform-api";
 import {
   isScenarioTabNavigatePayload,
   SCENARIO_TAB_NAVIGATE_EVENT,
 } from "@langwatch/scenario-contract";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import { blockTraceUsageExceededMiddleware } from "~/app/api/middleware";
+import { appRestSecurity } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
+import { bodyLimit } from "~/server/routes/_lib/body-limit";
+import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
+
+const { hono: app } = createScenarioEventsRestApp({
+  security: appRestSecurity,
+  simulations: () => getApp().simulations,
+  scenarioTabs: () => getApp().scenarioTabs,
+  broadcast: () => getApp().broadcast,
+  extractInlineMedia: (input) =>
+    extractInlineMediaFromEvent({ ...input, service: getApp().storedObjects }),
+  traceUsageGuard: blockTraceUsageExceededMiddleware,
+  bodyLimit,
+});
 
 const scenarioTabRegistry = getApp().scenarioTabs;
 
@@ -110,11 +126,15 @@ async function handoff(
   };
   if (token) headers["X-Auth-Token"] = token;
 
-  return app.request("/api/scenario-events/browser-tab", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  return app.request(
+    "/api/scenario-events/browser-tab",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    },
+    appContextBindingsFor(getApp()),
+  );
 }
 
 beforeAll(async () => {
@@ -219,8 +239,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       });
 
       expect(mockBroadcastToTenant).toHaveBeenCalledTimes(1);
-      const [broadcastProjectId, payload, eventType] =
-        mockBroadcastToTenant.mock.calls[0]!;
+      const [broadcastProjectId, payload, eventType] = mockBroadcastToTenant.mock.calls[0]!;
       expect(broadcastProjectId).toBe(projectId);
       expect(eventType).toBe("simulation_updated");
 
@@ -249,9 +268,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       const payload = JSON.parse(mockBroadcastToTenant.mock.calls[0]![1] as string) as {
         url: string;
       };
-      expect(payload.url).toBe(
-        `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-8`,
-      );
+      expect(payload.url).toBe(`${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-8`);
     });
 
     /** @scenario "A handoff sent while the tab was reloading is not lost" */
@@ -265,9 +282,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
         scenarioSetId: "checkout-flow",
       });
 
-      await expect(
-        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
-      ).resolves.toBe(
+      await expect(scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey })).resolves.toBe(
         `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-parked`,
       );
     });
@@ -324,10 +339,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
 
     /** @scenario "The handoff endpoint refuses an unauthenticated caller" */
     it("rejects an unauthenticated caller", async () => {
-      const res = await handoff(
-        { tabKey: `tab-${nanoid(8)}`, batchRunId: "batch-1" },
-        null,
-      );
+      const res = await handoff({ tabKey: `tab-${nanoid(8)}`, batchRunId: "batch-1" }, null);
 
       expect(res.status).toBe(401);
       expect(mockBroadcastToTenant).not.toHaveBeenCalled();

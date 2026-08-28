@@ -3,7 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
-import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
+import { TracesV2TrpcApi } from "@langwatch/trace-server";
+import { createTraceViewReadPorts } from "~/runtime/app/features/trace";
 import {
   baseResponses,
   coerceToEpoch,
@@ -408,7 +409,9 @@ export function registerTracesRoutes(
         });
       }
 
-      const transcript = await readCodingAgentTranscriptWithProtections({
+      const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
+        app: c.app,
+        ports: createTraceViewReadPorts(),
         projectId: project.id,
         traceId: trace.trace_id,
         occurredAtMs: trace.timestamps.started_at,

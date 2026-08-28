@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 import { handleError } from "~/app/api/middleware/error-handler";
 import { validator as zValidator } from "@langwatch/platform-api/app-rest";
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { createEvaluatorInputSchema } from "../[[...route]]/schemas";
+import { createEvaluatorInputSchema } from "@langwatch/platform-api";
 
 const app = new Hono();
 app.onError(handleError);

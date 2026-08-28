@@ -1,6 +1,21 @@
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
-import { app } from "../[[...route]]/app";
+import { createAgentLegacyRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+/**
+ * The document is generated from the route metadata, so the family is BUILT
+ * here and never served: the capabilities refuse rather than resolve.
+ */
+const { hono: app } = createAgentLegacyRestApp({
+  security: appRestSecurity,
+  agents: () => {
+    throw new Error("Agents are not available while generating the document");
+  },
+  agentPlatformUrl: () => {
+    throw new Error("The agent URL builder is not available while generating the document");
+  },
+});
 
 describe("Agents OpenAPI contract", () => {
   /** @scenario Contract schemas define both API interfaces */

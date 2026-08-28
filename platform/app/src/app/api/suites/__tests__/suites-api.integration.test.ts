@@ -11,7 +11,7 @@ import type {
   SimulationSuite,
   Team,
 } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { type App, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -22,7 +22,10 @@ import type { QueueRunCommandData } from "@langwatch/scenario-contract";
 import type { StartSuiteRunCommandData } from "@langwatch/suite-server";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createSuiteRestApp } from "@langwatch/platform-api";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import { platformUrl } from "~/app/api/shared/platform-url";
+import { appRestSecurity } from "~/server/api/security";
 
 describe("Feature: Suites REST API", () => {
   let testApiKey: string;
@@ -46,12 +49,25 @@ describe("Feature: Suites REST API", () => {
     "Content-Type": "application/json",
   });
 
+  let testApp: App;
+
+  const { hono: app } = createSuiteRestApp({
+    security: appRestSecurity,
+    suites: () => testApp.suites,
+    scenarios: () => testApp.scenarios,
+    projects: () => testApp.projects,
+    platformUrl,
+  });
+
+  const request = (path: string, init?: RequestInit) =>
+    app.request(path, init, appContextBindingsFor(testApp));
+
   beforeEach(async () => {
     await resetApp();
     const mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     startSuiteRun = vi.fn(async () => {});
     queueSimulationRun = vi.fn(async () => {});
-    globalForApp.__langwatch_app = createTestApp({
+    testApp = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -61,6 +77,7 @@ describe("Feature: Suites REST API", () => {
       } as any,
       suiteCommands: { startSuiteRun, queueRun: queueSimulationRun },
     });
+    globalForApp.__langwatch_app = testApp;
 
     testOrganization = await prisma.organization.create({
       data: {
@@ -90,21 +107,21 @@ describe("Feature: Suites REST API", () => {
 
     helpers = {
       api: {
-        get: (path: string) => app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        get: (path: string) => request(path, { headers: { "X-Auth-Token": testApiKey } }),
         post: (path: string, body: unknown) =>
-          app.request(path, {
+          request(path, {
             method: "POST",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
         patch: (path: string, body: unknown) =>
-          app.request(path, {
+          request(path, {
             method: "PATCH",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
         delete: (path: string) =>
-          app.request(path, {
+          request(path, {
             method: "DELETE",
             headers: { "X-Auth-Token": testApiKey },
           }),
@@ -190,7 +207,7 @@ describe("Feature: Suites REST API", () => {
 
   describe("Authentication", () => {
     it("returns 401 with invalid API key", async () => {
-      const res = await app.request("/api/suites", {
+      const res = await request("/api/suites", {
         headers: { "X-Auth-Token": "invalid-key" },
       });
 

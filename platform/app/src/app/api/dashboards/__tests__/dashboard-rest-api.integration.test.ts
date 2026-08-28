@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -12,7 +12,20 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createDashboardsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { platformUrl } from "../../shared/platform-url";
+
+/**
+ * Built here the way the process builds it, because the family is packaged
+ * now: the service is resolved per request off whatever App the test has
+ * installed, so `resetApp()` between cases still swaps what the routes reach.
+ */
+const app = createDashboardsRestApp({
+  security: appRestSecurity,
+  dashboard: () => getApp().dashboard,
+  platformUrl,
+}).hono;
 
 /**
  * Distinctive enough that a substring search over the whole serialised body

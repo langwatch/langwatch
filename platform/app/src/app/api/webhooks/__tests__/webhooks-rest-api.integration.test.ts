@@ -1,6 +1,7 @@
 import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { createServer, type Server } from "node:http";
 import {
+  assertWebhookEndpointsEntitled,
   WebhookEventsClickHouseRepository,
   WebhookEventsService,
 } from "~/runtime/app/features/webhooks";
@@ -61,7 +62,33 @@ vi.mock("~/server/app-layer/app", async () => {
   };
 });
 
-import { app } from "../[[...route]]/app";
+import { createWebhookRestApp } from "@langwatch/platform-api";
+import { requestTraceIds } from "@langwatch/platform-api/app-rest";
+import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
+import { withIdempotency } from "~/server/api/idempotency";
+import { appRestSecurity } from "~/server/api/security";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
+
+/**
+ * Built here the way the process builds it, because the family is packaged
+ * now: every capability is resolved per request off whatever App the test has
+ * installed, so the fixtures below still swap what the routes reach.
+ */
+const { hono: app } = createWebhookRestApp({
+  security: appRestSecurity,
+  webhooks: () => {
+    const gateway = getApp().gateway;
+    return {
+      endpoints: gateway.webhookEndpoints,
+      health: gateway.webhookHealth,
+      events: gateway.webhookEvents,
+      assertEndpointsEntitled: assertWebhookEndpointsEntitled,
+      dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
+      runIdempotent: (input) => withIdempotency({ prisma, ...input }),
+    };
+  },
+  canonicalError: (error, c) => canonicalErrorFor(error, requestTraceIds(c)),
+});
 
 describe("Feature: Webhook endpoints REST API", () => {
   const ns = `webhooks-api-${nanoid(8)}`;

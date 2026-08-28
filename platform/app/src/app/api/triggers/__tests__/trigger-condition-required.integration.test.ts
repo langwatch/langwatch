@@ -26,7 +26,16 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ triggers: { invalidate: async () => {} } }),
 }));
 
-import { app } from "../[[...route]]/app";
+import { createTriggerRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { platformUrl } from "../../shared/platform-url";
+
+const { hono: app } = createTriggerRestApp({
+  security: appRestSecurity,
+  automation: () => getApp().automation,
+  platformUrl,
+});
 
 describe("Feature: a REST-created automation must carry a condition", () => {
   const ns = `triggers-condition-${nanoid(8)}`;

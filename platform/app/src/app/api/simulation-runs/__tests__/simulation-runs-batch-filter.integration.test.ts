@@ -12,12 +12,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { app } from "../[[...route]]/app";
+import { createSimulationRunsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
+
+const { hono: app } = createSimulationRunsRestApp({
+  security: appRestSecurity,
+  simulations: () => getApp().simulations,
+  scenarioRunPlatformUrl,
+});
 
 function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
@@ -88,35 +96,31 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
       batchRunId: string;
     }> = [];
     let allSuitesCalls = 0;
-    vi.spyOn(testApp.simulations, "getRunDataForBatchRun").mockImplementation(
-      async (params) => {
-        batchCalls.push(params);
-        return {
-          changed: true as const,
-          lastUpdatedAt: Date.now(),
-          runs: [makeRun({ batchRunId: params.batchRunId })],
-        };
-      },
-    );
-    vi.spyOn(testApp.simulations, "getRunDataForAllSuites").mockImplementation(
-      async () => {
-        allSuitesCalls += 1;
-        return {
-          changed: true as const,
-          lastUpdatedAt: Date.now(),
-          runs: [
-            makeRun({ batchRunId: "batch_1" }),
-            makeRun({
-              batchRunId: "batch_stale",
-              scenarioRunId: "run_stale",
-              status: ScenarioRunStatus.IN_PROGRESS,
-            }),
-          ],
-          scenarioSetIds: {},
-          hasMore: false,
-        };
-      },
-    );
+    vi.spyOn(testApp.simulations, "getRunDataForBatchRun").mockImplementation(async (params) => {
+      batchCalls.push(params);
+      return {
+        changed: true as const,
+        lastUpdatedAt: Date.now(),
+        runs: [makeRun({ batchRunId: params.batchRunId })],
+      };
+    });
+    vi.spyOn(testApp.simulations, "getRunDataForAllSuites").mockImplementation(async () => {
+      allSuitesCalls += 1;
+      return {
+        changed: true as const,
+        lastUpdatedAt: Date.now(),
+        runs: [
+          makeRun({ batchRunId: "batch_1" }),
+          makeRun({
+            batchRunId: "batch_stale",
+            scenarioRunId: "run_stale",
+            status: ScenarioRunStatus.IN_PROGRESS,
+          }),
+        ],
+        scenarioSetIds: {},
+        hasMore: false,
+      };
+    });
     globalForApp.__langwatch_app = testApp;
     return {
       batchCalls,
@@ -161,9 +165,7 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
     it("passes both filters through to the batch query", async () => {
       const repository = withRepository();
 
-      const res = await get(
-        "/api/simulation-runs?batchRunId=batch_1&scenarioSetId=set_1",
-      );
+      const res = await get("/api/simulation-runs?batchRunId=batch_1&scenarioSetId=set_1");
       expect(res.status).toBe(200);
 
       expect(repository.batchCalls).toEqual([

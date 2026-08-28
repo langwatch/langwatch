@@ -24,8 +24,19 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
-import { MAX_VALUE_BYTES } from "../agent-cache.service";
+import { createAgentCacheRestApp, MAX_VALUE_BYTES } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { AgentCacheService } from "../agent-cache.service";
+
+/**
+ * The same wiring `api-router.ts` mounts: the family, built against this
+ * process's security and its one entry store.
+ */
+const agentCacheService = new AgentCacheService();
+const { hono: app } = createAgentCacheRestApp({
+  security: appRestSecurity,
+  agentCache: () => agentCacheService,
+});
 
 wireDefaultTestApp();
 
@@ -54,22 +65,14 @@ describe("Feature: the agent cache", () => {
   const readEntry = (name: string, token: string) =>
     app.request(`/api/agent-cache/${name}`, { headers: headersFor(token) });
 
-  const writeEntry = (
-    name: string,
-    token: string,
-    body: Record<string, unknown>,
-  ) =>
+  const writeEntry = (name: string, token: string, body: Record<string, unknown>) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "PUT",
       headers: { ...headersFor(token), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-  const claimEntry = (
-    name: string,
-    token: string,
-    body: Record<string, unknown>,
-  ) =>
+  const claimEntry = (name: string, token: string, body: Record<string, unknown>) =>
     app.request(`/api/agent-cache/${name}/claim`, {
       method: "POST",
       headers: { ...headersFor(token), "Content-Type": "application/json" },
@@ -244,9 +247,9 @@ describe("Feature: the agent cache", () => {
       it("refuses with the cache_entry_not_found code", async () => {
         const res = await readEntry("ACME_NEVER_STORED", manageToken);
         expect(res.status).toBe(404);
-        expect(
-          ((await res.json()) as { error: { code: string } }).error.code,
-        ).toBe("cache_entry_not_found");
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+          "cache_entry_not_found",
+        );
       });
     });
 
@@ -254,13 +257,9 @@ describe("Feature: the agent cache", () => {
       /** @scenario "Removing an entry the project does not hold succeeds" */
       it("succeeds whether or not the name was held", async () => {
         await writeEntry("ACME_DROPPED", manageToken, { value: "x" });
-        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(
-          200,
-        );
+        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(200);
         expect((await readEntry("ACME_DROPPED", manageToken)).status).toBe(404);
-        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(
-          200,
-        );
+        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(200);
       });
     });
 
@@ -317,9 +316,7 @@ describe("Feature: the agent cache", () => {
           value: "second",
         });
         expect(res.status).toBe(200);
-        expect(((await res.json()) as { claimed: boolean }).claimed).toBe(
-          false,
-        );
+        expect(((await res.json()) as { claimed: boolean }).claimed).toBe(false);
 
         const read = await readEntry("ACME_CLAIM_HELD", manageToken);
         expect(((await read.json()) as { value: string }).value).toBe("first");
@@ -333,9 +330,7 @@ describe("Feature: the agent cache", () => {
           value: "gone-soon",
           ttl_seconds: 5,
         });
-        expect(((await first.json()) as { claimed: boolean }).claimed).toBe(
-          true,
-        );
+        expect(((await first.json()) as { claimed: boolean }).claimed).toBe(true);
 
         // The route floor is 5 seconds, so waiting past it is the only way to
         // observe the name coming free again.
@@ -344,9 +339,7 @@ describe("Feature: the agent cache", () => {
         const second = await claimEntry("ACME_CLAIM_BRIEF", manageToken, {
           value: "the-next-one",
         });
-        expect(((await second.json()) as { claimed: boolean }).claimed).toBe(
-          true,
-        );
+        expect(((await second.json()) as { claimed: boolean }).claimed).toBe(true);
       }, 15_000);
     });
 
@@ -369,9 +362,7 @@ describe("Feature: the agent cache", () => {
 
         const winnerIndex = outcomes.findIndex((outcome) => outcome.claimed);
         const read = await readEntry("ACME_CLAIM_RACE", manageToken);
-        expect(((await read.json()) as { value: string }).value).toBe(
-          `row-${winnerIndex}`,
-        );
+        expect(((await read.json()) as { value: string }).value).toBe(`row-${winnerIndex}`);
       });
     });
   });
@@ -394,9 +385,7 @@ describe("Feature: the agent cache", () => {
           headers: { "X-Auth-Token": projectApiKey },
         });
         expect(res.status).toBe(200);
-        expect(((await res.json()) as { value: string }).value).toBe(
-          "from-the-legacy-key",
-        );
+        expect(((await res.json()) as { value: string }).value).toBe("from-the-legacy-key");
       });
     });
   });
@@ -406,9 +395,7 @@ describe("Feature: the agent cache", () => {
       /** @scenario "A caller without the manage grain is refused" */
       it("refuses a viewer", async () => {
         expect((await readEntry(ENTRY_NAME, viewerToken)).status).toBe(403);
-        expect(
-          (await writeEntry(ENTRY_NAME, viewerToken, { value: "x" })).status,
-        ).toBe(403);
+        expect((await writeEntry(ENTRY_NAME, viewerToken, { value: "x" })).status).toBe(403);
       });
     });
 
@@ -434,9 +421,7 @@ describe("Feature: the agent cache", () => {
 
         const res = await readEntry("ACME_FROM_SANDBOX", sandboxToken);
         expect(res.status).toBe(200);
-        expect(((await res.json()) as { value: string }).value).toBe(
-          "written-in-the-sandbox",
-        );
+        expect(((await res.json()) as { value: string }).value).toBe("written-in-the-sandbox");
       });
     });
 

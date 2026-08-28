@@ -13,9 +13,16 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createProjectRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
 
 wireDefaultTestApp();
+
+const { hono: app } = createProjectRestApp({
+  security: appRestSecurity,
+  projects: () => getApp().projects,
+  apiKeys: () => getApp().apiKeys,
+});
 
 describe("Feature: Projects REST API", () => {
   const ns = `projects-api-${nanoid(8)}`;

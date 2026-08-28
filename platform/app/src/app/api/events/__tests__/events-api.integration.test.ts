@@ -15,11 +15,40 @@ vi.mock("~/server/app-layer/events/track-event.service", async (importOriginal) 
   };
 });
 
-import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
+import { createEventsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
+import {
+  generateTrackedEventId,
+  recordTrackedEventSpan,
+} from "~/server/app-layer/events/track-event.service";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 
 wireDefaultTestApp();
+
+// The family is package-owned now, so this builds it the way the API router
+// does — same security spine, same ports.
+const { hono: app } = createEventsRestApp({
+  security: appRestSecurity,
+  ports: {
+    assertPredefinedEventPayload: (rawBody) => {
+      if (
+        typeof rawBody.event_type === "string" &&
+        predefinedEventTypes.includes(
+          rawBody.event_type as (typeof predefinedEventTypes)[number],
+        )
+      ) {
+        predefinedEventsSchemas.parse(rawBody);
+      }
+    },
+    generateEventId: generateTrackedEventId,
+    recordTrackedEvent: (input) => recordTrackedEventSpan(input),
+    reportError: (error) => captureException(toError(error)),
+    describeValidationError: zodErrorMessage,
+  },
+});
 
 describe("Events API", () => {
   let testApiKey: string;

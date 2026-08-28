@@ -17,14 +17,25 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
   type ManagementTestOrg,
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
-import { app } from "../[[...route]]/app";
+import { getApp } from "~/server/app-layer/app";
+import { createRolesRestApp } from "@langwatch/platform-api";
+import { appRestManagement } from "~/server/api/management/managed-service";
+import { appRestRbacVocabulary } from "~/server/api/management/rbac-vocabulary";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
+
+const app = createRolesRestApp({
+  management: appRestManagement,
+  roles: () => getApp().roles,
+  vocabulary: appRestRbacVocabulary,
+  ledgerActor: orgRequestLedgerActor,
+});
 
 describe("Feature: Custom roles REST API", () => {
   const ns = `roles-rest-${nanoid(8)}`;

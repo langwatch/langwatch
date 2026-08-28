@@ -30,7 +30,22 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import publishedSpec from "../../openapiLangWatch.json";
-import { app } from "../[[...route]]/app";
+import { createCodingAgentRestApp } from "@langwatch/platform-api";
+import { auditLog } from "~/runtime/app/features/audit-log";
+import { appRestSecurity } from "~/server/api/security";
+import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+
+const { hono: app } = createCodingAgentRestApp({
+  security: appRestSecurity,
+  codingAgents: () => ({
+    codingAgents: getApp().codingAgents,
+    githubWebBase: () => getApp().github.getWebBase(),
+    resolveOrganizationId,
+    resolveCallerProjectScope,
+    auditLog,
+  }),
+});
 
 const ns = nanoid(8);
 const USAGE_SPEC_PATH = "/api/coding-agent/pull-request-usage";

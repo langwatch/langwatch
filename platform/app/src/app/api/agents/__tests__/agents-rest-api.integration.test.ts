@@ -11,7 +11,16 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createAgentLegacyRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { LegacyAgentsRestFeature } from "~/runtime/app/legacy-rest/agents";
+import { agentPlatformUrl } from "../agent-platform-url";
+
+const { hono: app } = createAgentLegacyRestApp({
+  security: appRestSecurity,
+  agents: () => LegacyAgentsRestFeature.create({ prisma, session: null }),
+  agentPlatformUrl,
+});
 
 /**
  * Valid signature agent config — all fields are optional in the base component schema,

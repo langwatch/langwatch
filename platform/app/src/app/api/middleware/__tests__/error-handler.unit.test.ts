@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { InternalServerError } from "../../shared/errors";
+import { InternalServerError } from "@langwatch/platform-api/app-rest";
 import { handleError, handledErrorResponseBody } from "../error-handler";
 
 vi.mock("~/server/app-layer/app", () => ({

@@ -20,7 +20,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -28,7 +28,16 @@ import {
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
 import { seedSsoConnection } from "~/test-utils/ssoConnection";
-import { app } from "../[[...route]]/app";
+import { getApp } from "~/server/app-layer/app";
+import { createScimTokensRestApp } from "@langwatch/platform-api";
+import { appRestManagement } from "~/server/api/management/managed-service";
+import { managementAuditPort } from "~/server/api/management/audit";
+
+const app = createScimTokensRestApp({
+  management: appRestManagement,
+  scim: () => getApp().scim,
+  audit: managementAuditPort,
+});
 
 describe("Feature: SCIM tokens REST API", () => {
   const ns = `scim-tokens-${nanoid(8)}`;

@@ -8,14 +8,10 @@
  * taxonomies for the same failure.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { HttpError } from "./errors";
-import { type ApiErrorBody, apiErrorBody } from "@langwatch/platform-api/app-rest";
-
-const INVALID_SPAN_ID = "0".repeat(16);
+import { type ApiErrorBody, apiErrorBody, requestTraceIds } from "@langwatch/platform-api/app-rest";
 
 /**
  * The code for a refusal that only knows its status.
@@ -83,20 +79,26 @@ function reasonsOf(error: unknown): ApiErrorReason[] {
   }));
 }
 
-/** An all-zero id is OpenTelemetry's "no valid span" sentinel: treat as absent. */
-function liveId(id: unknown, zero: string): string | undefined {
-  return typeof id === "string" && id && id !== zero ? id : undefined;
-}
-
-/** The request's trace correlation handles, as set by the tracer middleware. */
-export function requestTraceIds(c: Context): {
-  traceId?: string;
-  spanId?: string;
-} {
-  return {
-    traceId: liveId(c.get("traceId"), INVALID_TRACE_ID),
-    spanId: liveId(c.get("spanId"), INVALID_SPAN_ID),
-  };
+/**
+ * A status-carrying REST error, recognised by its shape rather than by its
+ * class.
+ *
+ * There are two `HttpError` trees while the REST families move into
+ * `@langwatch/platform-api`: the application's own, and the packaged one a
+ * moved family throws. An `instanceof` against either would render the other
+ * as an opaque 500, turning a 400 the caller could act on into an incident
+ * they cannot. The pair of fields is the whole of the public surface of both,
+ * and nothing else at this boundary carries them: a `HandledError` names its
+ * status `httpStatus` and has no `error`, and it is matched first anyway.
+ */
+function isStatusCarryingError(
+  error: unknown,
+): error is Error & { status: ContentfulStatusCode; error: string } {
+  return (
+    error instanceof Error &&
+    typeof (error as { status?: unknown }).status === "number" &&
+    typeof (error as { error?: unknown }).error === "string"
+  );
 }
 
 /**
@@ -116,7 +118,7 @@ export function canonicalErrorFor(
     return handledErrorEnvelope(error, traceIds);
   }
 
-  if (error instanceof HttpError) {
+  if (isStatusCarryingError(error)) {
     const status = error.status;
     return {
       status,

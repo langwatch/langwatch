@@ -26,7 +26,16 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createApiKeysRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { managementAuditPort } from "~/server/api/management/audit";
+
+const { hono: app } = createApiKeysRestApp({
+  security: appRestSecurity,
+  apiKeys: () => getApp().apiKeys,
+  permissions: () => getApp().permissions,
+  audit: managementAuditPort,
+});
 
 wireDefaultTestApp();
 

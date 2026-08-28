@@ -7,7 +7,19 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createModelProvidersRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+/**
+ * Built here the way the process builds it, because the family is packaged
+ * now: both services are resolved per request off whatever App the test has
+ * installed.
+ */
+const app = createModelProvidersRestApp({
+  security: appRestSecurity,
+  modelProviders: () => getApp().modelProviders,
+  organizations: () => getApp().organizations,
+}).hono;
 
 wireDefaultTestApp();
 

@@ -48,7 +48,166 @@ import { nextAnchoredResetAt } from "@langwatch/gateway-server";
 import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createGatewayPlatformRestApp } from "@langwatch/platform-api";
+import type { GatewayPlatformRestPorts, GatewayRestActor } from "@langwatch/platform-api";
+import {
+  GatewayUsageService,
+  loadTraceDestinationFacts,
+  toVirtualKeySnakeDto,
+} from "@langwatch/gateway-server";
+import { appRestSecurity } from "~/server/api/security";
+import {
+  assertActorCanManageAllScopes,
+  assertActorCanOperateOnAnyScope,
+  assertGuardrailAttachmentsAllowed,
+  assertScopesBelongToOrg,
+  assertTraceProjectBelongsToOrg,
+  isVisibleToMembership,
+  type MembershipSet,
+  requireExistingVk,
+  requireVisibleVk,
+  resolveVkProjectId,
+  type VirtualKeyActor,
+} from "~/server/gateway/virtualKey.authz";
+import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
+import type { Permission } from "~/server/api/rbac";
+import type { GuardrailAttachment } from "@langwatch/gateway-contract";
+
+/**
+ * A project credential stands in for someone working in its project, so it
+ * sees organization-scoped keys, its own team's keys and its own project's.
+ */
+function membershipForProjectCredential(project: { id: string; teamId: string }): MembershipSet {
+  return {
+    isOrgMember: true,
+    isOrgAdmin: false,
+    teamIds: new Set([project.teamId]),
+    projectIds: new Set([project.id]),
+  };
+}
+
+/**
+ * The process's receipt ledger, as the family's port takes it. Declared as a
+ * generic function rather than an arrow so the port's own type parameter
+ * survives the assignment.
+ */
+function runIdempotently<T>(input: {
+  operation: string;
+  scopeId: string;
+  key: string | null;
+  validatedBody: unknown;
+  handler: () => Promise<{ status: number; body: T }>;
+}) {
+  return withIdempotency({ prisma, ...input });
+}
+
+/**
+ * The same ports `api-router.ts` composes for the mounted family, so what is
+ * exercised here is what production serves. Resolved per request, which is
+ * what lets a test install a different App between cases.
+ */
+function gatewayPlatformRestPorts(): GatewayPlatformRestPorts {
+  const current = getApp();
+  const asActor = (actor: GatewayRestActor) => actor as VirtualKeyActor;
+  return {
+    virtualKeys: current.gateway.virtualKeys,
+    budgets: current.gateway.budgetDecisions,
+    spendSourceAvailable: current.gateway.virtualKeySpend !== undefined,
+    organizationIdForProject: async (projectId) => {
+      const found = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: { team: true },
+      });
+      if (!found) throw new Error(`project ${projectId} missing team`);
+      return found.team.organizationId;
+    },
+    actorForCredential: ({ projectId, resolvedToken }) =>
+      resolvedToken?.type === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: resolvedToken.apiKeyId,
+              userId: resolvedToken.userId,
+              organizationId: resolvedToken.organizationId,
+            },
+            actorUserId: resolvedToken.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId },
+            actorUserId: `svc_${projectId}`,
+          },
+    visibleToProjectCredential: ({ project, virtualKeys }) => {
+      const membership = membershipForProjectCredential(project);
+      return virtualKeys.filter((vk) => isVisibleToMembership(membership, vk.scopes));
+    },
+    requireVisibleVirtualKey: ({ project, id, organizationId }) =>
+      requireVisibleVk(current.gateway.virtualKeys, membershipForProjectCredential(project), {
+        id,
+        organizationId,
+      }),
+    requireExistingVirtualKey: ({ id, organizationId }) =>
+      requireExistingVk(current.gateway.virtualKeys, id, organizationId),
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      assertActorCanManageAllScopes({ prisma, actor: asActor(actor) }, [...scopes]),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      assertActorCanOperateOnAnyScope(
+        { prisma, actor: asActor(actor) },
+        [...scopes],
+        permission as Permission,
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
+    assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
+      assertGuardrailAttachmentsAllowed(
+        { prisma, actor: asActor(actor) },
+        projectId,
+        attachments as GuardrailAttachment[] | undefined,
+      ),
+    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
+      resolveVkProjectId(prisma, organizationId, {
+        vkId: virtualKeyId,
+        inputScopes: scopes ? [...scopes] : undefined,
+        traceProjectId,
+      }),
+    toVirtualKeyDtos: async ({ virtualKeys }) => {
+      const facts = await loadTraceDestinationFacts({
+        projects: current.projects,
+        virtualKeys: [...virtualKeys],
+      });
+      return virtualKeys.map((virtualKey) => toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    groupMemberCounts: async (budgets) => {
+      const groupIds = Array.from(
+        new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
+      );
+      if (groupIds.length === 0) return new Map();
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: { id: true, _count: { select: { members: true } } },
+      });
+      return new Map(groups.map((g) => [g.id, g._count.members]));
+    },
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      GatewayUsageService.create({
+        prisma,
+        chRepo: undefined,
+        spendRepo: current.gateway.virtualKeySpend,
+      }).spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+    idempotency: runIdempotently,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+  };
+}
+
+const { hono: app } = createGatewayPlatformRestApp({
+  security: appRestSecurity,
+  gateway: gatewayPlatformRestPorts,
+});
 
 const suffix = nanoid(8);
 const ORG_ID = `org-gwrest-${suffix}`;

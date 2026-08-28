@@ -3,7 +3,7 @@
  * members, and its invites, addressed with no {orgId} segment because the
  * organization is implied by the credential.
  *
- * Built on `@langwatch/api` through `createManagementService`, so every
+ * Built on `@langwatch/api` through the management spine, so every
  * endpoint declares its RBAC permission once and gets the SecuredApp policy
  * registration, the org-key authentication (throwing mode), the permission
  * check (403) and the Enterprise plan gate (402) in that order. Every dated
@@ -19,8 +19,8 @@
  */
 import { z } from "zod";
 import { appFromContext } from "~/app/api/middleware/app-context";
-import { createManagementService } from "~/server/api/management/managed-service";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
+import { appRestManagement } from "~/server/api/management/managed-service";
 import { prisma } from "~/server/db";
 import { InviteService } from "~/server/invites/invite.service";
 import {
@@ -51,7 +51,7 @@ import {
   userIdParamsSchema,
 } from "./wire";
 
-const { service, guard } = createManagementService({
+const { service, guard } = appRestManagement.createFamily({
   name: "organization",
   basePath: "/api/organization",
   feature: "MANAGEMENT_API",

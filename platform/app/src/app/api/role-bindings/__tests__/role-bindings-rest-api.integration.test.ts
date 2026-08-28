@@ -31,7 +31,7 @@ import {
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -40,7 +40,16 @@ import {
   seedOrgMember,
 } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createRoleBindingsRestApp } from "@langwatch/platform-api";
+import { appRestManagement } from "~/server/api/management/managed-service";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
+
+const app = createRoleBindingsRestApp({
+  management: appRestManagement,
+  permissions: () => getApp().permissions,
+  grants: () => getApp().authzGrants,
+  ledgerActor: orgRequestLedgerActor,
+});
 
 const sessionFor = (userId: string): Session => ({ user: { id: userId } }) as unknown as Session;
 

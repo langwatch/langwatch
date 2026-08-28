@@ -17,7 +17,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
+import { MANAGEMENT_API_VERSION } from "@langwatch/platform-api/app-rest";
 import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";

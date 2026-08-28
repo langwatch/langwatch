@@ -5,7 +5,20 @@ import type { Evaluator, Organization, Project, Team } from "~/generated/prisma/
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { createEvaluatorsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { organizationMiddleware } from "~/app/api/middleware/organization";
+import { platformUrl } from "~/app/api/shared/platform-url";
+
+/** The family as the API router mounts it. */
+const app = createEvaluatorsRestApp({
+  security: appRestSecurity,
+  evaluators: () => getApp().evaluators,
+  modelProviders: () => getApp().modelProviders,
+  platformUrl,
+  organizationMiddleware,
+}).hono;
 
 wireDefaultTestApp();
 

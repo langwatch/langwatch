@@ -80,8 +80,7 @@ vi.mock("~/server/app-layer/app", async () => {
 });
 
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>();
+  const original = await importOriginal<typeof import("~/server/clickhouse/clickhouseClient")>();
   return {
     ...original,
     getClickHouseClientForTenant: resolveTestClickHouseClient,
@@ -89,7 +88,67 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
 });
 
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
-import { app } from "../[[...route]]/app";
+import { createGatewaySpendRestApp } from "@langwatch/platform-api";
+import type { GatewaySpendRestPorts } from "@langwatch/platform-api";
+import { ForbiddenError, requestTraceIds } from "@langwatch/platform-api/app-rest";
+import {
+  assertWebhookEndpointsEntitled,
+  WebhookEndpointsNotEntitledError,
+} from "~/runtime/app/features/webhooks";
+import { applicableEndUserCaps, FixedGatewaySettlementPolicy } from "@langwatch/gateway-server";
+import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
+import { appRestSecurity } from "~/server/api/security";
+import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
+import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
+import { resolveSpendScope } from "~/server/gateway/spendScope";
+
+/**
+ * The same ports and gates `api-router.ts` composes for the mounted family,
+ * so what is exercised here is what production serves. Resolved per request,
+ * which is what lets a test install a different App between cases.
+ */
+function gatewaySpendRestPorts(): GatewaySpendRestPorts {
+  const current = getApp();
+  return {
+    spendEvents: current.gateway.spendEvents,
+    budgetSpend: current.gateway.budgets,
+    webhookEndpoints: current.gateway.webhookEndpoints,
+    webhookEvents: current.gateway.webhookEvents,
+    webhookDelivery: current.gateway.webhookDelivery,
+    settlementPolicy: FixedGatewaySettlementPolicy.create(settlementGraceMs()),
+    resolveSpendScope,
+    endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>
+      applicableEndUserCaps({
+        prisma,
+        budgetRepository,
+        organizationId,
+        endUserId,
+        tenantIds,
+        virtualKeyId,
+      }),
+    spendStoreUnavailable: () => new ClickHouseUnavailableError(),
+  };
+}
+
+const { hono: app } = createGatewaySpendRestApp({
+  security: appRestSecurity,
+  billingPlanGate: async (c, next) => {
+    const organization = c.get("organization") as { id: string };
+    try {
+      await assertWebhookEndpointsEntitled(organization.id);
+    } catch (error) {
+      if (error instanceof WebhookEndpointsNotEntitledError) {
+        throw new ForbiddenError(
+          "The billing events API is an enterprise feature; this organization's plan does not include it.",
+        );
+      }
+      throw error;
+    }
+    await next();
+  },
+  canonicalError: (error, c) => canonicalErrorFor(error, requestTraceIds(c)),
+  spend: gatewaySpendRestPorts,
+});
 
 const ns = `billing-api-${nanoid(8)}`;
 const baseTime = Date.UTC(2026, 0, 10, 12, 0, 0);
@@ -99,9 +158,7 @@ const baseTime = Date.UTC(2026, 0, 10, 12, 0, 0);
  * tenant. A tenant id is absent when its fixture never got created, and the
  * client itself is unset when the containers never came up.
  */
-async function dropSpendRowsForTenants(
-  tenantIds: Array<string | undefined>,
-): Promise<void> {
+async function dropSpendRowsForTenants(tenantIds: Array<string | undefined>): Promise<void> {
   if (!chClient) return;
   for (const tenantId of tenantIds) {
     if (!tenantId) continue;
@@ -144,10 +201,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     "Content-Type": "application/json",
   });
 
-  const spendRow = (
-    requestId: string,
-    overrides: Partial<SpendEventRow> = {},
-  ): SpendEventRow => ({
+  const spendRow = (requestId: string, overrides: Partial<SpendEventRow> = {}): SpendEventRow => ({
     tenantId: project.id,
     gatewayRequestId: requestId,
     organizationId: organization.id,
@@ -427,18 +481,14 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         code: "validation_error",
       });
       expect(error.meta?.target).toBe("query");
-      expect(error.meta?.fields).toEqual(
-        expect.arrayContaining(["group_by", "from", "to"]),
-      );
+      expect(error.meta?.fields).toEqual(expect.arrayContaining(["group_by", "from", "to"]));
       // The reason chain names each offending field, in the wire's own
       // casing, so a caller never has to parse the sentence.
       const reasons = error.meta?.reasons as Array<{
         code: string;
         meta?: { field?: string };
       }>;
-      expect(reasons.map((r) => r.meta?.field)).toEqual(
-        expect.arrayContaining(["group_by"]),
-      );
+      expect(reasons.map((r) => r.meta?.field)).toEqual(expect.arrayContaining(["group_by"]));
       expect(reasons.every((r) => r.code === "schema_failure")).toBe(true);
     });
 
@@ -446,9 +496,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     it("answers an unexpected server failure with it, naming nothing internal", async () => {
       const boom = vi
         .spyOn(GatewaySpendEventsRepository.prototype, "readSpendSummaries")
-        .mockRejectedValueOnce(
-          new Error('relation "GatewaySpendRecords" does not exist'),
-        );
+        .mockRejectedValueOnce(new Error('relation "GatewaySpendRecords" does not exist'));
       try {
         const res = await app.request(
           `/api/gateway/v1/spend-summaries?group_by=virtual_key&from=${baseTime}&to=${baseTime + 1_000}`,
@@ -551,9 +599,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     const body = (await res.json()) as {
       data: Array<{ data: { gateway_request_id: string } }>;
     };
-    expect(body.data.map((e) => e.data.gateway_request_id)).not.toContain(
-      `${ns}-foreign`,
-    );
+    expect(body.data.map((e) => e.data.gateway_request_id)).not.toContain(`${ns}-foreign`);
   });
 
   it("refuses an inverted time range", async () => {
@@ -566,8 +612,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
   it("replays a window to one endpoint with unchanged envelope ids", async () => {
-    const { WEBHOOK_DELIVERY_PROCESS_NAME } =
-      await import("~/runtime/app/features/webhooks");
+    const { WEBHOOK_DELIVERY_PROCESS_NAME } = await import("~/runtime/app/features/webhooks");
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
     const endpoints = createEnterpriseWebhookEndpointService({ prisma });
@@ -1322,9 +1367,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       const body = (await res.json()) as {
         data: Array<{ key: string; event_count: number }>;
       };
-      expect(body.data).toEqual([
-        expect.objectContaining({ key: virtualKeyId, event_count: 1 }),
-      ]);
+      expect(body.data).toEqual([expect.objectContaining({ key: virtualKeyId, event_count: 1 })]);
     });
   });
 });

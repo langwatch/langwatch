@@ -13,12 +13,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { app } from "../[[...route]]/app";
+import { createSimulationRunsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
+
+const { hono: app } = createSimulationRunsRestApp({
+  security: appRestSecurity,
+  simulations: () => getApp().simulations,
+  scenarioRunPlatformUrl,
+});
 
 function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
@@ -108,9 +116,7 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
       expect(body.platformUrl).toContain(
         `/${testProject.slug}/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1`,
       );
-      expect(body.platformUrl).not.toMatch(
-        new RegExp(`/${testProject.slug}/simulations$`),
-      );
+      expect(body.platformUrl).not.toMatch(new RegExp(`/${testProject.slug}/simulations$`));
     });
   });
 

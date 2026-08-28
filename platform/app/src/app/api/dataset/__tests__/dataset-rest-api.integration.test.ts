@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -11,7 +11,21 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createDatasetRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { platformUrl } from "../../shared/platform-url";
+import { authorizeDirectUpload } from "../direct-upload-auth";
+
+/**
+ * The family as the API router mounts it. The service is resolved per request
+ * so the App this file composes in `beforeEach` is the one the routes use.
+ */
+const app = createDatasetRestApp({
+  security: appRestSecurity,
+  dataset: () => getApp().dataset,
+  platformUrl,
+  authorizeDirectUpload,
+}).hono;
 
 describe("Feature: Dataset REST API", () => {
   let testApiKey: string;

@@ -5,7 +5,18 @@ import type { Evaluator, Organization, Project, Team } from "~/generated/prisma/
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { app } from "../[[...route]]/app";
+import { createMonitorRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
+import { platformUrl } from "../../shared/platform-url";
+
+const { hono: app } = createMonitorRestApp({
+  security: appRestSecurity,
+  monitors: () => getApp().monitors,
+  platformUrl,
+  mappingsSchema: monitorMappingsSchema,
+});
 
 wireDefaultTestApp();
 

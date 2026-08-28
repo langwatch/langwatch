@@ -20,6 +20,7 @@
  * and passes it in) since there is no `authMiddleware` to set `c.get("project")`.
  */
 
+import type { DatasetDirectUploadAuthorization } from "@langwatch/platform-api";
 import type { Context } from "hono";
 import {
   apiKeyCeilingDenialResponse,
@@ -65,20 +66,6 @@ function isCrossSiteRequest(c: Context): boolean {
   }
 }
 
-export type DirectUploadAuthResult =
-  | { ok: true; projectId: string; teamId: string }
-  | {
-      ok: false;
-      status: 401 | 403;
-      error: string;
-      /**
-       * The full handled body for failures that have one (currently only the
-       * API-key ceiling denial: code, permission, tips, docsUrl). Routes should
-       * answer with this in preference to `error`, which is only a sentence.
-       */
-      body?: object;
-    };
-
 /**
  * Authorize a direct-upload request for `projectId` via session cookie OR API
  * key, requiring `datasets:manage`. Returns the resolved `projectId` + `teamId`
@@ -88,7 +75,7 @@ export type DirectUploadAuthResult =
 export async function authorizeDirectUpload(
   c: Context,
   projectId: string,
-): Promise<DirectUploadAuthResult> {
+): Promise<DatasetDirectUploadAuthorization> {
   // 1. Session cookie (the upload UI).
   const session = await getServerAuthSession({ app: c.app, req: c.req.raw });
   if (session) {

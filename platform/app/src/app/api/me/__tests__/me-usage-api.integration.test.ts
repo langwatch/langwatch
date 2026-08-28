@@ -22,7 +22,15 @@ import {
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createMeRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+const { hono: app } = createMeRestApp({
+  security: appRestSecurity,
+  governance: () => getApp().governance,
+  organizations: () => getApp().organizations,
+  projects: () => getApp().projects,
+});
 
 /** Minimal trace_summaries seed — mirrors the PersonalUsageService test helper. */
 async function insertTrace({

@@ -5,8 +5,11 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
 import { grafanaConfigFromEnv, grafanaLinksForTrace } from "~/utils/grafanaLinks";
 
-import { HttpError, NotFoundError } from "../shared/errors";
-import { errorSchema } from "@langwatch/platform-api/app-rest";
+import {
+  errorSchema,
+  HttpError,
+  NotFoundError,
+} from "@langwatch/platform-api/app-rest";
 
 const INVALID_SPAN_ID = "0".repeat(16);
 

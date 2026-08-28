@@ -30,7 +30,17 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createGroupRestApp } from "@langwatch/platform-api";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
+import { appRestSecurity } from "~/server/api/security";
+
+const { hono: app } = createGroupRestApp({
+  security: appRestSecurity,
+  organizations: () => getApp().organizations,
+  enterpriseGate: requireEnterprisePlanRest("GROUPS"),
+  ledgerActor: orgRequestLedgerActor,
+});
 
 describe("Feature: Group endpoints behind the Enterprise gate", () => {
   const ns = `groups-gate-${nanoid(8)}`;

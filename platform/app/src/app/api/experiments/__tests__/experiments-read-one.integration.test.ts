@@ -18,11 +18,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { ExperimentType } from "~/generated/prisma/client";
-import { globalForApp } from "~/server/app-layer/app";
+import { getApp, globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { app } from "../[[...route]]/app";
+import { createExperimentsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
+
+/** The family as the API router mounts it. */
+const app = createExperimentsRestApp({
+  security: appRestSecurity,
+  experiments: () => getApp().experiments,
+}).hono;
 
 /**
  * Run counts come from ClickHouse, and the default test App has no client, so
