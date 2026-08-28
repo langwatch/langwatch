@@ -1,16 +1,19 @@
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { resolveLegacyLoggerConfiguration } = await import("./runtime/logger.config");
+  const { isNodeInstrumentationRuntime } = await import("./runtime/executable-bootstrap.config");
+  if (isNodeInstrumentationRuntime(process.env)) {
+    const { initializeEnvironmentConfig } = await import("./env.mjs");
+    initializeEnvironmentConfig(process.env);
+
+    const { resolveProcessBootstrapConfig } = await import("./runtime/executable-bootstrap.config");
+    const bootstrap = resolveProcessBootstrapConfig(process.env);
     const { configureLogger } = await import("@langwatch/observability");
-    configureLogger(resolveLegacyLoggerConfiguration(process.env));
+    configureLogger(bootstrap.logger);
 
     const { setEnvironment } = await import("@langwatch/ksuid");
-    setEnvironment(process.env.ENVIRONMENT ?? "local");
+    setEnvironment(bootstrap.environment);
 
-    const { resolveTelemetryConfiguration } = await import("./runtime/telemetry.config");
-    const telemetryConfig = resolveTelemetryConfiguration(process.env);
     const { initializeInstrumentation } = await import("./instrumentation.node");
-    initializeInstrumentation(telemetryConfig);
+    initializeInstrumentation(bootstrap.telemetry);
 
     const { initializeWebApp } = await import("./server/app-layer/presets");
     try {

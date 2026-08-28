@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { RuntimeConfigResolver } from "@langwatch/runtime-composition";
 
 export const appBootConfigSchema = z
   .object({
@@ -7,23 +8,11 @@ export const appBootConfigSchema = z
     port: z.coerce.number().int().min(1).max(65_535).default(5_560),
     apiPort: z.coerce.number().int().min(1).max(65_535).optional(),
     workersInProcess: z
-      .union([
-        z.boolean(),
-        z.literal("true"),
-        z.literal("false"),
-        z.literal("1"),
-        z.literal("0"),
-      ])
+      .union([z.boolean(), z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
       .transform((value) => value === true || value === "true" || value === "1")
       .default(false),
     developmentHttp2: z
-      .union([
-        z.boolean(),
-        z.literal("true"),
-        z.literal("false"),
-        z.literal("1"),
-        z.literal("0"),
-      ])
+      .union([z.boolean(), z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
       .transform((value) => value === true || value === "true" || value === "1")
       .default(false),
     developmentHttpsCertificatePath: z.string().min(1).optional(),
@@ -89,4 +78,14 @@ export class AppBootConfigService {
     if (!result.success) throw new InvalidAppBootConfigError(result.error);
     return result.data;
   }
+}
+
+/**
+ * Keeps an already-projected boot value authoritative when an executable has
+ * resolved all of its private configuration at one boundary.
+ */
+export function fixedAppBootConfigResolver(
+  config: AppBootConfig,
+): RuntimeConfigResolver<AppBootConfig> {
+  return { resolve: () => config };
 }

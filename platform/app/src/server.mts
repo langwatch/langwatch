@@ -12,23 +12,25 @@ void (async () => {
   const { initializeEnvironmentConfig } = await import("./env.mjs");
   const environment = initializeEnvironmentConfig(process.env);
 
-  const { resolveLegacyLoggerConfiguration } = await import("./runtime/logger.config");
+  const { resolveProcessBootstrapConfig } = await import("./runtime/executable-bootstrap.config");
+  const bootstrap = resolveProcessBootstrapConfig(process.env);
   const { configureLogger } = await import("@langwatch/observability");
-  configureLogger(resolveLegacyLoggerConfiguration(process.env));
+  configureLogger(bootstrap.logger);
 
   const { setEnvironment } = await import("@langwatch/ksuid");
   const { AppBoot } = await import("./runtime/app/boot");
+  const { AppBootConfigService, fixedAppBootConfigResolver } = await import("./runtime/config");
 
-  setEnvironment(process.env.ENVIRONMENT ?? "local");
+  setEnvironment(bootstrap.environment);
 
-  if (process.env.NODE_ENV === "production") {
+  if (bootstrap.nodeEnv === "production") {
     process.setMaxListeners(128);
     events.EventEmitter.defaultMaxListeners = 128;
   }
 
   // CSS/SCSS/SASS are frontend-only. In dev (tsx) the server shares the app
   // graph, which transitively imports them, so stub them to a no-op.
-  if (process.env.NODE_ENV === "development") {
+  if (bootstrap.nodeEnv === "development") {
     const noopCssPath = new URL("./noop-css.cjs", import.meta.url).pathname;
     const mod = Module as unknown as {
       _resolveFilename: (request: string, ...rest: unknown[]) => string;
@@ -44,12 +46,14 @@ void (async () => {
 
   // OTel must register before the app graph evaluates. Resolve telemetry from
   // the selected .env/.env.portless source before loading the SDK module.
-  const { resolveTelemetryConfiguration } = await import("./runtime/telemetry.config");
-  const telemetryConfig = resolveTelemetryConfiguration(process.env);
   const { initializeInstrumentation } = await import("./instrumentation.node");
-  initializeInstrumentation(telemetryConfig);
+  initializeInstrumentation(bootstrap.telemetry);
 
+  // Preserve the original boundary: process-wide logging, IDs, and telemetry
+  // are ready before HTTP-specific settings can reject application boot.
+  const appConfig = new AppBootConfigService().resolve(process.env);
   const appBoot = new AppBoot({
+    config: fixedAppBootConfigResolver(appConfig),
     compose: async (config, resources) => {
       // Keep all env-reading legacy imports behind the explicit config phase.
       const { createLegacyAppRuntime } = await import("./runtime/app");
@@ -74,7 +78,7 @@ void (async () => {
     },
   });
 
-  await appBoot.boot(process.env);
+  await appBoot.boot({});
 })().catch((error: unknown) => {
   const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.stderr.write(`[langwatch:server] fatal boot failure: ${message}\n`);

@@ -35,6 +35,36 @@ describe("executable import boundaries", () => {
     expect(server).not.toContain("await appRuntime.start();");
   });
 
+  it("configures process-wide setup before HTTP boot validation", () => {
+    for (const file of ["server.mts", "workers.ts"]) {
+      const code = source(file);
+      const bootConfig = code.indexOf("new AppBootConfigService().resolve(process.env)");
+
+      expect(bootConfig).toBeGreaterThan(-1);
+      for (const setup of [
+        "configureLogger(bootstrap.logger)",
+        "setEnvironment(bootstrap.environment)",
+        "initializeInstrumentation(bootstrap.telemetry)",
+      ]) {
+        expect(code.indexOf(setup)).toBeGreaterThan(-1);
+        expect(code.indexOf(setup)).toBeLessThan(bootConfig);
+      }
+    }
+  });
+
+  it("keeps worker boot validation inside its structured startup error path", () => {
+    const workers = source("workers.ts");
+    const startupTry = workers.indexOf("try {\n    // Keep process-wide observability");
+    const bootConfig = workers.indexOf("new AppBootConfigService().resolve(process.env)");
+    const structuredFailureLog = workers.indexOf(
+      'logger.error({ error }, "failed to start background workers")',
+    );
+
+    expect(startupTry).toBeGreaterThan(-1);
+    expect(bootConfig).toBeGreaterThan(startupTry);
+    expect(structuredFailureLog).toBeGreaterThan(bootConfig);
+  });
+
   it("constructs workers through the external runtime seam", () => {
     const workers = source("workers.ts");
 

@@ -116,22 +116,22 @@ describe("legacy executable logger bootstrap order", () => {
   it.each([
     [
       "../../server.mts",
-      ["./runtime/logger.config", "@langwatch/observability"],
+      ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
       ["./runtime/app/boot", "./instrumentation.node"],
     ],
     [
       "../../workers.ts",
-      ["./runtime/logger.config", "@langwatch/observability"],
+      ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
       ["./runtime/app/boot", "./instrumentation.node", "./server/handled-error-wiring"],
     ],
     [
       "../../task.ts",
-      ["./runtime/logger.config", "@langwatch/observability"],
+      ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
       ["./server/app-layer/app", "./tasks.generated"],
     ],
     [
       "../../instrumentation.ts",
-      ["./runtime/logger.config", "@langwatch/observability"],
+      ["./runtime/executable-bootstrap.config", "@langwatch/observability"],
       ["./instrumentation.node", "./server/app-layer/presets"],
     ],
     [
@@ -144,7 +144,9 @@ describe("legacy executable logger bootstrap order", () => {
     async (entry, configImports, graphImports) => {
       const source = await readEntry(entry);
       const configuredAt = source.indexOf(
-        "configureLogger(resolveLegacyLoggerConfiguration(process.env))",
+        source.includes("configureLogger(bootstrap.logger)")
+          ? "configureLogger(bootstrap.logger)"
+          : "configureLogger(resolveLegacyLoggerConfiguration(process.env))",
       );
 
       expect(configuredAt).toBeGreaterThan(-1);
