@@ -125,6 +125,39 @@ function withSecretParameters(
     : {};
 }
 
+/**
+ * Report every enqueue the queue refused.
+ *
+ * A partial enqueue is otherwise invisible: the caller is handed the runs that
+ * were queued and hears nothing about the rest, so the batch looks smaller
+ * than it was asked for with no record of why.
+ */
+function logRejectedEnqueues({
+  items,
+  enqueued,
+  suiteId,
+  batchRunId,
+}: {
+  items: readonly { scenarioRunId: string; scenarioId: string }[];
+  enqueued: readonly PromiseSettledResult<unknown>[];
+  suiteId: string;
+  batchRunId: string;
+}): void {
+  enqueued.forEach((result, index) => {
+    if (result.status !== "rejected") return;
+    logger.error(
+      {
+        suiteId,
+        batchRunId,
+        scenarioRunId: items[index]?.scenarioRunId,
+        scenarioId: items[index]?.scenarioId,
+        error: result.reason,
+      },
+      "Failed to queue a simulation run; it is left out of the batch",
+    );
+  });
+}
+
 /** What SuiteRunService reaches the rest of the platform through. */
 export type SuiteRunServiceDependencies = {
   startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
@@ -334,26 +367,11 @@ export class SuiteRunService {
 
     // An item whose enqueue was rejected has no run and never will, so it is
     // reported neither in the count nor in the list: a caller that waited on
-    // its scenarioRunId would wait for a run that was never queued. Each
-    // rejection is logged with the batch it belongs to, because a partial
-    // enqueue is otherwise invisible to everyone.
+    // its scenarioRunId would wait for a run that was never queued.
     const queuedItems = items.filter(
       (_, index) => enqueued[index]?.status === "fulfilled",
     );
-    for (const [index, result] of enqueued.entries()) {
-      if (result.status !== "rejected") continue;
-      const item = items[index];
-      logger.error(
-        {
-          suiteId,
-          batchRunId,
-          scenarioRunId: item?.scenarioRunId,
-          scenarioId: item?.scenarioId,
-          error: result.reason,
-        },
-        "Failed to queue a simulation run; it is left out of the batch",
-      );
-    }
+    logRejectedEnqueues({ items, enqueued, suiteId, batchRunId });
 
     // No explicit job scheduling — the execution subscriber picks up queued events
     // via the GroupQueue and spawns child processes in the execution pool.
