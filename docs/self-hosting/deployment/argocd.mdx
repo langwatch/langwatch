@@ -20,7 +20,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 - `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
-This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
 Create the namespace and the Secrets:
 
