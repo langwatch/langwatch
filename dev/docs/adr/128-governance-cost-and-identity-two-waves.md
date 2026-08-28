@@ -36,8 +36,8 @@ project as the *home* of every pulled row and separates "home" from
 
 Customers running AI across providers (Anthropic, OpenAI, Azure/Copilot,
 Databricks) ask three questions no single screen answers today: what did we
-spend, who spent it, and which paid seats sit idle. The requirements doc
-(`Q3/governance/requirements/requirements.md`) breaks this into FR1–FR8;
+spend, who spent it, and which paid seats sit idle. The Q3 governance
+requirements break this into eight functional requirements, FR1–FR8;
 today FR5 (provider pulls) and FR7 (dashboards substrate) are shipped,
 FR1/FR4 partial, FR2 (drill-down), FR3 (idle seats), FR8 (ROI) not started.
 
@@ -99,8 +99,8 @@ before the relying code ships:
   invoice-grade conversion) is **unprobed** — no script ever requested
   it; a §20 probe before the Azure puller ships.
 - **Copilot** has no prepaid-credit consumption API (proven dead end,
-  `KNOWN_DEAD.md`); the per-seat price API's *absence* is documented
-  reasoning (`er-model.md`), not a probe — no probe can prove a
+  `KNOWN_DEAD.md`); the per-seat price API's *absence* is reasoned from
+  the licensing model, not a probe — no probe can prove a
   negative. It has SKU/roster counts (4 licensed / 2 enabled measured)
   and activity.
 - **Databricks** query history shows humans as **emails** and service
@@ -109,8 +109,8 @@ before the relying code ships:
   is one of those UUIDs). SCIM listing of people under that same
   app-only auth is **unprobed** (the script ran but no output artifact
   survives, and its curl would pass a 403 silently); the 11/13 Entra
-  `externalId` match exists in prose notes only. The vault's own later
-  correction (2026-08-20): **email is the primary join key** —
+  `externalId` match exists in prose notes only. The research itself
+  later corrected course (2026-08-20): **email is the primary join key** —
   `externalId` exists only for IdP-provisioned users, refreshes daily,
   and Databricks advises against building on it. Genie *serving* tokens
   are provably untieable to requests; warehouse cost prorates by
@@ -269,7 +269,7 @@ invented; replay, stores, and comparator patterns already exist.
 
 Rejects: ClickHouse MV hybrid (the evidence pack's initial lean — reversed
 on correction semantics); querying raw tables with no rollup (Lago's
-pattern; fine per-tenant at today's volume — the research vault's own
+pattern; fine per-tenant at today's volume — the pre-ADR research
 proposal recommended exactly this for v1 with a ~1s revisit trigger —
 the red-team reopened this sequencing question and the captain
 re-affirmed build-now with the corrected rationale above: the marginal
@@ -442,7 +442,7 @@ The match policy for `IdentityMatch`:
 
 - **Deterministic evidence links automatically**, recording which
   evidence and when: **exact verified-email equality is the primary
-  key** (the vault's own 2026-08-20 correction), with exact
+  key** (the research's own 2026-08-20 correction), with exact
   directory-id equality (SCIM `externalId` = provider id) as
   corroboration where present — `externalId` exists only for
   IdP-provisioned users, refreshes daily, and Databricks advises
@@ -572,10 +572,9 @@ then.
   silently); also record the privilege level the Databricks puller
   actually needs (docs indicate CAN MANAGE per Genie space and
   account-admin grants for system tables — some security teams will
-  refuse; `extraction-tradeoffs.md`).
+  refuse).
 - **Audit single-copy** — the 9 adapters' direct-insert audit path
-  becomes journal-backed on the infra track
-  (`governance/pending/audit-single-copy-infra-track.md`); not an ADR
+  becomes journal-backed on a separate infra track; not an ADR
   risk.
 - **Puller success/failure must persist onto the source** — today
   `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but never
@@ -746,7 +745,8 @@ them like every other pull.
 - **ClickHouse MV for the rollup** — over-counts on corrections; fold
   projection replays instead (§4, ADR-034's own reasoning).
 - **Query raw tables, no rollup** — fine per-tenant at today's volume
-  (Lago's pattern, and the vault proposal's own v1 recommendation).
+  (Lago's pattern, and the pre-ADR research proposal's own v1
+  recommendation).
   Reopened by the red-team, re-affirmed by the captain: the rollup is
   one projection class in the pipeline we already operate, not new
   machinery — build now (§4, Revisions v2).
@@ -818,7 +818,7 @@ money tables, only the identity tables and read paths.
     persistent "metering over bill" variance is the discount's expected
     signature, labeled as such.
   - **Identity evidence reordered** (§12, provider-behaviour): email is
-    the primary join key per the vault's own 2026-08-20 correction;
+    the primary join key per the research's own 2026-08-20 correction;
     `externalId` (IdP-only, daily-refreshed, provider-discouraged)
     corroborates but never stands alone.
   - **Numbers corrected**: the tooling-artifact count is 269/436 per
@@ -862,8 +862,8 @@ money tables, only the identity tables and read paths.
   - **§15's marker limitation stated**: latest revision only; chain in
     the event log.
   - **One locked ruling reopened and re-asked, not silently re-decided**:
-    rollup-now vs direct grouped queries first (the vault proposal's own
-    v1 recommendation, with the rollup buildable losslessly later via
+    rollup-now vs direct grouped queries first (the pre-ADR research
+    proposal's own v1 recommendation, with the rollup buildable losslessly later via
     replay). The captain re-affirmed **build now**, on a corrected
     rationale: the draft's "cross-org dashboards" justification was a
     drafting error (nothing in FR1–FR8 is cross-org), and the honest
@@ -876,8 +876,7 @@ money tables, only the identity tables and read paths.
   parc-fermé ceremony: framing round (decision scope, forcing function =
   stack closure + Q3 commitment with a waiting POC, blast radius =
   customer-facing money, three hard constraints), six prior interactive
-  rounds (2026-08-27/28, logged in the research vault's
-  `fable-analysis/02-decisions.md` — 29 rulings), and one final fork
+  rounds (2026-08-27/28) producing 29 recorded rulings, and one final fork
   round (governance one-off; Postgres identity home; proof-auto-links
   with conflict suspension; repo placement). Notable overrides along the
   way, recorded so the reasoning survives: "gateway wins" replaced by
