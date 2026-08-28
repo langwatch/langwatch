@@ -8,6 +8,7 @@ import {
   removeUserAvatarInputSchema,
   setUserAvatarInputSchema,
   setUserHomePathInputSchema,
+  setFirstUserPasswordInputSchema,
   updateUserProfileInputSchema,
   userEmailInputSchema,
   userIdInputSchema,
@@ -19,11 +20,14 @@ import {
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
   type SetUserHomePathInput,
+  type SetFirstUserPasswordInput,
+  type SetFirstUserPasswordResult,
   type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserAvatarResult,
   type UserEmailInput,
   type UserFullProfile,
+  type UserPasskeyNudgeStatus,
   type UserIdInput,
   type UserProfile,
   type UserProfilesInput,
@@ -89,6 +93,20 @@ export class UserService extends UserServiceContract {
   hasPassword(input: UserIdInput): Promise<boolean> {
     const parsed = userIdInputSchema.parse(input);
     return this.repository.hasPassword(parsed.id);
+  }
+
+  setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
+    return this.repository.setFirstPassword(setFirstUserPasswordInputSchema.parse(input));
+  }
+
+  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
+    const parsed = userIdInputSchema.parse(input);
+    return this.repository.getPasskeyNudgeStatus(parsed.id);
+  }
+
+  async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+    await this.repository.setPasskeyNudgeDismissedAt(parsed.id, this.now());
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {

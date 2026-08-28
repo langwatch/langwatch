@@ -1,4 +1,5 @@
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
@@ -267,20 +268,13 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       if (!deploymentOffersPasskeys()) return { offer: false };
 
-      const [passkeys, user] = await Promise.all([
-        ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
-        ctx.prisma.user.findUnique({
-          where: { id: ctx.session.user.id },
-          select: { passkeyNudgeDismissedAt: true },
-        }),
-      ]);
-      if (passkeys > 0) return { offer: false };
+      const nudge = await ctx.app.users.getPasskeyNudgeStatus({ id: ctx.session.user.id });
+      if (nudge.hasPasskey) return { offer: false };
 
-      const dismissedAt = user?.passkeyNudgeDismissedAt;
+      const dismissedAt = nudge.dismissedAt;
       if (!dismissedAt) return { offer: true };
 
-      const askAgainAfter =
-        dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
+      const askAgainAfter = dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
       return { offer: Date.now() >= askAgainAfter };
     }),
   /**
@@ -294,10 +288,7 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx }) => {
-      await ctx.prisma.user.update({
-        where: { id: ctx.session.user.id },
-        data: { passkeyNudgeDismissedAt: new Date() },
-      });
+      await ctx.app.users.dismissPasskeyNudge({ id: ctx.session.user.id });
       return { success: true };
     }),
   /**
@@ -374,46 +365,14 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      const credentialAccount = await ctx.prisma.account.findFirst({
-        where: { userId: ctx.session.user.id, provider: "credential" },
-        select: { id: true, password: true },
+      const result = await ctx.app.users.setFirstPassword({
+        id: ctx.session.user.id,
+        passwordHash: await hash(input.password, 10),
       });
-
-      // The refusal that makes this safe to expose. Overwriting a password
-      // without proving the old one is account takeover with extra steps.
-      if (credentialAccount?.password) {
+      if (result === "already_set") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "This account already has a password. Change it instead of setting a new one.",
-        });
-      }
-
-      const hashedPassword = await hash(input.password, 10);
-
-      if (credentialAccount) {
-        await ctx.prisma.account.update({
-          where: { id: credentialAccount.id },
-          data: { password: hashedPassword },
-        });
-      } else {
-        // An account that predates the credential row being written up front
-        // (an SSO-only user, say). The row is what password reset updates, so
-        // it has to exist before recovery can work.
-        await ctx.prisma.account.create({
-          data: {
-            userId: ctx.session.user.id,
-            type: "credential",
-            provider: "credential",
-            // better-auth 1.7 finds a credential account by
-            // `(providerId, issuer, accountId)` and nothing else. A row
-            // written without the issuer is a row its lookup cannot see, so
-            // the password set here would never sign anybody in — the
-            // customer would be told their correct password is wrong.
-            issuer: issuerForProviderId("credential"),
-            providerAccountId: ctx.session.user.id,
-            password: hashedPassword,
-          },
+          message: "This account already has a password. Change it instead of setting a new one.",
         });
       }
 

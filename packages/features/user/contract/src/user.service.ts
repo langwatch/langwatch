@@ -13,9 +13,12 @@ import type {
   UserIdInput,
   UserProfile,
   UserProfilesInput,
+  UserPasskeyNudgeStatus,
   UserSsoStatus,
   UserTourPreference,
   CreatedUser,
+  SetFirstUserPasswordInput,
+  SetFirstUserPasswordResult,
 } from "./user";
 
 export abstract class UserService {
@@ -27,6 +30,9 @@ export abstract class UserService {
   abstract createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
   abstract createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   abstract hasPassword(input: UserIdInput): Promise<boolean>;
+  abstract setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+  abstract getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
+  abstract dismissPasskeyNudge(input: UserIdInput): Promise<void>;
   abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   abstract getAccountInfo(input: UserIdInput): Promise<UserAccountInfo>;
   abstract getSsoStatus(input: UserIdInput): Promise<UserSsoStatus>;

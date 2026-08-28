@@ -7,6 +7,9 @@ import {
 function makeDatabase() {
   const userCreate = vi.fn(async () => ({ id: "user-1" }));
   const accountCreate = vi.fn(async () => ({}));
+  const accountUpdate = vi.fn(async () => ({}));
+  const userUpdate = vi.fn(async () => ({}));
+  const passkeyCount = vi.fn(async () => 0);
   const state = { committed: false };
   const transaction = {
     user: {
@@ -14,20 +17,29 @@ function makeDatabase() {
       findUnique: vi.fn(async () => null),
       findUniqueOrThrow: vi.fn(async () => ({})),
       create: userCreate,
-      update: vi.fn(async () => ({})),
+      update: userUpdate,
     },
-    account: { create: accountCreate, findFirst: vi.fn(async () => null) },
+    account: {
+      create: accountCreate,
+      findFirst: vi.fn(async () => null),
+      update: accountUpdate,
+    },
+    passkey: { count: passkeyCount },
     $transaction: vi.fn(async (callback) => {
-      try {
-        const result = await callback(transaction);
-        state.committed = true;
-        return result;
-      } catch (error) {
-        throw error;
-      }
+      const result = await callback(transaction);
+      state.committed = true;
+      return result;
     }),
   };
-  return { database: transaction as UserDatabase, userCreate, accountCreate, state };
+  return {
+    database: transaction as UserDatabase,
+    userCreate,
+    userUpdate,
+    accountCreate,
+    accountUpdate,
+    passkeyCount,
+    state,
+  };
 }
 
 describe("PrismaUserRepository credential creation", () => {
@@ -65,6 +77,87 @@ describe("PrismaUserRepository credential creation", () => {
 
     expect(accountCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ password: null, provider: "credential" }),
+    });
+  });
+
+  it("fills an empty credential row without creating another account", async () => {
+    const { database, accountCreate, accountUpdate } = makeDatabase();
+    database.account.findFirst = vi.fn(async () => ({ id: "account-1", password: null }));
+
+    await expect(
+      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+        id: "user-1",
+        passwordHash: "bcrypt-hash",
+      }),
+    ).resolves.toBe("set");
+    expect(accountUpdate).toHaveBeenCalledWith({
+      where: { id: "account-1" },
+      data: { password: "bcrypt-hash" },
+    });
+    expect(accountCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates the credential row where an older account has none", async () => {
+    const { database, accountCreate } = makeDatabase();
+
+    await expect(
+      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+        id: "user-1",
+        passwordHash: "bcrypt-hash",
+      }),
+    ).resolves.toBe("set");
+    expect(accountCreate).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        type: "credential",
+        provider: "credential",
+        issuer: "local:credential",
+        providerAccountId: "user-1",
+        password: "bcrypt-hash",
+      },
+    });
+  });
+
+  it("does not overwrite a credential that already has a password", async () => {
+    const { database, accountCreate, accountUpdate } = makeDatabase();
+    database.account.findFirst = vi.fn(async () => ({
+      id: "account-1",
+      password: "existing-hash",
+    }));
+
+    await expect(
+      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+        id: "user-1",
+        passwordHash: "bcrypt-hash",
+      }),
+    ).resolves.toBe("already_set");
+    expect(accountUpdate).not.toHaveBeenCalled();
+    expect(accountCreate).not.toHaveBeenCalled();
+  });
+
+  it("loads passkey presence and nudge dismissal together", async () => {
+    const { database, passkeyCount } = makeDatabase();
+    const dismissedAt = new Date(42);
+    passkeyCount.mockResolvedValue(1);
+    database.user.findUnique = vi.fn(async () => ({ passkeyNudgeDismissedAt: dismissedAt }));
+
+    await expect(
+      PrismaUserRepository.create(database, "local:credential").getPasskeyNudgeStatus("user-1"),
+    ).resolves.toEqual({ hasPasskey: true, dismissedAt });
+    expect(passkeyCount).toHaveBeenCalledWith({ where: { userId: "user-1" } });
+  });
+
+  it("stores the passkey-nudge dismissal timestamp", async () => {
+    const { database, userUpdate } = makeDatabase();
+    const dismissedAt = new Date(42);
+
+    await PrismaUserRepository.create(database, "local:credential").setPasskeyNudgeDismissedAt(
+      "user-1",
+      dismissedAt,
+    );
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { passkeyNudgeDismissedAt: dismissedAt },
     });
   });
 

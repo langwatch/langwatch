@@ -30,6 +30,9 @@ class StubRepository extends UserRepository {
   createCredentialUser = vi.fn(async () => ({ id: user.id }));
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
+  setFirstPassword = vi.fn(async () => "set" as const);
+  getPasskeyNudgeStatus = vi.fn(async () => ({ hasPasskey: false, dismissedAt: null }));
+  setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
   getSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
   getTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
@@ -119,6 +122,31 @@ describe("UserService", () => {
 
     await expect(service.hasPassword({ id: "user-1" })).resolves.toBe(true);
     expect(repository.hasPassword).toHaveBeenCalledWith("user-1");
+  });
+
+  it("sets a first password through its private repository", async () => {
+    const { service, repository } = createService();
+
+    await expect(
+      service.setFirstPassword({ id: "user-1", passwordHash: "bcrypt-hash" }),
+    ).resolves.toBe("set");
+    expect(repository.setFirstPassword).toHaveBeenCalledWith({
+      id: "user-1",
+      passwordHash: "bcrypt-hash",
+    });
+  });
+
+  it("owns passkey-nudge state through its private repository", async () => {
+    const { service, repository } = createService();
+
+    await expect(service.getPasskeyNudgeStatus({ id: "user-1" })).resolves.toEqual({
+      hasPasskey: false,
+      dismissedAt: null,
+    });
+    await service.dismissPasskeyNudge({ id: "user-1" });
+
+    expect(repository.getPasskeyNudgeStatus).toHaveBeenCalledWith("user-1");
+    expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith("user-1", new Date(42));
   });
 
   it("marks a user deactivated", async () => {

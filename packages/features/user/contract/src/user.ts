@@ -75,8 +75,25 @@ export type CreatePasskeyUserInput = z.infer<typeof createPasskeyUserInputSchema
 export const createdUserSchema = z.object({ id: z.string().min(1) }).strict();
 export type CreatedUser = z.infer<typeof createdUserSchema>;
 
+export const setFirstUserPasswordInputSchema = z
+  .object({ id: z.string().min(1), passwordHash: z.string().min(1) })
+  .strict();
+export type SetFirstUserPasswordInput = z.infer<typeof setFirstUserPasswordInputSchema>;
+
+export const setFirstUserPasswordResultSchema = z.enum(["set", "already_set"]);
+export type SetFirstUserPasswordResult = z.infer<typeof setFirstUserPasswordResultSchema>;
+
+export const userPasskeyNudgeStatusSchema = z
+  .object({ hasPasskey: z.boolean(), dismissedAt: z.date().nullable() })
+  .strict();
+export type UserPasskeyNudgeStatus = z.infer<typeof userPasskeyNudgeStatusSchema>;
+
 export const userCredentialAccountRowSchema = z
   .object({ password: z.string().nullable() })
+  .strict();
+
+export const userCredentialAccountSchema = userCredentialAccountRowSchema
+  .extend({ id: z.string().min(1) })
   .strict();
 
 export const updateUserProfileInputSchema = z

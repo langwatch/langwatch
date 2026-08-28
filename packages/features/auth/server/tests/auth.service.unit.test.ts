@@ -43,6 +43,15 @@ class Users extends UserService {
   async createPasskeyUser(): Promise<never> {
     throw new Error("not used");
   }
+  async setFirstPassword(): Promise<never> {
+    throw new Error("not used");
+  }
+  async getPasskeyNudgeStatus(): Promise<never> {
+    throw new Error("not used");
+  }
+  async dismissPasskeyNudge(): Promise<never> {
+    throw new Error("not used");
+  }
   async updateProfile(): Promise<never> {
     throw new Error("not used");
   }

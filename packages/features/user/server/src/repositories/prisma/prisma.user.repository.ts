@@ -8,16 +8,21 @@ import {
   userHomePathSchema,
   createdUserSchema,
   userCredentialAccountRowSchema,
+  userCredentialAccountSchema,
+  userPasskeyNudgeStatusSchema,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserFullProfile,
+  type UserPasskeyNudgeStatus,
   type UserProfile,
   type UserSsoStatus,
   type UserTourPreference,
   type CreateCredentialUserInput,
   type CreatePasskeyUserInput,
   type CreatedUser,
+  type SetFirstUserPasswordInput,
+  type SetFirstUserPasswordResult,
 } from "@langwatch/user-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { UserRepository } from "../user.repository";
@@ -30,9 +35,13 @@ export type UserDatabase = {
     create(args: Prisma.UserCreateArgs): PromiseLike<Record<string, unknown>>;
     update(args: Prisma.UserUpdateArgs): PromiseLike<Record<string, unknown>>;
   };
+  passkey: {
+    count(args: Prisma.PasskeyCountArgs): PromiseLike<number>;
+  };
   account: {
     create(args: Prisma.AccountCreateArgs): PromiseLike<Record<string, unknown>>;
     findFirst(args: Prisma.AccountFindFirstArgs): PromiseLike<Record<string, unknown> | null>;
+    update(args: Prisma.AccountUpdateArgs): PromiseLike<Record<string, unknown>>;
   };
   $transaction<T>(callback: (transaction: UserDatabase) => Promise<T>): Promise<T>;
 };
@@ -146,6 +155,56 @@ export class PrismaUserRepository extends UserRepository {
       select: { password: true },
     });
     return row ? userCredentialAccountRowSchema.parse(row).password !== null : false;
+  }
+
+  async setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
+    const credential = await this.database.account.findFirst({
+      where: { userId: input.id, provider: "credential" },
+      select: { id: true, password: true },
+    });
+    const parsedCredential = credential ? userCredentialAccountSchema.parse(credential) : null;
+    if (parsedCredential?.password) return "already_set";
+
+    if (parsedCredential) {
+      await this.database.account.update({
+        where: { id: parsedCredential.id },
+        data: { password: input.passwordHash },
+      });
+      return "set";
+    }
+
+    await this.database.account.create({
+      data: {
+        userId: input.id,
+        type: "credential",
+        provider: "credential",
+        issuer: this.credentialIssuer,
+        providerAccountId: input.id,
+        password: input.passwordHash,
+      },
+    });
+    return "set";
+  }
+
+  async getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
+    const [passkeyCount, user] = await Promise.all([
+      this.database.passkey.count({ where: { userId: id } }),
+      this.database.user.findUnique({
+        where: { id },
+        select: { passkeyNudgeDismissedAt: true },
+      }),
+    ]);
+    return userPasskeyNudgeStatusSchema.parse({
+      hasPasskey: passkeyCount > 0,
+      dismissedAt: user?.passkeyNudgeDismissedAt ?? null,
+    });
+  }
+
+  async setPasskeyNudgeDismissedAt(id: string, dismissedAt: Date): Promise<void> {
+    await this.database.user.update({
+      where: { id },
+      data: { passkeyNudgeDismissedAt: dismissedAt },
+    });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {

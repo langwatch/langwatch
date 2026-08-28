@@ -3,9 +3,12 @@ import type {
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreatedUser,
+  SetFirstUserPasswordInput,
+  SetFirstUserPasswordResult,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserFullProfile,
+  UserPasskeyNudgeStatus,
   UserProfile,
   UserSsoStatus,
   UserTourPreference,
@@ -20,6 +23,9 @@ export abstract class UserRepository {
   abstract createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
   abstract createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   abstract hasPassword(id: string): Promise<boolean>;
+  abstract setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+  abstract getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
+  abstract setPasskeyNudgeDismissedAt(id: string, dismissedAt: Date): Promise<void>;
   abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   abstract tryGetAccountInfo(id: string): Promise<UserAccountInfo | null>;
   abstract getSsoStatus(id: string): Promise<UserSsoStatus>;
