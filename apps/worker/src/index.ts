@@ -47,3 +47,10 @@ export {
   type WorkerProcessComposition,
   type WorkerProcessFactoryContext,
 } from "./worker.process";
+export {
+  bootWorkerMain,
+  WorkerMain,
+  type WorkerMainOptions,
+  type WorkerMainProcessPort,
+  type WorkerMainSignals,
+} from "./worker.main";

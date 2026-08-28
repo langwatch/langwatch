@@ -153,7 +153,7 @@ describe("WorkerApplication", () => {
     expect(first.handle.close).toHaveBeenCalledOnce();
   });
 
-  it("drains Eventing before tearing down a graph whose transport cannot start", async () => {
+  it("drains Eventing before deferring infrastructure teardown after a transport-start failure", async () => {
     const phases: string[] = [];
     const transport = new Transport();
     const startError = new Error("transport unavailable");
@@ -174,11 +174,13 @@ describe("WorkerApplication", () => {
 
     await expect(application.start()).rejects.toBe(startError);
 
+    expect(phases).toEqual(["eventing", "feature"]);
+    await application.close();
     expect(phases).toEqual(["eventing", "feature", "lifecycle"]);
     await expect(application.start()).rejects.toThrow("Worker application is closed.");
   });
 
-  it("cleans up in drain order when Eventing readiness fails", async () => {
+  it("drains features and defers infrastructure teardown when Eventing readiness fails", async () => {
     const phases: string[] = [];
     const readinessError = new Error("Redis is unavailable");
     const queue = new EventingQueue(phases);
@@ -211,6 +213,8 @@ describe("WorkerApplication", () => {
     await expect(application.start()).rejects.toBe(readinessError);
 
     expect(transport.start).not.toHaveBeenCalled();
+    expect(phases).toEqual(["eventing", "feature"]);
+    await application.close();
     expect(phases).toEqual(["eventing", "feature", "lifecycle"]);
   });
 

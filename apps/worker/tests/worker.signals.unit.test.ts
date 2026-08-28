@@ -32,7 +32,8 @@ describe("WorkerSignalHandlers", () => {
     const source = new Signals();
     const close = vi.fn(async () => undefined);
     const logger = { info: vi.fn(), error: vi.fn() };
-    WorkerSignalHandlers.install({ source, close, logger, onFailure: vi.fn() });
+    const onComplete = vi.fn();
+    WorkerSignalHandlers.install({ source, close, logger, onComplete, onFailure: vi.fn() });
 
     source.emit("SIGTERM");
     source.emit("SIGINT");
@@ -43,6 +44,7 @@ describe("WorkerSignalHandlers", () => {
     expect(source.listenerCount("SIGTERM")).toBe(0);
     expect(source.listenerCount("SIGINT")).toBe(0);
     expect(logger.info).toHaveBeenCalledWith({ signal: "SIGTERM" }, "worker shutdown requested");
+    expect(onComplete).toHaveBeenCalledWith("SIGTERM");
   });
 
   it("logs close failures without creating an unhandled signal rejection", async () => {

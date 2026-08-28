@@ -163,7 +163,7 @@ describe("ApiProcess", () => {
     expect(mocks.observabilityShutdown).toHaveBeenCalledOnce();
   });
 
-  it("closes listener, composed graph, then telemetry in that order", async () => {
+  it("closes listener, telemetry, then composed graph in that order", async () => {
     const phases: string[] = [];
     mocks.listenerClose.mockImplementation(async () => {
       phases.push("listener");
@@ -178,7 +178,7 @@ describe("ApiProcess", () => {
 
     await Promise.all([process.close(), process.close()]);
 
-    expect(phases).toEqual(["listener", "graph", "telemetry"]);
+    expect(phases).toEqual(["listener", "telemetry", "graph"]);
     expect(graph.close).toHaveBeenCalledOnce();
   });
 });

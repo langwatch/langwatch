@@ -3,6 +3,7 @@ import { AgentTrpcApi, type AgentTrpcContext } from "@langwatch/agent-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { runWithContext } from "@langwatch/observability/context";
 import type { SecretService } from "@langwatch/secret-contract";
 import { SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
 import { TRPCError, type TRPCDefaultErrorShape } from "@trpc/server";
@@ -233,31 +234,34 @@ export class ApiApplication {
 
     return this.root.procedure.use(async ({ ctx, input, next, path, type }) => {
       return tracer.startActiveSpan(`trpc ${path}`, async (span) => {
+        let actor: ApiActor | undefined;
         let failure: unknown;
         try {
-          ctx.actor();
-          const result = await next();
-          if (!result.ok) {
-            const cause = result.error.cause;
-            failure = result.error;
-            if (HandledError.isHandled(cause)) {
-              throw new TRPCError({
-                code: handledErrorCode(cause),
-                message: cause.message,
-                cause,
-              });
+          actor = ctx.actor();
+          return await runWithContext({ userId: actor.id }, async () => {
+            const result = await next();
+            if (!result.ok) {
+              const cause = result.error.cause;
+              failure = result.error;
+              if (HandledError.isHandled(cause)) {
+                throw new TRPCError({
+                  code: handledErrorCode(cause),
+                  message: cause.message,
+                  cause,
+                });
+              }
+              logger.error({ path, type, error: result.error }, "tRPC call failed");
+            } else {
+              logger.info({ path, type }, "tRPC call");
             }
-            logger.error({ path, type, error: result.error }, "tRPC call failed");
-          } else {
-            logger.info({ path, type }, "tRPC call");
-          }
-          return result;
+            return result;
+          });
         } catch (error) {
           failure = error;
           throw error;
         } finally {
-          if (type === "mutation" && audit) {
-            await audit({ actorId: ctx.actor().id, path, input, error: failure });
+          if (type === "mutation" && audit && actor) {
+            await audit({ actorId: actor.id, path, input, error: failure });
           }
           span.end();
         }

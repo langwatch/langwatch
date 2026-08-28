@@ -55,8 +55,14 @@ describe("bootWorker", () => {
           start: vi.fn(async () => {
             phases.push("start");
           }),
-          close: vi.fn(async () => {
+          drain: vi.fn(async () => {
             phases.push("eventing");
+          }),
+          closeResources: vi.fn(async () => {
+            phases.push("application-resources");
+          }),
+          close: vi.fn(async () => {
+            phases.push("close");
           }),
         },
       };
@@ -70,7 +76,13 @@ describe("bootWorker", () => {
     await Promise.all([worker.close(), worker.close()]);
 
     expect(createComposition).toHaveBeenCalledOnce();
-    expect(phases).toEqual(["start", "eventing", "resources", "observability"]);
+    expect(phases).toEqual([
+      "start",
+      "eventing",
+      "observability",
+      "application-resources",
+      "resources",
+    ]);
     expect(mocks.shutdown).toHaveBeenCalledOnce();
     expect(mocks.logger.info).toHaveBeenCalledWith(
       { consumersEnabled: false, mode: "producer-only" },
@@ -91,8 +103,15 @@ describe("bootWorker", () => {
           start: vi.fn(async () => {
             throw startFailure;
           }),
-          close: vi.fn(async () => {
+          drain: vi.fn(async () => {
             phases.push("application");
+            throw new Error("application drain failed");
+          }),
+          closeResources: vi.fn(async () => {
+            phases.push("application-resources");
+          }),
+          close: vi.fn(async () => {
+            phases.push("close");
             throw new Error("application close failed");
           }),
         },
@@ -106,22 +125,29 @@ describe("bootWorker", () => {
     const worker = await bootWorker({ source: { NODE_ENV: "test" }, createComposition });
 
     await expect(worker.start()).rejects.toBe(startFailure);
-    expect(phases).toEqual(["application", "resources", "observability"]);
+    expect(phases).toEqual(["application", "observability", "application-resources", "resources"]);
     expect(mocks.shutdown).toHaveBeenCalledOnce();
     await worker.close().catch(() => void 0);
-    expect(phases).toEqual(["application", "resources", "observability"]);
+    expect(phases).toEqual(["application", "observability", "application-resources", "resources"]);
   });
 
-  it("closes already-created process resources when composition fails", async () => {
+  it("flushes telemetry before closing already-created process resources when composition fails", async () => {
+    const phases: string[] = [];
     const closeFailure = new Error("composition failed");
     const createComposition = vi.fn(async ({ resources }: { resources: ResourceScope }) => {
-      resources.own("partial", () => undefined);
+      resources.own("partial", () => {
+        phases.push("resources");
+      });
       throw closeFailure;
+    });
+    mocks.shutdown.mockImplementation(async () => {
+      phases.push("observability");
     });
 
     await expect(bootWorker({ source: { NODE_ENV: "test" }, createComposition })).rejects.toBe(
       closeFailure,
     );
     expect(mocks.shutdown).toHaveBeenCalledOnce();
+    expect(phases).toEqual(["observability", "resources"]);
   });
 });

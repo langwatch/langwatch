@@ -20,12 +20,14 @@ export class WorkerSignalHandlers {
     source: WorkerSignalSource;
     close: () => Promise<void>;
     logger?: Pick<Logger, "error" | "info">;
+    onComplete?: (signal: WorkerShutdownSignal) => void | Promise<void>;
     onFailure: (error: unknown, signal: WorkerShutdownSignal) => void | Promise<void>;
   }): WorkerSignalHandlers {
     const handlers = new WorkerSignalHandlers(
       options.source,
       options.close,
       options.logger,
+      options.onComplete,
       options.onFailure,
     );
     handlers.install();
@@ -40,6 +42,9 @@ export class WorkerSignalHandlers {
     private readonly source: WorkerSignalSource,
     private readonly close: () => Promise<void>,
     private readonly logger: Pick<Logger, "error" | "info"> | undefined,
+    private readonly onComplete:
+      | ((signal: WorkerShutdownSignal) => void | Promise<void>)
+      | undefined,
     private readonly onFailure: (
       error: unknown,
       signal: WorkerShutdownSignal,
@@ -72,6 +77,7 @@ export class WorkerSignalHandlers {
     try {
       await this.close();
       this.logger?.info({ signal }, "worker shutdown complete");
+      await this.onComplete?.(signal);
     } catch (error) {
       this.logger?.error({ error, signal }, "worker shutdown failed");
       await this.onFailure(error, signal);

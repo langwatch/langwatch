@@ -24,6 +24,8 @@ export class WorkerRuntime {
 
   private handle: WorkerHandlePort | undefined;
   private starting: Promise<void> | undefined;
+  private draining: Promise<void> | undefined;
+  private resourcesClosing: Promise<void> | undefined;
   private closing: Promise<void> | undefined;
   private closed = false;
 
@@ -61,6 +63,19 @@ export class WorkerRuntime {
     return closing;
   }
 
+  /** Stops queue intake without releasing process infrastructure. */
+  drain(): Promise<void> {
+    this.closed = true;
+    this.draining ??= this.drainTransport();
+    return this.draining;
+  }
+
+  /** Releases lifecycle-owned technical resources after telemetry has flushed. */
+  closeResources(): Promise<void> {
+    this.resourcesClosing ??= this.closeLifecycleAndResources();
+    return this.resourcesClosing;
+  }
+
   private async startTransport(): Promise<void> {
     try {
       const handle = await this.transport.start();
@@ -75,13 +90,33 @@ export class WorkerRuntime {
   }
 
   private async closeRuntime(): Promise<void> {
-    await this.starting?.catch(() => void 0);
     let firstError: unknown;
     try {
-      await this.handle?.shutdown();
+      await this.drain();
     } catch (error) {
       firstError = error;
     }
+    try {
+      await this.closeResources();
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError) {
+      throw firstError;
+    }
+  }
+
+  private async drainTransport(): Promise<void> {
+    await this.starting?.catch(() => void 0);
+    try {
+      await this.handle?.shutdown();
+    } finally {
+      this.handle = void 0;
+    }
+  }
+
+  private async closeLifecycleAndResources(): Promise<void> {
+    let firstError: unknown;
     try {
       await this.lifecycle.close();
     } catch (error) {

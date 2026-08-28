@@ -55,7 +55,7 @@ describe("ApiRuntimeBootstrap", () => {
     expect(process.start).not.toHaveBeenCalled();
   });
 
-  it("retains one composed graph and closes listener, graph resources, then telemetry once", async () => {
+  it("retains one composed graph and closes listener, telemetry, then graph resources once", async () => {
     const phases: string[] = [];
     const process = new TestProcess();
     const composition = new TestComposition(process);
@@ -65,8 +65,8 @@ describe("ApiRuntimeBootstrap", () => {
       });
       process.close.mockImplementationOnce(async () => {
         phases.push("listener");
-        await graph.close();
         phases.push("telemetry");
+        await graph.close();
       });
       return process;
     });
@@ -83,7 +83,7 @@ describe("ApiRuntimeBootstrap", () => {
     expect(main.config.port).toBe(6560);
     expect(process.start).toHaveBeenCalledOnce();
     expect(process.close).toHaveBeenCalledOnce();
-    expect(phases).toEqual(["listener", "graph", "telemetry"]);
+    expect(phases).toEqual(["listener", "telemetry", "graph"]);
   });
 
   it("shares one close operation across repeated termination signals", async () => {

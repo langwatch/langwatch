@@ -10,14 +10,16 @@ import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listene
 import { ApiRequestPolicy } from "./api-request.policy";
 import type { Hono } from "hono";
 
-/** Resources backing the composed service graph, closed after HTTP intake stops. */
+/** Resources backing the composed service graph, closed after telemetry flushes. */
 export abstract class ApiProcessGraphPort {
   abstract close(): Promise<void>;
 }
 
 /**
  * Boot boundary for a standalone API listener. The host owns socket binding;
- * this process object owns the one logger/tracer provider and its final flush.
+ * this process object owns the finalization sequence. Intake drains first,
+ * then telemetry flushes while request diagnostics are still available, and
+ * only then are database and network resources released.
  */
 export class ApiProcess {
   static create(options: {
@@ -82,12 +84,12 @@ export class ApiProcess {
       firstError = error;
     }
     try {
-      await this.graph?.close();
+      await this.observability.shutdown();
     } catch (error) {
       firstError ??= error;
     }
     try {
-      await this.observability.shutdown();
+      await this.graph?.close();
     } catch (error) {
       firstError ??= error;
     }

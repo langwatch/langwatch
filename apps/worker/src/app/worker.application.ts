@@ -18,6 +18,7 @@ export class WorkerApplication {
   private started = false;
   private closed = false;
   private starting: Promise<void> | undefined;
+  private draining: Promise<void> | undefined;
   private closing: Promise<void> | undefined;
 
   private constructor(
@@ -53,6 +54,18 @@ export class WorkerApplication {
     return closing;
   }
 
+  /** Drains queue work and feature-owned handles while technical resources remain live. */
+  drain(): Promise<void> {
+    this.closed = true;
+    this.draining ??= this.closeEventingFeaturesAndTransport();
+    return this.draining;
+  }
+
+  /** Releases the worker runtime's infrastructure after telemetry has flushed. */
+  closeResources(): Promise<void> {
+    return this.runtime.closeResources();
+  }
+
   private async startApplication(): Promise<void> {
     try {
       for (const installer of this.featureInstallers) {
@@ -65,11 +78,11 @@ export class WorkerApplication {
     } catch (error) {
       // A queue readiness or transport-start failure can happen after Eventing
       // has staged work. Drain it while the feature handles and process
-      // infrastructure are still available, then release the rest of the
-      // process graph. The boot error remains the one the caller receives.
+      // infrastructure are still available. The process root flushes
+      // telemetry before it releases the rest of the process graph. The boot
+      // error remains the one the caller receives.
       this.closed = true;
-      await this.closeEventingAndFeaturesBestEffort();
-      await this.runtime.close().catch(() => void 0);
+      await this.drain().catch(() => void 0);
       throw error;
     } finally {
       this.starting = void 0;
@@ -80,11 +93,14 @@ export class WorkerApplication {
     await this.starting?.catch(() => void 0);
 
     let firstError: unknown;
-    const eventingAndFeatureError = await this.closeEventingAndFeaturesBestEffort();
-    firstError ??= eventingAndFeatureError;
+    try {
+      await this.drain();
+    } catch (error) {
+      firstError = error;
+    }
 
     try {
-      await this.runtime.close();
+      await this.closeResources();
     } catch (error) {
       firstError ??= error;
     }
@@ -106,6 +122,16 @@ export class WorkerApplication {
 
     const featureError = await this.closeFeatureHandlesBestEffort();
     return firstError ?? featureError;
+  }
+
+  private async closeEventingFeaturesAndTransport(): Promise<void> {
+    let firstError = await this.closeEventingAndFeaturesBestEffort();
+    try {
+      await this.runtime.drain();
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError) throw firstError;
   }
 
   private async closeFeatureHandlesBestEffort(): Promise<unknown> {

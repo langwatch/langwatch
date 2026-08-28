@@ -13,6 +13,8 @@ export type WorkerProcessComposition = {
 
 export type WorkerApplicationPort = {
   start(): Promise<void>;
+  drain(): Promise<void>;
+  closeResources(): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -42,7 +44,7 @@ export type WorkerBootOptions = {
  *
  * Passing this scope to a worker runtime makes that runtime borrow it by
  * construction. That leaves this boundary with the explicit order:
- * Eventing/application drain, technical resources, observability flush.
+ * Eventing/application drain, observability flush, technical resources.
  */
 export class WorkerProcess {
   static async boot(options: WorkerBootOptions): Promise<WorkerProcess> {
@@ -73,8 +75,8 @@ export class WorkerProcess {
       });
       return WorkerProcess.create({ config, resources, observability, composition });
     } catch (error) {
-      await resources.close().catch(() => void 0);
       await observability.shutdown().catch(() => void 0);
+      await resources.close().catch(() => void 0);
       throw error;
     }
   }
@@ -119,19 +121,25 @@ export class WorkerProcess {
     let firstError: unknown;
 
     try {
-      await this.application.close();
+      await this.application.drain();
     } catch (error) {
       firstError = error;
     }
 
     try {
-      await this.resources.close();
+      await this.observability.shutdown();
     } catch (error) {
       firstError ??= error;
     }
 
     try {
-      await this.observability.shutdown();
+      await this.application.closeResources();
+    } catch (error) {
+      firstError ??= error;
+    }
+
+    try {
+      await this.resources.close();
     } catch (error) {
       firstError ??= error;
     }

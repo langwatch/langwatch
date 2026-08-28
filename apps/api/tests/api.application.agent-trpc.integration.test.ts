@@ -1,4 +1,5 @@
 import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
+import { getCurrentContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../src/api.application";
@@ -27,7 +28,11 @@ const agent: AgentWithFields = {
 };
 
 class TestAgentService extends AgentService {
-  readonly getAll = vi.fn(async () => [agent]);
+  readonly observedContexts: Array<ReturnType<typeof getCurrentContext>> = [];
+  readonly getAll = vi.fn(async () => {
+    this.observedContexts.push(getCurrentContext());
+    return [agent];
+  });
 
   private unavailable(): never {
     throw new Error("This test does not dispatch this agent service method.");
@@ -130,6 +135,7 @@ describe("ApiApplication Agent tRPC composition", () => {
     await expect(agentCaller.getAll({ projectId: "project-1" })).resolves.toEqual([
       { ...agent, _count: { copiedAgents: 2 } },
     ]);
+    expect(agents.observedContexts).toEqual([{ userId: "user-1" }]);
     expect(authorize).toHaveBeenCalledWith("evaluations:view", { projectId: "project-1" });
 
     const names = Object.keys(application.trpc._def.procedures)
