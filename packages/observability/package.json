@@ -16,6 +16,7 @@
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./context": "./src/context/index.ts",
+    "./node": "./src/node/index.ts",
     "./request": "./src/request/requestLogging.ts",
     "./tracing": "./src/trace/traceContext.ts"
   },
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
+    "langwatch": "workspace:*",
     "pino": "^10.3.1",
     "pino-opentelemetry-transport": "^4.0.2",
     "pino-pretty": "^13.1.3",

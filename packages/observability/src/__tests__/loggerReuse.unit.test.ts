@@ -49,7 +49,10 @@ describe("given createLogger memoises by name", () => {
   beforeEach(() => {
     process.env.PINO_LOG_LEVEL = "info";
     resetLoggerCache();
-    registerLogContextProvider(() => getCurrentContext() ?? {});
+    registerLogContextProvider(() => {
+      const context = getCurrentContext();
+      return context ? { ...context } : {};
+    });
   });
 
   afterEach(() => {
@@ -60,18 +63,14 @@ describe("given createLogger memoises by name", () => {
   describe("when the same name is requested twice", () => {
     /** @scenario Asking for the same logger twice returns the same logger */
     it("hands back the same instance", () => {
-      expect(createLogger("langwatch:test:reuse")).toBe(
-        createLogger("langwatch:test:reuse"),
-      );
+      expect(createLogger("langwatch:test:reuse")).toBe(createLogger("langwatch:test:reuse"));
     });
   });
 
   describe("when two names are requested", () => {
     /** @scenario Different names get different loggers */
     it("keeps them separate", () => {
-      expect(createLogger("langwatch:test:one")).not.toBe(
-        createLogger("langwatch:test:two"),
-      );
+      expect(createLogger("langwatch:test:one")).not.toBe(createLogger("langwatch:test:two"));
     });
   });
 

@@ -4483,6 +4483,9 @@ importers:
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
+      langwatch:
+        specifier: workspace:*
+        version: link:../../sdks/typescript
       pino:
         specifier: ^10.3.1
         version: 10.3.1
