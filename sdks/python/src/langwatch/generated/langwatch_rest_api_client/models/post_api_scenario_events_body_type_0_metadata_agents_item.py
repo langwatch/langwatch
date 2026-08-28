@@ -1,32 +1,41 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="RunRunPlanBodyConfigScopeType3")
+from ..models.post_api_scenario_events_body_type_0_metadata_agents_item_role import (
+    PostApiScenarioEventsBodyType0MetadataAgentsItemRole,
+)
+
+T = TypeVar("T", bound="PostApiScenarioEventsBodyType0MetadataAgentsItem")
 
 
 @_attrs_define
-class RunRunPlanBodyConfigScopeType3:
+class PostApiScenarioEventsBodyType0MetadataAgentsItem:
     """
     Attributes:
-        mode (Literal['scenarios']):
+        name (str):
+        role (PostApiScenarioEventsBodyType0MetadataAgentsItemRole):
     """
 
-    mode: Literal["scenarios"]
+    name: str
+    role: PostApiScenarioEventsBodyType0MetadataAgentsItemRole
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        mode = self.mode
+        name = self.name
+
+        role = self.role.value
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "mode": mode,
+                "name": name,
+                "role": role,
             }
         )
 
@@ -35,16 +44,17 @@ class RunRunPlanBodyConfigScopeType3:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        mode = cast(Literal["scenarios"], d.pop("mode"))
-        if mode != "scenarios":
-            raise ValueError(f"mode must match const 'scenarios', got '{mode}'")
+        name = d.pop("name")
 
-        run_run_plan_body_config_scope_type_3 = cls(
-            mode=mode,
+        role = PostApiScenarioEventsBodyType0MetadataAgentsItemRole(d.pop("role"))
+
+        post_api_scenario_events_body_type_0_metadata_agents_item = cls(
+            name=name,
+            role=role,
         )
 
-        run_run_plan_body_config_scope_type_3.additional_properties = d
-        return run_run_plan_body_config_scope_type_3
+        post_api_scenario_events_body_type_0_metadata_agents_item.additional_properties = d
+        return post_api_scenario_events_body_type_0_metadata_agents_item
 
     @property
     def additional_keys(self) -> list[str]:

@@ -27,8 +27,8 @@ class PutApiScenariosByIdBody:
             each with an optional description and default. A run supplies values for these names, readable from the
             scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
             encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
-        folder_id (None | str | Unset): The test suite (folder) to file this scenario in. It must name a non-archived
-            folder of the same project. null unfiles the scenario.
+        test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
+            suite of the same project. null unfiles the scenario.
     """
 
     name: str | Unset = UNSET
@@ -36,7 +36,7 @@ class PutApiScenariosByIdBody:
     criteria: list[str] | Unset = UNSET
     labels: list[str] | Unset = UNSET
     parameters: list[PutApiScenariosByIdBodyParametersItem] | Unset = UNSET
-    folder_id: None | str | Unset = UNSET
+    test_suite_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -59,11 +59,11 @@ class PutApiScenariosByIdBody:
                 parameters_item = parameters_item_data.to_dict()
                 parameters.append(parameters_item)
 
-        folder_id: None | str | Unset
-        if isinstance(self.folder_id, Unset):
-            folder_id = UNSET
+        test_suite_id: None | str | Unset
+        if isinstance(self.test_suite_id, Unset):
+            test_suite_id = UNSET
         else:
-            folder_id = self.folder_id
+            test_suite_id = self.test_suite_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -78,8 +78,8 @@ class PutApiScenariosByIdBody:
             field_dict["labels"] = labels
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
-        if folder_id is not UNSET:
-            field_dict["folderId"] = folder_id
+        if test_suite_id is not UNSET:
+            field_dict["testSuiteId"] = test_suite_id
 
         return field_dict
 
@@ -105,14 +105,14 @@ class PutApiScenariosByIdBody:
 
                 parameters.append(parameters_item)
 
-        def _parse_folder_id(data: object) -> None | str | Unset:
+        def _parse_test_suite_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             return cast(None | str | Unset, data)
 
-        folder_id = _parse_folder_id(d.pop("folderId", UNSET))
+        test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
         put_api_scenarios_by_id_body = cls(
             name=name,
@@ -120,7 +120,7 @@ class PutApiScenariosByIdBody:
             criteria=criteria,
             labels=labels,
             parameters=parameters,
-            folder_id=folder_id,
+            test_suite_id=test_suite_id,
         )
 
         put_api_scenarios_by_id_body.additional_properties = d

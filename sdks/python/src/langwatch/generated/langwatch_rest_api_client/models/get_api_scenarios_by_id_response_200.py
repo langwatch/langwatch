@@ -28,8 +28,8 @@ class GetApiScenariosByIdResponse200:
         labels (list[str]):
         parameters (list[GetApiScenariosByIdResponse200ParametersItem]):
         platform_url (str):
-        folder_id (None | str | Unset): The test suite (folder) this scenario is filed in, or null when unfiled. Absent
-            on servers that predate test suites.
+        test_suite_id (None | str | Unset): The test suite this scenario is filed in, or null when unfiled. Absent on
+            servers that predate test suites.
     """
 
     id: str
@@ -39,7 +39,7 @@ class GetApiScenariosByIdResponse200:
     labels: list[str]
     parameters: list[GetApiScenariosByIdResponse200ParametersItem]
     platform_url: str
-    folder_id: None | str | Unset = UNSET
+    test_suite_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -60,11 +60,11 @@ class GetApiScenariosByIdResponse200:
 
         platform_url = self.platform_url
 
-        folder_id: None | str | Unset
-        if isinstance(self.folder_id, Unset):
-            folder_id = UNSET
+        test_suite_id: None | str | Unset
+        if isinstance(self.test_suite_id, Unset):
+            test_suite_id = UNSET
         else:
-            folder_id = self.folder_id
+            test_suite_id = self.test_suite_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -79,8 +79,8 @@ class GetApiScenariosByIdResponse200:
                 "platformUrl": platform_url,
             }
         )
-        if folder_id is not UNSET:
-            field_dict["folderId"] = folder_id
+        if test_suite_id is not UNSET:
+            field_dict["testSuiteId"] = test_suite_id
 
         return field_dict
 
@@ -110,14 +110,14 @@ class GetApiScenariosByIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
-        def _parse_folder_id(data: object) -> None | str | Unset:
+        def _parse_test_suite_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             return cast(None | str | Unset, data)
 
-        folder_id = _parse_folder_id(d.pop("folderId", UNSET))
+        test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
         get_api_scenarios_by_id_response_200 = cls(
             id=id,
@@ -127,7 +127,7 @@ class GetApiScenariosByIdResponse200:
             labels=labels,
             parameters=parameters,
             platform_url=platform_url,
-            folder_id=folder_id,
+            test_suite_id=test_suite_id,
         )
 
         get_api_scenarios_by_id_response_200.additional_properties = d

@@ -25,10 +25,10 @@ class RunRunPlanBodyConfig:
 
     Attributes:
         scope (RunRunPlanBodyConfigScopeType0 | RunRunPlanBodyConfigScopeType1 | RunRunPlanBodyConfigScopeType2 |
-            RunRunPlanBodyConfigScopeType3): What the run plan covers: all (every active scenario), folders (the scenarios
-            filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds
-            sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs
-            without editing the plan.
+            RunRunPlanBodyConfigScopeType3): What the run plan covers: all (every active scenario), test_suites (the
+            scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the
+            scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written
+            later runs without editing the plan.
         targets (list[RunRunPlanBodyConfigTargetsItem]): The prompts, agents or workflows every scenario runs against.
         repeat_count (int | Unset): How many times each scenario and target pairing runs. Between 1 and 5; defaults to
             1.
@@ -36,8 +36,8 @@ class RunRunPlanBodyConfig:
             each scenario's own choice. Leave it out for the scenario or project default.
         judge_model (None | str | Unset): The model that judges every scenario in the run. Overrides each scenario's own
             choice. Leave it out for the scenario or project default.
-        scenario_ids (list[str] | Unset): The scenarios a cases scope covers. Read by that scope alone; a scope that
-            states a rule resolves its own list at run time.
+        scenario_ids (list[str] | Unset): The scenarios a test_suites or scenarios scope covers. Read by a scenarios
+            scope alone; a scope that states a rule resolves its own list at run time.
     """
 
     scope: (

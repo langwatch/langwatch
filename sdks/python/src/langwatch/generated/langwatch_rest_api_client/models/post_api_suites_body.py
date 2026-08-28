@@ -31,10 +31,10 @@ class PostApiSuitesBody:
         description (str | Unset):
         scenario_ids (list[str] | Unset):
         scope (PostApiSuitesBodyScopeType0 | PostApiSuitesBodyScopeType1 | PostApiSuitesBodyScopeType2 |
-            PostApiSuitesBodyScopeType3 | Unset): What the run plan covers: all (every active scenario), folders (the cases
-            filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds
-            below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the
-            plan.
+            PostApiSuitesBodyScopeType3 | Unset): What the run plan covers: all (every active scenario), folders (the
+            scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the
+            scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without
+            editing the plan.
         targets (list[PostApiSuitesBodyTargetsItem] | Unset):
         repeat_count (int | Unset):  Default: 1.
         labels (list[str] | Unset):

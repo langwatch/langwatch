@@ -39,9 +39,9 @@ class GetApiSuitesResponse200Item:
             groups scenarios filed into it. Absent on servers that predate test suites.
         scope (GetApiSuitesResponse200ItemScopeType0 | GetApiSuitesResponse200ItemScopeType1 |
             GetApiSuitesResponse200ItemScopeType2 | GetApiSuitesResponse200ItemScopeType3 | None | Unset): What the run plan
-            covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases
-            carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run,
-            so a scenario written later runs without editing the plan.
+            covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the
+            scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at
+            every run, so a scenario written later runs without editing the plan.
     """
 
     id: str

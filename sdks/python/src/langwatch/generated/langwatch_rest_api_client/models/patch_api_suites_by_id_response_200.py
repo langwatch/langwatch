@@ -39,9 +39,9 @@ class PatchApiSuitesByIdResponse200:
             that groups scenarios filed into it. Absent on servers that predate test suites.
         scope (None | PatchApiSuitesByIdResponse200ScopeType0 | PatchApiSuitesByIdResponse200ScopeType1 |
             PatchApiSuitesByIdResponse200ScopeType2 | PatchApiSuitesByIdResponse200ScopeType3 | Unset): What the run plan
-            covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases
-            carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run,
-            so a scenario written later runs without editing the plan.
+            covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the
+            scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at
+            every run, so a scenario written later runs without editing the plan.
     """
 
     id: str

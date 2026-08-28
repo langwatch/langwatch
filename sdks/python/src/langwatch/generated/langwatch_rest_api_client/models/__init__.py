@@ -4525,6 +4525,10 @@ from .post_api_prompts_tags_response_422 import PostApiPromptsTagsResponse422
 from .post_api_prompts_tags_response_500 import PostApiPromptsTagsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
+from .post_api_scenario_events_body_type_0_metadata_agents_item import PostApiScenarioEventsBodyType0MetadataAgentsItem
+from .post_api_scenario_events_body_type_0_metadata_agents_item_role import (
+    PostApiScenarioEventsBodyType0MetadataAgentsItemRole,
+)
 from .post_api_scenario_events_body_type_0_metadata_langwatch import PostApiScenarioEventsBodyType0MetadataLangwatch
 from .post_api_scenario_events_body_type_0_metadata_langwatch_actor_label import (
     PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel,
@@ -8323,6 +8327,8 @@ __all__ = (
     "PostApiPromptsTagsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",
+    "PostApiScenarioEventsBodyType0MetadataAgentsItem",
+    "PostApiScenarioEventsBodyType0MetadataAgentsItemRole",
     "PostApiScenarioEventsBodyType0MetadataLangwatch",
     "PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel",
     "PostApiScenarioEventsBodyType0MetadataLangwatchTargetType",

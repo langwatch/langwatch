@@ -49,8 +49,8 @@ class PostApiSuitesByIdDuplicateResponse201:
             suite that groups scenarios filed into it. Absent on servers that predate test suites.
         scope (None | PostApiSuitesByIdDuplicateResponse201ScopeType0 | PostApiSuitesByIdDuplicateResponse201ScopeType1
             | PostApiSuitesByIdDuplicateResponse201ScopeType2 | PostApiSuitesByIdDuplicateResponse201ScopeType3 | Unset):
-            What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites),
-            labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved
+            What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites),
+            labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved
             again at every run, so a scenario written later runs without editing the plan.
     """
 
