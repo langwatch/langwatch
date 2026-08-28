@@ -135,9 +135,11 @@ describe("the pull effect's pulled-usage emit seam", () => {
       const record = recordPulledUsage.mock.calls[0]![0];
       expect(record.organizationId).toBe("org_acme");
       expect(record.teamId).toBe("team_platform");
-      expect(record.projectId).toBeNull();
       expect(record.costStatus).toBe("estimate");
-      // The stream lives under the governance project; the money does not.
+      // Home and owner, side by side: the row is STORED under the governance
+      // project — the event's own projectId, not just the stream's tenant —
+      // and the money still belongs to the source's team (ADR-128).
+      expect(record.projectId).toBe("proj_governance");
       expect(record.tenantId).toBe("proj_governance");
       expect(record.occurredAt).toBe(Date.parse("2026-08-01T00:00:00.000Z"));
     });

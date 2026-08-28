@@ -62,7 +62,11 @@ export async function resolveCallerProjectScope({
   prisma?: PrismaClient;
 }): Promise<CallerProjectScope> {
   const projects = await prisma.project.findMany({
-    where: { team: { organizationId }, archivedAt: null },
+    where: {
+      team: { organizationId },
+      archivedAt: null,
+      kind: { not: "internal_governance" },
+    },
     select: {
       id: true,
       name: true,
