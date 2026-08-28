@@ -1,6 +1,7 @@
 import { expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import { TABLE_NAME } from "../repositories/simulation.clickhouse.repository";
 import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
+import { UNKNOWN_TARGET_KEY } from "./atom.types";
 
 /**
  * Raw `Status` values that read as a failure.
@@ -63,8 +64,41 @@ export const LANGWATCH_METADATA =
  */
 export const TARGET_REF_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId')`;
 
-/** The target key, falling back to `unknown` so an untargeted run still groups. */
-export const TARGET_KEY_EXPR = `if(${TARGET_REF_EXPR} = '', 'unknown', ${TARGET_REF_EXPR})`;
+/**
+ * The names the code that pushed the run reported for its agents, joined.
+ *
+ * The SDK lists every participant of the run on `metadata.agents`, each with a
+ * role. Only the `agent` role names what the run was pointed at: the user
+ * simulator and the judge drive the run, they are not what it tests. Two
+ * agents in one run read the way the plan table already reads two targets.
+ *
+ * Empty when the run reported no agent, which is every run pushed by an older
+ * SDK.
+ */
+export const CODE_TARGET_NAME_EXPR = `arrayStringConcat(
+  arrayMap(agent -> JSONExtractString(agent, 'name'),
+    arrayFilter(agent ->
+      JSONExtractString(agent, 'role') = 'agent'
+      AND JSONExtractString(agent, 'name') != '',
+      JSONExtractArrayRaw(ifNull(Metadata, '{}'), 'agents'))),
+  ' vs ')`;
+
+/** The reported agent names as a key, folded the way a scenario name is. */
+export const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
+
+/**
+ * The key a target folds under.
+ *
+ * A run started on the platform names a stored agent or prompt, and that
+ * reference id is the key. A run pushed from code names its own agent instead,
+ * so its key is built from that name: `code:acme-support-agent`. Two runs of
+ * one agent therefore read as one target. A run that names neither keeps the
+ * `unknown` key, which the page reads as the default target.
+ */
+export const TARGET_KEY_EXPR = `multiIf(
+  ${TARGET_REF_EXPR} != '', ${TARGET_REF_EXPR},
+  ${CODE_TARGET_SLUG_EXPR} != '', concat('code:', ${CODE_TARGET_SLUG_EXPR}),
+  '${UNKNOWN_TARGET_KEY}')`;
 
 /**
  * What started the run.
@@ -83,11 +117,16 @@ export const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
 export const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
 
 /**
- * A run's name as a key: lower case, every stretch of anything but a letter
- * or a digit folded to one dash, no dash at either end. "List agents" and
- * "list-agents" are one scenario.
+ * Any name as a key: lower case, every stretch of anything but a letter or a
+ * digit folded to one dash, no dash at either end. "List agents" and
+ * "list-agents" fold to one key.
  */
-export const NAME_SLUG_EXPR = `trim(BOTH '-' FROM replaceRegexpAll(lowerUTF8(ifNull(Name, '')), '[^\\p{L}\\p{N}]+', '-'))`;
+function nameSlug(expr: string): string {
+  return `trim(BOTH '-' FROM replaceRegexpAll(lowerUTF8(${expr}), '[^\\p{L}\\p{N}]+', '-'))`;
+}
+
+/** A run's name as a key, so two spellings of one scenario fold together. */
+export const NAME_SLUG_EXPR = nameSlug("ifNull(Name, '')");
 
 /**
  * The key a scenario folds under.

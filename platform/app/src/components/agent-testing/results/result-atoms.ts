@@ -32,7 +32,6 @@ import type {
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { UNKNOWN_TARGET_KEY } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import {
-  CODE_RUN_LABEL,
   CODE_TARGET_NAME,
   type RunPlan,
   toExternalPlanSlug,
@@ -179,7 +178,14 @@ function planOfAtom({
   );
 }
 
-/** How a target reference id reads. */
+/**
+ * How a target key reads.
+ *
+ * A platform target is named from the project's agents and prompts. A run
+ * pushed from code names its own agent instead, and that name arrives with
+ * the runs, so it reaches the map the same way. A run from code that named no
+ * agent reads under the default target.
+ */
 export function targetNameOf({
   targetKey,
   targetNames,
@@ -187,15 +193,50 @@ export function targetNameOf({
   targetKey: string;
   targetNames: Map<string, string>;
 }): string {
-  // A run with no platform target was pointed at its agent by the code that
-  // pushed it, so it reads under the default target.
-  if (isCodeTargetKey(targetKey)) return CODE_TARGET_NAME;
-  return targetNames.get(targetKey) ?? targetKey;
+  const known = targetNames.get(targetKey);
+  if (known) return known;
+  if (isCodeTargetKey({ targetKey })) return CODE_TARGET_NAME;
+  return targetKey;
 }
 
-/** True for the key a run with no platform target is grouped under. */
-export function isCodeTargetKey(targetKey: string): boolean {
-  return targetKey === UNKNOWN_TARGET_KEY;
+/**
+ * The head of every key built from a name the code that pushed a run
+ * reported, which is what keeps such a key apart from a platform reference id.
+ */
+export const CODE_TARGET_KEY_PREFIX = "code:";
+
+/**
+ * True for a target the platform holds no agent or prompt for: the code that
+ * pushed the run chose what it ran against. Such a target carries the from
+ * code mark wherever it is listed.
+ */
+export function isCodeTargetKey({ targetKey }: { targetKey: string }): boolean {
+  return (
+    targetKey === UNKNOWN_TARGET_KEY ||
+    targetKey.startsWith(CODE_TARGET_KEY_PREFIX)
+  );
+}
+
+/**
+ * The names a run from code reported, keyed by the target they fold under.
+ *
+ * Fed from everything the page already holds: the targets the window lists,
+ * the group rows and the atoms of the drill-down. A platform target is left
+ * out, so a stored agent can never be renamed by what a run reported, and a
+ * name that is only the key repeated is left out too, so a run that reported
+ * no agent still reads under the default target.
+ */
+export function codeTargetNames(
+  named: { targetKey: string; targetName: string | null }[],
+): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const row of named) {
+    const { targetKey, targetName } = row;
+    if (!targetName || targetName === targetKey) continue;
+    if (!isCodeTargetKey({ targetKey })) continue;
+    names.set(targetKey, targetName);
+  }
+  return names;
 }
 
 /** How a row names its targets: "dev-agent vs prod-agent". */

@@ -68,8 +68,17 @@ export interface ResultAtom {
   scenarioKey: string;
   /** The name the run carries, or null when it carries none. */
   scenarioName: string | null;
-  /** The bare `targetReferenceId`, or {@link UNKNOWN_TARGET_KEY}. */
+  /**
+   * The bare `targetReferenceId`, `code:` and the slug of the agent name a run
+   * from code reported, or {@link UNKNOWN_TARGET_KEY}.
+   */
   targetKey: string;
+  /**
+   * The agent name the code that pushed the run reported, or null when it
+   * reported none. A run started on the platform is named by its reference id
+   * instead, so this stays null there.
+   */
+  targetName: string | null;
   status: ScenarioRunStatus;
   outcome: AtomOutcome;
   durationMs: number | null;
@@ -106,6 +115,13 @@ export type ResultsGroupBy = "plan" | "scenario" | "target" | "none";
 /** One scenario that ran from code, as the scenario filter lists it. */
 export interface CodeScenario {
   /** The key its runs fold under, and what the scenario filter takes. */
+  key: string;
+  name: string;
+}
+
+/** One target a run from code named, as the target filter lists it. */
+export interface CodeTarget {
+  /** The key its runs fold under, and what the target filter takes. */
   key: string;
   name: string;
 }

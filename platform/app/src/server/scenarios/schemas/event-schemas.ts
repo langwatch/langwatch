@@ -118,6 +118,27 @@ export const langwatchMetadataSchema = z.object({
 });
 
 /**
+ * One participant of a run, as the code that pushed the run names it.
+ *
+ * The SDK reports every agent it wired into the run: the agent under test,
+ * the user simulator and the judge. Only the `agent` role names what the run
+ * was pointed at, so a run pushed from code can say which agent it tested
+ * without the platform holding a target for it.
+ *
+ * `name` is the adapter's own name, or its class name when it was given none,
+ * for example "AgnoAgentAdapter".
+ *
+ * It sits beside `name` and `description` on the metadata rather than inside
+ * the reserved `langwatch` namespace, which only the platform writes.
+ *
+ * @see specs/features/agent-testing/results-atoms.feature
+ */
+export const scenarioAgentSchema = z.object({
+  name: z.string(),
+  role: z.enum(["agent", "user", "judge"]),
+});
+
+/**
  * Scenario Run Started Event Schema
  * Captures the initiation of a scenario run with metadata about the scenario being executed.
  * Contains the scenario name and optional description for identification purposes.
@@ -147,6 +168,8 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
         .trim()
         .transform((note) => (note === "" ? undefined : note))
         .optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),

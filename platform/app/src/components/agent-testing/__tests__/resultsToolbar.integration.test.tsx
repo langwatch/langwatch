@@ -50,6 +50,9 @@ const mockPush = vi.hoisted(() =>
 const codeScenarioState = vi.hoisted(() => ({
   scenarios: [] as { key: string; name: string }[],
 }));
+const codeTargetState = vi.hoisted(() => ({
+  targets: [] as { key: string; name: string }[],
+}));
 const overviewState = vi.hoisted(() => ({
   byGroupBy: {} as Record<string, unknown>,
   lastInput: null as Record<string, unknown> | null,
@@ -101,6 +104,9 @@ vi.mock("~/utils/api", () => ({
       },
       getCodeScenarios: {
         useQuery: () => ({ data: codeScenarioState.scenarios }),
+      },
+      getCodeTargets: {
+        useQuery: () => ({ data: codeTargetState.targets }),
       },
       getResultsOverview: {
         useQuery: (input: Record<string, unknown>) => {
@@ -226,6 +232,7 @@ function makeAtom(overrides: Record<string, unknown> = {}) {
     scenarioKey: "scen_1",
     scenarioName: null,
     targetKey: "agent_dev",
+    targetName: null,
     status: "SUCCESS",
     outcome: "passed",
     durationMs: 1000,
@@ -322,6 +329,7 @@ describe("the toolbar of the Results tab", () => {
     overviewState.lastInput = null;
     onSelectRun.mockClear();
     codeScenarioState.scenarios = [];
+    codeTargetState.targets = [];
   });
 
   afterEach(() => {
@@ -706,6 +714,116 @@ describe("the toolbar of the Results tab", () => {
         "from code",
       );
       expect(target).not.toHaveTextContent(/unknown/i);
+    });
+
+    /** @scenario "A target named by a run from code reads that name with the from code mark" */
+    it("reads a target a run from code named under that name, with the from code mark", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "code:acmesupportagent",
+            title: "AcmeSupportAgent",
+          }),
+        ],
+      };
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const row = await screen.findByTestId(
+        "results-group-row-code:acmesupportagent",
+      );
+      expect(row).toHaveTextContent("AcmeSupportAgent");
+      expect(within(row).getByTestId("from-code-badge")).toHaveTextContent(
+        "from code",
+      );
+      expect(row).not.toHaveTextContent(/code:/);
+    });
+
+    /** @scenario "The Targets column reads the agent name a run from code reported" */
+    it("reads the agent a run from code named in the Targets column of its plan", () => {
+      codeTargetState.targets = [
+        { key: "code:acmesupportagent", name: "AcmeSupportAgent" },
+      ];
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "default",
+            targetKeys: ["code:acmesupportagent"],
+            lastRunAt: NOW,
+          }),
+        ],
+      };
+
+      renderList({
+        externalSets: [
+          {
+            scenarioSetId: "default",
+            passedCount: 1,
+            failedCount: 0,
+            totalCount: 1,
+            lastRunTimestamp: NOW,
+          },
+        ],
+      });
+
+      const row = screen.getByTestId("run-plan-row-external:default");
+      expect(within(row).getByTestId("plan-targets")).toHaveTextContent(
+        "AcmeSupportAgent",
+      );
+    });
+
+    /** @scenario "The Target filter lists the targets named by runs from code" */
+    it("offers a target a run from code named in the Target filter, by its key", async () => {
+      const user = userEvent.setup();
+      codeTargetState.targets = [
+        { key: "code:acmesupportagent", name: "AcmeSupportAgent" },
+      ];
+      renderList();
+
+      await user.click(screen.getByTestId("results-filter-target"));
+      await user.click(
+        await screen.findByRole("menuitemcheckbox", {
+          name: /acmesupportagent/i,
+        }),
+      );
+
+      expect(overviewState.lastInput?.targetKeys).toEqual([
+        "code:acmesupportagent",
+      ]);
+    });
+
+    /** @scenario "A run line reads the agent name its run reported" */
+    it("names the agent a run reported on the run line behind its target row", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "code:acmesupportagent",
+            title: "AcmeSupportAgent",
+          }),
+        ],
+      };
+      atomState.atoms = [
+        makeAtom({
+          executionId: "exec_c",
+          targetKey: "code:acmesupportagent",
+          targetName: "AcmeSupportAgent",
+        }),
+      ];
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+      await user.click(
+        await screen.findByTestId("results-group-row-code:acmesupportagent"),
+      );
+
+      const line = await screen.findByTestId("results-run-line-exec_c");
+      expect(line).toHaveTextContent("AcmeSupportAgent");
     });
 
     /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */

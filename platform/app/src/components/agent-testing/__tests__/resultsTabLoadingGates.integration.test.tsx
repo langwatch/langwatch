@@ -58,6 +58,7 @@ vi.mock("~/utils/api", () => ({
       // lists, so the tab reads the scenarios of the project too.
       getAll: { useQuery: () => ({ data: [] }) },
       getCodeScenarios: { useQuery: () => ({ data: [] }) },
+      getCodeTargets: { useQuery: () => ({ data: [] }) },
       getResultsOverview: { useQuery: mockResultsOverview },
       getResultAtoms: { useQuery: mockResultAtoms },
       getExternalSetSummaries: { useQuery: mockExternalSets },

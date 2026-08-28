@@ -11,6 +11,7 @@ import type {
   AtomCostSource,
   AtomOutcome,
   CodeScenario,
+  CodeTarget,
   ResultAtom,
   ResultGroup,
   ResultsFilter,
@@ -121,6 +122,31 @@ export class ResultAtomsService {
     return rows.map((row) => ({
       key: row.ScenarioKey,
       name: row.Name !== "" ? row.Name : row.ScenarioKey,
+    }));
+  }
+
+  /**
+   * The targets a run from code named inside the window, for the target
+   * filter. Read over the window alone, for the same reason the scenarios
+   * that ran from code are.
+   */
+  async getCodeTargets({
+    projectId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<CodeTarget[]> {
+    const rows = await this.repository.findCodeTargets({
+      projectId,
+      startDate,
+      endDate,
+    });
+    return rows.map((row) => ({
+      key: row.TargetKey,
+      name: row.Name !== "" ? row.Name : row.TargetKey,
     }));
   }
 
@@ -356,6 +382,7 @@ function toAtom({
     scenarioKey: row.ScenarioKey,
     scenarioName: row.ScenarioName === "" ? null : row.ScenarioName,
     targetKey: row.TargetKey,
+    targetName: row.TargetName === "" ? null : row.TargetName,
     status: mapStatus(row.Status),
     outcome: row.Outcome as AtomOutcome,
     durationMs: row.DurationMs === "" ? null : Number(row.DurationMs),
@@ -405,6 +432,15 @@ function carriedName(row: RawGroupRow): string {
   return row.Name !== "" ? row.Name : row.GroupKey;
 }
 
+/**
+ * The name a target group reads under: the agent name the code that pushed
+ * the runs reported, and the key itself when it reported none. A platform
+ * target reports none, and the client names it from its own target map.
+ */
+function carriedTargetName(row: RawGroupRow): string {
+  return row.TargetName !== "" ? row.TargetName : row.GroupKey;
+}
+
 function headline({
   row,
   groupBy,
@@ -434,8 +470,9 @@ function headline({
       subtitle: null,
     };
   }
-  // Target: the client names a reference id through its own target map.
-  return { key: row.GroupKey, title: row.GroupKey, subtitle: null };
+  // Target: a run from code reads under the agent name it reported, and the
+  // client names a platform reference id through its own target map.
+  return { key: row.GroupKey, title: carriedTargetName(row), subtitle: null };
 }
 
 /**

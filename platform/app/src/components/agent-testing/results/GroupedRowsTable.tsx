@@ -158,7 +158,7 @@ function GroupSummaryRow({
   // A target group is keyed by a reference id, and the read leaves naming it
   // to the client, which holds the names of the agents and the prompts.
   const title = isScenario ? group.title : resolveTargetName(group.key);
-  const isCodeTarget = !isScenario && isCodeTargetKey(group.key);
+  const isCodeTarget = !isScenario && isCodeTargetKey({ targetKey: group.key });
   return (
     <ResultsTableRow
       columns={GROUP_COLUMNS}

@@ -29,6 +29,7 @@ interface FakeData {
   atoms?: RawAtomRow[];
   series?: { Bucket: string; Passed: string; Settled: string }[];
   totals?: Record<string, string> | null;
+  codeTargets?: { TargetKey: string; Name: string }[];
 }
 
 function makeRepo(data: FakeData) {
@@ -54,6 +55,7 @@ function makeRepo(data: FakeData) {
       .mockResolvedValue({ atoms: data.atoms ?? [], hasMore: false }),
     findRunOrdinals: vi.fn().mockResolvedValue([]),
     findCodeScenarios: vi.fn().mockResolvedValue([]),
+    findCodeTargets: vi.fn().mockResolvedValue(data.codeTargets ?? []),
   } as unknown as ResultAtomsClickHouseRepository;
 }
 
@@ -73,6 +75,7 @@ function makePrisma({
 const group = (over: Partial<RawGroupRow> = {}): RawGroupRow => ({
   GroupKey: "key",
   Name: "",
+  TargetName: "",
   Atoms: "2",
   Passed: "1",
   Settled: "2",
@@ -368,6 +371,31 @@ describe("getOverview", () => {
   });
 });
 
+describe("getCodeTargets", () => {
+  describe("given a target a run from code named", () => {
+    /** @scenario "The targets named by runs from code are listed for the filter" */
+    it("lists it under the name the run reported", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          codeTargets: [
+            { TargetKey: "code:acmesupportagent", Name: "AcmeSupportAgent" },
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const targets = await service.getCodeTargets({
+        projectId: "proj",
+        startDate,
+      });
+
+      expect(targets).toEqual([
+        { key: "code:acmesupportagent", name: "AcmeSupportAgent" },
+      ]);
+    });
+  });
+});
+
 describe("getAtoms", () => {
   describe("given an atom whose cost was never measured", () => {
     /**
@@ -388,6 +416,7 @@ describe("getAtoms", () => {
         DurationMs: "",
         Note: "",
         TargetKey: "unknown",
+        TargetName: "",
         Trigger: "code",
         CostUsd: "",
         CostSource: "unknown",
@@ -404,6 +433,51 @@ describe("getAtoms", () => {
       expect(atoms[0]?.costSource).toBe("unknown");
       expect(atoms[0]?.note).toBeNull();
       expect(atoms[0]?.durationMs).toBeNull();
+    });
+  });
+});
+
+describe("the target of a group", () => {
+  describe("when a run from code reported the agent it tested", () => {
+    /** @scenario "Two runs of one agent name fold under one target" */
+    it("reads the group under that agent name", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          groups: [
+            group({
+              GroupKey: "code:acmesupportagent",
+              TargetName: "AcmeSupportAgent",
+              RunCount: "2",
+            }),
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const overview = await service.getOverview({ filter, groupBy: "target" });
+
+      expect(overview.groups).toHaveLength(1);
+      expect(overview.groups[0]).toMatchObject({
+        key: "code:acmesupportagent",
+        title: "AcmeSupportAgent",
+      });
+    });
+  });
+
+  describe("when the run reported no agent", () => {
+    /**
+     * The client names a platform reference id from its own target map, so a
+     * group that reported nothing has to keep its key as its title.
+     */
+    it("keeps the key as the title", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({ groups: [group({ GroupKey: "agent_dev" })] }),
+        makePrisma(),
+      );
+
+      const overview = await service.getOverview({ filter, groupBy: "target" });
+
+      expect(overview.groups[0]?.title).toBe("agent_dev");
     });
   });
 });
@@ -468,6 +542,7 @@ describe("the shape of an atom", () => {
               DurationMs: "1500",
               Note: "",
               TargetKey: "agent_dev",
+              TargetName: "",
               Trigger: "app",
               CostUsd: "0.01",
               CostSource: "run",

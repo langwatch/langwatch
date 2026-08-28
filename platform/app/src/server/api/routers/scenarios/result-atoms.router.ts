@@ -57,6 +57,22 @@ export const resultAtomsRouter = createTRPCRouter({
     }),
 
   /**
+   * The targets a run from code named inside the window, for the target
+   * filter. They have no row in Postgres, so the agent and prompt lists
+   * cannot name them.
+   */
+  getCodeTargets: protectedProcedure
+    .input(windowSchema)
+    .permission("scenarios:view")
+    .query(async ({ input }) => {
+      return getApp().simulations.results.getCodeTargets({
+        projectId: input.projectId,
+        startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+        endDate: input.endDate,
+      });
+    }),
+
+  /**
    * The stat strip and the group rows for one grouping, aggregated in the
    * database.
    *

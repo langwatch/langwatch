@@ -276,6 +276,33 @@ Feature: The Results tab
     And not on the newest run of the plan
 
   @integration
+  Scenario: A target named by a run from code reads that name with the from code mark
+    Given a run from code that reported the agent "AcmeSupportAgent"
+    When "Target" is chosen in Group by
+    Then the row for it reads "AcmeSupportAgent"
+    And it carries the from code mark
+    And it does not read the key its runs fold under
+
+  @integration
+  Scenario: The Targets column reads the agent name a run from code reported
+    Given a set that runs from code whose runs reported the agent "AcmeSupportAgent"
+    When its row is read on the list of run plans
+    Then the Targets cell reads "AcmeSupportAgent"
+
+  @integration
+  Scenario: The Target filter lists the targets named by runs from code
+    Given a target named by a run from code inside the window
+    When the Target filter is opened
+    Then that target is offered under the name the run reported
+    And choosing it narrows the list by its key
+
+  @integration
+  Scenario: A run line reads the agent name its run reported
+    Given a target row opened onto the runs behind it
+    When a run line is read
+    Then it names the agent the run reported
+
+  @integration
   Scenario: A run of a set that runs from code opens the row the list draws for it
     Given a scenario row opened onto a run of a set that runs from code
     When that run is chosen

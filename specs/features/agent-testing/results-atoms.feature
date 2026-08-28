@@ -97,6 +97,51 @@ Feature: The results atom
     And its target key reads "unknown", so the atom still groups by target
 
   @integration
+  Scenario: A run that reports its agents names its target by the agent it tested
+    Given a run pushed from code that reports the agent "AcmeSupportAgent",
+      a user simulator and a judge
+    When the atom is read
+    Then its target key reads "code:acmesupportagent"
+    And it carries the target name "AcmeSupportAgent"
+    And the user simulator and the judge are left out, since neither is what
+      the run tests
+
+  @integration
+  Scenario: Two runs of one agent name fold under one target
+    Given two runs pushed from code, both reporting the agent "AcmeSupportAgent"
+    When the overview is read grouped by target
+    Then one group is returned
+    And it reads "AcmeSupportAgent"
+
+  @integration
+  Scenario: A run that reports no agent stays under the unknown target
+    Given a run pushed from code that reports no agent
+    When the atom is read
+    Then its target key reads "unknown"
+    And it carries no target name
+
+  @integration
+  Scenario: A run started on the platform keeps its platform target
+    Given a run started on the platform that also reports the agent "AcmeSupportAgent"
+    When the atom is read
+    Then its target key reads the reference id of the platform target
+
+    The platform runs its own scenarios through the same SDK, so such a run
+    can report agents as well. The stamped reference id always wins, or a run
+    of a stored agent would move to another target as soon as the SDK reports
+    what it wired in.
+
+  @integration
+  Scenario: The targets named by runs from code are listed for the filter
+    Given runs pushed from code naming "AcmeSupportAgent" and "AcmeBillingAgent",
+      a run that named no agent, and a run started on the platform
+    When the targets that ran from code are read
+    Then both agents are listed under their keys, in name order
+    And the run that named no agent is not listed
+    And the platform run is not
+    And no more targets are returned than the cap allows
+
+  @integration
   Scenario: One run against two targets gives one atom per target
     Given a run of two scenarios against two targets
     When the atoms are read
