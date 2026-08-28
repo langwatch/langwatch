@@ -373,6 +373,23 @@ const updateProjectLambdaImage = async (
 
   const response = await lambda.send(command);
   return response;
+}
+
+/**
+ * Checks if an error is a Lambda update-in-progress conflict.
+ * Discriminates by exception name (the contract) rather than message text
+ * (which can change). Message check retained as fallback for older SDK versions.
+ */
+const isLambdaUpdateInProgressError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const err = error as any;
+  if (err.name === \"ResourceConflictException\") {
+    return true;
+  }
+  // Fallback: check message for older SDK versions
+  return error.message.includes(\"An update is in progress\");
 };
 
 /**
@@ -562,10 +579,7 @@ const updateProjectLambdaImageIfDrifted = async (
     await pollLambdaUntilReady(lambda, functionName);
     return updated;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes("An update is in progress")
-    ) {
+    if (isLambdaUpdateInProgressError(error)) {
       logger.info(
         { projectId },
         "Lambda function update in progress, skipping update",
@@ -593,10 +607,7 @@ const reconcileProjectLambdaConfigSafely = async (
   try {
     return await reconcileProjectLambdaConfig(lambda, functionName, params);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes("An update is in progress")
-    ) {
+    if (isLambdaUpdateInProgressError(error)) {
       logger.info(
         { projectId: params.projectId },
         "Lambda function config reconcile skipped, update in progress",
@@ -690,7 +701,7 @@ const resolveProjectLambdaArn = async (
       if (
         error instanceof Error &&
         (error.message.includes("already exist") ||
-          error.message.includes("An update is in progress"))
+          isLambdaUpdateInProgressError(error))
       ) {
         logger.info(
           { projectId },
