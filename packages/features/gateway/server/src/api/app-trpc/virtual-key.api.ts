@@ -33,7 +33,12 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
+  virtualKeyApiApplicableBudgetsInputSchema,
+  virtualKeyApiCreateInputSchema,
+  virtualKeyApiDisableInputSchema,
+  virtualKeyApiKeyInputSchema,
+  virtualKeyApiOrganizationInputSchema,
+  virtualKeyApiUpdateInputSchema,
   type GatewayService,
   type VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
@@ -45,7 +50,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import { startOfCurrentMonthUTC } from "../../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository";
+import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
 import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
 import type { GatewayVirtualKeySpendPort } from "../../ports/gateway-virtual-key-spend.port";
 import type {
@@ -315,21 +320,6 @@ export type VirtualKeyTrpcPorts = Readonly<{
   schemas: Readonly<{ virtualKeyBudgetInput: z.ZodType<VirtualKeyBudgetInput> }>;
 }>;
 
-const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
-
-/**
- * The gateway's own scope-assignment wire shape. Annotated against
- * `GatewayVirtualKeyScope` so a tier added to the key's scope vocabulary is a
- * compile error here rather than a silently unaccepted value.
- */
-const scopeAssignmentSchema: z.ZodType<GatewayVirtualKeyScope> = z.object({
-  scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-  scopeId: z.string().min(1),
-});
-
-const organizationScopeSchema = z.object({ organizationId: z.string() });
-const idInput = z.object({ organizationId: z.string(), id: z.string() });
-
 /**
  * The reason every procedure here declares. Each one names the permissions its
  * resolver actually enforces, which is what keeps a per-scope decision
@@ -351,7 +341,12 @@ export class VirtualKeyTrpcApi {
     ports: TPorts,
   ) {
     const { protected: procedure, resolverAuthorizedPolicy } = procedures;
+    // The canonical budget parser the process injects, threaded into the two
+    // contract schemas that accept a budget so the write path's decimal regex
+    // and positive-amount refinement stay the one definition.
     const budgetInputSchema = ports.schemas.virtualKeyBudgetInput;
+    const createInputSchema = virtualKeyApiCreateInputSchema(budgetInputSchema);
+    const updateInputSchema = virtualKeyApiUpdateInputSchema(budgetInputSchema);
 
     /** One key projected through the same batched read a listing uses. */
     const toDto = async (input: {
@@ -373,7 +368,7 @@ export class VirtualKeyTrpcApi {
       list: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; only keys whose scopes intersect the caller's membership in this organization are returned`,
         permissions: ["virtualKeys:view"],
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiOrganizationInputSchema)).query(async ({ ctx, input }) => {
         const keys = await ports.listVisibleVirtualKeys({
           organizationId: input.organizationId,
           userId: ctx.actor().id,
@@ -385,7 +380,7 @@ export class VirtualKeyTrpcApi {
       get: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; the key must exist in this organization and intersect the caller's membership set, and a miss is answered as not found`,
         permissions: ["virtualKeys:view"],
-      })(procedure.input(idInput)).query(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiKeyInputSchema)).query(async ({ ctx, input }) => {
         // A key the caller can't see is indistinguishable from one that
         // doesn't exist — same NOT_FOUND, no existence leak.
         const vk = await ports.requireVisibleVirtualKey({
@@ -410,7 +405,7 @@ export class VirtualKeyTrpcApi {
       spendThisMonth: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; spend is reported only for keys visible to the caller's membership in this organization`,
         permissions: ["virtualKeys:view"],
-      })(procedure.input(organizationScopeSchema)).query(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiOrganizationInputSchema)).query(async ({ ctx, input }) => {
         // Without the ClickHouse spend source there is no number to report.
         // Failing loudly lets the column render "unavailable" instead of a
         // confident $0.00 that cannot be told apart from a zero-spend key.
@@ -463,121 +458,96 @@ export class VirtualKeyTrpcApi {
       applicableBudgets: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; for an existing key, its visibility in this organization, and for a draft, manage on every scope in it, both checked before any budget data is read`,
         permissions: ["virtualKeys:view", "virtualKeys:manage"],
-      })(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            virtualKeyId: z.string().nullable().optional(),
-            scopes: z.array(scopeAssignmentSchema).min(1),
-            traceProjectId: z.string().nullable().optional(),
-            principalUserId: z.string().nullable().optional(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        // Authorization first, before any budget data is touched. This
-        // resolver answers with budget names, limits, live spend and (for a
-        // principal) their name, so knowing an organization id must not be
-        // enough to call it.
-        //
-        // For an existing key (edit drawer): the caller must be able to SEE
-        // the key, and resolution binds to the key's STORED ownership. The
-        // caller-supplied scopes, destination and principal are ignored:
-        // honouring them would let anyone who can see an organization-wide key
-        // read a sibling team's budget names and spend by injecting that team's
-        // scope into the input.
-        if (input.virtualKeyId) {
-          const vk = await ports.requireVisibleVirtualKey({
+      })(procedure.input(virtualKeyApiApplicableBudgetsInputSchema)).query(
+        async ({ ctx, input }) => {
+          // Authorization first, before any budget data is touched. This
+          // resolver answers with budget names, limits, live spend and (for a
+          // principal) their name, so knowing an organization id must not be
+          // enough to call it.
+          //
+          // For an existing key (edit drawer): the caller must be able to SEE
+          // the key, and resolution binds to the key's STORED ownership. The
+          // caller-supplied scopes, destination and principal are ignored:
+          // honouring them would let anyone who can see an organization-wide key
+          // read a sibling team's budget names and spend by injecting that team's
+          // scope into the input.
+          if (input.virtualKeyId) {
+            const vk = await ports.requireVisibleVirtualKey({
+              organizationId: input.organizationId,
+              id: input.virtualKeyId,
+              userId: ctx.actor().id,
+              virtualKeys: ctx.app.gateway.virtualKeys,
+            });
+            return ports.resolveApplicableBudgets({
+              target: {
+                organizationId: input.organizationId,
+                virtualKeyId: vk.id,
+                scopes: vk.scopes.map((scope) => ({
+                  scopeType: scope.scopeType,
+                  scopeId: scope.scopeId,
+                })),
+                traceProjectId: vk.traceProjectId,
+                principalUserId: vk.principalUserId,
+              },
+              projects: ctx.app.projects,
+              budgetDecisions: ctx.app.gateway.budgetDecisions,
+              budgets: ctx.app.gateway.budgets,
+            });
+          }
+          // For a draft (create drawer): the caller must hold
+          // `virtualKeys:manage` on every draft scope AND on the chosen trace
+          // destination — the exact boundary `create` will hold them to when they
+          // submit. Previewing a target's budgets must not be cheaper than
+          // creating a key against it.
+          const principal = ctx.session;
+          await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
+          await ports.assertScopesBelongToOrganization({
             organizationId: input.organizationId,
-            id: input.virtualKeyId,
-            userId: ctx.actor().id,
-            virtualKeys: ctx.app.gateway.virtualKeys,
+            scopes: input.scopes,
           });
+          await ports.assertTraceProjectBelongsToOrganization({
+            organizationId: input.organizationId,
+            traceProjectId: input.traceProjectId,
+          });
+          if (input.traceProjectId) {
+            await ports.assertCanManageAllScopes({
+              principal,
+              scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+            });
+          }
+          // The principal id is still pinned to the organization: even an
+          // authorized caller must not resolve another tenant's rows.
+          if (input.principalUserId) {
+            const member = await ports.isOrganizationMember({
+              organizationId: input.organizationId,
+              userId: input.principalUserId,
+            });
+            if (!member) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "principalUserId is not a member of this organization.",
+              });
+            }
+          }
           return ports.resolveApplicableBudgets({
             target: {
               organizationId: input.organizationId,
-              virtualKeyId: vk.id,
-              scopes: vk.scopes.map((scope) => ({
-                scopeType: scope.scopeType,
-                scopeId: scope.scopeId,
-              })),
-              traceProjectId: vk.traceProjectId,
-              principalUserId: vk.principalUserId,
+              virtualKeyId: null,
+              scopes: input.scopes,
+              traceProjectId: input.traceProjectId ?? null,
+              principalUserId: input.principalUserId ?? null,
             },
             projects: ctx.app.projects,
             budgetDecisions: ctx.app.gateway.budgetDecisions,
             budgets: ctx.app.gateway.budgets,
           });
-        }
-        // For a draft (create drawer): the caller must hold
-        // `virtualKeys:manage` on every draft scope AND on the chosen trace
-        // destination — the exact boundary `create` will hold them to when they
-        // submit. Previewing a target's budgets must not be cheaper than
-        // creating a key against it.
-        const principal = ctx.session;
-        await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
-        await ports.assertScopesBelongToOrganization({
-          organizationId: input.organizationId,
-          scopes: input.scopes,
-        });
-        await ports.assertTraceProjectBelongsToOrganization({
-          organizationId: input.organizationId,
-          traceProjectId: input.traceProjectId,
-        });
-        if (input.traceProjectId) {
-          await ports.assertCanManageAllScopes({
-            principal,
-            scopes: [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-          });
-        }
-        // The principal id is still pinned to the organization: even an
-        // authorized caller must not resolve another tenant's rows.
-        if (input.principalUserId) {
-          const member = await ports.isOrganizationMember({
-            organizationId: input.organizationId,
-            userId: input.principalUserId,
-          });
-          if (!member) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "principalUserId is not a member of this organization.",
-            });
-          }
-        }
-        return ports.resolveApplicableBudgets({
-          target: {
-            organizationId: input.organizationId,
-            virtualKeyId: null,
-            scopes: input.scopes,
-            traceProjectId: input.traceProjectId ?? null,
-            principalUserId: input.principalUserId ?? null,
-          },
-          projects: ctx.app.projects,
-          budgetDecisions: ctx.app.gateway.budgetDecisions,
-          budgets: ctx.app.gateway.budgets,
-        });
-      }),
+        },
+      ),
 
       create: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
         permissions: ["virtualKeys:manage"],
-      })(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            name: z.string().min(1).max(128),
-            description: z.string().optional(),
-            principalUserId: z.string().nullable().optional(),
-            scopes: z.array(scopeAssignmentSchema).min(1),
-            traceProjectId: z.string().nullable().optional(),
-            routingPolicyId: z.string().nullable().optional(),
-            routingMode: routingModeSchema.optional(),
-            /** When the key stops serving. Omit it and the key never expires. */
-            expiresAt: z.coerce.date().optional(),
-            budget: budgetInputSchema.nullable().optional(),
-            config: virtualKeyConfigSchema.partial().optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
+      })(procedure.input(createInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
         const principal = ctx.session;
         await ports.assertCanManageAllScopes({ principal, scopes: input.scopes });
@@ -631,24 +601,7 @@ export class VirtualKeyTrpcApi {
       update: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes, plus manage on every new scope when re-scoping`,
         permissions: ["virtualKeys:update", "virtualKeys:manage"],
-      })(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            id: z.string(),
-            name: z.string().min(1).max(128).optional(),
-            description: z.string().nullable().optional(),
-            scopes: z.array(scopeAssignmentSchema).min(1).optional(),
-            traceProjectId: z.string().nullable().optional(),
-            routingPolicyId: z.string().nullable().optional(),
-            routingMode: routingModeSchema.optional(),
-            /** Omitted leaves it alone; null clears it; a date moves it. */
-            expiresAt: z.coerce.date().nullable().optional(),
-            budget: budgetInputSchema.nullable().optional(),
-            config: virtualKeyConfigSchema.partial().optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
+      })(procedure.input(updateInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
         const principal = ctx.session;
         const existing = await ports.requireExistingVirtualKey({
@@ -730,7 +683,7 @@ export class VirtualKeyTrpcApi {
       rotate: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,
         permissions: ["virtualKeys:rotate"],
-      })(procedure.input(idInput)).mutation(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
         const principal = ctx.session;
         const existing = await ports.requireExistingVirtualKey({
@@ -755,7 +708,7 @@ export class VirtualKeyTrpcApi {
       revoke: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; delete on one of the key's existing scopes`,
         permissions: ["virtualKeys:delete"],
-      })(procedure.input(idInput)).mutation(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
         const principal = ctx.session;
         const existing = await ports.requireExistingVirtualKey({
@@ -779,34 +732,32 @@ export class VirtualKeyTrpcApi {
       disable: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
         permissions: ["virtualKeys:update"],
-      })(procedure.input(idInput.extend({ reason: z.string().max(500).optional() }))).mutation(
-        async ({ ctx, input }) => {
-          const actorUserId = ctx.actor().id;
-          const principal = ctx.session;
-          const existing = await ports.requireExistingVirtualKey({
-            organizationId: input.organizationId,
-            id: input.id,
-            virtualKeys: ctx.app.gateway.virtualKeys,
-          });
-          await ports.assertCanOperateOnAnyScope({
-            principal,
-            scopes: existing.scopes,
-            permission: "virtualKeys:update",
-          });
-          const updated = await ctx.app.gateway.virtualKeys.disable({
-            id: input.id,
-            organizationId: input.organizationId,
-            actorUserId,
-            reason: input.reason ?? null,
-          });
-          return toDto({ virtualKey: updated, projects: ctx.app.projects });
-        },
-      ),
+      })(procedure.input(virtualKeyApiDisableInputSchema)).mutation(async ({ ctx, input }) => {
+        const actorUserId = ctx.actor().id;
+        const principal = ctx.session;
+        const existing = await ports.requireExistingVirtualKey({
+          organizationId: input.organizationId,
+          id: input.id,
+          virtualKeys: ctx.app.gateway.virtualKeys,
+        });
+        await ports.assertCanOperateOnAnyScope({
+          principal,
+          scopes: existing.scopes,
+          permission: "virtualKeys:update",
+        });
+        const updated = await ctx.app.gateway.virtualKeys.disable({
+          id: input.id,
+          organizationId: input.organizationId,
+          actorUserId,
+          reason: input.reason ?? null,
+        });
+        return toDto({ virtualKey: updated, projects: ctx.app.projects });
+      }),
 
       enable: resolverAuthorizedPolicy({
         reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
         permissions: ["virtualKeys:update"],
-      })(procedure.input(idInput)).mutation(async ({ ctx, input }) => {
+      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
         const actorUserId = ctx.actor().id;
         const principal = ctx.session;
         const existing = await ports.requireExistingVirtualKey({

@@ -27,9 +27,16 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import {
-  monitorExecutionModeSchema,
+  monitorApiCopyInputSchema,
+  monitorApiCreateInputSchema,
+  monitorApiMonitorInputSchema,
+  monitorApiNameAvailabilityInputSchema,
+  monitorApiPerformanceInputSchema,
+  monitorApiProjectInputSchema,
+  monitorApiToggleInputSchema,
+  monitorApiUpdateInputSchema,
   MonitorNotFoundError,
-  type MonitorCreateInput,
+  type MonitorApiPreconditionsParser,
   type MonitorService,
 } from "@langwatch/monitor-contract";
 import {
@@ -38,7 +45,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
 
 /** The window `getPerformanceForProject` reports, and compares to the one before it. */
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -94,18 +101,13 @@ type MonitorTrpcProcedures<
  * shape, so whatever the process supplies parses to something the service can
  * persist.
  */
-export type MonitorPreconditionsParser = z.ZodType<
-  MonitorCreateInput["preconditions"],
-  MonitorCreateInput["preconditions"]
->;
-
 /**
  * The process capabilities this transport needs that are not the monitor's own.
  * Each is handed the request context where it resolves per-request state, so
  * the process performs the work exactly as it always did.
  */
 type MonitorTrpcPorts = Readonly<{
-  preconditionsSchema: MonitorPreconditionsParser;
+  preconditionsSchema: MonitorApiPreconditionsParser;
   /**
    * The start of the window the performance trend compares against, from the
    * same helper the analytics page uses — so the comparison covers the exact
@@ -130,35 +132,6 @@ type MonitorTrpcPorts = Readonly<{
     input: Readonly<{ workflowId: string; projectId: string }>,
   ): Promise<void>;
 }>;
-
-const projectScopeSchema = z.object({ projectId: z.string() });
-
-const monitorIdInputSchema = z.object({ id: z.string(), projectId: z.string() });
-
-const performanceInputSchema = z.object({
-  projectId: z.string(),
-  timeZone: z.string().min(1).max(100).optional(),
-});
-
-const toggleInputSchema = z.object({
-  id: z.string(),
-  projectId: z.string(),
-  enabled: z.boolean(),
-});
-
-const copyInputSchema = z.object({
-  monitorId: z.string(),
-  // Target project to replicate into.
-  projectId: z.string(),
-  // Project the monitor is being copied from.
-  sourceProjectId: z.string(),
-});
-
-const nameAvailabilityInputSchema = z.object({
-  projectId: z.string(),
-  checkId: z.string().optional(),
-  name: z.string(),
-});
 
 /**
  * Refuses a monitor whose `checkType` names no evaluator we can run, and a
@@ -220,46 +193,22 @@ export class MonitorTrpcApi {
   ) {
     const { protected: procedure, policy, alsoRequire } = procedures;
 
-    const createInputSchema = z.object({
-      projectId: z.string(),
-      name: z.string(),
-      checkType: z.string(),
-      preconditions: ports.preconditionsSchema,
-      settings: z.record(z.string(), z.json()),
-      mappings: z.object({}).passthrough().optional(),
-      sample: z.number().min(0).max(1),
-      executionMode: monitorExecutionModeSchema,
-      evaluatorId: z.string().min(1).optional(),
-      level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
-      threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
-    });
-
-    const updateInputSchema = z.object({
-      id: z.string(),
-      projectId: z.string(),
-      name: z.string(),
-      checkType: z.string(),
-      preconditions: ports.preconditionsSchema,
-      settings: z.record(z.string(), z.json()),
-      mappings: z.object({}).passthrough(),
-      sample: z.number().min(0).max(1),
-      enabled: z.boolean().optional(),
-      executionMode: monitorExecutionModeSchema,
-      evaluatorId: z.string().min(1).nullable().optional(),
-      level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
-      threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
-    });
+    // The process's precondition parser, threaded into the two contract
+    // schemas that accept preconditions so the evaluation surface keeps the
+    // one definition.
+    const createInputSchema = monitorApiCreateInputSchema(ports.preconditionsSchema);
+    const updateInputSchema = monitorApiUpdateInputSchema(ports.preconditionsSchema);
 
     return trpc.router({
-      getAllForProject: policy("evaluations:view")(procedure.input(projectScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const { projectId } = input;
-          return ctx.app.monitors.getAllForProject({ projectId });
-        },
-      ),
+      getAllForProject: policy("evaluations:view")(
+        procedure.input(monitorApiProjectInputSchema),
+      ).query(async ({ input, ctx }) => {
+        const { projectId } = input;
+        return ctx.app.monitors.getAllForProject({ projectId });
+      }),
 
       getPerformanceForProject: alsoRequire("analytics:view")(
-        policy("evaluations:view")(procedure.input(performanceInputSchema)),
+        policy("evaluations:view")(procedure.input(monitorApiPerformanceInputSchema)),
       ).query(async ({ input, ctx }) => {
         const monitors = await ctx.app.monitors.getAllForProject({
           projectId: input.projectId,
@@ -288,7 +237,7 @@ export class MonitorTrpcApi {
         });
       }),
 
-      toggle: policy("evaluations:update")(procedure.input(toggleInputSchema)).mutation(
+      toggle: policy("evaluations:update")(procedure.input(monitorApiToggleInputSchema)).mutation(
         async ({ input, ctx }) => {
           return ctx.app.monitors.toggle(input);
         },
@@ -326,7 +275,7 @@ export class MonitorTrpcApi {
         },
       ),
 
-      copy: policy("evaluations:manage")(procedure.input(copyInputSchema)).mutation(
+      copy: policy("evaluations:manage")(procedure.input(monitorApiCopyInputSchema)).mutation(
         async ({ input, ctx }) => {
           const { monitorId, projectId, sourceProjectId } = input;
           const hasSourcePermission = await ctx.can("evaluations:manage", {
@@ -435,7 +384,7 @@ export class MonitorTrpcApi {
         },
       ),
 
-      getById: policy("evaluations:view")(procedure.input(monitorIdInputSchema)).query(
+      getById: policy("evaluations:view")(procedure.input(monitorApiMonitorInputSchema)).query(
         async ({ input, ctx }) => {
           try {
             return await ctx.app.monitors.getById(input);
@@ -449,14 +398,14 @@ export class MonitorTrpcApi {
         },
       ),
 
-      delete: policy("evaluations:delete")(procedure.input(monitorIdInputSchema)).mutation(
+      delete: policy("evaluations:delete")(procedure.input(monitorApiMonitorInputSchema)).mutation(
         async ({ input, ctx }) => {
           return ctx.app.monitors.delete(input);
         },
       ),
 
       isNameAvailable: policy("evaluations:view")(
-        procedure.input(nameAvailabilityInputSchema),
+        procedure.input(monitorApiNameAvailabilityInputSchema),
       ).mutation(async ({ input, ctx }) => {
         return ctx.app.monitors.isNameAvailable(input);
       }),

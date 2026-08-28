@@ -2,6 +2,7 @@ export * from "./agent";
 export * from "./agent.commands";
 export * from "./agent.errors";
 export * from "./agent.queries";
+export * from "./agent.schemas";
 export * from "./agent.service";
 export * from "./config";
 export * from "./fields";

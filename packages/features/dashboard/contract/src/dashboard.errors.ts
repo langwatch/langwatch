@@ -22,6 +22,20 @@ export class DashboardReorderError extends Error {
   }
 }
 
+export class SavedViewNotFoundError extends Error {
+  constructor() {
+    super("Saved view not found");
+    this.name = "SavedViewNotFoundError";
+  }
+}
+
+export class SavedViewReorderError extends Error {
+  constructor(public readonly missingIds: string[]) {
+    super(`Saved views not found: ${missingIds.join(", ")}`);
+    this.name = "SavedViewReorderError";
+  }
+}
+
 export class GraphNotFoundError extends Error {
   constructor() {
     super("Graph not found");

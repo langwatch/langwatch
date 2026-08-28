@@ -33,8 +33,10 @@ The package does not own performance analytics or evaluator/workflow copying.
 Performance analytics belongs to the evaluation analytics capability. An
 Evaluator-backed monitor copy first copies the evaluator through the canonical
 Evaluator service; Monitor then persists the disabled replica with that new
-evaluator id. The compatibility router owns the cross-feature rollback while
-workflow copying remains there.
+evaluator id. The package's tRPC transport sequences the cross-feature rollback
+— archive the copied evaluator, then remove its workflow — but the workflow
+copy and its removal are process-supplied ports, because the studio DSL and its
+version history belong to the Workflow feature.
 
 ## Contracts and validation
 
@@ -65,9 +67,14 @@ repositories per request.
 
 ## Public surfaces and transports
 
-Existing tRPC and REST routes keep their current URLs and procedure names.
-They are thin compatibility handlers over `MonitorService`. This package does
-not register routes.
+Existing tRPC and REST routes keep their current URLs and procedure names. The
+tRPC surface is package-owned: `MonitorTrpcApi.create` installs the nine
+`monitors.*` procedures on a root the process supplies, and the process injects
+its own authenticated procedure plus the authorization, audit, error, logging
+and tracing chain. That chain is applied AFTER each procedure's `.input()`,
+because the declared permission check reads its scope id from the validated
+input. The REST routes remain thin process handlers over `MonitorService`. This
+package registers nothing on import.
 
 ## Runtime and registration
 

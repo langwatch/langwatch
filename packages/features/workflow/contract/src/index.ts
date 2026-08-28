@@ -7,6 +7,7 @@ export * from "./studio-workflow-utils";
 export * from "./studio-entry-input-defaults";
 export * from "./studio-events";
 export * from "./studio-optimization";
+export * from "./workflow.trpc-schemas";
 export * from "./workflow.commands";
 export * from "./workflow.errors";
 export * from "./workflow.service";

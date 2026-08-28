@@ -51,6 +51,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "nanoid": "^5.1.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

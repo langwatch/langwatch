@@ -28,8 +28,15 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  datasetRecordFormSchema,
-  datasetRecordInputSchema,
+  datasetApiCopyInputSchema,
+  datasetApiDatasetInputSchema,
+  datasetApiDeleteInputSchema,
+  datasetApiFindNextNameInputSchema,
+  datasetApiProjectInputSchema,
+  datasetApiUpdateMappingInputSchema,
+  datasetApiUpsertBaseInputSchema,
+  datasetApiUpsertTargetInputSchema,
+  datasetApiValidateNameInputSchema,
   type DatasetService,
 } from "@langwatch/dataset-contract";
 import {
@@ -38,7 +45,6 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { z } from "zod";
 
 /**
  * The experiment read `upsert` makes when the caller names an experiment
@@ -187,72 +193,6 @@ const datasetErrorHandler = async <T extends MiddlewareOutcome>({
 };
 
 /**
- * Either shape a dataset write arrives in: the editor names the dataset, the
- * experiment pages name an experiment and borrow its name.
- */
-const upsertInputSchema = z.intersection(
-  z.object({
-    projectId: z.string(),
-    datasetRecords: z.array(datasetRecordInputSchema).optional(),
-  }),
-  z.union([
-    datasetRecordFormSchema.extend({
-      datasetId: z.string().optional(),
-    }),
-    datasetRecordFormSchema
-      .omit({
-        name: true,
-      })
-      .extend({
-        experimentId: z.string(),
-      }),
-  ]),
-);
-
-const validateDatasetNameInputSchema = z.object({
-  projectId: z.string(),
-  proposedName: z.string(),
-  excludeDatasetId: z.string().optional(),
-});
-
-const projectScopeSchema = z.object({ projectId: z.string() });
-
-const datasetLookupSchema = z.object({ projectId: z.string(), datasetId: z.string() });
-
-const deleteByIdInputSchema = z.object({
-  projectId: z.string(),
-  datasetId: z.string(),
-  undo: z.boolean().optional(),
-});
-
-const updateMappingInputSchema = z.object({
-  projectId: z.string(),
-  datasetId: z.string(),
-  mapping: z
-    .object({
-      mapping: z.record(z.string(), z.any()),
-      expansions: z.array(z.string()),
-    })
-    .optional(),
-  threadMapping: z
-    .object({
-      mapping: z.record(z.string(), z.any()),
-    })
-    .optional(),
-});
-
-const findNextNameInputSchema = z.object({
-  projectId: z.string(),
-  proposedName: z.string(),
-});
-
-const copyInputSchema = z.object({
-  datasetId: z.string(),
-  sourceProjectId: z.string(),
-  projectId: z.string(),
-});
-
-/**
  * Installs the complete `dataset.*` tRPC surface on a host-owned root. The
  * procedure and the policy are injected by the host so its auth, audit, error,
  * logging and tracing policies wrap every feature procedure consistently.
@@ -275,7 +215,9 @@ export class DatasetTrpcApi {
 
     return trpc.router({
       /** Creates a new dataset or replaces an existing one's shape. */
-      upsert: policy("datasets:manage")(procedure.input(upsertInputSchema))
+      upsert: policy("datasets:manage")(
+        procedure.input(datasetApiUpsertBaseInputSchema).input(datasetApiUpsertTargetInputSchema),
+      )
         .use(datasetErrorHandler)
         .mutation(async ({ ctx, input }) => {
           const experimentId = "experimentId" in input ? input.experimentId : undefined;
@@ -300,14 +242,16 @@ export class DatasetTrpcApi {
         }),
 
       /** The slug a proposed name would get, and whether it is available. */
-      validateDatasetName: policy("datasets:view")(procedure.input(validateDatasetNameInputSchema))
+      validateDatasetName: policy("datasets:view")(
+        procedure.input(datasetApiValidateNameInputSchema),
+      )
         .use(datasetErrorHandler)
         .query(async ({ input, ctx }) => {
           return await ctx.app.dataset.validateDatasetName(input);
         }),
 
       /** Every dataset in the project, for the list and picker surfaces. */
-      getAll: policy("datasets:view")(procedure.input(projectScopeSchema)).query(
+      getAll: policy("datasets:view")(procedure.input(datasetApiProjectInputSchema)).query(
         async ({ input, ctx }) => {
           const result = await ctx.app.dataset.listDatasets({
             projectId: input.projectId,
@@ -322,7 +266,7 @@ export class DatasetTrpcApi {
        * One dataset by id or slug. An archived or missing one reads as null
        * rather than failing the page that asked for it.
        */
-      getById: policy("datasets:view")(procedure.input(datasetLookupSchema)).query(
+      getById: policy("datasets:view")(procedure.input(datasetApiDatasetInputSchema)).query(
         async ({ input, ctx }) => {
           try {
             return await ctx.app.dataset.getBySlugOrId({
@@ -337,7 +281,7 @@ export class DatasetTrpcApi {
       ),
 
       /** Archives a dataset, or restores one the caller just archived. */
-      deleteById: policy("datasets:delete")(procedure.input(deleteByIdInputSchema)).mutation(
+      deleteById: policy("datasets:delete")(procedure.input(datasetApiDeleteInputSchema)).mutation(
         async ({ ctx, input }) => {
           if (input.undo) {
             return ctx.app.dataset.restoreDataset({
@@ -354,14 +298,14 @@ export class DatasetTrpcApi {
       ),
 
       /** The trace and thread mapping a dataset is filled from. */
-      updateMapping: policy("datasets:update")(procedure.input(updateMappingInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.dataset.updateMapping(input);
-        },
-      ),
+      updateMapping: policy("datasets:update")(
+        procedure.input(datasetApiUpdateMappingInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        return ctx.app.dataset.updateMapping(input);
+      }),
 
       /** The next free name for a proposed one. */
-      findNextName: policy("datasets:view")(procedure.input(findNextNameInputSchema))
+      findNextName: policy("datasets:view")(procedure.input(datasetApiFindNextNameInputSchema))
         .use(datasetErrorHandler)
         .query(async ({ input, ctx }) => {
           return await ctx.app.dataset.findNextAvailableName(input);
@@ -371,7 +315,7 @@ export class DatasetTrpcApi {
        * Copies a dataset into another project, records and all. Name clashes
        * in the target get a suffix.
        */
-      copy: policy("datasets:create")(procedure.input(copyInputSchema))
+      copy: policy("datasets:create")(procedure.input(datasetApiCopyInputSchema))
         .use(datasetErrorHandler)
         .mutation(async ({ ctx, input }) => {
           // The declared check covers `projectId`, the TARGET. The source is a

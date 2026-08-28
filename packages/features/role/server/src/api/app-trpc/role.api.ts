@@ -1,10 +1,14 @@
 import { ledgerActorFor } from "@langwatch/actor";
-import type { RoleService } from "@langwatch/role-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import {
+  roleApiCreateInputSchema,
+  roleApiOrganizationInputSchema,
+  roleApiRoleInputSchema,
+  roleApiUpdateInputSchema,
+  roleApiUserRoleAssignmentInputSchema,
+  type CustomRolePermissionSchema,
+  type RoleService,
+} from "@langwatch/role-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { ProcedureBuilder, UnsetMarker } from "@trpc/server/unstable-core-do-not-import";
 import { z } from "zod";
 
@@ -17,13 +21,6 @@ export type RoleTrpcContext = Readonly<{
 }>;
 
 /**
- * The permission vocabulary a custom role is written in. It spans every
- * feature, so the process owns it and hands it in — the role surface only
- * says that a permission is a validated string.
- */
-export type CustomRolePermissionSchema = z.ZodType<string, string>;
-
-/**
  * The wire contract of `role.*`, exactly as the browser sends it. The process
  * parses these on the procedures it builds, so the schemas stay owned here
  * while the access decision stays owned there.
@@ -34,31 +31,13 @@ export function roleTrpcInputSchemas({
   customRolePermission: CustomRolePermissionSchema;
 }) {
   return {
-    getAll: z.object({ organizationId: z.string() }),
-    getById: z.object({ roleId: z.string() }),
-    create: z.object({
-      organizationId: z.string(),
-      name: z.string().min(1).max(50),
-      description: z.string().optional(),
-      permissions: z.array(customRolePermission),
-    }),
-    update: z.object({
-      roleId: z.string(),
-      name: z.string().min(1).max(50).optional(),
-      description: z.string().optional(),
-      permissions: z.array(customRolePermission).optional(),
-    }),
-    delete: z.object({ roleId: z.string() }),
-    assignToUser: z.object({
-      userId: z.string(),
-      teamId: z.string(),
-      customRoleId: z.string(),
-    }),
-    removeFromUser: z.object({
-      userId: z.string(),
-      teamId: z.string(),
-      customRoleId: z.string(),
-    }),
+    getAll: roleApiOrganizationInputSchema,
+    getById: roleApiRoleInputSchema,
+    create: roleApiCreateInputSchema(customRolePermission),
+    update: roleApiUpdateInputSchema(customRolePermission),
+    delete: roleApiRoleInputSchema,
+    assignToUser: roleApiUserRoleAssignmentInputSchema,
+    removeFromUser: roleApiUserRoleAssignmentInputSchema,
   };
 }
 

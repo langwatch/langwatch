@@ -222,10 +222,7 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
         blockedRequests: Number(r.blockedRequests) || 0,
       }));
     } catch (error) {
-      logger.warn(
-        { tenantIds, error },
-        "failed to aggregate gateway usage from trace summaries",
-      );
+      logger.warn({ tenantIds, error }, "failed to aggregate gateway usage from trace summaries");
       throw error;
     }
   }
@@ -347,16 +344,8 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
         blockedByGuardrail: Boolean(Number(r.blocked)),
       }));
     } catch (error) {
-      logger.warn(
-        { tenantIds, error },
-        "failed to read gateway traces from trace summaries",
-      );
+      logger.warn({ tenantIds, error }, "failed to read gateway traces from trace summaries");
       throw error;
     }
   }
-}
-
-/** First instant of the current calendar month, UTC. */
-export function startOfCurrentMonthUTC(now: Date = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }

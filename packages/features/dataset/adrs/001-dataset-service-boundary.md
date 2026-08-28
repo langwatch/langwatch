@@ -15,9 +15,9 @@ JSONL are Dataset implementation details; they are not separate features.
 ## Decision
 
 Dataset exposes one portable `DatasetService` contract and one process-owned
-implementation. Existing tRPC procedure names and REST paths remain
-compatibility transports and delegate to that service while migration is in
-progress. Callers consume only `@langwatch/dataset-contract`.
+implementation. Existing tRPC procedure names and REST paths keep their exact
+shape and delegate to that service. Callers consume only
+`@langwatch/dataset-contract`.
 
 The first strict package slice owns dataset metadata and record lifecycle:
 create/update, name and slug policy, lookup, archive, copy, paginated reads,
@@ -29,15 +29,39 @@ ports. That adapter is not a second Dataset service.
 ### Public surfaces and transports
 
 The contract exports Dataset and Dataset Record values, Zod 4 schemas, domain
-errors, and `DatasetService`. The server exports the service and its Postgres
-composition adapter. Existing tRPC names and REST paths remain compatibility
-surfaces and are not duplicated inside the feature package.
+errors, and `DatasetService`. The server exports the service, its Postgres
+composition adapter, and the tRPC transports.
+
+The `dataset.*`, `datasetRecord.*` and `batchRecord.*` tRPC surfaces are owned
+by `server/src/api/app-trpc/`. Each is a `<Name>TrpcApi.create(root, { protected,
+policy }, ports)` class that owns its procedure names, input schemas and error
+mapping; the process supplies the authenticated procedure, the authorization,
+audit, tracing, logging and scope-lineage policy, and the ports below. The
+process keeps only a thin mount per router under
+`platform/app/src/runtime/app/internal-api/`.
+
+The policy is applied by the feature AFTER its own `.input()` parser, never
+composed ahead of it: tRPC appends the input middleware where `.input()` is
+called, so a check installed earlier receives `input === undefined` and the
+authorization decision, the scope-lineage guard and the audit row all see
+nothing while still reporting success.
 
 ### Dependencies
 
-Dataset depends on no other product service for the core lifecycle. Experiment
-name resolution is an optional `DatasetExperimentPort`; future storage and
-normalization capabilities will be narrow ports owned by Dataset.
+Dataset depends on no other product service for the core lifecycle. Future
+storage and normalization capabilities will be narrow ports owned by Dataset.
+
+Three capabilities the tRPC transports need are NOT Dataset's, and each is
+declared structurally at the transport rather than imported:
+
+- an experiment lookup, so `dataset.upsert` can borrow an experiment's name
+  and `batchRecord.getAllByexperimentSlug` can turn a slug into an id;
+- a project-permission probe, because `dataset.copy` names a SECOND project —
+  the source — that the declared check on `projectId` never covers;
+- the two `BatchEvaluation` reads behind `batchRecord.*`. That table is
+  process-owned state with no feature of its own, so the reads stay in the
+  process mount and the transport takes them as ports with generic result
+  types. This is the one remaining seam in this vertical.
 
 `DatasetNormalizationWorkerPort` is the Dataset-owned worker lifecycle port.
 Its durable payload has a contract Zod schema and is parsed before normalization
@@ -85,8 +109,9 @@ map persistence rows into the same portable schemas.
 
 ## Consequences
 
-Dataset and Dataset Record have one owner, while all existing public URLs and
-internal tRPC names remain stable. The package can be adopted by the process
+Dataset and Dataset Record have one owner — transport included — while all
+existing public URLs and internal tRPC names, inputs, outputs, error codes and
+permissions remain stable. The package can be adopted by the process
 graph without making persistence records part of a cross-feature API. Upload
 and S3 work have a clear next seam instead of being copied into a second
 transport-owned implementation.

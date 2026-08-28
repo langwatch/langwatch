@@ -7,7 +7,6 @@ export {
 export {
   RoleTrpcApi,
   roleTrpcInputSchemas,
-  type CustomRolePermissionSchema,
   type DeclaredProcedure,
   type RoleTrpcContext,
   type RoleTrpcProcedures,

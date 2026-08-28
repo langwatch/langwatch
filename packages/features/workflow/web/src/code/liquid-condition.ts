@@ -42,7 +42,7 @@ export function validateLiquidCondition(
   try {
     referenced = liquid.variablesSync(wrapped);
   } catch {
-    referenced = [];
+    // Liquid could not enumerate variables; keep the empty default.
   }
 
   const known = new Set(availableVariables);

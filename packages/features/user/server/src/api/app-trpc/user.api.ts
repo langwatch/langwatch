@@ -52,6 +52,16 @@ import type { OpsService } from "@langwatch/ops-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   EmailAlreadyRegisteredError,
+  userApiChangePasswordInputSchema,
+  userApiEmptyInputSchema,
+  userApiOrganizationInputSchema,
+  userApiRegisterInputSchema,
+  userApiRequestBudgetIncreaseInputSchema,
+  userApiSetAvatarInputSchema,
+  userApiSetLastHomePathInputSchema,
+  userApiSetPasswordInputSchema,
+  userApiUnlinkAccountInputSchema,
+  userApiUserInputSchema,
   UserAvatarRateLimitedError,
   type UserService,
 } from "@langwatch/user-contract";
@@ -61,7 +71,6 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { z } from "zod";
 
 const logger = createLogger("langwatch:user-router");
 
@@ -80,10 +89,7 @@ type UserApplication = Readonly<{
   users: UserService;
   auth: Pick<AuthService, "revokeOtherBrowserSessions" | "revokeAllBrowserSessions">;
   ops: Pick<OpsService, "isAdmin">;
-  organizations: Pick<
-    OrganizationService,
-    "ensurePersonalWorkspace" | "tryFindPersonalWorkspace"
-  >;
+  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "tryFindPersonalWorkspace">;
 }>;
 
 /**
@@ -228,10 +234,7 @@ export type UserTrpcPorts = Readonly<{
     input: Readonly<{ userId: string; accountId: string }>,
   ): Promise<UnlinkAccountOutcome>;
   /** The CLI credentials a deactivated user must lose along with their sessions. */
-  revokeCliTokensForUser(
-    ctx: UserTrpcContext,
-    input: Readonly<{ userId: string }>,
-  ): Promise<void>;
+  revokeCliTokensForUser(ctx: UserTrpcContext, input: Readonly<{ userId: string }>): Promise<void>;
 
   // -- the organization the /me dashboard is read inside -------------------
   isOrganizationMember(
@@ -346,70 +349,6 @@ const ORGANIZATION_VIEW: AuthzDeclaration = {
   permission: "organization:view",
 };
 
-// ---------------------------------------------------------------------------
-// input schemas
-// ---------------------------------------------------------------------------
-
-const emptyInputSchema = z.object({});
-
-const registerInputSchema = z.object({
-  // Optional: the front door does not ask. Onboarding does, in a place
-  // where the question is worth a field. The legacy sign-up page still
-  // sends one, so it is taken when it comes.
-  name: z.string().min(1, "Name is required").optional(),
-  email: z.string().email("Invalid email"),
-  // Length only here; the POLICY is checked in the body so its refusal
-  // can carry `meta.fieldErrors` and land on the field the person is
-  // looking at. An input-schema rejection arrives as a tRPC parse error
-  // with no field to hang on.
-  password: z.string().min(1),
-});
-
-const unlinkAccountInputSchema = z.object({ accountId: z.string() });
-
-const setPasswordInputSchema = z.object({ password: z.string().min(1) });
-
-const changePasswordInputSchema = z.object({
-  // Required for both modes — the user must re-confirm their current
-  // password to change it. Defends against a stolen session lock-out: even
-  // with a valid session cookie, an attacker can't change the password
-  // without knowing the existing one.
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-const userScopeSchema = z.object({ userId: z.string() });
-
-const setAvatarInputSchema = z.object({
-  organizationId: z.string(),
-  // A base64 image data URL (`data:image/...;base64,...`) produced by the
-  // client crop/resize step. Deliberately NOT bounded with a `.max()` here:
-  // `parseAvatarDataUrl` rejects at exactly the same ceiling before it scans
-  // or decodes anything, so a `.max()` only wins the race and turns the
-  // specific `avatar_image_too_large` ("Pick one under 8 MB") into the
-  // anonymous `validation_error`. The point of that code is that both halves
-  // of the check answer with it, whichever caught the file.
-  imageDataUrl: z.string().min(1),
-});
-
-const organizationScopeSchema = z.object({ organizationId: z.string() });
-
-const requestBudgetIncreaseInputSchema = z.object({
-  organizationId: z.string(),
-  scope: z.string(),
-  scopeId: z.string(),
-  limitUsd: z.string(),
-  spentUsd: z.string(),
-  period: z.string().optional(),
-  message: z.string().max(2000).optional(),
-});
-
-const setLastHomePathInputSchema = z.object({
-  path: z.string().min(1).max(1024).regex(/^\//, "must start with /").nullable(),
-});
-
-// ---------------------------------------------------------------------------
-
 /**
  * The authenticated principal. The process's protected procedure has already
  * refused an anonymous caller; this is the same refusal, so the handlers below
@@ -468,13 +407,13 @@ export class UserTrpcApi {
 
     return trpc.router({
       getTraceExplorerTourPreference: policy(OWN_ACCOUNT)(
-        procedure.input(emptyInputSchema),
+        procedure.input(userApiEmptyInputSchema),
       ).query(async ({ ctx }) =>
         ctx.app.users.getTraceExplorerTourPreference({ id: operatorOrSelf(ctx).id }),
       ),
 
       dismissTraceExplorerTour: policy(OWN_ACCOUNT)(
-        procedure.input(emptyInputSchema),
+        procedure.input(userApiEmptyInputSchema),
       ).mutation(async ({ ctx }) =>
         ctx.app.users.dismissTraceExplorerTour({ id: operatorOrSelf(ctx).id }),
       ),
@@ -486,11 +425,11 @@ export class UserTrpcApi {
        * NOT an authorization gate — server-side admin routes enforce access
        * independently via the same check.
        */
-      isAdmin: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(({ ctx }) => ({
+      isAdmin: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(({ ctx }) => ({
         isAdmin: ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email }),
       })),
 
-      register: policy(OWN_ACCOUNT)(publicProcedure.input(registerInputSchema)).mutation(
+      register: policy(OWN_ACCOUNT)(publicProcedure.input(userApiRegisterInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { name, password } = input;
 
@@ -558,7 +497,7 @@ export class UserTrpcApi {
         },
       ),
 
-      updateLastLogin: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).mutation(
+      updateLastLogin: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
         async ({ ctx }) => {
           // Don't update lastLoginAt for impersonated sessions — an admin
           // browsing as another user should not overwrite that user's
@@ -570,42 +509,42 @@ export class UserTrpcApi {
         },
       ),
 
-      getSsoStatus: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(
+      getSsoStatus: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
         async ({ ctx }) => ctx.app.users.getSsoStatus({ id: sessionUserOf(ctx).id }),
       ),
 
-      getAccountInfo: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(
+      getAccountInfo: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
         async ({ ctx }) => ctx.app.users.getAccountInfo({ id: sessionUserOf(ctx).id }),
       ),
 
-      getLinkedAccounts: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(
+      getLinkedAccounts: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
         async ({ ctx }) => ports.listLinkedAccounts(ctx, { userId: sessionUserOf(ctx).id }),
       ),
 
-      unlinkAccount: policy(OWN_ACCOUNT)(
-        procedure.input(unlinkAccountInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        // The count and the delete run in ONE serializable transaction. Done
-        // as separate statements with no isolation, two concurrent unlink
-        // calls (a user double-clicking the X) could both observe two
-        // accounts, both pass the "last account" guard, and both delete —
-        // leaving the user with zero accounts and no way to sign in.
-        const outcome = await ports.unlinkAccount(ctx, {
-          userId: sessionUserOf(ctx).id,
-          accountId: input.accountId,
-        });
-        if (outcome === "last_account") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot remove the last authentication method",
+      unlinkAccount: policy(OWN_ACCOUNT)(procedure.input(userApiUnlinkAccountInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          // The count and the delete run in ONE serializable transaction. Done
+          // as separate statements with no isolation, two concurrent unlink
+          // calls (a user double-clicking the X) could both observe two
+          // accounts, both pass the "last account" guard, and both delete —
+          // leaving the user with zero accounts and no way to sign in.
+          const outcome = await ports.unlinkAccount(ctx, {
+            userId: sessionUserOf(ctx).id,
+            accountId: input.accountId,
           });
-        }
-        if (outcome === "not_found") {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
-        }
+          if (outcome === "last_account") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot remove the last authentication method",
+            });
+          }
+          if (outcome === "not_found") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Account not found" });
+          }
 
-        return { success: true };
-      }),
+          return { success: true };
+        },
+      ),
 
       /**
        * Whether to offer this person a passkey right now (ADR-120).
@@ -620,7 +559,7 @@ export class UserTrpcApi {
        * a new device does not restart the count and the 30 days actually mean
        * 30 days.
        */
-      passkeyNudge: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(
+      passkeyNudge: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
         async ({ ctx }) => {
           if (!ports.deploymentOffersPasskeys()) return { offer: false };
 
@@ -643,12 +582,12 @@ export class UserTrpcApi {
        * flag would make one dismissal permanent, and somebody who declines on
        * the day they sign up is not somebody who never wants a passkey.
        */
-      dismissPasskeyNudge: policy(OWN_ACCOUNT)(
-        procedure.input(emptyInputSchema),
-      ).mutation(async ({ ctx }) => {
-        await ctx.app.users.dismissPasskeyNudge({ id: sessionUserOf(ctx).id });
-        return { success: true };
-      }),
+      dismissPasskeyNudge: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
+        async ({ ctx }) => {
+          await ctx.app.users.dismissPasskeyNudge({ id: sessionUserOf(ctx).id });
+          return { success: true };
+        },
+      ),
 
       /**
        * Whether the session user can sign in with a password.
@@ -658,7 +597,7 @@ export class UserTrpcApi {
        * both produce accounts with no password at all, and offering "Change
        * password" to somebody who has none is an offer that can only fail.
        */
-      hasPassword: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).query(
+      hasPassword: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).query(
         async ({ ctx }) => ({
           hasPassword: await ctx.app.users.hasPassword({ id: sessionUserOf(ctx).id }),
         }),
@@ -682,7 +621,7 @@ export class UserTrpcApi {
        * first one still hands it persistence, so the attempt is throttled, and
        * every other session is ended the moment it lands.
        */
-      setPassword: policy(OWN_ACCOUNT)(procedure.input(setPasswordInputSchema)).mutation(
+      setPassword: policy(OWN_ACCOUNT)(procedure.input(userApiSetPasswordInputSchema)).mutation(
         async ({ ctx, input }) => {
           // The same rules the form ran, from the same module, so the two
           // cannot drift into accepting different passwords.
@@ -738,7 +677,7 @@ export class UserTrpcApi {
       ),
 
       changePassword: policy(OWN_ACCOUNT)(
-        procedure.input(changePasswordInputSchema),
+        procedure.input(userApiChangePasswordInputSchema),
       ).mutation(async ({ ctx, input }) => {
         // Resolved provider, not raw env (ADR-027): on a denied SSO
         // deployment the platform gate coerces to email mode, and a user who
@@ -853,37 +792,37 @@ export class UserTrpcApi {
         return { success: true };
       }),
 
-      deactivate: policy(SELF_OR_INSTANCE_ADMIN)(
-        procedure.input(userScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const user = sessionUserOf(ctx);
-        if (
-          input.userId !== user.id &&
-          !ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })
-        ) {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
+      deactivate: policy(SELF_OR_INSTANCE_ADMIN)(procedure.input(userApiUserInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const user = sessionUserOf(ctx);
+          if (
+            input.userId !== user.id &&
+            !ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })
+          ) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
 
-        // User owns the durable state transition. The process-level lifecycle
-        // services own the effects that follow it: browser sessions and CLI
-        // credentials must be revoked without injecting Auth or Governance
-        // callback ports into User (which would create a service cycle).
-        await ctx.app.users.deactivate({ id: input.userId });
-        await ctx.app.auth.revokeAllBrowserSessions({ userId: input.userId });
-        await ports.revokeCliTokensForUser(ctx, { userId: input.userId });
-        return { success: true };
-      }),
+          // User owns the durable state transition. The process-level lifecycle
+          // services own the effects that follow it: browser sessions and CLI
+          // credentials must be revoked without injecting Auth or Governance
+          // callback ports into User (which would create a service cycle).
+          await ctx.app.users.deactivate({ id: input.userId });
+          await ctx.app.auth.revokeAllBrowserSessions({ userId: input.userId });
+          await ports.revokeCliTokensForUser(ctx, { userId: input.userId });
+          return { success: true };
+        },
+      ),
 
-      reactivate: policy(SELF_OR_INSTANCE_ADMIN)(
-        procedure.input(userScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        if (!ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })) {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
+      reactivate: policy(SELF_OR_INSTANCE_ADMIN)(procedure.input(userApiUserInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          if (!ctx.app.ops.isAdmin({ email: operatorOrSelf(ctx).email })) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
 
-        await ctx.app.users.reactivate({ id: input.userId });
-        return { success: true };
-      }),
+          await ctx.app.users.reactivate({ id: input.userId });
+          return { success: true };
+        },
+      ),
 
       /**
        * Uploads and sets the caller's own avatar photo. The image is stored in
@@ -894,7 +833,7 @@ export class UserTrpcApi {
        *
        * Spec: specs/settings/user-avatar.feature
        */
-      setAvatar: policy(ORGANIZATION_VIEW)(procedure.input(setAvatarInputSchema)).mutation(
+      setAvatar: policy(ORGANIZATION_VIEW)(procedure.input(userApiSetAvatarInputSchema)).mutation(
         async ({ ctx, input }) => {
           const user = sessionUserOf(ctx);
           // Throttle uploads per user — each writes bytes to object storage
@@ -929,7 +868,7 @@ export class UserTrpcApi {
        *
        * Spec: specs/settings/user-avatar.feature
        */
-      removeAvatar: policy(OWN_ACCOUNT)(procedure.input(emptyInputSchema)).mutation(
+      removeAvatar: policy(OWN_ACCOUNT)(procedure.input(userApiEmptyInputSchema)).mutation(
         async ({ ctx }) => {
           await ctx.app.users.removeAvatar({ userId: sessionUserOf(ctx).id });
           return { success: true };
@@ -945,7 +884,7 @@ export class UserTrpcApi {
        * one without re-accepting an invite.
        */
       personalContext: policy(ORGANIZATION_VIEW)(
-        procedure.input(organizationScopeSchema),
+        procedure.input(userApiOrganizationInputSchema),
       ).query(async ({ ctx, input }) => {
         const user = sessionUserOf(ctx);
 
@@ -966,9 +905,7 @@ export class UserTrpcApi {
 
         return {
           workspace,
-          routingPolicy: defaultPolicy
-            ? { id: defaultPolicy.id, name: defaultPolicy.name }
-            : null,
+          routingPolicy: defaultPolicy ? { id: defaultPolicy.id, name: defaultPolicy.name } : null,
         };
       }),
 
@@ -992,7 +929,7 @@ export class UserTrpcApi {
        * analytics store configured.
        */
       personalBudget: policy(ORGANIZATION_VIEW)(
-        procedure.input(organizationScopeSchema),
+        procedure.input(userApiOrganizationInputSchema),
       ).query(async ({ ctx, input }) => {
         const user = sessionUserOf(ctx);
 
@@ -1044,8 +981,7 @@ export class UserTrpcApi {
         const baseStatus =
           decision.decision === "hard_block"
             ? ("exceeded" as const)
-            : decision.decision === "soft_warn" ||
-                ("pctUsed" in topScope && topScope.pctUsed >= 80)
+            : decision.decision === "soft_warn" || ("pctUsed" in topScope && topScope.pctUsed >= 80)
               ? ("warning" as const)
               : ("ok" as const);
 
@@ -1080,7 +1016,7 @@ export class UserTrpcApi {
        * and optional free-form message.
        */
       requestBudgetIncrease: policy(ORGANIZATION_VIEW)(
-        procedure.input(requestBudgetIncreaseInputSchema),
+        procedure.input(userApiRequestBudgetIncreaseInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const user = sessionUserOf(ctx);
         const adminEmail = await ports.resolveBudgetIncreaseRecipient(ctx, {
@@ -1125,7 +1061,7 @@ export class UserTrpcApi {
        *       (user pin > organization pin > auto-detection priority)
        */
       setLastHomePath: policy(OWN_ACCOUNT)(
-        procedure.input(setLastHomePathInputSchema),
+        procedure.input(userApiSetLastHomePathInputSchema),
       ).mutation(async ({ ctx, input }) => {
         await ctx.app.users.setLastHomePath({
           id: sessionUserOf(ctx).id,
@@ -1145,7 +1081,7 @@ export class UserTrpcApi {
        * the auto-detected destination rather than duplicating that logic here.
        */
       homePagePickerState: policy(ORGANIZATION_VIEW)(
-        procedure.input(organizationScopeSchema),
+        procedure.input(userApiOrganizationInputSchema),
       ).query(async ({ ctx, input }) => {
         const userId = sessionUserOf(ctx).id;
         const [lastHomePath, firstProjectSlug] = await Promise.all([

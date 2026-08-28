@@ -1,6 +1,6 @@
 /**
  * Shared DTO shape for GatewayBudget on the public REST wire, the budget
- * counterpart to `virtualKey.dto.ts`.
+ * counterpart to `gateway-virtual-key-dto.adapter.ts`.
  *
  * Lives outside the route file so the money and availability rules it encodes
  * can be asserted directly, without standing up a request to find out what a

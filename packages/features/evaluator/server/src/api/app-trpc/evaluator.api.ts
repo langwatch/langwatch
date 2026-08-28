@@ -23,7 +23,14 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   codeEvaluatorConfigSchema,
-  evaluatorTypeSchema,
+  evaluatorApiCopyInputSchema,
+  evaluatorApiCreateInputSchema,
+  evaluatorApiEvaluatorIdInputSchema,
+  evaluatorApiEvaluatorInputSchema,
+  evaluatorApiProjectInputSchema,
+  evaluatorApiPushToCopiesInputSchema,
+  evaluatorApiSlugInputSchema,
+  evaluatorApiUpdateInputSchema,
   type EvaluatorService,
 } from "@langwatch/evaluator-contract";
 import {
@@ -33,7 +40,6 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { z } from "zod";
 import {
   EvaluatorReplicationApi,
   type EvaluatorReplicationPorts,
@@ -105,51 +111,11 @@ export type EvaluatorTrpcPorts = Readonly<{
   ): Promise<void>;
 }>;
 
-const projectScopeSchema = z.object({ projectId: z.string() });
+/** The process's evaluator-id scheme, handed to the schemas that mint one. */
+const generateEvaluatorId = (): string => `evaluator_${nanoid()}`;
 
-const evaluatorIdInputSchema = z.object({ id: z.string(), projectId: z.string() });
-
-const slugInputSchema = z.object({ slug: z.string(), projectId: z.string() });
-
-const createInputSchema = z.object({
-  // Generated server-side so it's present in audit log args for history lookup
-  id: z.string().default(() => `evaluator_${nanoid()}`),
-  projectId: z.string(),
-  name: z.string().min(1).max(255),
-  type: evaluatorTypeSchema,
-  config: z.record(z.string(), z.unknown()),
-  workflowId: z.string().optional(),
-});
-
-const updateInputSchema = z.object({
-  id: z.string(),
-  projectId: z.string(),
-  name: z.string().min(1).max(255).optional(),
-  type: evaluatorTypeSchema.optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  workflowId: z.string().nullable().optional(),
-});
-
-const evaluatorScopeSchema = z.object({
-  projectId: z.string(),
-  evaluatorId: z.string(),
-});
-
-const copyInputSchema = z.object({
-  evaluatorId: z.string(),
-  projectId: z.string(),
-  sourceProjectId: z.string(),
-  // Generated server-side so it's present in audit log args for history lookup
-  newEvaluatorId: z.string().default(() => `evaluator_${nanoid()}`),
-});
-
-const pushToCopiesInputSchema = z.object({
-  projectId: z.string(),
-  evaluatorId: z.string(),
-  copyIds: z.array(z.string()).optional(),
-});
-
-const historyInputSchema = z.object({ evaluatorId: z.string(), projectId: z.string() });
+const createInputSchema = evaluatorApiCreateInputSchema(generateEvaluatorId);
+const copyInputSchema = evaluatorApiCopyInputSchema(generateEvaluatorId);
 
 /** Code evaluators carry their program on `config`; nothing else can run one. */
 function assertCodeEvaluatorConfig(config: unknown): void {
@@ -191,7 +157,7 @@ export class EvaluatorTrpcApi {
        * Gets all evaluators for a project with computed fields.
        * Fields include required/optional inputs derived from evaluator type.
        */
-      getAll: policy("evaluations:view")(procedure.input(projectScopeSchema)).query(
+      getAll: policy("evaluations:view")(procedure.input(evaluatorApiProjectInputSchema)).query(
         async ({ ctx, input }) => {
           return await ctx.app.evaluators.getAllWithFields({
             projectId: input.projectId,
@@ -203,17 +169,17 @@ export class EvaluatorTrpcApi {
        * Gets a single evaluator by ID with computed fields.
        * Fields include required/optional inputs derived from evaluator type.
        */
-      getById: policy("evaluations:view")(procedure.input(evaluatorIdInputSchema)).query(
-        async ({ ctx, input }) => {
-          return await ctx.app.evaluators.tryGetByIdWithFields({
-            id: input.id,
-            projectId: input.projectId,
-          });
-        },
-      ),
+      getById: policy("evaluations:view")(
+        procedure.input(evaluatorApiEvaluatorIdInputSchema),
+      ).query(async ({ ctx, input }) => {
+        return await ctx.app.evaluators.tryGetByIdWithFields({
+          id: input.id,
+          projectId: input.projectId,
+        });
+      }),
 
       /** Gets a single evaluator by slug. */
-      getBySlug: policy("evaluations:view")(procedure.input(slugInputSchema)).query(
+      getBySlug: policy("evaluations:view")(procedure.input(evaluatorApiSlugInputSchema)).query(
         async ({ ctx, input }) => {
           return await ctx.app.evaluators.tryGetBySlug({
             slug: input.slug,
@@ -256,7 +222,7 @@ export class EvaluatorTrpcApi {
       ),
 
       /** Updates an existing evaluator. */
-      update: policy("evaluations:manage")(procedure.input(updateInputSchema)).mutation(
+      update: policy("evaluations:manage")(procedure.input(evaluatorApiUpdateInputSchema)).mutation(
         async ({ ctx, input }) => {
           if (input.type === "code" && input.config !== undefined) {
             assertCodeEvaluatorConfig(input.config);
@@ -282,30 +248,30 @@ export class EvaluatorTrpcApi {
        * Gets entities related to an evaluator for cascade archive warning.
        * Returns linked workflow and monitors that would be affected.
        */
-      getRelatedEntities: policy("evaluations:view")(procedure.input(evaluatorIdInputSchema)).query(
-        async ({ ctx, input }) => {
-          const evaluator = await ctx.app.evaluators.tryGetById({
-            id: input.id,
-            projectId: input.projectId,
-          });
+      getRelatedEntities: policy("evaluations:view")(
+        procedure.input(evaluatorApiEvaluatorIdInputSchema),
+      ).query(async ({ ctx, input }) => {
+        const evaluator = await ctx.app.evaluators.tryGetById({
+          id: input.id,
+          projectId: input.projectId,
+        });
 
-          // Find the linked workflow (if any)
-          const workflow = evaluator?.workflowId
-            ? await ports.findLinkedWorkflow(ctx, {
-                workflowId: evaluator.workflowId,
-                projectId: input.projectId,
-              })
-            : null;
+        // Find the linked workflow (if any)
+        const workflow = evaluator?.workflowId
+          ? await ports.findLinkedWorkflow(ctx, {
+              workflowId: evaluator.workflowId,
+              projectId: input.projectId,
+            })
+          : null;
 
-          // Find monitors using this evaluator
-          const monitors = await ports.findMonitorsUsingEvaluator(ctx, {
-            evaluatorId: input.id,
-            projectId: input.projectId,
-          });
+        // Find monitors using this evaluator
+        const monitors = await ports.findMonitorsUsingEvaluator(ctx, {
+          evaluatorId: input.id,
+          projectId: input.projectId,
+        });
 
-          return { workflow, monitors };
-        },
-      ),
+        return { workflow, monitors };
+      }),
 
       /**
        * Archives an evaluator and all related entities in a transaction.
@@ -313,7 +279,7 @@ export class EvaluatorTrpcApi {
        * - Deletes monitors using this evaluator (hard delete)
        */
       cascadeArchive: policy("evaluations:manage")(
-        procedure.input(evaluatorIdInputSchema),
+        procedure.input(evaluatorApiEvaluatorIdInputSchema),
       ).mutation(async ({ ctx, input }) => {
         const evaluator = await ctx.app.evaluators.getById({
           id: input.id,
@@ -343,42 +309,42 @@ export class EvaluatorTrpcApi {
       }),
 
       /** Soft deletes an evaluator. */
-      delete: policy("evaluations:manage")(procedure.input(evaluatorIdInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return await ctx.app.evaluators.archive({
-            id: input.id,
-            projectId: input.projectId,
-          });
-        },
-      ),
+      delete: policy("evaluations:manage")(
+        procedure.input(evaluatorApiEvaluatorIdInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        return await ctx.app.evaluators.archive({
+          id: input.id,
+          projectId: input.projectId,
+        });
+      }),
 
       /**
        * Gets workflow fields for a workflow-based evaluator.
        * Returns the entry node outputs from the linked workflow.
        * These represent the fields that need to be mapped from trace data.
        */
-      getWorkflowFields: policy("evaluations:view")(procedure.input(evaluatorIdInputSchema)).query(
-        async ({ ctx, input }) => {
-          // Fetch the evaluator first, then scope its workflow to the same project.
-          return ctx.app.evaluators.getWorkflowFields(input);
-        },
-      ),
+      getWorkflowFields: policy("evaluations:view")(
+        procedure.input(evaluatorApiEvaluatorIdInputSchema),
+      ).query(async ({ ctx, input }) => {
+        // Fetch the evaluator first, then scope its workflow to the same project.
+        return ctx.app.evaluators.getWorkflowFields(input);
+      }),
 
       /** Get copies of an evaluator (replicas in other projects) for push selection. */
-      getCopies: policy("evaluations:view")(procedure.input(evaluatorScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const copies = await ctx.app.evaluators.getCopies(input);
+      getCopies: policy("evaluations:view")(
+        procedure.input(evaluatorApiEvaluatorInputSchema),
+      ).query(async ({ ctx, input }) => {
+        const copies = await ctx.app.evaluators.getCopies(input);
 
-          const authorizedCopies = await Promise.all(
-            copies.map(async (c) => ({
-              copy: c,
-              hasPermission: await ctx.can("evaluations:view", { projectId: c.projectId }),
-            })),
-          ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
+        const authorizedCopies = await Promise.all(
+          copies.map(async (c) => ({
+            copy: c,
+            hasPermission: await ctx.can("evaluations:view", { projectId: c.projectId }),
+          })),
+        ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
 
-          return authorizedCopies;
-        },
-      ),
+        return authorizedCopies;
+      }),
 
       /** Copy (replicate) an evaluator to another project. */
       copy: policy("evaluations:manage")(procedure.input(copyInputSchema)).mutation(
@@ -404,54 +370,54 @@ export class EvaluatorTrpcApi {
       ),
 
       /** Push source evaluator config to selected copies (replicas). */
-      pushToCopies: policy("evaluations:manage")(procedure.input(pushToCopiesInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const copies = await ctx.app.evaluators.getCopies(input);
-          const copiesToPush = input.copyIds
-            ? copies.filter((copy) => input.copyIds!.includes(copy.id))
-            : copies;
-          const allowedProjectIds: string[] = [];
-          for (const copy of copiesToPush) {
-            const hasPermission = await ctx.can("evaluations:manage", {
-              projectId: copy.projectId,
-            });
-            if (hasPermission) allowedProjectIds.push(copy.projectId);
-          }
-          return ctx.app.evaluators.pushToCopies({ ...input, allowedProjectIds });
-        },
-      ),
+      pushToCopies: policy("evaluations:manage")(
+        procedure.input(evaluatorApiPushToCopiesInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        const copies = await ctx.app.evaluators.getCopies(input);
+        const copiesToPush = input.copyIds
+          ? copies.filter((copy) => input.copyIds!.includes(copy.id))
+          : copies;
+        const allowedProjectIds: string[] = [];
+        for (const copy of copiesToPush) {
+          const hasPermission = await ctx.can("evaluations:manage", {
+            projectId: copy.projectId,
+          });
+          if (hasPermission) allowedProjectIds.push(copy.projectId);
+        }
+        return ctx.app.evaluators.pushToCopies({ ...input, allowedProjectIds });
+      }),
 
       /** Sync a copied evaluator from its source. */
-      syncFromSource: policy("evaluations:manage")(procedure.input(evaluatorScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { source } = await ctx.app.evaluators.getCopySource(input);
+      syncFromSource: policy("evaluations:manage")(
+        procedure.input(evaluatorApiEvaluatorInputSchema),
+      ).mutation(async ({ ctx, input }) => {
+        const { source } = await ctx.app.evaluators.getCopySource(input);
 
-          const hasSourcePermission = await ctx.can("evaluations:manage", {
-            projectId: source.projectId,
+        const hasSourcePermission = await ctx.can("evaluations:manage", {
+          projectId: source.projectId,
+        });
+        if (!hasSourcePermission) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You do not have permission to read from the source evaluator's project",
           });
-          if (!hasSourcePermission) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "You do not have permission to read from the source evaluator's project",
-            });
-          }
+        }
 
-          return ctx.app.evaluators.syncFromSource(input);
-        },
-      ),
+        return ctx.app.evaluators.syncFromSource(input);
+      }),
 
       /**
        * Returns recent audit log history for a specific evaluator.
        * Used by the "View History" drawer on the evaluators page.
        */
-      getHistory: policy("evaluations:view")(procedure.input(historyInputSchema)).query(
-        async ({ ctx, input }) => {
-          return ctx.app.evaluators.getHistory({
-            evaluatorId: input.evaluatorId,
-            projectId: input.projectId,
-          });
-        },
-      ),
+      getHistory: policy("evaluations:view")(
+        procedure.input(evaluatorApiEvaluatorInputSchema),
+      ).query(async ({ ctx, input }) => {
+        return ctx.app.evaluators.getHistory({
+          evaluatorId: input.evaluatorId,
+          projectId: input.projectId,
+        });
+      }),
     });
   }
 }

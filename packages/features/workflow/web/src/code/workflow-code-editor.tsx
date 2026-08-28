@@ -100,10 +100,8 @@ export function WorkflowCodeEditorModal({
   }, [localCode, setCode, onClose]);
 
   const onClose_ = useCallback(() => {
-    if (localCode !== code) {
-      if (!window.confirm("Your changes will be lost. Are you sure?")) {
-        return;
-      }
+    if (localCode !== code && !window.confirm("Your changes will be lost. Are you sure?")) {
+      return;
     }
     onClose();
   }, [localCode, code, onClose]);

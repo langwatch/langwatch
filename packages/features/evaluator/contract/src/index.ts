@@ -3,6 +3,7 @@ export * from "./evaluator";
 export * from "./evaluator-execution";
 export * from "./evaluator.service";
 export * from "./evaluator.errors";
+export * from "./evaluator.schemas";
 export * from "./evaluators";
 export {
   batchEvaluationResultSchema,

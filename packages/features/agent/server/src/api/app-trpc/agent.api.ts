@@ -1,10 +1,15 @@
 import {
+  agentApiAgentInputSchema,
+  agentApiAgentReferenceInputSchema,
+  agentApiCopyInputSchema,
+  agentApiCreateInputSchema,
+  agentApiProjectInputSchema,
+  agentApiPushToCopiesInputSchema,
   AgentCopiesNotFoundError,
   AgentCopySelectionError,
   AgentIsNotCopyError,
   AgentNotFoundError,
   AgentSourceNotFoundError,
-  createAgentCommandSchema,
   InvalidAgentConfigError,
   type AgentService,
   updateAgentCommandSchema,
@@ -17,7 +22,6 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { z } from "zod";
 
 type AgentApplication = Readonly<{ agents: AgentService }>;
 
@@ -115,10 +119,11 @@ function withLegacyCopyCount<T extends { copyCount?: number }>(agent: T) {
   return { ...agent, _count: { copiedAgents: agent.copyCount ?? 0 } };
 }
 
-const createInput = createAgentCommandSchema.transform((input) => ({
-  ...input,
-  id: input.id ?? `agent_${nanoid()}`,
-}));
+/** The process's agent-id scheme, handed to the two schemas that mint one. */
+const generateAgentId = (): string => `agent_${nanoid()}`;
+
+const createInput = agentApiCreateInputSchema(generateAgentId);
+const copyInput = agentApiCopyInputSchema(generateAgentId);
 
 /**
  * Installs the complete legacy `agents.*` tRPC surface on a process-owned root.
@@ -139,21 +144,21 @@ export class AgentTrpcApi {
     const { protected: procedure, policy = contextAuthorizationPolicy } = procedures;
 
     return trpc.router({
-      getAll: policy("evaluations:view")(
-        procedure.input(z.object({ projectId: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        ctx.actor();
-        const agents = await withAgentErrors(() => ctx.app.agents.getAll(input));
-        return agents.map(withLegacyCopyCount);
-      }),
+      getAll: policy("evaluations:view")(procedure.input(agentApiProjectInputSchema)).query(
+        async ({ ctx, input }) => {
+          ctx.actor();
+          const agents = await withAgentErrors(() => ctx.app.agents.getAll(input));
+          return agents.map(withLegacyCopyCount);
+        },
+      ),
 
-      getById: policy("evaluations:view")(
-        procedure.input(z.object({ id: z.string(), projectId: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        ctx.actor();
-        const agent = await withAgentErrors(() => ctx.app.agents.getById(input));
-        return withLegacyCopyCount(agent);
-      }),
+      getById: policy("evaluations:view")(procedure.input(agentApiAgentInputSchema)).query(
+        async ({ ctx, input }) => {
+          ctx.actor();
+          const agent = await withAgentErrors(() => ctx.app.agents.getById(input));
+          return withLegacyCopyCount(agent);
+        },
+      ),
 
       create: policy("evaluations:manage")(procedure.input(createInput)).mutation(
         async ({ ctx, input }) => {
@@ -170,28 +175,28 @@ export class AgentTrpcApi {
       ),
 
       getRelatedEntities: policy("evaluations:view")(
-        procedure.input(z.object({ id: z.string(), projectId: z.string() })),
+        procedure.input(agentApiAgentInputSchema),
       ).query(async ({ ctx, input }) => {
         ctx.actor();
         return withAgentErrors(() => ctx.app.agents.relatedEntities(input));
       }),
 
       cascadeArchive: policy("evaluations:manage")(
-        procedure.input(z.object({ id: z.string(), projectId: z.string() })),
+        procedure.input(agentApiAgentInputSchema),
       ).mutation(async ({ ctx, input }) => {
         ctx.actor();
         return withAgentErrors(() => ctx.app.agents.cascadeArchive(input));
       }),
 
-      delete: policy("evaluations:manage")(
-        procedure.input(z.object({ id: z.string(), projectId: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        ctx.actor();
-        return withAgentErrors(() => ctx.app.agents.archive(input));
-      }),
+      delete: policy("evaluations:manage")(procedure.input(agentApiAgentInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          ctx.actor();
+          return withAgentErrors(() => ctx.app.agents.archive(input));
+        },
+      ),
 
       getCopies: policy("evaluations:view")(
-        procedure.input(z.object({ projectId: z.string(), agentId: z.string() })),
+        procedure.input(agentApiAgentReferenceInputSchema),
       ).query(async ({ ctx, input }) => {
         ctx.actor();
         await withAgentErrors(() =>
@@ -212,44 +217,31 @@ export class AgentTrpcApi {
         return permitted.filter(({ allowed }) => allowed).map(({ copy }) => copy);
       }),
 
-      copy: policy("evaluations:manage")(
-        procedure.input(
-          z.object({
-            agentId: z.string(),
-            projectId: z.string(),
-            sourceProjectId: z.string(),
-            newAgentId: z.string().default(() => `agent_${nanoid()}`),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        // The source project is a second scope the declaration cannot express;
-        // it is the caller's own input, so nothing else proves it is theirs.
-        if (!(await ctx.can("evaluations:manage", { projectId: input.sourceProjectId }))) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to manage evaluations in the source project",
-          });
-        }
-        return withAgentErrors(() =>
-          ctx.app.agents.copy({
-            sourceAgentId: input.agentId,
-            sourceProjectId: input.sourceProjectId,
-            targetProjectId: input.projectId,
-            actorUserId: actor.id,
-            newAgentId: input.newAgentId,
-          }),
-        );
-      }),
+      copy: policy("evaluations:manage")(procedure.input(copyInput)).mutation(
+        async ({ ctx, input }) => {
+          const actor = ctx.actor();
+          // The source project is a second scope the declaration cannot express;
+          // it is the caller's own input, so nothing else proves it is theirs.
+          if (!(await ctx.can("evaluations:manage", { projectId: input.sourceProjectId }))) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "You do not have permission to manage evaluations in the source project",
+            });
+          }
+          return withAgentErrors(() =>
+            ctx.app.agents.copy({
+              sourceAgentId: input.agentId,
+              sourceProjectId: input.sourceProjectId,
+              targetProjectId: input.projectId,
+              actorUserId: actor.id,
+              newAgentId: input.newAgentId,
+            }),
+          );
+        },
+      ),
 
       pushToCopies: policy("evaluations:manage")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            agentId: z.string(),
-            copyIds: z.array(z.string()).optional(),
-          }),
-        ),
+        procedure.input(agentApiPushToCopiesInputSchema),
       ).mutation(async ({ ctx, input }) => {
         ctx.actor();
         const copies = await withAgentErrors(() =>
@@ -277,7 +269,7 @@ export class AgentTrpcApi {
       }),
 
       syncFromSource: policy("evaluations:manage")(
-        procedure.input(z.object({ projectId: z.string(), agentId: z.string() })),
+        procedure.input(agentApiAgentReferenceInputSchema),
       ).mutation(async ({ ctx, input }) => {
         ctx.actor();
         const source = await withAgentErrors(() => ctx.app.agents.getSourceOfCopy(input));
@@ -293,7 +285,7 @@ export class AgentTrpcApi {
       }),
 
       getHistory: policy("evaluations:view")(
-        procedure.input(z.object({ agentId: z.string(), projectId: z.string() })),
+        procedure.input(agentApiAgentReferenceInputSchema),
       ).query(async ({ ctx, input }) => {
         ctx.actor();
         return withAgentErrors(() => ctx.app.agents.getHistory(input));

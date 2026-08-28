@@ -86,6 +86,12 @@ transport orchestrates session/CLI-token revocation after state transitions
 through complete Auth/governance services. These are composition/transport
 obligations, not duplicate User implementations.
 
+Ops and SCIM email-change callers compare the persisted normalized email,
+write through `UserService`, then revoke browser sessions through the complete
+`AuthService` only when the email materially changed. A revocation failure
+therefore retains the written profile while surfacing the failure, matching the
+former transaction boundary.
+
 ## Consequences
 
 - Callers cannot construct a separate avatar repository or service.

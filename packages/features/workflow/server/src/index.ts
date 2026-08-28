@@ -14,7 +14,22 @@ export {
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
 } from "./ports/workflow.port";
+export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service";
 export {
-  WorkflowService,
-  type WorkflowServiceOptions,
-} from "./services/workflow.service";
+  WorkflowOptimizationTrpcApi,
+  type WorkflowOptimizationTrpcContext,
+  type WorkflowOptimizationTrpcPorts,
+} from "./api/app-trpc/workflow-optimization.api";
+export {
+  WorkflowTrpcApi,
+  type WorkflowCascadeArchiveResult,
+  type WorkflowCopiesRow,
+  type WorkflowCopyRow,
+  type WorkflowListRow,
+  type WorkflowProjectPath,
+  type WorkflowRowWithLatestVersion,
+  type WorkflowSourceRow,
+  type WorkflowTrpcContext,
+  type WorkflowTrpcPorts,
+  type WorkflowVersionRow,
+} from "./api/app-trpc/workflow.trpc-schemas";

@@ -5,3 +5,4 @@ export * from "./gateway-guardrail";
 export * from "./gateway.realtime-session";
 export * from "./gateway.service";
 export * from "./virtual-key-config";
+export * from "./virtual-key.schemas";

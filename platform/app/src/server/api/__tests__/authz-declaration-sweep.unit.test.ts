@@ -46,7 +46,12 @@ const UNRESOLVABLE_SCOPES: readonly string[] = [
   "datasetRecord.create declares a permission its input carries no scope id for",
 ];
 
-const OPAQUE_INPUTS: readonly string[] = ["dataset.upsert", "datasetRecord.create"];
+// `dataset.upsert` left this list when its input stopped being a
+// `z.intersection`: an intersection exposes no `.shape`, so `scopeFieldsOf`
+// cannot see the scope ids and the procedure reads as opaque. Two chained
+// `.input()` calls parse the same thing and stay readable. `datasetRecord.create`
+// is the last one composed that way, and the same fix applies to it.
+const OPAQUE_INPUTS: readonly string[] = ["datasetRecord.create"];
 
 type Procedure = {
   path: string;

@@ -33,7 +33,6 @@ import type {
   DatasetStorage,
   PresignedUpload,
   DatasetAzureConfigResolver,
-  DatasetAzureConfig,
 } from "../ports/dataset-storage.port";
 import {
   ChunkTooLargeError,
@@ -43,7 +42,6 @@ import {
 } from "../services/errors";
 import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload";
 
-/** Resolved per-project Azure wiring: the driver plus the account/container it addresses. */
 /**
  * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text).
  * Capped at CHUNK_MAX_BYTES — chunks are written under that bound by
@@ -68,25 +66,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetAzureConfigResolver): AzureDatasetStorageAdapter {
     return new AzureDatasetStorageAdapter(resolver);
   }
-  /**
-   * Per-project memo of the resolved driver + account/container, keyed by
-   * `projectId` so two projects never share a client (parity with
-   * `S3DatasetStorage`'s per-project client memo).
-   */
-  private readonly configs = new Map<string, Promise<DatasetAzureConfig>>();
-
   constructor(private readonly resolver: DatasetAzureConfigResolver) {}
-
-  private config(projectId: string): Promise<DatasetAzureConfig> {
-    const cached = this.configs.get(projectId);
-    if (cached) return cached;
-    const created = this.resolver.resolve(projectId);
-    this.configs.set(projectId, created);
-    // Evict a transient resolution failure so the next call retries instead of
-    // caching a rejected promise forever (parity with S3DatasetStorage M4).
-    created.catch(() => this.configs.delete(projectId));
-    return created;
-  }
 
   private uriFor({
     accountName,
@@ -118,7 +98,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
       ...c,
       index: c.index + fromIndex,
     }));
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     for (const chunk of chunks) {
       const uri = this.uriFor({
         accountName,
@@ -140,7 +120,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     fromIndex: number;
   }): Promise<void> {
     assertNoTraversal(projectId, datasetId);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     // Chunks are contiguous from 0, so walk upward and stop at the first miss
     // (the first gap) — no fixed cap needed.
     for (let i = fromIndex; ; i++) {
@@ -165,7 +145,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     chunkCount: number;
   }): Promise<unknown[]> {
     assertNoTraversal(projectId, datasetId);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const rows: unknown[] = [];
     for (let i = 0; i < chunkCount; i++) {
       const key = chunkKey(projectId, datasetId, i);
@@ -196,7 +176,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     index: number;
   }): Promise<unknown[]> {
     assertNoTraversal(projectId, datasetId);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const key = chunkKey(projectId, datasetId, index);
     const uri = this.uriFor({ accountName, container, key });
     let jsonl: string;
@@ -230,7 +210,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     if (byteSize > CHUNK_MAX_BYTES) {
       throw new ChunkTooLargeError({ byteSize, maxBytes: CHUNK_MAX_BYTES });
     }
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({
       accountName,
       container,
@@ -275,7 +255,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     maxBytes?: number;
   }): Promise<void> {
     assertKeyWithinProject(projectId, key);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     let buffer: Buffer;
     try {
       buffer = await readStream(body, maxBytes);
@@ -298,7 +278,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     key: string;
   }): Promise<number> {
     assertKeyWithinProject(projectId, key);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({ accountName, container, key });
     try {
       // Signed HEAD — Content-Length only, never the body. Downloading the
@@ -321,7 +301,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     key: string;
   }): Promise<void> {
     assertKeyWithinProject(projectId, key);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({ accountName, container, key });
     await driver.delete(uri);
   }
@@ -334,7 +314,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     key: string;
   }): Promise<Readable> {
     assertKeyWithinProject(projectId, key);
-    const { driver, accountName, container } = await this.config(projectId);
+    const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({ accountName, container, key });
     try {
       return await driver.get(uri);

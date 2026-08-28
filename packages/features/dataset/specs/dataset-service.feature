@@ -40,3 +40,32 @@ Feature: Shared Dataset service
     When an upload is normalized or S3 JSONL chunks are rewritten
     Then the Dataset service uses injected storage and queue capabilities
     And it does not import an object-store client or global Prisma
+
+  @unit
+  Scenario: The dataset transports move without changing who may call them
+    Given the dataset, dataset record and batch record tRPC surfaces
+    When the process mounts them
+    Then every procedure keeps the name its callers already use
+    And every procedure keeps the access decision it declared before the move
+
+  @unit
+  Scenario: The declared check reads the validated input
+    Given a procedure authorized at the project its input names
+    When a permitted caller calls it
+    Then the authorization check resolves its scope from the parsed input
+    And the scope lineage guard is given the same input
+    And no procedure answers before a check has run
+
+  @unit
+  Scenario: A copy is refused when the source project is not the caller's
+    Given a caller permitted on the target project
+    When they copy a dataset out of a project they may not read
+    Then the copy is refused
+    And nothing is read from the source project
+
+  @unit
+  Scenario: A still-preparing dataset refuses record reads and writes
+    Given a dataset whose contents are still being prepared
+    When a caller reads or writes its records
+    Then the transport refuses it as a client precondition failure
+    And it does not report a server fault

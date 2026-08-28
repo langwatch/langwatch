@@ -139,18 +139,16 @@ export const useTableKeyboardNavigation = ({
                 columnId: allColumns[allColumns.length - 1]!.id,
               });
             }
-          } else {
-            if (currentColIndex < allColumns.length - 1) {
-              setSelectedCell({
-                row: selectedCell.row,
-                columnId: allColumns[currentColIndex + 1]!.id,
-              });
-            } else if (selectedCell.row < displayRowCount - 1) {
-              setSelectedCell({
-                row: selectedCell.row + 1,
-                columnId: allColumns[0]!.id,
-              });
-            }
+          } else if (currentColIndex < allColumns.length - 1) {
+            setSelectedCell({
+              row: selectedCell.row,
+              columnId: allColumns[currentColIndex + 1]!.id,
+            });
+          } else if (selectedCell.row < displayRowCount - 1) {
+            setSelectedCell({
+              row: selectedCell.row + 1,
+              columnId: allColumns[0]!.id,
+            });
           }
           break;
 

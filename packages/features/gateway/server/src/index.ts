@@ -27,6 +27,7 @@ export {
 } from "./adapters/gateway-bucket-scope.adapter";
 export * from "./adapters/gateway-audit-serializer.adapter";
 export * from "./adapters/gateway-budget-dto.adapter";
+export * from "./adapters/gateway-virtual-key-dto.adapter";
 export {
   GatewayBudgetCycleAnchorInvalidError,
   GatewayBudgetNotFoundError,
@@ -51,6 +52,11 @@ export * from "./adapters/gateway-spend-filters.adapter";
 export * from "./adapters/gateway-spend-parse.adapter";
 export * from "./adapters/gateway-spend-grouping.adapter";
 export * from "./processes/gateway-spend-commands.process";
+export * from "./processes/gateway-spend-settlement.process";
+export * from "./ports/gateway-open-admissions.port";
+export * from "./adapters/clickhouse.gateway-open-admissions.adapter";
+export * from "./adapters/eventing.gateway-spend-commands.adapter";
+export * from "./adapters/eventing.gateway-spend.adapter";
 export * from "./adapters/gateway-spend-constants.adapter";
 export * from "./adapters/gateway-spend-events.adapter";
 export * from "./adapters/gateway-window.adapter";

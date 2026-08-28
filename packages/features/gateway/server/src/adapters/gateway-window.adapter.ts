@@ -8,6 +8,17 @@
  */
 import type { GatewayBudgetWindow } from "@langwatch/gateway-contract";
 
+/**
+ * First instant of the current calendar month, UTC.
+ *
+ * The default floor of every spend window: a read with no `from` reports the
+ * month to date, and both doors into the gateway take it from here so the
+ * default cannot be phrased two ways.
+ */
+export function startOfCurrentMonthUTC(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
 export function nextResetAt(window: GatewayBudgetWindow, now: Date = new Date()): Date {
   const d = new Date(now);
   d.setUTCMilliseconds(0);
@@ -95,13 +106,7 @@ const FIXED_CYCLE_MS: Record<Exclude<CyclicWindow, "MONTH">, number> = {
   WEEK: 604_800_000,
 };
 
-function daysInUtcMonth({
-  year,
-  monthIndex,
-}: {
-  year: number;
-  monthIndex: number;
-}): number {
+function daysInUtcMonth({ year, monthIndex }: { year: number; monthIndex: number }): number {
   // Day 0 of the following month is the last day of this one.
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
@@ -116,13 +121,7 @@ function daysInUtcMonth({
  * month would walk the cycle backwards a few days a year until it settled
  * on the 28th, silently moving a customer's billing day.
  */
-function monthlyCycleStart({
-  anchorAt,
-  cycles,
-}: {
-  anchorAt: Date;
-  cycles: number;
-}): Date {
+function monthlyCycleStart({ anchorAt, cycles }: { anchorAt: Date; cycles: number }): Date {
   const anchorDay = anchorAt.getUTCDate();
   // Date.UTC normalises month overflow and underflow into the year.
   const normalised = new Date(

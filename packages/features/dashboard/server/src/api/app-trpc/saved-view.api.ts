@@ -19,10 +19,15 @@
  * Spec: packages/features/dashboard/specs/saved-views.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
+import {
+  SavedViewNotFoundError,
+  SavedViewReorderError,
+} from "@langwatch/dashboard-contract";
+import {
+  TRPCError,
+  type AnyTRPCRootTypes,
+  type TRPCRootObject,
+  type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
 
@@ -91,6 +96,29 @@ export type SavedViewsPort<TView> = Readonly<{
 
 export type SavedViewTrpcPorts<TView> = Readonly<{ savedViews: SavedViewsPort<TView> }>;
 
+/**
+ * Translates the two saved-view domain errors that need it, and hands
+ * everything else back untouched.
+ *
+ * A view that is not there, and a reorder naming ids that are not there, are
+ * both the `NOT_FOUND` this surface has always answered with; the message is
+ * the domain error's own, unchanged.
+ */
+function mapSavedViewError(error: unknown): never {
+  if (error instanceof SavedViewNotFoundError || error instanceof SavedViewReorderError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  }
+  throw error;
+}
+
+async function savedViewCall<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    mapSavedViewError(error);
+  }
+}
+
 const projectScopeSchema = z.object({
   projectId: z.string(),
   // Storage shape to read. Omit for the legacy default ("v1-traces-filter") so
@@ -123,11 +151,13 @@ export class SavedViewTrpcApi {
       /** Auto-seeds the origin defaults the first time a project asks. */
       getAll: policy("traces:view")(procedure.input(projectScopeSchema)).query(
         async ({ ctx, input }) =>
-          await ports.savedViews.getAll({
-            projectId: input.projectId,
-            userId: ctx.actor().id,
-            ...(input.kind === undefined ? {} : { kind: input.kind }),
-          }),
+          await savedViewCall(() =>
+            ports.savedViews.getAll({
+              projectId: input.projectId,
+              userId: ctx.actor().id,
+              ...(input.kind === undefined ? {} : { kind: input.kind }),
+            }),
+          ),
       ),
 
       /**
@@ -160,27 +190,31 @@ export class SavedViewTrpcApi {
         ),
       ).mutation(
         async ({ ctx, input }) =>
-          await ports.savedViews.create({
-            projectId: input.projectId,
-            ...(input.id === undefined ? {} : { id: input.id }),
-            name: input.name,
-            filters: input.filters,
-            ...(input.query === undefined ? {} : { query: input.query }),
-            ...(input.period === undefined ? {} : { period: input.period }),
-            ...(input.scope === "myself" ? { userId: ctx.actor().id } : {}),
-            ...(input.kind === undefined ? {} : { kind: input.kind }),
-          }),
+          await savedViewCall(() =>
+            ports.savedViews.create({
+              projectId: input.projectId,
+              ...(input.id === undefined ? {} : { id: input.id }),
+              name: input.name,
+              filters: input.filters,
+              ...(input.query === undefined ? {} : { query: input.query }),
+              ...(input.period === undefined ? {} : { period: input.period }),
+              ...(input.scope === "myself" ? { userId: ctx.actor().id } : {}),
+              ...(input.kind === undefined ? {} : { kind: input.kind }),
+            }),
+          ),
       ),
 
       delete: policy("traces:view")(
         procedure.input(z.object({ projectId: z.string(), viewId: z.string() })),
       ).mutation(
         async ({ ctx, input }) =>
-          await ports.savedViews.delete({
-            projectId: input.projectId,
-            viewId: input.viewId,
-            userId: ctx.actor().id,
-          }),
+          await savedViewCall(() =>
+            ports.savedViews.delete({
+              projectId: input.projectId,
+              viewId: input.viewId,
+              userId: ctx.actor().id,
+            }),
+          ),
       ),
 
       rename: policy("traces:view")(
@@ -189,12 +223,14 @@ export class SavedViewTrpcApi {
         ),
       ).mutation(
         async ({ ctx, input }) =>
-          await ports.savedViews.rename({
-            projectId: input.projectId,
-            viewId: input.viewId,
-            name: input.name,
-            userId: ctx.actor().id,
-          }),
+          await savedViewCall(() =>
+            ports.savedViews.rename({
+              projectId: input.projectId,
+              viewId: input.viewId,
+              name: input.name,
+              userId: ctx.actor().id,
+            }),
+          ),
       ),
 
       reorder: policy("traces:view")(
@@ -203,10 +239,12 @@ export class SavedViewTrpcApi {
         ),
       ).mutation(
         async ({ input }) =>
-          await ports.savedViews.reorder({
-            projectId: input.projectId,
-            viewIds: input.viewIds,
-          }),
+          await savedViewCall(() =>
+            ports.savedViews.reorder({
+              projectId: input.projectId,
+              viewIds: input.viewIds,
+            }),
+          ),
       ),
     });
   }

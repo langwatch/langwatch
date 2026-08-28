@@ -12,7 +12,7 @@ import type {
 import {
   PrismaWorkflowRepository,
   type WorkflowDatabase,
-} from "../repositories/prisma/prisma-workflow.repository";
+} from "../repositories/prisma/prisma.workflow.repository";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service";
 import { WorkflowService } from "../services/workflow.service";

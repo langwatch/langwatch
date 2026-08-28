@@ -7,7 +7,7 @@ Feature: Canonical user lifecycle
     And CLI tokens are revoked
 
   Scenario: Changing an email refreshes authenticated identity
-    When the User service changes a user's normalized email
+    When an authorized transport changes a user's normalized email through the User service
     Then the profile is updated
     And browser sessions are revoked
 

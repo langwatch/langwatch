@@ -1,16 +1,14 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { type AuthzGrantsService, type AuthzService } from "@langwatch/authz-contract";
 import {
-  type AuthzGrantsService,
-  type AuthzService,
-  roleBindingScopeTypeSchema,
-  teamUserRoleSchema,
-} from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
-import { z } from "zod";
+  roleBindingApiApplyMemberBindingsInputSchema,
+  roleBindingApiBindingInputSchema,
+  roleBindingApiCreateInputSchema,
+  roleBindingApiOrganizationInputSchema,
+  roleBindingApiUpdateInputSchema,
+  roleBindingApiUserInputSchema,
+} from "@langwatch/role-contract";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { DeclaredProcedure } from "./role.api";
 
 type RoleBindingApplication = Readonly<{
@@ -29,13 +27,6 @@ export type RoleBindingTrpcContext = Readonly<{
   }> | null;
 }>;
 
-const bindingWriteSchema = z.object({
-  role: teamUserRoleSchema,
-  customRoleId: z.string().optional(),
-  scopeType: roleBindingScopeTypeSchema,
-  scopeId: z.string(),
-});
-
 /**
  * The wire contract of `roleBinding.*`, exactly as the browser sends it. The
  * process parses these on the procedures it builds, so the schemas stay owned
@@ -43,37 +34,13 @@ const bindingWriteSchema = z.object({
  */
 export function roleBindingTrpcInputSchemas() {
   return {
-    listForOrg: z.object({ organizationId: z.string() }),
-    listForUser: z.object({ organizationId: z.string(), userId: z.string() }),
-    getMyAccessBreakdown: z.object({ organizationId: z.string() }),
-    create: z.object({
-      organizationId: z.string(),
-      // Principal — exactly one
-      userId: z.string().optional(),
-      groupId: z.string().optional(),
-      // Role
-      role: teamUserRoleSchema,
-      customRoleId: z.string().optional(),
-      // Scope
-      scopeType: roleBindingScopeTypeSchema,
-      scopeId: z.string(),
-    }),
-    update: z.object({
-      organizationId: z.string(),
-      bindingId: z.string(),
-      role: teamUserRoleSchema,
-      customRoleId: z.string().optional(),
-    }),
-    delete: z.object({
-      organizationId: z.string(),
-      bindingId: z.string(),
-    }),
-    applyMemberBindings: z.object({
-      organizationId: z.string(),
-      userId: z.string(),
-      bindingIdsToDelete: z.array(z.string()),
-      bindingsToCreate: z.array(bindingWriteSchema),
-    }),
+    listForOrg: roleBindingApiOrganizationInputSchema,
+    listForUser: roleBindingApiUserInputSchema,
+    getMyAccessBreakdown: roleBindingApiOrganizationInputSchema,
+    create: roleBindingApiCreateInputSchema,
+    update: roleBindingApiUpdateInputSchema,
+    delete: roleBindingApiBindingInputSchema,
+    applyMemberBindings: roleBindingApiApplyMemberBindingsInputSchema,
   };
 }
 

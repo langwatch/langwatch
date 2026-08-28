@@ -68,14 +68,7 @@ export type GatewayBudgetScopeType =
   | "GROUP"
   | "ATTRIBUTED_USER";
 
-export type GatewayBudgetWindow =
-  | "MINUTE"
-  | "HOUR"
-  | "DAY"
-  | "WEEK"
-  | "MONTH"
-  | "TOTAL"
-  | "MANUAL";
+export type GatewayBudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
 export type GatewayBudgetLedgerStatus =
   | "SUCCESS"
@@ -341,3 +334,102 @@ export type GatewayBudgetHealth = {
   readAt: Date;
   unreachableByAnyKey: boolean;
 };
+
+/**
+ * The inputs the `gatewayBudgets.*` tRPC surface publishes.
+ *
+ * Deliberately separate from the service schemas above, which they resemble
+ * without matching: the wire surface takes no `actorUserId` (the process reads
+ * the actor from its own session), publishes neither `externalId` nor
+ * `metadata`, does not accept an ATTRIBUTED_USER scope, and demands a positive
+ * `limitUsd` where the service accepts any finite amount. Collapsing the two
+ * would change what a live endpoint accepts, so they stay apart and adjacent.
+ */
+const gatewayBudgetApiScopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("ORGANIZATION"),
+    organizationId: z.string(),
+  }),
+  z.object({ kind: z.literal("TEAM"), teamId: z.string() }),
+  z.object({ kind: z.literal("PROJECT"), projectId: z.string() }),
+  z.object({ kind: z.literal("VIRTUAL_KEY"), virtualKeyId: z.string() }),
+  z.object({ kind: z.literal("PRINCIPAL"), principalUserId: z.string() }),
+  // Per-member group budgets. Creation is service-guarded: it needs
+  // the ClickHouse spend path (group_budget_requires_clickhouse otherwise).
+  z.object({ kind: z.literal("GROUP"), groupId: z.string() }),
+]);
+
+/** One organization, for the reads scoped to a whole tenant. */
+export const gatewayBudgetApiOrganizationInputSchema = z.object({ organizationId: z.string() });
+
+/** One project, for the read a project's own screens make. */
+export const gatewayBudgetApiProjectInputSchema = z.object({ projectId: z.string() });
+
+/** One budget inside one organization. */
+export const gatewayBudgetApiBudgetInputSchema = z.object({
+  organizationId: z.string(),
+  id: z.string(),
+});
+
+export const gatewayBudgetApiCreateInputSchema = z.object({
+  organizationId: z.string(),
+  scope: gatewayBudgetApiScopeSchema,
+  name: z.string().min(1).max(128),
+  description: z.string().optional(),
+  window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL", "MANUAL"]),
+  limitUsd: z.number().positive().or(z.string()),
+  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+  timezone: z.string().nullable().optional(),
+  // ModelProvider row id. Null / absent = the budget counts every
+  // provider; set = it counts and constrains only that provider.
+  providerKey: z.string().nullable().optional(),
+  // Phases a cyclic window off this instant instead of the calendar.
+  // Absent keeps the calendar alignment. Rejected on TOTAL and
+  // MANUAL, which do not cycle.
+  //
+  // A Date, or an ISO string carrying its offset, and nothing looser:
+  // the same instant the REST surface demands. An offsetless string
+  // would be read in whichever zone the server process happens to run
+  // in, so the anchor a customer set would land on a different instant
+  // per deployment.
+  cycleAnchorAt: z
+    .union([
+      z.date(),
+      z
+        .string()
+        .datetime({ offset: true })
+        .transform((iso) => new Date(iso)),
+    ])
+    .nullable()
+    .optional(),
+  // Keeps a team / project / group budget no active key can reach,
+  // which is otherwise refused. Provisioning ahead of the keys that
+  // will use it is legitimate, so the guardrail is not a prohibition.
+  allowUnreachable: z.boolean().optional(),
+});
+
+export const gatewayBudgetApiUpdateInputSchema = z.object({
+  organizationId: z.string(),
+  id: z.string(),
+  name: z.string().min(1).max(128).optional(),
+  description: z.string().nullable().optional(),
+  limitUsd: z.number().positive().or(z.string()).optional(),
+  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+  timezone: z.string().nullable().optional(),
+});
+
+export const gatewayBudgetApiResetInputSchema = z.object({
+  organizationId: z.string(),
+  id: z.string(),
+  endUserId: z.string().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export type GatewayBudgetApiOrganizationInput = z.infer<
+  typeof gatewayBudgetApiOrganizationInputSchema
+>;
+export type GatewayBudgetApiProjectInput = z.infer<typeof gatewayBudgetApiProjectInputSchema>;
+export type GatewayBudgetApiBudgetInput = z.infer<typeof gatewayBudgetApiBudgetInputSchema>;
+export type GatewayBudgetApiCreateInput = z.infer<typeof gatewayBudgetApiCreateInputSchema>;
+export type GatewayBudgetApiUpdateInput = z.infer<typeof gatewayBudgetApiUpdateInputSchema>;
+export type GatewayBudgetApiResetInput = z.infer<typeof gatewayBudgetApiResetInputSchema>;
