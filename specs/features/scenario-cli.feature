@@ -70,48 +70,48 @@ Feature: Scenario CLI Commands
 
   @unit
   Scenario: Create a scenario inside a test suite
-    Given my project has a test suite "folder_abc"
-    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder folder_abc"
-    Then the scenario is created inside that folder
-    And the confirmation names the folder
+    Given my project has a test suite "suite_abc"
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite suite_abc"
+    Then the scenario is created inside that test suite
+    And the confirmation names the test suite
 
   @unit
   Scenario: Move a scenario to another test suite
-    Given my project has a scenario and a test suite "folder_xyz"
-    When I run "langwatch scenario update <scenario-id> --folder folder_xyz"
-    Then the scenario is moved to that folder
-    And it no longer belongs to the folder it was in
+    Given my project has a scenario and a test suite "suite_xyz"
+    When I run "langwatch scenario update <scenario-id> --test-suite suite_xyz"
+    Then the scenario is moved to that test suite
+    And it no longer belongs to the test suite it was in
 
   @unit
   Scenario: Unfile a scenario from its test suite
-    Given my project has a scenario inside a folder
-    When I run "langwatch scenario update <scenario-id> --no-folder"
-    Then the scenario belongs to no folder
+    Given my project has a scenario inside a test suite
+    When I run "langwatch scenario update <scenario-id> --no-test-suite"
+    Then the scenario belongs to no test suite
 
   @unit
   Scenario: Create a scenario with a test suite that does not exist
-    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder nonexistent-id"
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite nonexistent-id"
     Then I see an error that the test suite was not found
     And no scenario is created
 
   @unit
-  Scenario: Combining --folder and --no-folder is rejected
-    When I run "langwatch scenario update <scenario-id> --folder folder_abc --no-folder"
+  Scenario: Combining --test-suite and --no-test-suite is rejected
+    When I run "langwatch scenario update <scenario-id> --test-suite suite_abc --no-test-suite"
     Then I see an error that the two options cannot be used together
     And the scenario is unchanged
 
   @unit
-  Scenario: List scenarios shows the folder each one belongs to
+  Scenario: List scenarios shows the test suite each one belongs to
     Given my project has scenarios inside and outside test suites
     When I run "langwatch scenario list"
-    Then the table has a folder column
-    And a scenario with no folder reads as unfiled
+    Then the table has a test suite column
+    And a scenario with no test suite reads as unfiled
 
   # ============================================================================
   # Running one scenario (Agent Testing v2)
   # ============================================================================
   # Running a scenario is sugar over a run plan: one request, scoped to the one
-  # case. No suite is created for it, and none is deleted afterwards. The
+  # scenario. No test suite is created for it, and none is deleted afterwards. The
   # platform files the run under a plan named after the scenario and the target
   # unless a name is sent. See specs/features/run-plan-cli.feature.
 
@@ -119,7 +119,7 @@ Feature: Scenario CLI Commands
   Scenario: Run a scenario against a target
     Given my project has a scenario "Login Flow" and an HTTP agent
     When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
-    Then one run request is sent, scoped to that one case
+    Then one run request is sent, scoped to that one scenario
     And no test suite is created or deleted
     And I see the plan name, the job count and the batch run ID
 
