@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `29c90932cc`
+**Working checkpoint:** `5b22664452`
 
 **Current execution waves:** Wave 1 named foundations + Wave 2 identity/access
 
@@ -405,13 +405,22 @@ completed gates and are outside the active Wave 1 scope:
 
 - Analytics/Dashboard persistence and its app adapters/tests;
 - Gateway cache-rule, guardrail and budget persistence and tests;
-- Prompt persistence/service parity and its app adapters/tests;
-- Mailer/runtime/provider work and tests.
+- Prompt persistence/service parity and its app adapters/tests.
 
 Their exact modified and untracked paths remain visible in `git status`; they
 must not be staged with foundation or Wave 2 commits. Reassess them only when
 the user expands the Wave 1 scope or a Wave 2 dependency requires a narrowly
 owned hunk.
+
+#### Active Wave 1 foundation lanes at `5b22664452`
+
+1. Make `packages/config` the single parsing mechanism and complete the four
+   typed process projections with compatibility boot coverage.
+2. Complete physical API/Worker entrypoints, observability context, health and
+   ordered first-error-safe lifecycle drain without activating consumers.
+3. Compose Group Queue, storage and AWS clients once per owning process.
+4. Compose mail, Stripe, Slack, WebSocket, NLP/Langevals and model clients
+   behind explicit process adapters; preserve dynamic tenant/project policy.
 
 Current Wave 1 progress at `de578b0f66`:
 
@@ -517,7 +526,11 @@ Do not pull Project, Organization, User, Role, AuthZ, API-key or Data
 Privacy/Retention scope queries forward to satisfy that sweep. Their repository
 boundaries depend on the Wave 2 actor/tenant graph and remain deferred.
 
-#### Next parallel Wave 1 lanes at `de578b0f66`
+#### Previous Wave 1 lanes and current disposition
+
+Persistence items 1–4 below are frozen outside the current user-authorized
+foundation scope. Item 5 is complete. Mail composition in item 6 is active
+across the Wave 1 external-client and Wave 2 Auth lanes.
 
 1. **Analytics and Dashboard persistence:** move legacy LWQL execution,
    saved-workbench chart and dashboard placement repositories into the existing
@@ -544,16 +557,15 @@ boundaries depend on the Wave 2 actor/tenant graph and remain deferred.
 5. **Trace processing clients, complete in `de578b0f66`:** one typed process
    graph now owns Data Privacy, lazy Google DLP, Presidio and tokenization for
    Trace, logs and metrics; focused lifecycle/parity coverage is green.
-6. **Mailer decision, deferred:** a real `createAuth(mailer)` cut must also make
-   passkey registration a factory, compose Auth on `AppDependencies`, convert
-   the Auth/Ops routes to factories and migrate the session adapter's broad
-   caller graph. That is Wave 2/3 auth composition. Keep BetterAuth's current
-   mail boundary untouched and land no partial provider/runtime duplicate now.
+6. **Mailer/Auth composition, active:** a real `createAuth(mailer)` cut must
+   also make passkey registration a factory, compose Auth on `AppDependencies`,
+   convert the Auth/Ops routes to factories and migrate the session adapter's
+   broad caller graph. Coordinate the Wave 1 process adapter with the Wave 2
+   Auth lifecycle so no partial provider/runtime duplicate lands.
 
-Explicitly deferred from Wave 1: WebSocket listener ownership and route startup
-(Wave 3), Worker registry/consumer activation (Wave 4), tenant-dynamic Slack,
-Enterprise Billing Stripe behaviour, per-project model-provider clients, and
-all identity-owned persistence.
+Still deferred from Wave 1: transport route cutover (Wave 3), Worker registry/
+consumer activation (Wave 4), feature persistence outside the named foundation
+scope, and identity-owned persistence except through active Wave 2 verticals.
 
 Gate: API and worker independently construct one explicit graph without global
 App, package env reads or request/job-time service construction.
@@ -563,6 +575,9 @@ App, package env reads or request/job-time service construction.
 **Active.** Start with the actor/tenant dependency graph, then migrate
 independent owners in parallel without sharing composition-root files. Root
 owns the integration hunks and commits each reviewed vertical separately.
+
+Current parallel verticals are Auth/API-key actor extraction, User,
+Organization/Project/Role tenancy, and AuthZ/Entitlement/Enterprise identity.
 
 Move these owners before broad product transport cutover:
 
