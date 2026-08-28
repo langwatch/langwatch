@@ -38,13 +38,11 @@ const harness = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", async () => {
-  const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
-    );
+vi.mock("~/hooks/useOrganizationTeamProject", () => {
+  // The real permission check, not a stand-in: a `governanceCost:view`
+  // missing from the built-in role bag has to fail these tests.
   const holds = (permission: string) =>
-    rbac.hasPermissionWithHierarchy(harness.permissions, permission);
+    hasPermissionWithHierarchy(harness.permissions, permission);
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,

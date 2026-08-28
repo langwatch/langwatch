@@ -33,11 +33,21 @@ let team: Team;
 let sourceId: string;
 /** The last run that worked. Everything after this is unknown, not zero. */
 let lastSuccessAt: Date;
+/**
+ * The teardown's own handle on what setup created.
+ *
+ * `afterAll` runs even when `beforeAll` threw partway, and reading `.id` off a
+ * fixture that was never assigned raises a TypeError there — which is the
+ * error the report shows, in place of the setup failure that actually broke
+ * the run.
+ */
+let createdOrganizationId: string | undefined;
 
 beforeAll(async () => {
   organization = await prisma.organization.create({
     data: { name: `Coverage ${ns}`, slug: `--test-org-${ns}` },
   });
+  createdOrganizationId = organization.id;
   team = await prisma.team.create({
     data: {
       name: `Coverage ${ns}`,
@@ -66,18 +76,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.ingestionSource
-    .deleteMany({ where: { organizationId: organization.id } })
-    .catch(() => undefined);
-  await prisma.project
-    .deleteMany({ where: { team: { organizationId: organization.id } } })
-    .catch(() => undefined);
-  await prisma.team
-    .deleteMany({ where: { organizationId: organization.id } })
-    .catch(() => undefined);
-  await prisma.organization
-    .delete({ where: { id: organization.id } })
-    .catch(() => undefined);
+  const organizationId = createdOrganizationId;
+  if (!organizationId) return;
+
+  // Not swallowed: a delete that fails leaves rows behind for every later run
+  // against this database, and a silent teardown is how that goes unnoticed
+  // until an unrelated suite starts failing.
+  await prisma.ingestionSource.deleteMany({ where: { organizationId } });
+  await prisma.project.deleteMany({ where: { team: { organizationId } } });
+  await prisma.team.deleteMany({ where: { organizationId } });
+  await prisma.organization.delete({ where: { id: organizationId } });
 });
 
 describe("given a source that has been unhealthy since its last successful pull", () => {

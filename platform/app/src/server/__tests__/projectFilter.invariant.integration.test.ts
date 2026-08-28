@@ -195,6 +195,23 @@ const surfaces: ListingSurface[] = [
   },
 ];
 
+/**
+ * One surface, by the name it declares rather than its position.
+ *
+ * The scenario-bound cases below each speak about specific surfaces. Reaching
+ * them by index means inserting a surface silently re-points every case after
+ * it at a different one — and nothing fails, because every case asserts the
+ * same two facts about whichever surface it was handed. The scenario would
+ * then claim coverage of a surface no test had looked at.
+ */
+function surfaceNamed({ name }: { name: string }): ListingSurface {
+  const surface = surfaces.find((candidate) => candidate.name === name);
+  if (!surface) {
+    throw new Error(`No listing surface named "${name}" — was it renamed?`);
+  }
+  return surface;
+}
+
 beforeAll(async () => {
   const organization = await prisma.organization.create({
     data: { name: `Leak Gate ${ns}`, slug: `--test-org-${ns}` },
@@ -210,7 +227,7 @@ beforeAll(async () => {
   });
   teamId = team.id;
 
-  const mkProject = (slug: string, kind: string) =>
+  const mkProject = ({ slug, kind }: { slug: string; kind: string }) =>
     prisma.project.create({
       data: {
         name: `Project ${slug} ${ns}`,
@@ -222,8 +239,11 @@ beforeAll(async () => {
         kind,
       },
     });
-  applicationProjectId = (await mkProject("app", "application")).id;
-  governanceProjectId = (await mkProject("gov", "internal_governance")).id;
+  applicationProjectId = (await mkProject({ slug: "app", kind: "application" }))
+    .id;
+  governanceProjectId = (
+    await mkProject({ slug: "gov", kind: "internal_governance" })
+  ).id;
 
   const user = await prisma.user.create({
     data: { name: "Leak Gate", email: `${ns}@example.com` },
@@ -291,88 +311,114 @@ afterAll(async () => {
 
 describe("the hidden governance project as a member sees it", () => {
   describe("given an organization holding both a real project and its governance home", () => {
-    /** @scenario "The governance home never appears anywhere members list projects" */
-    it("keeps the home out of every member-facing listing surface", async () => {
-      // The other end of the guard first: without the safeguard the home IS
-      // in this org's project population, so a surface that omits it below is
-      // filtering rather than looking at an empty org.
-      const unfiltered = await prisma.project.findMany({
-        where: { team: { organizationId } },
-        select: { id: true },
+    describe("when every listing surface is swept at once", () => {
+      /** @scenario "The governance home never appears anywhere members list projects" */
+      it("keeps the home out of every member-facing listing surface", async () => {
+        // The other end of the guard first: without the safeguard the home IS
+        // in this org's project population, so a surface that omits it below is
+        // filtering rather than looking at an empty org.
+        const unfiltered = await prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true },
+        });
+        expect(unfiltered.map((p) => p.id)).toContain(governanceProjectId);
+        expect(unfiltered.map((p) => p.id)).toContain(applicationProjectId);
+
+        const leaked: string[] = [];
+        const blind: string[] = [];
+        for (const surface of surfaces) {
+          const ids = await surface.ids();
+          if (!ids.includes(applicationProjectId)) blind.push(surface.name);
+          if (ids.includes(governanceProjectId)) leaked.push(surface.name);
+        }
+
+        // Reported before the leak list: a surface that showed the member
+        // nothing would have "excluded" the home for the wrong reason.
+        expect(blind).toEqual([]);
+        expect(leaked).toEqual([]);
       });
-      expect(unfiltered.map((p) => p.id)).toContain(governanceProjectId);
-      expect(unfiltered.map((p) => p.id)).toContain(applicationProjectId);
-
-      const leaked: string[] = [];
-      const blind: string[] = [];
-      for (const surface of surfaces) {
-        const ids = await surface.ids();
-        if (!ids.includes(applicationProjectId)) blind.push(surface.name);
-        if (ids.includes(governanceProjectId)) leaked.push(surface.name);
-      }
-
-      // Reported before the leak list: a surface that showed the member
-      // nothing would have "excluded" the home for the wrong reason.
-      expect(blind).toEqual([]);
-      expect(leaked).toEqual([]);
     });
 
-    /** @scenario "The hidden Governance Project never appears in the ProjectSelector dropdown" */
-    it("keeps it out of the project selector's own tree", async () => {
-      const ids = await surfaces[1]!.ids();
+    describe("when the project selector loads its tree", () => {
+      /** @scenario "The hidden Governance Project never appears in the ProjectSelector dropdown" */
+      it("keeps it out of the project selector's own tree", async () => {
+        const ids = await surfaceNamed({
+          name: "the organization project tree behind the project selector",
+        }).ids();
 
-      expect(ids).toContain(applicationProjectId);
-      expect(ids).not.toContain(governanceProjectId);
+        expect(ids).toContain(applicationProjectId);
+        expect(ids).not.toContain(governanceProjectId);
+      });
     });
 
-    /** @scenario "The hidden Governance Project never appears in /api/v1/projects responses" */
-    it("keeps it out of the projects REST list, count included", async () => {
-      const page = await new PrismaProjectRepository(
-        prisma,
-      ).findAllByOrganization({ organizationId, page: 1, limit: 100 });
+    describe("when the projects REST list is paged", () => {
+      /** @scenario "The hidden Governance Project never appears in /api/v1/projects responses" */
+      it("keeps it out of the projects REST list, count included", async () => {
+        const page = await new PrismaProjectRepository(
+          prisma,
+        ).findAllByOrganization({ organizationId, page: 1, limit: 100 });
 
-      expect(page.data.map((p) => p.id)).toContain(applicationProjectId);
-      expect(page.data.map((p) => p.id)).not.toContain(governanceProjectId);
-      // The count is filtered by the same `where`, so the total cannot betray
-      // a row the page does not list.
-      expect(page.pagination.total).toBe(page.data.length);
+        expect(page.data.map((p) => p.id)).toContain(applicationProjectId);
+        expect(page.data.map((p) => p.id)).not.toContain(governanceProjectId);
+        // The count is filtered by the same `where`, so the total cannot
+        // betray a row the page does not list.
+        expect(page.pagination.total).toBe(page.data.length);
+      });
     });
 
-    /** @scenario "The hidden Governance Project never appears in billing exports or invoice line-items" */
-    it("keeps it out of per-project cost and plan-limit lines", async () => {
-      const costIds = await surfaces[10]!.ids();
-      const alertIds = await surfaces[4]!.ids();
+    describe("when the billing surfaces are built", () => {
+      /** @scenario "The hidden Governance Project never appears in billing exports or invoice line-items" */
+      it("keeps it out of per-project cost and plan-limit lines", async () => {
+        const costIds = await surfaceNamed({ name: "cost by project" }).ids();
+        const alertIds = await surfaceNamed({
+          name: "the plan-limit alert's per-project lines",
+        }).ids();
 
-      expect(costIds).toContain(applicationProjectId);
-      expect(costIds).not.toContain(governanceProjectId);
-      expect(alertIds).toContain(applicationProjectId);
-      expect(alertIds).not.toContain(governanceProjectId);
+        expect(costIds).toContain(applicationProjectId);
+        expect(costIds).not.toContain(governanceProjectId);
+        expect(alertIds).toContain(applicationProjectId);
+        expect(alertIds).not.toContain(governanceProjectId);
+      });
     });
 
-    /** @scenario "The hidden Governance Project never appears in RBAC role binding pickers" */
-    it("keeps it out of team settings and the API-key scope picker", async () => {
-      const teamIds = await surfaces[2]!.ids();
-      const apiKeyIds = await surfaces[3]!.ids();
+    describe("when an RBAC picker is opened", () => {
+      /** @scenario "The hidden Governance Project never appears in RBAC role binding pickers" */
+      it("keeps it out of team settings and the API-key scope picker", async () => {
+        const teamIds = await surfaceNamed({
+          name: "team and RBAC settings",
+        }).ids();
+        const apiKeyIds = await surfaceNamed({
+          name: "the API-key scope picker",
+        }).ids();
 
-      expect(teamIds).toContain(applicationProjectId);
-      expect(teamIds).not.toContain(governanceProjectId);
-      expect(apiKeyIds).toContain(applicationProjectId);
-      expect(apiKeyIds).not.toContain(governanceProjectId);
+        expect(teamIds).toContain(applicationProjectId);
+        expect(teamIds).not.toContain(governanceProjectId);
+        expect(apiKeyIds).toContain(applicationProjectId);
+        expect(apiKeyIds).not.toContain(governanceProjectId);
+      });
     });
 
-    /** @scenario "The hidden Governance Project never appears in any other user-visible Project surface" */
-    it("keeps it out of the settings scope pickers and the caller scope map", async () => {
-      for (const index of [5, 6, 7, 8, 9]) {
-        const surface = surfaces[index]!;
-        const ids = await surface.ids();
+    describe("when the remaining settings pickers are opened", () => {
+      /** @scenario "The hidden Governance Project never appears in any other user-visible Project surface" */
+      it("keeps it out of the settings scope pickers and the caller scope map", async () => {
+        const names = [
+          "the data-privacy scope picker",
+          "the data-retention scope picker",
+          "the model-defaults scope picker",
+          "department assignment",
+          "the caller project scope map",
+        ];
+        for (const name of names) {
+          const ids = await surfaceNamed({ name }).ids();
 
-        expect(ids, `${surface.name} shows the member nothing`).toContain(
-          applicationProjectId,
-        );
-        expect(ids, `${surface.name} leaks the home`).not.toContain(
-          governanceProjectId,
-        );
-      }
+          expect(ids, `${name} shows the member nothing`).toContain(
+            applicationProjectId,
+          );
+          expect(ids, `${name} leaks the home`).not.toContain(
+            governanceProjectId,
+          );
+        }
+      });
     });
   });
 });

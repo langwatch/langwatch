@@ -17,6 +17,74 @@ import { formatLaneUsd } from "./costLaneFormat";
 const BILLED_COLOR = "#7c3aed";
 const GATEWAY_COLOR = "#0ea5e9";
 
+/** No day in the window reported anything — said, rather than drawn empty. */
+function NoReportedDays() {
+  return (
+    <Box
+      data-testid="cost-lanes-chart-empty"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={5}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        No days in this window have reported cost yet.
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * The plot itself: one area per lane, both over the same baseline.
+ *
+ * `connectNulls={false}` is what leaves a gap on a day a lane holds no
+ * figure, instead of drawing a line through it down to the axis.
+ */
+function LaneAreas({ series }: { series: readonly GovernanceCostDayDto[] }) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={[...series]}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="day" tick={{ fontSize: 11 }} minTickGap={24} />
+        <YAxis
+          tick={{ fontSize: 11 }}
+          width={70}
+          tickFormatter={(value: number) => formatLaneUsd(value)}
+        />
+        <Tooltip
+          formatter={(value) =>
+            formatLaneUsd(value === null ? null : Number(value))
+          }
+          contentStyle={{ fontSize: 12 }}
+        />
+        <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+        <Area
+          type="monotone"
+          dataKey="billedUsd"
+          name="Billed by provider"
+          stroke={BILLED_COLOR}
+          fill={BILLED_COLOR}
+          fillOpacity={0.15}
+          strokeWidth={1.5}
+          connectNulls={false}
+          isAnimationActive={false}
+        />
+        <Area
+          type="monotone"
+          dataKey="gatewayUsd"
+          name="Metered by gateway"
+          stroke={GATEWAY_COLOR}
+          fill={GATEWAY_COLOR}
+          fillOpacity={0.15}
+          strokeWidth={1.5}
+          connectNulls={false}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
 /**
  * Billed and gateway cost per day, UNSTACKED.
  *
@@ -35,21 +103,7 @@ export function CostLanesChart({
 }: {
   series: readonly GovernanceCostDayDto[];
 }) {
-  if (series.length === 0) {
-    return (
-      <Box
-        data-testid="cost-lanes-chart-empty"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={5}
-      >
-        <Text fontSize="sm" color="fg.muted">
-          No days in this window have reported cost yet.
-        </Text>
-      </Box>
-    );
-  }
+  if (series.length === 0) return <NoReportedDays />;
 
   return (
     <VStack
@@ -63,46 +117,7 @@ export function CostLanesChart({
     >
       <Heading size="sm">Cost per day</Heading>
       <Box height="260px">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={[...series]}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize: 11 }} minTickGap={24} />
-            <YAxis
-              tick={{ fontSize: 11 }}
-              width={70}
-              tickFormatter={(value: number) => formatLaneUsd(value)}
-            />
-            <Tooltip
-              formatter={(value) =>
-                formatLaneUsd(value === null ? null : Number(value))
-              }
-              contentStyle={{ fontSize: 12 }}
-            />
-            <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
-            <Area
-              type="monotone"
-              dataKey="billedUsd"
-              name="Billed by provider"
-              stroke={BILLED_COLOR}
-              fill={BILLED_COLOR}
-              fillOpacity={0.15}
-              strokeWidth={1.5}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="gatewayUsd"
-              name="Metered by gateway"
-              stroke={GATEWAY_COLOR}
-              fill={GATEWAY_COLOR}
-              fillOpacity={0.15}
-              strokeWidth={1.5}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <LaneAreas series={series} />
       </Box>
     </VStack>
   );
