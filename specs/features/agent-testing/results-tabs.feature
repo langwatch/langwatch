@@ -554,8 +554,17 @@ Feature: The Results tab
     And no name is made up from the recorded user id
 
   @integration
+  Scenario: The block names the models the run really ran on
+    Given a run that recorded the simulator model "openai/gpt-5-mini" and the judge model "openai/gpt-5" it resolved
+    When "Show run settings" is chosen
+    Then the block reads the simulator model the run resolved
+    And the block reads the judge model the run resolved
+    And neither row reads the project default
+    And each model reads with the icon of its provider
+
+  @integration
   Scenario: The judge always reads, and a run that named no model reads the project default
-    Given a run whose metadata names neither simulation model
+    Given a run stored before the resolved models were recorded, whose metadata names neither simulation model
     When "Show run settings" is chosen
     Then the judge reads as the project default model, because that is what such a run judged with
     And no simulator model reads in the block

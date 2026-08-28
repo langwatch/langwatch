@@ -1093,6 +1093,34 @@ describe("<RunPlanDetail/>", () => {
     expect(judge.querySelector("svg")).not.toBeNull();
   });
 
+  /** @scenario "The block names the models the run really ran on" */
+  /** @scenario "The run settings read the resolved model, not the configured one" */
+  it("names the models the run resolved, never the project default", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        resolvedSimulatorModel: "openai/gpt-5-mini",
+        resolvedJudgeModel: "openai/gpt-5",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    const simulator = within(block).getByTestId("run-settings-simulator");
+    expect(simulator).toHaveTextContent("gpt-5-mini");
+    expect(simulator.querySelector("svg")).not.toBeNull();
+
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("gpt-5");
+    expect(judge.querySelector("svg")).not.toBeNull();
+
+    expect(block).not.toHaveTextContent(PROJECT_DEFAULT_MODEL);
+  });
+
   /** @scenario "The judge always reads, and a run that named no model reads the project default" */
   it("reads the judge as the project default on a run that stamped no model", async () => {
     const user = userEvent.setup();

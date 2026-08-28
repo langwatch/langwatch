@@ -313,6 +313,10 @@ describe("simulationRunnerRouter.run", () => {
           endpoint: "http://localhost:3000",
           apiKey: "test-api-key",
         },
+        resolvedModels: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
       });
     });
 
@@ -381,6 +385,10 @@ describe("simulationRunnerRouter.run", () => {
           endpoint: "http://localhost:3000",
           apiKey: "test-api-key",
         },
+        resolvedModels: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
       });
     });
 
@@ -419,6 +427,21 @@ describe("simulationRunnerRouter.run", () => {
           expect.objectContaining({
             scenarioRunId: "scenariorun_test_456",
           }),
+        );
+      });
+
+      /** @scenario "A run of a single case records the models the validation prefetch resolved" */
+      it("records the models the prefetch resolved on the queued run", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata: { langwatch: Record<string, unknown> };
+        };
+        expect(queued.metadata.langwatch.resolvedSimulatorModel).toBe(
+          "openai/gpt-5-mini",
+        );
+        expect(queued.metadata.langwatch.resolvedJudgeModel).toBe(
+          "openai/gpt-5",
         );
       });
 
@@ -665,6 +688,8 @@ describe("simulationRunnerRouter.run", () => {
             scenarioVersion: 5,
             actorId: "user_test_123",
             actorLabel: "user",
+            resolvedSimulatorModel: "openai/gpt-5-mini",
+            resolvedJudgeModel: "openai/gpt-5",
           },
         });
       });
@@ -686,6 +711,8 @@ describe("simulationRunnerRouter.run", () => {
                 scenarioVersion: 5,
                 actorId: "user_test_123",
                 actorLabel: "user",
+                resolvedSimulatorModel: "openai/gpt-5-mini",
+                resolvedJudgeModel: "openai/gpt-5",
               },
             }),
           }),

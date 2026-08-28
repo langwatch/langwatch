@@ -82,13 +82,12 @@ async function queuedCommandFor(params: {
   judgeModel?: string | null;
 }): Promise<QueueRunCommandData> {
   const queued: QueueRunCommandData[] = [];
-  const service = new SuiteRunService(
-    new NullSuiteRunReadRepository(),
-    async () => {},
-    async (data) => {
+  const service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+    startSuiteRun: async () => {},
+    queueSimulationRun: async (data) => {
       queued.push(data);
     },
-  );
+  });
 
   await service.startRun({
     suiteId: `suite-${nanoid()}`,

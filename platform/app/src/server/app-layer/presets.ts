@@ -71,6 +71,7 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -1468,6 +1469,7 @@ export function initializeDefaultApp(options?: {
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
+    resolveRunModels: createRunModelsResolver(prisma),
   });
 
   const traceCollection = traced(

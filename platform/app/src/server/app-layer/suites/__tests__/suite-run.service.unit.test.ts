@@ -37,11 +37,10 @@ describe("SuiteRunService", () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
-      service = new SuiteRunService(
-        new NullSuiteRunReadRepository(),
-        startSuiteRunCommand,
-        queueSimulationRunCommand,
-      );
+      service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+        startSuiteRun: startSuiteRunCommand,
+        queueSimulationRun: queueSimulationRunCommand,
+      });
     });
 
     describe("when a run is started with one scenario and one target", () => {

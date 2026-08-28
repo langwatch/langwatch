@@ -7,6 +7,11 @@ import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import { withActor } from "~/server/scenarios/run-actor";
+import {
+  type ResolvedRunModels,
+  withResolvedModels,
+} from "~/server/scenarios/run-models";
+import type { RunModelsResolver } from "~/server/scenarios/run-models.resolver";
 import { withNote } from "~/server/scenarios/run-note";
 import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
@@ -120,33 +125,34 @@ function withSecretParameters(
     : {};
 }
 
+/** What SuiteRunService reaches the rest of the platform through. */
+export type SuiteRunServiceDependencies = {
+  startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
+  queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
+  /**
+   * Reads the models each run of the batch will run on, so every run says
+   * which simulator played the person and which judge decided the verdict.
+   * Absent in a context with no database behind it; the runs then record no
+   * resolved model, the same as a run recorded before the field existed.
+   */
+  resolveRunModels?: RunModelsResolver;
+};
+
 export class SuiteRunService {
   constructor(
     readonly repository: SuiteRunReadRepository,
-    private readonly startSuiteRunCommand: (
-      data: StartSuiteRunCommandData,
-    ) => Promise<void>,
-    private readonly queueSimulationRunCommand: (
-      data: QueueRunCommandData,
-    ) => Promise<void>,
+    private readonly deps: SuiteRunServiceDependencies,
   ) {}
 
-  static create(params: {
-    resolveClickHouseClient: ClickHouseClientResolver | null;
-    startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
-    queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
-  }): SuiteRunService {
+  static create(
+    params: SuiteRunServiceDependencies & {
+      resolveClickHouseClient: ClickHouseClientResolver | null;
+    },
+  ): SuiteRunService {
     const repo = params.resolveClickHouseClient
       ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
       : new NullSuiteRunReadRepository();
-    return traced(
-      new SuiteRunService(
-        repo,
-        params.startSuiteRun,
-        params.queueSimulationRun,
-      ),
-      "SuiteRunService",
-    );
+    return traced(new SuiteRunService(repo, params), "SuiteRunService");
   }
 
   /**
@@ -194,6 +200,9 @@ export class SuiteRunService {
      * The simulation models the plan was configured with. Stamped onto every
      * run so the run dialog can read a configuration back off the runs and
      * not only off the plan row.
+     *
+     * They also start the chain that resolves what each run really runs on,
+     * which is stamped beside them.
      */
     simulatorModel?: string | null;
     judgeModel?: string | null;
@@ -221,6 +230,17 @@ export class SuiteRunService {
       actor,
     } = params;
     const simulationModels = withSimulationModels(params);
+    // Read before the first run is queued: every run of the batch says which
+    // models it ran on, and the answer must not change part way through it.
+    const resolvedModelsByScenarioId: Map<string, ResolvedRunModels> =
+      (await this.deps.resolveRunModels?.({
+        projectId,
+        scenarioIds: activeScenarioIds,
+        plan: {
+          simulatorModel: params.simulatorModel,
+          judgeModel: params.judgeModel,
+        },
+      })) ?? new Map();
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(suiteId);
@@ -239,7 +259,7 @@ export class SuiteRunService {
       "Starting suite run",
     );
 
-    await this.startSuiteRunCommand({
+    await this.deps.startSuiteRun({
       tenantId: projectId,
       batchRunId,
       scenarioSetId: setId,
@@ -280,7 +300,7 @@ export class SuiteRunService {
         const secretParameters = secretParametersByScenarioId?.get(
           item.scenarioId,
         );
-        return this.queueSimulationRunCommand({
+        return this.deps.queueSimulationRun({
           tenantId: projectId,
           scenarioRunId: item.scenarioRunId,
           scenarioId: item.scenarioId,
@@ -294,6 +314,9 @@ export class SuiteRunService {
               ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
               ...withActor(actor),
               ...simulationModels,
+              ...withResolvedModels(
+                resolvedModelsByScenarioId.get(item.scenarioId),
+              ),
             },
             ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),

@@ -20,13 +20,12 @@ async function queuedCommandFor(
   actor?: RunActor,
 ): Promise<QueueRunCommandData> {
   const queued: QueueRunCommandData[] = [];
-  const service = new SuiteRunService(
-    new NullSuiteRunReadRepository(),
-    async () => {},
-    async (data) => {
+  const service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+    startSuiteRun: async () => {},
+    queueSimulationRun: async (data) => {
       queued.push(data);
     },
-  );
+  });
 
   const scenarioId = `scenario-${nanoid()}`;
   await service.startRun({

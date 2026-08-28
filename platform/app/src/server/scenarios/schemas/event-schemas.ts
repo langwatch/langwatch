@@ -88,6 +88,22 @@ export const langwatchMetadataSchema = z.object({
   simulatorModel: z.string().optional(),
   judgeModel: z.string().optional(),
   /**
+   * The simulation models the run RESOLVED, stamped at queue time: the run
+   * plan's choice, else the case's own choice, else the project default for
+   * that role.
+   *
+   * This is what a person reads back off the run. The project default changes
+   * over time, so a run that recorded only the configured value cannot say
+   * which model judged it a month later.
+   *
+   * Absent when the project had no model set for the role, and absent on runs
+   * recorded before this was stamped. Both read the same way.
+   *
+   * @see specs/scenarios/resolved-run-models-on-runs.feature
+   */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /**
    * Who started the run: the platform user id, and the surface that person
    * acted through. Stamped at queue time, and absent whenever the caller
    * named no person, which is every project-key and SDK run.

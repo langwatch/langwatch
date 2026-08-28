@@ -12,11 +12,12 @@
  * `langwatch` namespace. A run started by a project key names no person and
  * reads back as none.
  *
- * A model reads back as the value the plan was CONFIGURED with, which is
- * absent when the plan named none. A run recorded before the models were
- * stamped is absent for the same reason and reads the same way. The name of
- * the project default is never put in its place, because the default of today
- * is not always the model the run took.
+ * A model reads back as the model the run RESOLVED, which is the plan's
+ * choice, or the case's own choice, or the project default of the moment the
+ * run was queued. That is the one a person needs after the fact, because the
+ * project default of today is not always the model the run took. A run
+ * recorded before the resolved models were stamped falls back to the value its
+ * plan was configured with, and reads as nothing when the plan named none.
  *
  * The run NOTE is not here. It reads in the header line and does not move.
  *
@@ -38,9 +39,9 @@ export type RunSettings = {
   parameters: RunSettingParameter[];
   /** How many times each scenario and target pair ran. One when it ran once. */
   repeatCount: number;
-  /** Null when the run names no simulator model. */
+  /** Null only on a run recorded before the models were stamped. */
   simulatorModel: string | null;
-  /** Null when the run names no judge model. */
+  /** Null only on a run recorded before the models were stamped. */
   judgeModel: string | null;
   /**
    * Who started the run, or null when the run records no person. A run
@@ -96,11 +97,25 @@ function readRepeatCount(scenarioRuns: ScenarioRunData[]): number {
   return Math.max(1, ...counts.values());
 }
 
-/** The first run of the batch that names the model, or null. */
+/**
+ * The model the batch ran on: the first run that names one.
+ *
+ * The resolved model answers first, because it is the model that really ran.
+ * The configured model answers for a run recorded before resolved models were
+ * stamped, and such a run names one only when its plan did.
+ */
 function readModel(
   scenarioRuns: ScenarioRunData[],
   field: "simulatorModel" | "judgeModel",
 ): string | null {
+  const resolvedField =
+    field === "simulatorModel"
+      ? ("resolvedSimulatorModel" as const)
+      : ("resolvedJudgeModel" as const);
+  for (const run of scenarioRuns) {
+    const model = run.metadata?.langwatch?.[resolvedField];
+    if (model) return model;
+  }
   for (const run of scenarioRuns) {
     const model = run.metadata?.langwatch?.[field];
     if (model) return model;

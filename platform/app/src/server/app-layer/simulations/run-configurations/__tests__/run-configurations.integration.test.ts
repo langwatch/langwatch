@@ -136,13 +136,12 @@ async function runBatch(params: {
   runAt: number;
 }): Promise<void> {
   const queued: QueueRunCommandData[] = [];
-  const service = new SuiteRunService(
-    new NullSuiteRunReadRepository(),
-    async () => {},
-    async (data) => {
+  const service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+    startSuiteRun: async () => {},
+    queueSimulationRun: async (data) => {
       queued.push(data);
     },
-  );
+  });
 
   await service.startRun({
     suiteId: params.suiteId,

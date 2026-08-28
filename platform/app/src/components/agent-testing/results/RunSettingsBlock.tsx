@@ -14,9 +14,10 @@
  * monospace font, because a value like `eu-central` is a literal and a
  * proportional font hides the difference between two of them. The judge reads
  * on every run, even a standard one, because the judge is what decided every
- * verdict on the page. A run that named no model of its own reads as the
- * project default, which is what it ran on. The repeat count and the simulator model read only
- * when the run carries them, so a plain run stays a short block.
+ * verdict on the page. Each model row names the model the run really ran on,
+ * which the run recorded when it was queued. The repeat count and the
+ * simulator model read only when the run carries them, so a run that recorded
+ * neither stays a short block.
  *
  * The run note is not here. It reads in the header line and does not move.
  *
@@ -30,12 +31,12 @@ import { FG_MUTED } from "../shared/design";
 import type { RunSettings } from "./run-settings";
 
 /**
- * What a model row says when the run named no model of its own.
+ * What a model row says when the run recorded no model at all.
  *
- * Such a run did not go unjudged: it took the default model of the project,
- * resolved when the run was queued. Naming that is what the reader needs, and
- * the row cannot print the model itself, because the default of today is not
- * always the one the run took.
+ * Only a run stored before the resolved models were recorded reads this way.
+ * Such a run did not go unjudged: it took the default model of the project of
+ * that day. The row cannot print that model, because the default of today is
+ * not always the one the run took.
  */
 export const PROJECT_DEFAULT_MODEL = "Project default model";
 
