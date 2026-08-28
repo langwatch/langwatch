@@ -5,7 +5,7 @@
  * LangWatchQL REST endpoints under it; the directory this file sits in is
  * only where the repo keeps route modules, and carries no routing meaning.
  * The raw-LWQL routes those endpoints served (query and schema) were removed
- * by issue #7565 — the JSON-RPC domain endpoint `POST /api/v1/query`
+ * by issue #7565 — the REST domain endpoint `POST /api/v1/query`
  * supersedes them. What remains here is `./app.charts.v1.ts`: the saved
  * workbench chart routes, which publish their refusals through the same
  * canonical error handler this app still wires.

@@ -80,10 +80,16 @@ export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
   /**
-   * `schema()` and `runQuery()` delegate to the shared query door
-   * rather than a dedicated chart-family route (issue #7565) — built once,
-   * from the same underlying `apiClient`, so it picks up the same auth and
-   * base URL this service was configured with.
+   * `schema()` and `runQuery()` delegate to the shared query door rather
+   * than a dedicated chart-family route (issue #7565). That door is
+   * project-implicit (no path/body slot — see `QueryApiService`'s own doc
+   * comment), so it only learns this family's project from the client it is
+   * given: when the caller supplied their own `langwatchApiClient`, this
+   * reuses it verbatim (that client's auth is the caller's to own);
+   * otherwise a client is built fresh, scoped to the same
+   * `configuredProjectId` CRUD resolves through `projectId()`, so a
+   * `ChartsApiService` configured for one project cannot leak a chart's
+   * query to a different project via ambient scope (issue #7565 follow-up).
    */
   private readonly queryApi: QueryApiService;
 
@@ -94,7 +100,15 @@ export class ChartsApiService {
   ) {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
     this.configuredProjectId = config?.projectId;
-    this.queryApi = new QueryApiService({ langwatchApiClient: this.apiClient });
+    this.queryApi = new QueryApiService({
+      langwatchApiClient:
+        config?.langwatchApiClient ??
+        createLangWatchApiClient(
+          undefined,
+          undefined,
+          this.resolvedProjectId(),
+        ),
+    });
   }
 
   private handleApiError(
@@ -115,11 +129,24 @@ export class ChartsApiService {
     throw new ChartsApiError(message, operation, error, status);
   }
 
-  private projectId(operation: string): string {
-    const projectId =
+  /**
+   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain
+   * `projectId()` throws on, without the throw — for the one caller that
+   * must tolerate "no project" rather than refuse on it: the query-door
+   * client build in the constructor above, which has to keep working for
+   * legacy project-scoped keys that carry no project in any of those three
+   * places (see `QueryApiService`'s own doc comment).
+   */
+  private resolvedProjectId(): string | undefined {
+    return (
       this.configuredProjectId ??
       scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID;
+      process.env.LANGWATCH_PROJECT_ID
+    );
+  }
+
+  private projectId(operation: string): string {
+    const projectId = this.resolvedProjectId();
     if (!projectId) {
       throw new ChartsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",

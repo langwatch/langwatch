@@ -1348,7 +1348,6 @@
             "group": "Analytics",
             "pages": [
               "api-reference/analytics/overview",
-              "api-reference/analytics/query-analytics-timeseries-legacy-path",
               "api-reference/analytics/create-timeseries"
             ]
           },
@@ -1356,7 +1355,7 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
-              "api-reference/query/discover-the-queryable-langwatchql-schem",
+              "api-reference/query/discover-the-queryable-langwatchql-schema",
               "api-reference/query/run-a-langwatchql-query"
             ]
           },

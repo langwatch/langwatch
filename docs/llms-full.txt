@@ -69183,7 +69183,7 @@ openapi: "PUT /api/prompts/{id}/tags/{tag}"
 
 ---
 
-# FILE: ./api-reference/query/discover-the-queryable-langwatchql-schem.mdx
+# FILE: ./api-reference/query/discover-the-queryable-langwatchql-schema.mdx
 
 ---
 title: "Discover the queryable LangWatchQL schema"

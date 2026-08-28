@@ -27,7 +27,15 @@ function requestSchema(): any {
   return paths[RUN]?.post?.requestBody?.content?.["application/json"]?.schema;
 }
 
-function responseSchema(path: string, method: string, status: string): any {
+function responseSchema({
+  path,
+  method,
+  status,
+}: {
+  path: string;
+  method: string;
+  status: string;
+}): any {
   return paths[path]?.[method]?.responses?.[status]?.content?.[
     "application/json"
   ]?.schema;
@@ -61,7 +69,7 @@ describe("given the generated OpenAPI document", () => {
       ["GET", SCHEMA, "get"],
     ])("gives %s %s's success a response schema", (label, path, method) => {
       expect(
-        responseSchema(path, method, "200"),
+        responseSchema({ path, method, status: "200" }),
         `${label} ${path} publishes no response schema`,
       ).toBeDefined();
     });
@@ -76,7 +84,9 @@ describe("given the generated OpenAPI document", () => {
      * only fails against a live server.
      */
     it("publishes the run result itself as the 200 body", () => {
-      const properties = responseSchema(RUN, "post", "200")?.properties ?? {};
+      const properties =
+        responseSchema({ path: RUN, method: "post", status: "200" })
+          ?.properties ?? {};
 
       expect(Object.keys(properties)).toEqual(
         expect.arrayContaining(["columns", "rows", "statistics"]),
@@ -87,7 +97,9 @@ describe("given the generated OpenAPI document", () => {
 
     /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
     it("publishes the queryable schema itself as the 200 body", () => {
-      const properties = responseSchema(SCHEMA, "get", "200")?.properties ?? {};
+      const properties =
+        responseSchema({ path: SCHEMA, method: "get", status: "200" })
+          ?.properties ?? {};
 
       expect(Object.keys(properties)).toEqual(
         expect.arrayContaining(["database", "datasets"]),
