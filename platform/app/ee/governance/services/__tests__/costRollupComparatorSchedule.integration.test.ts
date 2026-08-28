@@ -119,11 +119,16 @@ describe("cost rollup comparator schedules", () => {
     });
 
     it("adds nothing on a second pass, so every pod can run it", async () => {
-      const result = await reconcile();
+      // Asserted on this project's rows rather than on the returned counters:
+      // the reconciler walks every governance project in the database, and the
+      // integration lane shares one Postgres, so a project another suite left
+      // behind moves `created` for reasons that have nothing to do with this.
+      const before = await entriesForGovProject();
+      await reconcile();
 
-      expect(result.created).toBe(0);
-      expect(result.failed).toBe(0);
-      expect(await entriesForGovProject()).toHaveLength(2);
+      const after = await entriesForGovProject();
+      expect(after).toEqual(before);
+      expect(after).toHaveLength(2);
     });
 
     it("leaves an entry an operator paused switched off", async () => {
@@ -141,10 +146,10 @@ describe("cost rollup comparator schedules", () => {
         data: { active: false },
       });
 
-      const result = await reconcile();
+      await reconcile();
 
-      expect(result.created).toBe(0);
       const entries = await entriesForGovProject();
+      expect(entries).toHaveLength(2);
       expect(entries.find((e) => e.targetId.endsWith(":gateway"))?.active).toBe(
         false,
       );
@@ -168,10 +173,10 @@ describe("cost rollup comparator schedules", () => {
         data: { archivedAt: new Date() },
       });
 
-      const result = await reconcile();
+      await reconcile();
 
-      expect(result.deactivated).toBe(2);
       const entries = await entriesForGovProject();
+      expect(entries).toHaveLength(2);
       expect(entries.every((entry) => entry.active)).toBe(false);
 
       // Restored so the archived state does not leak into other assertions.
