@@ -43,6 +43,7 @@ EXTERNAL_SERVICE_ERROR_INDICATORS = (
     "Rate limit",
     "RateLimitError",
     "insufficient_quota",
+    "budget_exceeded",
     "API Error",
     "Connection error",
     "Timeout",
@@ -113,6 +114,17 @@ def test_example_input_is_local():
 def test_provider_quota_failure_is_external_service_issue():
     assert is_external_service_error(
         RuntimeError("request failed with insufficient_quota")
+    )
+
+
+# @scenario "Gateway budget limits are classified as external service issues"
+def test_gateway_budget_limit_is_external_service_issue():
+    assert is_external_service_error(
+        RuntimeError(
+            "Error code: 402 - {'error': {'code': 'budget_exceeded', "
+            "'message': 'The virtual key spending limit (per day) for this "
+            "request has been reached.'}}"
+        )
     )
 
 
