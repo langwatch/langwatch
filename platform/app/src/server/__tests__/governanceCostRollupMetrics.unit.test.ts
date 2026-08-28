@@ -11,7 +11,7 @@
  *
  * Decision: ADR-128.
  */
-import { type Gauge, register } from "prom-client";
+import { type Gauge, type MetricValue, register } from "prom-client";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { setGovernanceCostRollupLagSeconds } from "../metrics";
@@ -22,9 +22,12 @@ function lagGauge(): Gauge<string> {
   return register.getSingleMetric(LAG_METRIC) as Gauge<string>;
 }
 
-async function lagSeries(): Promise<
-  Array<{ labels: Record<string, string | number>; value: number }>
-> {
+/**
+ * prom-client's own value type, rather than a hand-rolled shape: its `labels`
+ * is a PARTIAL record, so a local type claiming every label is present does not
+ * describe what `get()` returns.
+ */
+async function lagSeries(): Promise<MetricValue<string>[]> {
   return (await lagGauge().get()).values;
 }
 
