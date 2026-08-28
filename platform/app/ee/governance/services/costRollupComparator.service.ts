@@ -133,6 +133,7 @@ export class CostRollupComparatorService {
       windowStartMs: Date.parse(`${day}T00:00:00.000Z`),
     });
     setGovernanceCostRollupLagSeconds({
+      tenantId,
       costSource,
       seconds: lagMs / 1000,
     });
