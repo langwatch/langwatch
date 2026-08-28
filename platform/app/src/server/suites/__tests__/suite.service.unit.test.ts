@@ -164,15 +164,26 @@ function createService(overrides?: {
   );
   const suiteRunService = createMockSuiteRunService();
 
+  // Resolving a run plan by name takes an advisory lock, so the stub answers
+  // `$transaction` and the `$executeRaw` that takes the lock. There is no
+  // database in this lane: the body runs at once and the transaction client
+  // is the stub itself, so a read under `tx` sees the same fixtures as a read
+  // that names the client directly. What the lock holds apart is proven by
+  // the datastore-lane test, `plan-identity.integration.test.ts`.
+  const prismaStub: Record<string, unknown> = {
+    $executeRaw: vi.fn(async () => 0),
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(prismaStub),
+    ...(overrides?.prisma ?? {}),
+  };
+
   const service = new SuiteService(
     suiteRepo as unknown as SuiteRepository,
     scenarioRepo as unknown as ScenarioRepository,
     agentRepo as unknown as AgentRepository,
     llmConfigRepo as unknown as LlmConfigRepository,
     suiteRunService,
-    // Unit paths never open a transaction; the folder cascades that do are
-    // covered by the datastore-lane integration tests.
-    (overrides?.prisma ?? {}) as unknown as PrismaClient,
+    prismaStub as unknown as PrismaClient,
   );
 
   return {
@@ -1434,8 +1445,11 @@ describe("SuiteService", () => {
         );
         // The settings land on the run plan the run resolved, never on the
         // folder row.
+        // The second argument carries the transaction client, so the plan is
+        // written under the name lock that the matching read was taken with.
         expect(suiteRepo.create).toHaveBeenCalledWith(
           expect.objectContaining({ kind: "custom", repeatCount: 3 }),
+          expect.objectContaining({ tx: expect.anything() }),
         );
         expect(suiteRepo.update).not.toHaveBeenCalled();
       });
@@ -1494,6 +1508,7 @@ describe("SuiteService", () => {
         expect(result.planName).toBe("Refunds dev-agent vs prod-agent");
         expect(suiteRepo.create).toHaveBeenCalledWith(
           expect.objectContaining({ name: "Refunds dev-agent vs prod-agent" }),
+          expect.objectContaining({ tx: expect.anything() }),
         );
       });
     });
