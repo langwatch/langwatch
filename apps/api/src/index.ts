@@ -1,4 +1,10 @@
 export { ApiApplication } from "./api.application";
+export { ApiSecretRestFeature } from "./api-secret-rest.feature";
+export {
+  ApiRestSecurityPolicy,
+  ApiRestSecurityPort,
+  type ApiRestAuthenticatedRequest,
+} from "./api-rest.security";
 export { ApiProductionComposition } from "./app/api-production.composition";
 export {
   ApiHttpListener,

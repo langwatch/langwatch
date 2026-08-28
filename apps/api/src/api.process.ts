@@ -8,6 +8,7 @@ import type { SecretService } from "@langwatch/secret-contract";
 import { ApiApplication, type ApiHttpOptions } from "./api.application";
 import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener";
 import { ApiRequestPolicy } from "./api-request.policy";
+import type { Hono } from "hono";
 
 /**
  * Boot boundary for a standalone API listener. The host owns socket binding;
@@ -19,6 +20,7 @@ export class ApiProcess {
     secrets: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;
     requestPolicy?: ApiRequestPolicy;
+    rest?: Hono;
     observability: ProcessObservabilityOptions;
     listener?: Omit<ApiHttpListenerOptions, "application" | "logger">;
   }): ApiProcess {
@@ -35,6 +37,7 @@ export class ApiProcess {
       agents: options.agents,
       secrets: options.secrets,
       http: { ...http, logger: observability.logger },
+      rest: options.rest,
     });
     const hono = application.hono;
     const listener = options.listener

@@ -8,6 +8,8 @@ import {
   ApiRequestPolicy,
 } from "../api-request.policy";
 import { ApiProcess } from "../api.process";
+import { ApiSecretRestFeature } from "../api-secret-rest.feature";
+import type { ApiRestSecurityPort } from "../api-rest.security";
 import type { ApiConfig } from "../platform/config/api.config";
 
 /** The directly runnable API graph for feature-owned transports. */
@@ -18,6 +20,7 @@ export class ApiProductionComposition {
     secrets: SecretService;
     authentication: ApiAuthenticationPort;
     authorization: ApiAuthorizationPort;
+    restSecurity: ApiRestSecurityPort;
     audit?: ApiAuditPort;
     observability: ProcessObservabilityOptions;
   }): ApiProductionComposition {
@@ -30,6 +33,10 @@ export class ApiProductionComposition {
       agents: options.agents,
       secrets: options.secrets,
       requestPolicy: policy,
+      rest: ApiSecretRestFeature.create({
+        secrets: options.secrets,
+        security: options.restSecurity,
+      }),
       observability: options.observability,
       listener: {
         host: options.config.host,

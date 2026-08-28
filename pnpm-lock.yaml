@@ -119,6 +119,9 @@ importers:
       '@langwatch/agent-server':
         specifier: workspace:*
         version: link:../../packages/features/agent/server
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../packages/features/authz/contract

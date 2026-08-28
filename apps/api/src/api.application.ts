@@ -172,11 +172,13 @@ export class ApiApplication {
     secrets: SecretService;
     topic?: TopicApiFeature;
     http?: ApiHttpOptions;
+    rest?: Hono;
   }): ApiApplication {
     options.topic?.install();
     return new ApiApplication(
       { agents: options.agents, secrets: options.secrets },
       options.http,
+      options.rest,
       options.topic,
     );
   }
@@ -192,6 +194,7 @@ export class ApiApplication {
       secrets: SecretService;
     }>,
     private readonly http: ApiHttpOptions | undefined,
+    rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
@@ -201,7 +204,7 @@ export class ApiApplication {
       : undefined;
     const secrets = SecretTrpcApi.create(this.root, { protected: protectedProcedure });
     this.trpc = this.root.router({ ...(agents ? { agents } : {}), secrets });
-    this.hono = http ? this.createHono(http) : undefined;
+    this.hono = http ? this.createHono(http, rest) : undefined;
   }
 
   createCaller(context: ApiRequestContext) {
@@ -262,7 +265,7 @@ export class ApiApplication {
     });
   }
 
-  private createHono(http: ApiHttpOptions): Hono {
+  private createHono(http: ApiHttpOptions, rest: Hono | undefined): Hono {
     const endpoint = http.endpoint ?? "/api/trpc";
     const handler = async (request: Request): Promise<Response> =>
       fetchRequestHandler({
@@ -274,6 +277,9 @@ export class ApiApplication {
     const hono = new Hono();
     hono.get(`${endpoint}/*`, (context) => handler(context.req.raw));
     hono.post(`${endpoint}/*`, (context) => handler(context.req.raw));
+    if (rest) {
+      hono.route("/", rest);
+    }
     return hono;
   }
 }

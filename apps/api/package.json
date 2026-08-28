@@ -28,6 +28,7 @@
     "@hono/node-server": "^2.0.6",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
