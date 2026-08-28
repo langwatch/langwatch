@@ -26,7 +26,6 @@ import {
   teamRoleHasPermission,
 } from "../api/rbac";
 import { authzChecksFor } from "../app-layer/authz/checks";
-import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -325,29 +324,17 @@ export async function checkRoleBindingPermission({
     type: "user",
     id: userId!,
   };
-  const legacyPermitted = () =>
-    checkRoleBindingPermissionInner({
-      prisma,
-      principal: resolvedPrincipal,
-      organizationId,
-      scope,
-      permission,
-    });
 
   // The NAMED principal only, with no owner ceiling: this function reports
   // one principal's own grants and nothing else, which is its contract and
   // its suite's subject.
-  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
-    const decision = await authzChecksFor(prisma).checkByIds({
-      principal: resolvedPrincipal,
-      permission,
-      ceiling: false,
-      ...scopeRefToIds(scope, organizationId),
-    });
-    return decision.allowed;
-  }
-
-  return legacyPermitted();
+  const decision = await authzChecksFor(prisma).checkByIds({
+    principal: resolvedPrincipal,
+    permission,
+    ceiling: false,
+    ...scopeRefToIds(scope, organizationId),
+  });
+  return decision.allowed;
 }
 
 function scopeRefToIds(
@@ -364,107 +351,6 @@ function scopeRefToIds(
   }
 }
 
-async function checkRoleBindingPermissionInner({
-  prisma,
-  principal,
-  organizationId,
-  scope,
-  permission,
-}: {
-  prisma: PrismaClient;
-  principal: Principal;
-  organizationId: string;
-  scope: ScopeRef;
-  permission: Permission;
-}): Promise<boolean> {
-  const bindings = await collectBindingsForScope({
-    prisma,
-    principal,
-    organizationId,
-    scope,
-  });
-
-  for (const binding of bindings) {
-    // A team/project binding can never grant an org-exclusive permission,
-    // even via a custom role that lists it (ADR-021). Stays in sync with
-    // checkPermissionFromBindings() in rbac.ts.
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
-
-    // Custom role: look up its permissions. Defense in depth on two axes:
-    // the lookup is scoped to the organization being checked, so a poisoned
-    // binding pointing at another organization's role grants nothing of that
-    // role even if a write path let it through; and an API key's private
-    // permission role (kind system_api_key) backs only that key's own
-    // bindings, never a user's, a group's, or another key's. Either mismatch
-    // resolves exactly like a missing role: the built-in CUSTOM baseline
-    // below, which cannot carry the foreign role's permissions.
-    if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
-      const customRole = await prisma.customRole.findFirst({
-        where: {
-          id: binding.customRoleId,
-          organizationId,
-          ...systemRoleGuard(principal),
-        },
-        select: { permissions: true },
-      });
-      // Use the shared parser so shape validation is consistent with the
-      // API-key-create ceiling path. On malformed data we fail safe here (the
-      // caller is a permission check — deny, log, move on) rather than
-      // bubbling the error up, because unrelated principals should not be
-      // blocked by one corrupted custom role.
-      let perms: string[] = [];
-      if (customRole) {
-        try {
-          perms = parseCustomRolePermissions({
-            customRoleId: binding.customRoleId,
-            permissions: customRole.permissions,
-          });
-        } catch (err) {
-          if (err instanceof MalformedCustomRolePermissionsError) {
-            logger.warn(
-              { err, customRoleId: binding.customRoleId },
-              "custom role has malformed permissions; treating as no-grant",
-            );
-          } else {
-            throw err;
-          }
-        }
-      }
-      if (perms.length > 0) {
-        if (hasPermissionWithHierarchy(perms, permission)) {
-          return true;
-        }
-        // Non-empty custom role is authoritative — skip VIEWER baseline.
-        // See also resolveBindingPermission() in rbac.ts which must stay
-        // in sync with this logic.
-        continue;
-      }
-      // Empty/missing/malformed custom role — fall through to the built-in
-      // CUSTOM permission set below (VIEWER-equivalent baseline). This
-      // preserves backward compatibility for legacy CUSTOM bindings that
-      // were created before fine-grained permissions existed.
-    }
-
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
-    if (
-      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      binding.role !== TeamUserRole.CUSTOM
-    ) {
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
-        return true;
-      continue;
-    }
-
-    if (teamRoleHasPermission(binding.role, permission)) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * A user's legacy `TeamUser` ceiling, resolved once and then asked about as
@@ -631,72 +517,13 @@ export async function resolveApiKeyPermission({
   permission: Permission;
   /** See checkRoleBindingPermission - the per-permission mint loops opt out. */
 }): Promise<boolean> {
-  /**
-   * Steps 1-4 of the legacy ceiling — the answering path below when the
-   * organization is still on legacy. (It was also the fork's reverse-shadow
-   * thunk before the shadow comparison was removed; a migrated organization is
-   * now answered by the engine outright.)
-   */
-  const legacyPermitted = async (): Promise<boolean> => {
-    // 1. Check API key's own bindings (inner variant: the composite check
-    // below covers this path, so the per-leg wrapper is skipped)
-    const apiKeyAllowed = await checkRoleBindingPermissionInner({
-      prisma,
-      principal: { type: "apiKey", id: apiKeyId },
-      organizationId,
-      scope,
-      permission,
-    });
-
-    if (!apiKeyAllowed) return false;
-    // 2. Service keys (no userId) have no user ceiling — binding check is
-    //    sufficient
-    if (!userId) return true;
-
-    // 3. Check owning user's current bindings (ceiling)
-    const userAllowed = await checkRoleBindingPermissionInner({
-      prisma,
-      principal: { type: "user", id: userId },
-      organizationId,
-      scope,
-      permission,
-    });
-    if (userAllowed) return true;
-
-    // 4. Fall back to legacy membership, the same way the mint-side ceiling
-    //    and the tRPC path do.
-    //
-    //    Without this the mint-side fix was no fix at all: the population it
-    //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
-    //    false for every permission and the key it just allowed to be minted
-    //    is a dead credential. Every REST route funnels through
-    //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal
-    //    at mint time to every tool call 403ing after the turn had already
-    //    started streaming, which is the worse of the two.
-    //
-    //    Safe by construction: this can only restore access the same legacy
-    //    role already grants through tRPC, which is what the key's
-    //    permission set was measured from in the first place.
-    const legacy = await resolveLegacyCeiling({
-      prisma,
-      userId,
-      organizationId,
-      scope,
-    });
-    return legacy.grants(permission);
-  };
-
-  // The engine states the same ceiling as algebra — effective(key) =
-  // grants(key) ∩ grants(owner) — rather than as the four steps above. The
-  // key's owner is resolved by the collector, so it is not passed here.
-  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
-    const decision = await authzChecksFor(prisma).checkByIds({
-      principal: { type: "apiKey", id: apiKeyId },
-      permission,
-      ...scopeRefToIds(scope, organizationId),
-    });
-    return decision.allowed;
-  }
-
-  return legacyPermitted();
+  // The engine states the ceiling as algebra — effective(key) = grants(key)
+  // ∩ grants(owner) — rather than as a sequence of steps. The key's owner is
+  // resolved by the collector, so it is not passed here.
+  const decision = await authzChecksFor(prisma).checkByIds({
+    principal: { type: "apiKey", id: apiKeyId },
+    permission,
+    ...scopeRefToIds(scope, organizationId),
+  });
+  return decision.allowed;
 }

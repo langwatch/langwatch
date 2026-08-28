@@ -163,6 +163,34 @@ export class AuthzService {
   }
 
   /**
+   * `effectivePermissions`, asked with the ids a caller already holds rather
+   * than a resolved scope ref — the by-ids sibling the rest of this family
+   * has.
+   *
+   * It exists so a caller wanting to know WHICH of several permissions it
+   * holds asks once instead of once per permission. That fan-out is the
+   * failure `batchProjectPermissions` was written for: Langy's session-key
+   * mint tested 27 candidates at ~3 queries each, and issued through
+   * `Promise.all` it demanded ~81 connections at once, starving the Prisma
+   * pool until `ApiKeyService.create`'s interactive transaction blew its
+   * 5-second budget. One collected snapshot answers all of them.
+   *
+   * An unresolvable scope is the empty set, not an error: a non-member
+   * resolves to no access rather than to a refusal.
+   */
+  async effectivePermissionsByIds({
+    principal,
+    projectId,
+    teamId,
+    organizationId,
+  }: ScopeIds & { principal: AuthzPrincipalRef }): Promise<AuthzPermission[]> {
+    const scope = await this.resolveScope({ projectId, teamId, organizationId });
+    if (!scope) return [];
+
+    return this.effectivePermissions({ principal, scope });
+  }
+
+  /**
    * The same question as `check`, asked with the ids a caller already holds
    * instead of a resolved scope ref. Most call sites have a projectId or a
    * teamId and nothing else, and resolving the ref themselves is the step

@@ -41,7 +41,6 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
-import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
@@ -838,141 +837,6 @@ export const checkOrganizationPermission =
 // ROLE BINDING RESOLUTION
 // ============================================================================
 
-/**
- * Checks whether any of the user's RoleBindings at the given scopes grants the
- * requested permission. All matching bindings are evaluated and their permission
- * sets are unioned — a user is permitted if ANY binding grants the permission.
- *
- * Falls back to the legacy TeamUser table when no RoleBindings exist.
- */
-async function checkPermissionFromBindings({
-  prisma,
-  userId,
-  organizationId,
-  scopes,
-  organizationRole,
-  permission,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-  scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
-  organizationRole: OrganizationUserRole | null;
-  permission: Permission;
-}): Promise<boolean> {
-  const scopeIds = scopes.map((s) => s.scopeId);
-
-  // Fetch groups the user belongs to in this org
-  const groupMemberships = await prisma.groupMembership.findMany({
-    where: { userId, group: { organizationId } },
-    select: { groupId: true },
-  });
-  const groupIds = groupMemberships.map((m) => m.groupId);
-
-  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes.
-  // The direct-binding branch is gated on current organization membership so a
-  // stale cross-org binding (one naming this user at a scope in an org they no
-  // longer/never belonged to) is never selected. Membership — not the binding
-  // row — is the tenancy boundary.
-  const bindings = await prisma.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeId: { in: scopeIds },
-      OR: [
-        {
-          userId,
-          user: {
-            orgMemberships: { some: { organizationId, disabledAt: null } },
-          },
-        },
-        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
-      ],
-    },
-    select: { role: true, customRoleId: true, scopeType: true },
-  });
-
-  if (bindings.length === 0) {
-    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings.
-    // The fallback stays live for EVERY organization — backfilled, cut over,
-    // or untouched — until contract deletes the rows: stage B's finalization
-    // proves the promoted bindings answer identically at the scopes they
-    // replace, and the engine keeps inferring from the same rows on both
-    // heads (the dormant-fact principle), so switching this off early made
-    // the readers disagree instead of making the rows dead.
-    const teamScope = scopes.find(
-      (s) => s.scopeType === RoleBindingScopeType.TEAM,
-    );
-    if (!teamScope) return false;
-
-    const teamUser = await prisma.teamUser.findFirst({
-      // Gate the legacy fallback on org membership too: a stale cross-org
-      // TeamUser row must not confer access any more than a stale RoleBinding,
-      // and neither does a seat an admin disabled.
-      where: {
-        userId,
-        teamId: teamScope.scopeId,
-        team: {
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
-      },
-      select: { role: true, assignedRoleId: true },
-    });
-
-    if (!teamUser) return false;
-    // Legacy team membership is a TEAM-scoped grant, so it can't confer an
-    // org-exclusive permission even through a custom role (ADR-021).
-    if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
-      return false;
-    }
-    return resolveBindingPermission({
-      binding: {
-        role: teamUser.role,
-        customRoleId: teamUser.assignedRoleId ?? null,
-      },
-      organizationId,
-      organizationRole,
-      permission,
-      prisma,
-    });
-  }
-
-  // Union permissions across ALL matching bindings — permitted if any grants it
-  for (const binding of bindings) {
-    // A team/project binding can never grant an org-exclusive permission,
-    // even via a custom role that lists it (ADR-021).
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
-
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
-    // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
-    // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
-    if (
-      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      binding.role !== TeamUserRole.CUSTOM
-    ) {
-      // Defense-in-depth: EXTERNAL (Lite Member) users must never be promoted
-      // by this fast path even if an ORG-scoped MEMBER binding exists — the
-      // OrganizationUser role is authoritative for EXTERNAL restrictions.
-      if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
-        return true;
-      continue;
-    }
-
-    const permitted = await resolveBindingPermission({
-      binding,
-      organizationId,
-      organizationRole,
-      permission,
-      prisma,
-    });
-    if (permitted) return true;
-  }
-
-  return false;
-}
 
 /**
  * Checks whether a single binding grants the requested permission,
@@ -1218,49 +1082,18 @@ export async function resolveProjectPermission(
   const context = await resolveProjectPermissionContext(ctx, projectId);
   if ("refused" in context) return refused(context.denialReason);
 
-  /** The legacy binding walk, run only while this organization is still
-   *  waiting for its migration. */
-  const legacyPermitted = () =>
-    checkPermissionFromBindings({
-      prisma: ctx.prisma,
-      userId: context.userId,
-      organizationId: context.organizationId,
-      scopes: projectPermissionScopes({
-        projectId,
-        teamId: context.teamId,
-        organizationId: context.organizationId,
-      }),
-      organizationRole: context.organizationRole,
-      permission,
-    });
-
-  // ADR-110: finishing the migration IS the switch. An organization that
-  // finished is decided by the engine; one that has not is decided by the
-  // legacy walk.
-  if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
-      organizationId: context.organizationId,
-    })
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: context.userId },
-      permission,
-      projectId,
-    });
-    return {
-      permitted: decision.allowed,
-      // The engine's snapshot read the same OrganizationUser row the context
-      // above did, so these agree; the context's is the fallback for the
-      // unresolved-scope answer, which carries no snapshot at all.
-      organizationRole: decision.organizationRole ?? context.organizationRole,
-      denialReason: decision.denialReason,
-    };
-  }
-
+  const decision = await authzChecksFor(ctx.prisma).checkByIds({
+    principal: { type: "user", id: context.userId },
+    permission,
+    projectId,
+  });
   return {
-    permitted: await legacyPermitted(),
-    organizationRole: context.organizationRole,
+    permitted: decision.allowed,
+    // The engine's snapshot read the same OrganizationUser row the context
+    // above did, so these agree; the context's is the fallback for the
+    // unresolved-scope answer, which carries no snapshot at all.
+    organizationRole: decision.organizationRole ?? context.organizationRole,
+    denialReason: decision.denialReason,
   };
 }
 
@@ -1296,48 +1129,18 @@ export async function resolveProjectPermissionAny(
   const context = await resolveProjectPermissionContext(ctx, projectId);
   if ("refused" in context) return refused(context.denialReason);
 
-  const scopes = projectPermissionScopes({
+  // The engine answers every candidate off one collected snapshot, in the
+  // order given, stopping at the first allow.
+  const decision = await authzChecksFor(ctx.prisma).canAnyByIds({
+    principal: { type: "user", id: context.userId },
+    permissions,
     projectId,
-    teamId: context.teamId,
-    organizationId: context.organizationId,
   });
-
-  // ADR-110: the engine answers every candidate off one collected snapshot,
-  // in the same order, stopping at the same first allow the legacy loop
-  // below would have stopped at.
-  if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
-      organizationId: context.organizationId,
-    })
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).canAnyByIds({
-      principal: { type: "user", id: context.userId },
-      permissions,
-      projectId,
-    });
-    return {
-      permitted: decision.allowed,
-      organizationRole: decision.organizationRole ?? context.organizationRole,
-      denialReason: decision.denialReason,
-    };
-  }
-
-  for (const permission of permissions) {
-    const permitted = await checkPermissionFromBindings({
-      prisma: ctx.prisma,
-      userId: context.userId,
-      organizationId: context.organizationId,
-      scopes,
-      organizationRole: context.organizationRole,
-      permission,
-    });
-    if (permitted) {
-      return { permitted: true, organizationRole: context.organizationRole };
-    }
-  }
-
-  return { permitted: false, organizationRole: context.organizationRole };
+  return {
+    permitted: decision.allowed,
+    organizationRole: decision.organizationRole ?? context.organizationRole,
+    denialReason: decision.denialReason,
+  };
 }
 
 /**
@@ -1406,43 +1209,16 @@ export async function resolveTeamPermission(
 
   const userId = ctx.session.user.id;
 
-  /** The legacy binding walk, as ONE implementation both paths run. */
-  const legacyPermitted = () =>
-    checkPermissionFromBindings({
-      prisma: ctx.prisma,
-      userId,
-      organizationId: team.organizationId,
-      scopes: [
-        { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-        {
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: team.organizationId,
-        },
-      ],
-      organizationRole,
-      permission,
-    });
-
-  // The organization is the one the team read above already resolved.
-  if (
-    await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
-      organizationId: team.organizationId,
-    })
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: userId },
-      permission,
-      teamId,
-    });
-    return {
-      permitted: decision.allowed,
-      organizationRole: decision.organizationRole ?? organizationRole,
-      denialReason: decision.denialReason,
-    };
-  }
-
-  return { permitted: await legacyPermitted(), organizationRole };
+  const decision = await authzChecksFor(ctx.prisma).checkByIds({
+    principal: { type: "user", id: userId },
+    permission,
+    teamId,
+  });
+  return {
+    permitted: decision.allowed,
+    organizationRole: decision.organizationRole ?? organizationRole,
+    denialReason: decision.denialReason,
+  };
 }
 
 /**
@@ -1481,20 +1257,14 @@ export async function hasOrganizationPermission(
   permission: Permission,
 ): Promise<boolean> {
   const userId = ctx.session?.user?.id;
+  if (!userId) return false;
 
-  if (
-    userId &&
-    (await organizationOnAuthzEngine({ prisma: ctx.prisma, organizationId }))
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: userId },
-      permission,
-      organizationId,
-    });
-    return decision.allowed;
-  }
-
-  return hasOrganizationPermissionLegacy(ctx, organizationId, permission);
+  const decision = await authzChecksFor(ctx.prisma).checkByIds({
+    principal: { type: "user", id: userId },
+    permission,
+    organizationId,
+  });
+  return decision.allowed;
 }
 
 /**
@@ -1517,121 +1287,6 @@ export async function organizationDenialReason({
   );
 }
 
-async function hasOrganizationPermissionLegacy(
-  ctx: { prisma: PrismaClient; session: Session },
-  organizationId: string,
-  permission: Permission,
-): Promise<boolean> {
-  if (!ctx.session?.user) {
-    return false;
-  }
-
-  const userId = ctx.session.user.id;
-
-  const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    // A seat-disabled membership confers nothing, exactly as an absent one
-    // does — see getCurrentOrganizationRole above.
-    where: { userId, organizationId, disabledAt: null },
-    select: { role: true },
-  });
-
-  if (!orgMember) return false;
-
-  // EXTERNAL (Lite Member) is a billing classification, not an access-control
-  // boundary, so it must NOT cap organization-permission resolution. Removing
-  // the old `organization:view`-only short-circuit lets a lite member reach the
-  // MEMBER base bag below (`organization:view` + `aiTools:view`), which is what
-  // the /me AI-tools portal needs to render. The binding-level guards in
-  // `checkPermissionFromBindings` are unchanged: they still skip non-CUSTOM
-  // ORGANIZATION-scoped bindings for EXTERNAL and cap non-CUSTOM team bindings
-  // at EXTERNAL_MEMBER_PERMISSIONS, so a lite member does not escalate through
-  // the default role bag. An explicit CUSTOM role binding is still honored for
-  // EXTERNAL — that is the intended admin delegation surface (see the
-  // EXTERNAL_MEMBER_PERMISSIONS docs), and it is unchanged here. So beyond the
-  // MEMBER base bag this change adds, a lite member only ever gains what a
-  // custom role was deliberately granted. (Fully retiring EXTERNAL as a
-  // permission gate is the follow-up for when it becomes a computed property.)
-  //
-  // Regression: the short-circuit fired before the floor below and hid
-  // `aiTools:view`, so a lite member's /me portal `aiTools.list` threw
-  // UNAUTHORIZED and rendered the empty "your admin hasn't added any tools"
-  // state even when an org-wide tool was published (customer report).
-
-  // Universal personal-context floor: every org member, regardless of
-  // role, gets MEMBER's base bag (`organization:view` + `aiTools:view`)
-  // so /me works. Without this floor, a bare org-member with no team
-  // membership AND no custom RoleBinding fell through every check
-  // below and was rejected from every personal-context tRPC procedure
-  // (user.personalContext / personalUsage / personalBudget /
-  // homePagePickerState / governance.resolveHome / limits.getUsage /
-  // aiTools.list — all gated on `organization:view`). Caught when
-  // MEMBER `rogerio@…` was added to an org for the Claude Code OTLP
-  // dogfood and his /me page permission-denied silently — the page
-  // rendered as if no data existed instead of "no access".
-  //
-  // Critical: floor is MEMBER's bag *only*, NOT the role's full bag.
-  // ADMIN-only org perms (`organization:manage` / `governance:manage`
-  // / `ingestionSources:create` / etc.) still require an explicit
-  // ORGANIZATION-scoped RoleBinding. A bare OrgUser.role=ADMIN with
-  // no RoleBinding doesn't escalate — the existing legacy fallback
-  // semantics expect RoleBindings (primary path) or TeamUser ADMIN
-  // (limited team-resource fallback) to be the source of admin
-  // power, not the OrgUser.role field by itself.
-  if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) {
-    return true;
-  }
-
-  // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
-  const permittedByBindings = await checkPermissionFromBindings({
-    prisma: ctx.prisma,
-    userId,
-    organizationId,
-    scopes: [
-      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
-    ],
-    organizationRole: orgMember.role,
-    permission,
-  });
-  if (permittedByBindings) return true;
-
-  // Legacy fallback: users migrated before RoleBindings existed keep their
-  // TeamUser row (with ADMIN/MEMBER/VIEWER role) but may have zero
-  // RoleBindings. For org-scoped permission checks we union across every
-  // TeamUser the user has in the organization — this matches the intent
-  // that org ADMINs / team ADMINs have broad access to org-scoped gateway
-  // resources (audit, org-level budgets, cache rules) without requiring a
-  // RoleBinding backfill first.
-  //
-  // Personal teams are excluded: every user is ADMIN of their own
-  // single-member personal workspace team, so unioning it here would let
-  // any member escalate to the full org ADMIN template (including
-  // virtualKeys:viewOtherPersonal / organization:manage) just by owning a
-  // personal workspace. A personal team's legitimate ADMIN power is
-  // team-scoped and flows through its TEAM-scoped RoleBinding, never this
-  // org-wide union.
-  // The team-membership union below is a TEAM-scoped grant applied to an
-  // org-level check; org-exclusive permissions (organization:* / governance
-  // family) are never conferred through it — only an ORGANIZATION-scoped
-  // binding can (ADR-021). Gateway/audit resources stay grantable here.
-  if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
-    return false;
-  }
-  const teamMemberships = await ctx.prisma.teamUser.findMany({
-    where: { userId, team: { organizationId, isPersonal: false } },
-    select: { role: true, assignedRoleId: true },
-  });
-  for (const tu of teamMemberships) {
-    const permitted = await resolveBindingPermission({
-      binding: { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
-      organizationId,
-      organizationRole: orgMember.role,
-      permission,
-      prisma: ctx.prisma,
-    });
-    if (permitted) return true;
-  }
-  return false;
-}
 
 /**
  * Batched team + project permission check used by surfaces that need to
@@ -1691,121 +1346,6 @@ type ResolvedBinding = {
 const scopeKey = (scopeType: RoleBindingScopeType, scopeId: string) =>
   `${scopeType}::${scopeId}`;
 
-/**
- * Loads everything a scoped permission decision needs, in ~4 queries, for ANY
- * number of permissions and scopes. Returns null when the caller is not a member
- * of the organization at all — the "no" that short-circuits every question.
- */
-async function loadScopeResolution(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  args: { organizationId: string; scopeIds: string[] },
-): Promise<ScopeResolution | null> {
-  const userId = ctx.session?.user?.id;
-  if (!userId) return null;
-
-  const organizationRole = await getCurrentOrganizationRole({
-    prisma: ctx.prisma,
-    userId,
-    organizationId: args.organizationId,
-  });
-  // Fail closed on current membership — a non-member gets nothing, even if a
-  // stale cross-org binding names them at one of these scopes.
-  if (organizationRole === null) return null;
-
-  const groupMemberships = await ctx.prisma.groupMembership.findMany({
-    where: { userId, group: { organizationId: args.organizationId } },
-    select: { groupId: true },
-  });
-  const groupIds = groupMemberships.map((m) => m.groupId);
-
-  const scopeIds = [args.organizationId, ...args.scopeIds];
-  const bindings: ResolvedBinding[] =
-    scopeIds.length > 0
-      ? await ctx.prisma.roleBinding.findMany({
-          where: {
-            organizationId: args.organizationId,
-            scopeId: { in: scopeIds },
-            // Non-membership already short-circuits above, but gate the direct
-            // branch on membership too so this query is safe on its own if the
-            // early return is ever refactored away.
-            OR: [
-              {
-                userId,
-                user: {
-                  orgMemberships: {
-                    some: {
-                      organizationId: args.organizationId,
-                      disabledAt: null,
-                    },
-                  },
-                },
-              },
-              ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
-            ],
-          },
-          select: {
-            role: true,
-            customRoleId: true,
-            scopeType: true,
-            scopeId: true,
-          },
-        })
-      : [];
-
-  const customRoleIds = Array.from(
-    new Set(
-      bindings.map((b) => b.customRoleId).filter((id): id is string => !!id),
-    ),
-  );
-  const customRoles =
-    customRoleIds.length > 0
-      ? await ctx.prisma.customRole.findMany({
-          // Same organization- and kind-scoping as resolveBindingPermission:
-          // a poisoned binding referencing another organization's role, or an
-          // API key's system_api_key role, must resolve like a missing role.
-          // This loader only ever backs session-user and group resolution.
-          where: {
-            id: { in: customRoleIds },
-            organizationId: args.organizationId,
-            kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY },
-          },
-          select: { id: true, permissions: true },
-        })
-      : [];
-
-  const bindingsByScope = new Map<string, ResolvedBinding[]>();
-  for (const b of bindings) {
-    const key = scopeKey(b.scopeType, b.scopeId);
-    const list = bindingsByScope.get(key) ?? [];
-    list.push(b);
-    bindingsByScope.set(key, list);
-  }
-
-  // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
-  // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers. The fallback stays live until contract deletes
-  // the rows — see the same note in checkPermissionFromBindings.
-  const needsLegacyFallback = bindings.length === 0;
-  const legacyTeamUser = needsLegacyFallback
-    ? await ctx.prisma.teamUser.findMany({
-        where: { userId, team: { organizationId: args.organizationId } },
-        select: { teamId: true, role: true, assignedRoleId: true },
-      })
-    : [];
-
-  return {
-    organizationRole,
-    bindingsByScope,
-    customRoleById: new Map(customRoles.map((c) => [c.id, c])),
-    needsLegacyFallback,
-    legacyByTeam: new Map(
-      legacyTeamUser.map((t) => [
-        t.teamId,
-        { role: t.role, assignedRoleId: t.assignedRoleId },
-      ]),
-    ),
-  };
-}
 
 /**
  * Does this ONE binding grant this ONE permission? Pure — no I/O.
@@ -1856,80 +1396,7 @@ function bindingGrants(
   return teamRoleHasPermission(binding.role, permission);
 }
 
-/** Does the caller hold `permission` on this project, given a loaded resolution? */
-function projectGrants(
-  resolution: ScopeResolution,
-  args: { organizationId: string; projectId: string; teamId?: string },
-  permission: Permission,
-): boolean {
-  const grantedBy = (key: string) =>
-    (resolution.bindingsByScope.get(key) ?? []).some((b) =>
-      bindingGrants(resolution, b, permission),
-    );
 
-  if (
-    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
-  ) {
-    return true;
-  }
-  if (grantedBy(scopeKey(RoleBindingScopeType.PROJECT, args.projectId))) {
-    return true;
-  }
-  if (args.teamId) {
-    if (grantedBy(scopeKey(RoleBindingScopeType.TEAM, args.teamId))) {
-      return true;
-    }
-    if (resolution.needsLegacyFallback) {
-      const legacy = resolution.legacyByTeam.get(args.teamId);
-      if (legacy) {
-        return bindingGrants(
-          resolution,
-          {
-            role: legacy.role,
-            customRoleId: legacy.assignedRoleId,
-            scopeType: RoleBindingScopeType.TEAM,
-          },
-          permission,
-        );
-      }
-    }
-  }
-  return false;
-}
-
-/** Does the caller hold `permission` on this team, given a loaded resolution? */
-function teamGrants(
-  resolution: ScopeResolution,
-  args: { organizationId: string; teamId: string },
-  permission: Permission,
-): boolean {
-  const grantedBy = (key: string) =>
-    (resolution.bindingsByScope.get(key) ?? []).some((b) =>
-      bindingGrants(resolution, b, permission),
-    );
-
-  if (
-    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
-  ) {
-    return true;
-  }
-  if (grantedBy(scopeKey(RoleBindingScopeType.TEAM, args.teamId))) return true;
-  if (resolution.needsLegacyFallback) {
-    const legacy = resolution.legacyByTeam.get(args.teamId);
-    if (legacy) {
-      return bindingGrants(
-        resolution,
-        {
-          role: legacy.role,
-          customRoleId: legacy.assignedRoleId,
-          scopeType: RoleBindingScopeType.TEAM,
-        },
-        permission,
-      );
-    }
-  }
-  return false;
-}
 
 /**
  * MANY permissions, ONE project scope — resolved in ~4 queries total.
@@ -1962,23 +1429,17 @@ export async function batchProjectPermissions(
     permissions: Permission[];
   },
 ): Promise<Permission[]> {
-  const resolution = await loadScopeResolution(ctx, {
-    organizationId: args.organizationId,
-    scopeIds: [args.projectId, ...(args.teamId ? [args.teamId] : [])],
-  });
-  if (!resolution) return [];
+  const userId = ctx.session?.user?.id;
+  if (!userId) return [];
 
-  return args.permissions.filter((permission) =>
-    projectGrants(
-      resolution,
-      {
-        organizationId: args.organizationId,
-        projectId: args.projectId,
-        ...(args.teamId ? { teamId: args.teamId } : {}),
-      },
-      permission,
-    ),
+  const held = new Set(
+    await authzChecksFor(ctx.prisma).effectivePermissionsByIds({
+      principal: { type: "user", id: userId },
+      projectId: args.projectId,
+    }),
   );
+
+  return args.permissions.filter((permission) => held.has(permission));
 }
 
 /**
@@ -2012,102 +1473,33 @@ export async function batchTeamsPermissions(
     permissions: Permission[];
   },
 ): Promise<Map<string, Permission[]>> {
+  const userId = ctx.session?.user?.id;
   const result = new Map<string, Permission[]>();
-  const resolution = await loadScopeResolution(ctx, {
-    organizationId: args.organizationId,
-    scopeIds: args.teamIds,
-  });
-  for (const teamId of args.teamIds) {
-    if (!resolution) {
-      result.set(teamId, []);
-      continue;
-    }
-    result.set(
-      teamId,
-      args.permissions.filter((permission) =>
-        teamGrants(
-          resolution,
-          { organizationId: args.organizationId, teamId },
-          permission,
-        ),
-      ),
-    );
+  if (!userId) {
+    for (const teamId of args.teamIds) result.set(teamId, []);
+    return result;
   }
+
+  const authz = authzChecksFor(ctx.prisma);
+  const principal = { type: "user", id: userId } as const;
+
+  // One scope per team, and one collected snapshot inside each: the collect
+  // is cached per (principal, organization), so the teams share it.
+  await Promise.all(
+    args.teamIds.map(async (teamId) => {
+      const held = new Set(
+        await authz.effectivePermissionsByIds({ principal, teamId }),
+      );
+      result.set(
+        teamId,
+        args.permissions.filter((permission) => held.has(permission)),
+      );
+    }),
+  );
+
   return result;
 }
 
-/**
- * The legacy batch resolution — the answering path in `batchScopePermissions`
- * when the organization is still on legacy. (It was also the fork's
- * reverse-shadow thunk before the shadow comparison was removed; the engine
- * now answers a migrated organization outright.) It builds its own maps per
- * call, so no two callers can hand out the same mutable pair.
- */
-async function legacyBatchScopePermissions(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  args: {
-    organizationId: string;
-    teamIds: string[];
-    projectIds: string[];
-    projectTeamId: Record<string, string>;
-    permission: Permission;
-  },
-): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
-  const teamsMap = new Map<string, boolean>();
-  const projectsMap = new Map<string, boolean>();
-
-  // A project inherits TEAM-scoped bindings from its team, so the binding
-  // load must cover the projects' team ids too — `projectGrants` below
-  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
-  // can't grant. Without this, a member whose only access is a TEAM-scope
-  // binding (no legacy TeamUser rows) fails every project in the batch
-  // while the single-project resolver — which always queries the team
-  // scope — grants it.
-  const resolution = await loadScopeResolution(ctx, {
-    organizationId: args.organizationId,
-    scopeIds: [
-      ...new Set([
-        ...args.teamIds,
-        ...args.projectIds,
-        ...Object.values(args.projectTeamId),
-      ]),
-    ],
-  });
-  if (!resolution) {
-    args.teamIds.forEach((id) => teamsMap.set(id, false));
-    args.projectIds.forEach((id) => projectsMap.set(id, false));
-    return { teams: teamsMap, projects: projectsMap };
-  }
-
-  for (const teamId of args.teamIds) {
-    teamsMap.set(
-      teamId,
-      teamGrants(
-        resolution,
-        { organizationId: args.organizationId, teamId },
-        args.permission,
-      ),
-    );
-  }
-
-  for (const projectId of args.projectIds) {
-    const teamId = args.projectTeamId[projectId];
-    projectsMap.set(
-      projectId,
-      projectGrants(
-        resolution,
-        {
-          organizationId: args.organizationId,
-          projectId,
-          ...(teamId ? { teamId } : {}),
-        },
-        args.permission,
-      ),
-    );
-  }
-
-  return { teams: teamsMap, projects: projectsMap };
-}
 
 /**
  * Batched team + project permission check used by surfaces that need to
@@ -2142,36 +1534,30 @@ export async function batchScopePermissions(
     permission: Permission;
   },
 ): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
-  const legacyBatch = () => legacyBatchScopePermissions(ctx, args);
-
   const userId = ctx.session?.user?.id;
-
-  // One collected snapshot answers every scope in the batch. Deciding per
-  // scope would fan the legacy batch's four flat queries into a collect per
-  // scope — the pool-starving fan-out api-key.service.ts documents.
-  if (
-    userId &&
-    (await organizationOnAuthzEngine({
-      prisma: ctx.prisma,
-      organizationId: args.organizationId,
-    }))
-  ) {
-    const decision = await authzChecksFor(ctx.prisma).canBatchByIds({
-      principal: { type: "user", id: userId },
-      permission: args.permission,
-      organizationId: args.organizationId,
-      teams: args.teamIds.map((teamId) => ({ teamId })),
-      projects: args.projectIds.map((projectId) => ({
-        projectId,
-        teamId: args.projectTeamId[projectId],
-      })),
-    });
-    return { teams: decision.teams, projects: decision.projects };
+  if (!userId) {
+    // No caller, nothing granted — the answer the batch has always given for
+    // an unauthenticated context, stated here rather than reached by walking.
+    return {
+      teams: new Map(args.teamIds.map((id) => [id, false])),
+      projects: new Map(args.projectIds.map((id) => [id, false])),
+    };
   }
 
-  const { teams: teamsMap, projects: projectsMap } = await legacyBatch();
-
-  return { teams: teamsMap, projects: projectsMap };
+  // One collected snapshot answers every scope in the batch. Deciding per
+  // scope would fan four flat queries into a collect per scope — the
+  // pool-starving fan-out api-key.service.ts documents.
+  const decision = await authzChecksFor(ctx.prisma).canBatchByIds({
+    principal: { type: "user", id: userId },
+    permission: args.permission,
+    organizationId: args.organizationId,
+    teams: args.teamIds.map((teamId) => ({ teamId })),
+    projects: args.projectIds.map((projectId) => ({
+      projectId,
+      teamId: args.projectTeamId[projectId],
+    })),
+  });
+  return { teams: decision.teams, projects: decision.projects };
 }
 
 // ============================================================================
