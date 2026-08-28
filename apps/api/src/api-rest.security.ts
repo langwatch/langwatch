@@ -98,3 +98,102 @@ export class ApiRestSecurityPolicy {
     });
   }
 }
+
+/** One organization credential resolved at the API process's REST boundary. */
+export type ApiOrganizationRestAuthenticatedRequest = Readonly<{
+  organizationId: string;
+  apiKeyId: string;
+  actor: ApiActor | null;
+}>;
+
+export type ApiOrganizationRestSuccessfulResponse = Readonly<{
+  request: ApiOrganizationRestAuthenticatedRequest;
+  method: string;
+  path: string;
+  status: number;
+}>;
+
+/** Organization-key authentication and authorization for management REST routes. */
+export abstract class ApiOrganizationRestSecurityPort {
+  abstract authenticate(request: Request): Promise<ApiOrganizationRestAuthenticatedRequest>;
+
+  abstract authorize(input: {
+    request: ApiOrganizationRestAuthenticatedRequest;
+    permission: AuthzPermission;
+  }): Promise<void>;
+
+  abstract isAdmin(input: { request: ApiOrganizationRestAuthenticatedRequest }): Promise<boolean>;
+
+  abstract complete(input: ApiOrganizationRestSuccessfulResponse): Promise<void>;
+}
+
+/** Bridges organization-key security into a physical API REST feature. */
+export class ApiOrganizationRestSecurityPolicy {
+  static create(port: ApiOrganizationRestSecurityPort): ApiOrganizationRestSecurityPolicy {
+    return new ApiOrganizationRestSecurityPolicy(port);
+  }
+
+  private readonly requests = new WeakMap<Context, ApiOrganizationRestAuthenticatedRequest>();
+  private readonly completed = new WeakSet<Context>();
+
+  private constructor(private readonly port: ApiOrganizationRestSecurityPort) {}
+
+  authenticationMiddleware(): MiddlewareHandler {
+    return async (context, next) => {
+      const request = await this.port.authenticate(context.req.raw);
+      this.requests.set(context, request);
+      context.set("organization", { id: request.organizationId });
+      await next();
+      if (context.res.status >= 200 && context.res.status < 300) {
+        await this.complete(context, request);
+      }
+    };
+  }
+
+  actor(context: Context): RequestActor {
+    const actor = this.request(context).actor;
+    if (!actor) {
+      throw new AuthenticatedActorRequiredError();
+    }
+    return actor;
+  }
+
+  request(context: Context): ApiOrganizationRestAuthenticatedRequest {
+    const request = this.requests.get(context);
+    if (!request) {
+      throw new Error("Organization REST authentication must run before request security is used.");
+    }
+    return request;
+  }
+
+  authorize(context: Context, permission: AuthzPermission): Promise<void> {
+    return this.port.authorize({ request: this.request(context), permission });
+  }
+
+  isAdmin(context: Context): Promise<boolean> {
+    return this.port.isAdmin({ request: this.request(context) });
+  }
+
+  permissionMiddleware(permission: AuthzPermission): MiddlewareHandler {
+    return async (context, next) => {
+      await this.authorize(context, permission);
+      await next();
+    };
+  }
+
+  private async complete(
+    context: Context,
+    request: ApiOrganizationRestAuthenticatedRequest,
+  ): Promise<void> {
+    if (this.completed.has(context)) {
+      return;
+    }
+    this.completed.add(context);
+    await this.port.complete({
+      request,
+      method: context.req.method,
+      path: context.req.path,
+      status: context.res.status,
+    });
+  }
+}

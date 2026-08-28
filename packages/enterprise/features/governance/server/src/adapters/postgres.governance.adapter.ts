@@ -1,5 +1,5 @@
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
-import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma-cost-attribution-policy.repository";
+import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma.cost-attribution-policy.repository";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service";
 
 export type GovernanceDatabase = {

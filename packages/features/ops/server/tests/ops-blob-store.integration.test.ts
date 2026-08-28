@@ -14,6 +14,7 @@ import {
   type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
 import type { OpsService } from "@langwatch/ops-contract";
+import { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectService } from "@langwatch/project-contract";
@@ -41,6 +42,18 @@ class NoopQueuePayloadDecoder extends QueuePayloadDecoderPort {
   async tryDecode(): Promise<Record<string, unknown> | null> {
     return null;
   }
+}
+
+class NoopAuthService extends AuthService {
+  async tryResolveBrowserSession() {
+    return null;
+  }
+
+  async revokeAllBrowserSessions(): Promise<void> {}
+
+  async revokeBrowserSession(): Promise<void> {}
+
+  async revokeOtherBrowserSessions(): Promise<void> {}
 }
 
 /**
@@ -81,6 +94,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       adminEmails: [],
       audit: { record: async () => undefined },
       users: {} as UserService,
+      auth: new NoopAuthService(),
       redis,
       queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {

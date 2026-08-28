@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import {
@@ -137,10 +138,14 @@ function harness(
     departmentAssignUser: vi.fn(async () => undefined),
   } as GovernanceService;
   const writer = new GrantsFake();
+  const auth = {
+    revokeAllBrowserSessions: vi.fn(async () => undefined),
+  } as AuthService;
   const service = ScimService.create({
     prisma: repo,
     writer,
     users,
+    auth,
     governance,
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
@@ -149,7 +154,7 @@ function harness(
   if (options.membership !== void 0) {
     vi.mocked(repo.tryFindMembership).mockResolvedValue(options.membership as never);
   }
-  return { repo, users, governance, writer, service };
+  return { repo, users, auth, governance, writer, service };
 }
 
 describe("SCIM user parity", () => {
@@ -254,7 +259,7 @@ describe("SCIM user parity", () => {
 
   it("repairs the grant when membership creation loses a uniqueness race", async () => {
     const addMembership = vi.fn(async () => {
-      throw { code: "P2002" };
+      throw Object.assign(new Error("P2002"), { code: "P2002" });
     });
     const repo = repository({
       addMembership,
@@ -428,6 +433,77 @@ describe("SCIM user parity", () => {
       }),
     ).resolves.toMatchObject({ active: false });
     expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+  });
+
+  it("revokes browser sessions after a full replace changes an email", async () => {
+    const { auth, users, service } = harness({ membership: { user: user() } });
+    const order: string[] = [];
+    vi.mocked(users.updateProfile).mockImplementation(async (input) => {
+      order.push("profile");
+      return user({ email: input.email ?? "alice@acme.com" });
+    });
+    vi.mocked(auth.revokeAllBrowserSessions).mockImplementation(async () => {
+      order.push("sessions");
+    });
+
+    await service.replaceUser({
+      id: "user-1",
+      organizationId: "org-1",
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "new@acme.com",
+      },
+    });
+
+    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
+    expect(order).toEqual(["profile", "sessions"]);
+  });
+
+  it("revokes browser sessions after a PATCH changes an email", async () => {
+    const { auth, users, service } = harness({ membership: { user: user() } });
+    const order: string[] = [];
+    vi.mocked(users.updateProfile).mockImplementation(async (input) => {
+      order.push("profile");
+      return user({ email: input.email ?? "alice@acme.com" });
+    });
+    vi.mocked(auth.revokeAllBrowserSessions).mockImplementation(async () => {
+      order.push("sessions");
+    });
+
+    await service.updateUser({
+      id: "user-1",
+      organizationId: "org-1",
+      patchRequest: {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace", value: { userName: "new@acme.com" } }],
+      },
+    });
+
+    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
+    expect(order).toEqual(["profile", "sessions"]);
+  });
+
+  it("retains a SCIM profile update when session revocation fails", async () => {
+    const { auth, users, service } = harness({ membership: { user: user() } });
+    vi.mocked(users.updateProfile).mockResolvedValue(user({ email: "new@acme.com" }));
+    vi.mocked(auth.revokeAllBrowserSessions).mockRejectedValue(new Error("cache unavailable"));
+
+    await expect(
+      service.replaceUser({
+        id: "user-1",
+        organizationId: "org-1",
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "new@acme.com",
+        },
+      }),
+    ).rejects.toThrow("cache unavailable");
+
+    expect(users.updateProfile).toHaveBeenCalledWith({
+      id: "user-1",
+      name: "new",
+      email: "new@acme.com",
+    });
   });
 });
 

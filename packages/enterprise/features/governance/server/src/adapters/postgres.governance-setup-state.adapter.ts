@@ -1,5 +1,5 @@
 import type { GovernanceSetupActivityPort } from "../ports/governance-setup-state.port";
-import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma-governance-setup-state.repository";
+import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma.governance-setup-state.repository";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service";
 
 export class PostgresGovernanceSetupStateAdapter {

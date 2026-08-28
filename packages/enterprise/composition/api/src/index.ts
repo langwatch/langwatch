@@ -4,6 +4,13 @@ import type { ScimService } from "@langwatch/enterprise-scim-contract";
 import type { SsoGate } from "@langwatch/enterprise-sso-contract";
 
 export {
+  BACK_OFFICE_NO_PERMISSION,
+  BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
+  EnterpriseTrpcComposition,
+  INSTANCE_LICENSE_NO_PERMISSION,
+  type EnterpriseTrpcContext,
+} from "./trpc/enterprise-trpc.composition";
+export {
   AppGatewayDebitAdapter,
   AppGatewayGovernancePort,
   GatewayGovernancePort,

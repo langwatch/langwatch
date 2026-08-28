@@ -1,4 +1,5 @@
 import process from "node:process";
+import { clearTimeout, setTimeout } from "node:timers";
 import type { Logger } from "@langwatch/observability";
 
 export type ApiShutdownSignal = "SIGTERM" | "SIGINT";
@@ -13,6 +14,12 @@ export type ApiSignalHandlerOptions = {
   logger: Pick<Logger, "error" | "info">;
   host?: ApiSignalHost;
   exit?: (code: number) => void;
+  /**
+   * The wall-clock budget the whole shutdown sequence gets. A drain that
+   * outlives it is a stuck process, not a slow one, so the deadline reports the
+   * overrun and exits non-zero rather than waiting for an orchestrator kill.
+   */
+  deadlineMs?: number;
 };
 
 /**
@@ -32,14 +39,30 @@ export function installApiSignalHandlers(options: ApiSignalHandlerOptions): () =
   const handleInt = () => {
     handle("SIGINT");
   };
+  const markFinished = () => {
+    finished = true;
+  };
+  const isFinished = () => finished;
   const handle = (signal: ApiShutdownSignal) => {
-    closing ??= closeForSignal({ signal, close: options.close, logger: options.logger });
+    if (closing) return;
+    const deadline = startShutdownDeadline({
+      signal,
+      deadlineMs: options.deadlineMs,
+      logger: options.logger,
+      onDeadline: () =>
+        finish({ code: 1, exit, finished: isFinished, markFinished }),
+    });
+    closing = closeForSignal({ signal, close: options.close, logger: options.logger });
     void closing.then(
-      () =>
-        finish({ code: 0, exit, finished: () => finished, markFinished: () => (finished = true) }),
+      () => {
+        deadline.clear();
+        options.logger.info({ signal }, "API graceful shutdown complete");
+        finish({ code: 0, exit, finished: isFinished, markFinished });
+      },
       (error) => {
+        deadline.clear();
         options.logger.error({ error, signal }, "API graceful shutdown failed");
-        finish({ code: 1, exit, finished: () => finished, markFinished: () => (finished = true) });
+        finish({ code: 1, exit, finished: isFinished, markFinished });
       },
     );
   };
@@ -50,6 +73,31 @@ export function installApiSignalHandlers(options: ApiSignalHandlerOptions): () =
   return () => {
     host.off?.("SIGTERM", handleTerm);
     host.off?.("SIGINT", handleInt);
+  };
+}
+
+function startShutdownDeadline({
+  signal,
+  deadlineMs,
+  logger,
+  onDeadline,
+}: {
+  signal: ApiShutdownSignal;
+  deadlineMs: number | undefined;
+  logger: Pick<Logger, "error">;
+  onDeadline(): void;
+}): { clear(): void } {
+  if (!deadlineMs || deadlineMs <= 0) return { clear: () => void 0 };
+
+  const timer = setTimeout(() => {
+    logger.error({ signal, deadlineMs }, "API graceful shutdown exceeded its deadline");
+    onDeadline();
+  }, deadlineMs);
+  timer.unref();
+  return {
+    clear: () => {
+      clearTimeout(timer);
+    },
   };
 }
 

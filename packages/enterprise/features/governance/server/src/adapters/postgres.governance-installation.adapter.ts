@@ -10,8 +10,8 @@ import { CanonicalCostExtractorService } from "../services/canonical-cost-extrac
 import { GovernanceActivityService } from "../services/governance-activity.service";
 import { GovernanceAiToolsService } from "../services/governance-ai-tools.service";
 import { GovernanceDepartmentService } from "../services/governance-department.service";
-import { PostgresAnomalyRuleAdapter } from "./postgres-anomaly-rule.adapter";
-import { PostgresDepartmentAdapter } from "./postgres-department.adapter";
+import { PostgresAnomalyRuleAdapter } from "./postgres.anomaly-rule.adapter";
+import { PostgresDepartmentAdapter } from "./postgres.department.adapter";
 import { DefaultGovernanceCliBootstrapService } from "../services/cli-bootstrap.service";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service";
 import { DefaultGovernanceCliTokenRevocationService } from "../services/cli-token-revocation.service";
@@ -28,19 +28,19 @@ import {
   IngestionSecretService,
 } from "../services/ingestion-source-secret.service";
 import { PullDestinationService } from "../services/pull-destination.service";
-import { PostgresAdminWorkspaceViewAuditAdapter } from "./postgres-admin-workspace-view-audit.adapter";
-import { PostgresAiToolCatalogAdapter } from "./postgres-ai-tool-catalog.adapter";
+import { PostgresAdminWorkspaceViewAuditAdapter } from "./postgres.admin-workspace-view-audit.adapter";
+import { PostgresAiToolCatalogAdapter } from "./postgres.ai-tool-catalog.adapter";
 import {
   PostgresGovernanceAdapter,
   type GovernanceDatabase,
-} from "./postgres-governance.adapter";
-import { PostgresGovernanceOcsfExportAdapter } from "./postgres-ocsf-export.adapter";
-import { PostgresGovernanceSetupStateAdapter } from "./postgres-governance-setup-state.adapter";
-import { PostgresIngestionTemplateAdapter } from "./postgres-ingestion-template.adapter";
-import { PostgresIngestionSourceActivityAdapter } from "./postgres-ingestion-source-activity.adapter";
-import { PostgresIngestionSourceAdapter } from "./postgres-ingestion-source.adapter";
-import { PostgresPersonalVirtualKeyAdapter } from "./postgres-governance-personal-key.adapter";
-import { PostgresRoutingPolicyAdapter } from "./postgres-governance-routing.adapter";
+} from "./postgres.governance.adapter";
+import { PostgresGovernanceOcsfExportAdapter } from "./postgres.ocsf-export.adapter";
+import { PostgresGovernanceSetupStateAdapter } from "./postgres.governance-setup-state.adapter";
+import { PostgresIngestionTemplateAdapter } from "./postgres.ingestion-template.adapter";
+import { PostgresIngestionSourceActivityAdapter } from "./postgres.ingestion-source-activity.adapter";
+import { PostgresIngestionSourceAdapter } from "./postgres.ingestion-source.adapter";
+import { PostgresPersonalVirtualKeyAdapter } from "./postgres.governance-personal-key.adapter";
+import { PostgresRoutingPolicyAdapter } from "./postgres.governance-routing.adapter";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port";
 import type {
   AiToolProviderCatalogPort,

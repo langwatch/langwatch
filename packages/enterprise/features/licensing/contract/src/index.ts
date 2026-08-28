@@ -1,5 +1,6 @@
 export * from "./license";
 export * from "./license-constants";
+export * from "./license-limit-type";
 export * from "./license-minting";
 export * from "./license-plan";
 export * from "./license-plan-defaults";

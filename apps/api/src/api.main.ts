@@ -74,6 +74,7 @@ export class ApiRuntimeBootstrap {
       if (options.signals !== false) {
         main.disposeSignals = installApiSignalHandlers({
           ...options.signals,
+          deadlineMs: options.signals?.deadlineMs ?? config.shutdown.processDeadlineMs,
           close: () => main.close(),
           logger: main.logger,
         });

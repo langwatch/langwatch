@@ -14,6 +14,12 @@ import { z } from "zod";
 const optionalEnvironmentString = z.string().optional();
 
 /**
+ * Telemetry flush and infrastructure release still have to finish after the
+ * listener's own drain grace elapses, so the process deadline sits above it.
+ */
+const PROCESS_CLOSE_SLACK_MS = 15_000;
+
+/**
  * A standalone API bootstrap accepts these deterministic aliases. Existing
  * split-process deployment uses LANGWATCH_API_PORT; API_PORT and PORT are new
  * compatibility inputs for a future physical API executable.
@@ -39,6 +45,11 @@ export const apiConfigDefinition = RuntimeConfig.define({
   httpDrainGraceMs: Config.value(z.coerce.number().int().min(0).default(5_000), {
     env: "API_HTTP_DRAIN_GRACE_MS",
   }),
+  shutdown: {
+    deadlineMs: Config.value(z.coerce.number().int().positive().optional(), {
+      env: "API_SHUTDOWN_DEADLINE_MS",
+    }),
+  },
   logger: {
     format: Config.value(z.enum(["pretty", "json"]).optional(), { env: "LOG_FORMAT" }),
     level: Config.value(z.string().min(1).optional(), { env: "LOG_LEVEL" }),
@@ -89,9 +100,15 @@ export type ApiInfrastructureConfig = Readonly<{
   groupQueue: GroupQueuePolicy;
 }>;
 
+export type ApiShutdownConfig = Readonly<{
+  /** The whole shutdown sequence's budget, listener drain included. */
+  processDeadlineMs: number;
+}>;
+
 export type ApiConfig = Readonly<
-  Omit<ApiConfigProjection, "infrastructure"> & {
+  Omit<ApiConfigProjection, "infrastructure" | "shutdown"> & {
     infrastructure: ApiInfrastructureConfig;
+    shutdown: ApiShutdownConfig;
   }
 >;
 
@@ -107,6 +124,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   }).value;
   return {
     ...value,
+    shutdown: {
+      processDeadlineMs:
+        value.shutdown.deadlineMs ?? value.httpDrainGraceMs + PROCESS_CLOSE_SLACK_MS,
+    },
     infrastructure: {
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicy(value.infrastructure.groupQueue),

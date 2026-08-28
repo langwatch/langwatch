@@ -3,6 +3,7 @@ import type {
   OpsService as OpsServiceContract,
   UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { Cluster, Redis as IORedis } from "ioredis";
 import type { UserService } from "@langwatch/user-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -18,10 +19,7 @@ import {
   AdminAccessService,
   type AdminAccessServiceOptions,
 } from "../services/admin-access.service";
-import {
-  type AdminAuditSink,
-  ImpersonationService,
-} from "../services/impersonation.service";
+import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service";
 import { OpsService } from "../services/ops.service";
 import { BlobStoreService } from "../services/blob-store.service";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository";
@@ -50,6 +48,7 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   redis?: IORedis | Cluster | undefined;
   queuePayloads?: QueuePayloadDecoderPort | undefined;
   users: UserService;
+  auth: AuthService;
   scheduler: {
     repository: SchedulerOpsRepository;
     wake: SchedulerWakeService;
@@ -74,8 +73,7 @@ export class PostgresOpsAdapter {
 
   build(): OpsServiceContract {
     const access =
-      this.options.access ??
-      AdminAccessService.create({ adminEmails: this.options.adminEmails });
+      this.options.access ?? AdminAccessService.create({ adminEmails: this.options.adminEmails });
     const queues = this.options.redis
       ? QueueService.create({
           repo: new QueueRedisRepository(this.options.redis, this.queuePayloads()),
@@ -88,6 +86,7 @@ export class PostgresOpsAdapter {
       adminBackoffice: AdminBackofficeService.create({
         repository: PrismaAdminBackofficeRepository.create(this.options.database),
         users: this.options.users,
+        auth: this.options.auth,
         audit: this.options.audit,
       }),
       blobStore: BlobStoreService.create(
@@ -114,9 +113,7 @@ export class PostgresOpsAdapter {
 
   private queuePayloads(): QueuePayloadDecoderPort {
     if (!this.options.queuePayloads) {
-      throw new Error(
-        "Ops queue composition requires a payload decoder when Redis is configured",
-      );
+      throw new Error("Ops queue composition requires a payload decoder when Redis is configured");
     }
 
     return this.options.queuePayloads;

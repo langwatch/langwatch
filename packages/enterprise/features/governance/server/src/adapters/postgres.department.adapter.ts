@@ -1,4 +1,4 @@
-import { PrismaDepartmentRepository } from "../repositories/prisma/prisma-department.repository";
+import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository";
 import { DepartmentService } from "../services/department.service";
 
 export class PostgresDepartmentAdapter {

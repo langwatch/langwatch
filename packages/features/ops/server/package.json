@@ -30,6 +30,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "ioredis": "5.10.1",
     "ra-data-simple-prisma": "3.1.3",
     "zod": "^4.4.3"

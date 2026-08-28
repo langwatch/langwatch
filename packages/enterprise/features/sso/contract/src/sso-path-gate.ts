@@ -53,12 +53,7 @@ const PASSWORD_RESET_SUFFIXES = ["/request-password-reset", "/reset-password"] a
  */
 export const requestPathname = (url: string): string => {
   try {
-    const UrlConstructor = (
-      globalThis as unknown as {
-        URL: new (input: string) => { pathname: string };
-      }
-    ).URL;
-    return new UrlConstructor(url).pathname;
+    return new URL(url).pathname;
   } catch {
     return url.split("?")[0] ?? url;
   }

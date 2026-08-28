@@ -1,5 +1,15 @@
 export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter";
 export {
+  LicenseTrpcApi,
+  type LicenseTrpcContext,
+  type LicenseTrpcPorts,
+} from "./api/app-trpc/license.api";
+export {
+  LicenseEnforcementTrpcApi,
+  type LicenseEnforcementTrpcContext,
+  type LicenseEnforcementTrpcPorts,
+} from "./api/app-trpc/license-enforcement.api";
+export {
   LicensingEntitlementSource,
   type LicensingEntitlementSourceMode,
 } from "./adapters/licensing.entitlement-source.adapter";

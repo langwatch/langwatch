@@ -72,7 +72,9 @@ Scheduler and queue operator controls are methods on the canonical
 state, queue DLQ audit rows, and Redis snapshot reads. Queue payload decoding
 uses one named application storage adapter; the package has no app storage or
 environment import. Project labels come from the complete Project service, not
-a Project repository owned by Ops. The application registers Hono/tRPC routes
+a Project repository owned by Ops. User email updates compose the complete User
+and Auth services: the profile write completes before Auth revokes sessions for
+a material normalized-email change. The application registers Hono/tRPC routes
 and owns the calendar scheduler loop; package imports do not register
 transports. The app metrics collector is a process adapter only: it receives
 the canonical Ops service and never a queue repository.

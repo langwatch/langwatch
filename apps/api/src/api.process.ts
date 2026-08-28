@@ -111,35 +111,47 @@ export class ApiProcess {
     return this.closing;
   }
 
-  private async closeProcess(): Promise<void> {
-    let firstError: unknown;
-    try {
-      await this.listener?.close();
-    } catch (error) {
-      firstError = error;
-    }
-    try {
-      await this.featureDrain?.drain();
-    } catch (error) {
-      firstError ??= error;
-    }
-    try {
-      await this.graph?.drain();
-    } catch (error) {
-      firstError ??= error;
-    }
-    try {
-      await this.observability.shutdown();
-    } catch (error) {
-      firstError ??= error;
-    }
-    try {
-      await this.graph?.close();
-    } catch (error) {
-      firstError ??= error;
-    }
-    if (firstError) throw firstError;
+  private closeProcess(): Promise<void> {
+    return closeApiProcessResources({
+      listener: this.listener,
+      featureDrain: this.featureDrain,
+      graph: this.graph,
+      observability: this.observability,
+    });
   }
+}
+
+/**
+ * The one API finalization order, shared by every process shape.
+ *
+ * Intake stops first, then feature work drains, then telemetry flushes while
+ * request diagnostics still exist, and only then are infrastructure resources
+ * released. Every phase runs even after an earlier one fails, and the first
+ * failure is the one reported.
+ */
+export async function closeApiProcessResources(options: {
+  listener?: Pick<ApiHttpListener, "close"> | undefined;
+  featureDrain?: ApiFeatureDrainPort | undefined;
+  graph?: ApiProcessGraphPort | undefined;
+  observability: Pick<ProcessObservability, "shutdown">;
+}): Promise<void> {
+  let firstError: unknown;
+  const phases: Array<() => Promise<void> | undefined> = [
+    () => options.listener?.close(),
+    () => options.featureDrain?.drain(),
+    () => options.graph?.drain(),
+    () => options.observability.shutdown(),
+    () => options.graph?.close(),
+  ];
+
+  for (const phase of phases) {
+    try {
+      await phase();
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError) throw firstError;
 }
 
 /** Feature-owned shutdown work that must finish before telemetry and infrastructure close. */

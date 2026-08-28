@@ -1,9 +1,12 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
+import { Hono } from "hono";
+import { ApiKeyManagementRestFeature } from "../api-key-management-rest.feature";
 import {
   ApiAuditPort,
   ApiRequestPolicy,
@@ -11,19 +14,23 @@ import {
 } from "../api-request.policy";
 import { ApiFeatureDrainPort, ApiProcess } from "../api.process";
 import { ApiMetricsPort, ApiReadinessPort } from "../api-process.lifecycle";
-import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.infrastructure";
+import {
+  ApiQueueAbsenceReportPort,
+  ApiQueueInfrastructure,
+} from "../platform/infrastructure/api-queue.infrastructure";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
 } from "../api.main";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
-import type { ApiRestSecurityPort } from "../api-rest.security";
+import type { ApiOrganizationRestSecurityPort, ApiRestSecurityPort } from "../api-rest.security";
 import {
   ApiAuthSessionCompositionPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition";
 import { ApiKeyRestSecurityAdapter } from "./api-key-rest-security.adapter";
+import { ApiKeyOrganizationRestSecurityAdapter } from "./api-key-organization-rest-security.adapter";
 
 /** The concrete composition port for the migrated API transports. */
 export class ApiProductionComposition extends ApiRuntimeCompositionPort {
@@ -32,6 +39,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     secrets: SecretService;
     apiKeys: ApiKeyService;
     authz: AuthzService;
+    organizations: OrganizationService;
     auth: ApiAuthSessionCompositionPort;
     audit?: ApiAuditPort;
     readiness?: ApiReadinessPort;
@@ -49,11 +57,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authz: options.authz,
       audit: options.audit,
     });
+    const organizationRestSecurity = ApiKeyOrganizationRestSecurityAdapter.create({
+      apiKeys: options.apiKeys,
+      authz: options.authz,
+      organizations: options.organizations,
+    });
     return new ApiProductionComposition(
       options.agents,
       options.secrets,
+      options.apiKeys,
       policy,
       restSecurity,
+      organizationRestSecurity,
+      options.audit,
       options.readiness,
       options.metrics,
       options.featureDrain,
@@ -64,8 +80,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private constructor(
     private readonly agents: AgentService,
     private readonly secrets: SecretService,
+    private readonly apiKeys: ApiKeyService,
     readonly policy: ApiRequestPolicy,
     private readonly restSecurity: ApiRestSecurityPort,
+    private readonly organizationRestSecurity: ApiOrganizationRestSecurityPort,
+    private readonly audit: ApiAuditPort | undefined,
     private readonly readiness: ApiReadinessPort | undefined,
     private readonly metrics: ApiMetricsPort | undefined,
     private readonly featureDrain: ApiFeatureDrainPort | undefined,
@@ -75,25 +94,31 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
-    const queueInfrastructure = ApiQueueInfrastructure.create({
-      resources: options.resources,
-      redis: options.config.infrastructure.redis,
-      redisLogger: createLogger(options.config.serviceName),
-      queuePolicy: options.config.infrastructure.groupQueue,
-      storage: this.queueStorage,
-    });
+    const queueInfrastructure = this.composeQueue(options);
     const process = ApiProcess.create({
       agents: this.agents,
       secrets: this.secrets,
       requestPolicy: this.policy,
-      rest: ApiSecretRestFeature.create({
-        secrets: this.secrets,
-        security: this.restSecurity,
-      }),
+      rest: new Hono()
+        .route(
+          "/",
+          ApiSecretRestFeature.create({
+            secrets: this.secrets,
+            security: this.restSecurity,
+          }),
+        )
+        .route(
+          "/",
+          ApiKeyManagementRestFeature.create({
+            apiKeys: this.apiKeys,
+            security: this.organizationRestSecurity,
+            audit: this.audit,
+          }),
+        ),
       observability: options.observability,
       graph: options.graph,
       featureDrain: this.featureDrain,
-      readiness: this.readiness ?? queueInfrastructure.readiness,
+      readiness: this.readiness ?? queueInfrastructure?.readiness,
       metrics: this.metrics,
       listener: {
         host: options.config.host,
@@ -103,6 +128,36 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
 
     return Promise.resolve(ApiProductionProcess.create(process));
+  }
+
+  private composeQueue(options: ApiRuntimeCompositionOptions): ApiQueueInfrastructure | undefined {
+    const logger = createLogger(options.config.serviceName);
+    return ApiQueueInfrastructure.tryCreate({
+      resources: options.resources,
+      redis: options.config.infrastructure.redis,
+      redisLogger: logger,
+      queuePolicy: options.config.infrastructure.groupQueue,
+      storage: this.queueStorage,
+      report: LoggedApiQueueAbsence.create(logger),
+    });
+  }
+}
+
+/** Names the absent Redis once, at boot, rather than leaving it to be inferred. */
+export class LoggedApiQueueAbsence extends ApiQueueAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedApiQueueAbsence {
+    return new LoggedApiQueueAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  absent(reason: "disabled" | "unconfigured"): void {
+    this.logger.info(
+      { reason },
+      "API composed without Redis: Group Queue dispatch and the Redis readiness gate are absent",
+    );
   }
 }
 

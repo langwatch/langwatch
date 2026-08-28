@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import crypto from "node:crypto";
 import type { UserProfile, UserService } from "@langwatch/user-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
@@ -47,6 +48,7 @@ export class ScimService extends ScimServiceContract {
     prisma,
     writer,
     users,
+    auth,
     governance,
     entitlements,
     lifecycle,
@@ -55,6 +57,7 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     users: UserService;
+    auth: AuthService;
     governance: GovernanceService;
     entitlements: EntitlementService;
     lifecycle: ScimSyncLifecyclePort;
@@ -70,6 +73,7 @@ export class ScimService extends ScimServiceContract {
       writer,
       grants,
       users,
+      auth,
       governance,
       lifecycle,
       provenOffboarding,
@@ -82,6 +86,7 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     users: UserService;
+    auth: AuthService;
     governance: GovernanceService;
     entitlements: EntitlementService;
     lifecycle: ScimSyncLifecyclePort;

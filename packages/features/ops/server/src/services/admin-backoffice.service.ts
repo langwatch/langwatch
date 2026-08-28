@@ -5,21 +5,17 @@ import {
   type AdminOperationResult,
   type AdminOperationParams,
 } from "@langwatch/ops-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository";
 import type { AdminAuditSink } from "./impersonation.service";
 
-const MUTATING_METHODS = new Set([
-  "create",
-  "update",
-  "updateMany",
-  "delete",
-  "deleteMany",
-]);
+const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
 
 export interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserService;
+  auth: AuthService;
   audit: AdminAuditSink;
 }
 
@@ -28,11 +24,17 @@ export class AdminBackofficeService {
   private constructor(
     private readonly repository: AdminBackofficeRepository,
     private readonly users: UserService,
+    private readonly auth: AuthService,
     private readonly audit: AdminAuditSink,
   ) {}
 
   static create(options: AdminBackofficeServiceOptions): AdminBackofficeService {
-    return new AdminBackofficeService(options.repository, options.users, options.audit);
+    return new AdminBackofficeService(
+      options.repository,
+      options.users,
+      options.auth,
+      options.audit,
+    );
   }
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
@@ -94,7 +96,11 @@ export class AdminBackofficeService {
     if ("email" in data && typeof data.email === "string") {
       const userId = String(input.params.id ?? "");
       const email = data.email.trim().toLowerCase();
-      await this.users.updateProfile({ id: userId, email });
+      const previous = await this.users.tryFindById({ id: userId });
+      const updated = await this.users.updateProfile({ id: userId, email });
+      if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
+        await this.auth.revokeAllBrowserSessions({ userId });
+      }
       delete data.email;
       handledSideEffect = true;
       sideEffectAudits.push({
@@ -158,10 +164,7 @@ export class AdminBackofficeService {
     if (id !== null) await this.recordMutationAudit(input, id);
   }
 
-  private async recordMutationAudit(
-    input: AdminOperationInput,
-    id: string,
-  ): Promise<void> {
+  private async recordMutationAudit(input: AdminOperationInput, id: string): Promise<void> {
     const payload: Record<string, unknown> = { id };
     if (input.params.previousData) {
       payload.previousData = input.params.previousData;
@@ -175,10 +178,7 @@ export class AdminBackofficeService {
     });
   }
 
-  private operationId(
-    params: AdminOperationParams,
-    result: AdminOperationResult,
-  ): string | null {
+  private operationId(params: AdminOperationParams, result: AdminOperationResult): string | null {
     if (params.id !== undefined) return String(params.id);
     if (!this.isDataResult(result) || !this.isRecord(result.data)) return null;
     const id = result.data.id;

@@ -1,16 +1,42 @@
 export { ApiApplication } from "./api.application";
 export { ApiSecretRestFeature } from "./api-secret-rest.feature";
+export { ApiKeyManagementRestFeature } from "./api-key-management-rest.feature";
 export {
+  ApiOrganizationRestSecurityPolicy,
+  ApiOrganizationRestSecurityPort,
   ApiRestSecurityPolicy,
   ApiRestSecurityPort,
+  type ApiOrganizationRestAuthenticatedRequest,
+  type ApiOrganizationRestSuccessfulResponse,
   type ApiRestAuthenticatedRequest,
   type ApiRestSuccessfulResponse,
 } from "./api-rest.security";
-export { ApiProductionComposition } from "./app/api-production.composition";
+export {
+  ApiProductionComposition,
+  LoggedApiQueueAbsence,
+} from "./app/api-production.composition";
+export {
+  API_UNAVAILABLE_PRODUCT_ADAPTERS,
+  ApiStandaloneComposition,
+  type ApiProductAdapters,
+  type ApiStandaloneCompositionOptions,
+} from "./app/api-standalone.composition";
+export {
+  describeApiFailure,
+  startStandaloneApi,
+  WrittenApiBootFailure,
+  type ApiExecutableHost,
+  type ApiStandaloneExecutableOptions,
+} from "./app/api-standalone.executable";
 export {
   ApiKeyRestSecurityAdapter,
   ApiRestAuthenticationError,
 } from "./app/api-key-rest-security.adapter";
+export {
+  ApiKeyOrganizationRestSecurityAdapter,
+  ApiOrganizationAuthenticationError,
+  ApiOrganizationPermissionError,
+} from "./app/api-key-organization-rest-security.adapter";
 export {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
@@ -24,7 +50,12 @@ export {
   type ApiHttpListenerOptions,
   type ApiListenerAddress,
 } from "./api-http.listener";
-export { ApiFeatureDrainPort, ApiProcess, ApiProcessGraphPort } from "./api.process";
+export {
+  ApiFeatureDrainPort,
+  ApiProcess,
+  ApiProcessGraphPort,
+  closeApiProcessResources,
+} from "./api.process";
 export {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -66,9 +97,11 @@ export {
   API_PORT_ENV_PRECEDENCE,
   type ApiConfig,
   type ApiInfrastructureConfig,
+  type ApiShutdownConfig,
 } from "./platform/config/api.config";
 export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter";
 export {
+  ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
 } from "./platform/infrastructure/api-queue.infrastructure";

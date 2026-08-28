@@ -1,6 +1,6 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PersonalVirtualKeyIssuerPort } from "../ports/personal-virtual-key.port";
-import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma-governance-personal-key.repository";
+import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.governance-personal-key.repository";
 import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service";
 
 type RoutingPolicyReader = {

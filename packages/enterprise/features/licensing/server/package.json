@@ -26,7 +26,10 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/enterprise-licensing-contract": "workspace:*"
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

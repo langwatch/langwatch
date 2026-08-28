@@ -2582,10 +2582,8 @@ export class QueueRedisRepository implements QueueRepository {
     const matchingGroups = new Set<string>();
     for (let i = 0; i < dataRequests.length; i++) {
       const raw = dataResults?.[i]?.[1] as string | null;
-      if (raw) {
-        if (readJobRoutingMeta(raw).pipelineName === params.pipelineFilter) {
-          matchingGroups.add(dataRequests[i]!.groupId);
-        }
+      if (raw && readJobRoutingMeta(raw).pipelineName === params.pipelineFilter) {
+        matchingGroups.add(dataRequests[i]!.groupId);
       }
     }
     return params.members.filter((id) => matchingGroups.has(id));

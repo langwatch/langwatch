@@ -266,12 +266,15 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
         context: options.context,
       });
     }
-    if (config.authMode === "bearer" && credentials.token) {
-      // Inject standard Authorization header. If the caller already
-      // declared one in `headers`, theirs wins.
-      if (!("Authorization" in headers) && !("authorization" in headers)) {
-        headers.Authorization = `Bearer ${credentials.token}`;
-      }
+    // Inject standard Authorization header. If the caller already declared one
+    // in `headers`, theirs wins.
+    if (
+      config.authMode === "bearer" &&
+      credentials.token &&
+      !("Authorization" in headers) &&
+      !("authorization" in headers)
+    ) {
+      headers.Authorization = `Bearer ${credentials.token}`;
     }
     return headers;
   }

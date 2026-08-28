@@ -1,7 +1,7 @@
 import type { ProjectService } from "@langwatch/project-contract";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
-import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma-admin-workspace-view-audit.repository";
+import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service";
 
 export class PostgresAdminWorkspaceViewAuditAdapter {

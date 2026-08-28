@@ -1,4 +1,9 @@
 export {
+  SsoConnectionTrpcApi,
+  type SsoConnectionTrpcContext,
+  type SsoConnectionTrpcPorts,
+} from "./api/app-trpc/sso-connection.api";
+export {
   LicensingSsoAdapter,
   type LicensingSsoAdapterOptions,
 } from "./adapters/licensing.sso.adapter";

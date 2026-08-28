@@ -1,4 +1,4 @@
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma-governance-routing.repository";
+import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service";
 
 export class PostgresRoutingPolicyAdapter {

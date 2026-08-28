@@ -4,7 +4,7 @@ import type {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
 } from "../ports/ingestion-source.port";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma-ingestion-source.repository";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository";
 import type { IngestionCredentialsService } from "../services/ingestion-credentials.service";
 import type { IngestionSecretService } from "../services/ingestion-source-secret.service";
 import { IngestionSourceService } from "../services/ingestion-source.service";

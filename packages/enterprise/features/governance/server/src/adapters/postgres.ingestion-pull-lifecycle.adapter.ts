@@ -4,7 +4,7 @@ import type {
   IngestionPullLifecycleDatabase,
   IngestionPullTenantPort,
 } from "../ports/ingestion-pull-lifecycle.port";
-import { PrismaIngestionPullLifecycleRepository } from "../repositories/prisma/prisma-ingestion-pull-lifecycle.repository";
+import { PrismaIngestionPullLifecycleRepository } from "../repositories/prisma/prisma.ingestion-pull-lifecycle.repository";
 import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service";
 
 export type PostgresIngestionPullLifecycleAdapterOptions = {

@@ -3,6 +3,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { UserProfile, UserService } from "@langwatch/user-contract";
 import {
   type ScimCreateUserRequest,
@@ -17,6 +18,7 @@ import { ScimGrantsService } from "./scim-grants.service";
 import { ScimCostCenterService } from "./scim-cost-center.service";
 import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimUserPatchService } from "./scim-user-patch.service";
+import { ScimUserProfileService } from "./scim-user-profile.service";
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
 
 function isUniqueViolation(error: unknown): boolean {
@@ -34,12 +36,14 @@ export class ScimProvisioningService {
   private readonly provenOffboarding: boolean;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
+  private readonly profiles: ScimUserProfileService;
 
   private constructor({
     prisma,
     writer,
     grants,
     users,
+    auth,
     governance,
     lifecycle,
     provenOffboarding,
@@ -48,6 +52,7 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: UserService;
+    auth: AuthService;
     governance: GovernanceService;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
@@ -55,6 +60,7 @@ export class ScimProvisioningService {
     this.prisma = prisma;
     this.writer = writer;
     this.userService = users;
+    this.profiles = ScimUserProfileService.create({ users, auth });
     this.grants = grants;
     this.deprovision = ScimDeprovisionService.create({
       grants: writer,
@@ -64,6 +70,7 @@ export class ScimProvisioningService {
     this.costCenters = ScimCostCenterService.create(governance);
     this.patches = ScimUserPatchService.create(
       this.userService,
+      this.profiles,
       this.costCenters,
       this.deprovision,
       provenOffboarding,
@@ -75,6 +82,7 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: UserService;
+    auth: AuthService;
     governance: GovernanceService;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
@@ -298,7 +306,7 @@ export class ScimProvisioningService {
     const name = this.buildNameFromRequest(request);
     const active = request.active !== false;
 
-    const updatedUser = await this.userService.updateProfile({
+    const updatedUser = await this.profiles.updateProfile({
       id,
       name,
       email: request.userName,

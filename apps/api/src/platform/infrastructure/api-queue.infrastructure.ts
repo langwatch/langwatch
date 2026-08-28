@@ -24,18 +24,43 @@ export type ApiQueueInfrastructureOptions = {
   storage?: GroupQueueStoragePort;
 };
 
+/** Reports the composition decision an unconfigured Redis silently used to hide. */
+export abstract class ApiQueueAbsenceReportPort {
+  abstract absent(reason: "disabled" | "unconfigured"): void;
+}
+
 /**
  * API-owned Redis and Group Queue construction. It receives resolved private
  * configuration and borrows storage so the physical API root owns exactly the
  * clients it creates while feature composition retains its own project storage.
  */
 export class ApiQueueInfrastructure {
+  /**
+   * Composes the queue only when Redis is configured.
+   *
+   * The API process dispatches nothing yet, so an unconfigured Redis is a
+   * smaller process rather than a dead one, and the caller is told which is
+   * happening. A Redis that IS configured and unusable still fails at boot:
+   * degrading that quietly would move the failure to the first request.
+   */
+  static tryCreate(
+    options: ApiQueueInfrastructureOptions & { report?: ApiQueueAbsenceReportPort },
+  ): ApiQueueInfrastructure | undefined {
+    if (!options.redis.configured) {
+      options.report?.absent(options.redis.reason);
+      return undefined;
+    }
+    return ApiQueueInfrastructure.create(options);
+  }
+
   static create(options: ApiQueueInfrastructureOptions): ApiQueueInfrastructure {
     const redis = new RedisConnectionService({ logger: options.redisLogger }).connectResolved({
       config: options.redis,
     });
     if (!redis) {
-      throw new Error("API Group Queue infrastructure requires configured Redis");
+      throw new Error(
+        "API Group Queue infrastructure requires configured Redis: set REDIS_URL or REDIS_CLUSTER_ENDPOINTS.",
+      );
     }
 
     try {

@@ -1,5 +1,5 @@
 import type { GovernanceOcsfEventsReaderPort } from "../ports/ocsf-export.port";
-import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma-ocsf-export.repository";
+import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma.ocsf-export.repository";
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service";
 
 export class PostgresGovernanceOcsfExportAdapter {

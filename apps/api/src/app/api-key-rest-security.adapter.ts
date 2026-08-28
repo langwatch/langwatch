@@ -14,11 +14,7 @@ import {
   type ApiRestSuccessfulResponse,
 } from "../api-rest.security";
 import type { ApiAuditPort } from "../api-request.policy";
-
-type RequestCredentials = Readonly<{
-  token: string;
-  projectId: string | null;
-}>;
+import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 
 /** The published credential refusal for the standalone REST process. */
 export class ApiRestAuthenticationError extends HandledError {
@@ -40,8 +36,8 @@ export class ApiRestAuthenticationError extends HandledError {
 /**
  * API-process adapter for the established project-key transport semantics.
  *
- * It deliberately has no response lifecycle hook: callers must add one before
- * `markUsed` or request audit can be attributed to a successful response.
+ * The policy invokes `complete` only after a successful response, keeping
+ * mark-used and request audit effects out of failed requests.
  */
 export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
   static create(options: {
@@ -68,7 +64,7 @@ export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
   }
 
   async authenticate(request: Request): Promise<ApiRestAuthenticatedRequest> {
-    const credentials = extractRequestCredentials(request);
+    const credentials = extractApiKeyRequestCredentials(request);
     if (!credentials) {
       throw new ApiRestAuthenticationError("missing_credentials");
     }
@@ -180,44 +176,6 @@ function refuseApiKeyCeiling(request: CurrentApiKeyRequest, permission: AuthzPer
     throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy", meta });
   }
   throw new ApiKeyPermissionDeniedError(permission, { meta });
-}
-
-function extractRequestCredentials(request: Request): RequestCredentials | null {
-  const authorization = request.headers.get("authorization");
-  const xAuthToken = request.headers.get("x-auth-token");
-  const xProjectId = request.headers.get("x-project-id");
-
-  if (authorization?.toLowerCase().startsWith("basic ")) {
-    const parsed = parseBasicCredentials(authorization.slice(6));
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  if (authorization?.toLowerCase().startsWith("bearer ")) {
-    const token = authorization.slice(7).trim();
-    if (token) {
-      return { token, projectId: xProjectId };
-    }
-  }
-
-  return xAuthToken ? { token: xAuthToken, projectId: xProjectId } : null;
-}
-
-function parseBasicCredentials(value: string): RequestCredentials | null {
-  try {
-    const decoded = Buffer.from(value, "base64").toString("utf-8");
-    const separator = decoded.indexOf(":");
-    if (separator < 1 || separator === decoded.length - 1) {
-      return null;
-    }
-    return {
-      projectId: decoded.slice(0, separator),
-      token: decoded.slice(separator + 1),
-    };
-  } catch {
-    return null;
-  }
 }
 
 function isMutation(method: string): boolean {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
@@ -146,6 +147,7 @@ describe("SCIM PATCH operation casing parity", () => {
       prisma: repo,
       writer: new GrantsFake(),
       users,
+      auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) } as AuthService,
       governance: governance(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),

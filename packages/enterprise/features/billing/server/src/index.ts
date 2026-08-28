@@ -1,3 +1,7 @@
+export {
+  SubscriptionTrpcApi,
+  type SubscriptionTrpcContext,
+} from "./api/app-trpc/subscription.api";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter";
 export {
   ClickHouseBillingAdapter,

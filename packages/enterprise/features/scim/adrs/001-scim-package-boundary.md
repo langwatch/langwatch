@@ -16,7 +16,7 @@ and product provisioning were coupled in the application Enterprise tree.
 Own SCIM v2 resource contracts and role resolution in a contract package. Own
 one abstract `ScimService` that owns both provisioning and credential lifecycle.
 The server package provides its Postgres composition and OpenAPI metadata; the
-application composes it once with UserService, GovernanceService,
+application composes it once with UserService, AuthService, GovernanceService,
 AuthzGrantsService, and plans.
 
 ## Public surfaces and transports
@@ -28,7 +28,9 @@ the application owns thin Hono route registration.
 ## Dependencies
 
 The contract depends on handled errors and Zod 4. The server depends on the
-contract, GovernanceService, UserService, AuthzGrantsService, and Node crypto.
+contract, GovernanceService, UserService, AuthService, AuthzGrantsService, and
+Node crypto. SCIM PUT and PATCH persist a materially changed email through User
+before calling Auth to revoke browser sessions.
 Hono OpenAPI types stay in the transport adapter.
 
 ## Persistence

@@ -4,6 +4,7 @@ import type { UserService } from "@langwatch/user-contract";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import { ScimCostCenterService } from "./scim-cost-center.service";
 import { ScimDeprovisionService } from "./scim-deprovision.service";
+import { ScimUserProfileService } from "./scim-user-profile.service";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -13,6 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export class ScimUserPatchService {
   private constructor(
     private readonly users: UserService,
+    private readonly profiles: ScimUserProfileService,
     private readonly costCenters: ScimCostCenterService,
     private readonly deprovision: ScimDeprovisionService,
     private readonly provenOffboarding: boolean,
@@ -20,11 +22,12 @@ export class ScimUserPatchService {
 
   static create(
     users: UserService,
+    profiles: ScimUserProfileService,
     costCenters: ScimCostCenterService,
     deprovision: ScimDeprovisionService,
     provenOffboarding: boolean,
   ): ScimUserPatchService {
-    return new ScimUserPatchService(users, costCenters, deprovision, provenOffboarding);
+    return new ScimUserPatchService(users, profiles, costCenters, deprovision, provenOffboarding);
   }
 
   async apply(input: {
@@ -56,7 +59,7 @@ export class ScimUserPatchService {
       await this.updateActive(input, updates.active);
     }
     if (updates.name !== void 0 || updates.email !== void 0) {
-      await this.users.updateProfile({
+      await this.profiles.updateProfile({
         id: input.id,
         ...(updates.name !== void 0 ? { name: updates.name } : {}),
         ...(updates.email !== void 0 ? { email: updates.email } : {}),
