@@ -3886,6 +3886,15 @@ model IngestionSource {
   /// admin UI as "last event 2 minutes ago".
   lastEventAt DateTime?
 
+  /// ADR-128 - when a pull run last reached the provider without erroring,
+  /// mirrored from the ingestionPullRunStatus projection. Deliberately NOT
+  /// lastEventAt: an empty period is a working puller, and a run that
+  /// delivered data and then failed is not. Drives the health badge and
+  /// the "no data since" cut-off, below which a day's spend is unknown
+  /// rather than zero.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  lastSuccessAt DateTime?
+
   archivedAt DateTime?
 
   createdAt   DateTime @default(now())
@@ -4696,6 +4705,10 @@ model IngestionPullRunProjection {
   LastRunError      String? @map("lastRunError")
   LastRunErrorCode  String? @map("lastRunErrorCode")
   ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
+
+  /// When a run last completed without erroring. Backfilled by replay, which
+  /// is why the projection version moved with this column.
+  LastSuccessAt Float? @map("lastSuccessAt")
 
   /// Identity of the run whose outcome this row reflects. Outcomes from a
   /// superseded run arrive with a smaller value and are ignored, so a late

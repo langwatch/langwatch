@@ -9,18 +9,18 @@ Feature: A broken puller is visible, a flaky one is not
   Background:
     Given an organization with a connected provider source
 
-  @unit @unimplemented
+  @unit
   Scenario: A single failed run does not mark the source unhealthy
     Given the source's last run succeeded
     When one run fails
     Then the source is still considered healthy
 
-  @unit @unimplemented
+  @unit
   Scenario: Three consecutive failed runs mark the source unhealthy
     When three runs in a row fail
     Then the source is marked unhealthy
 
-  @unit @unimplemented
+  @unit
   Scenario: A successful run records its time and resets the failure count
     Given the source has two consecutive failed runs
     When a run succeeds
@@ -31,7 +31,7 @@ Feature: A broken puller is visible, a flaky one is not
     Then the source's last-successful-run time is updated
     And the consecutive-failure count starts over
 
-  @unit @unimplemented
+  @unit
   Scenario: A run that finds nothing new still counts as a success
     Given the provider reports no new usage for the period
     When the run completes without error
@@ -39,7 +39,7 @@ Feature: A broken puller is visible, a flaky one is not
     And the last-successful-run time is updated
     And the last-event time stays unchanged
 
-  @integration @unimplemented
+  @integration
   Scenario: A day with no data is shown as unknown, never as zero
     Given the source has been unhealthy since its last successful pull
     When a viewer looks at a day after that last successful pull

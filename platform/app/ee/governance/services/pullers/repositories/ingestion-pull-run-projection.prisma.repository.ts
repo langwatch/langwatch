@@ -6,6 +6,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
+import { buildIngestionSourceMirror } from "./ingestionSourceMirror";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";
@@ -81,27 +82,25 @@ export class PrismaIngestionPullRunProjectionRepository
         },
         update: data,
       });
+      const mirror = buildIngestionSourceMirror({ state: projection.state });
       await tx.ingestionSource.updateMany({
-        where: { id: sourceId },
+        // `IngestionSource` is organization-scoped and carries no projectId,
+        // so the tenant predicate has to travel through the org that owns
+        // this pipeline's governance project. Keyed on the source id alone,
+        // a projection carrying another org's source id wrote that org's
+        // cursor, error count and status.
+        where: {
+          id: sourceId,
+          organization: {
+            teams: { some: { projects: { some: { id: projectId } } } },
+          },
+        },
         data: {
+          ...mirror,
           pollerCursor:
-            projection.state.Cursor === null
+            mirror.pollerCursor === null
               ? Prisma.JsonNull
-              : projection.state.Cursor,
-          errorCount: projection.state.ConsecutiveErrors,
-          lastEventAt:
-            projection.state.Enabled &&
-            projection.state.LastRunOutcome === "completed" &&
-            projection.state.LastRunEventCount > 0 &&
-            projection.state.LastRunAt !== null
-              ? new Date(projection.state.LastRunAt)
-              : undefined,
-          status:
-            projection.state.Enabled &&
-            projection.state.LastRunOutcome === "completed" &&
-            projection.state.LastRunEventCount > 0
-              ? "active"
-              : undefined,
+              : mirror.pollerCursor,
         },
       });
     });
