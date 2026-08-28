@@ -14,47 +14,37 @@ import {
   graphTriggerActivityGroupKey,
 } from "@langwatch/automation-server";
 import {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
+  EXPERIMENT_METRICS_SYNC_DELAY_MS,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
+  PROJECT_METADATA_WINDOW_MS,
   RecordSpanCommand,
+  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
+  SIMULATION_METRICS_SYNC_DELAY_MS,
+  SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
+  TRACE_UPDATE_BROADCAST_WINDOW_MS,
+  TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+  TRACKED_EVENT_SYNC_DELAY_MS,
   TraceProcessingPipelinePort,
   createOriginGateHandler,
+  customEvaluationSyncDedupId,
+  hasExperimentCostMetrics,
+  hasSimulationMetrics,
+  hasSyncableEvaluations,
+  hasSyncableFeedback,
+  isRealFirstIngest,
+  projectMetadataGroupKey,
+  trackedEventSyncDedupId,
   type EventingTracePipelineAdapterOptions,
   type TraceDeferredOriginSchedulerPort,
+  type TraceSummarySubscriber,
 } from "@langwatch/trace-server";
 import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { TraceSummarySubscriber } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
-import {
-  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-  CUSTOM_EVAL_SYNC_DELAY_MS,
-  customEvaluationSyncDedupId,
-  hasSyncableEvaluations,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
-import {
-  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-  EXPERIMENT_METRICS_SYNC_DELAY_MS,
-  hasExperimentCostMetrics,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
-import {
-  isRealFirstIngest,
-  PROJECT_METADATA_WINDOW_MS,
-  projectMetadataGroupKey,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/projectMetadata.subscriber";
-import {
-  hasSimulationMetrics,
-  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
-  SIMULATION_METRICS_SYNC_DELAY_MS,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
-import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
-import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/traceUpdateBroadcast.subscriber";
-import {
-  hasSyncableFeedback,
-  TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
-  TRACKED_EVENT_SYNC_DELAY_MS,
-  trackedEventSyncDedupId,
-} from "~/server/event-sourcing/pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 
 /** A subscriber handler on the committed traceSummary fold state. */
 export type TraceSummaryHandler = (
@@ -118,13 +108,24 @@ export interface TraceProcessingPipelineDeps {
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
+/**
+ * Everything the composition root supplies. `originGateHandler` is absent by
+ * design: it is built from the deferred-origin scheduler, which only exists at
+ * `build` time, so requiring it here would ask the caller for something it
+ * cannot have yet.
+ */
+export type AppTraceProcessingPipelineDeps = Omit<
+  TraceProcessingPipelineDeps,
+  "originGateHandler"
+>;
+
 /** App-side composition of Trace's external subscribers into its pipeline. */
 export class AppTraceProcessingPipeline extends TraceProcessingPipelinePort {
-  static create(deps: TraceProcessingPipelineDeps): AppTraceProcessingPipeline {
+  static create(deps: AppTraceProcessingPipelineDeps): AppTraceProcessingPipeline {
     return new AppTraceProcessingPipeline(deps);
   }
 
-  private constructor(private readonly deps: TraceProcessingPipelineDeps) {
+  private constructor(private readonly deps: AppTraceProcessingPipelineDeps) {
     super();
   }
 

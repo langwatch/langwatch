@@ -1,4 +1,5 @@
-import type { Event, TriggerContext } from "@langwatch/eventing";
+import type { TriggerContext } from "@langwatch/eventing";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 export type GovernanceTraceSummary = {
   traceId: string;
@@ -10,7 +11,15 @@ export type GovernanceTraceSummary = {
   attributes: Record<string, string>;
 };
 
-export type GovernanceTraceEvent = Event<unknown>;
+/**
+ * The event these subscribers actually receive. They mount on the trace
+ * pipeline and nowhere else, so `Event<unknown>` understated it: the origin
+ * guard discriminates on `type`, and against `unknown` every such check
+ * silently compiled while the guard could never narrow. This package already
+ * depends on `@langwatch/trace-contract`, so naming the real union costs
+ * nothing and is what lets the guard type-check at its call site.
+ */
+export type GovernanceTraceEvent = TraceProcessingEvent;
 export type GovernanceTraceContext = TriggerContext<GovernanceTraceSummary>;
 
 export type GovernanceKpiContribution = {

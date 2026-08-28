@@ -16,6 +16,7 @@ import {
   type GovernanceTraceEvent,
   type GovernanceTraceSummary,
   type GovernanceVkLifecycleData,
+  type TraceAlertTrigger,
   TraceAlertTriggerMatchPort,
   TraceAlertTriggerPort,
 } from "@langwatch/enterprise-governance-server";
@@ -158,13 +159,13 @@ import { AppEvaluationExecutionReceiptPort } from "~/runtime/app/features/evalua
 import { TraceAnalyticsAttributePolicy } from "~/runtime/app/features/evaluation-analytics-attribute-policy.adapter";
 import {
   createExperimentRunProcessingPipeline,
-  createExperimentRunStateFoldStore,
-  type ClickHouseExperimentRunResultRecord,
-  type ComputeExperimentRunMetricsCommandData,
-  type ExperimentIdLookup,
-  type ExperimentRunStateData,
-  type ExperimentRunStateRepository,
+  ExperimentEventingAdapter,
+  type ExperimentRunEventingIdLookup,
+  type ExperimentRunEventingResultRecord,
+  type ExperimentRunEventingState,
+  type ExperimentRunEventingStateRepository,
 } from "@langwatch/experiment-server";
+import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
@@ -366,7 +367,7 @@ export interface PipelineRepositories {
   /** Write side of the simulationRunMetrics map projection (migration 00078). */
   simulationRunMetricsStore: SimulationRunMetricsStoreAdapter;
   /** Primary replica for read-after-write consistency. */
-  experimentRunState: ExperimentRunStateRepository;
+  experimentRunState: ExperimentRunEventingStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
   /** Coding Agent owns the four persistence models behind this named projection adapter. */
@@ -375,9 +376,9 @@ export interface PipelineRepositories {
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
   traceAnalytics: TraceAnalyticsRepository;
-  experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  experimentRunItemStorage: AppendStore<ExperimentRunEventingResultRecord>;
   /** experimentMetricsSync's late-bound runId -> experimentId lookup. */
-  experimentIdLookup: ExperimentIdLookup;
+  experimentIdLookup: ExperimentRunEventingIdLookup;
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationState: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */
@@ -487,7 +488,10 @@ class AppGovernanceTraceAlertTriggerPort extends TraceAlertTriggerPort {
     return new AppGovernanceTraceAlertTriggerPort(automation);
   }
 
-  async activeForProject(projectId: string) {
+  // The return type is declared rather than inferred: without it the
+  // `actionClass` ternary widens to `string` inside the mapped object literal
+  // and the class silently stops satisfying `TraceAlertTriggerPort`.
+  async activeForProject(projectId: string): Promise<TraceAlertTrigger[]> {
     const triggers = await this.automation.getActiveTraceTriggersForProject(projectId);
     return triggers.map((trigger) => ({
       id: trigger.id,
@@ -1323,7 +1327,8 @@ export class PipelineRegistry {
       organizations: this.deps.organizations,
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
-      queryBillableEventsTotal: (input) => getApp().billingQueries.queryBillableEventsTotal(input),
+      queryBillableEventsTotal: (input) =>
+        getApp().billingQueries.tryQueryBillableEventsTotal(input),
       organizationCache: new TtlCache<{
         id: string;
         stripeCustomerId: string | null;
@@ -1345,8 +1350,8 @@ export class PipelineRegistry {
   }: {
     wireExperimentDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireExperimentDeps"];
   }) {
-    const experimentRunStore = this.cached<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+    const experimentRunStore = this.cached<ExperimentRunEventingState>(
+      ExperimentEventingAdapter.createStateFoldStore(this.deps.repositories.experimentRunState),
       "experiment_runs",
     );
 

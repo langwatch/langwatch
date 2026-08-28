@@ -69,7 +69,10 @@ export interface ReportUsageForMonthCommandDeps {
   organizations: BillingReportOrganizationReader;
   billingCheckpoints: BillingCheckpointPort;
   getUsageReportingService: () => UsageReportingService | undefined;
-  queryBillableEventsTotal: BillableEventsQueryService["queryBillableEventsTotal"];
+  /** Nullable by contract: `null` means ClickHouse was unavailable, and the
+   *  caller must skip the month rather than report a total it did not read.
+   *  The service spells that with the repo's `try` prefix. */
+  queryBillableEventsTotal: BillableEventsQueryService["tryQueryBillableEventsTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see BILLING_ORG_CACHE_PREFIX. */
   organizationCache: BillingOrganizationCache;

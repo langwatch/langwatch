@@ -111,8 +111,23 @@ export interface LangyConversationFreshnessReader {
     conversationId: string;
   }): Promise<LangyConversationFreshnessRecord | null>;
 }
+/**
+ * The tenant-wide broadcast channel this feature publishes on.
+ *
+ * `eventType` is the single literal this feature ever fires, not an open
+ * string. The host's broadcaster types it as a closed union and routes on it
+ * (each type is its own Redis channel), so a port promising to pass any string
+ * cannot be satisfied by the real service — a parameter position is
+ * contravariant. Pinning the literal is also the ADR-046 contract: the signal
+ * carries the conversation id and nothing else, and a second channel from here
+ * would be a new decision rather than a wider type.
+ */
 export interface LangyBroadcastPort {
-  broadcastToTenant(tenantId: string, message: string, event: string): Promise<void>;
+  broadcastToTenant(
+    tenantId: string,
+    payload: string,
+    eventType: "langy_conversation_updated",
+  ): Promise<void>;
 }
 export interface LangyConversationUpdateBroadcastSubscriberDeps {
   broadcast: LangyBroadcastPort;

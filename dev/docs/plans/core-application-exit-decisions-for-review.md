@@ -6366,6 +6366,152 @@ else in the file changes.
 
 ---
 
+## 258. The gateway ClickHouse port dropped the nested-map setting it never used
+
+`GatewayClickHouseClient.query`/`insert` declared `clickhouse_settings` values as
+`string | number | boolean | Record<string, string | number | boolean> | undefined`.
+The driver types the same field as `string | number | boolean | SettingsMap | undefined`,
+and `SettingsMap` is a distinct shape. A parameter position is contravariant, so
+a port that promises to accept MORE than the driver does cannot be satisfied by
+the driver — the real client was simply not assignable to the port, which is
+why wiring the settlement sweeper to `getApp().clickhouse.allInstances()` failed
+to compile.
+
+Narrowed the port to scalars. Every call site in the feature passes
+`async_insert`, `wait_for_async_insert` or `max_execution_time` — all scalars —
+so nothing lost a capability it was using.
+
+**Alternative not taken:** casting at the composition root, which is what the
+error tempts you into and which would have hidden the fact that the port was
+wrong rather than the caller.
+
+**Reversible:** yes, trivially. **Review:** confirm no gateway query wants a map
+setting; if one ever does, widen the port to the driver's own `SettingsMap`
+rather than back to a bare `Record`.
+
+## 259. `LangyBroadcastPort` pins the single event type it fires
+
+The port declared `broadcastToTenant(tenantId, message: string, event: string)`.
+The host's `BroadcastService` types the third parameter as a closed
+`BroadcastEventType` union and routes on it — each type is its own Redis
+channel. Same contravariance problem as 258: a port promising to pass any
+string could not be satisfied by the service.
+
+Pinned the third parameter to `"langy_conversation_updated"`, the only value
+this feature has ever passed, and renamed the second to `payload` to match what
+it actually carries. This is also the ADR-046 contract: the signal carries the
+conversation id and nothing else.
+
+**Alternative not taken:** exporting `BroadcastEventType` from the app into the
+package, which would make a feature package depend on the host's channel
+taxonomy.
+
+**Reversible:** yes. **Review:** if Langy ever needs a second channel, that is a
+new decision — add the literal to the union in the port deliberately rather
+than widening back to `string`.
+
+## 260. `GovernanceTraceEvent` is the real trace union, not `Event<unknown>`
+
+The governance subscribers mount on the trace pipeline and nowhere else, but
+the port typed their event as `Event<unknown>`. The origin guard discriminates
+on `type`, and against `unknown` that check compiled while never being able to
+narrow — so the guard's call into `passesTraceOriginGuards` was the only thing
+that surfaced it.
+
+The governance package already depends on `@langwatch/trace-contract`, so
+`GovernanceTraceEvent = TraceProcessingEvent` costs no new dependency.
+
+**Cost, stated honestly:** nineteen other usages become more specific. Any test
+fixture that built a loosely-typed governance event will now fail to compile.
+That is the change doing its job, but it is churn.
+
+**Reversible:** yes. **Review:** check the governance test fixtures compile, and
+that no subscriber was relying on receiving a non-trace event.
+
+## 261. `AppTraceProcessingPipeline.create` no longer demands `originGateHandler`
+
+The class builds `originGateHandler` itself inside `build({ deferredOrigins })`,
+from a scheduler that does not exist at `create` time — yet `create` required
+the full deps including that handler, so no caller could satisfy it. Introduced
+`AppTraceProcessingPipelineDeps = Omit<TraceProcessingPipelineDeps, "originGateHandler">`.
+
+**Alternative not taken:** having the registry construct the handler and pass it
+in, which would move the deferred-origin wiring out of the adapter that owns it.
+
+**Reversible:** yes. **Review:** the omitted key is the only one `build` injects;
+if `build` ever injects a second, this type must omit that too or the caller
+will be asked for something it cannot have.
+
+## 262. The billing usage dep is typed against the nullable `try` method
+
+`EventingReportUsageForMonthAdapter` declared its dependency as
+`BillableEventsQueryService["queryBillableEventsTotal"]`, a method that no
+longer exists — it is `tryQueryBillableEventsTotal`, returning `number | null`
+where `null` means ClickHouse was unavailable. Because the type reference
+resolved to nothing, the registry's lambda parameter was also implicitly `any`.
+
+The adapter body already handled `currentTotal === null` by skipping the month,
+so the semantics were always the `try` semantics; only the type reference was
+stale. Repointed the type and left the property name as-is.
+
+**Cost, stated honestly:** the property is now named `queryBillableEventsTotal`
+while typed against `tryQueryBillableEventsTotal`. That mismatch is a small
+readability trap. Renaming it would touch the package's own unit test, which
+could not be run in this pass, so it was left with an explicit comment instead.
+
+**Reversible:** yes. **Review:** rename the property in the same change as a test
+run. Confirm the skip-on-null path is what billing wants — reporting a usage
+total that was never read would be the alternative, and it is worse.
+
+## 263. `grantsService.invalidateOrganization` was restored, not dropped — SECURITY
+
+Recorded here because it was nearly lost silently. `src/server/app-layer/authz/runtime.ts`
+was deleted in 52980c4405 and `GrantsService.invalidateOrganization` was not
+carried into the replacement `AuthzGrantsService`, leaving a
+`Cannot find name 'grantsService'` compile error at the one call site.
+
+That call retires an organization's cached authz snapshots when a membership is
+disabled or re-enabled. It is not a grant write, so nothing else bumps the
+epoch. Deleting the call to make the error go away — the obvious move — would
+have left **a disabled administrator able to act until the cache aged out.**
+
+The capability was restored: an abstract `invalidateOrganization({ organizationId })`
+on `packages/features/authz/contract`, the `epoch.bump` implementation in
+`packages/features/authz/server`, and a stub in the eight existing test fakes.
+
+**Review:** this is the one entry in this batch worth a second pair of eyes.
+Confirm the epoch bump is the same invalidation the old `GrantsService` did, and
+that membership disable/enable is the only caller that needs it.
+
+## 264. ADR-057's trace-share revoke cascade will fail open at the cutover — NOT FIXED
+
+A trap for whoever finishes the composition cutover, recorded now because it is
+invisible from either side alone.
+
+The app-layer `OrganizationService.updateSettings` runs the ADR-057 revoke
+cascade inline. The package service in `packages/features/organization/server`
+does not — it returns `{ traceShareRevocationRequired }` and expects the caller
+to act, which its REST handler does via
+`revokeTraceSharesAfterOrganizationSettingsUpdate`. **Its tRPC `update` mutation
+runs no effect at all**, while its comment still claims "the cascade lives in
+the service".
+
+So the moment `presets.ts` composes the package service as `app.organizations`
+in place of the app-layer facade, the tRPC settings path stops revoking existing
+trace share links. The kill switch appears to work and shares stay live.
+
+Today the facade still cascades, so this is safe. It is not fixed here because
+fixing it means deciding where the cascade belongs — service or caller — and
+that decision should be made once, deliberately, with the tRPC and REST paths
+brought into agreement rather than patched apart.
+
+**Review:** do not complete the organization composition cutover without closing
+this. Related: the share-link mint is already unbounded (428,720 permanent
+bearer tokens on our own organization), so a failed revoke has a large blast
+radius.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
