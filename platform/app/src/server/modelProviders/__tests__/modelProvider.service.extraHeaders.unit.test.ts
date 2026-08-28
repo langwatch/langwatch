@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-
+import type { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import type { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
@@ -16,6 +16,7 @@ const REAL_TENANT = "tenant-42";
 
 const existingRow = {
   id: "mp_custom",
+  organizationId: "org_1",
   name: "Custom",
   provider: "custom",
   enabled: true,
@@ -44,11 +45,13 @@ function makeService() {
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => fn({}),
   };
-  const service = new ModelProviderService(
-    prisma as unknown as PrismaClient,
-    repository as unknown as ModelProviderRepository,
-  );
-  return { service, repository };
+  const changeEvents = { append: vi.fn().mockResolvedValue({ revision: 1n }) };
+  const service = new ModelProviderService({
+    prisma: prisma as unknown as PrismaClient,
+    repository: repository as unknown as ModelProviderRepository,
+    changeEvents: changeEvents as unknown as ChangeEventRepository,
+  });
+  return { service, repository, changeEvents };
 }
 
 async function saveWithHeaders(

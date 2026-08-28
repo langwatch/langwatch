@@ -1,5 +1,9 @@
-import { Button, HStack, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 
+import {
+  InviteLanding,
+  useIdentityFrontDoor,
+} from "~/features/auth-front-door";
 import { HandledErrorAlert } from "~/features/errors";
 import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -9,7 +13,36 @@ import { SetupLayout } from "../../components/SetupLayout";
 import { useAcceptInviteOnce } from "../../hooks/useAcceptInviteOnce";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 
+/**
+ * The invitation link's landing (ADR-117 §6, D13).
+ *
+ * Enforced, it is a screen: it says who is asking before anything happens,
+ * takes a signed-out visitor through sign-in or sign-up with the invitation
+ * still in hand, and asks a signed-in one to confirm. Until the flip it stays
+ * what it was — a page that accepts on arrival and requires a session to
+ * reach at all.
+ */
 export default function Accept() {
+  const router = useRouter();
+  const frontDoor = useIdentityFrontDoor();
+  const inviteCode = router.query.inviteCode;
+
+  if (!frontDoor.isResolved) return <LoadingScreen />;
+
+  if (frontDoor.enabled) {
+    return typeof inviteCode === "string" && inviteCode.length > 0 ? (
+      <InviteLanding inviteCode={inviteCode} />
+    ) : (
+      <SetupLayout>
+        <Text>This invitation link is incomplete. Ask for a new one.</Text>
+      </SetupLayout>
+    );
+  }
+
+  return <LegacyAccept />;
+}
+
+function LegacyAccept() {
   const router = useRouter();
   const { inviteCode } = router.query;
   const { data: session } = useRequiredSession();

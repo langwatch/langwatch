@@ -151,6 +151,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "project_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

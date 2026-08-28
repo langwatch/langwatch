@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import type { Scenario } from "~/generated/prisma/client";
@@ -15,6 +14,7 @@ import {
   scenarioParameterDefinitionsSchema,
 } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -34,14 +34,106 @@ const scenarioResponseSchema = z.object({
   judgeModel: z.string().nullable(),
   maxTurns: z.number().int().nullable(),
   minTurns: z.number().int().nullable(),
+  /**
+   * Optional in the document, not in the answer: every server sends it. The
+   * field arrived after clients were generated from this family, and a client
+   * that reads it as required fails against a server that predates it.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
+  testSuiteId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
+    ),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+const scenarioVersionSummarySchema = z.object({
+  version: z.number().int().describe("The version number, counting from 1."),
+  authorLabel: z
+    .string()
+    .nullable()
+    .describe(
+      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded.",
+    ),
+  authorId: z
+    .string()
+    .nullable()
+    .describe(
+      "The user who saved the version. Null when the save came from an API key.",
+    ),
+  changeDescription: z.string().nullable(),
+  changedFields: z
+    .array(z.string())
+    .describe("The fields whose value this save changed."),
+  createdAt: z.string().describe("When the version was written, in ISO 8601."),
+  isSynthesized: z
+    .boolean()
+    .describe(
+      "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
+    ),
+});
+
+const scenarioVersionListResponseSchema = z.object({
+  versions: z.array(scenarioVersionSummarySchema),
+  nextCursor: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Pass as cursor to read the page below this one. Null on the last page.",
+    ),
+});
+
+const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
+  {
+    schemaVersion: z
+      .number()
+      .int()
+      .describe("The shape the snapshot was written in."),
+    snapshot: z
+      .object({
+        name: z.string(),
+        situation: z.string(),
+        criteria: z.array(z.string()),
+        labels: z.array(z.string()),
+        parameters: z.array(scenarioParameterDefinitionSchema),
+        simulatorModel: z.string().nullable(),
+        judgeModel: z.string().nullable(),
+        maxTurns: z.number().nullable(),
+        minTurns: z.number().nullable(),
+      })
+      .describe(
+        "The editable content of the scenario as this version saved it.",
+      ),
+  },
+);
+
+const listScenarioVersionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe("Read the page below this version number."),
+});
+
+const versionPathSchema = z.object({
+  version: z.coerce.number().int().min(1),
+});
+
 const parametersDescription =
-  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME.";
+  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
+
+const testSuiteIdDescription =
+  "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
 
 const simulatorModelDescription =
   "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
@@ -78,6 +170,7 @@ const createScenarioSchema = z.object({
     .max(100)
     .nullish()
     .describe(minTurnsDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -106,7 +199,23 @@ const updateScenarioSchema = z.object({
     .max(100)
     .nullish()
     .describe(minTurnsDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
+
+/**
+ * Who a version row written through this surface names as its author.
+ *
+ * A project key names no person, so `userId` stays null. The `langwatch` CLI
+ * declares itself with `X-LangWatch-Surface: cli` on its scenario writes;
+ * only that value is honored, so a caller cannot spoof an in-process surface
+ * over the wire. Everything else is the API.
+ */
+function actorFromRequest(c: {
+  req: { header: (name: string) => string | undefined };
+}): ScenarioActor {
+  const declared = c.req.header("X-LangWatch-Surface")?.toLowerCase();
+  return { userId: null, label: declared === "cli" ? "cli" : "api" };
+}
 
 function toScenarioResponse(scenario: Scenario) {
   return {
@@ -120,6 +229,7 @@ function toScenarioResponse(scenario: Scenario) {
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
+    testSuiteId: scenario.testSuiteId,
   };
 }
 
@@ -131,6 +241,8 @@ export function registerScenarioRoutes(
   registerCreateScenarioRoute(secured);
   registerUpdateScenarioRoute(secured);
   registerDeleteScenarioRoute(secured);
+  registerListScenarioVersionsRoute(secured);
+  registerGetScenarioVersionRoute(secured);
 }
 
 /** List every scenario in the project. */
@@ -263,20 +375,26 @@ function registerCreateScenarioRoute(
       logger.info({ projectId: project.id }, "Creating scenario");
 
       const service = getService();
-      const scenario = await service.create({
-        projectId: project.id,
-        name: body.name,
-        situation: body.situation,
-        criteria: body.criteria,
-        labels: body.labels,
-        ...(body.parameters !== undefined && { parameters: body.parameters }),
-        ...(body.simulatorModel !== undefined && {
-          simulatorModel: body.simulatorModel,
-        }),
-        ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
-        ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
-        ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
-      });
+      const scenario = await service.create(
+        {
+          projectId: project.id,
+          name: body.name,
+          situation: body.situation,
+          criteria: body.criteria,
+          labels: body.labels,
+          ...(body.parameters !== undefined && { parameters: body.parameters }),
+          ...(body.testSuiteId !== undefined && {
+            testSuiteId: body.testSuiteId,
+          }),
+          ...(body.simulatorModel !== undefined && {
+            simulatorModel: body.simulatorModel,
+          }),
+          ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+          ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+          ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
+        },
+        { actor: actorFromRequest(c) },
+      );
 
       return c.json(
         {
@@ -354,18 +472,26 @@ function registerUpdateScenarioVerb({
         return c.json({ error: "Scenario not found" }, 404);
       }
 
-      const scenario = await service.update(id, project.id, {
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.situation !== undefined && { situation: body.situation }),
-        ...(body.criteria !== undefined && { criteria: body.criteria }),
-        ...(body.labels !== undefined && { labels: body.labels }),
-        ...(body.parameters !== undefined && { parameters: body.parameters }),
-        ...(body.simulatorModel !== undefined && {
-          simulatorModel: body.simulatorModel,
-        }),
-        ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
-        ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
-        ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
+      const scenario = await service.update({
+        id,
+        projectId: project.id,
+        data: {
+          ...(body.name !== undefined && { name: body.name }),
+          ...(body.situation !== undefined && { situation: body.situation }),
+          ...(body.criteria !== undefined && { criteria: body.criteria }),
+          ...(body.labels !== undefined && { labels: body.labels }),
+          ...(body.parameters !== undefined && { parameters: body.parameters }),
+          ...(body.testSuiteId !== undefined && {
+            testSuiteId: body.testSuiteId,
+          }),
+          ...(body.simulatorModel !== undefined && {
+            simulatorModel: body.simulatorModel,
+          }),
+          ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+          ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+          ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
+        },
+        options: { actor: actorFromRequest(c) },
       });
 
       return c.json({
@@ -425,6 +551,158 @@ function registerDeleteScenarioRoute(
       try {
         await service.archive({ id, projectId: project.id });
         return c.json({ id, archived: true });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          return c.json({ error: "Scenario not found" }, 404);
+        }
+        throw error;
+      }
+    },
+  );
+}
+
+/** The version history of a scenario, newest first. */
+function registerListScenarioVersionsRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
+    "/:id/versions",
+    describeRoute({
+      description:
+        "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(scenarioVersionListResponseSchema),
+            },
+          },
+        },
+        404: {
+          description: "Scenario not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("query", listScenarioVersionsQuerySchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const { limit, cursor } = c.req.valid("query");
+
+      logger.info(
+        { projectId: project.id, scenarioId: id },
+        "Listing scenario versions",
+      );
+
+      const service = getService();
+      try {
+        const page = await service.listVersions({
+          projectId: project.id,
+          scenarioId: id,
+          ...(limit !== undefined && { limit }),
+          ...(cursor !== undefined && { cursor }),
+        });
+        return c.json({
+          versions: page.versions.map((version) => ({
+            version: version.version,
+            authorLabel: version.authorLabel,
+            authorId: version.authorId,
+            changeDescription: version.changeDescription,
+            changedFields: version.changedFields,
+            createdAt: version.createdAt.toISOString(),
+            isSynthesized: version.isSynthesized,
+          })),
+          nextCursor: page.nextCursor,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          return c.json({ error: "Scenario not found" }, 404);
+        }
+        throw error;
+      }
+    },
+  );
+}
+
+/**
+ * One version of a scenario with the content it saved.
+ *
+ * A version number that names nothing refuses with the
+ * `scenario_version_not_found` code, which the synthesized Created entry also
+ * answers: it has no stored snapshot to serve.
+ */
+function registerGetScenarioVersionRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
+    "/:id/versions/:version",
+    describeRoute({
+      description:
+        "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(scenarioVersionDetailResponseSchema),
+            },
+          },
+        },
+        404: {
+          description: "Scenario or version not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("param", versionPathSchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const { version } = c.req.valid("param");
+
+      logger.info(
+        { projectId: project.id, scenarioId: id, version },
+        "Getting scenario version",
+      );
+
+      const service = getService();
+      try {
+        const detail = await service.getVersion({
+          projectId: project.id,
+          scenarioId: id,
+          version,
+        });
+        return c.json({
+          version: detail.version,
+          authorLabel: detail.authorLabel,
+          authorId: detail.authorId,
+          changeDescription: detail.changeDescription,
+          changedFields: detail.changedFields,
+          createdAt: detail.createdAt.toISOString(),
+          isSynthesized: detail.isSynthesized,
+          schemaVersion: detail.schemaVersion,
+          snapshot: {
+            name: detail.fields.name,
+            situation: detail.fields.situation,
+            criteria: detail.fields.criteria,
+            labels: detail.fields.labels,
+            parameters: parseScenarioParameterDefinitions(
+              detail.fields.parameters,
+            ),
+            simulatorModel: detail.fields.simulatorModel,
+            judgeModel: detail.fields.judgeModel,
+            maxTurns: detail.fields.maxTurns,
+            minTurns: detail.fields.minTurns,
+          },
+        });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
           return c.json({ error: "Scenario not found" }, 404);

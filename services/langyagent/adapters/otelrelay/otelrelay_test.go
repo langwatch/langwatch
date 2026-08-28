@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,9 +33,12 @@ func startRelay(t *testing.T) *Relay {
 }
 
 // capturedIngest is a fake customer LangWatch OTLP ingest recording the last
-// forwarded request.
+// forwarded request. The handler runs on the server's own goroutine, so every
+// field is written and read under mu.
 type capturedIngest struct {
-	srv    *httptest.Server
+	srv *httptest.Server
+
+	mu     sync.Mutex
 	path   string
 	auth   string
 	body   []byte
@@ -45,13 +49,41 @@ func startIngest(t *testing.T) *capturedIngest {
 	t.Helper()
 	ci := &capturedIngest{status: http.StatusOK}
 	ci.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		ci.mu.Lock()
 		ci.path = req.URL.Path
 		ci.auth = req.Header.Get("Authorization")
-		ci.body, _ = io.ReadAll(req.Body)
-		w.WriteHeader(ci.status)
+		ci.body = body
+		status := ci.status
+		ci.mu.Unlock()
+		w.WriteHeader(status)
 	}))
 	t.Cleanup(ci.srv.Close)
 	return ci
+}
+
+func (ci *capturedIngest) lastPath() string {
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	return ci.path
+}
+
+func (ci *capturedIngest) lastAuth() string {
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	return ci.auth
+}
+
+func (ci *capturedIngest) lastBody() []byte {
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	return ci.body
+}
+
+func (ci *capturedIngest) setStatus(status int) {
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	ci.status = status
 }
 
 func protoBatch(t *testing.T) []byte {
@@ -88,13 +120,13 @@ func TestRelayTraces(t *testing.T) {
 			t.Fatalf("relay answered %d, want 200", resp.StatusCode)
 		}
 
-		if ingest.path != "/api/otel/v1/traces" {
-			t.Errorf("forward path = %q, want /api/otel/v1/traces", ingest.path)
+		if ingest.lastPath() != "/api/otel/v1/traces" {
+			t.Errorf("forward path = %q, want /api/otel/v1/traces", ingest.lastPath())
 		}
-		if ingest.auth != "Bearer sk-session" {
-			t.Errorf("forward auth = %q, want the session key the MANAGER holds", ingest.auth)
+		if ingest.lastAuth() != "Bearer sk-session" {
+			t.Errorf("forward auth = %q, want the session key the MANAGER holds", ingest.lastAuth())
 		}
-		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.lastBody())
 		if err != nil {
 			t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
 		}
@@ -131,7 +163,7 @@ func TestRelayTraces(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("relay answered %d for a gzip body, want 200", resp.StatusCode)
 		}
-		if len(ingest.body) == 0 {
+		if len(ingest.lastBody()) == 0 {
 			t.Fatalf("nothing forwarded for a gzip export")
 		}
 	})
@@ -148,8 +180,8 @@ func TestRelayTraces(t *testing.T) {
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("unknown token must 404, got %d", resp.StatusCode)
 		}
-		if ingest.path != "" {
-			t.Errorf("nothing may be forwarded for an unknown token; upstream saw %q", ingest.path)
+		if ingest.lastPath() != "" {
+			t.Errorf("nothing may be forwarded for an unknown token; upstream saw %q", ingest.lastPath())
 		}
 	})
 
@@ -173,7 +205,7 @@ func TestRelayTraces(t *testing.T) {
 	t.Run("when the customer ingest is down", func(t *testing.T) {
 		relay := startRelay(t)
 		ingest := startIngest(t)
-		ingest.status = http.StatusInternalServerError
+		ingest.setStatus(http.StatusInternalServerError)
 		token, _ := relay.Register(WorkerInfo{ConversationID: "conv-err", LangwatchEndpoint: ingest.srv.URL, LangwatchAPIKey: "k"})
 
 		resp, err := http.Post(relay.OTLPEndpointFor(token)+"/v1/traces", "application/x-protobuf", bytes.NewReader(protoBatch(t)))
@@ -202,8 +234,8 @@ func TestRelayDropsNonTraceSignals(t *testing.T) {
 			t.Errorf("%s must be accepted (200) so the worker exporter stays quiet, got %d", signal, resp.StatusCode)
 		}
 	}
-	if ingest.path != "" {
-		t.Errorf("logs/metrics must be dropped, never forwarded; upstream saw %q", ingest.path)
+	if ingest.lastPath() != "" {
+		t.Errorf("logs/metrics must be dropped, never forwarded; upstream saw %q", ingest.lastPath())
 	}
 }
 
@@ -242,7 +274,7 @@ func TestRelayTraces_JSONEncodedExport(t *testing.T) {
 		t.Fatalf("relay answered %d for a JSON body, want 200", resp.StatusCode)
 	}
 
-	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.lastBody())
 	if err != nil {
 		t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
 	}
@@ -429,7 +461,7 @@ func TestRelayTracesCodexNonBillable(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("relay answered %d, want 200", resp.StatusCode)
 		}
-		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.lastBody())
 		if err != nil {
 			t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
 		}

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
+  LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "../errors";
@@ -19,6 +20,7 @@ type Row = {
   status: string;
   currentTurnId: string | null;
   lastError: string | null;
+  lastModel: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   cursorActivityAtMs?: number | null;
@@ -72,6 +74,7 @@ const row = (o: Partial<Row> = {}): Row => ({
   status: "active",
   currentTurnId: null,
   lastError: null,
+  lastModel: null,
   messageCount: 0,
   lastActivityAtMs: 0,
   createdAtMs: Date.parse("2026-04-01T00:00:00.000Z"),
@@ -369,6 +372,101 @@ describe("LangyConversationService", () => {
       });
       expect(result.id).not.toBe("archived-id");
       expect(result.id).toBeTruthy();
+    });
+
+    it("mints a fresh conversation id when the projection row is archived", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "archived-id",
+      });
+      expect(result.id).not.toBe("archived-id");
+      expect(result.id).toBeTruthy();
+    });
+  });
+
+  describe("when ensureConversation is asked to adopt an unknown id", () => {
+    it("adopts the caller-chosen id as a new conversation", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: true,
+      });
+    });
+
+    it("reuses an already-adopted id on later turns without re-adopting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("owned"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: false,
+      });
+    });
+
+    it("still refuses an id owned by another user", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("other"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "c1",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+    });
+
+    it("throws loudly on an archived collision instead of resurrecting or minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "archived-id",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
+    });
+
+    it("throws loudly on an id that fails the shape gate instead of minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "bad id!", // space and punctuation
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
     });
   });
 
@@ -944,6 +1042,96 @@ describe("LangyConversationService", () => {
           eventId: last.id,
         });
       });
+    });
+  });
+
+  // Two paths finish a turn and race each other: the relay's terminal frame and
+  // the agent's own HTTP post. Both land here, so the turn's ordered account is
+  // read HERE rather than by either caller — otherwise the record's shape would
+  // depend on which of them won.
+  describe("given a turn that wrote between its calls", () => {
+    const account = [
+      { kind: "text" as const, text: "Reading the failures first." },
+      { kind: "tool" as const, id: "call-1" },
+      { kind: "text" as const, text: "Now trying a tighter prompt." },
+      { kind: "tool" as const, id: "call-2" },
+      { kind: "text" as const, text: "Done." },
+    ];
+    const toolCalls = [
+      { id: "call-1", name: "read", output: "{}" },
+      { id: "call-2", name: "write", output: "{}" },
+    ];
+
+    const partKinds = (
+      recordAgentResponse: ReturnType<typeof vi.fn>,
+    ): string[] => {
+      const [call] = recordAgentResponse.mock.calls;
+      const { parts } = (call?.[0] ?? { parts: [] }) as {
+        parts: Array<{ type: string; text?: string }>;
+      };
+      return parts.map((part) =>
+        part.type === "text" ? `text:${part.text}` : part.type,
+      );
+    };
+
+    /** @scenario "The order does not depend on which path finished the turn" */
+    it("records the paragraphs and the calls in the order they happened", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        { readTurnOrder: vi.fn(async () => account) },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "text:Reading the failures first.",
+        "tool-read",
+        "text:Now trying a tighter prompt.",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+
+    /** @scenario "A turn whose order cannot be read is still recorded" */
+    it("records the calls before the reply when the account cannot be read", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        {
+          readTurnOrder: vi.fn(async () => {
+            throw new Error("redis is down");
+          }),
+        },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "tool-read",
+        "tool-write",
+        "text:Done.",
+      ]);
     });
   });
 });

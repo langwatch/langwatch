@@ -36,7 +36,26 @@ interface EndpointGroup {
    * default way.
    */
   endpointOrder?: string[];
+  /**
+   * Hand-written pages that belong to this family but document no single
+   * operation, appended after the generated endpoint pages.
+   *
+   * They have to be declared here rather than edited into `docs.json`, because
+   * this generator replaces the whole API Reference anchor on every run: a page
+   * added to the nav by hand survives until the next run and then vanishes.
+   */
+  extraPages?: string[];
 }
+
+/**
+ * Pages that open the anchor, before the first endpoint family. Same reason as
+ * `extraPages`: the anchor is generated wholesale, so its front matter has to
+ * be generated too.
+ */
+const INTRO_GROUP = {
+  group: "Get Started",
+  pages: ["api-reference/introduction"],
+};
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
@@ -92,6 +111,8 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -101,6 +122,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/traces", "/api/trace"],
     overviewDescription:
       "Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.",
+    // The projection DSL shapes the response of the search endpoint rather than
+    // being an endpoint itself, and the Traces overview links to it.
+    extraPages: ["api-reference/traces/projection-dsl"],
   },
   {
     name: "Datasets",
@@ -194,11 +218,25 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Run Plans",
+    dirName: "run-plans",
+    pathPrefixes: ["/api/v1/run-plans"],
+    overviewDescription:
+      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.",
+  },
+  {
+    name: "Test Suites",
+    dirName: "test-suites",
+    pathPrefixes: ["/api/v1/test-suites"],
+    overviewDescription:
+      "Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
+  },
+  {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.",
+      "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.",
   },
   {
     name: "Agents",
@@ -267,6 +305,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/secrets"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
+  },
+  {
+    name: "Agent Cache",
+    dirName: "agent-cache",
+    pathPrefixes: ["/api/agent-cache"],
+    overviewDescription:
+      "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself.",
   },
   {
     name: "Model Providers",
@@ -597,6 +642,28 @@ function main() {
 
   const owners = resolveOwners(Object.keys(spec.paths));
 
+  // A hand-written page is named as a string, so a rename or a typo would drop
+  // it out of the sidebar silently — the same failure this generator exists to
+  // prevent. Check every one of them against the filesystem up front.
+  const declaredExtras = [
+    ...INTRO_GROUP.pages,
+    ...ENDPOINT_GROUPS.flatMap((group) => group.extraPages ?? []),
+  ];
+  const missingExtras = declaredExtras.filter(
+    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`))
+  );
+  if (missingExtras.length > 0) {
+    const noun = missingExtras.length === 1 ? "page" : "pages";
+    console.error(
+      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`
+    );
+    for (const page of missingExtras.sort()) console.error(`  ${page}`);
+    console.error(
+      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts."
+    );
+    process.exit(1);
+  }
+
   const unowned = Object.keys(spec.paths).filter(
     (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
   );
@@ -687,6 +754,8 @@ function main() {
   if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
+
+  allNavGroups.push(INTRO_GROUP);
 
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
@@ -787,6 +856,8 @@ function main() {
 
       pages.push(`api-reference/${group.dirName}/${fileName}`);
     }
+
+    pages.push(...(group.extraPages ?? []));
 
     allNavGroups.push({ group: group.name, pages });
 

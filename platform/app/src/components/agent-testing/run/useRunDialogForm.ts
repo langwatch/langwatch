@@ -1,0 +1,779 @@
+/**
+ * The state of an open run dialog: the fields it holds, the targets it can
+ * offer, the parameter overrides, and the chips that add them.
+ *
+ * The fields reset once per subject, so opening the dialog on another suite
+ * or scenario starts from that subject's remembered target.
+ *
+ * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/suites/run-notes.feature
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import { useFilteredAgents } from "~/components/scenarios/useFilteredScenarioTargets";
+import { unionParameterDefinitions } from "~/components/suites/useRunSuite";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import { api } from "~/utils/api";
+import type { CustomizeChip } from "../shared/CustomizeChips";
+import { applyConfigurationTo } from "./apply-configuration";
+import type { PromptEntry } from "./PromptPicker";
+import {
+  formatParameterLine,
+  formatStoredParameterLine,
+  toLineRunParameters,
+} from "./parameter-line";
+import {
+  canCollapseRows,
+  lineFromRows,
+  missingSecretRowNames,
+  type ParameterRow,
+  rowsFromLine,
+  storableSecretRowNames,
+  toRowsRunParameters,
+  toStorableRowParameters,
+} from "./parameter-rows";
+import { type ScopeScenario, scenariosInScope } from "./RunScopeSection";
+import { normaliseRunScope, type RunScope } from "./run-configuration";
+import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
+import { useRunConfigurationHistory } from "./useRunConfigurationHistory";
+import { useRunHistorySeed } from "./useRunHistorySeed";
+import { buildTargetLabels, scopeLabelOf, useRunName } from "./useRunName";
+import { type RunPlanFields, useRunPlanFields } from "./useRunPlanFields";
+
+/** One key per subject the dialog can be open on, "closed" when it is not. */
+function subjectKeyOf(subject: RunDialogSubject | null): string {
+  if (!subject) return "closed";
+  if (subject.kind === "plan") return "plan";
+  if (subject.kind === "all") return "all";
+  if (subject.kind === "suite") return `suite:${subject.suiteId}`;
+  return `case:${subject.scenarioId}`;
+}
+
+/** The scenarios a run of this subject covers. */
+function scenarioIdsOfSubject(
+  subject: RunDialogSubject | null,
+  allScenarios: readonly { id: string }[],
+): string[] {
+  if (!subject) return [];
+  if (subject.kind === "case") return [subject.scenarioId];
+  if (subject.kind === "suite") return subject.scenarioIds;
+  return allScenarios.map((scenario) => scenario.id);
+}
+
+/** The scenarios in the dialog's scope, which only New run plan can narrow. */
+function scopedScenarioIds({
+  subject,
+  scope,
+  scenarios,
+  allScenarios,
+}: {
+  subject: RunDialogSubject | null;
+  scope: RunScope;
+  scenarios: readonly ScopeScenario[];
+  allScenarios: readonly { id: string }[];
+}): string[] {
+  if (subject?.kind === "plan") {
+    return scenariosInScope({ scope, scenarios });
+  }
+  return scenarioIdsOfSubject(subject, allScenarios);
+}
+
+/**
+ * The parameter overrides the subject remembers, as the line the dialog
+ * opens on. Nothing remembered means the parameter block stays folded away.
+ */
+function rememberedParameterLine(subject: RunDialogSubject | null): string {
+  if (subject?.kind !== "suite") return "";
+  const values = subject.persistedTarget?.runParameters;
+  if (!values || Object.keys(values).length === 0) return "";
+  return formatStoredParameterLine(values);
+}
+
+/**
+ * The secret rows the subject remembers, by name and with no value.
+ *
+ * A run never writes a secret value down, so the row comes back empty and the
+ * next run asks for the value again.
+ */
+function rememberedSecretRows(
+  subject: RunDialogSubject | null,
+): ParameterRow[] {
+  if (subject?.kind !== "suite") return [];
+  const names = subject.persistedTarget?.runSecretParameterNames ?? [];
+  return names.map((name) => ({ name, value: "", secret: true }));
+}
+
+/** The parameter block as the subject remembers it, block by block. */
+function rememberedParameters(subject: RunDialogSubject | null) {
+  const line = rememberedParameterLine(subject);
+  const secretRows = rememberedSecretRows(subject);
+  const hasSecretRows = secretRows.length > 0;
+  return {
+    show: line !== "" || hasSecretRows,
+    line,
+    rowsRequested: hasSecretRows,
+    rows: hasSecretRows ? [...rowsFromLine(line), ...secretRows] : null,
+  };
+}
+
+/** The fields of the dialog, reset whenever it opens on a new subject. */
+function useRunDialogFields(subject: RunDialogSubject | null) {
+  const [target, setTarget] = useState<TargetValue>(null);
+  const [mode, setMode] = useState<RunDialogMode>("agents");
+  const [showNote, setShowNote] = useState(false);
+  const [note, setNote] = useState("");
+  const [showParams, setShowParams] = useState(false);
+  const [parameterLine, setParameterLine] = useState("");
+  // Null while the line is what the block holds: the rows are read off the
+  // line until something is typed into one of them.
+  const [parameterRows, setParameterRows] = useState<ParameterRow[] | null>(
+    null,
+  );
+  const [rowsRequested, setRowsRequested] = useState(false);
+  const [secretValues, setSecretValues] = useState<Record<string, string>>({});
+  const [inlineError, setInlineError] = useState<unknown>(null);
+  const [missingProvider, setMissingProvider] = useState(false);
+  // The subject the fields below already hold the opening values of. Anything
+  // that reads the fields waits for this, because the reset runs in an effect
+  // and the render that opens the dialog is one render ahead of it.
+  const [resetFor, setResetFor] = useState("closed");
+  const agentTargetBeforePrompt = useRef<TargetValue>(null);
+
+  const subjectKey = subjectKeyOf(subject);
+  const initialTarget = subject?.initialTarget ?? null;
+  const remembered = rememberedParameters(subject);
+  useEffect(() => {
+    setTarget(initialTarget);
+    setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
+    // The note is the one field a run never remembers: it says what this run
+    // is for, so it starts empty every time.
+    setShowNote(false);
+    setNote("");
+    setShowParams(remembered.show);
+    setParameterLine(remembered.line);
+    setRowsRequested(remembered.rowsRequested);
+    setParameterRows(remembered.rows);
+    setSecretValues({});
+    setInlineError(null);
+    setMissingProvider(false);
+    setResetFor(subjectKey);
+    agentTargetBeforePrompt.current = null;
+    // Reset exactly once per subject; the target of a subject does not move
+    // under an open dialog.
+  }, [subjectKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return {
+    target,
+    setTarget,
+    mode,
+    setMode,
+    showNote,
+    setShowNote,
+    note,
+    setNote,
+    showParams,
+    setShowParams,
+    parameterLine,
+    setParameterLine,
+    parameterRows,
+    setParameterRows,
+    rowsRequested,
+    setRowsRequested,
+    secretValues,
+    setSecretValues,
+    inlineError,
+    setInlineError,
+    missingProvider,
+    setMissingProvider,
+    resetFor,
+    agentTargetBeforePrompt,
+  };
+}
+
+export type RunDialogFields = ReturnType<typeof useRunDialogFields>;
+
+/** The agents, the published prompts and the scenarios the project holds. */
+function useRunDialogChoices(subject: RunDialogSubject | null) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const isDialogOpen = !!project && !!subject;
+
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId },
+    { enabled: isDialogOpen },
+  );
+  const scenarioAgents = useFilteredAgents(agents, "");
+  const { data: prompts } = useAllPromptsForProject();
+  const { data: allScenarios } = api.scenarios.getAll.useQuery(
+    { projectId },
+    { enabled: isDialogOpen },
+  );
+  // Only the New run plan entry point names test suites, but the run name of
+  // every entry point can read one, so the list is read whenever it is open.
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
+    { projectId },
+    { enabled: isDialogOpen },
+  );
+
+  const publishedPrompts: PromptEntry[] = useMemo(
+    () =>
+      (prompts ?? [])
+        .filter((prompt) => prompt.version > 0)
+        .map((prompt) => ({
+          id: prompt.id,
+          handle: prompt.handle,
+          version: prompt.version,
+        })),
+    [prompts],
+  );
+
+  const scopeScenarios: ScopeScenario[] = useMemo(
+    () =>
+      (allScenarios ?? []).map((scenario) => ({
+        id: scenario.id,
+        name: scenario.name,
+        testSuiteId: scenario.testSuiteId ?? null,
+        labels: scenario.labels ?? [],
+      })),
+    [allScenarios],
+  );
+
+  return {
+    scenarioAgents,
+    publishedPrompts,
+    allScenarios,
+    testSuites: testSuites ?? [],
+    scopeScenarios,
+  };
+}
+
+/** The overrides the run can carry, and the fields that collect them. */
+function useRunDialogParameters({
+  subject,
+  allScenarios,
+  fields,
+}: {
+  subject: RunDialogSubject | null;
+  allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
+  fields: RunDialogFields;
+}) {
+  const { showParams, parameterLine } = fields;
+  const { secretValues, setSecretValues } = fields;
+
+  const parameterDefinitions = useMemo(
+    () =>
+      unionParameterDefinitions({
+        scenarioIds: scenarioIdsOfSubject(subject, allScenarios ?? []),
+        scenarios: allScenarios ?? [],
+      }),
+    [subject, allScenarios],
+  );
+
+  // The line a single input can carry, and the secrets that cannot ride on it.
+  const secretDefinitions = useMemo(
+    () =>
+      parameterDefinitions.filter((definition) => definition.secret === true),
+    [parameterDefinitions],
+  );
+
+  // A declared secret cannot ride on the line, so the block that holds one
+  // opens on its rows and stays there.
+  const hasDeclaredSecrets = secretDefinitions.length > 0;
+  const showParameterRows = fields.rowsRequested || hasDeclaredSecrets;
+
+  // The line is what the block holds until a row is touched; after that the
+  // rows are, and the line is written back from them.
+  const parameterRows = useMemo(
+    () => fields.parameterRows ?? rowsFromLine(parameterLine),
+    [fields.parameterRows, parameterLine],
+  );
+
+  const { showParameters, hideParameters } = useParameterBlockToggle({
+    fields,
+    parameterDefinitions,
+  });
+
+  const setSecretValue = useCallback(
+    (name: string, value: string) => {
+      setSecretValues((previous) => ({ ...previous, [name]: value }));
+    },
+    [setSecretValues],
+  );
+
+  const rowActions = useParameterRowActions({ fields, rows: parameterRows });
+
+  /** Whether the block may fold back into the single line it started on. */
+  const canLeaveParameterRows =
+    !hasDeclaredSecrets && canCollapseRows(parameterRows);
+
+  const values = resolveParameterValues({
+    showParams,
+    showParameterRows,
+    rows: parameterRows,
+    line: parameterLine,
+    secretValues,
+  });
+
+  const hasMissingSecrets =
+    showParams &&
+    (secretDefinitions.some(
+      (definition) => (secretValues[definition.name] ?? "") === "",
+    ) ||
+      (showParameterRows && missingSecretRowNames(parameterRows).length > 0));
+
+  return {
+    parameterDefinitions,
+    secretDefinitions,
+    parameterRows,
+    showParameterRows,
+    canLeaveParameterRows,
+    ...rowActions,
+    showParameters,
+    hideParameters,
+    setSecretValue,
+    ...values,
+    hasMissingSecrets,
+  };
+}
+
+/** The chip that opens the parameter block, and the x that takes it away. */
+function useParameterBlockToggle({
+  fields,
+  parameterDefinitions,
+}: {
+  fields: RunDialogFields;
+  parameterDefinitions: ScenarioParameterDefinition[];
+}) {
+  const { setShowParams, setParameterLine } = fields;
+  const { setParameterRows, setRowsRequested, setSecretValues } = fields;
+
+  /** Opens the overrides on the values the scenarios declare. */
+  const showParameters = useCallback(() => {
+    setParameterLine(formatParameterLine(parameterDefinitions));
+    setParameterRows(null);
+    setRowsRequested(false);
+    setShowParams(true);
+  }, [
+    parameterDefinitions,
+    setParameterLine,
+    setParameterRows,
+    setRowsRequested,
+    setShowParams,
+  ]);
+
+  const hideParameters = useCallback(() => {
+    setShowParams(false);
+    setParameterLine("");
+    setParameterRows(null);
+    setRowsRequested(false);
+    setSecretValues({});
+  }, [
+    setShowParams,
+    setParameterLine,
+    setParameterRows,
+    setRowsRequested,
+    setSecretValues,
+  ]);
+
+  return { showParameters, hideParameters };
+}
+
+/** Writing on the line, moving between the two modes, and editing the rows. */
+function useParameterRowActions({
+  fields,
+  rows,
+}: {
+  fields: RunDialogFields;
+  rows: ParameterRow[];
+}) {
+  const { setParameterLine, setParameterRows, setRowsRequested } = fields;
+
+  /** Typing on the line makes the line what the rows are read from again. */
+  const editParameterLine = useCallback(
+    (line: string) => {
+      setParameterLine(line);
+      setParameterRows(null);
+    },
+    [setParameterLine, setParameterRows],
+  );
+
+  const setParameterRowsMode = useCallback(
+    (wanted: boolean) => {
+      if (wanted) {
+        setParameterRows(rows);
+        setRowsRequested(true);
+        return;
+      }
+      setParameterLine(lineFromRows(rows));
+      setParameterRows(null);
+      setRowsRequested(false);
+    },
+    [rows, setParameterLine, setParameterRows, setRowsRequested],
+  );
+
+  const updateParameterRow = useCallback(
+    (index: number, patch: Partial<ParameterRow>) => {
+      setParameterRows(
+        rows.map((row, at) => (at === index ? { ...row, ...patch } : row)),
+      );
+    },
+    [rows, setParameterRows],
+  );
+
+  const addParameterRow = useCallback(() => {
+    setParameterRows([...rows, { name: "", value: "", secret: false }]);
+  }, [rows, setParameterRows]);
+
+  const removeParameterRow = useCallback(
+    (index: number) => {
+      setParameterRows(rows.filter((_, at) => at !== index));
+    },
+    [rows, setParameterRows],
+  );
+
+  return {
+    editParameterLine,
+    setParameterRowsMode,
+    updateParameterRow,
+    addParameterRow,
+    removeParameterRow,
+  };
+}
+
+/**
+ * What the run carries, and the part of it the suite may remember.
+ *
+ * A secret value goes to the run alone. A secret row leaves its key behind, so
+ * the next dialog shows the row again and asks for the value.
+ */
+function resolveParameterValues({
+  showParams,
+  showParameterRows,
+  rows,
+  line,
+  secretValues,
+}: {
+  showParams: boolean;
+  showParameterRows: boolean;
+  rows: ParameterRow[];
+  line: string;
+  secretValues: Record<string, string>;
+}) {
+  if (!showParams) {
+    return {
+      runParameters: undefined,
+      storableRunParameters: undefined,
+      storableSecretNames: undefined,
+    };
+  }
+
+  if (!showParameterRows) {
+    return {
+      runParameters: toLineRunParameters({ line, secretValues }),
+      storableRunParameters: toLineRunParameters({ line, secretValues: {} }),
+      storableSecretNames: undefined,
+    };
+  }
+
+  return {
+    runParameters: toRowsRunParameters({ rows, secretValues }),
+    storableRunParameters: toStorableRowParameters(rows),
+    storableSecretNames: storableSecretRowNames(rows),
+  };
+}
+
+/** Moving between the agent blocks, the prompt picker and the agent setup. */
+function useRunDialogTargeting({
+  fields,
+  publishedPrompts,
+}: {
+  fields: RunDialogFields;
+  publishedPrompts: PromptEntry[];
+}) {
+  const { target, setTarget, setMode, agentTargetBeforePrompt } = fields;
+  const { openDrawer, setFlowCallbacks } = useDrawer();
+
+  const selectPrompts = useCallback(() => {
+    agentTargetBeforePrompt.current = target?.type === "prompt" ? null : target;
+    setMode("prompts");
+    const first = publishedPrompts[0];
+    if (first) setTarget({ type: "prompt", id: first.id });
+  }, [target, publishedPrompts, setMode, setTarget, agentTargetBeforePrompt]);
+
+  const removePromptPicker = useCallback(() => {
+    setMode("agents");
+    setTarget(agentTargetBeforePrompt.current);
+  }, [setMode, setTarget, agentTargetBeforePrompt]);
+
+  const handleSetupAgent = useCallback(() => {
+    const onAgentSaved = (agent: TypedAgent) => {
+      const targetType = agent.type as NonNullable<TargetValue>["type"];
+      setTarget({ type: targetType, id: agent.id });
+    };
+    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
+    openDrawer("agentTypeSelector");
+  }, [openDrawer, setFlowCallbacks, setTarget]);
+
+  return { selectPrompts, removePromptPicker, handleSetupAgent };
+}
+
+/**
+ * The chips that add the optional parts of a run, in one fixed order.
+ *
+ * A chip is offered while the block it adds is closed, so the row shortens as
+ * the run is customised and each block can be taken away again.
+ */
+function buildCustomizeRunChips({
+  fields,
+  planFields,
+  hasParameterDefinitions,
+  hasPublishedPrompts,
+  onAddParameters,
+  onRunAgainstPrompt,
+}: {
+  fields: RunDialogFields;
+  planFields: RunPlanFields;
+  hasParameterDefinitions: boolean;
+  hasPublishedPrompts: boolean;
+  onAddParameters: () => void;
+  onRunAgainstPrompt: () => void;
+}): CustomizeChip[] {
+  const chips: CustomizeChip[] = [];
+  if (!fields.showParams && hasParameterDefinitions) {
+    chips.push({
+      key: "params",
+      label: "Add parameters",
+      onAdd: onAddParameters,
+    });
+  }
+  if (!planFields.showCompare && fields.mode === "agents") {
+    chips.push({
+      key: "compare",
+      label: "Compare agents",
+      onAdd: () => planFields.setShowCompare(true),
+    });
+  }
+  if (!fields.showNote) {
+    chips.push({
+      key: "note",
+      label: "Add a note",
+      onAdd: () => fields.setShowNote(true),
+    });
+  }
+  if (fields.mode === "agents" && hasPublishedPrompts) {
+    chips.push({
+      key: "prompt",
+      label: "Run against a prompt",
+      onAdd: onRunAgainstPrompt,
+    });
+  }
+  if (!planFields.showModels) {
+    chips.push({
+      key: "models",
+      label: "Custom simulation models",
+      onAdd: () => planFields.setShowModels(true),
+    });
+  }
+  if (!planFields.showRepeat) {
+    chips.push({
+      key: "repeat",
+      label: "Run multiple times",
+      onAdd: () => planFields.setShowRepeat(true),
+    });
+  }
+  return chips;
+}
+
+/**
+ * How many scenarios a run of this subject covers, or nothing while the scenario
+ * list a "run everything" subject needs is still on its way.
+ */
+function caseCountOf(
+  subject: RunDialogSubject | null,
+  allScenarios: readonly { id: string }[] | undefined,
+  scopedIds: readonly string[],
+): number | null {
+  if (!subject) return null;
+  if (subject.kind === "plan") return scopedIds.length;
+  if (subject.kind === "case") return 1;
+  if (subject.kind === "suite") return subject.scenarioIds.length;
+  return allScenarios?.length ?? null;
+}
+
+/** The targets the run goes against: the agent, and the one it is compared to. */
+function runTargetsOf({
+  target,
+  compareTarget,
+  showCompare,
+}: {
+  target: TargetValue;
+  compareTarget: TargetValue;
+  showCompare: boolean;
+}): NonNullable<TargetValue>[] {
+  const targets: NonNullable<TargetValue>[] = [];
+  if (target) targets.push(target);
+  if (showCompare && compareTarget) targets.push(compareTarget);
+  return targets;
+}
+
+/**
+ * The name of the run, and the configurations this scope already ran with.
+ *
+ * The scope is folded the way the server folds it before the history is read:
+ * a scope naming every test suite of the project IS every scenario, and a
+ * dialog that did not fold it would read the history of a scope its run never
+ * lands in.
+ */
+function useRunDialogNaming({
+  subject,
+  subjectKey,
+  choices,
+  fields,
+  planFields,
+  runTargets,
+}: {
+  subject: RunDialogSubject | null;
+  subjectKey: string;
+  choices: ReturnType<typeof useRunDialogChoices>;
+  fields: RunDialogFields;
+  planFields: RunPlanFields;
+  runTargets: NonNullable<TargetValue>[];
+}) {
+  const targetLabels = useMemo(
+    () =>
+      buildTargetLabels({
+        agents: choices.scenarioAgents,
+        prompts: choices.publishedPrompts,
+      }),
+    [choices.scenarioAgents, choices.publishedPrompts],
+  );
+
+  const runScope = useMemo(
+    () =>
+      normaliseRunScope({
+        scope: planFields.scope,
+        allTestSuiteIds: choices.testSuites.map((testSuite) => testSuite.id),
+      }),
+    [planFields.scope, choices.testSuites],
+  );
+
+  const history = useRunConfigurationHistory({
+    scope: subject ? runScope : null,
+    isEnabled: !!subject,
+  });
+  const historyEntries = history.entries;
+
+  const name = useRunName({
+    subjectKey,
+    // A stored run plan opens on its own name; every other subject derives one.
+    planName: subject?.kind === "suite" ? (subject.planName ?? null) : null,
+    scopeLabel: subject
+      ? scopeLabelOf({
+          subject,
+          scope: planFields.scope,
+          testSuites: choices.testSuites,
+          scenarios: choices.scopeScenarios,
+        })
+      : "",
+    targets: runTargets,
+    targetLabels,
+    entries: historyEntries,
+  });
+
+  const applyConfiguration = useCallback(
+    (key: string) => {
+      const entry = historyEntries.find((candidate) => candidate.key === key);
+      if (!entry) return;
+      applyConfigurationTo({
+        entry,
+        fields,
+        planFields,
+        pinRunName: name.pinRunName,
+      });
+    },
+    [historyEntries, fields, planFields, name.pinRunName],
+  );
+
+  useRunHistorySeed({
+    subject,
+    subjectKey,
+    entries: historyEntries,
+    isLoaded: history.isLoaded,
+    fields,
+    planFields,
+  });
+
+  return { name, runScope, applyConfiguration };
+}
+
+/** Everything an open run dialog holds and offers. */
+export function useRunDialogForm(subject: RunDialogSubject | null) {
+  const subjectKey = subjectKeyOf(subject);
+  const choices = useRunDialogChoices(subject);
+  const fields = useRunDialogFields(subject);
+  const planFields = useRunPlanFields({ subject, subjectKey });
+  const parameters = useRunDialogParameters({
+    subject,
+    allScenarios: choices.allScenarios,
+    fields,
+  });
+  const targeting = useRunDialogTargeting({
+    fields,
+    publishedPrompts: choices.publishedPrompts,
+  });
+
+  const runTargets = runTargetsOf({
+    target: fields.target,
+    compareTarget: planFields.compareTarget,
+    showCompare: planFields.showCompare,
+  });
+  const naming = useRunDialogNaming({
+    subject,
+    subjectKey,
+    choices,
+    fields,
+    planFields,
+    runTargets,
+  });
+
+  const chips = buildCustomizeRunChips({
+    fields,
+    planFields,
+    hasParameterDefinitions: parameters.parameterDefinitions.length > 0,
+    hasPublishedPrompts: choices.publishedPrompts.length > 0,
+    onAddParameters: parameters.showParameters,
+    onRunAgainstPrompt: targeting.selectPrompts,
+  });
+
+  const scopedIds = scopedScenarioIds({
+    subject,
+    scope: planFields.scope,
+    scenarios: choices.scopeScenarios,
+    allScenarios: choices.allScenarios ?? [],
+  });
+
+  return {
+    ...fields,
+    ...choices,
+    ...parameters,
+    ...targeting,
+    ...planFields,
+    ...naming.name,
+    applyConfiguration: naming.applyConfiguration,
+    /** The scope the run goes out with, folded the way the server folds it. */
+    runScope: naming.runScope,
+    runTargets,
+    scopedScenarioIds: scopedIds,
+    chips,
+    caseCount: caseCountOf(subject, choices.allScenarios, scopedIds),
+  };
+}
+
+export type RunDialogForm = ReturnType<typeof useRunDialogForm>;

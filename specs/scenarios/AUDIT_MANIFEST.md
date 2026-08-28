@@ -4,6 +4,18 @@ Phase 0 audit of every unimplemented-tagged scenario under `specs/scenarios/` (2
 
 Tracking: https://github.com/langwatch/langwatch/issues/3458
 
+## Agent Testing v2 additions
+
+Four spec files were added for Agent Testing v2. They are outside the #3458
+audit: they describe behavior being built now, not legacy debt.
+
+| File | Tagging | Note |
+|------|---------|------|
+| scenario-test-suite-assignment.feature | all bound tags | Bound as WS1 and WS2 land. |
+| scenario-versioning.feature | all bound tags | Bound. The editor-reload clause of the stale-save scenario is a frontend surface (WS4). |
+| scenario-version-on-runs.feature | all bound tags | Stamping scenarios bound. The three run-drawer scenarios are a frontend surface (WS4). "A one-off run of a single scenario records that scenario version" is bound in simulation-runner.router.unit.test.ts: the stamp decision lives in the router, and the queue-time version read is integration-covered by scenario-versioning.integration.test.ts. |
+| scenario-version-restore.feature | all bound tags | Restore shipped; the `@unimplemented` tags are removed and every scenario is bound. |
+
 ## TL;DR
 
 | Class | Count | % | Phase 1 action |
@@ -151,10 +163,10 @@ Concentrations:
 | specs/scenarios/scenario-failure-handler.feature | "Worker calls failure handler on job failure" | DUPLICATE | Covered by scenario-processor-failure-handler.unit.test.ts "calls ensureFailureEventsEmitted with correct parameters" |
 | specs/scenarios/scenario-failure-handler.feature | "Worker does not call failure handler on success" | KEEP | Documented contract in scenario-processor-failure-handler.unit.test.ts but not actually asserted; worker integration test missing |
 | specs/scenarios/scenario-failure-handler.feature | "Failure handler errors do not crash worker" | KEEP | Documented contract only (placeholder test asserts true); needs real integration test of the worker.on("completed") try/catch |
-| specs/scenarios/scenario-failure-handler.feature | "Return success when RUN_STARTED exists with IN_PROGRESS status" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "returns success when RUN_STARTED exists with IN_PROGRESS status" |
-| specs/scenarios/scenario-failure-handler.feature | "Return error when run has ERROR status" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "returns error when run has ERROR status" |
-| specs/scenarios/scenario-failure-handler.feature | "Return error when run has FAILED status" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "returns error when run has FAILED status" |
-| specs/scenarios/scenario-failure-handler.feature | "Continue polling when no runs exist yet" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "continues polling when no runs exist yet and times out" |
+| specs/scenarios/scenario-failure-handler.feature | "Return success when RUN_STARTED exists with IN_PROGRESS status" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "given a run exists for the batch > when it is still in progress > hands back its id so the caller can show progress" |
+| specs/scenarios/scenario-failure-handler.feature | "Return error when run has ERROR status" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "given a run exists for the batch > when it never produced an outcome > reports run_error for a run that errored" |
+| specs/scenarios/scenario-failure-handler.feature | "Return error when run has FAILED status" | UPDATE | Premise is outdated: FAILED means the run executed and did not pass, so the poll now returns `run_failed`, not `run_error` (pollForScenarioRun.ts). Covered by pollForScenarioRun.unit.test.ts "given a run exists for the batch > when it executed and did not pass > reports run_failed, not an execution error" |
+| specs/scenarios/scenario-failure-handler.feature | "Continue polling when no runs exist yet" | DUPLICATE | Covered by pollForScenarioRun.unit.test.ts "given no run has appeared yet > when the polling budget runs out > reports a timeout" |
 | specs/scenarios/scenario-failure-handler.feature | "Frontend displays error instead of timeout on job failure" | KEEP | E2E — backend dispatches finishRun with ERROR status but no E2E test asserts UI navigation + error message rendering |
 | specs/scenarios/scenario-failure-handler.feature | "Frontend displays error when child process crashes" | KEEP | E2E — child process crash error path implemented (scenario.processor.ts:390) but no E2E asserting UI shows error + ERROR status |
 | specs/scenarios/scenario-failure-handler.feature | "Run history shows failed runs with error details" | KEEP | E2E — failed runs persist via finishRun but no E2E test exercising run history UI for failed runs |

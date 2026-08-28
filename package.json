@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.15.0",
+  "version": "3.17.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
@@ -32,12 +32,15 @@
   },
   "files": [
     "packages/server/dist/",
+    "packages/actor/",
     "packages/api/",
     "packages/authz/",
     "packages/authz-server/",
     "packages/automations/",
     "packages/clickhouse-client/",
     "packages/handled-error/",
+    "packages/identity/",
+    "packages/identity-server/",
     "packages/langy/",
     "packages/observability/",
     "packages/react-rum/",
@@ -59,6 +62,7 @@
     "pnpm-lock.yaml",
     "packages/server/package.json",
     "plugins/langwatch/package.json",
+    "services/langyworker/package.json",
     "tests/agentic-e2e/package.json"
   ],
   "scripts": {
@@ -84,6 +88,7 @@
     "lint:fix": "pnpm --filter @langwatch/web lint:fix",
     "format": "pnpm --filter @langwatch/web format",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
+    "start:prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",

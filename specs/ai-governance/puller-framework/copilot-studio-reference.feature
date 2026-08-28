@@ -1,19 +1,42 @@
+# RETIRED. This source reads Microsoft's directory audit — the log of
+# directory changes — which has never contained a Copilot conversation and
+# cannot be made to. Copilot conversations are read from Dataverse instead;
+# see copilot-studio-dataverse.feature and ADR-088 Decision 15.
+#
+# The scenarios below are kept because rows configured on this source type
+# still exist and must keep rendering, and because the framework behaviour
+# they pin (cursor restart, 401 handling) is still the framework's contract.
+# The source type is no longer offered in the picker, so nothing here may
+# require creating one — see copilot-studio-dataverse.feature, which requires
+# its absence from the picker outright.
+
 Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAdapter)
   As a platform engineer who needs Copilot Studio audit-log ingestion working
   end-to-end without writing a custom adapter
   I want a reference implementation that uses HttpPollingPullerAdapter + a
   fixed config shape per Microsoft's audit-log API
-  So that admins enable "Copilot Studio" with one click in the UI + the
-  framework handles polling / pagination / event-mapping
+  So that a source configured against it keeps running + the framework
+  handles polling / pagination / event-mapping
 
   Background:
     Given the puller framework + HttpPollingPullerAdapter + S3PollingPullerAdapter are in place
 
-  Scenario: Admin enables Copilot Studio with one click
-    Given alice is an org ADMIN
-    When alice clicks "Add ingestion source" → "Microsoft Copilot Studio" → enters her tenant credentials → Save
-    Then a new IngestionSource row lands with `sourceType = "copilot_studio"` + `pullConfig = <auto-populated reference config>` + `pullSchedule = "*/15 * * * *"` (15 min default)
-    And the process outbox picks up the first scheduled run within ~15 min
+  # Replaces "Admin enables Copilot Studio with one click". Creating one is no
+  # longer possible and must not be: the type is out of the picker, and the
+  # Dataverse feature requires it absent. What still has to hold is that a row
+  # created before the retirement is still dispatchable.
+  #
+  # Narrowed from "keeps running", which had no trigger and asserted an
+  # ongoing state nothing can observe at a point in time. The observable
+  # property is the one that actually breaks when an adapter is deleted: the
+  # registry still answers for this id, so a scheduled run resolves an adapter
+  # instead of failing with "unknown ingestion pull adapter". Picker absence
+  # is not restated here — copilot-studio-dataverse.feature owns it, and that
+  # copy is the one with a test bound to it.
+  Scenario: A source configured before the retirement still resolves an adapter
+    Given an IngestionSource row already exists with `sourceType = "copilot_studio"` + `pullConfig.adapter = "copilot_studio"`
+    When the worker dispatches its scheduled run
+    Then the registry resolves the retired adapter rather than refusing the run
 
   Scenario: Reference config is locked + auditable
     Given the copilot_studio reference puller exists at `platform/app/ee/governance/services/pullers/copilotStudio.puller.ts`
@@ -36,10 +59,19 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
   Scenario: Microsoft 401 surfaces as actionable
     Given Microsoft returns 401 (credentials expired)
     Then the puller fails with `errorCount = 1` + cursor unchanged
-    And the IngestionSource UI shows "Microsoft authentication failed. Re-authorize at /governance/ingestion-sources/<id>"
+    And the IngestionSource UI shows "Microsoft authentication failed. Re-authorize at /governance/inventory/<id>"
     And the next pull won't fire until the admin re-authenticates (back-off + alert; not infinite retry)
 
   Scenario: Future pullers follow the same pattern
     Given the openai_compliance + claude_compliance reference pullers eventually land
-    Then they MUST: extend `HttpPollingPullerAdapter` (not implement PullerAdapter directly), export their reference config as a constant, lock URL + auth shape, allow only credentials override
+    Then they MUST: export their reference config as a constant, lock URL + auth shape, allow only credentials override
     And the admin UI auto-discovers reference impls + presents them as one-click options
+    # This scenario originally also required extending `HttpPollingPullerAdapter`
+    # rather than implementing `PullerAdapter` directly. That requirement is
+    # withdrawn: it holds only for sources whose credential is a fixed value
+    # known before the run, which is what that base class substitutes into
+    # header templates. A source that must exchange credentials for a token
+    # and refresh it on expiry has no seam there, and forcing the reuse would
+    # push token machinery into a base class four adapters share for the sake
+    # of one. See ADR-088 Decision 17 (v10.2). The rest of the pattern —
+    # locked config, credentials-only override, auto-discovery — still binds.

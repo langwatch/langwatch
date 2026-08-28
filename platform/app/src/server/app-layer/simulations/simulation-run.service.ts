@@ -2,7 +2,9 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
+  BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -49,6 +51,13 @@ export class SimulationRunService {
     endDate?: number;
   }): Promise<BatchHistoryResult> {
     return this.repository.getBatchHistoryForScenarioSet(params);
+  }
+
+  async getBatchSummary(params: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<BatchSummary | null> {
+    return this.repository.getBatchSummary(params);
   }
 
   async getRunDataForBatchRun(params: {
@@ -106,6 +115,20 @@ export class SimulationRunService {
     endDate?: number;
   }): Promise<ExternalSetSummary[]> {
     return this.repository.getInternalSuiteSummaries(params);
+  }
+
+  /**
+   * The latest run result per scenario inside the window, for the last-result
+   * cells of the scenarios table. Kept separate from the scenario list read
+   * so the list renders instantly and the cells stream in.
+   */
+  async getLastResultSummaries(params: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]> {
+    return this.repository.getLastResultSummaries(params);
   }
 
   async getRunDataForAllSuites(params: {

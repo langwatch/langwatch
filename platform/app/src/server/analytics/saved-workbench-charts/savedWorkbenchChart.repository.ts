@@ -39,6 +39,17 @@ export type UpdateSavedWorkbenchChartInput = {
   definition?: Prisma.InputJsonValue;
 };
 
+export type PlaceSavedWorkbenchChartInput = {
+  id: string;
+  projectId: string;
+  /** Already checked against this project by the service. */
+  dashboardId: string;
+  gridColumn: number;
+  gridRow: number;
+  colSpan: number;
+  rowSpan: number;
+};
+
 /**
  * What the service needs from storage, and the whole of it.
  *
@@ -55,6 +66,11 @@ export interface SavedWorkbenchChartStore {
   }): Promise<CustomGraph | null>;
   create(input: CreateSavedWorkbenchChartInput): Promise<CustomGraph>;
   update(input: UpdateSavedWorkbenchChartInput): Promise<CustomGraph | null>;
+  place(input: PlaceSavedWorkbenchChartInput): Promise<CustomGraph | null>;
+  unplace(input: {
+    id: string;
+    projectId: string;
+  }): Promise<CustomGraph | null>;
   delete(input: { id: string; projectId: string }): Promise<number>;
 }
 
@@ -124,6 +140,62 @@ export class SavedWorkbenchChartRepository implements SavedWorkbenchChartStore {
       },
     });
     return updated[0] ?? null;
+  }
+
+  /**
+   * Places one saved workbench chart on a dashboard.
+   *
+   * The dashboard's tenancy is the service's to check before calling this —
+   * this method only writes what it is given. Returns `null` when nothing
+   * matched, the same not-found-by-predicate idiom {@link update} uses.
+   */
+  async place(
+    input: PlaceSavedWorkbenchChartInput,
+  ): Promise<CustomGraph | null> {
+    const placed = await this.prisma.customGraph.updateManyAndReturn({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+      },
+      data: {
+        dashboardId: input.dashboardId,
+        gridColumn: input.gridColumn,
+        gridRow: input.gridRow,
+        colSpan: input.colSpan,
+        rowSpan: input.rowSpan,
+      },
+    });
+    return placed[0] ?? null;
+  }
+
+  /**
+   * Removes one saved workbench chart from whatever dashboard it is on.
+   *
+   * Clears every placement field, not just `dashboardId` — a chart with a
+   * dashboard id of `null` but a stale grid position is not meaningfully
+   * unplaced, and would place wrong the moment it was placed again with no
+   * explicit grid row.
+   */
+  async unplace(input: {
+    id: string;
+    projectId: string;
+  }): Promise<CustomGraph | null> {
+    const unplaced = await this.prisma.customGraph.updateManyAndReturn({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+      },
+      data: {
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+      },
+    });
+    return unplaced[0] ?? null;
   }
 
   /** Deletes one saved workbench chart. Answers how many rows went. */

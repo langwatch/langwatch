@@ -79,8 +79,27 @@ export type LangyStreamEntry =
   // design: never a durable event, so reopening a past conversation (which
   // reads the durable fold, not this buffer) never replays a navigation.
   | { type: "navigate"; href: string }
+  // The agent asking the OPEN PAGE to carry out one typed action (duplicate a
+  // workbench column, edit a prompt draft, start a run). `kind` names an entry
+  // in a page's action manifest and `payload` has already passed that entry's
+  // schema server-side before it was appended — the browser re-parses with the
+  // same schema and never executes anything else. LIVE-ONLY like `navigate`:
+  // never a durable event, so reopening a past conversation can never replay
+  // an action. `actionId` is the server-minted claim/result key, which makes
+  // the whole round trip at-most-once.
+  | { type: "ui"; actionId: string; kind: string; payload: unknown }
   | { type: "end" }
   | { type: "error"; error: string };
+
+/**
+ * What the panel says when a turn finishes without the agent writing anything.
+ * Names the state and hands the user their next move, rather than apologising
+ * for an internal detail they cannot act on. It points at the cards instead of
+ * inviting a blind repeat, because a silent turn can still have completed a
+ * write, and the cards are where that write is visible.
+ */
+export const LANGY_EMPTY_TURN_FALLBACK =
+  "I finished this turn without writing a reply. Check the cards above for what ran before you ask again.";
 
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
@@ -143,6 +162,13 @@ export class LangyTokenBuffer {
   private readonly tokenCounts = new Map<string, number>();
   /** Turns whose FIRST delta already flushed (time-to-first-token done). */
   private readonly firstFlushDone = new Set<string>();
+  /**
+   * Turns that emitted at least one delta with a non-whitespace character.
+   * Separate from `firstFlushDone` because a delta of pure whitespace still
+   * has to be buffered (it is the space between two words) while leaving the
+   * panel with nothing the user can read.
+   */
+  private readonly sawVisibleText = new Set<string>();
   /** Per-turn time-arm timers: flush pending text FLUSH_AFTER_MS after the first pending token. */
   private readonly flushTimers = new Map<
     string,
@@ -215,6 +241,7 @@ export class LangyTokenBuffer {
   }): Promise<void> {
     if (!text) return;
     const pk = this.pendingKey(conversationId, turnId);
+    if (text.trim()) this.sawVisibleText.add(pk);
     this.pending.set(pk, (this.pending.get(pk) ?? "") + text);
     // Cheap word-count proxy — we do not tokenize here.
     const count =
@@ -412,7 +439,9 @@ export class LangyTokenBuffer {
    * platform-computed link before ever calling this, so nothing agent-authored
    * reaches the stream. No durable event is ever written for this: a navigate
    * fires at most once, on the live edge, and reopening a past conversation
-   * (the durable fold) can never replay it.
+   * (the durable fold) can never replay it. Buffered tokens are flushed first,
+   * so the line that says where the agent is going arrives before the page
+   * moves there.
    */
   async appendNavigate({
     conversationId,
@@ -423,7 +452,43 @@ export class LangyTokenBuffer {
     turnId: string;
     href: string;
   }): Promise<void> {
+    await this.flush({ conversationId, turnId });
     await this.append(conversationId, turnId, { type: "navigate", href });
+  }
+
+  /**
+   * Push a live-only UI action for the attached page to claim and execute.
+   * The caller (the UI-action service) has already validated `kind` against
+   * the page manifest and `payload` against that kind's schema, and pinned the
+   * action to this conversation + turn in Redis; nothing agent-authored
+   * reaches the stream unvalidated. No durable event is ever written: like
+   * `navigate`, an action fires at most once, on the live edge.
+   *
+   * Buffered tokens are flushed first, as `appendPlan` and `appendTool` do.
+   * The agent says what it is about to do and then does it, so the page has to
+   * receive those words before the change they announce. Without the flush a
+   * column can appear while the line explaining it is still in the buffer.
+   */
+  async appendUiAction({
+    conversationId,
+    turnId,
+    actionId,
+    kind,
+    payload,
+  }: {
+    conversationId: string;
+    turnId: string;
+    actionId: string;
+    kind: string;
+    payload: unknown;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "ui",
+      actionId,
+      kind,
+      payload,
+    });
   }
 
   /**
@@ -472,18 +537,68 @@ export class LangyTokenBuffer {
     });
   }
 
-  /** Terminal marker: the turn completed. Flushes buffered tokens first. */
+  /**
+   * Terminal marker: the live stream is over. Flushes buffered tokens first.
+   *
+   * `backstopSilentTurn` asks for the empty-turn fallback line, and only a
+   * genuinely completed turn may ask. A user Stop and an ADR-048 handoff both
+   * end the stream too, and neither is a turn that finished without writing a
+   * reply: Stop usually lands on a real partial answer, and a handoff is
+   * re-driven on a fresh worker. Telling either one "I finished this turn
+   * without writing a reply" is wrong on both halves of the sentence.
+   */
   async markEnd({
+    conversationId,
+    turnId,
+    backstopSilentTurn = false,
+  }: {
+    conversationId: string;
+    turnId: string;
+    backstopSilentTurn?: boolean;
+  }): Promise<{ backstopped: boolean }> {
+    await this.flush({ conversationId, turnId });
+    await this.flushReasoning({ conversationId, turnId });
+    // A turn that completes without a text delta leaves a finished spinner and
+    // nothing else, which reads as a broken product even when every command in
+    // the turn succeeded. The agent is told to always end with visible text;
+    // this is the backstop. Pure whitespace reads the same as nothing, so it
+    // takes the fallback too.
+    const backstopped =
+      backstopSilentTurn &&
+      !this.sawVisibleText.has(this.pendingKey(conversationId, turnId)) &&
+      !(await this.streamCarriesVisibleText({ conversationId, turnId }));
+    if (backstopped) {
+      await this.append(conversationId, turnId, {
+        type: "delta",
+        text: LANGY_EMPTY_TURN_FALLBACK,
+      });
+    }
+    this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
+    this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
+    await this.append(conversationId, turnId, { type: "end" });
+    return { backstopped };
+  }
+
+  /**
+   * Did this turn already write something the user can read?
+   *
+   * `sawVisibleText` is in-memory and a buffer is built per relay request, so a
+   * worker that reconnects mid-turn ends the stream on an instance that never
+   * saw the earlier deltas. The stream is the durable record of what the user
+   * got, so it decides. Only reached when instance memory says nothing was
+   * written, which is the rare case, so the normal path pays no read.
+   */
+  private async streamCarriesVisibleText({
     conversationId,
     turnId,
   }: {
     conversationId: string;
     turnId: string;
-  }): Promise<void> {
-    await this.flush({ conversationId, turnId });
-    await this.flushReasoning({ conversationId, turnId });
-    this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
-    await this.append(conversationId, turnId, { type: "end" });
+  }): Promise<boolean> {
+    const { reads } = await this.readTail({ conversationId, turnId });
+    return reads.some(
+      ({ entry }) => entry.type === "delta" && entry.text.trim() !== "",
+    );
   }
 
   /** Terminal marker: the turn errored. Flushes buffered tokens first. */
@@ -499,6 +614,7 @@ export class LangyTokenBuffer {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
+    this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "error", error });
   }
 

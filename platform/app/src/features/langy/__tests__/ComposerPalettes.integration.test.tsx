@@ -61,7 +61,6 @@ beforeEach(() => {
   useLangyStore.setState({
     turnPhase: "idle",
     draft: "",
-    contextHintDismissed: true,
     isOpen: false,
   });
   useLangyContextTargetStore.getState().reset();
@@ -282,38 +281,11 @@ describe("given a page with something Langy can be given", () => {
     ref: "wf_1",
   };
 
-  describe("when the user has never handed Langy anything", () => {
-    it("teaches the # gesture once", () => {
-      useLangyStore.setState({ contextHintDismissed: false });
+  describe("when the composer renders above it", () => {
+    it("shows no teaching banner", () => {
       useLangyContextTargetStore.getState().register(target);
       renderComposer();
 
-      const hint = screen.getByTestId("langy-context-gesture-hint");
-      expect(hint).toHaveTextContent(
-        "Type # to add anything on this page to Langy context",
-      );
-    });
-
-    it("says nothing on a page with nothing to point at", () => {
-      useLangyStore.setState({ contextHintDismissed: false });
-      renderComposer();
-
-      expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
-    });
-  });
-
-  describe("when the user dismisses the hint", () => {
-    it("does not show it again", async () => {
-      const user = userEvent.setup();
-      useLangyStore.setState({ contextHintDismissed: false });
-      useLangyContextTargetStore.getState().register(target);
-      const { unmount } = renderComposer();
-
-      await user.click(screen.getByRole("button", { name: /dismiss hint/i }));
-      expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
-
-      unmount();
-      renderComposer();
       expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
     });
   });

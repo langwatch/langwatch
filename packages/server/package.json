@@ -11,10 +11,10 @@
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:invariants": "vitest run test/workspace-invariants.test.ts"
+		"test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
 	},
 	"dependencies": {
-		"chalk": "^5.4.1",
+		"chalk": "^6.0.0",
 		"commander": "^15.0.0",
 		"concurrently": "^9.1.2",
 		"execa": "^9.6.0",

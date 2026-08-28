@@ -1,3 +1,5 @@
+import type { LedgerActor } from "@langwatch/actor";
+import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,
   Prisma,
@@ -5,7 +7,22 @@ import type {
   RoleBinding,
 } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
+import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+
+/** The grants an API key carries, as the request states them. */
+export type ApiKeyBindingInput = {
+  role: TeamUserRole;
+  customRoleId?: string | null;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+};
 
 export type ApiKeyWithBindings = ApiKey & {
   roleBindings: RoleBinding[];
@@ -20,7 +37,18 @@ export type ApiKeyWithBindings = ApiKey & {
 export type ApiKeyPrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
 export class ApiKeyRepository {
-  constructor(private readonly prisma: ApiKeyPrismaDelegate) {}
+  constructor(
+    private readonly prisma: ApiKeyPrismaDelegate,
+    /**
+     * A key's grants are ledger facts (ADR-092 §13). The writer never rides
+     * the caller's transaction, so it is composed over the app's own client
+     * rather than `prisma` above, which may be one.
+     */
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+      prisma,
+    ),
+  ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);
@@ -39,6 +67,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    startsDisabled = false,
   }: {
     name: string;
     description?: string | null;
@@ -52,6 +81,13 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Born revoked, to be activated once the key's grants are facts (see
+     * {@link activate}). The row and its grants cannot share a transaction —
+     * the grants are ledger commands — so the key is unusable until the
+     * writes it depends on have landed.
+     */
+    startsDisabled?: boolean;
   }): Promise<ApiKey> {
     return this.prisma.apiKey.create({
       data: {
@@ -67,7 +103,20 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
+    });
+  }
+
+  /**
+   * Clear the revocation a {@link create} with `startsDisabled` set, once the
+   * key's grants exist. The last step of a create, and the only one that
+   * makes the credential able to authenticate.
+   */
+  async activate({ id }: { id: string }): Promise<ApiKey> {
+    return this.prisma.apiKey.update({
+      where: { id },
+      data: { revokedAt: null },
     });
   }
 
@@ -319,39 +368,52 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Replaces all role bindings for an API key. Deletes existing ones first,
-   * then creates the new set — all within the caller's transaction.
+   * Replaces all grants on an API key: attach the set the caller asked for,
+   * then revoke everything else the key still holds.
+   *
+   * ATTACH FIRST, REVOKE AFTER. The two writes are ledger commands and cannot
+   * share a transaction, so their order is the only fail-safety left, and the
+   * invariant it buys is: a crash between them leaves the credential holding
+   * the union of what it had and what was asked for — never nothing. The
+   * revoke-first order left a window in which the key held ZERO grants, which
+   * is both an outage for whoever is using it and the shape the read-through
+   * mint treats as "legacy" (see ./legacy-grant-mint.ts, which additionally
+   * gates on the key predating the ledger era so this window can never widen
+   * a key to organization ADMIN).
+   *
+   * The revoke names the ids to spare rather than the ones to take, so a
+   * binding attached a moment ago — or an identical one that was already
+   * there and was therefore skipped as a duplicate — is never revoked by the
+   * write that asked for it.
    */
   async replaceRoleBindings({
     apiKeyId,
     organizationId,
     bindings,
+    actor,
   }: {
     apiKeyId: string;
     organizationId: string;
-    bindings: Array<{
-      role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-      customRoleId?: string | null;
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
   }): Promise<{ count: number }> {
-    await this.prisma.roleBinding.deleteMany({
-      where: { apiKeyId },
+    const attached = await this.attachRoleBindings({
+      apiKeyId,
+      organizationId,
+      bindings,
+      actor,
     });
-
-    if (bindings.length === 0) return { count: 0 };
-
-    return this.prisma.roleBinding.createMany({
-      data: bindings.map((b) => ({
-        organizationId,
+    const keep = [...attached.attached, ...attached.duplicates];
+    await this.writer.revokeBindingsWhere({
+      organizationId,
+      where: {
         apiKeyId,
-        role: b.role,
-        customRoleId: b.role === "CUSTOM" ? (b.customRoleId ?? null) : null,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      })),
+        ...(keep.length > 0 ? { id: { notIn: keep } } : {}),
+      },
+      actor,
+      reason: "api key grants replaced",
     });
+    return { count: attached.attached.length };
   }
 
   async findOrgMembership({
@@ -433,16 +495,20 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }) {
-    return this.prisma.roleBinding.findMany({
-      where: { userId, organizationId },
-      select: {
-        id: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
+    // Through the per-organization fork (ADR-092, delivery-plan PR 3
+    // follow-up): a cut-over organization's key drawer is served from the
+    // ledger's own head.
+    const rows = await this.accessListing.findUserBindings({
+      organizationId,
+      userId,
     });
+    return rows.map((row) => ({
+      id: row.id,
+      role: row.role,
+      customRoleId: row.customRoleId,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+    }));
   }
 
   async findOrgsByIds(ids: string[]) {
@@ -513,34 +579,57 @@ export class ApiKeyRepository {
     }));
   }
 
-  /**
-   * Inserts all role bindings for an API key in a single query.
-   */
+  /** Attaches all of an API key's grants as one command. */
   async createRoleBindings({
     apiKeyId,
     organizationId,
     bindings,
+    actor,
   }: {
     apiKeyId: string;
     organizationId: string;
-    bindings: Array<{
-      role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-      customRoleId?: string | null;
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
   }): Promise<{ count: number }> {
-    if (bindings.length === 0) return { count: 0 };
+    const outcome = await this.attachRoleBindings({
+      apiKeyId,
+      organizationId,
+      bindings,
+      actor,
+    });
+    return { count: outcome.attached.length };
+  }
 
-    return this.prisma.roleBinding.createMany({
-      data: bindings.map((b) => ({
-        organizationId,
-        apiKeyId,
+  /**
+   * The attach itself, with the outcome intact: which ids were written and
+   * which identical rows were already there. `replaceRoleBindings` needs both
+   * to know what its revoke must spare.
+   */
+  private async attachRoleBindings({
+    apiKeyId,
+    organizationId,
+    bindings,
+    actor,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+    bindings: ApiKeyBindingInput[];
+    actor: LedgerActor;
+  }): Promise<{ attached: string[]; duplicates: string[] }> {
+    if (bindings.length === 0) return { attached: [], duplicates: [] };
+
+    return this.writer.attachBindings({
+      organizationId,
+      bindings: bindings.map((b) => ({
+        bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        principal: { apiKeyId },
         role: b.role,
         customRoleId: b.role === "CUSTOM" ? (b.customRoleId ?? null) : null,
         scopeType: b.scopeType,
         scopeId: b.scopeId,
       })),
+      actor,
+      onDuplicate: "skip",
     });
   }
 }

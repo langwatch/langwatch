@@ -9,12 +9,20 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { tryGetApp } from "~/server/app-layer/app";
 
 /** Resolves the ClickHouse client for a project. Injectable for tests. */
 export type IngestLagClientResolver = (
   projectId: string,
 ) => Promise<ClickHouseClient | null>;
+
+/** The App's per-tenant resolver, null when no App or no ClickHouse - this
+ *  measurement is best-effort and callers already treat null as "no data". */
+const appClientResolver: IngestLagClientResolver = async (projectId) => {
+  const app = tryGetApp();
+  if (!app?.clickhouse.enabled) return null;
+  return app.clickhouse.resolveClient(projectId);
+};
 
 export interface IngestLagSample {
   p95LagMs: number;
@@ -32,7 +40,7 @@ interface IngestLagRow {
  */
 export async function findIngestLagP95({
   projectId,
-  clientResolver = getClickHouseClientForProject,
+  clientResolver = appClientResolver,
 }: {
   projectId: string;
   clientResolver?: IngestLagClientResolver;

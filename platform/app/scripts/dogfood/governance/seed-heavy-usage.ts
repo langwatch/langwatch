@@ -22,7 +22,7 @@
  */
 import { randomBytes } from "crypto";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 
 export interface Args {
   personalProject: string;
@@ -239,7 +239,7 @@ export async function runSeedHeavyUsage(
   const traces: SyntheticTrace[] = [];
   for (let i = 0; i < args.rows; i++) traces.push(synthTrace(args));
 
-  const client = await getClickHouseClientForProject(args.personalProject);
+  const client = await getClickHouseClientForTenant(args.personalProject);
   if (!client) throw new Error("ClickHouse client unavailable for tenant");
 
   const traceRows = traces.map((t) => ({

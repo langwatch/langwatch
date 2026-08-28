@@ -1,13 +1,13 @@
 ---
-title: Remote Traces
-sidebarTitle: Remote traces
-keywords: langwatch, agent simulations, remote traces, traceparent, trace propagation, judge, tool calls, opentelemetry
+title: Linking Your Traces
+sidebarTitle: Linking your traces
+keywords: langwatch, agent simulations, linked traces, traceparent, trace propagation, judge, tool calls, opentelemetry
 description: Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
 ---
 
-# Remote Traces
+## Connecting your agent traces to the scenario run
 
-Remote traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+Linked traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
 
 For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
 
@@ -69,9 +69,9 @@ Write the criterion about the action, in your system's own vocabulary, and the j
 
 A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
 
-## Remote traces in code-first scenarios
+## Linked traces in code-first scenarios
 
-The Scenario SDKs fetch remote traces from LangWatch with a flag on the run or on the global configuration:
+The Scenario SDKs fetch the agent's traces from LangWatch with a flag on the run or on the global configuration:
 
 <Tabs>
   <Tab title="Python">
@@ -144,6 +144,6 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
     Register your agent's HTTP endpoint and adopt the trace context
   </Card>
   <Card title="Local development" icon="laptop-code" href="/agent-simulations/local-development">
-    Run platform suites against the agent on your machine with a tunnel
+    Run platform test suites against the agent on your machine with a tunnel
   </Card>
 </CardGroup>

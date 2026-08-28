@@ -18,12 +18,11 @@ import { createGzip } from "node:zlib";
 import { auditLog } from "@ee/audit-log/auditLog";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
@@ -58,8 +57,8 @@ secured
         throw new ScenarioRunExportUnauthenticatedError();
       }
 
-      const hasPermission = await hasProjectPermission(
-        { prisma, session },
+      const hasPermission = await probeProjectPermission(
+        { session },
         request.projectId,
         "scenarios:view",
       );

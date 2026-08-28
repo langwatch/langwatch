@@ -64,8 +64,10 @@ function SortChip({
   );
 }
 
-const fmtUsd = (n: number) =>
-  n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
+const fmtUsd = (n: number | string) => {
+  const v = typeof n === "string" ? Number(n) : n;
+  return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
+};
 
 const fmtRelative = (date: Date | string | null): string => {
   if (!date) return "—";
@@ -110,21 +112,7 @@ function GovernanceUsersListPage() {
   return (
     <GovernanceLayout pageTitle="Users · AI Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <Text fontSize="xs" color="fg.muted">
-              <Link href="/governance" color="blue.600">
-                ← AI Governance
-              </Link>{" "}
-              · All users
-            </Text>
-            <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Every LangWatch member that reported activity in the last 30 days.
-              Click a row to drill into a single user.
-            </Text>
-          </VStack>
-        </HStack>
+        <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
 
         {canReadActivity ? (
           <UserSpendPanel

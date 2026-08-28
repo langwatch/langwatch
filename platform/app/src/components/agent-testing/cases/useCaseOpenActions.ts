@@ -1,0 +1,60 @@
+/**
+ * Every way the Scenarios tab opens one scenario: the editor drawer and the run it
+ * last had. The versions of a scenario read inside the editor drawer.
+ *
+ * @see specs/features/agent-testing/cases-table.feature
+ * @see dev/docs/best_practices/drawers.md
+ */
+
+import { useCallback } from "react";
+import { useDrawer } from "~/hooks/useDrawer";
+import { CASE_EDITOR_DRAWER } from "./AgentTestingCaseEditorDrawer";
+import type { CaseLastResult } from "./CasesTable";
+import type { TestCase } from "./test-cases";
+import { useOpenLiveRun } from "./useOpenLiveRun";
+
+export type CaseOpenActions = {
+  openEditor: (testCase: TestCase) => void;
+  openLastRun: (testCase: TestCase) => void;
+  /** A row click always opens the scenario editor. */
+  onRowClick: (testCase: TestCase) => void;
+};
+
+export function useCaseOpenActions(
+  lastResults: Map<string, CaseLastResult>,
+): CaseOpenActions {
+  const { openLiveRun } = useOpenLiveRun();
+  const { openDrawer } = useDrawer();
+
+  const openEditor = useCallback(
+    (testCase: TestCase) =>
+      openDrawer(CASE_EDITOR_DRAWER, { scenarioId: testCase.id }),
+    [openDrawer],
+  );
+
+  const openLastRun = useCallback(
+    (testCase: TestCase) => {
+      const lastResult = lastResults.get(testCase.id);
+      if (!lastResult) return;
+      openLiveRun({
+        batchRunId: lastResult.batchRunId,
+        scenarioSetId: lastResult.scenarioSetId,
+        scenarioId: testCase.id,
+      });
+    },
+    [lastResults, openLiveRun],
+  );
+
+  // A row click opens the scenario editor pre-scoped to the test suite it sits in, so
+  // a new derivative of the scenario would file under the same suite.
+  const onRowClick = useCallback(
+    (testCase: TestCase) =>
+      openDrawer(CASE_EDITOR_DRAWER, {
+        scenarioId: testCase.id,
+        testSuiteId: testCase.testSuiteId ?? undefined,
+      }),
+    [openDrawer],
+  );
+
+  return { openEditor, openLastRun, onRowClick };
+}

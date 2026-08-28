@@ -29,6 +29,19 @@ func TestParamPolicyDocsInSync(t *testing.T) {
 	if docTable != want {
 		t.Fatalf("docs table drifted from paramPolicyTable.\nRegenerate with: go test ./services/aigateway/adapters/providers -run TestPrintParamTable -v\n\nwant:\n%s\n\ngot:\n%s", want, docTable)
 	}
+
+	codexBegin := "{/* codex-param-table:begin generated from codexParamPolicyTable, kept in sync by TestParamPolicyDocsInSync */}"
+	codexEnd := "{/* codex-param-table:end */}"
+	ci := strings.Index(page, codexBegin)
+	cj := strings.Index(page, codexEnd)
+	if ci < 0 || cj < 0 || cj < ci {
+		t.Fatal("codex-param-table markers missing from docs/ai-gateway/parameter-mapping.mdx")
+	}
+	codexDocTable := strings.TrimSpace(page[ci+len(codexBegin) : cj])
+	codexWant := strings.TrimSpace(renderCodexParamPolicyTable())
+	if codexDocTable != codexWant {
+		t.Fatalf("docs table drifted from codexParamPolicyTable.\nRegenerate with: go test ./services/aigateway/adapters/providers -run TestPrintParamTable -v\n\nwant:\n%s\n\ngot:\n%s", codexWant, codexDocTable)
+	}
 }
 
 // TestPrintParamTable is the generator: go test -run TestPrintParamTable -v
@@ -36,5 +49,6 @@ func TestParamPolicyDocsInSync(t *testing.T) {
 func TestPrintParamTable(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("\n" + renderParamPolicyTable())
+		t.Log("\n" + renderCodexParamPolicyTable())
 	}
 }

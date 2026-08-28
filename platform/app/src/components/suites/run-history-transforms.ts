@@ -8,7 +8,7 @@
 import {
   computeMetricStats,
   type MetricStats,
-} from "~/components/shared/MetricStatsTooltip";
+} from "~/components/shared/metricStats";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
@@ -467,17 +467,24 @@ export function buildDisplayTitle({
  * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
  * - External runs: returns the raw scenario set ID as the label
  * - No set ID: returns null
+ *
+ * onPlatformLabel renames only the on-platform set, for a surface that calls
+ * it something else. Omitted, the label is the one v1 has always shown.
  */
 export function resolveOriginLabel({
   scenarioSetId,
   suiteNameMap,
+  onPlatformLabel,
 }: {
   scenarioSetId: string | undefined;
   suiteNameMap: Map<string, string>;
+  onPlatformLabel?: string;
 }): string | null {
   if (!scenarioSetId) return null;
 
-  if (isOnPlatformSet(scenarioSetId)) return ON_PLATFORM_DISPLAY_NAME;
+  if (isOnPlatformSet(scenarioSetId)) {
+    return onPlatformLabel ?? ON_PLATFORM_DISPLAY_NAME;
+  }
 
   if (isSuiteSetId(scenarioSetId)) {
     const suiteId = extractSuiteId(scenarioSetId);

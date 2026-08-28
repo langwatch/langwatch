@@ -52,6 +52,7 @@ import {
   langyRelayFrameSchema,
 } from "./langyRelayFrame";
 import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import { LANGY_EMPTY_TURN_FALLBACK } from "./langyTokenBuffer";
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -185,7 +186,11 @@ export interface LangyRelayBuffer {
     digest?: CliResultDigest;
     result?: CliToolResult;
   }): Promise<void>;
-  markEnd(a: { conversationId: string; turnId: string }): Promise<void>;
+  markEnd(a: {
+    conversationId: string;
+    turnId: string;
+    backstopSilentTurn?: boolean;
+  }): Promise<{ backstopped: boolean }>;
   markError(a: {
     conversationId: string;
     turnId: string;
@@ -289,6 +294,23 @@ export interface LangyTurnRelayDeps {
     conversationId: string;
     turnId: string;
   }): Promise<string | null>;
+  /**
+   * Extend the turn's handoff by another full TTL.
+   *
+   * The handoff TTL is written once when the turn is dispatched, and the
+   * heartbeat below is the only ongoing proof that the worker is alive. Without
+   * this, a turn running longer than the handoff TTL lost the record it would
+   * be revived from while it was still working.
+   *
+   * No `projectId`, unlike `readHandoffRunToken`: that one runs BEFORE the MAC
+   * check and so cannot trust the conversation id it was handed, while this one
+   * runs after it, on a triple the signature has already proven. Optional dep so
+   * unit tests and non-relaying consumers stay thin.
+   */
+  refreshHandoffTtl?(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<void>;
   /**
    * Per-conversation memory of "which platform address did a lookup surface for
    * resource X". A `navigate` instruction resolves its destination from here.
@@ -534,6 +556,24 @@ export class LangyTurnRelay {
       case "heartbeat":
         // Liveness only — refresh the turn's freshness, write no content.
         await this.deps.buffer.heartbeat(at);
+        // The same proof of life extends the handoff. One EXPIRE, never a
+        // rewrite of the record: this frame says the worker is alive, not that
+        // anything about the turn's resume inputs changed.
+        try {
+          await this.deps.refreshHandoffTtl?.(at);
+        } catch (error) {
+          // A heartbeat that reached the buffer has done its job. Failing the
+          // frame over the handoff would report a live worker as unreachable,
+          // which is the fault this refresh exists to prevent.
+          this.deps.logger?.warn(
+            {
+              projectId,
+              ...at,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "langy relay handoff ttl refresh failed; the handoff keeps its current expiry",
+          );
+        }
         return { status: "applied" };
 
       case "plan":
@@ -585,19 +625,34 @@ export class LangyTurnRelay {
         return this.applyTool(projectId, at, frame);
       }
 
-      case "final":
-        await this.deps.buffer.markEnd(at);
+      case "final": {
+        // The one terminal that means the turn finished. Stop and handoff also
+        // end the stream, and neither may claim the turn wrote no reply.
+        //
+        // The durable message is built from the frame, the live stream from the
+        // deltas, so this is the one place that sees both. Whether the backstop
+        // fired decides both, or the fallback would show live and the turn
+        // would render blank again the moment history reloads.
+        const { backstopped } = await this.deps.buffer.markEnd({
+          ...at,
+          backstopSilentTurn: (frame.text ?? "").trim() === "",
+        });
+        const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        // markEnd first: it flushes the last tokens, so the turn's own account
+        // of what happened when is complete on the stream before the ingest
+        // reads it back to record the parts in that order.
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,
           conversationId,
           turnId,
           status: "completed",
-          ...(frame.text !== undefined ? { text: frame.text } : {}),
+          ...(text !== undefined ? { text } : {}),
           ...(frame.toolCalls !== undefined
             ? { toolCalls: frame.toolCalls }
             : {}),
         });
         return { status: "terminal" };
+      }
 
       case "error": {
         // The LIVE edge must carry the SAME classified, serialized domain error

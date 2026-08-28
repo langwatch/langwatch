@@ -89,6 +89,47 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names the granularity step when that is the parameter supplied", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_granularity_seconds"] },
+        }),
+      );
+
+      expect(description).toContain("period_granularity_seconds");
+      // The bug this pins: the copy named the window pair unconditionally, so
+      // a caller that sent only the step was told to remove two parameters it
+      // had never sent.
+      expect(description).not.toContain("period_start");
+      expect(description).not.toContain("period_end");
+    });
+
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names every supplied reserved parameter, and agrees in number", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_start", "period_end"] },
+        }),
+      );
+
+      expect(description).toContain("period_start and period_end");
+      expect(description).toContain("come from");
+      expect(description).toContain("Remove them");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("still says something useful when the supplied names are absent", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "lwql_reserved_parameter_supplied", meta: {} }),
+      );
+
+      expect(title.length).toBeGreaterThan(0);
+      expect(description).toContain("Remove them from your parameters");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("ignores meta of the wrong type rather than rendering it", () => {
       const { description } = explainHandledError(
@@ -245,6 +286,21 @@ describe("explainHandledError", () => {
       // registry had only `validation_error` left to go on.
       expect(title).not.toBe("Check your input");
       expect(description).not.toContain("Some of the values aren't valid");
+    });
+  });
+
+  describe("given a deployment whose dataset storage is not writable", () => {
+    /** @scenario The customer reads copy written for the code */
+    it("says nothing was saved and that an administrator has to act", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "storage_not_writable", httpStatus: 500 }),
+      );
+
+      expect(title).not.toContain("storage_not_writable");
+      expect(description).toContain("Nothing was saved");
+      expect(description).toContain("administrator");
+      expect(description).not.toContain("S3_BUCKET_NAME");
+      expect(description).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
     });
   });
 
@@ -429,6 +485,27 @@ describe("explainHandledError", () => {
       expect(description).toBe(
         "Map all of its required fields before running it.",
       );
+    });
+
+    it("names the model when the rejected field is the per-send modelOverride", () => {
+      // The Langy composer sends the picked model as `modelOverride`; the
+      // customer is looking at a model picker, so the card says "the model".
+      const { title, description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: {
+              modelOverride: [
+                "modelOverride must be in 'provider/model' shape",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("There's a problem with the model.");
     });
 
     it("names them the way the screen does, not the way the schema does", () => {

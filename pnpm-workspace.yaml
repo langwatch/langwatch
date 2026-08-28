@@ -16,6 +16,7 @@ packages:
   - "mcp/typescript"
   - "plugins/*"
   - "sdks/typescript"
+  - "services/langyworker"
   - "skills"
   - "tests/agentic-e2e"
 
@@ -47,12 +48,40 @@ minimumReleaseAgeExclude:
   # deepmerge-ts prototype pollution: the patched 8.0.0 (and 8.0.1) both
   # published 2026-08-16, inside the age gate. Drop this once they age out.
   - deepmerge-ts@8.0.0
+  # better-auth 1.7.x, taken deliberately inside the gate. The passkey plugin
+  # gains `createSession` on `/passkey/verify-registration`, which mints the
+  # session inside the SAME transaction as the credential row — that is what
+  # lets passkey sign-up create an account, its passkey and its session
+  # atomically instead of as three unguarded writes. The core schema is
+  # byte-identical to 1.6.23 (`dist/db/schema.mjs` diffs empty), so this is a
+  # behavior upgrade with no migration. 1.7.0 and 1.7.1 ship an identical
+  # passkey plugin; 1.7.1 is named because it is the release the app is
+  # actually tested against. Drop both once they age past 2026-08-25.
+  # better-auth pins its whole family to its own version, so exempting the
+  # entry point alone fails on the first transitive one. All of them, pinned.
+  - better-auth@1.7.1
+  - "@better-auth/passkey@1.7.1"
+  - "@better-auth/core@1.7.1"
+  - "@better-auth/drizzle-adapter@1.7.1"
+  - "@better-auth/kysely-adapter@1.7.1"
+  - "@better-auth/memory-adapter@1.7.1"
+  - "@better-auth/mongo-adapter@1.7.1"
+  - "@better-auth/prisma-adapter@1.7.1"
+  - "@better-auth/telemetry@1.7.1"
+  - better-call@1.4.0
   # Collateral of the security re-resolve below, NOT a new dependency: 1.11.23
   # is already the version this lockfile carries for mermaid's dayjs, but it
   # published 2026-08-17 and re-resolving re-tests it against the gate, which
   # fails the whole install. Drop this once it ages out (2026-08-24).
   - dayjs@1.11.23
   - es-toolkit@1.51.0
+  # The Langy pi harness pins the pi SDK exactly (services/langyworker); the
+  # release sits right at the age-gate boundary, so name it explicitly rather
+  # than letting the install flap around the 7-day mark. pi-ai is the SDK's
+  # model layer, a direct dependency too (the wrapper reads its model catalog),
+  # pinned to the same release. Drop both once they age out (2026-08-28).
+  - "@earendil-works/pi-coding-agent@0.84.2"
+  - "@earendil-works/pi-ai@0.84.2"
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these
@@ -94,6 +123,16 @@ overrides:
   react-dom: ^19.2.7
   react-is: ^19.2.7
   kysely: 0.28.17
+  # One copy, or better-auth's types stop being its own. better-auth 1.7.1 and
+  # @better-auth/passkey peer `@better-auth/utils` at exactly 0.4.2, while
+  # better-call 1.4.0 — which better-auth itself depends on — requires 0.5.0.
+  # Left alone, pnpm satisfies the peer from each side and builds TWO
+  # `@better-auth/core@1.7.1` instances; `GenericEndpointContext` from one is
+  # then not assignable to the same type from the other, and every plugin
+  # callback we hand better-auth fails to typecheck against the plugin that
+  # receives it. 0.5.0 is the version that must exist regardless, so it is the
+  # one everything gets.
+  "@better-auth/utils": 0.5.0
   # Raised from ^8.5.13 to clear a postcss parsing DoS: the caret already
   # permitted 8.5.23, but resolution was sitting on a vulnerable 8.5.x.
   postcss: ^8.5.23
@@ -109,6 +148,17 @@ overrides:
   # Path-scoped, so they touch only these two dependents.
   "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
   "@langchain/community>fast-xml-parser": ^5.7.0
+  # The scenario child bundle inlines @langwatch/scenario and its whole graph
+  # (build-server.mjs, `inlineAll`) but keeps @opentelemetry/* external, so the
+  # SDK bundled in there binds `NoopLoggerProvider` against the app's own
+  # api-logs. 0.221 dropped that export, which killed every scenario run at
+  # module init. The published SDK still calls it; the workspace one already
+  # moved to `createNoopLogger`, so scenario reads from the same copy the app
+  # does instead of a second, older one resolved from npm.
+  # Pinned to the vendored 1.3.0 specifically: mcp/typescript and skills are on
+  # @langwatch/scenario 0.4.x, which pins langwatch to 0.16.1 exactly, and they
+  # are not built through the inlining bundle that breaks.
+  "@langwatch/scenario@1.3.0>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping

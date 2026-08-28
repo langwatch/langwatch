@@ -66,7 +66,8 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -88,7 +89,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+If the `agent-improve` skill is installed, offer it as the next step: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. It writes to the platform, which this skill does not, so run it only once the user says to. Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 

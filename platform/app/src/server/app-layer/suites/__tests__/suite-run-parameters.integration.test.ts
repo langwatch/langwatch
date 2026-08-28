@@ -6,6 +6,12 @@
  * Assert each hop in one place, against a real ClickHouse, because a break in
  * any of them looks identical from the outside: a run that started fine and
  * shows nothing.
+ *
+ * A secret parameter travels the same path with the opposite requirement: the
+ * name has to arrive and the value has to not, in any form, at every hop.
+ *
+ * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -25,6 +31,7 @@ import {
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
@@ -70,27 +77,37 @@ afterAll(async () => {
 async function queuedCommandFor(params: {
   scenarioId: string;
   parameters?: Record<string, string | number | boolean>;
+  secretParameters?: Record<string, string>;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
 }): Promise<QueueRunCommandData> {
   const queued: QueueRunCommandData[] = [];
-  const service = new SuiteRunService(
-    new NullSuiteRunReadRepository(),
-    async () => {},
-    async (data) => {
+  const service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+    startSuiteRun: async () => {},
+    queueSimulationRun: async (data) => {
       queued.push(data);
     },
-  );
+  });
 
   await service.startRun({
     suiteId: `suite-${nanoid()}`,
     projectId: tenantId,
     activeScenarioIds: [params.scenarioId],
     scenarioNameMap: new Map([[params.scenarioId, "Refund flow"]]),
+    scenarioVersionMap: new Map([[params.scenarioId, 1]]),
     activeTargets: [{ type: "http", referenceId: "agent-1" }],
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${nanoid()}`,
+    simulatorModel: params.simulatorModel ?? null,
+    judgeModel: params.judgeModel ?? null,
     ...(params.parameters && {
       parametersByScenarioId: new Map([[params.scenarioId, params.parameters]]),
+    }),
+    ...(params.secretParameters && {
+      secretParametersByScenarioId: new Map([
+        [params.scenarioId, encryptRunSecretValues(params.secretParameters)],
+      ]),
     }),
   });
 
@@ -179,6 +196,77 @@ describe("Feature: recording a run's resolved parameters", () => {
     });
   });
 
+  describe("given a run started with a secret parameter value", () => {
+    const SECRET_VALUE = "tok-live-abc123";
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("records the name and neither the value nor its encrypted form", async () => {
+      const scenarioId = `scenario-${nanoid()}`;
+      const command = await queuedCommandFor({
+        scenarioId,
+        parameters: { region: "eu-central" },
+        secretParameters: { api_token: SECRET_VALUE },
+      });
+
+      // The command carries the encrypted value beside the metadata, never
+      // inside it: what the fold projection stores is built from the metadata.
+      expect(command.secretParameters?.api_token).toBeDefined();
+      expect(command.secretParameters?.api_token).not.toContain(SECRET_VALUE);
+      expect(JSON.stringify(command.metadata)).not.toContain(SECRET_VALUE);
+
+      // The command schema strips what it does not declare, so a field the
+      // dispatch path drops would never reach execution at all.
+      const validated = QueueRunCommand.schema.validate(command);
+      expect(validated.success).toBe(true);
+      expect(
+        (validated as { data: { secretParameters?: Record<string, string> } })
+          .data.secretParameters,
+      ).toEqual(command.secretParameters);
+
+      await recordQueuedRun(command);
+
+      const stored = await ch.query({
+        query: `SELECT Metadata FROM simulation_runs WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}`,
+        query_params: { tenantId, scenarioRunId: command.scenarioRunId },
+        format: "JSONEachRow",
+      });
+      const rows = (await stored.json()) as { Metadata: string }[];
+      const metadata = rows[0]!.Metadata;
+
+      expect(metadata).not.toContain(SECRET_VALUE);
+      expect(metadata).not.toContain(command.secretParameters!.api_token!);
+      expect(metadata).not.toContain('secretParameters"');
+      expect(JSON.parse(metadata)).toMatchObject({
+        parameters: { region: "eu-central" },
+        secretParameterNames: ["api_token"],
+      });
+    });
+
+    /** @scenario "The runs API never returns a secret value" */
+    it("serves the run back without a value or an encrypted form", async () => {
+      const scenarioId = `scenario-${nanoid()}`;
+      const command = await queuedCommandFor({
+        scenarioId,
+        secretParameters: { api_token: SECRET_VALUE },
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const served = JSON.stringify(run);
+      expect(served).not.toContain(SECRET_VALUE);
+      expect(served).not.toContain(command.secretParameters!.api_token!);
+      expect(run!.metadata).toMatchObject({
+        secretParameterNames: ["api_token"],
+      });
+      expect(run!.metadata).not.toHaveProperty("secretParameters");
+    });
+  });
+
   describe("given a run started with no parameter values", () => {
     it("records the metadata it always did, with no empty parameters entry", async () => {
       const scenarioId = `scenario-${nanoid()}`;
@@ -192,8 +280,87 @@ describe("Feature: recording a run's resolved parameters", () => {
       });
 
       expect(run!.metadata).toEqual({
-        langwatch: { targetReferenceId: "agent-1" },
+        langwatch: {
+          targetReferenceId: "agent-1",
+          targetType: "http",
+          scenarioVersion: 1,
+        },
       });
+    });
+  });
+});
+
+describe("Feature: recording the simulation models a run was configured with", () => {
+  describe("given a run plan that names both models", () => {
+    /** @scenario "A run records the simulation models its plan was configured with" */
+    it("reads both back off the run", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+        simulatorModel: "openai/gpt-5-mini",
+        judgeModel: "openai/gpt-5",
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      expect(run!.metadata).toMatchObject({
+        langwatch: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
+      });
+    });
+  });
+
+  describe("given a run plan that names neither model", () => {
+    // A plan naming no model runs on the project default and records no
+    // model, so it keys the same as a run recorded before models were
+    // stamped at all.
+    /** @scenario "A run plan that names no model records no model" */
+    it("records neither key", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const langwatch = (
+        run!.metadata as { langwatch: Record<string, unknown> }
+      ).langwatch;
+      expect(langwatch).not.toHaveProperty("simulatorModel");
+      expect(langwatch).not.toHaveProperty("judgeModel");
+    });
+  });
+
+  describe("given a run plan that names only the judge model", () => {
+    /** @scenario "A plan that names only one of the two models records only that one" */
+    it("records that one and not the other", async () => {
+      const command = await queuedCommandFor({
+        scenarioId: `scenario-${nanoid()}`,
+        judgeModel: "openai/gpt-5",
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const langwatch = (
+        run!.metadata as { langwatch: Record<string, unknown> }
+      ).langwatch;
+      expect(langwatch.judgeModel).toBe("openai/gpt-5");
+      expect(langwatch).not.toHaveProperty("simulatorModel");
     });
   });
 });

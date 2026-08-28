@@ -22,6 +22,22 @@ import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 type OrgScopedModelConfig = {
   /**
+   * Actions admitted with NO single-organization predicate at all — the narrow
+   * case of a table whose rows are platform bookkeeping rather than tenant
+   * data, and whose reads are across-organizations by design.
+   *
+   * This is deliberately separate from `extraBound`, which can only ever
+   * narrow a WHERE clause that exists: the guard rejects a missing or
+   * non-object `where` before any bound is consulted, so a bare `findMany()`
+   * is unreachable from there no matter what the bound says. A model that
+   * genuinely has no predicate to offer has to say so here, by action, where
+   * it reads as the exemption it is.
+   *
+   * Grant this to READ actions only, and only to a model carrying no customer
+   * data. It is the widest thing in this file.
+   */
+  platformScopeActions?: readonly string[];
+  /**
    * Extra single-org-bounding predicates beyond organizationId / row id /
    * composite-org key. Used for parent foreign keys and globally-unique
    * secret columns that each resolve to exactly one organization.
@@ -36,6 +52,23 @@ type OrgScopedModelConfig = {
    */
   extraBound?: (args: { clause: unknown; action: string }) => boolean;
 };
+
+/**
+ * Prisma's read actions. A token/id hatch that resolves one organization is
+ * safe for a READ, but a write keyed on the same token would still be a
+ * cross-tenant write; scoping a hatch to these keeps a future
+ * `updateMany`/`deleteMany` on that shape from riding through it.
+ */
+const READ_ACTIONS = new Set([
+  "findUnique",
+  "findUniqueOrThrow",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "count",
+  "aggregate",
+  "groupBy",
+]);
 
 /**
  * Read one top-level key off a WHERE clause of unknown shape. The clause comes
@@ -223,6 +256,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
+  // A request to join one organization (D12). It carries `organizationId`, and
+  // every read is either an admin listing that organization's queue or a
+  // lookup of one request by its own id — so the ordinary guard fits, and a
+  // bare `findMany()` over everybody's pending requests is exactly what it
+  // should refuse.
+  JoinRequest: {},
+  // One row per SSO connection's sync state (D08), carrying the connection's
+  // `organizationId`. Reachable by that or by the connection itself, which
+  // belongs to exactly one organization.
+  ScimSyncState: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "connectionId") === "string",
+  },
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
     // its inline (scopeType, scopeId) target (a team / project id unique
@@ -265,12 +311,53 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // The resource tier's possession path presents only the share token —
     // globally unique, resolving to exactly one organization (ADR-057's
     // ShareLink lookup, inherited when share links become RESOURCE grants).
-    extraBound: ({ clause }) =>
+    // READ actions only: the possession path is a read, and a write keyed on
+    // a bare token would still cross tenants (the ApiKey hatch above scopes
+    // its own widening the same way).
+    extraBound: ({ clause, action }) =>
+      READ_ACTIONS.has(action) &&
       typeof clauseField(clause, "token") === "string",
   },
+  // ShareService's view accounting for resource grants (delivery-plan
+  // decision 22). Keyed by grantId - a ledger-derived id, globally unique
+  // and resolving to exactly one organization - which is also the only
+  // predicate the per-view increment can name, since the viewer arrives
+  // with a share token and nothing else.
+  GrantUsage: {
+    // A single grant id resolves to exactly one organization; a LIST of them
+    // is only as tenant-scoped as its weakest entry, so the list shape is
+    // admitted only alongside the organization it claims to be about.
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "grantId") === "string" ||
+      (isNonEmptyStringList(clauseField(clause, "grantId")) &&
+        typeof clauseField(clause, "organizationId") === "string"),
+  },
   Role: {},
-  AuthzProjectionCursor: {},
-  AuthzCutoverProjection: {},
+  // Which organizations the in-place migration runner processes on cloud
+  // (specs/migration/authz-grants-rollout.feature, the enrollment scenarios).
+  // The runner's per-pass read and the ops listing are platform-scope by
+  // design - the same posture as the ops rollup over
+  // SystemMigrationTenantState - so READS are admitted unbounded.
+  //
+  // They used to be admitted only alongside a `stage` string, back when
+  // enrollment was one row per (organization, stage) and every read named the
+  // stage it was about. Enrollment is now per MIGRATION, and all three reads
+  // span migrations as well as organizations: the ops listing shows every
+  // enrollment, the pass reads the whole table once to probe per (tenant,
+  // migration) in memory, and the rollout gauge groups by migration name.
+  // There is no narrowing predicate left to require, and going on requiring
+  // the departed column meant the guard refused every one of them.
+  //
+  // Reads only, and the action gate is what keeps that honest. Writes stay
+  // bounded to one organization: enroll carries organizationId in its data,
+  // withdraw names the compound (organizationId, migrationName) key, the
+  // organization purge deletes by organizationId, and a migration-wide bulk
+  // write - which would withdraw every organization at once - has no admitted
+  // shape. The rows themselves are operator bookkeeping: an organization id, a
+  // migration name, and who enrolled it.
+  SystemMigrationEnrollment: {
+    platformScopeActions: ["findMany", "groupBy"],
+  },
   AiToolEntry: {},
   GatewayBudget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
@@ -362,6 +449,12 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // organizationId; the evaluator's sweep is the constraint.
   "AnomalyRule",
   "AnomalyAlert",
+  // Same shape: two cross-tenant sweeps read this one. The realtime session
+  // poller reconciles every org's unreported voice calls, and the expiry
+  // pass releases cap slots the vendor never closed. Every service-layer
+  // query still names its own tenant, and the webhook lookup scopes to the
+  // organization that owns the credential the delivery was signed for.
+  "GatewayRealtimeSession",
   // Org-scoped but not yet audited for every query shape. Listed explicitly so
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.
@@ -375,6 +468,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
+  // The D04 SSO connection projection (ADR-117 §5). Org-bearing, and
+  // deliberately not org-CONSTRAINED: it is addressed by connection id (the
+  // fold's load and store), and two of its reads are cross-organization on
+  // purpose — "who already verified this domain", which is what makes first
+  // verifier own globally on SaaS, and the self-hosted sole-connection list.
+  // A guard demanding organizationId would refuse exactly the queries the
+  // ownership rule is made of. It holds no customer content: ids, domains,
+  // enums and credential references.
+  "SsoConnection",
   "Subscription",
 ];
 
@@ -448,6 +550,12 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
     }
     return;
   }
+
+  // The platform-scope exemption, granted per action and read before any
+  // predicate is looked at — which is the whole point of it, since the reads it
+  // covers carry no predicate to look at. Placed after the create branch so it
+  // can never admit a write that declares no owner.
+  if (config.platformScopeActions?.includes(action)) return;
 
   const where = params.args?.where;
   if (!where || typeof where !== "object") {

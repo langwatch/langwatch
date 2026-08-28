@@ -231,6 +231,31 @@ export const getEdgeMediaExtractFailOpenCounter = (
     | "part_store",
 ) => edgeMediaExtractFailOpenCounter.labels(reason);
 
+// Authorization writes that reach the projection WITHOUT going through the
+// group queue. Every other authz write is queued; these two are deliberate
+// exceptions, and both only ever make a denial true earlier: a revocation
+// and an offboarding.
+//
+// The reason to count them is that a direct write is the one path whose
+// effect is NOT recorded as an event when Redis is down — the deny lands in
+// Postgres, the event never appends, and a later projection replay would
+// resurrect the access. This counter is how you know that window happened
+// and how wide it was; a replay run without checking it is unsafe.
+//
+// A healthy fleet emits this at a low, human-paced rate (it tracks people
+// revoking and offboarding). A spike means a bulk revocation; increments
+// while the queue is down are the ones that matter.
+register.removeSingleMetric("langwatch_authz_direct_projection_write_total");
+const authzDirectProjectionWriteCounter = new Counter({
+  name: "langwatch_authz_direct_projection_write_total",
+  help: "Authorization projection writes that bypassed the group queue, by cause",
+  labelNames: ["reason"] as const,
+});
+
+export const getAuthzDirectProjectionWriteCounter = (
+  reason: "revocation" | "offboard",
+) => authzDirectProjectionWriteCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer
@@ -1043,7 +1068,10 @@ export const incrementEsProcessIntentsSuppressed = ({
 // --- Topic clustering domain metrics (ADR-051/ADR-054) ---
 // Run-page outcomes as the domain sees them, not just generic es_* counters:
 // `failed_final` is the alertable one (retries exhausted, run_failed
-// recorded); `failed_retryable` is expected noise under provider hiccups.
+// recorded); `failed_retryable` is expected noise under provider hiccups;
+// `failed_customer` is a run the customer's own configuration stopped —
+// recorded with its remediation, never retried, and deliberately outside
+// the alertable series (ADR-054 §4).
 register.removeSingleMetric("topic_clustering_page_total");
 const topicClusteringPageTotal = new Counter({
   name: "topic_clustering_page_total",
@@ -1054,7 +1082,12 @@ const topicClusteringPageTotal = new Counter({
 export const incrementTopicClusteringPageTotal = ({
   outcome,
 }: {
-  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+  outcome:
+    | "completed"
+    | "skipped"
+    | "failed_retryable"
+    | "failed_final"
+    | "failed_customer";
 }) => topicClusteringPageTotal.labels(outcome).inc();
 
 register.removeSingleMetric("topic_clustering_page_duration_milliseconds");

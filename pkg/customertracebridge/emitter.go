@@ -505,11 +505,12 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 		domain.RequestTypeResponses, domain.RequestTypeSpeech:
 		return EndUserIDFromBody(params.RequestBody)
 	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
-		domain.RequestTypeTranscription:
+		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
-		// bodies are provider-shaped and forwarded verbatim, and transcription
-		// arrives as multipart form data rather than JSON.
+		// bodies are provider-shaped and forwarded verbatim, transcription
+		// arrives as multipart form data rather than JSON, and a realtime mint
+		// declares a socket rather than a completion.
 	}
 	return ""
 }
@@ -550,10 +551,12 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 			return sid
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription:
+		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
 		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all); the header lifted above (when present) is
-		// the only source.
+		// session field at all, and a realtime mint's session id is the one
+		// the gateway itself hands back); the header lifted above (when
+		// present) is the only source.
 	}
 	return ""
 }
@@ -584,11 +587,21 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
+	case domain.RequestTypeMessages:
+		// Anthropic /v1/messages: the system prompt lives in a
+		// top-level `system` field, not inside `messages`, so reading
+		// only `messages` drops it from the trace. Prepend it as a
+		// system message and keep the caller's messages verbatim.
+		return anthropicBodyAsMessages(body)
 	case domain.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
-		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		// Two field names because two wires reach this shape: the OpenAI one
+		// calls it input, and ElevenLabs' own route calls it text.
+		for _, field := range []string{"input", "text"} {
+			if in := gjson.GetBytes(body, field); in.Exists() && in.String() != "" {
+				return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+			}
 		}
 		return ""
 	default:
@@ -606,18 +619,30 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 // ([{role:"user", content:[{type:"input_text", text:"..."}]}]). Both
 // shapes land here and get flattened to the same renderable form so
 // codex traces show the same input cell as OpenAI chat / Anthropic.
+// The system prompt travels in a top-level `instructions` field, so it
+// is prepended as a system message; reading `input` alone drops it.
 func responsesInputAsMessages(body []byte) string {
+	var msgs []string
+	if instr := gjson.GetBytes(body, "instructions"); instr.Type == gjson.String && instr.String() != "" {
+		msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(instr.String())))
+	}
 	input := gjson.GetBytes(body, "input")
 	if !input.Exists() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if input.Type == gjson.String {
-		return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(input.String()))
+		msgs = append(msgs, fmt.Sprintf(`{"role":"user","content":%s}`, jsonString(input.String())))
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if !input.IsArray() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
-	var msgs []string
 	input.ForEach(func(_, m gjson.Result) bool {
 		role := m.Get("role").String()
 		if role == "" {
@@ -653,6 +678,59 @@ func responsesInputAsMessages(body []byte) string {
 		return ""
 	}
 	return "[" + strings.Join(msgs, ",") + "]"
+}
+
+// anthropicBodyAsMessages renders an Anthropic /v1/messages request as
+// a chat-style messages array. When the top-level `system` field is
+// present it becomes a leading {"role":"system"} message; the caller's
+// `messages` array is kept verbatim either way.
+func anthropicBodyAsMessages(body []byte) string {
+	msgs := gjson.GetBytes(body, "messages")
+	sys := anthropicSystemText(body)
+	if sys == "" {
+		if !msgs.Exists() {
+			return ""
+		}
+		return msgs.Raw
+	}
+	sysMsg := fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(sys))
+	if !msgs.Exists() || !msgs.IsArray() {
+		return "[" + sysMsg + "]"
+	}
+	inner := strings.TrimSpace(msgs.Raw)
+	inner = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(inner, "["), "]"))
+	if inner == "" {
+		return "[" + sysMsg + "]"
+	}
+	return "[" + sysMsg + "," + inner + "]"
+}
+
+// anthropicSystemText flattens Anthropic's top-level `system` field to
+// plain text. The wire accepts a bare string or an array of content
+// blocks (used when the caller sets cache_control on the prompt); the
+// blocks' `text` parts join with newlines, mirroring joinGeminiPartsText.
+func anthropicSystemText(body []byte) string {
+	sys := gjson.GetBytes(body, "system")
+	if !sys.Exists() {
+		return ""
+	}
+	if sys.Type == gjson.String {
+		return sys.String()
+	}
+	if !sys.IsArray() {
+		return ""
+	}
+	var out strings.Builder
+	sys.ForEach(func(_, blk gjson.Result) bool {
+		if t := blk.Get("text"); t.Exists() {
+			if out.Len() > 0 {
+				out.WriteByte('\n')
+			}
+			out.WriteString(t.String())
+		}
+		return true
+	})
+	return out.String()
 }
 
 // geminiContentsAsMessages flattens Gemini's `systemInstruction` +

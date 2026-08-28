@@ -19,7 +19,7 @@ Feature: Unified authorization engine
   # See ADR-092 "Grant semantics" for why. That file's premise sentence -
   # "The most specific scope always wins" - is superseded by the same
   # decision and gets rewritten with those scenarios in the contract PR
-  # (the delivery plan's PR 4), not before: until then it still describes
+  # (the delivery plan's PR 6, the contract), not before: until then it still describes
   # the resolver in production for not-yet-cut-over organizations.
   #
   # Also superseded: fetch-org-role-permission-resolution.feature's "Demo
@@ -161,7 +161,7 @@ Feature: Unified authorization engine
   # routes and their build-time enumeration. What is left unbound is the
   # tRPC stack, which has no equivalent sweep yet - stage D adds one, and
   # Gate D is the two stacks answering to the same rule with no allowlist.
-  @unimplemented
+  @unit
   Scenario: Every tRPC procedure declares its access decision or an explicit reason not to
     When the tRPC surface is enumerated at build time
     Then every procedure either declares a permission
@@ -250,7 +250,7 @@ Feature: Unified authorization engine
   # append is accepted, a revocation applies the deny effect synchronously
   # on the calling path, without waiting for the queued fold. Redis never
   # gates it, so the guarantee below must hold with Redis stopped entirely.
-  @integration @unimplemented
+  @integration
   Scenario: A revocation holds before the revoke call returns, with Redis stopped
     Given user "alice" has role "member" bound at project "chatbot"
     And Redis is unavailable
@@ -281,6 +281,122 @@ Feature: Unified authorization engine
     When the key's permission "project:delete" is checked on project "chatbot"
     Then the check is denied
     And dave's own session is granted "project:delete" on project "chatbot"
+
+  # ============================================================================
+  # The per-organization fork (delivery plan PR 3)
+  # ============================================================================
+  # The engine does not become the decider everywhere on a deploy. It becomes
+  # the decider one organization at a time, after that organization's own
+  # parity proof came back clean, and the switch is a fact in the ledger that
+  # the running fleet picks up by itself.
+  #
+  # Every scenario below is built so the two resolvers CANNOT agree: the
+  # access exists as a grant and as nothing else. Which answer comes back is
+  # therefore proof of which resolver decided it, rather than a coincidence
+  # of both saying yes.
+
+  @unit
+  Scenario: A cut-over organization is decided by the engine
+    Given "acme" has been cut over to the engine
+    And user "alice" holds a grant at project "chatbot" that no binding records
+    When alice's permission "traces:view" is checked on project "chatbot"
+    Then the check is granted on the engine's answer
+    And the answer does not wait for the legacy resolver
+
+  # The reverse-shadow comparison retired with the fork: the engine is the
+  # only resolver, so there is no legacy answer left to compare against.
+
+  @unit
+  Scenario: An organization that has not cut over is unchanged
+    Given "acme" has not been cut over
+    When a permission check runs for a member of "acme"
+    Then the legacy resolver's answer is the one returned
+    And the engine still shadows that answer for comparison
+
+  @unit
+  Scenario: Rolling back returns an organization to the legacy path within the gate's cache window
+    Given "acme" is being served by the engine
+    When "acme" is rolled back onto the legacy path
+    Then checks in "acme" stop consulting the engine within the gate's cache window
+    And nothing is deployed or restarted for that to hold
+
+  @unit
+  Scenario: A failed migration-state read is reported
+    Given the gate cannot read an organization's migration state
+    When a check runs for that organization
+    Then the answer falls back to the legacy path for the cache window
+    And the failure is reported with the organization and the window it reopened
+
+  @unit
+  Scenario: A cut-over organization's checks read the ledger's own head
+    Given "acme" has been cut over to the engine
+    When grants are collected for a member of "acme"
+    Then they come from the grants the ledger itself records
+    And the legacy binding tables are not read
+
+  # ============================================================================
+  # The Access surface reads the head that decides (delivery plan PR 3 follow-up)
+  # ============================================================================
+  # Decisions moved onto the ledger's head at cutover; this section moves what
+  # people SEE. Every settings page that renders access - the bindings table,
+  # a member's own breakdown, team member lists, a group's bindings, the API
+  # key drawer, the role editor - lists from the same head the engine decides
+  # from, per organization, behind the same gate. A page that renders one head
+  # while the engine decides from the other could show access that does not
+  # exist or hide access that does.
+  #
+  # Same proof style as the fork above: the listed access exists as a grant
+  # and as nothing else (or the reverse), so which rows come back proves which
+  # head served the listing rather than both happening to agree.
+
+  @unit
+  Scenario: A cut-over organization's access listings are served from the ledger's head
+    Given "acme" has been cut over to the engine
+    And user "alice" holds a grant at project "chatbot" that no binding row records
+    When the organization's bindings are listed for the Access page
+    Then alice's grant appears in the listing
+    And the legacy binding tables are not read
+
+  @unit
+  Scenario: An organization that has not cut over keeps listing from the legacy tables
+    Given "acme" has not been cut over
+    And a grant head row exists that no legacy binding records
+    When the organization's bindings are listed for the Access page
+    Then the listing shows exactly the legacy binding rows
+    And the grant head is not read
+
+  @unit
+  Scenario: A listing row keeps its identity across the cutover
+    Given "acme" has a binding imported into the ledger
+    When the organization's bindings are listed from each head
+    Then both heads list the row under the same id
+    # The imported grant ADOPTS the binding's row id, so a bookmarked or
+    # cached row reference survives the head swap.
+
+  @unit
+  Scenario: A rolled-back organization's listings return to the legacy head within the gate's cache window
+    Given "acme" is being served by the engine
+    When "acme" is rolled back onto the legacy path
+    Then access listings in "acme" stop reading the grant head within the gate's cache window
+    And nothing is deployed or restarted for that to hold
+
+  @unit
+  Scenario: A cut-over organization's role editor lists roles from the ledger's head
+    Given "acme" has been cut over to the engine
+    And a custom role exists in the ledger's role head
+    When the organization's roles are listed
+    Then the role appears with its name, description and permissions
+    And the legacy custom-role table is not read
+
+  @unit
+  Scenario: Dormant facts never appear as bindings in a listing
+    Given "acme" has been cut over to the engine
+    And the cutover imported lite-member, project-credential and platform facts
+    When the organization's bindings are listed for the Access page
+    Then none of those facts appear as binding rows
+    # The listing shows what the legacy page showed: the compat head never
+    # carried these facts, so a cut-over listing that surfaced them would be
+    # a parity break in what people see, not extra honesty.
 
   # ============================================================================
   # The resource tier (ADR-092 §8) — sharing is a grant on the tree

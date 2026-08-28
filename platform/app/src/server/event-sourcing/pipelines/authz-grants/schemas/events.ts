@@ -1,14 +1,10 @@
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -43,7 +39,7 @@ export const ledgerPrincipalSchema = z
   .object({
     type: z.enum([
       "user",
-      "api_key",
+      "apiKey",
       "group",
       "team",
       "organization",
@@ -81,23 +77,26 @@ export const ledgerScopeSchema = z.object({
   id: z.string(),
 });
 
-export const grantEventSourceSchema = z.enum([
-  "grants-service",
-  "scim",
-  "invite",
-  "backfill-b",
-  "genesis-import",
-  "read-through-mint",
-]);
+/** Derived, never restated: a source added to the vocabulary is accepted on
+ *  the wire with no edit here. */
+export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 
 export const grantsLedgerActorSchema = z.object({
   type: z.enum(["user", "system"]),
   id: z.string().nullable(),
 });
 
+/** `kind` and `projectId` are required, not optional-tolerant: nothing has
+ *  ever emitted resource terms, so there is no stored event these fields
+ *  could be missing from, and a resource fact without them cannot say which
+ *  thing it opens or where that thing lives. `createdByUserId` is genuinely
+ *  optional — a link nobody minted by hand has no author. */
 export const resourceGrantTermsSchema = z.object({
-  token: z.string(),
-  permission: z.string(),
+  kind: z.enum(["trace", "thread"]),
+  projectId: z.string().min(1),
+  token: z.string().min(1),
+  permission: z.string().min(1),
+  createdByUserId: z.string().min(1).optional(),
   expiresAtMs: z.number().int().nonnegative().optional(),
   maxViews: z.number().int().nonnegative().optional(),
 });
@@ -116,27 +115,41 @@ export const resourceGrantTermsSchema = z.object({
  * team-wide grant, which is a public credential for a scope no share link is
  * ever supposed to reach.
  *
- * The `anyone` and `project` principals are resource-tier only (delivery plan,
- * the `Grant` shape: "project | anyone -- last two: resource tier only"). That
- * one is a security boundary rather than a tidiness rule: `anyone` names no
- * subject, so an `anyone` grant at ORGANIZATION or TEAM scope is a standing
- * public grant over the whole tenant, held by nobody and revocable by no
- * principal. It is only meaningful paired with a token, and tokens exist at
- * RESOURCE scope alone.
+ * The `anyone` principal is resource-tier only (delivery plan, the `Grant`
+ * shape). That one is a security boundary rather than a tidiness rule:
+ * `anyone` names no subject, so an `anyone` grant at ORGANIZATION or TEAM
+ * scope is a standing public grant over the whole tenant, held by nobody and
+ * revocable by no principal. It is only meaningful paired with a token, and
+ * tokens exist at RESOURCE scope alone.
+ *
+ * The `project` principal has exactly two legal placements: the resource tier
+ * (a share link whose audience is "members who can see this project"), and
+ * its OWN project's PROJECT scope — the project-credential self-grant the
+ * cutover imports, `Project.apiKey` acting as the project it belongs to. The
+ * self-grant is the contract the edge will resolve a project credential
+ * against once bare column comparison retires; it is dormant until then (no
+ * collector returns PROJECT-principal rows for a user or an api key). Any
+ * other placement — a project principal on a foreign project, a team, or the
+ * organization — would be a standing cross-scope credential nobody holds, and
+ * is refused.
  */
-const RESOURCE_ONLY_PRINCIPALS = new Set(["anyone", "project"]);
-
 export const grantShapeRefinement = {
   check: (grant: {
-    principal: { type: string };
+    principal: { type: string; id: string | null };
     roleKey: string | null;
-    scope: { type: string };
+    scope: { type: string; id: string };
     resource?: unknown;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
+    if (grant.principal.type === "anyone" && !isResourceScope) {
+      return false;
+    }
+    const isOwnProjectCredential =
+      grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
     if (
-      RESOURCE_ONLY_PRINCIPALS.has(grant.principal.type) &&
-      !isResourceScope
+      grant.principal.type === "project" &&
+      !isResourceScope &&
+      !isOwnProjectCredential
     ) {
       return false;
     }
@@ -146,7 +159,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms, and the `anyone` and `project` principals exist only at RESOURCE scope",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
   path: ["resource"] as const,
 };
 
@@ -154,9 +167,9 @@ export const grantAttachedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_ATTACHED_EVENT_TYPE),
   data: z
     .object({
-      grantId: z.string(),
+      grantId: z.string().min(1),
       principal: ledgerPrincipalSchema,
-      roleKey: z.string().nullable(),
+      roleKey: z.string().min(1).nullable(),
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
@@ -173,19 +186,21 @@ export type GrantAttachedEvent = z.infer<typeof grantAttachedEventSchema>;
 export const grantRoleChangedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_ROLE_CHANGED_EVENT_TYPE),
   data: z.object({
-    grantId: z.string(),
-    from: z.string().nullable(),
-    to: z.string(),
+    grantId: z.string().min(1),
+    from: z.string().min(1).nullable(),
+    to: z.string().min(1),
     actor: grantsLedgerActorSchema,
   }),
 });
 export type GrantRoleChangedEvent = z.infer<typeof grantRoleChangedEventSchema>;
 
+/** A revoke names its grant, and only its grant: the aggregate IS the grant,
+ *  so an event cannot address a set of them. */
 export const grantRevokedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_REVOKED_EVENT_TYPE),
   data: z.object({
-    grantId: z.string(),
-    reason: z.string().optional(),
+    grantId: z.string().min(1),
+    reason: z.string().min(1).optional(),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -194,10 +209,12 @@ export type GrantRevokedEvent = z.infer<typeof grantRevokedEventSchema>;
 export const roleDefinedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_DEFINED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
-    name: z.string(),
+    roleId: z.string().min(1),
+    name: z.string().min(1),
+    /** No `.min(1)`: an imported role may carry an empty description, and
+     *  refusing it would park a genesis import over a blank field. */
     description: z.string().optional(),
-    permissions: z.array(z.string()),
+    permissions: z.array(z.string().min(1)),
     kind: z.enum(["custom", "system_api_key"]),
     actor: grantsLedgerActorSchema,
   }),
@@ -207,8 +224,8 @@ export type RoleDefinedEvent = z.infer<typeof roleDefinedEventSchema>;
 export const rolePermissionsChangedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_PERMISSIONS_CHANGED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
-    permissions: z.array(z.string()),
+    roleId: z.string().min(1),
+    permissions: z.array(z.string().min(1)),
     actor: grantsLedgerActorSchema,
   }),
 });
@@ -219,75 +236,11 @@ export type RolePermissionsChangedEvent = z.infer<
 export const roleDeletedEventSchema = EventSchema.extend({
   type: z.literal(ROLE_DELETED_EVENT_TYPE),
   data: z.object({
-    roleId: z.string(),
+    roleId: z.string().min(1),
     actor: grantsLedgerActorSchema,
   }),
 });
 export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
-
-export const memberOffboardedEventSchema = EventSchema.extend({
-  type: z.literal(MEMBER_OFFBOARDED_EVENT_TYPE),
-  data: z.object({
-    userId: z.string(),
-    revokedGrantIds: z.array(z.string()),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type MemberOffboardedEvent = z.infer<typeof memberOffboardedEventSchema>;
-
-export const migrationParityProvedEventSchema = EventSchema.extend({
-  type: z.literal(MIGRATION_PARITY_PROVED_EVENT_TYPE),
-  data: z.object({
-    /** Empty means clean — the organization may finalize. */
-    diffs: z.array(z.string()),
-  }),
-});
-export type MigrationParityProvedEvent = z.infer<
-  typeof migrationParityProvedEventSchema
->;
-
-export const cutoverCompletedEventSchema = EventSchema.extend({
-  type: z.literal(CUTOVER_COMPLETED_EVENT_TYPE),
-  data: z.object({
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type CutoverCompletedEvent = z.infer<typeof cutoverCompletedEventSchema>;
-
-export const cutoverRolledBackEventSchema = EventSchema.extend({
-  type: z.literal(CUTOVER_ROLLED_BACK_EVENT_TYPE),
-  data: z.object({
-    reason: z.string().optional(),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type CutoverRolledBackEvent = z.infer<
-  typeof cutoverRolledBackEventSchema
->;
-
-/** The runner's per-(migration, tenant) status vocabulary — mirrored from
- *  @langwatch/system-migrations without importing it (the wire schema must
- *  not couple to the runner package). */
-export const migrationTenantStatusSchema = z.enum([
-  "migrated",
-  "finalized",
-  "parked",
-  "rolled_back",
-]);
-
-export const migrationTenantStateChangedEventSchema = EventSchema.extend({
-  type: z.literal(MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE),
-  data: z.object({
-    migrationName: z.string(),
-    status: migrationTenantStatusSchema,
-    /** The runner's report for the transition, JSON as stored. */
-    report: z.unknown().nullish(),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type MigrationTenantStateChangedEvent = z.infer<
-  typeof migrationTenantStateChangedEventSchema
->;
 
 export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   grantAttachedEventSchema,
@@ -296,10 +249,5 @@ export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   roleDefinedEventSchema,
   rolePermissionsChangedEventSchema,
   roleDeletedEventSchema,
-  memberOffboardedEventSchema,
-  migrationParityProvedEventSchema,
-  cutoverCompletedEventSchema,
-  cutoverRolledBackEventSchema,
-  migrationTenantStateChangedEventSchema,
 ]);
 export type AuthzGrantsEvent = z.infer<typeof authzGrantsEventSchema>;

@@ -6,9 +6,10 @@
  * reader proves the effective set resolves to nothing INSIDE the transaction.
  * Anything left rolls the whole thing back.
  *
- * GrantsService keeps the audit record and the epoch bump; this module owns
- * the transaction, the proof, and the manifest.
+ * GrantsService keeps the epoch bump; this module owns the flow, the proof,
+ * and the manifest.
  */
+import type { LedgerActor } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
@@ -48,17 +49,20 @@ export type OffboardResult = {
 export async function offboardUserFromOrganization({
   repository,
   collectorFor,
+  actor,
   userId,
   organizationId,
 }: {
   repository: AuthzGrantsRepository;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
+  actor: LedgerActor;
   userId: string;
   organizationId: string;
 }): Promise<OffboardResult> {
   const removed = await repository.offboardUser({
     userId,
     organizationId,
+    actor,
     prove: (txReader) =>
       proveNothingResolves({
         collector: collectorFor(txReader),
@@ -81,6 +85,13 @@ export async function offboardUserFromOrganization({
  * key-held grants cannot survive for this user: memberships are gone, and a
  * personal key is ceilinged by an owner who now resolves to nothing
  * (AuthzService applies that ceiling on every check).
+ *
+ * WHICH head the re-collect reads is the repository's business, not this
+ * function's, and since the per-organization cutover (delivery-plan PR 3) the
+ * app binds a cutover-aware reader to the transaction so the proof is made
+ * against the head the organization is actually served from. It means the same
+ * thing either way: a revocation names GRANT ids, and the compat row shares
+ * the grant's id, so removing one head removes both.
  */
 async function proveNothingResolves({
   collector,

@@ -16,7 +16,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,9 +46,20 @@ const organization = {
   teams: [team],
 };
 
+// The real resolver, so `router.pathname` carries the route pattern here
+// exactly as it does in the app. Returning the address instead hid a bug
+// where the settings menu matched its entries against the pattern: one
+// `/settings/*` pattern covers nearly every settings page, so none matched.
+const { resolvePathname } = await vi.hoisted(
+  async () =>
+    await vi.importActual<typeof import("~/utils/compat/next-router")>(
+      "~/utils/compat/next-router",
+    ),
+);
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
-    pathname: mockPathname,
+    pathname: resolvePathname(mockPathname),
     query: {},
     asPath: mockPathname,
     push: pushMock,
@@ -73,8 +84,10 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  userBelongsToTeam: () => true,
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// fixture holds the membership rows they read, so the real ones answer.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization,
@@ -110,6 +123,10 @@ vi.mock("~/utils/tracking", () => ({
 vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div data-testid="loading-screen" />,
 }));
+
+// Legacy mode renders through DashboardLayout, which mounts the nudge. This
+// suite asserts on settings navigation, not on the nudge's own contract.
+vi.mock("~/components/me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({
@@ -263,6 +280,7 @@ beforeEach(() => {
   pushMock.mockClear();
   localStorage.clear();
   sessionStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -364,6 +382,68 @@ describe("the settings shell in a new navigation mode", () => {
       });
     });
 
+    /** @scenario "The way back stays in place while the menu scrolls" */
+    it("keeps the way back out of the region the menu scrolls in", () => {
+      renderSettings();
+
+      const scrollRegion = screen.getByTestId("sidebar-scroll-region");
+      expect(scrollRegion).not.toContainElement(
+        screen.getByRole("link", { name: /^Back/ }),
+      );
+      // The pages themselves are what scrolls, so they stay inside it.
+      expect(scrollRegion).toContainElement(
+        screen.getByRole("link", { name: "Members" }),
+      );
+    });
+
+    /** @scenario "The pages are cut at the rule as they scroll under the way back" */
+    it("starts the scrolling part at the rule and keeps the gap inside it", () => {
+      renderSettings();
+
+      const backEntry = screen.getByRole("link", { name: /^Back/ });
+      // A margin under the rule is a strip the pages disappear in before they
+      // reach the line. As padding inside the scrolling part, the same space
+      // holds the first page off the rule and the pages travel through it.
+      // An unset margin reads as "0" here, where a spacing step would read as
+      // the variable the scale is written with.
+      expect(getComputedStyle(backEntry.parentElement!).marginBottom).toBe("0");
+      expect(
+        getComputedStyle(screen.getByTestId("sidebar-scroll-region"))
+          .paddingTop,
+      ).toBe("var(--chakra-spacing-1\\.5)");
+    });
+
+    /** @scenario "API Keys sits under General" */
+    it("puts API Keys under General, above the ACCESS group", () => {
+      renderSettings();
+
+      const entries = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+
+      // It moved out of ACCESS rather than gaining a second home there, which
+      // an index lookup on its own would read as the move having worked.
+      expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
+      expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
+      // Members opens ACCESS, so an entry before it is in ORGANIZATION.
+      expect(entries.indexOf("API Keys")).toBeLessThan(
+        entries.indexOf("Members"),
+      );
+    });
+
+    /** @scenario The menu marks the page that is open */
+    it("marks the entry of the page on screen, and only that one", () => {
+      mockPathname = "/settings/email-suppressions";
+      renderSettings();
+
+      const marked = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page")
+        .map((link) => link.textContent?.trim());
+
+      expect(marked).toEqual(["Email Suppressions"]);
+    });
+
     it("hides the enterprise entries outside an enterprise plan", () => {
       mockIsEnterprise = false;
       renderSettings();
@@ -404,21 +484,6 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the device is in legacy mode", () => {
-    /** @scenario Legacy mode keeps the current settings chrome */
-    it("keeps the current settings navigation", () => {
-      useNavigationModeStore.setState({ storedMode: "legacy" });
-      renderSettings();
-
-      expect(
-        screen.getByRole("link", { name: "General Settings" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Quick Search" }),
-      ).not.toBeInTheDocument();
-    });
-  });
-
   describe("when the reader has ops access and is an admin", () => {
     /** @scenario The settings menu holds the ops groups at the bottom */
     it("puts OPS and BACKOFFICE last", () => {
@@ -436,12 +501,9 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the pin flag and the environment variable are both off", () => {
-    /** @scenario The settings menu shows ops without the pin flag or the environment variable */
-    it("still shows the OPS group away from an ops page", () => {
-      // `usePublicEnv` names no SHOW_OPS_IN_MAIN_SIDEBAR and the address
-      // is a settings page, so the two conditions the legacy sidebar
-      // needs are both absent here.
+  describe("when the reader has ops access", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("shows the OPS group away from an ops page", () => {
       mockHasOpsAccess = true;
       renderSettings();
 

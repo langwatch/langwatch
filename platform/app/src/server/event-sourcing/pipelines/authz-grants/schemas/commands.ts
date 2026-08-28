@@ -6,7 +6,6 @@ import {
   ledgerPrincipalSchema,
   ledgerScopeSchema,
   legacyBindingRoleSchema,
-  migrationTenantStatusSchema,
   resourceGrantTermsSchema,
 } from "./events";
 
@@ -33,12 +32,13 @@ const commandIdentitySchema = z.object({
  * Every command payload in this ledger carries the identity block AND the
  * invariant that makes it one ledger: `tenantId === organizationId`.
  *
- * The two are not interchangeable downstream — the emitted event takes its
- * `tenantId` from the command envelope and its `aggregateId` from
- * `organizationId` — so a caller that wired them to different values would
- * persist the event under one tenant's stream and fold it into a different
- * organization's projection. Nothing later in the pipeline can detect that,
- * which is why it is refused at the wire boundary.
+ * The organization is the TENANT of both aggregates (ADR-110) — the stream
+ * an event is persisted under and the routing key that places it. It is the
+ * AGGREGATE of only `authz_org_policy`; a grant command's aggregate is its
+ * own grant id. A caller that wired tenantId and organizationId to different
+ * values would persist the event under one tenant's stream and fold it into
+ * a different organization's projection, and nothing later in the pipeline
+ * can detect that, which is why it is refused at the wire boundary.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema
@@ -54,7 +54,7 @@ export const attachGrantEntrySchema = z
   .object({
     grantId: z.string().min(1),
     principal: ledgerPrincipalSchema,
-    roleKey: z.string().nullable(),
+    roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
     /** Imported bindings only — the legacy `role` column a `custom:<id>`
@@ -75,45 +75,89 @@ export const attachGrantEntrySchema = z
   });
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-export const attachGrantsCommandDataSchema = commandDataSchema({
-  grants: z.array(attachGrantEntrySchema).min(1),
+/**
+ * One command, one grant, one aggregate (ADR-110). The batched form this
+ * replaces emitted an event per entry onto a single organization-wide
+ * aggregate; with the grant as the aggregate a batch would have to straddle
+ * hundreds of them, so the import sends one of these per grant instead. They
+ * are independent and fold concurrently, which is the point.
+ */
+export const attachGrantCommandDataSchema = commandDataSchema({
+  grant: attachGrantEntrySchema,
 });
-export type AttachGrantsCommandData = z.infer<
-  typeof attachGrantsCommandDataSchema
+export type AttachGrantCommandData = z.infer<
+  typeof attachGrantCommandDataSchema
 >;
 
-export const proveMigrationParityCommandDataSchema = commandDataSchema({
-  diffs: z.array(z.string()),
-  occurredAtMs: z.number().int().nonnegative(),
-});
-export type ProveMigrationParityCommandData = z.infer<
-  typeof proveMigrationParityCommandDataSchema
->;
-
-export const completeCutoverCommandDataSchema = commandDataSchema({
+export const changeGrantRoleCommandDataSchema = commandDataSchema({
+  grantId: z.string().min(1),
+  from: z.string().min(1).nullable(),
+  to: z.string().min(1),
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type CompleteCutoverCommandData = z.infer<
-  typeof completeCutoverCommandDataSchema
+export type ChangeGrantRoleCommandData = z.infer<
+  typeof changeGrantRoleCommandDataSchema
 >;
 
-export const rollBackCutoverCommandDataSchema = commandDataSchema({
+/**
+ * One revocation, one aggregate (ADR-110). A revoke names its grant id and
+ * nothing else: a selector cannot address an aggregate, so resolving "every
+ * grant this principal holds at this scope" into ids is the caller's job now.
+ *
+ * Two things make that safe rather than a hole. Grant ids are derived from
+ * content, so a caller that knows the fact can derive its id without reading
+ * the lagging projection at all. And where the set genuinely is not known —
+ * offboarding — the deny is enforced synchronously against the projection
+ * before the call returns (the sanctioned direct write, ADR-092 decision 7),
+ * so access ends immediately and these events are the durable record rather
+ * than the mechanism.
+ */
+export const revokeGrantCommandDataSchema = commandDataSchema({
+  grantId: z.string().min(1),
+  reason: z.string().min(1).optional(),
   actor: grantsLedgerActorSchema,
-  reason: z.string().optional(),
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type RollBackCutoverCommandData = z.infer<
-  typeof rollBackCutoverCommandDataSchema
+export type RevokeGrantCommandData = z.infer<
+  typeof revokeGrantCommandDataSchema
 >;
 
-export const recordMigrationTenantStateCommandDataSchema = commandDataSchema({
-  migrationName: z.string().min(1),
-  status: migrationTenantStatusSchema,
-  report: z.unknown().nullish(),
+export const defineRoleEntrySchema = z.object({
+  roleId: z.string().min(1),
+  name: z.string().min(1),
+  /** No `.min(1)`: an imported role may carry an empty description (see the
+   *  event schema), and refusing it would park a genesis import. */
+  description: z.string().optional(),
+  permissions: z.array(z.string().min(1)),
+  kind: z.enum(["custom", "system_api_key"]),
+  /** Business time of the fact — an imported role carries the legacy
+   *  row's createdAt; it becomes the emitted event's `occurredAt`. */
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
+
+/** One command, one role, one aggregate (ADR-110) — the same rule the
+ *  grant commands follow, for the same reason. */
+export const defineRoleCommandDataSchema = commandDataSchema({
+  role: defineRoleEntrySchema,
+  actor: grantsLedgerActorSchema,
+});
+export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
+
+export const changeRolePermissionsCommandDataSchema = commandDataSchema({
+  roleId: z.string().min(1),
+  permissions: z.array(z.string().min(1)),
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type RecordMigrationTenantStateCommandData = z.infer<
-  typeof recordMigrationTenantStateCommandDataSchema
+export type ChangeRolePermissionsCommandData = z.infer<
+  typeof changeRolePermissionsCommandDataSchema
 >;
+
+export const deleteRoleCommandDataSchema = commandDataSchema({
+  roleId: z.string().min(1),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;

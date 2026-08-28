@@ -57,7 +57,7 @@ async def chat(request: ChatRequest):
     history = get_conversation_history(request.thread_id)
 
     response = client.chat.completions.create(
-        model="gpt-4.1",
+        model="gpt-5-mini",
         messages=[*history, {"role": "user", "content": request.message}],
     )
 

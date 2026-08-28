@@ -44,8 +44,13 @@ export interface UseRunSuiteOptions {
  * Two scenarios can declare the same name and only one of them describe it or
  * default it, so a name keeps the first description and the first default any
  * of them gives it rather than the last one read.
+ *
+ * Secret is the one field that is not first-wins: a name any scenario in the
+ * run declares secret is offered as secret. The run refuses that pair anyway,
+ * and asking for the value behind a password field is what lets the person see
+ * the conflict instead of typing a credential into a plain field first.
  */
-function unionParameterDefinitions({
+export function unionParameterDefinitions({
   scenarioIds,
   scenarios,
 }: {
@@ -66,6 +71,7 @@ function unionParameterDefinitions({
       name: definition.name,
       description: seen?.description ?? definition.description,
       defaultValue: seen?.defaultValue ?? definition.defaultValue,
+      secret: seen?.secret === true || definition.secret === true,
     });
   }
   return [...union.values()];
@@ -77,8 +83,12 @@ function unionParameterDefinitions({
  * A name left empty is omitted rather than sent as an empty string: the run
  * then falls back to whatever default each scenario declares for it, which is
  * the same path a run that was never offered the name at all takes.
+ *
+ * A secret keeps whatever was typed as text. A token of digits is still a
+ * token, and reading it as a number would both change it and have the run
+ * refuse it, because a secret value has to be a string.
  */
-function toRunParameters({
+export function toRunParameters({
   definitions,
   values,
 }: {
@@ -87,7 +97,12 @@ function toRunParameters({
 }): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
   for (const definition of definitions) {
-    const value = serializeOptionalScalarValue(values[definition.name] ?? "");
+    const typed = values[definition.name] ?? "";
+    if (definition.secret === true) {
+      if (typed !== "") parameters[definition.name] = typed;
+      continue;
+    }
+    const value = serializeOptionalScalarValue(typed);
     if (value === undefined) continue;
     parameters[definition.name] = value;
   }

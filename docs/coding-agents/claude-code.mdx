@@ -1,0 +1,306 @@
+---
+title: Claude Code Monitoring with OpenTelemetry
+sidebarTitle: Claude Code
+description: Monitor Claude Code with OpenTelemetry. Send sessions, cost and traces to LangWatch with one command, or set CLAUDE_CODE_ENABLE_TELEMETRY and the OTEL_ variables by hand.
+keywords:
+  - claude code monitoring
+  - claude code opentelemetry
+  - claude_code_enable_telemetry
+  - claude code otel
+  - claude code telemetry
+  - claude code traces
+  - monitor claude code
+---
+
+Claude Code reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
+
+There are two ways to set it up:
+
+- `langwatch claude` starts Claude Code and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument claude` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install Claude Code.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Claude Code through the wrapper
+
+```bash
+langwatch login --device
+langwatch claude
+```
+
+The first run asks one question:
+
+| Answer | What it does |
+| --- | --- |
+| **Using a Claude subscription** | Claude Code keeps your own plan and your own login. LangWatch receives telemetry only. |
+| **Using an API key** | Claude Code calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch claude` accepts the same flags, the same subcommands and the same keyboard shortcuts as `claude`, and it returns the same exit code.
+
+<Note>
+  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
+</Note>
+
+## Set up a machine without starting Claude Code
+
+`langwatch instrument claude` writes the connection into `~/.claude/settings.json` and exits. A plain `claude` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument claude
+```
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command | Destination |
+| --- | --- |
+| `langwatch instrument claude` | Your personal workspace |
+| `langwatch instrument claude --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
+| `langwatch instrument claude --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument claude --personal` | Back to your personal workspace |
+
+The wrapper accepts the same flags: `langwatch claude --project acme-app` pins the project and then starts Claude Code. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Claude Code reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Claude Code to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per Claude Code session, with the context it carried, how often it compacted, how long it worked, and a terminal replay of the whole conversation.
+- **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
+- **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
+- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model. Content is what a [data privacy policy](/coding-agents/privacy) can drop or restrict, so the terminal replay and these fields are only as complete as that policy allows.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+### Attribute sessions to pull requests
+
+The session reports the repository and branch it works on: automatically from its working directory, and by declaring with `langwatch ingest context` when it works somewhere else through the Bash tool. The setup installs the declaration channel for you, through the LangWatch plugin or the hooks `langwatch instrument claude` writes. [Repository and PR attribution](/coding-agents/repository-and-pr-attribution) covers both channels and their limits.
+
+## Content and privacy
+
+The setup that `langwatch claude` and `langwatch instrument claude` write turns on the four Claude Code content flags, because the content is what makes a trace worth reading:
+
+| Flag | What it puts on the wire |
+| --- | --- |
+| `OTEL_LOG_USER_PROMPTS` | The text of every prompt |
+| `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
+| `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
+| `OTEL_LOG_RAW_API_BODIES` | The request and the response of every model call |
+
+Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
+
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_RAW_API_BODIES`, which already carries the assistant's response text along with the rest of the request and response body. If you want the response text on its own, without the full body, add `OTEL_LOG_ASSISTANT_RESPONSES` yourself: the wrapper does not set it for you.
+
+Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
+
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: Claude Code keeps your own plan and your own provider login. Choosing **Using an API key** on the first wrapper run instead routes the model calls themselves through the LangWatch AI Gateway with a virtual key, which adds budgets, model policies and provider fallback on top of the same telemetry. [Claude Code through the gateway](/ai-gateway/cli/claude-code) covers that setup, model aliases and the governance recipes.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No telemetry arrives in LangWatch">
+    Restart Claude Code. It reads `~/.claude/settings.json` at start, so a session that was already open when you ran `langwatch instrument claude` keeps its old configuration.
+
+    Then run `langwatch instrument claude` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
+  </Accordion>
+
+  <Accordion title="The trace has no tool call tree, no latencies and no subagents">
+    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` has no effect without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
+  </Accordion>
+
+  <Accordion title="The trace has no prompt">
+    `OTEL_LOG_USER_PROMPTS` is missing. Claude Code removes the prompt text from its `user_prompt` event by default.
+  </Accordion>
+
+  <Accordion title="The trace has no response">
+    Both `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` are missing. Claude Code reports the response text of the assistant on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON) or on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text). Both are off by default. Set `OTEL_LOG_ASSISTANT_RESPONSES=1` if you want the response without the rest of the body.
+
+    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+
+    Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
+  </Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument claude --project <id-or-slug>` to move it to a team project, or `langwatch instrument claude --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+  </Accordion>
+
+  <Accordion title="The cost is zero although the traces arrive">
+    The model name on the span does not match an entry in the LangWatch cost catalog. Read `gen_ai.request.model` on the span. Current names such as `claude-sonnet-4-6`, `claude-opus-4-7` and `claude-haiku-4-5` match; older aliases return no cost.
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command-line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
+
+### Environment variables
+
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
+claude
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
+
+<Warning>
+  The five `OTEL_LOG_*` flags put your session content in LangWatch. Read [Content and privacy](#content-and-privacy) before you use them where the content matters.
+</Warning>
+
+### Settings file
+
+Claude Code reads the same variables from the `env` block of `~/.claude/settings.json`, which survives a new terminal:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
+    "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code"
+  }
+}
+```
+
+To wire one repository instead of the whole machine, see [Per-repository telemetry](#per-repository-telemetry) below. To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
+
+### Per-repository telemetry
+
+Use this when work and personal repositories share a machine and you want telemetry on for some of them only. Claude Code walks up from the launch directory to find `.claude/settings.json`, so the wiring travels with the repository rather than with your account.
+
+Split it across two files. The committed one decides the shape of the export:
+
+**`.claude/settings.json`** (commit this):
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel"
+  }
+}
+```
+
+**`.claude/settings.local.json`** (add it to `.gitignore`) holds the key, the enable flag and every content flag, so each person turns content on for themselves:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
+    "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code,project.repo=my-repo,enduser.id=you@example.com"
+  }
+}
+```
+
+Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends no telemetry.
+
+<Warning>
+  `OTEL_RESOURCE_ATTRIBUTES` is the one key that does not merge across the two files. The local file replaces the committed value outright, so carry every attribute you want in the local file or the missing ones are dropped from every span.
+</Warning>
+
+Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending no telemetry until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
+
+```gitignore
+.claude/
+!.claude/                       # un-ignore the directory
+.claude/settings.local.json     # re-ignore the file holding the key
+```
+
+### Team attribution
+
+Add your own labels to every trace with `OTEL_RESOURCE_ATTRIBUTES`:
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code,department=engineering,team.id=platform"
+```
+
+<Warning>
+  `OTEL_RESOURCE_ATTRIBUTES` follows the [W3C Baggage specification](https://www.w3.org/TR/baggage/). Write comma-separated `key=value` pairs. Values cannot contain a space, a double quote, a comma, a semicolon or a backslash. Percent-encode any other character outside that range.
+
+  ```bash
+  # Rejected, the value contains a space
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme Corporation"
+
+  # Accepted
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme_Corporation"
+  export OTEL_RESOURCE_ATTRIBUTES="org.name=Acme%20Corporation"
+  ```
+</Warning>
+
+### Headers from a script
+
+An enterprise that issues short-lived tokens can produce the headers at start time. Add this to `.claude/settings.json`:
+
+```json
+{
+  "otelHeadersHelper": "/bin/generate_langwatch_headers.sh"
+}
+```
+
+The script writes a JSON object of string headers to standard output:
+
+```bash
+#!/bin/bash
+echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\"}"
+```
+
+<Warning>
+  Claude Code reads the headers at start only, so a token that expires mid-session is not refreshed. For frequent refresh, send the telemetry to an OpenTelemetry Collector and let the collector refresh its own headers.
+</Warning>

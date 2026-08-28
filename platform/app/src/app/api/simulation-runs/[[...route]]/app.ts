@@ -1,11 +1,14 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import type {
+  BatchSummary,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -46,6 +49,29 @@ const scenarioRunResponseSchema = z.object({
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+  /**
+   * `note` and `scenarioVersion` are optional in the document, not in the
+   * answer: every server sends both. They arrived after clients were generated
+   * from this family, and a client that reads them as required fails against
+   * a server that predates them.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
+  note: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes.",
+    ),
+  scenarioVersion: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.",
+    ),
 });
 
 const scenarioRunResponseWithPlatformUrlSchema =
@@ -59,12 +85,67 @@ const batchSummarySchema = z.object({
   passCount: z.number(),
   failCount: z.number(),
   runningCount: z.number(),
+  settledCount: z.number(),
   stalledCount: z.number(),
   lastRunAt: z.number(),
   lastUpdatedAt: z.number(),
   firstCompletedAt: z.number().nullable(),
-  allCompletedAt: z.number().nullable(),
+  allCompletedAt: z
+    .number()
+    .nullable()
+    .describe(
+      "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+    )
+    // Machine-readable beside the sentence: a generated client marks the field
+    // deprecated from this, not from the prose.
+    .openapi({ deprecated: true }),
+  isComplete: z
+    .boolean()
+    .describe("True when every run of the batch reached a terminal status."),
+  note: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes.",
+    ),
 });
+
+/**
+ * Adds the completion flag the API exposes on top of the stored counts.
+ * An empty batch is never complete: it has nothing that settled.
+ */
+function toBatchSummaryResponse(batch: BatchSummary) {
+  return {
+    batchRunId: batch.batchRunId,
+    totalCount: batch.totalCount,
+    passCount: batch.passCount,
+    failCount: batch.failCount,
+    runningCount: batch.runningCount,
+    settledCount: batch.settledCount,
+    stalledCount: batch.stalledCount,
+    lastRunAt: batch.lastRunAt,
+    lastUpdatedAt: batch.lastUpdatedAt,
+    firstCompletedAt: batch.firstCompletedAt,
+    allCompletedAt: batch.allCompletedAt,
+    isComplete: batch.settledCount === batch.totalCount && batch.totalCount > 0,
+    note: batch.note,
+  };
+}
+
+/**
+ * The API's view of one run. The published fields are mapped one by one off
+ * the run's metadata, and the metadata itself stays out of the response: its
+ * layout is internal, the fields are the contract.
+ */
+function toRunResponse(run: ScenarioRunData) {
+  const { metadata, ...rest } = run;
+  return {
+    ...rest,
+    note: metadata?.note ?? null,
+    scenarioVersion: metadata?.langwatch?.scenarioVersion ?? null,
+  };
+}
 
 const listQuerySchema = z.object({
   scenarioSetId: z.string().optional(),
@@ -141,7 +222,7 @@ secured.access(requires("scenarios:view")).get(
       const runs = "runs" in result ? result.runs : [];
       return c.json({
         runs: runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
@@ -163,7 +244,7 @@ secured.access(requires("scenarios:view")).get(
 
       return c.json({
         runs: result.runs.map((r) => ({
-          ...r,
+          ...toRunResponse(r),
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
@@ -188,7 +269,7 @@ secured.access(requires("scenarios:view")).get(
 
     return c.json({
       runs: result.runs.map((r) => ({
-        ...r,
+        ...toRunResponse(r),
         platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
           scenarioRunId: r.scenarioRunId,
@@ -242,7 +323,7 @@ secured.access(requires("scenarios:view")).get(
     }
 
     return c.json({
-      ...run,
+      ...toRunResponse(run),
       platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
         scenarioRunId: run.scenarioRunId,
@@ -293,21 +374,51 @@ secured.access(requires("scenarios:view")).get(
     });
 
     return c.json({
-      batches: result.batches.map((b) => ({
-        batchRunId: b.batchRunId,
-        totalCount: b.totalCount,
-        passCount: b.passCount,
-        failCount: b.failCount,
-        runningCount: b.runningCount,
-        stalledCount: b.stalledCount,
-        lastRunAt: b.lastRunAt,
-        lastUpdatedAt: b.lastUpdatedAt,
-        firstCompletedAt: b.firstCompletedAt,
-        allCompletedAt: b.allCompletedAt,
-      })),
+      batches: result.batches.map(toBatchSummaryResponse),
       hasMore: result.hasMore,
       nextCursor: result.nextCursor,
     });
+  },
+);
+
+// ── Get Single Batch ──────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
+  "/batches/:batchRunId",
+  describeRoute({
+    description:
+      "Get the summary of a single batch run, including its completion flag",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": { schema: resolver(batchSummarySchema) },
+        },
+      },
+      404: {
+        description: "Batch run not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { batchRunId } = c.req.param();
+    logger.info({ projectId: project.id, batchRunId }, "Getting batch summary");
+
+    const simulationRuns = getApp().simulations.runs;
+    const batch = await simulationRuns.getBatchSummary({
+      projectId: project.id,
+      batchRunId,
+    });
+
+    if (!batch) {
+      return c.json({ error: "Batch run not found" }, 404);
+    }
+
+    return c.json(toBatchSummaryResponse(batch));
   },
 );
 

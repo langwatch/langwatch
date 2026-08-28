@@ -55,7 +55,6 @@ describe("the real command tree", () => {
       ["analytics", "query"],
       ["trigger", "delete"],
       ["secret", "update"],
-      ["suite", "run"],
     ];
 
     it.each(wired)("marks `%s %s` as speaking the output contract", async (group, name) => {
@@ -69,12 +68,12 @@ describe("the real command tree", () => {
 
   describe("when a command still prints its own output", () => {
     // The commands that legitimately still print their own output because a
-    // format-blind port cannot serve them: a raw byte stream, and the
-    // human-interactive `scenario run --wait` poll whose completion has no
-    // structured payload. (`suite run` renders its own result through
-    // `printResult` and is asserted in the wired list above.)
+    // format-blind port cannot serve them: a raw byte stream, and the two
+    // human-interactive `--wait` polls whose completion has no structured payload.
     const unmigrated = [
       ["dataset", "download"],
+      ["run-plan", "run"],
+      ["test-suite", "run"],
       ["scenario", "run"],
     ];
 
@@ -123,6 +122,30 @@ describe("the real command tree", () => {
    * Adding a command now forces a decision: wire it to the port, or say here
    * why it cannot be.
    */
+  /**
+   * `-o json` is the current spelling, but `-f/--format json` is the one the
+   * skills put in front of the agent, and 186 commands accept it. The three
+   * commands that drive the open page did not, so an agent that followed its
+   * own instructions got `error: unknown option '--format'` and had to guess
+   * again. Commander rejects an undeclared option before the output
+   * preprocessor ever runs, so the flag has to be declared per command.
+   */
+  describe("when inspecting the commands an agent drives the open page with", () => {
+    const agentDriven = [
+      ["ui", "call"],
+      ["ui", "actions"],
+      ["workbench", "get-state"],
+    ];
+
+    it.each(agentDriven)("lets `%s %s` be asked for json the way the skills ask", async (group, name) => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), [group, name]);
+
+      expect(command).toBeDefined();
+      expect(command!.options.map((option) => option.long)).toContain("--format");
+    });
+  });
+
   describe("every leaf command", () => {
     /** Leaf path -> why the port cannot serve it. */
     const holdouts = new Map<string, string>([
@@ -130,7 +153,9 @@ describe("the real command tree", () => {
       ["dataset download", "streams raw bytes to a file or stdout"],
       ["trace export", "writes its own jsonl/csv/json, to a file when asked"],
 
-      // Human-interactive `--wait` poll: no structured completion payload.
+      // Human-interactive `--wait` polls: no structured completion payload.
+      ["run-plan run", "human-interactive --wait poll"],
+      ["test-suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 
       // A live session that runs until Ctrl-C: it produces status prose and

@@ -1,7 +1,7 @@
 ---
 name: connect-agent
 user-prompt: "Connect my agent to LangWatch simulations"
-description: Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so scenario suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first suite. Use when the user wants platform scenarios to test their real, deployed agent.
+description: Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.
 license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface for platform operations.
 ---
@@ -86,7 +86,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL: it opens a tunnel to the local port and points the registered agent at it for the session (Ctrl-C restores the previous URL). Register the agent in Step 6 as normal, then run `langwatch agent dev --port <port> --agent <agent-id>` and keep it running while suites execute.
+If the agent only runs on the user's machine, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL: it opens a tunnel to the local port and points the registered agent at it for the session (Ctrl-C restores the previous URL). Register the agent in Step 6 as normal, then run `langwatch agent dev --port <port> --agent <agent-id>` and keep it running while test suites execute.
 
 ## Step 6: Register the agent and run the first scenario
 
@@ -117,32 +117,35 @@ The body template renders as a Liquid template on every turn. The URL and header
 | `{{ params.NAME }}` | A run parameter the scenario declares |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
 
-Then create one scenario about something this agent really handles, pair it with the agent in a suite, and run it:
+Then create a test suite, create one scenario about something this agent really handles, file it into the test suite, and run the test suite against the agent:
 
 ```bash
+langwatch test-suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --test-suite 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 ```
 
 - Write the situation and criteria from the agent's real behavior in this codebase, not from the example above. Include at least one criterion about a tool call or a lookup, which the judge verifies against the traces from Step 4.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma; rephrase instead.
-- `--targets` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config.
+- `--test-suite` files the scenario into a test suite that already exists, by name or by id. Create the test suite first.
+- `--target` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config. Repeat `--target` for a second agent or prompt.
+- The run goes under the run plan named after the test suite and the target. A later run of the same pair joins the same history, so the pass rate over time is readable in **Agent Testing > Results**.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 7 needs the result.
 
 ## Step 7: Report the result
 
 Report to the user:
 
-- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the `LANGWATCH_ENDPOINT` host when self-hosted).
+- The Agent Testing page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/agent-testing`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
 
@@ -166,7 +169,7 @@ A connected setup shows, on the run page: the conversation transcript with the r
 - Do NOT skip trace adoption because the endpoint "already returns the answer". The reply text cannot prove a tool call happened; the trace can.
 - Do NOT append a list of tools used to the response text so the judge can "see" them. That grades a self-report instead of evidence; adopt `traceparent` and the trace carries the real calls.
 - Do NOT point the agent's tracing at a different LangWatch project than the one running the scenarios. The judge finds nothing there.
-- Do NOT invent an agent id or pass a URL as the suite target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
-- Do NOT comma-separate `--targets` on `suite create`. It is space-separated and variadic; `--scenarios` is the comma-separated one.
+- Do NOT invent an agent id or pass a URL as the run target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
+- Do NOT pass `--test-suite` a test suite the project does not hold. The command refuses it; create the test suite first with `langwatch test-suite create`.
 - Do NOT guess the deployment URL or quietly default to localhost. Step 5 is a question for the user; ask and wait.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.

@@ -3,6 +3,7 @@
  * a run's values resolve against those declarations.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,8 +15,10 @@ import {
   MAX_SCENARIO_PARAMETER_DEFINITIONS,
   mergeRunParameters,
   parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
+  withoutParameterNames,
 } from "../parameters";
 
 const definition = (
@@ -296,6 +299,59 @@ describe("scenario run parameters", () => {
             values: { region: "eu-central" },
           }),
         ).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a parameter declared secret", () => {
+    describe("when it also carries a default value", () => {
+      /** @scenario "A parameter declared secret cannot carry a default value" */
+      it("rejects the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, defaultValue: "abc" },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when it carries no default value", () => {
+      it("accepts the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, description: "The API token" },
+        ]);
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe("when the declarations are split for a run", () => {
+      it("keeps the secret ones out of the plain half", () => {
+        const { plain, secret } = partitionParameterDefinitions([
+          definition("region", "eu-central"),
+          { name: "api_token", secret: true },
+          { name: "plain_flag", secret: false },
+        ]);
+
+        expect(plain.map((one) => one.name)).toEqual(["region", "plain_flag"]);
+        expect(secret.map((one) => one.name)).toEqual(["api_token"]);
+      });
+
+      it("resolves nothing for a secret name in the plain merge", () => {
+        const { plain } = partitionParameterDefinitions([
+          definition("region", "eu-central"),
+          { name: "api_token", secret: true },
+        ]);
+
+        const resolved = mergeRunParameters({
+          definitions: plain,
+          values: withoutParameterNames({
+            values: { region: "us-east", api_token: "tok-live-1" },
+            names: new Set(["api_token"]),
+          }),
+        });
+
+        expect(resolved).toEqual({ region: "us-east" });
       });
     });
   });

@@ -36,13 +36,21 @@
  *
  * ## Targeting
  *
- * Flags can target users, projects, or organizations via PostHog personProperties.
- * Configure targeting in PostHog release conditions, not in the flag name.
- * Pass `projectId` or `organizationId` to `useFeatureFlag` for targeted evaluation.
+ * Flags target projects or organizations through the operator store's rules,
+ * written at /ops/feature-flags. Configure targeting there, not in the flag
+ * name. Pass `projectId` or `organizationId` to `useFeatureFlag` for targeted
+ * evaluation. Targeting is scope-independent: a SYSTEM flag takes per-project
+ * and per-org rules exactly like a PRODUCT one (PostHog was removed from the
+ * resolver — see ADR-005).
  *
  * ## Adding New Flags
  *
- * 1. Create the flag in PostHog with your desired release conditions
+ * 1. Register the flag in `registry.ts` (`FEATURE_FLAGS`) with a scope and a
+ *    default. Listing a key here WITHOUT registering it is the one real
+ *    failure mode: the service falls through to the legacy in-memory path,
+ *    /ops/feature-flags can neither list nor write it, and targeting rules
+ *    never apply. `__tests__/frontendFlagsRegistered.unit.test.ts` enforces
+ *    this.
  * 2. Add the flag key to this array
  * 3. Use `useFeatureFlag("your_flag_key")` in components
  *
@@ -51,21 +59,24 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
-  // Product-scoped navigation shells (product-switcher / icon-rail) plus
-  // the avatar-menu mode picker. The flag unlocks the picker; the
-  // per-device mode in localStorage decides which shell renders. Flag off
-  // or mode legacy = the current chrome, unchanged. See
-  // specs/navigation/navigation-modes.feature and useNavigationMode.
-  "release_ui_navigation_v2_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
-  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches live
-  // in PostHog. Distinct from `release_ui_ai_gateway_menu_enabled`
+  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are
+  // targeting rules at /ops/feature-flags. Distinct from `release_ui_ai_gateway_menu_enabled`
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
+  // The Costs and Billed placeholder pages + their governance nav items.
+  // Composed ON TOP of `release_ui_ai_governance_enabled` (never instead
+  // of it): the section flag off still hides everything. Off by default —
+  // the pages are empty shells shipped ahead of the spend views. See
+  // specs/ai-gateway/governance/governance-home-routing.feature.
+  "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // Gates the Optimize this prompt menu item alongside the UI-action channel
+  // it hands off to; the server-side dispatch checks the same flag.
+  "release_langy_ui_actions",
   // The Langy home composition (the lit block leads, with a real composer in
   // it). Rolls out on its own schedule ON TOP of `release_langy_enabled`:
   // having Langy is necessary but not sufficient, so the panel can ship to a
@@ -83,7 +94,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_webhook_automations",
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
-  // NOT a PostHog flag — it resolves false server-side (unknown flag) and is
+  // NOT registered — it resolves false server-side (unknown flag) and is
   // meant to be forced On locally from the hidden Feature Flags (Dev) drawer,
   // persisting in that browser via the local override. It never widens who can
   // see ops: the sidebar still gates on ops access, so a non-ops user forcing
@@ -94,6 +105,20 @@ export const FRONTEND_FEATURE_FLAGS = [
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
   "release_ui_comparison_leaderboard_enabled",
+  // The Agent Testing v2 interface: one page with Scenarios and Results
+  // tabs, test suites as folders, run notes, scenario versions, and the
+  // wide run drawer (specs/features/agent-testing/). Off by default and
+  // purely additive: the current Simulations pages and menu group are
+  // untouched while it is off, and the backend it calls is unflagged.
+  "release_ui_agent_testing_v2_enabled",
+  // The identifier-first front door: the sign-in, sign-up and invitation
+  // screens (D13, ADR-117). Deliberately NOT a PostHog flag — every screen it
+  // governs is reached SIGNED OUT, and `featureFlag.isEnabled` is a protected
+  // procedure that answers 401 rather than false to a visitor with no session.
+  // It resolves from this browser's own override, set by `?ff_<flag>=on` and
+  // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
+  // when no override is set. See useIdentityFrontDoor.
+  "release_ui_identity_front_door_enabled",
 ] as const;
 
 /**

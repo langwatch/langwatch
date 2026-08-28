@@ -301,6 +301,13 @@ Feature: Model default config cascade
     Then the save fails with a handled "model_default_scope_forbidden" error carrying a 403
     And no ModelDefaultConfig row is created
 
+  @unit
+  Scenario: Saving with a key that names no user is refused with a handled error
+    Given a caller whose API key carries a project but no user
+    When they save a config attached to any scope
+    Then the save fails with a handled "model_default_user_key_required" error carrying a 403
+    And the message names the two ways forward, and does not say the caller is unauthenticated
+
   @integration
   Scenario: Migration collapses pre-invariant duplicate configs per scope
     Given two configs attached to the same (ORGANIZATION, org-acme) scope

@@ -1,22 +1,20 @@
 /**
- * @langwatch/authz — the unified authorization engine (ADR-092).
+ * @langwatch/authz — the isomorphic authorization core (ADR-092).
  *
- * The design is three layers, and this package is the innermost one: the
- * PURE core — the permission registry, the built-in roles, the decide()
- * walk, and the witness/bitset primitives. It reads nothing and writes
- * nothing (no Prisma, no env, no server imports), so the client (useCan),
- * the server runtime, and any future service all get the same answer.
+ * The frontend and the backend import this package verbatim, so it reads
+ * nothing and writes nothing: no Prisma, no env, no node built-ins. That is
+ * not a convention — the package's tsconfig declares no node types, so a
+ * `node:crypto` import or a `Buffer` reference here does not compile.
  *
- *   @langwatch/authz         this package — vocabulary + AuthzEngine
- *   @langwatch/authz-server  the runtime services (AuthzService,
- *                            AuthzCollectorService, GrantsService,
- *                            AuthzShadowService) over repository INTERFACES
- *   platform/app             the Prisma repositories, the redis epoch store,
- *                            the tRPC middleware, and the composition root
- *                            (`src/server/authz/runtime.ts`) that wires them
+ *   @langwatch/authz         this package — the vocabulary, the permission
+ *                            registry, the built-in roles and decide()
+ *   @langwatch/authz-server  the server runtime: services over ports, the
+ *                            event stream, the migration
+ *   platform/app             the Prisma adapters and the composition root
  *
- * The services feed CollectedGrants snapshots into decide(); nothing in this
- * package ever reaches for storage itself.
+ * `./witness` is a subpath for encapsulation rather than safety: minting the
+ * authorization brand is the server's job, so only the server runtime may
+ * import the factory. The `Authorized` type is erased and stays here.
  */
 export { AuthzEngine } from "./engine";
 export { scopeChain, scopeOrganizationId } from "./scope";
@@ -51,19 +49,76 @@ export type {
   ShareableResourceKind,
 } from "./registry";
 export {
+  declaredScopeId,
+  isPlatformTierPermission,
+  permissionGrantTiers,
+  resolveDeclaredScope,
+  SCOPE_TIER_BY_FIELD,
+  SCOPE_TIER_FIELDS,
+} from "./declaration";
+export type {
+  AccessDeclaration,
+  DeclaredScopeId,
+  DeclaredScopeResolution,
+  UnresolvedDeclaredScope,
+  NoPermissionOptions,
+  DeclarationError,
+  PermissionGrantTiers,
+  PermissionScopeArg,
+  PlatformTierPermission,
+  ScopeTierField,
+  ValidatePermissionForInput,
+  ViaFieldFor,
+  TierOfScopeArg,
+} from "./declaration";
+export {
   builtinRoleGrants,
   builtinRolePermissions,
   roleKeyForTeamRole,
 } from "./roles";
 export type { BuiltinRoleKey } from "./roles";
-export { PermissionDeniedError } from "./errors";
+export { BlankScopeIdError, PermissionDeniedError } from "./errors";
 export type { Authorized } from "./witness";
 export { bitsetHasPermission, encodePermissionBitset } from "./bitset";
-// Three things are deliberately NOT re-exported here, and the barrel stays
-// browser-safe (useCan imports it) because of it:
-//   - PassportService and the base64url bitset codecs
-//     (bitsetToBase64Url / bitsetFromBase64Url) use node:crypto and Buffer —
-//     server code imports "@langwatch/authz/passport".
-//   - mintWitness is the one factory for the authorization brand — the
-//     server runtime imports "@langwatch/authz/witness". The `Authorized`
-//     TYPE stays here: it is erased, and every layer names it in signatures.
+export {
+  BINDING_SCOPE_TIERS,
+  CALLER_KINDS,
+  isBindingScopeTier,
+  isPrincipalKind,
+  isScopeTier,
+  isStoredPrincipalKind,
+  isStoredScopeTier,
+  PRINCIPAL_KIND_NAMES,
+  PRINCIPAL_KINDS,
+  PRINCIPAL_KIND_FROM_STORED,
+  principalKindIsIdentified,
+  SCOPE_TIER_FROM_STORED,
+  SCOPE_TIER_NAMES,
+  SCOPE_TIERS,
+  STORED_PRINCIPAL_KIND,
+  STORED_SCOPE_TIER,
+} from "./vocabulary";
+export type {
+  BindingScopeTier,
+  CallerKind,
+  PrincipalKind,
+  ScopeTier,
+  StoredBindingScopeTier,
+  StoredPrincipalKind,
+  StoredScopeTier,
+} from "./vocabulary";
+export {
+  AUTHZ_DECLARATION,
+  authzDeclarationOf,
+  declareAuthzMiddleware,
+} from "./declared-middleware";
+export type {
+  AuthzDeclaration,
+  DeclaredAuthzMiddleware,
+  EnforcedScopeFields,
+} from "./declared-middleware";
+export { arbitrateClaims } from "./credential-claims";
+export type {
+  ClaimArbitration,
+  CredentialClaim,
+} from "./credential-claims";

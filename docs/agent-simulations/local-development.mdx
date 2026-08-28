@@ -2,10 +2,10 @@
 title: Local Development
 sidebarTitle: Local development
 keywords: langwatch, agent simulations, local development, tunnel, langwatch agent dev, cloudflare tunnel, development loop
-description: Run platform scenario suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
+description: Run platform test suites against the agent on your machine, edit the code, and run them again, with no deployment in between.
 ---
 
-# Local Development
+## Start the tunnel
 
 `langwatch agent dev` starts a tunnel in front of a local port, points the chosen registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
 
@@ -16,7 +16,7 @@ langwatch agent dev --port 8010
 ```text
 Tunnel up: https://lively-otter.trycloudflare.com -> localhost:8010
 Agent "bid-companion" now points at your machine (was https://staging.example.com/agent).
-Run your scenarios: https://app.langwatch.ai/my-project/simulations
+Run your scenarios: https://app.langwatch.ai/my-project/agent-testing
 Ctrl-C restores the previous URL.
 ```
 
@@ -27,8 +27,8 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 ## The loop
 
 1. Start the agent process on your machine, then start the tunnel: `langwatch agent dev --port 8010`.
-2. Run the suite, from the simulations page or with `langwatch suite run <suite-id> --wait`.
-3. Read the results, change your code, and run the suite again. The tunnel keeps forwarding to the port, so a restarted or hot-reloaded server needs no new tunnel.
+2. Run the test suite, from **Agent Testing > Scenarios** or with `langwatch test-suite run <test-suite-id> --target http:<agent-id> --wait`.
+3. Read the results, change your code, and run the test suite again. The tunnel keeps forwarding to the port, so a restarted or hot-reloaded server needs no new tunnel.
 4. Press Ctrl-C when you are done. The agent's previous URL comes back.
 
 ## Flags
@@ -39,7 +39,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 | `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
 | `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
 | `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
-| `--no-update-url` | Print the tunnel URL and change nothing on the agent. |
+| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
 | `--no-auth` | Skip the session secret protection described below. |
 
 ## How the tunnel is protected
@@ -50,13 +50,13 @@ A tunnel URL is public, and a local agent process usually holds real model provi
 
 ## While the tunnel is up
 
-The agents list and the simulations target selector show a **local tunnel** badge on the repointed agent, so the team sees that the agent currently points at a developer machine.
+The agents list and the run target selector show a **local tunnel** badge on the repointed agent, so the team sees that the agent currently points at a developer machine.
 
 ## Limits
 
 The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The command shows Cloudflare's terms notice on the first run.
 
-- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the suites you rely on against a deployed URL.
+- Quick tunnels carry no availability guarantee. Use them for the development loop, and run the test suites you rely on against a deployed URL.
 - Quick tunnels buffer server-sent events. This does not affect scenario calls, which are plain JSON requests; it only affects a streaming endpoint served through the same tunnel.
 - Quick tunnels cap at around 200 concurrent requests.
 

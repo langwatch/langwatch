@@ -173,6 +173,10 @@ describe("the open conversation's catch-up from the recorded tail", () => {
     // leak projection state between tests.
     useLangyStore.setState({ scopeAnnounced: false });
     useLangyStore.getState().resetForProject(PROJECT_ID);
+    // The panel passes the hook the store's own `activeConversationId`, and
+    // the catch-up drops a tail that no longer matches it, so the two have to
+    // agree here the way they do in the panel.
+    useLangyStore.setState({ activeConversationId: CONVERSATION_ID });
   });
 
   describe("given the snapshot has seeded the local fold", () => {

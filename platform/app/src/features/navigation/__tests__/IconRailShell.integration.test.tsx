@@ -96,8 +96,10 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  userBelongsToTeam: () => true,
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// fixture holds the membership rows they read, so the real ones answer.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization: mockOrganizations[0],
@@ -262,6 +264,7 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { ICON_RAIL_WIDTH } from "../shell/IconRail";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
 
 function renderShell(props: Record<string, unknown> = {}) {
   return render(
@@ -281,6 +284,7 @@ beforeEach(() => {
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "icon-rail");
   useNavigationModeStore.setState({ storedMode: "icon-rail" });
 });
 
@@ -316,6 +320,25 @@ describe("the icon-rail shell", () => {
       });
       expect(railTile("Gateway")).not.toHaveStyle({
         backgroundColor: "var(--chakra-colors-bg-panel)",
+      });
+    });
+  });
+
+  describe("when a page renders beside the rail", () => {
+    /** @scenario The page keeps its right edge inside the window */
+    it("gives the page the window less the rail and the sidebar", () => {
+      renderShell();
+
+      // Both are subtracted. Handing the rail over inside a `+` sum makes it
+      // `calc(100vw - sidebar + rail)`, which reads left to right and gives
+      // the page two rails it does not have.
+      const roomForThePage =
+        window.innerWidth -
+        Number.parseInt(SHELL_SIDEBAR_WIDTH_EXPANDED, 10) -
+        Number.parseInt(ICON_RAIL_WIDTH, 10);
+
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({
+        maxWidth: `${roomForThePage}px`,
       });
     });
   });

@@ -62,3 +62,48 @@ Feature: Langy composer, feedback, and card polish
     Given an applied proposal that opens an in-app trace
     When the customer cmd-clicks or ctrl-clicks the open link
     Then the browser opens it in a new tab as usual
+
+  @integration
+  Scenario: Typing in the message field leaves the rest of the composer alone
+    Given the Langy composer is idle
+    When the customer types a message one character at a time
+    Then the message field shows exactly what was typed
+    And the model picker is not rebuilt for each character
+
+  @integration
+  Scenario: The input row still sends and opens palettes after typing
+    Given the Langy composer is idle with a typed message
+    When the customer presses Enter
+    Then the message is sent
+    And pressing the slash key at a word boundary opens the skills palette instead of typing a slash
+
+  Rule: The composer takes no queue, and says so
+
+    A message cannot be sent while a turn is in flight. The customer may still
+    write one, and it waits in the field. The field has to say that, because a
+    refused Enter looks the same as a broken one.
+
+    @integration
+    Scenario: The message field says a message waits while Langy works
+      Given a Langy turn is in flight
+      When the customer looks at the message field
+      Then it says Langy is working and the message sends when it stops
+
+    @integration
+    Scenario: The message field says the same while the turn is stopping
+      Given a Langy turn that the customer asked to stop
+      When the customer looks at the message field
+      Then it says Langy is working and the message sends when it stops
+
+    @integration
+    Scenario: Enter during a turn keeps the message instead of sending it
+      Given a Langy turn is in flight
+      When the customer types a message and presses Enter
+      Then no message is sent
+      And the message is still in the field
+
+    @integration
+    Scenario: The kept message sends once the turn ends
+      Given a message typed during a turn that has now ended
+      When the customer presses Enter
+      Then that message is sent

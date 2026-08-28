@@ -113,6 +113,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY packages/langy ./packages/langy
 COPY sdks/typescript ./sdks/typescript
+# Full source for the langy-worker wrapper: its Bun compile below bundles
+# src/ + the pi SDK from node_modules, so manifests alone are not enough.
+COPY services/langyworker/package.json ./services/langyworker/
+COPY services/langyworker/tsconfig.json ./services/langyworker/
+COPY services/langyworker/tsconfig.build.json ./services/langyworker/
+COPY services/langyworker/src ./services/langyworker/src
+COPY services/langyworker/scripts ./services/langyworker/scripts
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
@@ -132,7 +139,7 @@ COPY skills/package.json ./skills/
 COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
 
 WORKDIR /src
-RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..."
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --filter "@langwatch/langyworker..."
 
 # Back to the SDK for the generator + compile steps below, which resolve their
 # inputs (../../platform/app, ../../services/langevals, ../../feature-map.json)
@@ -182,6 +189,21 @@ RUN set -eux; \
     bun run scripts/build-cli-binary.ts --target="${bun_target}" --outfile=/out/langwatch; \
     chmod 0755 /out/langwatch
 
+# Compile the langy-worker wrapper (services/langyworker) the same way: one
+# Bun-compiled binary per target arch. The manager spawns one worker per
+# conversation, so spawn-to-ready time rides on the bytecode snapshot here.
+# scripts/build-binary.ts owns the Bun.build compile flags.
+WORKDIR /src/services/langyworker
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) bun_target=bun-linux-x64 ;; \
+      arm64) bun_target=bun-linux-arm64 ;; \
+      *) echo "unsupported TARGETARCH for the langy-worker binary: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /out; \
+    bun run scripts/build-binary.ts --target="${bun_target}" --outfile=/out/langy-worker; \
+    chmod 0755 /out/langy-worker
+
 # -----------------------------------------------------------------------------
 # Stage 2: runtime image.
 # -----------------------------------------------------------------------------
@@ -196,8 +218,14 @@ FROM debian:bookworm-slim
 # grammar, so a bump means re-checking the command table in
 # services/langyagent/internal/assets/AGENTS.md.
 ARG LANGWATCH_CLI_VERSION=0.31.0
+# `jq` and `python-is-python3` are here because the agent reaches for them by
+# name. The CLI's own `--jq` is a small subset (dot paths and a terminal
+# `| length`) that reads an answer before it is written to disk; anything past
+# that belongs in the shell. Without these three names present, one session
+# lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
+# under a name it did not try.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 util-linux \
+    curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker
@@ -276,6 +304,15 @@ COPY --from=cli-builder /out/langwatch /usr/local/bin/langwatch
 # require) is worse than the npm install it replaced.
 RUN langwatch --version
 
+# The langy-worker wrapper (pi harness): the manager spawns it per conversation
+# when LANGY_PI_WORKER_BINARY_PATH resolves to it (default: `langy-worker` on
+# PATH). Compiled by the cli-builder stage from services/langyworker.
+COPY --from=cli-builder /out/langy-worker /usr/local/bin/langy-worker
+
+# Same rationale as the CLI smoke above: catch an unbundled dynamic require at
+# build time, not at the first worker spawn.
+RUN langy-worker --version
+
 # Drop the Go mono-binary in place; it is the image ENTRYPOINT (below), invoked
 # with the `langyagent` subcommand so it runs the manager as PID 1 DIRECTLY — no
 # shell wrapper. PID 1 is required for the orphan reaper: opencode's children
@@ -304,6 +341,21 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
     chmod 0755 /workspace
 
 ENV HOME=/root
+# The `langwatch` CLI here is a Bun-compiled binary (the cli-builder stage
+# above), and Bun can auto-upload a crash report to a third party. A Bun crash
+# report reprints the process argv, and argv for `langwatch ui call` carries
+# the customer's own payload: prompt text, dataset field names, evaluator ids.
+# That data must never leave this worker, so the upload is turned off here
+# rather than left to the default of whichever platform the image runs on.
+# DO_NOT_TRACK is Bun's documented switch for it and is equivalent to
+# `telemetry = false` in bunfig.toml. It stops the upload only: Bun still
+# prints its crash banner to stderr, which no Bun setting suppresses.
+#
+# The manager passes an allowlisted environment to its workers, and the CLI
+# runs in a worker, so this ENV only reaches it because DO_NOT_TRACK is listed
+# in services/langyagent/internal/workerenv/workerenv.go. Both halves are
+# needed; a test asserts them together.
+ENV DO_NOT_TRACK=1
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/langyagent"]

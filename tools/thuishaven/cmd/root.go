@@ -204,6 +204,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		IsAgent:                 isAgent,
+		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
 		// Opt-in on purpose: "no stack registered" does not mean nobody is
 		// querying — the documented native test mode (LANGWATCH_TEST_CLICKHOUSE_URL)
@@ -212,6 +213,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
+		RedisDBOverride:          app.RedisDBOverrideFromEnv(devEnv("LANGWATCH_HAVEN_REDIS_DB")),
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
 		ShouldStartObservability:  devEnv("LANGWATCH_HAVEN_OBS") != "0",

@@ -1,0 +1,235 @@
+Feature: CLI login mints a user-scoped API key that inherits the user's permissions
+
+  A user who signs in with `langwatch login` (device-session flow) today only
+  receives their personal project's legacy API key. An org admin can therefore
+  not read traces from any other project through the CLI, even though the web
+  app grants them that access.
+
+  The device-session approval now mints a scoped `ApiKey` owned by the
+  approving user. Its role bindings and permission list are selected on the
+  authorize screen, default to the widest access the user holds minus
+  organization-management permissions, and are always intersected with the
+  owner's live permissions at request time. This lets `langwatch projects list`
+  and `langwatch trace search --project <id|slug>` reach every project the user
+  can see, while a leaked key can never create projects, manage RBAC, or mint
+  other keys unless the user opted in.
+
+  Pairs with:
+    - specs/ai-governance/cli-onboarding/login-unified.feature      (CLI login UX)
+    - specs/ai-governance/cli-onboarding/authorize-project-picker.feature
+    - specs/api-keys/unified-api-keys.feature                       (ApiKey + ceiling model)
+    - specs/typescript-sdk/cli-cross-project-access.feature         (CLI side)
+
+  Background:
+    Given a user who is a member of an organization
+    And the organization has governance enabled (`release_ui_ai_governance_enabled`)
+    And a pending device code with credential_type "device_session"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Authorize screen defaults
+  # ─────────────────────────────────────────────────────────────────────
+
+  Rule: the code is confirmed before anything else is shown
+
+    @integration
+    Scenario: the screen asks for the code check first
+      Given the user opened the authorize screen for the device code
+      Then the screen shows only the code, the confirmation question and the
+        confirm action
+      And the organization picker, the access selection and the approve
+        action are not shown yet
+
+    @integration
+    Scenario: confirming the code reveals the access selection
+      When the user confirms the code matches the one in their terminal
+      Then the code section goes away
+      And the organization picker, the access selection and the approve
+        action are shown
+
+    @integration
+    Scenario: a new device code starts the confirmation over
+      Given the user confirmed one device code
+      When the screen is opened for a different device code
+      Then the confirmation is asked again before anything else is shown
+
+  Rule: the authorize screen preselects the widest scope the user holds
+
+    @integration
+    Scenario: org admin defaults to organization scope
+      Given the user holds an ORGANIZATION-scoped ADMIN role binding
+      When the user opens the authorize screen for the device code
+      Then the scope selection defaults to the whole organization
+      And the permission selection defaults to every permission except the
+        organization-management set
+
+    @integration
+    Scenario: regular member defaults to their own teams plus personal workspace
+      Given the user is an org MEMBER who belongs to two shared teams
+      When the user opens the authorize screen for the device code
+      Then the scope selection defaults to those two teams and the user's
+        personal workspace
+      And the whole-organization scope is not selected
+
+    @integration
+    Scenario: the organization-management permissions are off by default
+      When the user opens the authorize screen for the device code
+      Then "organization:manage", "organization:delete" and "team:manage" are
+        not part of the default permission list
+      And none of them is reachable through the manage hierarchy either, so
+        the exclusion holds in effect and not only in the list
+      And gateway permissions (virtual keys, budgets, providers, routing
+        policies) and "project:manage" (model providers, project settings)
+        are part of the default permission list
+
+    @unit
+    Scenario: project administration rides along with project settings
+      Given "project:manage" is in the default permission list, because model
+        providers and project settings check it
+      When a request checks "project:create" or "project:delete"
+      Then the manage grant answers it, so the default list names both rather
+        than withholding what the request path would still allow
+      And a user who wants project administration off the key sets Project to
+        Read on the authorize screen
+
+  Rule: the user can customize scopes and permissions before approving
+
+    @integration
+    Scenario: narrowing the selection narrows the minted key
+      Given the user deselects everything except one shared project
+      And sets the permission level for traces to read only
+      When the user approves and the CLI exchanges the device code
+      Then the minted key has exactly one PROJECT-scoped binding for that project
+      And its permission list contains "traces:view" but not "traces:update"
+
+    @integration
+    Scenario: the offered permissions are the intersection of every selected scope
+      Given the user is ADMIN on one shared team and VIEWER on another
+      And both teams are in the scope selection
+      When the user opens the authorize screen for the device code
+      Then only the permissions both teams grant are sent on approval
+      And the write level is unavailable on a row only one of the teams grants
+
+    @unit
+    Scenario: Customized permissions follow the scopes that are selected
+      Given the user customized the permission rows under one set of scopes
+      When a scope is added that grants less than the rows already chosen
+      Then each row drops to the highest level the new selection still grants
+      And the approval carries what the rows show, so it is never refused for
+        a level the screen still displayed as chosen
+
+    @integration
+    Scenario: approval with zero scopes selected is refused
+      Given the user deselects every scope on the authorize screen
+      Then the approve action is unavailable
+      And an approve request carrying zero bindings is refused with a handled
+        error naming the bindings field
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Minting mechanics
+  # ─────────────────────────────────────────────────────────────────────
+
+  Rule: the key is minted at exchange time, owned by the user, ceiling-capped
+
+    @integration
+    Scenario: exchange returns a user-owned scoped key
+      Given the user approved the device code with the default selection
+      When the CLI polls the exchange endpoint
+      Then the response carries a `cli_api_key` in the `sk-lw-{lookupId}_{secret}` format
+      And the ApiKey row records the approving user as owner
+      And its permissionMode is "restricted" with the selected permission list
+      And the response still carries the personal project and its API key,
+        so older CLI versions keep working unchanged
+
+    @integration
+    Scenario: an approval that is never exchanged mints nothing
+      Given the user approved the device code
+      But the CLI never polls the exchange endpoint before the code expires
+      Then no ApiKey row is created for this login
+
+    @integration
+    Scenario: the key can never exceed the owner's live permissions
+      Given a minted CLI key whose bindings cover the whole organization
+      And the owner is later demoted from org ADMIN to MEMBER
+      When the key is used to search traces on a project the owner can no
+        longer view
+      Then the request is refused with a 403
+
+    @integration
+    Scenario: a failed re-login leaves the previous key working
+      Given the user already has a login key for this device
+      When a second login from the same device fails at the mint
+      Then the previous key is still active, because the replacement is
+        created before the key it replaces is revoked
+      And no half-minted replacement outlives the failed exchange
+
+    @integration
+    Scenario: access lost between approve and exchange ends the login
+      Given the user approved the device code
+      But the user loses the access the selection was approved against before
+        the CLI polls the exchange endpoint
+      When the CLI polls the exchange endpoint
+      Then the response is a fatal "access_denied" telling the user to log in
+        again
+      And the device code is gone, so the next poll cannot re-run the mint
+
+    @integration
+    Scenario: approve refuses bindings above the approving user's ceiling
+      Given the user is an org MEMBER of one team
+      When an approve request claims an ORGANIZATION-scoped binding
+      Then the approval is refused with a handled error
+      And no selection is stamped on the device code
+
+  Rule: re-login and logout do not accumulate keys
+
+    @integration
+    Scenario: re-login from the same device replaces the previous CLI key
+      Given the user already holds a CLI key minted for device label "my-laptop"
+      When the user logs in again from "my-laptop" and completes the exchange
+      Then the previous CLI key for that device label is revoked
+      And exactly one active CLI key remains for that user and device label
+
+    @integration
+    Scenario: two logins racing on one device leave the newer key alive
+      Given two logins from the same device label are exchanged at the same
+        time
+      When both mints complete
+      Then each mint revokes only the keys created before its own
+      And the key the last exchange handed to the CLI is still active
+
+    @integration
+    Scenario: logout revokes the CLI key
+      Given the user holds an active CLI key from this login
+      When the CLI calls the logout endpoint
+      Then that CLI key is revoked along with the device session tokens
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Project listing honours the key's reach
+  # ─────────────────────────────────────────────────────────────────────
+
+  Rule: GET /api/projects returns exactly the projects the credential can view
+
+    @integration
+    Scenario: org-scoped key lists every project in the organization
+      Given a CLI key with an ORGANIZATION-scoped binding granting "project:view"
+      When the key calls GET /api/projects
+      Then the response lists every non-archived project in the organization
+
+    @integration
+    Scenario: project-scoped key gets a filtered list, not a refusal
+      Given a CLI key bound to two of the organization's five projects
+      When the key calls GET /api/projects
+      Then the response lists exactly those two projects
+      And the response is a 200, not a 403
+
+    @integration
+    Scenario: a key without project:view gets an empty list, not a refusal
+      Given a CLI key bound to one team but carrying only "traces:view"
+      When the key calls GET /api/projects
+      Then the response is a 200 with an empty list and a total of zero
+
+    @integration
+    Scenario: the filtered list respects the owner's ceiling
+      Given a CLI key bound to the whole organization
+      And the owner has meanwhile lost access to one team's projects
+      When the key calls GET /api/projects
+      Then that team's projects are absent from the response

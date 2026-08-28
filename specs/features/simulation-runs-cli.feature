@@ -49,3 +49,46 @@ Feature: Simulation Run CLI Commands
     Given my project has completed simulation runs
     When I run "langwatch simulation-run list --format json"
     Then I see the runs as raw JSON including all fields
+
+  # ============================================================================
+  # Note and test case version (Agent Testing v2)
+  # ============================================================================
+  # The note belongs to the batch (specs/suites/run-notes.feature); the version
+  # is the test case version the run used
+  # (specs/scenarios/scenario-version-on-runs.feature). Both read as named
+  # fields, never as raw metadata.
+
+  @unit
+  Scenario: List simulation runs shows the note and the scenario version
+    Given my project has runs started with a note
+    When I run "langwatch simulation-run list"
+    Then each row shows the note of its batch
+    And each row shows the scenario version the run used
+
+  @unit
+  Scenario: List simulation runs where a run has no note
+    Given my project has runs started without a note
+    When I run "langwatch simulation-run list"
+    Then the note column is empty for those runs
+    And no other column shifts
+
+  @unit
+  Scenario: Get simulation run shows the note and the scenario version
+    Given my project has a completed simulation run started with a note
+    When I run "langwatch simulation-run get <run-id>"
+    Then I see the note of the batch
+    And I see the scenario version the run used
+
+  @unit
+  Scenario: Get a simulation run stored before versions were recorded
+    Given my project has a run stored before scenario versions were recorded
+    When I run "langwatch simulation-run get <run-id>"
+    Then no scenario version is shown
+    And the rest of the run details are shown as before
+
+  @unit
+  Scenario: JSON output carries the note and the version as named fields
+    Given my project has completed simulation runs started with a note
+    When I run "langwatch simulation-run list --format json"
+    Then each run carries a "note" field and a "scenarioVersion" field
+    And raw run metadata is not part of the output

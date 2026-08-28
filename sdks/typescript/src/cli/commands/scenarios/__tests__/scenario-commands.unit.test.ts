@@ -57,6 +57,7 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   judgeModel: null,
   maxTurns: null,
   minTurns: null,
+  testSuiteId: null,
   platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });

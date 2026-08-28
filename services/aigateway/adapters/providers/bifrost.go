@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -69,6 +71,17 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// realtimeClient makes the one bounded REST call a voice session mint
+	// needs. Its own client because the mint must not follow redirects and
+	// re-checks every dialed address against the endpoint policy: it carries
+	// the customer's provider key in a header Go does not strip across
+	// hosts.
+	realtimeClient *http.Client
+	// elevenLabsClient serves the two ElevenLabs-native audio routes, which
+	// Bifrost cannot forward. Its own client for the same reasons as the mint
+	// above, with the gateway-wide provider timeout because synthesis and
+	// transcription are real work rather than a mint.
+	elevenLabsClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -129,19 +142,23 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
 	return &BifrostRouter{
-		bf:           bf,
-		logger:       opts.Logger,
-		voyageClient: newVoyageClient(),
-		endpointPolicy: newCustomerEndpointPolicy(
-			opts.BlockLocalHTTPCalls,
-			opts.RequireHTTPSCustomerEndpoints,
-			opts.AllowedEndpointHosts,
-		),
+		bf:              bf,
+		logger:          opts.Logger,
+		voyageClient:    newVoyageClient(),
+		endpointPolicy:  endpointPolicy,
 		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		realtimeClient:  newRealtimeClient(endpointPolicy),
+
+		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
 	}, nil
 }
 
@@ -193,6 +210,25 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
+	// A realtime session mint is a bounded REST call to the vendor's own
+	// mint endpoint, not an inference request: no Bifrost translation, no
+	// model dispatch, no usage on the answer. It branches before the
+	// provider mapping because the route already named the vendor.
+	if req.Type == domain.RequestTypeRealtimeSession {
+		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
+	// ElevenLabs' own audio paths carry that vendor's wire, which Bifrost's
+	// ElevenLabs provider answers with an unsupported-operation error, so the
+	// gateway calls the vendor itself. The route pinned the provider, so the
+	// credential here is already an ElevenLabs one.
+	if elevenLabsNativeRoute(req) {
+		if req.Type == domain.RequestTypeTranscription {
+			return r.dispatchElevenLabsTranscription(ctx, req, cred)
+		}
+		return r.dispatchElevenLabsSpeech(ctx, req, cred)
+	}
+
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -269,7 +305,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, classifyChatBuildError(ctx, err)
+		return nil, classifyRequestBuildError(ctx, err)
 	}
 	stampParamsDropped(ctx, paramsDroppedFrom(dispatchCtx))
 
@@ -637,7 +673,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, classifyChatBuildError(ctx, err)
+		return nil, classifyRequestBuildError(ctx, err)
 	}
 	dropped := paramsDroppedFrom(dispatchCtx)
 	stampParamsDropped(ctx, dropped)
@@ -652,11 +688,12 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	return &bifrostStreamIterator{ch: ch, paramsDropped: dropped}, nil
 }
 
-// classifyChatBuildError turns a buildChatRequest failure into the right
-// client-facing 400: parameter-policy refusals carry the policy's full
-// sentence under unsupported_parameter (the code OpenAI itself uses for
-// parameter rejections), everything else is a malformed client body.
-func classifyChatBuildError(ctx context.Context, err error) error {
+// classifyRequestBuildError turns a request-build failure (buildChatRequest,
+// codexRequestBody) into the right client-facing 400: parameter-policy
+// refusals carry the policy's full sentence under unsupported_parameter (the
+// code OpenAI itself uses for parameter rejections), everything else is a
+// malformed client body.
+func classifyRequestBuildError(ctx context.Context, err error) error {
 	var refusal *paramRefusalError
 	if errors.As(err, &refusal) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{"message": refusal.msg, "fault": "customer"})
@@ -665,6 +702,22 @@ func classifyChatBuildError(ctx context.Context, err error) error {
 	// (unparseable JSON, malformed params): classify it as a 400 the same
 	// way the embeddings lane does, not an internal error.
 	return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+}
+
+// recordParamsDropped puts a policy drop list on the response-header seam
+// (the dispatch meta accumulator, which setMetaHeaders writes before the
+// first byte on either lane) and on the request span. The chat parse path
+// wires the same two seams itself inside buildChatRequest; lanes that build
+// their own body (codex) call this instead.
+func recordParamsDropped(ctx context.Context, dropped []string) {
+	if len(dropped) == 0 {
+		return
+	}
+	if meta := pipeline.MetaFromContext(ctx); meta != nil {
+		droppedCopy := slices.Clone(dropped)
+		meta.Update(func(m *pipeline.Meta) { m.ParamsDropped = droppedCopy })
+	}
+	stampParamsDropped(ctx, dropped)
 }
 
 // stampParamsDropped records the policy drop list on the gateway's
@@ -1511,173 +1564,6 @@ func normalizeOpenAICompatBaseURL(u string) string {
 	return strings.TrimRight(u, "/")
 }
 
-// --- Error classification ---
-
-// errFromBifrost turns a Bifrost dispatch error into the error the gateway
-// surfaces to the client. When the provider returned a real HTTP status, that
-// status (and the provider's native error body when Bifrost captured it) is
-// forwarded verbatim via UpstreamError — so a terminal upstream 4xx reaches
-// the client as that 4xx instead of a retryable 502, and the client can tell
-// terminal from retryable correctly. A zero status means there was no upstream
-// response (transport failure / timeout) — fall back to classification, which
-// maps it to provider_timeout / the gateway's own error taxonomy.
-//
-// This is the streaming-path counterpart to the non-stream
-// rawResponseFromBifrostError branch: streaming dispatch can only return an
-// error, so the upstream status + body ride on UpstreamError instead of a
-// *domain.Response.
-func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
-	}
-	if status <= 0 {
-		return classifyBifrostError(ctx, berr)
-	}
-	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
-	errType, errCode := bfErrorTypeCode(berr)
-	return &domain.UpstreamError{
-		StatusCode: status,
-		Body:       body,
-		Message:    bfErrorMsg(berr),
-		ErrorType:  errType,
-		ErrorCode:  errCode,
-		Headers:    forwardableUpstreamHeaders(respHeaders),
-	}
-}
-
-// bifrostResponseHeaders reads the provider's HTTP response headers that
-// Bifrost stashes on the dispatch context (provider handlers call
-// ctx.SetValue(BifrostContextKeyProviderResponseHeaders, ...) before returning,
-// including on the non-2xx error path). Returns nil when absent.
-func bifrostResponseHeaders(bfCtx *bfschemas.BifrostContext) map[string]string {
-	if bfCtx == nil {
-		return nil
-	}
-	if v, ok := bfCtx.Value(bfschemas.BifrostContextKeyProviderResponseHeaders).(map[string]string); ok {
-		return v
-	}
-	return nil
-}
-
-// forwardableUpstreamHeaders selects the upstream response headers that are
-// safe and useful to forward to the client on an error: the retry-signaling
-// headers Retry-After (backoff hint on 429/503) and x-should-retry (the
-// provider's canonical terminal-vs-retryable signal). Everything else
-// (transport headers, content-length, auth echoes) is dropped. Match is
-// case-insensitive; output uses canonical names.
-func forwardableUpstreamHeaders(in map[string]string) map[string]string {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]string, 2)
-	for k, v := range in {
-		switch strings.ToLower(k) {
-		case "retry-after":
-			out["Retry-After"] = v
-		case "x-should-retry":
-			out["x-should-retry"] = v
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
-	}
-
-	code := domain.ErrProviderError
-	switch status {
-	case http.StatusTooManyRequests:
-		code = domain.ErrRateLimited
-	case http.StatusGatewayTimeout, 0:
-		code = domain.ErrProviderTimeout
-	}
-
-	return herr.New(ctx, code, herr.M{
-		"status":  status,
-		"message": bfErrorMsg(berr),
-	})
-}
-
-func bfErrorMsg(e *bfschemas.BifrostError) string {
-	if e == nil {
-		return ""
-	}
-	if e.Error != nil {
-		return e.Error.Message
-	}
-	return fmt.Sprintf("bifrost error (status %v)", e.StatusCode)
-}
-
-// bfErrorTypeCode lifts the provider's own error discriminants (error.type /
-// error.code as parsed by Bifrost's provider adapter) off a BifrostError.
-// These carry the error's identity (insufficient_quota, overloaded_error,
-// ThrottlingException, ...) on lanes where the native body is not captured.
-func bfErrorTypeCode(e *bfschemas.BifrostError) (errType, errCode string) {
-	if e == nil || e.Error == nil {
-		return "", ""
-	}
-	if e.Error.Type != nil {
-		errType = *e.Error.Type
-	}
-	if e.Error.Code != nil {
-		errCode = *e.Error.Code
-	}
-	return errType, errCode
-}
-
-// upstreamStreamError converts a mid-stream BifrostError chunk into a
-// structured domain.UpstreamError the SSE writer can forward faithfully.
-//
-// Providers can fail a 200-established stream with an in-stream error event
-// whose detail nests under an `error` OBJECT (OpenAI Responses:
-// {"type":"error","error":{"type","code","message","param"}}). Bifrost's
-// stream schema maps only the legacy flat `message`/`code`/`param` fields, so
-// for the nested shape it hands over an ErrorField with an EMPTY message
-// but, on raw-forward paths (rawForwardCtx), the verbatim event body rides
-// ExtraFields.RawResponse. Recover the message from there, and keep the raw
-// body so the writer can forward the provider's own event bytes unchanged.
-func upstreamStreamError(e *bfschemas.BifrostError) *domain.UpstreamError {
-	ue := &domain.UpstreamError{Message: bfErrorMsg(e)}
-	if e == nil {
-		ue.Message = "provider stream error"
-		return ue
-	}
-	ue.ErrorType, ue.ErrorCode = bfErrorTypeCode(e)
-	if code := e.StatusCode; code != nil {
-		ue.StatusCode = *code
-	}
-	raw, ok := extractRawResponseBytes(e.ExtraFields.RawResponse)
-	if !ok {
-		if ue.Message == "" {
-			ue.Message = "provider stream error"
-		}
-		return ue
-	}
-	var event struct {
-		Error *struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if sonic.Unmarshal(raw, &event) == nil && event.Error != nil {
-		// The raw body IS a provider error event, forward it verbatim.
-		ue.Body = raw
-		if ue.Message == "" {
-			ue.Message = event.Error.Message
-		}
-	}
-	if ue.Message == "" {
-		ue.Message = "provider stream error"
-	}
-	return ue
-}
-
 // --- Usage extraction ---
 
 func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
@@ -1776,6 +1662,14 @@ type bifrostStreamIterator struct {
 	// carry the same extra_fields.params_dropped signal as sync ones.
 	// Never set on raw-framing passthrough streams.
 	paramsDropped []string
+	// usageTail carries the unterminated remainder of the previous
+	// passthrough chunk. Bifrost's passthrough adapter forwards raw
+	// socket reads, not whole SSE events, so a usage-bearing frame can
+	// straddle two chunks; the tail is prepended to the next chunk
+	// before usage parsing so a split frame still counts. Capped at
+	// maxUsageTailBytes so a stream that never closes a frame cannot
+	// grow it without bound.
+	usageTail []byte
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1839,8 +1733,20 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			if parser == nil {
 				parser = parseGeminiPassthroughUsage
 			}
+			// The chunk boundary is a socket-read boundary, not an SSE
+			// frame boundary, so a usage-bearing frame can arrive split
+			// across two chunks and a per-chunk parse would silently
+			// lose it (Anthropic's message_start, the only frame with
+			// input and cache counts, is the largest and most exposed).
+			// Prepend the unterminated remainder of the previous chunk
+			// so the frame parses whole once its closing bytes arrive.
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			if u, ok := parser(chunk.BifrostPassthroughResponse.Body); ok {
+			scan := chunk.BifrostPassthroughResponse.Body
+			if len(it.usageTail) > 0 {
+				scan = append(it.usageTail, scan...)
+			}
+			it.usageTail = passthroughUsageTail(scan)
+			if u, ok := parser(scan); ok {
 				// Merge — Anthropic streams emit prompt+cache tokens
 				// once on `message_start` and a stream of output token
 				// counters on `message_delta`, so a chunk-by-chunk
@@ -1893,6 +1799,33 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		}
 		return true
 	}
+}
+
+// maxUsageTailBytes caps the carry-over buffer between passthrough
+// chunks. A well-formed SSE frame closes within a few socket reads; a
+// pathological stream that never closes one must not grow the tail
+// without bound, so past the cap the tail is dropped, losing at worst
+// that one frame's usage.
+const maxUsageTailBytes = 64 * 1024
+
+// passthroughUsageTail returns the bytes after the last complete SSE
+// frame in scan: everything past the final blank-line terminator
+// ("\n\n", or "\r\n\r\n" on CRLF wires). Frames before that point were
+// already handed to the usage parser, so only the unterminated
+// remainder carries over to the next chunk.
+func passthroughUsageTail(scan []byte) []byte {
+	start := 0
+	if i := bytes.LastIndex(scan, []byte("\n\n")); i >= 0 {
+		start = i + 2
+	}
+	if i := bytes.LastIndex(scan, []byte("\r\n\r\n")); i >= 0 && i+4 > start {
+		start = i + 4
+	}
+	tail := scan[start:]
+	if len(tail) == 0 || len(tail) > maxUsageTailBytes {
+		return nil
+	}
+	return append([]byte(nil), tail...)
 }
 
 // parseGeminiPassthroughUsage extracts Gemini's `usageMetadata` block from a

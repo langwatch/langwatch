@@ -168,11 +168,20 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          return parsed != null &&
-            typeof parsed === "object" &&
-            !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : null;
+          if (
+            parsed == null ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+          ) {
+            return null;
+          }
+          // A run's secret parameter values never belong in a stored row, and
+          // the fold projection keeps them out. Dropped again on the way out
+          // so a row written by another path cannot serve one. The names, on
+          // `secretParameterNames`, stay.
+          const { secretParameters: _secretParameters, ...rest } =
+            parsed as Record<string, unknown>;
+          return rest;
         } catch {
           return null;
         }

@@ -254,12 +254,19 @@ describe("PATCH /:traceId/metadata", () => {
     it("has the update-metadata docs file", async () => {
       const fs = await import("node:fs");
       const path = await import("node:path");
+      // update-metadata.mdx was the orphan twin of this page — served by the
+      // docs site but absent from the navigation — and #6824 removed it along
+      // with the other twenty-five. This is the page that survived, and the
+      // one the navigation points at.
       const docsPath = path.resolve(
         __dirname,
         "../../../../../../../..",
-        "docs/api-reference/traces/update-metadata.mdx",
+        "docs/api-reference/traces/update-trace-metadata.mdx",
       );
-      expect(fs.existsSync(docsPath)).toBe(true);
+      expect(
+        fs.existsSync(docsPath),
+        `expected the endpoint's docs page at ${docsPath}`,
+      ).toBe(true);
 
       const content = fs.readFileSync(docsPath, "utf-8");
       expect(content).toContain("Update trace metadata");

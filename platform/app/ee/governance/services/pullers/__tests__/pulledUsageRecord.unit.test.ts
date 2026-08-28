@@ -35,7 +35,7 @@ function usageEvent({
     actor: "",
     action: "usage_report",
     target: "anthropic/claude-sonnet-5",
-    cost_usd: 0,
+    cost_usd: "0",
     tokens_input: 120_000,
     tokens_output: 8_000,
     raw_payload: "{}",
@@ -109,7 +109,7 @@ describe("building one pulled usage record", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent({
           overrides: {
-            cost_usd: 42.5,
+            cost_usd: "42.5",
             action: "cost_report",
             tokens_input: 0,
             tokens_output: 0,
@@ -131,7 +131,7 @@ describe("building one pulled usage record", () => {
         event: usageEvent({
           // What the canonical `cost_usd: number` field could still carry
           // after a provider's string went through a JS float.
-          overrides: { cost_usd: 1.1, action: "cost_report" },
+          overrides: { cost_usd: "1.1", action: "cost_report" },
           hint: {
             costBasis: "provider_reported",
             costStatus: "exact",
@@ -156,7 +156,7 @@ describe("building one pulled usage record", () => {
       const corrected = buildPulledUsageRecord({
         event: usageEvent({
           overrides: {
-            cost_usd: 99,
+            cost_usd: "99",
             tokens_input: 999_999,
             tokens_output: 999_999,
           },
@@ -171,6 +171,37 @@ describe("building one pulled usage record", () => {
       expect(corrected?.restatementKey).toBe(first?.restatementKey);
       expect(corrected?.costNanoUsd).not.toBe(first?.costNanoUsd);
       expect(corrected?.observedAtMs).toBeGreaterThan(first!.observedAtMs);
+    });
+
+    /** @scenario "The hour's context never changes which record a correction lands on" */
+    it("keeps the restatement key identical though the hour's context changed", () => {
+      // Display-only context rides on `extra` BESIDE the hint, never in it.
+      // Late-arriving statements grow an hour's executed-time total, so a
+      // re-read recomputes it — keyed, that correction would mint a second
+      // record and the ledger would count the question twice.
+      const withHour = (totalExecutionMs: string): NormalizedPullEvent => {
+        const event = usageEvent();
+        return {
+          ...event,
+          extra: {
+            ...event.extra,
+            warehouseHour: { totalExecutionMs, billableUsd: "6" },
+          },
+        };
+      };
+
+      const first = buildPulledUsageRecord({
+        event: withHour("60000"),
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      const corrected = buildPulledUsageRecord({
+        event: withHour("3600000"),
+        source: SOURCE,
+        observedAt: new Date("2026-08-07T09:00:00.000Z"),
+      });
+
+      expect(corrected?.restatementKey).toBe(first?.restatementKey);
     });
 
     it("mints a different key when a coordinate actually differs", () => {
@@ -296,7 +327,7 @@ describe("building one pulled usage record", () => {
       expect(() =>
         buildPulledUsageRecord({
           event: usageEvent({
-            overrides: { cost_usd: 1 },
+            overrides: { cost_usd: "1" },
             hint: { costBasis: "provider_reported" },
           }),
           source: SOURCE,

@@ -4,9 +4,9 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
+<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -19,12 +19,16 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | Source type | Delivery | OTLP shape | Storage | State |
 |---|---|---|---|---|
 | [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
+| `claude_code` | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | Pull (Purview Audit API) | Logs | `log_records` | **Setup-contract-only**: Azure AD app config persisted, puller worker pending |
+| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
+| `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
+| `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
+| `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
 
@@ -36,8 +40,8 @@ Each supported `sourceType` below states what is wired up today, what is still e
 
 Different upstreams emit different event shapes:
 
-- **Span-shaped sources** (`otel_generic`, `claude_cowork`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
-- **Flat-event sources** (`workato`, `s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
+- **Span-shaped sources** (`otel_generic`, `claude_code`, `claude_cowork`, `copilot_studio_dataverse`, `databricks_genie`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
+- **Flat-event sources** (`workato`, `s3_custom`, `openai_compliance`, `claude_compliance`, `http_custom`, `anthropic_admin`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` or OCSF events and drill into the log detail pane.
 
 **One internal pipeline either way**: both shapes pass through the same hardened OTLP parser (`parseOtlpBody.ts`) and the same trace pipeline downstream. Both are queryable from the same governance dashboard, both pull into the OCSF v1.1 read API, both honour the per-origin retention class.
 
@@ -93,9 +97,8 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
-4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
-5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
+3. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
+4. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
 If you need an unwired adapter, file an issue tagged `governance/ingestion/adapter-roadmap` and we'll sequence accordingly.
 

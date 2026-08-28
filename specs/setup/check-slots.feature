@@ -4,7 +4,7 @@ Feature: Machine-wide slots for whole-repo checks
   So that N parallel checks never take the machine down, and a slow one
   explains itself instead of looking hung
 
-  # Both checks saturate the machine on purpose. A tsgo run peaks around 3 to 4
+  # Both checks saturate the machine on purpose. A typecheck peaks around 3 to 4
   # GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds
   # in 4 seconds of wall clock. That is the right trade for one run, and capping
   # either tool's threads only stretches the same CPU cost over 5x the wall
@@ -27,7 +27,9 @@ Feature: Machine-wide slots for whole-repo checks
   # hung tool.
   #
   # Knobs, all optional:
-  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate)
+  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate,
+  #                            from a person's shell; agent shells cannot)
+  #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
   #   CHECK_QUEUE_DIR=<path>   where the shared state lives
   #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
   #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
@@ -122,7 +124,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: The limit can be turned off
-    Given CHECK_SLOTS is 0
+    Given CHECK_SLOTS is 0 in a person's shell
     When several checks run at once
     Then none of them queue
 
@@ -144,14 +146,184 @@ Feature: Machine-wide slots for whole-repo checks
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
 
+  # --- The gate-off is the operator's lever, not the agents' ---
+
+  # Observed in the wild: an agent prefixed CHECK_SLOTS=0 onto a whole-tree
+  # typecheck to jump the queue, and the machine ran three checks at once, 14
+  # GB into swap. The queue exists to serialize agents, so a lever any agent
+  # may pull is not a limit. Agent shells are recognizable: Claude Code sets
+  # CLAUDECODE in every shell it spawns. A person's own shell does not carry
+  # it, so the operator keeps the lever.
+
+  @unit
+  Scenario: An agent shell cannot turn the queue off
+    Given CLAUDECODE is set, as it is in every agent shell
+    And CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies as if CHECK_SLOTS were unset
+    And the run says the gate-off was ignored and that only a person may turn the queue off
+
+  # The queue itself turns the gate off for everything below a run it already
+  # counted, or a slot-holding run would queue behind itself at the first bin
+  # shim. That gate-off carries the wrapper's pid in CHECK_QUEUE_HELD, and the
+  # pid must pass two tests: it is a live ancestor of the run asking, and that
+  # process is one of the queue's own wrappers. Ancestry alone would prove
+  # nothing, because a shell is an ancestor of every command it runs, so
+  # CHECK_QUEUE_HELD=$$ would hand the gate-off to any agent that types it.
+  #
+  # This is a lock on an honest door, not a vault. Anyone who may start
+  # processes on the machine may start one named haven. It closes the one-token
+  # bypasses, which is what the queue needs: the runs it serializes are all
+  # started by the wrappers themselves.
+
+  @unit
+  Scenario: A run the queue spawned itself stays unqueued in an agent shell
+    Given a wrapper holding a slot spawned the run with its pid in CHECK_QUEUE_HELD
+    And CLAUDECODE is set
+    When the limit is resolved
+    Then the gate is off for this run, because the wrapper above already counted it
+    And nothing is printed, because nothing was refused
+
+  @unit
+  Scenario: A borrowed held-marker does not turn the queue off
+    Given CHECK_QUEUE_HELD names a live process that is not an ancestor of the run
+    And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies
+
+  @unit
+  Scenario: An agent's own shell is not a queue wrapper
+    Given CHECK_QUEUE_HELD names a live ancestor of the run that is not a queue wrapper
+    And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies, because the marker names no wrapper that counted the run
+
+  @unit
+  Scenario: haven ignores an agent's gate-off the same way
+    Given CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When haven resolves the slot limit
+    Then the derived limit applies, exactly as the JavaScript queue resolves it
+
+  # --- Memory pressure: the machine says the formula's assumption is false ---
+
+  # The derived limit and the 6 GiB memory ceiling both assume an otherwise
+  # idle machine. A machine that is already compressing and swapping is the
+  # machine saying that assumption is false: its RAM is spoken for, and every
+  # gigabyte a check takes is paid by evicting someone else's pages. Under
+  # pressure the check runs in its smallest shape, so the check pays for the
+  # shortage in its own time instead of everything else paying in swap.
+  # The level and its thresholds are ADR-090's (domain/pressure.go): either
+  # swap fill or compressor occupancy alone can raise it. A machine the queue
+  # cannot read is green, because a governor that cannot see must not throttle.
+
+  @unit
+  Scenario: Memory pressure narrows the queue to one run
+    Given the machine reports amber or red memory pressure
+    And CHECK_SLOTS is not set
+    When the limit is resolved
+    Then it is one, whatever the formula would have said
+    And an explicit CHECK_SLOTS still wins, because it is the operator's call
+
+  @unit
+  Scenario: Memory pressure lowers the memory ceiling to the floor
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMEMLIMIT is the 3 GiB floor, whatever the machine's size
+    And an operator's explicit GOMEMLIMIT still reaches it unchanged
+
+  @unit
+  Scenario: Memory pressure halves the compiler's parallelism
+    Given the machine reports amber or red memory pressure
+    When a check runs through the queue
+    Then its GOMAXPROCS is half the cores, never below two
+    And a green machine sets no GOMAXPROCS at all
+    And an operator's explicit GOMAXPROCS still wins
+
+  @unit
+  Scenario: A forced pressure level overrides the measurement
+    Given CHECK_PRESSURE is set to green, amber or red
+    When the level is resolved
+    Then the forced level is used instead of measuring the machine
+    And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
+
+  # CI already runs one check per job on a machine of its own, which is why it
+  # gets no queue. The same reasoning retires the pressure policy there: nobody
+  # is typing on a runner, so buying back an interactive machine buys nothing
+  # and only makes the job slower, and a swap figure read inside a container
+  # describes the host rather than the job.
+
+  @unit
+  Scenario: CI keeps the runtime limits it had before the pressure policy
+    Given the run is under CI
+    When the level is resolved
+    Then it is green whatever the machine measures
+    And the check runs with the same memory ceiling and parallelism it had before
+    And an explicitly forced level still wins, for a test that needs one
+
+  # --- A killed run must not read as the queue's doing ---
+
+  # Observed in the wild: a whole-tree typecheck ended in a bare exit 137, and
+  # the agent driving it concluded the queue had killed it and re-ran with
+  # CHECK_SLOTS=0, removing the machine-wide serialization for everyone. The
+  # queue never kills runs; a signal death it did not forward is an operator
+  # kill or the OS reclaiming memory, and the wrapper now says so at the
+  # moment it happens, where the next reader of the transcript will see it.
+
+  @unit
+  Scenario: A run killed from outside is reported as not the queue's doing
+    Given a check is running through the queue
+    When the command dies by a signal the wrapper did not forward
+    Then the wrapper says the queue never kills runs and names the likely causes
+    And it says to re-run the same command rather than set CHECK_SLOTS=0
+    And a signal the wrapper itself forwarded, like Ctrl-C, is not reported
+    And a command that fails on its own is not reported
+
+  @unit
+  Scenario: An interrupted run killed from outside is still reported
+    Given a check was interrupted and the command ignored the forwarded signal
+    When the command is then killed by a signal the wrapper did not forward
+    Then the wrapper still reports the kill, because the earlier interrupt did not cause it
+    And a run the wrapper itself canceled is not reported
+
+  # A Ctrl-C at a terminal reaches the wrapper and the command together, so the
+  # command can be gone before the wrapper has handled its own copy of the
+  # signal. Reading the record at that moment would accuse the operator of a
+  # kill from outside for their own interrupt, which is the exact mistake the
+  # report exists to prevent.
+
+  @unit
+  Scenario: A signal delivered to the whole process group still counts as forwarded
+    Given a check is running through the queue
+    When the whole process group is signalled at once
+    Then the wrapper counts the signal as one it forwarded
+    And it reports no kill from outside
+
+  # A signal keeps its default disposition until the wrapper is listening for
+  # it, so the order of starting the command and listening decides what a
+  # Ctrl-C at that instant does. In the wrong order the machine kills the
+  # wrapper outright: the interrupt reaches nobody and the command keeps
+  # running with no parent. A slot is counted for as long as its wrapper
+  # lives, so the queue then makes that slot free and can start another check
+  # on top of a run that is still using the machine.
+
+  @unit
+  Scenario: An interrupt that arrives as the command starts is forwarded
+    Given a contributor interrupts a check in the instant its command starts
+    Then the interrupt reaches the command
+    And the check still reports how the command ended
+
   # --- The bin shims: the package scripts are not the only way in ---
 
   # Wrapping the scripts left every other route to the binary uncounted, and
-  # they get used: `pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
-  # `./node_modules/.bin/tsgo`, and the standing advice to iterate with
+  # they get used: `pnpm exec tsc --noEmit -p tsconfig.tsgo.json`,
+  # `./node_modules/.bin/tsc`, and the standing advice to iterate with
   # targeted checks, widened to the whole project. Observed in the wild as
-  # three tsgo processes on an 18 GB laptop with the limit set to 2, one of
+  # three compiler processes on an 18 GB laptop with the limit set to 2, one of
   # them started from the same worktree as a properly queued run.
+  #
+  # The compiler answers to two names — typescript@7 installs it as `tsc`,
+  # @typescript/native-preview as `tsgo` — so the shims cover both and so does
+  # haven's gate (ADR-095).
   #
   # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
   # themselves the boundary, so the route into the tool stops mattering. Only
@@ -161,7 +333,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: A whole-project run counts however it was started
-    When I run "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
+    When I run "pnpm exec tsc --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
     Then the run counts against the limit, exactly as the script would have
 
   @unit
@@ -178,12 +350,12 @@ Feature: Machine-wide slots for whole-repo checks
   # file to check is what turns a whole-project run into one nothing waits for.
   @unit
   Scenario: A subcommand or a flag's value is not a target
-    When I run "biome check" with no paths, or "tsgo --pretty false"
+    When I run "biome check" with no paths, or "tsc --pretty false"
     Then the run counts against the limit, because neither names a file and both walk the project
 
   @unit
   Scenario: A run that names files starts immediately
-    When I run "tsgo --noEmit src/foo.ts"
+    When I run "tsc --noEmit src/foo.ts"
     Then it starts without waiting, so the iterate-fast loop never sits behind a full run
 
   @unit
@@ -194,7 +366,7 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: A check does not queue behind itself
     Given "pnpm typecheck" holds the only slot
-    When the tsgo it runs would otherwise ask for a slot of its own
+    When the compiler it runs would otherwise ask for a slot of its own
     Then it starts without waiting
     And the check does not sit out the maximum wait before starting
 

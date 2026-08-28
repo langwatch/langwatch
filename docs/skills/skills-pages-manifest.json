@@ -50,6 +50,18 @@
         "promptFile": "datasets.docs.txt"
       },
       {
+        "title": "Find my coding agent's context sweet spot",
+        "skill": "langwatch/skills/context-sweet-spot",
+        "slashCommand": "/context-sweet-spot",
+        "promptFile": "context-sweet-spot.docs.txt"
+      },
+      {
+        "title": "Check if another provider would be cheaper",
+        "skill": "langwatch/skills/provider-cost-comparison",
+        "slashCommand": "/provider-cost-comparison",
+        "promptFile": "provider-cost-comparison.docs.txt"
+      },
+      {
         "boldPrefix": "\u2b50 All of the above:",
         "title": "Take my agent to the next level",
         "skill": "langwatch/skills/level-up",
@@ -124,6 +136,12 @@
         "skill": "langwatch/skills/recipes/test-cli-usability",
         "slashCommand": "/test-cli-usability",
         "promptFile": "recipes-test-cli-usability.docs.txt"
+      },
+      {
+        "title": "Build a chart from a question and put it on my dashboard",
+        "skill": "langwatch/skills/recipes/lwql-charts",
+        "slashCommand": "/lwql-charts",
+        "promptFile": "recipes-lwql-charts.docs.txt"
       }
     ]
   },
@@ -151,6 +169,26 @@
         "slashCommand": "/connect-agent",
         "promptFile": "connect-agent.docs.txt",
         "static": true
+      }
+    ]
+  },
+  "coding-agents/find-your-context-sweet-spot.mdx": {
+    "skill": [
+      {
+        "title": "Find my context sweet spot",
+        "skill": "langwatch/skills/context-sweet-spot",
+        "slashCommand": "/context-sweet-spot",
+        "promptFile": "context-sweet-spot.docs.txt"
+      }
+    ]
+  },
+  "coding-agents/compare-provider-costs.mdx": {
+    "skill": [
+      {
+        "title": "Would another provider be cheaper for my usage?",
+        "skill": "langwatch/skills/provider-cost-comparison",
+        "slashCommand": "/provider-cost-comparison",
+        "promptFile": "provider-cost-comparison.docs.txt"
       }
     ]
   }

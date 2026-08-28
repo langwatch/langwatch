@@ -438,6 +438,17 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   workflow_id: string;
   project_id: string;
   secrets?: Record<string, string>;
+  /**
+   * The short-lived credential a code node's sandbox authenticates with,
+   * minted once for a run. It reaches the project's agent cache and nothing
+   * else, and expires by itself, so a run can keep state between rows without
+   * the project key entering the sandbox.
+   *
+   * Absent on a run that could not mint one, and on a one-off Studio run,
+   * which carries none by design. The engine injects nothing when it is
+   * absent, so every row then does its own work.
+   */
+  sandbox_api_key?: string;
 };
 
 // ============================================================================
@@ -540,6 +551,13 @@ export const codeComponentSchema = baseComponentSchema.extend({
         message: "Code component must have a 'code' parameter with type 'code'",
       },
     ),
+  /**
+   * Wall-clock budget for this node's code, in milliseconds. Emitted as the
+   * `timeout_ms` node parameter, the same identifier and units the HTTP node
+   * uses. The engine clamps it to the operator ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`), so it can only shorten a run.
+   */
+  timeoutMs: z.number().int().positive().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Which output field to use as the scenario result. When unset, uses the first output. */

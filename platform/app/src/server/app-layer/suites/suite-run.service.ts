@@ -5,6 +5,15 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { RunActor } from "~/server/scenarios/run-actor";
+import { withActor } from "~/server/scenarios/run-actor";
+import {
+  type ResolvedRunModels,
+  withResolvedModels,
+} from "~/server/scenarios/run-models";
+import type { RunModelsResolver } from "~/server/scenarios/run-models.resolver";
+import { withNote } from "~/server/scenarios/run-note";
+import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -55,33 +64,128 @@ function withParameters(
   return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
 }
 
+/**
+ * The `scenarioVersion` entry of the reserved langwatch namespace, or nothing
+ * at all. The map built from the queue-time read holds every scheduled
+ * scenario, so an absent entry only happens if a caller schedules a scenario
+ * it never read; the run then records no version rather than an undefined.
+ */
+function withScenarioVersion(
+  version: number | undefined,
+): { scenarioVersion: number } | Record<string, never> {
+  return version !== undefined ? { scenarioVersion: version } : {};
+}
+
+/**
+ * The simulation models the plan was configured with, or nothing at all.
+ *
+ * A plan that names no model runs on the project default, and records no
+ * model rather than the default's name: a configuration is what a person
+ * chose, so the same choice has to key the same way after a project default
+ * changes.
+ *
+ * @see specs/scenarios/run-configuration-on-runs.feature
+ */
+function withSimulationModels(models: {
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+}): { simulatorModel?: string; judgeModel?: string } {
+  return {
+    ...(models.simulatorModel ? { simulatorModel: models.simulatorModel } : {}),
+    ...(models.judgeModel ? { judgeModel: models.judgeModel } : {}),
+  };
+}
+
+/**
+ * The names of the secrets a run used, for the run's metadata.
+ *
+ * Names only. They are what lets a person see which credentials a run needed;
+ * the values ride the event beside the metadata, encrypted, and never enter it.
+ */
+function withSecretParameterNames(
+  secretParameters: RunSecretCiphertext | undefined,
+): { secretParameterNames: string[] } | Record<string, never> {
+  const names = Object.keys(secretParameters ?? {});
+  return names.length > 0 ? { secretParameterNames: names } : {};
+}
+
+/**
+ * The encrypted secret values, as a sibling of the metadata rather than a
+ * member of it.
+ *
+ * The fold projection stringifies the metadata object into a stored column, so
+ * a worker running an older build would copy anything inside it into the runs
+ * store. A sibling field is dropped by that same worker instead.
+ */
+function withSecretParameters(
+  secretParameters: RunSecretCiphertext | undefined,
+): { secretParameters: RunSecretCiphertext } | Record<string, never> {
+  return secretParameters && Object.keys(secretParameters).length > 0
+    ? { secretParameters }
+    : {};
+}
+
+/**
+ * Report every enqueue the queue refused.
+ *
+ * A partial enqueue is otherwise invisible: the caller is handed the runs that
+ * were queued and hears nothing about the rest, so the batch looks smaller
+ * than it was asked for with no record of why.
+ */
+function logRejectedEnqueues({
+  items,
+  enqueued,
+  suiteId,
+  batchRunId,
+}: {
+  items: readonly { scenarioRunId: string; scenarioId: string }[];
+  enqueued: readonly PromiseSettledResult<unknown>[];
+  suiteId: string;
+  batchRunId: string;
+}): void {
+  enqueued.forEach((result, index) => {
+    if (result.status !== "rejected") return;
+    logger.error(
+      {
+        suiteId,
+        batchRunId,
+        scenarioRunId: items[index]?.scenarioRunId,
+        scenarioId: items[index]?.scenarioId,
+        error: result.reason,
+      },
+      "Failed to queue a simulation run; it is left out of the batch",
+    );
+  });
+}
+
+/** What SuiteRunService reaches the rest of the platform through. */
+export type SuiteRunServiceDependencies = {
+  startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
+  queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
+  /**
+   * Reads the models each run of the batch will run on, so every run says
+   * which simulator played the person and which judge decided the verdict.
+   * Absent in a context with no database behind it; the runs then record no
+   * resolved model, the same as a run recorded before the field existed.
+   */
+  resolveRunModels?: RunModelsResolver;
+};
+
 export class SuiteRunService {
   constructor(
     readonly repository: SuiteRunReadRepository,
-    private readonly startSuiteRunCommand: (
-      data: StartSuiteRunCommandData,
-    ) => Promise<void>,
-    private readonly queueSimulationRunCommand: (
-      data: QueueRunCommandData,
-    ) => Promise<void>,
+    private readonly deps: SuiteRunServiceDependencies,
   ) {}
 
-  static create(params: {
-    resolveClickHouseClient: ClickHouseClientResolver | null;
-    startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
-    queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
-  }): SuiteRunService {
+  static create(
+    params: SuiteRunServiceDependencies & {
+      resolveClickHouseClient: ClickHouseClientResolver | null;
+    },
+  ): SuiteRunService {
     const repo = params.resolveClickHouseClient
       ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
       : new NullSuiteRunReadRepository();
-    return traced(
-      new SuiteRunService(
-        repo,
-        params.startSuiteRun,
-        params.queueSimulationRun,
-      ),
-      "SuiteRunService",
-    );
+    return traced(new SuiteRunService(repo, params), "SuiteRunService");
   }
 
   /**
@@ -95,6 +199,12 @@ export class SuiteRunService {
     projectId: string;
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    /**
+     * Each scenario's version from the same read that resolved the names, so
+     * every queued run says which state of its scenario it ran. Stamped at
+     * queue time: a later edit never changes what an old run says.
+     */
+    scenarioVersionMap: Map<string, number>;
     activeTargets: SuiteRunTarget[];
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
@@ -107,18 +217,63 @@ export class SuiteRunService {
      * resolution pass reaching a different answer.
      */
     parametersByScenarioId?: Map<string, RunParameterValues>;
+    /**
+     * The secret values each scenario resolved, already encrypted, keyed by
+     * scenario id. They ride the queued event beside the metadata so the run
+     * carries them into execution without any store holding a readable
+     * credential.
+     */
+    secretParametersByScenarioId?: Map<string, RunSecretCiphertext>;
+    /**
+     * One short line describing why this batch was run. Stamped onto every run
+     * of the batch, so a run carries its note from its first moment.
+     */
+    note?: string;
+    /**
+     * The simulation models the plan was configured with. Stamped onto every
+     * run so the run dialog can read a configuration back off the runs and
+     * not only off the plan row.
+     *
+     * They also start the chain that resolves what each run really runs on,
+     * which is stamped beside them.
+     */
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+    /**
+     * The person who started this batch, stamped onto every run of it. Absent
+     * when the caller named no person, which is every project-key run.
+     *
+     * @see specs/scenarios/run-actor-on-runs.feature
+     */
+    actor?: RunActor;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
       projectId,
       activeScenarioIds,
       scenarioNameMap,
+      scenarioVersionMap,
       activeTargets,
       repeatCount,
       skippedArchived,
       idempotencyKey,
       parametersByScenarioId,
+      secretParametersByScenarioId,
+      note,
+      actor,
     } = params;
+    const simulationModels = withSimulationModels(params);
+    // Read before the first run is queued: every run of the batch says which
+    // models it ran on, and the answer must not change part way through it.
+    const resolvedModelsByScenarioId: Map<string, ResolvedRunModels> =
+      (await this.deps.resolveRunModels?.({
+        projectId,
+        scenarioIds: activeScenarioIds,
+        plan: {
+          simulatorModel: params.simulatorModel,
+          judgeModel: params.judgeModel,
+        },
+      })) ?? new Map();
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(suiteId);
@@ -137,7 +292,7 @@ export class SuiteRunService {
       "Starting suite run",
     );
 
-    await this.startSuiteRunCommand({
+    await this.deps.startSuiteRun({
       tenantId: projectId,
       batchRunId,
       scenarioSetId: setId,
@@ -173,9 +328,12 @@ export class SuiteRunService {
     }
 
     const now = Date.now();
-    await Promise.allSettled(
-      items.map((item) =>
-        this.queueSimulationRunCommand({
+    const enqueued = await Promise.allSettled(
+      items.map((item) => {
+        const secretParameters = secretParametersByScenarioId?.get(
+          item.scenarioId,
+        );
+        return this.deps.queueSimulationRun({
           tenantId: projectId,
           scenarioRunId: item.scenarioRunId,
           scenarioId: item.scenarioId,
@@ -183,32 +341,57 @@ export class SuiteRunService {
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+            langwatch: {
+              targetReferenceId: item.target.referenceId,
+              targetType: item.target.type,
+              ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
+              ...withActor(actor),
+              ...simulationModels,
+              ...withResolvedModels(
+                resolvedModelsByScenarioId.get(item.scenarioId),
+              ),
+            },
+            ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
+            ...withSecretParameterNames(secretParameters),
           },
+          ...withSecretParameters(secretParameters),
           target: {
             type: item.target.type,
             referenceId: item.target.referenceId,
           },
           occurredAt: now,
-        }),
-      ),
+        });
+      }),
     );
+
+    // An item whose enqueue was rejected has no run and never will, so it is
+    // reported neither in the count nor in the list: a caller that waited on
+    // its scenarioRunId would wait for a run that was never queued.
+    const queuedItems = items.filter(
+      (_, index) => enqueued[index]?.status === "fulfilled",
+    );
+    logRejectedEnqueues({ items, enqueued, suiteId, batchRunId });
 
     // No explicit job scheduling — the execution subscriber picks up queued events
     // via the GroupQueue and spawns child processes in the execution pool.
 
     logger.debug(
-      { suiteId, batchRunId, itemCount: items.length },
+      {
+        suiteId,
+        batchRunId,
+        itemCount: items.length,
+        queuedCount: queuedItems.length,
+      },
       "Suite run queued via event-sourcing",
     );
 
     return {
       batchRunId,
       setId,
-      jobCount: items.length,
+      jobCount: queuedItems.length,
       skippedArchived,
-      items: items.map((item) => ({
+      items: queuedItems.map((item) => ({
         scenarioRunId: item.scenarioRunId,
         scenarioId: item.scenarioId,
         target: item.target,

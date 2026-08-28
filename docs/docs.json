@@ -16,6 +16,37 @@
     "dark": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
+  "description": "LangWatch is an open-source LLMOps platform for observability, evaluations, prompt optimization, and agent simulations.",
+  "seo": {
+    "indexing": "navigable",
+    "organization": {
+      "name": "LangWatch",
+      "url": "https://langwatch.ai",
+      "logo": "https://langwatch.ai/docs/logo/light.svg",
+      "sameAs": [
+        "https://github.com/langwatch/langwatch",
+        "https://x.com/langwatchai",
+        "https://www.linkedin.com/company/langwatch/",
+        "https://www.youtube.com/@LangWatch"
+      ]
+    }
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "search": {
+    "prompt": "Search the LangWatch docs"
+  },
+  "errors": {
+    "404": {
+      "redirect": false,
+      "title": "That page has moved or been retired",
+      "description": "Search above for what you were looking for, or start from the [introduction](/introduction). If a link on our own site sent you here, [tell us](/support) so we can fix it."
+    }
+  },
+  "markdown": {
+    "instructions": "If anything on this page is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved` to send the problem to the LangWatch team. No login is needed and secrets are redacted locally. `npx langwatch report --help` has the details."
+  },
   "banner": {
     "content": "**[Get started with LangWatch Skills in seconds](https://langwatch.ai/docs/skills/directory):** Set up evals, scenario tests, and tracing just by asking your AI coding assistant.",
     "dismissible": true
@@ -24,8 +55,11 @@
     "options": [
       "copy",
       "view",
+      "claude",
       "chatgpt",
-      "claude"
+      "cursor",
+      "vscode",
+      "mcp"
     ]
   },
   "api": {
@@ -39,13 +73,6 @@
         "curl"
       ],
       "defaults": "required"
-    },
-    "mdx": {
-      "server": "https://app.langwatch.ai/api/evaluations",
-      "auth": {
-        "method": "key",
-        "name": "x-api-key"
-      }
     }
   },
   "navigation": {
@@ -86,6 +113,7 @@
               },
               "agent-simulations/testing-your-agent",
               "agent-simulations/getting-started",
+              "agent-simulations/run-suites-from-ci",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -224,6 +252,7 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
+                  "platform/scim-groups",
                   "platform/model-providers",
                   "platform/data-retention"
                 ]
@@ -236,12 +265,12 @@
               {
                 "group": "Cookbooks",
                 "pages": [
-                  "/cookbooks/build-a-simple-rag-app",
-                  "/cookbooks/finetuning-embedding-models",
-                  "/cookbooks/vector-vs-hybrid-search",
-                  "/cookbooks/tool-selection",
-                  "/cookbooks/finetuning-agents",
-                  "/cookbooks/evaluating-multi-turn-conversations"
+                  "cookbooks/build-a-simple-rag-app",
+                  "cookbooks/finetuning-embedding-models",
+                  "cookbooks/vector-vs-hybrid-search",
+                  "cookbooks/tool-selection",
+                  "cookbooks/finetuning-agents",
+                  "cookbooks/evaluating-multi-turn-conversations"
                 ]
               },
               {
@@ -311,8 +340,6 @@
                   "integration/go/reference"
                 ]
               },
-              "integration/opentelemetry/guide",
-              "integration/opentelemetry/multiple-providers",
               "integration/metadata-and-labels",
               {
                 "group": "Tutorials",
@@ -336,6 +363,27 @@
                     "pages": [
                       "integration/python/tutorials/capturing-metadata",
                       "integration/typescript/tutorials/capturing-metadata"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Images",
+                    "pages": [
+                      "integration/python/tutorials/capturing-images",
+                      "integration/typescript/tutorials/capturing-images"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Documents",
+                    "pages": [
+                      "integration/python/tutorials/capturing-documents",
+                      "integration/typescript/tutorials/capturing-documents"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Audio and Voice",
+                    "pages": [
+                      "integration/python/tutorials/capturing-audio",
+                      "integration/typescript/tutorials/capturing-audio"
                     ]
                   },
                   {
@@ -465,10 +513,6 @@
           {
             "group": "Tools",
             "pages": [
-              "integration/tools/integrations/claude-code",
-              "integration/tools/integrations/openai-codex",
-              "integration/tools/integrations/github-copilot-cli",
-              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -595,7 +639,10 @@
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
               "ai-gateway/governance/routing-policies",
-              "ai-gateway/governance/retention"
+              "ai-gateway/governance/retention",
+              "ai-gateway/governance/ocsf-export",
+              "ai-gateway/governance/architecture",
+              "ai-gateway/governance/activity-monitor-event-sourcing"
             ]
           },
           {
@@ -619,6 +666,7 @@
                 "group": "Caching & Performance",
                 "pages": [
                   "ai-gateway/caching-passthrough",
+                  "ai-gateway/cache-control",
                   "ai-gateway/streaming"
                 ]
               },
@@ -627,6 +675,7 @@
                 "pages": [
                   "ai-gateway/guardrails",
                   "ai-gateway/security",
+                  "ai-gateway/policy-rules",
                   "ai-gateway/audit"
                 ]
               },
@@ -649,6 +698,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -689,8 +739,6 @@
             "group": "Get Started",
             "pages": [
               "ai-governance/overview",
-              "ai-governance/track-your-claude-code-usage",
-              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -711,6 +759,7 @@
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
               "ai-governance/roles-and-permissions",
+              "ai-governance/personas",
               "ai-governance/audit-log"
             ]
           },
@@ -732,6 +781,7 @@
             "group": "Sources",
             "pages": [
               "ai-governance/ingestion-sources/index",
+              "ai-governance/ingestion-templates/index",
               "ai-governance/ingestion-sources/otel-generic",
               "ai-governance/ingestion-sources/claude-cowork",
               "ai-governance/ingestion-sources/workato",
@@ -772,6 +822,91 @@
         ]
       },
       {
+        "anchor": "Coding Agents",
+        "icon": "square-terminal",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "coding-agents/overview",
+              "coding-agents/quickstart",
+              "coding-agents/claude-code-usage"
+            ]
+          },
+          {
+            "group": "Set Up Your Agent",
+            "pages": [
+              {
+                "group": "Claude Code",
+                "icon": "/images/logos/claude-code.svg",
+                "pages": [
+                  "coding-agents/claude-code"
+                ]
+              },
+              {
+                "group": "Codex",
+                "icon": "/images/logos/codex.svg",
+                "pages": [
+                  "coding-agents/openai-codex"
+                ]
+              },
+              {
+                "group": "GitHub Copilot",
+                "icon": "/images/logos/github-copilot.svg",
+                "pages": [
+                  "coding-agents/github-copilot-cli"
+                ]
+              },
+              {
+                "group": "Gemini CLI",
+                "icon": "/images/logos/gemini.svg",
+                "pages": [
+                  "coding-agents/gemini-cli"
+                ]
+              },
+              {
+                "group": "OpenCode",
+                "icon": "/images/logos/opencode.svg",
+                "pages": [
+                  "coding-agents/opencode"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "See Your Usage",
+            "pages": [
+              "coding-agents/sessions",
+              "coding-agents/pull-requests",
+              "coding-agents/usage-analytics",
+              "coding-agents/repository-and-pr-attribution"
+            ]
+          },
+          {
+            "group": "Teams & Fleets",
+            "pages": [
+              "coding-agents/team-projects",
+              "coding-agents/headless-and-ci"
+            ]
+          },
+          {
+            "group": "Privacy & Security",
+            "pages": [
+              "coding-agents/privacy",
+              "coding-agents/secrets-redaction"
+            ]
+          },
+          {
+            "group": "Investigate With Your Agent",
+            "pages": [
+              "coding-agents/explore-your-usage-with-your-own-agent",
+              "coding-agents/find-your-context-sweet-spot",
+              "coding-agents/compare-provider-costs"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Langy",
         "icon": "robot",
         "groups": [
@@ -787,6 +922,7 @@
             "group": "Using Langy",
             "pages": [
               "langy/chat",
+              "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
               "langy/insights"
@@ -898,6 +1034,12 @@
         "icon": "code",
         "groups": [
           {
+            "group": "Get Started",
+            "pages": [
+              "api-reference/introduction"
+            ]
+          },
+          {
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
@@ -906,7 +1048,8 @@
               "api-reference/traces/get-transcript",
               "api-reference/traces/update-trace-metadata",
               "api-reference/traces/create-public-trace-path",
-              "api-reference/traces/delete-public-trace-path"
+              "api-reference/traces/delete-public-trace-path",
+              "api-reference/traces/projection-dsl"
             ]
           },
           {
@@ -1028,7 +1171,13 @@
               "api-reference/experiments/list-runs-of-an-experiment",
               "api-reference/experiments/poll-a-run",
               "api-reference/experiments/read-run-results",
-              "api-reference/experiments/report-dspy-optimizer-steps"
+              "api-reference/experiments/report-dspy-optimizer-steps",
+              "api-reference/experiments/post-create-an-experiment",
+              "api-reference/experiments/read-one-experiment",
+              "api-reference/experiments/list-an-experiment-s-versions",
+              "api-reference/experiments/read-an-experiment-s-setup",
+              "api-reference/experiments/save-an-experiment-s-setup",
+              "api-reference/experiments/restore-an-experiment-version"
             ]
           },
           {
@@ -1081,6 +1230,8 @@
               "api-reference/scenarios/list-scenarios",
               "api-reference/scenarios/create-scenarios",
               "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/list-a-scenario-s-versions",
+              "api-reference/scenarios/read-one-scenario-version",
               "api-reference/scenarios/update-scenarios",
               "api-reference/scenarios/patch-update-scenarios",
               "api-reference/scenarios/delete-scenarios"
@@ -1101,7 +1252,31 @@
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
               "api-reference/simulation-runs/list-list",
-              "api-reference/simulation-runs/get-simulation-runs"
+              "api-reference/simulation-runs/get-simulation-runs",
+              "api-reference/simulation-runs/get-batches"
+            ]
+          },
+          {
+            "group": "Run Plans",
+            "pages": [
+              "api-reference/run-plans/overview",
+              "api-reference/run-plans/list-run-plans",
+              "api-reference/run-plans/create-run",
+              "api-reference/run-plans/get-run-plans",
+              "api-reference/run-plans/run-a-plan-again",
+              "api-reference/run-plans/delete-run-plans"
+            ]
+          },
+          {
+            "group": "Test Suites",
+            "pages": [
+              "api-reference/test-suites/overview",
+              "api-reference/test-suites/list-test-suites",
+              "api-reference/test-suites/create-test-suites",
+              "api-reference/test-suites/read-one-test-suite",
+              "api-reference/test-suites/update-test-suites",
+              "api-reference/test-suites/run-a-test-suite",
+              "api-reference/test-suites/delete-test-suites"
             ]
           },
           {
@@ -1212,6 +1387,16 @@
               "api-reference/secrets/get-secrets",
               "api-reference/secrets/update-secrets",
               "api-reference/secrets/delete-secrets"
+            ]
+          },
+          {
+            "group": "Agent Cache",
+            "pages": [
+              "api-reference/agent-cache/overview",
+              "api-reference/agent-cache/get-entry",
+              "api-reference/agent-cache/put-entry",
+              "api-reference/agent-cache/claim-entry",
+              "api-reference/agent-cache/delete-entry"
             ]
           },
           {
@@ -1439,16 +1624,6 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Sign In to LangWatch",
-          "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=sidebar-signin",
-          "icon": "house"
-        },
-        {
-          "anchor": "Visit GitHub",
-          "href": "https://github.com/langwatch/langwatch",
-          "icon": "github"
-        },
-        {
           "anchor": "Get Support",
           "href": "https://docs.langwatch.ai/support#email-support",
           "icon": "life-ring"
@@ -1472,26 +1647,6 @@
       "href": "https://github.com/langwatch/langwatch"
     }
   },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/langwatch/langwatch",
-      "website": "https://langwatch.ai",
-      "x-twitter": "https://x.com/langwatchai",
-      "linkedin": "https://www.linkedin.com/company/langwatch/",
-      "youtube": "https://www.youtube.com/@LangWatch"
-    },
-    "links": [
-      {
-        "header": "For agents",
-        "items": [
-          {
-            "label": "For agents: report an issue using npx langwatch report",
-            "href": "https://langwatch.ai/docs/support"
-          }
-        ]
-      }
-    ]
-  },
   "integrations": {
     "gtm": {
       "tagId": "GTM-KJ4S6Z9C"
@@ -1499,8 +1654,32 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1787158581",
-      "destination": "/"
+      "source": "/ci/cache/busted/1787934174",
+      "destination": "/introduction"
+    },
+    {
+      "source": "/integration/tools/integrations/claude-code",
+      "destination": "/coding-agents/claude-code"
+    },
+    {
+      "source": "/integration/tools/integrations/openai-codex",
+      "destination": "/coding-agents/openai-codex"
+    },
+    {
+      "source": "/integration/tools/integrations/github-copilot-cli",
+      "destination": "/coding-agents/github-copilot-cli"
+    },
+    {
+      "source": "/integration/tools/integrations/opencode",
+      "destination": "/coding-agents/opencode"
+    },
+    {
+      "source": "/ai-governance/track-your-claude-code-usage",
+      "destination": "/coding-agents/claude-code-usage"
+    },
+    {
+      "source": "/ai-governance/explore-your-usage-with-your-own-agent",
+      "destination": "/coding-agents/explore-your-usage-with-your-own-agent"
     },
     {
       "source": "/langevals/:path*",
@@ -1568,7 +1747,7 @@
     },
     {
       "source": "/features/datasets",
-      "destination": "/datasets/quickstart"
+      "destination": "/datasets/overview"
     },
     {
       "source": "/self-hosting/sso-hybrid",
@@ -1576,7 +1755,7 @@
     },
     {
       "source": "/self-hosting/open-source",
-      "destination": "/self-hosting/docker-compose"
+      "destination": "/self-hosting/deployment/docker-compose"
     },
     {
       "source": "/agent-simulations/overview",
@@ -1624,11 +1803,11 @@
     },
     {
       "source": "/self-hosting/helm",
-      "destination": "/self-hosting/kubernetes-helm"
+      "destination": "/self-hosting/deployment/kubernetes-helm"
     },
     {
       "source": "/hybrid-setup/sso-setup-langwatch",
-      "destination": "/self-hosting/sso-setup-langwatch"
+      "destination": "/self-hosting/configuration/sso"
     },
     {
       "source": "/skills/overview",

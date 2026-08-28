@@ -13,7 +13,7 @@ Get the CLI authenticated and talking to the right LangWatch project, then verif
 
 ## Step 1: Credentials
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
 
 For CI and agents, configure non-interactively, and never block on a browser. Have the runner inject the key from your secret store into `LANGWATCH_API_KEY`, which is what the CLI reads:
 
@@ -56,22 +56,6 @@ langwatch status          # resource counts: proves auth + endpoint + project in
 `langwatch status` printing resource counts means the setup is done. Everything else (traces, evaluations, scenarios) builds on this.
 
 ## Step 4: Discover What You Can Do
-
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 ## Troubleshooting
 

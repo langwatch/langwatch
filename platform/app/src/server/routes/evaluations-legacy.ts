@@ -17,8 +17,7 @@ import type { JsonArray } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -181,7 +180,7 @@ async function authenticateRequest(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the descriptor
@@ -737,7 +736,7 @@ secured.access(legacyEvaluationAuth).post(
       };
     }
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
+    const experiment = await ExperimentService.create({ prisma }).findBySlug({
       projectId: project.id,
       slug: experimentSlug,
     });

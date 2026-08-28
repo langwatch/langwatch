@@ -77,9 +77,13 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
         expect(created.simulatorModel).toBeNull();
         expect(created.judgeModel).toBeNull();
 
-        const updated = await service.update(created.id, projectId, {
-          simulatorModel: "openai/gpt-5-mini",
-          judgeModel: "openai/gpt-5-nano",
+        const updated = await service.update({
+          id: created.id,
+          projectId,
+          data: {
+            simulatorModel: "openai/gpt-5-mini",
+            judgeModel: "openai/gpt-5-nano",
+          },
         });
         expect(updated.simulatorModel).toBe("openai/gpt-5-mini");
         expect(updated.judgeModel).toBe("openai/gpt-5-nano");

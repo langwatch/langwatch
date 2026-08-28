@@ -183,7 +183,10 @@ test-scripts:
 # Mirror the Go services' herr error codes into
 # packages/handled-error/src/codes.generated.ts, so the TypeScript control
 # plane stops compiling when a Go service gains a code with no presentation.
-# Run after adding or renaming a `herr.Code(...)` const. `herrgen-check` is the
+# Run after adding or renaming a `herr.Code(...)` const — and after EDITING one's
+# doc comment, which the generator copies into the emitted file, so a reworded
+# sentence fails `generated` in CI exactly like a new code does.
+# `herrgen-check` is the
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
@@ -247,7 +250,7 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
 
 go-lint:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION)"

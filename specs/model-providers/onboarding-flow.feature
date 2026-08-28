@@ -228,3 +228,39 @@ Feature: Onboarding Flow
     # Voyage is embedding-only. The cascade walks up for DEFAULT and
     # FAST so an Anthropic+Voyage org has Anthropic chat + Voyage
     # embeddings without falling through to OpenAI.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Seeding an existing scope config
+  # ────────────────────────────────────────────────────────────────────────────
+  # The seed used to stop at the first config already attached to the scope, so
+  # the order the providers were added in decided which role keys ever existed.
+  # Anthropic first seeds DEFAULT and FAST and nothing else; adding OpenAI after
+  # it did nothing at all, and every embeddings feature stayed unconfigured.
+  # The seed now merges the roles the scope is missing and never rewrites a role
+  # the scope already has.
+
+  @integration
+  Scenario: Seeding a scope that already has a config adds only the missing roles
+    Given an organization whose default models carry DEFAULT and FAST
+    When OpenAI is enabled at that organization
+    Then EMBEDDINGS is added to the existing config
+    And DEFAULT keeps the value it already had
+    And FAST keeps the value it already had
+
+  @integration
+  Scenario: A role the scope already carries is never rewritten
+    Given an organization whose default models carry every role the provider seeds
+    When that provider is enabled again at the organization
+    Then no default model value changes
+
+  @integration
+  Scenario: A provider whose plan adds nothing new leaves the config untouched
+    Given an organization whose default models carry DEFAULT and FAST
+    When Anthropic is enabled at that organization
+    Then the stored config is unchanged
+
+  @integration
+  Scenario: Enabling a provider that was turned off seeds the roles it can fill
+    Given a disabled OpenAI provider at an organization whose default models carry no EMBEDDINGS
+    When the provider is turned back on
+    Then EMBEDDINGS is added to the organization's default models

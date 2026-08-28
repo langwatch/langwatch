@@ -1,3 +1,9 @@
+/**
+ * Batch aggregates over the simulation_runs table.
+ *
+ * @see specs/features/simulation-runs-batch-completion.feature
+ */
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -1413,6 +1419,127 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(previewQuery!.query_params?.minStartedAtMs).toBe(
           String(oldStartedAtMs),
         );
+      });
+    });
+
+    /**
+     * Seeds one batch and returns the ids the assertions need. A queued run
+     * carries no FinishedAt: the queue writes the row before the worker picks
+     * it up.
+     */
+    async function seedBatch(statuses: string[]) {
+      const setId = `set-completion-${nanoid()}`;
+      const batchRunId = `batch-completion-${nanoid()}`;
+
+      for (const status of statuses) {
+        const settled = status !== "QUEUED";
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            Status: status,
+            FinishedAt: settled ? new Date(now) : null,
+          }),
+        );
+      }
+
+      return { setId, batchRunId };
+    }
+
+    async function readBatch({
+      setId,
+      batchRunId,
+    }: {
+      setId: string;
+      batchRunId: string;
+    }) {
+      const result = await repo.getBatchHistoryForScenarioSet({
+        projectId: tenantId,
+        scenarioSetId: setId,
+        limit: 10,
+      });
+      const batch = result.batches.find((b) => b.batchRunId === batchRunId);
+      if (!batch) throw new Error("expected the seeded batch");
+      return batch;
+    }
+
+    describe("when the batch still holds a queued run", () => {
+      /** @scenario "A batch with queued runs is not complete" */
+      it("counts the queued run as running and the finished one as settled", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(1);
+        expect(batch.settledCount).toBe(1);
+      });
+
+      /** @scenario "allCompletedAt stays null until the last run settles" */
+      it("leaves allCompletedAt null while the queued run waits", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.allCompletedAt).toBeNull();
+      });
+    });
+
+    describe("when every run of the batch reached a terminal status", () => {
+      /** @scenario "A batch is complete when every run is terminal" */
+      it("settles every run and carries a completion timestamp", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(0);
+        expect(batch.settledCount).toBe(batch.totalCount);
+        expect(batch.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when one batch is read by its batch run id", () => {
+      it("returns the same counts as the history page, without items", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.batchRunId).toBe(batchRunId);
+        expect(summary!.totalCount).toBe(2);
+        expect(summary!.runningCount).toBe(1);
+        expect(summary!.settledCount).toBe(1);
+        expect(summary!.allCompletedAt).toBeNull();
+      });
+
+      it("carries a completion timestamp once every run is terminal", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.settledCount).toBe(2);
+        expect(summary!.runningCount).toBe(0);
+        expect(summary!.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when the batch run id belongs to no run of the project", () => {
+      it("returns null", async () => {
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId: `batch-unknown-${nanoid()}`,
+        });
+
+        expect(summary).toBeNull();
       });
     });
   });

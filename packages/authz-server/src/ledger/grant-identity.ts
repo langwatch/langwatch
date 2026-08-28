@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Instance, Ksuid } from "@langwatch/ksuid";
-import type { LedgerPrincipal, LedgerScope } from "./grants-ledger.reducer";
+import type { LedgerPrincipal, LedgerScope } from "./facts";
 
 /**
  * Pinned, never read from the ambient environment. A KSUID's environment is a
@@ -78,4 +78,47 @@ export function deriveGrantId({
     instance,
     sequenceId,
   ).toString();
+}
+
+/** The one principal a binding identity is keyed on. */
+export type BindingIdentityPrincipal = {
+  userId?: string | null;
+  groupId?: string | null;
+  apiKeyId?: string | null;
+};
+
+export type BindingIdentityInput = {
+  principal: BindingIdentityPrincipal;
+  scopeType: string;
+  scopeId: string;
+  role: string;
+  customRoleId: string | null;
+};
+
+/**
+ * A binding's identity as the database's partial unique indexes define it
+ * (migration `20260410120000_fix_role_binding_unique_custom_role`): a
+ * built-in binding is keyed on its role, a custom one on its custom role id
+ * — the role column is not part of a custom binding's identity at all. Two
+ * rows with the same key are the same grant, whatever their row ids.
+ *
+ * Callers that compare across vocabularies (a legacy enum against the
+ * ledger's role key) normalize their `role` before calling this — this
+ * function only joins what it is given.
+ *
+ * Joined on the ASCII unit separator, not a delimiter that could appear
+ * inside an id or an enum, the same choice `deriveGrantId` makes above.
+ */
+export function bindingIdentityKey({
+  principal,
+  scopeType,
+  scopeId,
+  role,
+  customRoleId,
+}: BindingIdentityInput): string {
+  const principalId =
+    principal.userId ?? principal.groupId ?? principal.apiKeyId ?? "";
+  const roleIdentity =
+    customRoleId === null ? `builtin:${role}` : `custom:${customRoleId}`;
+  return [principalId, scopeType, scopeId, roleIdentity].join("\u001f");
 }

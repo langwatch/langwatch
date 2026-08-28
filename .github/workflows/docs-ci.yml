@@ -13,6 +13,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
 
+# No job here writes anything. Declared explicitly rather than inherited,
+# because this workflow installs an npm dependency tree and runs it: if the
+# repository default is ever flipped to write, that would silently hand those
+# jobs a write token. go-ci.yaml and langwatch-app-ci.yml do the same.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Supersede an outdated run on a PR branch, never on main: every commit
@@ -48,6 +55,22 @@ jobs:
               # generates its api-reference pages from it, so a spec change has
               # to re-run this job or the copy silently falls behind.
               - 'platform/app/src/app/api/openapiLangWatch.json'
+              # The structure checker and the rules it applies.
+              - 'pkg/docsscan/**'
+              - 'tools/docscheck/**'
+              - 'cmd/docscheck/**'
+              - 'go.mod'
+              - 'go.sum'
+              # docscheck holds the release the docs name against the chart's
+              # appVersion, so bumping the chart without touching the docs is
+              # exactly the drift this job has to catch.
+              - 'charts/langwatch/Chart.yaml'
+              # check_generated_files installs with --frozen-lockfile, and both
+              # composites below shape how these jobs run — detect-changes is
+              # the gate itself, so a change to it must re-run the gate.
+              - 'pnpm-lock.yaml'
+              - '.github/actions/setup-pnpm-node/**'
+              - '.github/actions/detect-changes/**'
 
   check_links:
     needs: changes
@@ -60,27 +83,107 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The CLI refuses to run on Node >= 25 and on < 20.17, and this job would
+      # otherwise use whatever the runner image ships — so the next image bump
+      # would red every docs PR with nothing in the repo having changed. 24 is
+      # what .github/actions/setup-pnpm-node pins for the sibling job.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      # `mint` is the CLI. `mintlify` is the same package at the same version,
+      # and Mintlify's install docs say to remove it if both are present, so
+      # this pins the name that is going to keep existing.
+      #
+      # --ignore-scripts because the dependency tree reaches puppeteer, whose
+      # postinstall downloads a Chrome build that none of validate, broken-links
+      # or a11y needs.
+      #
+      # The pin covers the CLI, not everything it runs: `mint validate` fetches
+      # the current Mintlify build client at run time (releases.mintlify.com,
+      # unpinned, no checksum), so an upstream client release can still change
+      # this step's behaviour, and an outage there fails it. Pinning the client
+      # is possible only through an undocumented hidden flag, so this accepts
+      # the exposure rather than depending on unsupported surface.
+      - name: Install the Mintlify CLI
+        run: npm install -g --ignore-scripts mint@4.2.788
+
+      # Strict mode: exits non-zero on warnings as well as errors, and
+      # validates the OpenAPI documents docs.json references. Replaces a shell
+      # wrapper that swallowed the exit code and decided pass/fail by grepping
+      # the CLI's console prose for "no broken links found" — so a change to
+      # that wording, or any new failure mode, read as green.
+      - name: Validate the build
+        run: mint validate
+
+      # The three --check flags are all off by default, which is why a redirect
+      # that pointed at another redirect's source survived in docs.json. Anchor
+      # checking stays off deliberately: it currently reports 47 pre-existing
+      # broken heading anchors, and turning it on here would gate every PR on
+      # that backlog. Run `mint broken-links --check-anchors` to see it.
       - name: Check for broken links
+        run: mint broken-links --check-redirects --check-snippets
+
+      # We ship 52 <Frame> images and a lot of generated tables; a11y regressions
+      # are invisible in review. Non-blocking for now — it reports a baseline
+      # nobody has triaged, and a gate nobody can pass gets deleted.
+      #
+      # Exit 1 means "issues found", which is the baseline we are choosing not
+      # to gate on. Anything else means the check did not run — CLI missing
+      # (127), OOM-killed (137), a crash — and that must not read as the same
+      # warning, or the day it stops checking looks identical to today.
+      - name: Check accessibility
         run: |
-          # Pipe `continue\n` to dismiss any first-run interactive prompt
-          # (Mintlify CLI in a fresh CI runner can prompt about config / version
-          # before producing output, exiting nonzero from inside $() under
-          # `set -eo pipefail` and killing the step before the broken-links
-          # report ever runs). `|| true` keeps us from short-circuiting on
-          # CLI nonzero; we drive pass/fail purely from the captured output
-          # so a real broken-link report still fails the step.
-          output=$(printf 'continue\n' | npx mintlify broken-links 2>&1 || true)
-          echo "$output"
-          if echo "$output" | grep -qi "found.*broken links in"; then
-            echo "Broken links detected!"
-            exit 1
-          fi
-          if echo "$output" | grep -qi "no broken links found"; then
-            echo "No broken links found"
-            exit 0
-          fi
-          echo "Mintlify CLI did not report success or broken-links — treating as failure."
-          exit 1
+          set +e
+          mint a11y
+          code=$?
+          set -e
+          case "$code" in
+            0) ;;
+            1) echo "::warning::mint a11y reported issues (not gating)" ;;
+            *) echo "::error::mint a11y did not run (exit $code)"; exit 1 ;;
+          esac
+
+  # Structural rules the Mintlify CLI does not have: a page that exists but is
+  # in no navigation group is still served at its URL, so nothing upstream
+  # reports it, and `--check-redirects` validates a destination without
+  # noticing it is another redirect's source.
+  check_structure:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check docs structure
+        run: go run ./cmd/docscheck
+
+  check_prose:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # The check reads docs written in the pull request and prints them in a
+      # ::error annotation, which GitHub reads as a workflow command. This
+      # proves the values are encoded before they reach one.
+      - name: Check the prose script encodes its annotations
+        run: bash docs/scripts/check-docs-prose.test.sh
+
+      - name: Check docs prose for banned words
+        run: bash docs/scripts/check-docs-prose.sh
+        env:
+          DOCS_PROSE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
 
   check_generated_files:
     needs: changes
@@ -155,11 +258,11 @@ jobs:
           fi
 
   docs-complete:
-    needs: [changes, check_links, check_generated_files]
+    needs: [changes, check_links, check_structure, check_prose, check_generated_files]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: check_links, check_generated_files
+          allowed-skips: check_links, check_structure, check_prose, check_generated_files

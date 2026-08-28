@@ -94,6 +94,30 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
 		})
 	}
+	if opts.Selection.IDP {
+		idpEnv := append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("idp")))
+		// The issuer/metadata URLs the simulator publishes must be the routed
+		// hostname, not loopback — the browser follows them during a login.
+		for _, svc := range st.Services {
+			if svc.Name == "idp" {
+				if svc.URL != "" {
+					idpEnv = append(idpEnv, "IDPSIM_BASE_URL="+svc.URL)
+				}
+				// Bound to loopback rather than the wildcard the simulator
+				// defaults to: this nameserver answers whatever it is asked
+				// about, so it should be reachable from this machine and
+				// nowhere else.
+				if svc.DNSPort != 0 {
+					idpEnv = append(idpEnv, fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", svc.DNSPort))
+				}
+			}
+		}
+		out = append(out, Child{
+			Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
+			Shell: goServiceShell(opts.RepoRoot, "idpsim", opts.ShouldGoWatch),
+			Env:   idpEnv,
+		})
+	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
 		langy.LogPath = logPath("langyagent")

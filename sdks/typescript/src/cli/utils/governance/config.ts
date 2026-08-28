@@ -55,6 +55,28 @@ export interface GovernanceConfig {
   };
 
   /**
+   * The user-scoped API key minted for this login by
+   * `POST /api/auth/cli/exchange`, in the `sk-lw-{lookupId}_{secret}` shape.
+   * It reaches every project the user picked on the authorize screen, so data
+   * and management commands use it instead of the personal project's own key
+   * and `--project <id|slug>` can point them at another project. Absent when
+   * the server predates the feature; the resolver then falls back to
+   * `personal_project.api_key`, exactly as before.
+   * Spec: specs/typescript-sdk/cli-cross-project-access.feature
+   */
+  cli_api_key?: string;
+
+  /**
+   * What `cli_api_key` reaches, as the exchange reported it. `organization`
+   * means every project of the organization, now and later; `projects` means
+   * the listed ids only. Read by `langwatch whoami` to summarise the login.
+   */
+  cli_api_key_scope?: {
+    kind: "organization" | "projects";
+    project_ids: string[];
+  };
+
+  /**
    * Personal ingest keys (write-only ingest ApiKeys in the
    * `ik-lw-{lookupId}_{secret}` shape minted by
    * `/api/auth/cli/governance/ingestion-key`), keyed by the tool's
@@ -227,6 +249,27 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
   return !!secret && secret.startsWith(VK_SECRET_PREFIX);
 }
 
+/** Whether a stored `cli_api_key_scope` is in the shape `whoami` can read. */
+function isWellFormedCliKeyScope(
+  scope: GovernanceConfig["cli_api_key_scope"],
+): boolean {
+  if (!scope) return false;
+  if (scope.kind !== "organization" && scope.kind !== "projects") return false;
+  if (
+    !Array.isArray(scope.project_ids) ||
+    !scope.project_ids.every((id) => typeof id === "string")
+  ) {
+    return false;
+  }
+  // An organization scope carries no project ids by definition. A scope
+  // holding both would have `whoami` report "whole organization" while the
+  // list says otherwise, so refuse it as malformed.
+  if (scope.kind === "organization" && scope.project_ids.length > 0) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Returns the absolute path to the config file. Override with
  * LANGWATCH_CLI_CONFIG for tests / non-default homes.
@@ -275,6 +318,19 @@ export function loadConfig(): GovernanceConfig {
           ([, pin]) => typeof pin?.secret === "string" && pin.secret !== "",
         ),
       );
+    }
+    // A blank or non-string `cli_api_key` is a hand-edit, not a credential.
+    // Kept, it would win over the personal-project key in the resolver and
+    // send `Basic base64(projectId:undefined)` at every command; dropped, the
+    // resolver degrades to the pre-feature path and the next login writes a
+    // working key again. The scope goes with it: it describes a key that is
+    // no longer there, and `whoami` would otherwise report a reach the CLI
+    // cannot use.
+    if (typeof cfg.cli_api_key !== "string" || cfg.cli_api_key.trim() === "") {
+      delete cfg.cli_api_key;
+      delete cfg.cli_api_key_scope;
+    } else if (!isWellFormedCliKeyScope(cfg.cli_api_key_scope)) {
+      delete cfg.cli_api_key_scope;
     }
     return cfg;
   } catch (err) {

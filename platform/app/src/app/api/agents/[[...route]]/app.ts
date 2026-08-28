@@ -1,7 +1,7 @@
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
@@ -14,25 +14,7 @@ import {
   agentServiceMiddleware,
 } from "../../middleware/agent-service";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
-import { platformUrl } from "../../shared/platform-url";
-
-function agentPlatformUrl({
-  projectSlug,
-  agentId,
-  agentType,
-}: {
-  projectSlug: string;
-  agentId: string;
-  agentType: string;
-}): string {
-  const drawer = agentType === "http" ? "agentHttpEditor" : "agentCodeEditor";
-  return platformUrl({
-    projectSlug,
-    path: `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`,
-  });
-}
-
-import { ZodError } from "zod";
+import { agentPlatformUrl } from "../agent-platform-url";
 import { handleAgentError } from "./error-handler";
 
 patchZodOpenapi();

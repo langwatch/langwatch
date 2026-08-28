@@ -26,7 +26,7 @@ Before suggesting anything, read EVERYTHING:
 
 4. `langwatch trace search --limit 25 --format json` to check trace quality (inputs/outputs populated? spans connected? labels present?)
 5. `langwatch scenario list --format json` to see what scenarios exist. Are they comprehensive or shallow?
-6. `langwatch suite list --format json` to see what suites (run plans) exist
+6. `langwatch test-suite list --format json` to see what test suites exist, and `langwatch run-plan list --format json` to see what run plans they are run under
 7. `langwatch evaluator list --format json` to see what evaluators are configured
 8. `langwatch monitor list --format json` to check for online evaluation monitors
 9. `langwatch prompt list --format json` to check whether prompts are versioned (or all hardcoded in code)
@@ -54,7 +54,7 @@ Fix the easiest, highest-impact gaps first:
 - No tests at all: create initial scenario tests (see the `scenarios` skill)
 - Generic datasets: generate domain-specific ones (see the `datasets` skill)
 
-Deliver working results. Show the user what improved. This is the a-ha moment.
+Deliver working results. Show the user what improved.
 
 ## Phase 3: Guide Deeper
 
@@ -79,7 +79,7 @@ Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactf
 After each improvement:
 
 1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch suite run --wait`, etc.)
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run <id|name> --target <type:id> --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 

@@ -1,72 +1,86 @@
-export const AUTHZ_GRANTS_PIPELINE_NAME = "authz_grants" as const;
-export const AUTHZ_GRANTS_AGGREGATE_TYPE = "authz_grants" as const;
+// ADR-110. Two aggregates, both keyed by the entity their events are about:
+// what separates a grant's fold from a role's is the aggregate ID its command
+// stamps, which is the whole point of the split. The organization is the
+// tenant of every event and the aggregate of nothing. Rollout state is not
+// here: the migration's status is the read fork.
+//
+// ONE aggregate TYPE for both families, and it is not cosmetic. The type is
+// the storage partition key (`domain/aggregateType.ts`: "events are
+// partitioned by tenantId + aggregateType") and the event store rejects, at
+// append, any event whose type differs from the one its pipeline declares.
+// Both families ride the `authz_grant` pipeline, so both stamp its type; a
+// separate `authz_role` type would have to come with a pipeline of its own.
+export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
+export const AUTHZ_GRANT_AGGREGATE_TYPE = "authz_grant" as const;
 
-/**
- * The grants ledger (ADR-092 §13). One aggregate per organization
- * (`aggregateId = organizationId`, the billing_report precedent). The
- * runtime family records one access fact per event; the process family
- * records the cutover machine's own facts. Checks never read these —
- * they read the Postgres projections the fold maintains.
- */
+// Each command names one grant; a command may not straddle aggregates.
+export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
+export const CHANGE_GRANT_ROLE_COMMAND_TYPE =
+  "lw.authz_grant.change_role" as const;
+export const REVOKE_GRANT_COMMAND_TYPE = "lw.authz_grant.revoke" as const;
 
-export const ATTACH_GRANTS_COMMAND_TYPE =
-  "lw.authz_grants.attach_grants" as const;
-export const PROVE_MIGRATION_PARITY_COMMAND_TYPE =
-  "lw.authz_grants.prove_migration_parity" as const;
-export const COMPLETE_CUTOVER_COMMAND_TYPE =
-  "lw.authz_grants.complete_cutover" as const;
-export const ROLL_BACK_CUTOVER_COMMAND_TYPE =
-  "lw.authz_grants.roll_back_cutover" as const;
-export const RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE =
-  "lw.authz_grants.record_migration_tenant_state" as const;
-
-export const AUTHZ_GRANTS_COMMAND_TYPES = [
-  ATTACH_GRANTS_COMMAND_TYPE,
-  PROVE_MIGRATION_PARITY_COMMAND_TYPE,
-  COMPLETE_CUTOVER_COMMAND_TYPE,
-  ROLL_BACK_CUTOVER_COMMAND_TYPE,
-  RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
+export const AUTHZ_GRANT_COMMAND_TYPES = [
+  ATTACH_GRANT_COMMAND_TYPE,
+  CHANGE_GRANT_ROLE_COMMAND_TYPE,
+  REVOKE_GRANT_COMMAND_TYPE,
 ] as const;
 
-// Runtime family — one access fact each.
-export const GRANT_ATTACHED_EVENT_TYPE =
-  "lw.authz.grants.grant_attached" as const;
+export const GRANT_ATTACHED_EVENT_TYPE = "lw.authz.grant.attached" as const;
 export const GRANT_ROLE_CHANGED_EVENT_TYPE =
-  "lw.authz.grants.grant_role_changed" as const;
-export const GRANT_REVOKED_EVENT_TYPE =
-  "lw.authz.grants.grant_revoked" as const;
-export const ROLE_DEFINED_EVENT_TYPE = "lw.authz.grants.role_defined" as const;
-export const ROLE_PERMISSIONS_CHANGED_EVENT_TYPE =
-  "lw.authz.grants.role_permissions_changed" as const;
-export const ROLE_DELETED_EVENT_TYPE = "lw.authz.grants.role_deleted" as const;
-export const MEMBER_OFFBOARDED_EVENT_TYPE =
-  "lw.authz.grants.member_offboarded" as const;
+  "lw.authz.grant.role_changed" as const;
+export const GRANT_REVOKED_EVENT_TYPE = "lw.authz.grant.revoked" as const;
 
-// Process family — the cutover machine's own facts.
-export const MIGRATION_PARITY_PROVED_EVENT_TYPE =
-  "lw.authz.grants.migration_parity_proved" as const;
-export const CUTOVER_COMPLETED_EVENT_TYPE =
-  "lw.authz.grants.cutover_completed" as const;
-export const CUTOVER_ROLLED_BACK_EVENT_TYPE =
-  "lw.authz.grants.cutover_rolled_back" as const;
-/** The runner's lifecycle transitions as witness facts: the state table's
- *  synchronous write stays the latch; this event makes the transition
- *  replayable and auditable. */
-export const MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE =
-  "lw.authz.grants.migration_tenant_state_changed" as const;
-
-export const AUTHZ_GRANTS_EVENT_TYPES = [
+export const AUTHZ_GRANT_EVENT_TYPES = [
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
+] as const;
+
+export const DEFINE_ROLE_COMMAND_TYPE = "lw.authz_role.define" as const;
+export const CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE =
+  "lw.authz_role.change_permissions" as const;
+export const DELETE_ROLE_COMMAND_TYPE = "lw.authz_role.delete" as const;
+
+export const AUTHZ_ROLE_COMMAND_TYPES = [
+  DEFINE_ROLE_COMMAND_TYPE,
+  CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
+  DELETE_ROLE_COMMAND_TYPE,
+] as const;
+
+export const ROLE_DEFINED_EVENT_TYPE = "lw.authz.role.defined" as const;
+export const ROLE_PERMISSIONS_CHANGED_EVENT_TYPE =
+  "lw.authz.role.permissions_changed" as const;
+export const ROLE_DELETED_EVENT_TYPE = "lw.authz.role.deleted" as const;
+
+export const AUTHZ_ROLE_EVENT_TYPES = [
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
 ] as const;
 
-export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-17" as const;
+export const AUTHZ_GRANTS_COMMAND_TYPES = [
+  ...AUTHZ_GRANT_COMMAND_TYPES,
+  ...AUTHZ_ROLE_COMMAND_TYPES,
+] as const;
+
+export const AUTHZ_GRANTS_EVENT_TYPES = [
+  ...AUTHZ_GRANT_EVENT_TYPES,
+  ...AUTHZ_ROLE_EVENT_TYPES,
+] as const;
+
+export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-20" as const;
+
+export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
+
+// Shared by the audit subscriber and the pre-migration writer, which both
+// write `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` into the same column.
+export const AUTHZ_AUDIT_VERBS = [
+  "attach",
+  "role_change",
+  "revoke",
+  "role_defined",
+  "role_permissions_changed",
+  "role_deleted",
+] as const;
+
+export type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];

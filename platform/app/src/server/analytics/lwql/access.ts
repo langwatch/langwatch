@@ -1,5 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 /**
  * The experimental gate over the whole LangWatchQL surface.
@@ -46,9 +47,8 @@ export async function lwqlEnabled({
   return featureFlagService.isEnabled(LWQL_FLAG, {
     distinctId: projectId,
     projectId,
-    // Omitted rather than passed as undefined when the project cannot be read:
-    // a rule matching on the organization should not be handed a value this
-    // function guessed at.
-    ...(organizationId ? { organizationId } : {}),
+    // A project that cannot be read has no organization to state, and a rule
+    // that names an organization must not be handed a guess.
+    organizationId: organizationId ?? NOT_TARGETED,
   });
 }

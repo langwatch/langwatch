@@ -12,6 +12,7 @@ import {
   mergeConfigs,
 } from "@chakra-ui/react";
 import { colorSystem } from "../components/ui/color-mode";
+import { frontDoorThemeConfig } from "../features/auth-front-door/frontDoorTheme";
 import { langyThemeConfig } from "../features/langy/langyTheme";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
@@ -1079,7 +1080,7 @@ const appConfig = defineConfig({
             borderColor: "border",
             borderRadius: "lg",
             boxShadow: "lg",
-            "& button:not([data-variant=ghost]):not([data-part])": {
+            "& button[data-variant=solid], & button[data-variant=outline]": {
               boxShadow: "md",
             },
             "& input, & textarea, & select": {
@@ -1327,7 +1328,7 @@ const appConfig = defineConfig({
  */
 export const system = createSystem(
   defaultConfig,
-  mergeConfigs(appConfig, langyThemeConfig),
+  mergeConfigs(appConfig, langyThemeConfig, frontDoorThemeConfig),
 );
 
 // The LangWatch app shell (providers, routing, NProgress) has moved to:

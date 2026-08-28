@@ -42,11 +42,23 @@ import {
 export type HookedTool = "claude_code" | "codex";
 
 /**
- * What marks an entry as ours. The prefix rather than the whole command, so an
+ * What marks an entry as ours. Prefixes rather than whole commands, so an
  * entry written by an older CLI (or for another agent) is still recognised as
  * langwatch-authored and gets replaced or removed rather than duplicated.
  */
 const OWNED_COMMAND_PREFIX = "langwatch ingest hook";
+
+/**
+ * The guidance hook that injects the declare-your-context text as
+ * SessionStart additionalContext, for a claude without plugin support (the
+ * plugin carries its own copy). Installed and removed with the session hooks.
+ */
+const GUIDANCE_COMMAND_PREFIX = "langwatch ingest guidance";
+
+const OWNED_COMMAND_PREFIXES = [
+	OWNED_COMMAND_PREFIX,
+	GUIDANCE_COMMAND_PREFIX,
+] as const;
 
 /** The two events a session's git context can have changed between. */
 const HOOK_EVENTS = ["SessionStart", "Stop"] as const;
@@ -133,7 +145,7 @@ export function installSessionContextHooks({
 
 	const hooks = isPlainObject(document.hooks) ? document.hooks : {};
 	for (const event of HOOK_EVENTS) {
-		hooks[event] = mergeHookEntries(hooks[event], tool);
+		hooks[event] = mergeHookEntries({ raw: hooks[event], tool, event });
 	}
 	document.hooks = hooks;
 
@@ -222,10 +234,18 @@ export function removeSessionContextHooks({
  * already matches keeps its position, anything else of ours is replaced by
  * exactly one current entry, and the user's entries keep their order.
  */
-function mergeHookEntries(raw: unknown, tool: HookedTool): unknown[] {
+function mergeHookEntries({
+	raw,
+	tool,
+	event,
+}: {
+	raw: unknown;
+	tool: HookedTool;
+	event: (typeof HOOK_EVENTS)[number];
+}): unknown[] {
 	const entries = Array.isArray(raw) ? (raw as unknown[]) : [];
 	const ours = entries.filter(isLangwatchHookEntry);
-	const desired = sessionContextHookEntry(tool);
+	const desired = sessionContextHookEntry(tool, event);
 
 	if (ours.length === 1 && JSON.stringify(ours[0]) === JSON.stringify(desired)) {
 		return entries;
@@ -233,16 +253,28 @@ function mergeHookEntries(raw: unknown, tool: HookedTool): unknown[] {
 	return [...entries.filter((entry) => !isLangwatchHookEntry(entry)), desired];
 }
 
-/** No matcher: every session start counts, whatever started it. */
-function sessionContextHookEntry(tool: HookedTool): Record<string, unknown> {
+/**
+ * No matcher: every session start counts, whatever started it. Still ONE
+ * entry per event: claude's SessionStart carries the guidance hook as a
+ * second command in the same entry, so the one-entry invariant (and the
+ * removal that rides on it) holds for both commands. Only claude takes the
+ * guidance: codex hook output never reaches the model, so its guidance
+ * rides the AGENTS.md block instead.
+ */
+function sessionContextHookEntry(
+	tool: HookedTool,
+	event: (typeof HOOK_EVENTS)[number],
+): Record<string, unknown> {
+	const commands = [sessionContextHookCommand(tool)];
+	if (tool === "claude_code" && event === "SessionStart") {
+		commands.push(`${GUIDANCE_COMMAND_PREFIX} claude-code`);
+	}
 	return {
-		hooks: [
-			{
-				type: "command",
-				command: sessionContextHookCommand(tool),
-				timeout: HOOK_TIMEOUT_SECONDS,
-			},
-		],
+		hooks: commands.map((command) => ({
+			type: "command",
+			command,
+			timeout: HOOK_TIMEOUT_SECONDS,
+		})),
 	};
 }
 
@@ -252,7 +284,8 @@ function isLangwatchHookEntry(entry: unknown): boolean {
 		if (!isPlainObject(hook)) return false;
 		const command = hook.command;
 		return (
-			typeof command === "string" && command.startsWith(OWNED_COMMAND_PREFIX)
+			typeof command === "string" &&
+			OWNED_COMMAND_PREFIXES.some((prefix) => command.startsWith(prefix))
 		);
 	});
 }

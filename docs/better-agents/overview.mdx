@@ -3,7 +3,7 @@ title: "Better Agents"
 description: "Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development"
 ---
 
-# Better Agents
+## The Reliability Layer
 
 Better Agents is a CLI tool and a set of standards for building **reliable, testable, production-grade agents**, independent of which framework you use. It gives your coding assistant (Kilocode, Claude Code, Cursor, etc.) knowledge of any agent framework you choose (Agno, Mastra, LangGraph, etc.) and all their best practices.
 
@@ -92,7 +92,7 @@ npm test
 </Tabs>
 
 <Check>
-Once you run your first scenario, you'll see results appear in your LangWatch project dashboard under the Simulations section.
+Once you run your first scenario, you'll see results appear in your LangWatch project under Agent Testing > Results.
 </Check>
 
 ## Project Structure
@@ -163,7 +163,7 @@ describe("Customer Support Agent", () => {
       description: "Customer requests refund for defective product",
       agents: [
         customerSupportAgent,
-        scenario.userSimulatorAgent({ model: openai("gpt-4o") }),
+        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
       ],
       script: [
         scenario.user("I want a refund for my order"),
@@ -216,7 +216,7 @@ Example prompt structure:
 ```yaml prompts/customer-support.yaml
 handle: customer-support-bot
 scope: PROJECT
-model: openai/gpt-4o-mini
+model: openai/gpt-5-mini
 prompt: |
   You are a helpful customer support agent.
   

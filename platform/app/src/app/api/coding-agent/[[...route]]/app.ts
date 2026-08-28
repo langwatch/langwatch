@@ -1,7 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { ValidationError } from "@langwatch/handled-error";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";

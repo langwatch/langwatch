@@ -1,3 +1,4 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthzCollectorService } from "../authz-collector.service";
 import {
@@ -10,6 +11,7 @@ import type { AuthzReadRepository } from "../authz-read.repository";
 import { AuthzService } from "../authz.service";
 import { GrantValidationError } from "../grant-validation";
 import { GrantsService } from "../grants.service";
+import { GRANT_EVENT_SOURCES } from "../ledger/facts";
 import { OffboardIncompleteError } from "../offboard";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -59,22 +61,20 @@ function makeRepository(
 
 const actor = { userId: "admin-1" };
 
-function makeService(
-  repository: RepositoryStub,
-  { audit = vi.fn().mockResolvedValue(undefined) } = {},
-) {
+const WRITE_ACTOR = { type: "user", id: "admin-1" };
+
+function makeService(repository: RepositoryStub) {
   const bumpEpoch = vi.fn().mockResolvedValue(undefined);
   const service = new GrantsService(
     repository as unknown as AuthzGrantsRepository,
     {
-      audit,
       newBindingId: () => "rb_test_ksuid",
       bumpEpoch,
       collectorFor: (reader: AuthzReadRepository) =>
         new AuthzCollectorService(reader),
     },
   );
-  return { service, audit, bumpEpoch };
+  return { service, bumpEpoch };
 }
 
 beforeEach(() => {
@@ -85,7 +85,7 @@ describe("GrantsService.attach", () => {
   describe("when attaching a built-in role at team scope", () => {
     it("creates the binding row and bumps the org epoch", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
 
       const result = await service.attach({
         actor,
@@ -96,18 +96,19 @@ describe("GrantsService.attach", () => {
 
       expect(result.bindingId).toBe("rb_test_ksuid");
       expect(repository.createBinding).toHaveBeenCalledWith({
-        bindingId: "rb_test_ksuid",
-        organizationId: ORG,
-        scopeType: "TEAM",
-        scopeId: TEAM,
-        role: "VIEWER",
-        customRoleId: null,
-        principal: { userId: "alice" },
+        row: {
+          bindingId: "rb_test_ksuid",
+          organizationId: ORG,
+          scopeType: "TEAM",
+          scopeId: TEAM,
+          role: "VIEWER",
+          customRoleId: null,
+          principal: { userId: "alice" },
+        },
+        actor: WRITE_ACTOR,
+        source: "grants-service",
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.attach" }),
-      );
     });
   });
 
@@ -177,6 +178,132 @@ describe("GrantsService.attach", () => {
     });
   });
 
+  describe("when the caller states where the grant came from", () => {
+    /** @scenario "A grant states which surface authored it" */
+    it("stamps that source onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "join-request" }),
+      );
+    });
+
+    /** Every vocabulary entry reaches the port unchanged: the seam is the
+     *  vocabulary's, not a private list of the two callers that exist today.
+     *  @scenario "A grant states which surface authored it" */
+    it("carries every source the vocabulary names", async () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        const repository = makeRepository();
+        const { service } = makeService(repository);
+
+        await service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+          source,
+        });
+
+        expect(repository.createBinding).toHaveBeenCalledWith(
+          expect.objectContaining({ source }),
+        );
+      }
+    });
+  });
+
+  describe("when the caller states no source", () => {
+    /** @scenario "A grant nobody attributed is the grants service's own" */
+    it("attributes the grant to the grants service", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "grants-service" }),
+      );
+    });
+  });
+
+  describe("when the caller is a surface rather than a person", () => {
+    /** The registry's name, never a hand-built `"system:..."` string: what
+     *  reaches the port is what `toLedgerActor` renders it as.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("stamps the registry's system principal onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "scim" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "scim",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+          source: "scim",
+        }),
+      );
+    });
+
+    /** @scenario "A write with no person behind it names the surface that made it" */
+    it("carries the join-requests principal the auto-approval path acts as", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "joinRequests" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.joinRequests },
+          source: "join-request",
+        }),
+      );
+    });
+
+    /** The raw-id shape every boundary already passes is untouched by the
+     *  widening — that is the whole constraint on this change.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("still records a person from the raw id shape", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ actor: WRITE_ACTOR }),
+      );
+    });
+  });
+
   describe("when the team is not in the target organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
@@ -199,7 +326,7 @@ describe("GrantsService.attach", () => {
 
   describe("when the scope already holds an identical binding", () => {
     /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
-    it("names the duplicate the repository surfaced", async () => {
+    it("answers the REST contract's own conflict code, not a generic validation failure", async () => {
       const repository = makeRepository({
         createBinding: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       });
@@ -211,7 +338,35 @@ describe("GrantsService.attach", () => {
           role: { builtin: "MEMBER" },
           where: { type: "team", id: TEAM, organizationId: ORG },
         }),
-      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
+    it("matches the port signal by code, not by class identity", async () => {
+      // Not a `DuplicateBindingError` instance - e.g. what a port adapter
+      // reconstructs from a serialised error crossing a worker or a bundle
+      // boundary. `rethrowKnownWriteFailure` must still translate it.
+      const repository = makeRepository({
+        createBinding: vi
+          .fn()
+          .mockRejectedValue({ code: "role_binding_already_exists" }),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "user-1" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
   });
@@ -222,15 +377,14 @@ describe("GrantsService.revoke", () => {
     /** @scenario "Revoking a binding takes effect on the caller's next request" */
     it("deletes the row and bumps the epoch so the next check recollects", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
       await service.revoke({ actor, bindingId: "rb-1", organizationId: ORG });
       expect(repository.deleteBinding).toHaveBeenCalledWith({
         bindingId: "rb-1",
+        organizationId: ORG,
+        actor: WRITE_ACTOR,
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.revoke" }),
-      );
     });
   });
 
@@ -270,26 +424,11 @@ describe("GrantsService.revoke", () => {
     });
   });
 
-  describe("when the audit write rejects", () => {
-    it("has already bumped the epoch before the error propagates", async () => {
-      const repository = makeRepository();
-      const { service, bumpEpoch } = makeService(repository, {
-        audit: vi.fn().mockRejectedValue(new Error("audit sink down")),
-      });
-
-      await expect(
-        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
-      ).rejects.toThrow("audit sink down");
-      // The delete is committed; if the epoch had not moved, every cached
-      // caller would keep the revoked grant.
-      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-    });
-  });
 });
 
 describe("GrantsService.update", () => {
   describe("when the role change collides with a sibling binding", () => {
-    it("names the duplicate the repository surfaced", async () => {
+    it("answers the REST contract's own conflict code", async () => {
       const repository = makeRepository({
         updateBindingRole: vi
           .fn()
@@ -303,7 +442,10 @@ describe("GrantsService.update", () => {
           organizationId: ORG,
           role: { builtin: "MEMBER" },
         }),
-      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
   });
@@ -381,9 +523,9 @@ describe("GrantsService.update", () => {
 describe("GrantsService.replace", () => {
   describe("when narrowing an org grant to a team grant", () => {
     /** @scenario "Replacing a grant is one atomic swap" */
-    it("hands the repository one atomic swap, with one audit record", async () => {
+    it("hands the repository one swap carrying the actor", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
       const result = await service.replace({
         actor,
         who: { type: "user", id: "user-1" },
@@ -407,12 +549,9 @@ describe("GrantsService.replace", () => {
           role: "MEMBER",
           principal: { userId: "user-1" },
         }),
+        actor: WRITE_ACTOR,
       });
       expect(repository.createBinding).not.toHaveBeenCalled();
-      expect(audit).toHaveBeenCalledTimes(1);
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.replace" }),
-      );
       expect(bumpEpoch).toHaveBeenCalledTimes(1);
     });
   });
@@ -429,7 +568,7 @@ describe("GrantsService.offboard", () => {
           .fn()
           .mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
       });
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
 
       const result = await service.offboard({
         actor,
@@ -444,10 +583,39 @@ describe("GrantsService.offboard", () => {
       expect(result.needsHumanDecision.personalTeams).toEqual([
         { id: "team-p", name: "Dave's workspace" },
       ]);
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.offboard" }),
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          organizationId: ORG,
+          actor: WRITE_ACTOR,
+        }),
       );
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+
+  describe("when a directory sync offboards the member", () => {
+    /** D08's de-enroll. The revocation says which surface removed the
+     *  member through its ACTOR — `grant_revoked` has no `source` field and
+     *  does not need one, because the offboarding fact already names the
+     *  surface here and the reason alongside it.
+     *  @scenario "A revocation names the surface that made it without a source of its own" */
+    it("hands the port the surface as the offboarding actor", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.offboard({
+        actor: { type: "system", name: "scim" },
+        userId: "dave",
+        organizationId: ORG,
+      });
+
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        }),
+      );
     });
   });
 

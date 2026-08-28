@@ -8,6 +8,7 @@ import {
   type BrowserQAResult,
   browserQA,
 } from "./browser-qa";
+import { isTransientInfrastructureError } from "./langy-agent";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,24 @@ type Result = Awaited<ReturnType<typeof scenario.run>>;
 
 /** Browser-QA override for one scenario. `label` defaults to the test name. */
 export type BrowserQAOptions = Partial<BrowserQACheck>;
+
+/**
+ * Options accepted alongside `config`. `browserQA` overrides the QA pass; `beforeRetry`
+ * makes a scenario whose write CANNOT simply be repeated safe under the
+ * whole-scenario replay (see `runScenarioAndLog`).
+ */
+export type RunOptions = BrowserQAOptions & {
+  /**
+   * Runs after a transient infrastructure failure and before the replay,
+   * so a scenario can rebuild the world state its script consumes.
+   *
+   * The motivating case is deletion: the first attempt can delete its target
+   * and THEN hit a dead worker, leaving the replay asking Langy to delete
+   * something that no longer exists — a judge failure for work that actually
+   * succeeded. Such a scenario re-seeds here and returns the new target.
+   */
+  beforeRetry?: () => Promise<void>;
+};
 
 /**
  * Drop-in wrapper around `scenario.run` that, after the run completes:
@@ -34,18 +53,49 @@ export type BrowserQAOptions = Partial<BrowserQACheck>;
  * result itself — the judge verdict is what the suite asserts on, and a
  * verification aid or a disk write should never mask a real pass/fail.
  *
- * `config` stays a single positional argument (not `{ config, ... }`) by
- * design — this wraps `scenario.run(config)`, an external library call that
- * itself takes one positional config object, and every one of this
- * function's 50+ existing call sites already passes `config` as an inline
- * object literal. `browserQAOptions` is the one true second argument, and it
- * was already an options object, not a bag of positional values.
+ * Takes named parameters (`{ config, ... }`) per the house rule in CLAUDE.md.
+ * `config` is passed straight through to `scenario.run`, so it stays a single
+ * nested object rather than being spread into loose fields.
  */
-export async function runScenarioAndLog(
-  config: RunConfig,
-  browserQAOptions?: BrowserQAOptions,
-): Promise<Result> {
-  const result = await scenario.run(config);
+export async function runScenarioAndLog({
+  config,
+  beforeRetry,
+  ...browserQAOptions
+}: { config: RunConfig } & RunOptions): Promise<Result> {
+  // Two transients get one retry, both infrastructure rather than agent
+  // behaviour: langy_worker_stopped (the worker died mid-reply, server-side
+  // recovery already exhausted — the panel offers the user a retry too), and a
+  // turn that never settled because the conversation lock was still held or the
+  // machine was too loaded to answer inside the adapter's retry budget.
+  // Judge verdicts never come through here — a scenario that FAILS its criteria
+  // returns normally and is not retried.
+  //
+  // The retry replays the WHOLE scenario, and the worker can die after Langy
+  // finished a create. So every scenario reaching this helper has to tolerate
+  // its writes happening twice: the platform accepts a repeated name and gives
+  // it a fresh id, and each Layer 2 check reads back the resource it asked for
+  // rather than counting how many appeared. A scenario whose write cannot be
+  // repeated must not run through here WITHOUT a `beforeRetry` that rebuilds
+  // the state the script consumes — that hook is what makes a deletion
+  // scenario replay-safe, by re-seeding the victim the first attempt removed.
+  // The adapter marks both on the error it throws, so this reads a flag rather
+  // than looking for a code inside prose that is free to be reworded.
+  let result: Result;
+  try {
+    result = await scenario.run(config);
+  } catch (error) {
+    if (!isTransientInfrastructureError(error)) throw error;
+    console.log(`[scenario] transient infrastructure failure, retrying once`);
+    // A replay is a new conversation. Without this the adapter keeps the id of
+    // the conversation that just failed, so the replay's first message arrives
+    // as a continuation of a turn the server is often still running: it
+    // answers `conversation_busy` until the test's own clock runs out.
+    for (const agent of config.agents ?? []) {
+      (agent as { resetSession?: () => void }).resetSession?.();
+    }
+    await beforeRetry?.();
+    result = await scenario.run(config);
+  }
   const testName =
     expect.getState().currentTestName ??
     (config as { name?: string }).name ??
@@ -54,9 +104,9 @@ export async function runScenarioAndLog(
   let qa: BrowserQAResult | null = null;
   try {
     qa = await browserQA({
-      label: browserQAOptions?.label ?? testName,
-      path: browserQAOptions?.path,
-      verify: browserQAOptions?.verify,
+      label: browserQAOptions.label ?? testName,
+      path: browserQAOptions.path,
+      verify: browserQAOptions.verify,
     });
   } catch {
     // intentionally silent — see jsdoc above.

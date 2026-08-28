@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, http agent, black box testing, tracepare
 description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
 
-# Connect Your Agent
+## Getting Started
 
 The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first suite:
 
@@ -49,8 +49,8 @@ Connect my agent to LangWatch simulations
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
-Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
 # Connect Your Agent to LangWatch Simulations
 
@@ -70,11 +70,11 @@ langwatch docs prompt-management/cli              # Prompts CLI
 langwatch scenario-docs                           # Scenario docs index
 ```
 
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -88,7 +88,18 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is available to the CLI. Locally that is the project's `.env`; in CI the runner injects it into the process environment, and the CLI reads either. Check whether the variable is already set before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. Look for `LANGWATCH_ENDPOINT` in the same places: if it is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Read `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` from the
+project's own `.env`, that is how you learn where to work. Read nothing else out
+of that file: it holds database, cloud and provider credentials that are none of
+your business, and every value you read can reach your context and your command
+output. What must not reach an answer is anything that describes the machine YOU
+run on: a path in your workspace, a container port, the address this worker
+dials. Those say how the work is done rather than what was done, and a host of
+ours means nothing to the reader. Say what you did and where to find it in
+LangWatch.
 
 ## Step 2: Locate the agent's HTTP endpoint
 
@@ -154,7 +165,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL: it opens a tunnel to the local port and points the registered agent at it for the session (Ctrl-C restores the previous URL). Register the agent in Step 6 as normal, then run `langwatch agent dev --port <port> --agent <agent-id>` and keep it running while suites execute.
+If the agent only runs on the user's machine, plan to use `langwatch agent dev --port <port>` at the end instead of a public URL: it opens a tunnel to the local port and points the registered agent at it for the session (Ctrl-C restores the previous URL). Register the agent in Step 6 as normal, then run `langwatch agent dev --port <port> --agent <agent-id>` and keep it running while test suites execute.
 
 ## Step 6: Register the agent and run the first scenario
 
@@ -185,32 +196,35 @@ The body template renders as a Liquid template on every turn. The URL and header
 | `{{ params.NAME }}` | A run parameter the scenario declares |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
 
-Then create one scenario about something this agent really handles, pair it with the agent in a suite, and run it:
+Then create a test suite, create one scenario about something this agent really handles, file it into the test suite, and run the test suite against the agent:
 
 ```bash
+langwatch test-suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --test-suite 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 ```
 
 - Write the situation and criteria from the agent's real behavior in this codebase, not from the example above. Include at least one criterion about a tool call or a lookup, which the judge verifies against the traces from Step 4.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma; rephrase instead.
-- `--targets` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config.
+- `--test-suite` files the scenario into a test suite that already exists, by name or by id. Create the test suite first.
+- `--target` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config. Repeat `--target` for a second agent or prompt.
+- The run goes under the run plan named after the test suite and the target. A later run of the same pair joins the same history, so the pass rate over time is readable in **Agent Testing > Results**.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 7 needs the result.
 
 ## Step 7: Report the result
 
 Report to the user:
 
-- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the `LANGWATCH_ENDPOINT` host when self-hosted).
+- The Agent Testing page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/agent-testing`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
 
@@ -222,7 +236,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if the CLI is pointed at a self-hosted endpoint. Read the endpoint the CLI actually uses, which can come from `.env`, from the process environment, or from the saved CLI configuration.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Common Failures
@@ -241,8 +255,8 @@ How to handle:
 - Do NOT skip trace adoption because the endpoint "already returns the answer". The reply text cannot prove a tool call happened; the trace can.
 - Do NOT append a list of tools used to the response text so the judge can "see" them. That grades a self-report instead of evidence; adopt `traceparent` and the trace carries the real calls.
 - Do NOT point the agent's tracing at a different LangWatch project than the one running the scenarios. The judge finds nothing there.
-- Do NOT invent an agent id or pass a URL as the suite target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
-- Do NOT comma-separate `--targets` on `suite create`. It is space-separated and variadic; `--scenarios` is the comma-separated one.
+- Do NOT invent an agent id or pass a URL as the run target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
+- Do NOT pass `--test-suite` a test suite the project does not hold. The command refuses it; create the test suite first with `langwatch test-suite create`.
 - Do NOT guess the deployment URL or quietly default to localhost. Step 5 is a question for the user; ask and wait.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
 ````
@@ -299,17 +313,17 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
 | `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Remote traces](/agent-simulations/remote-traces) |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs nothing else.
+For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 <Tabs>
   <Tab title="Python">
@@ -345,7 +359,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge.
 
 <Note>
-  **Also check:** [Remote traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
+  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
 </Note>
 
 ## 5. Register the agent and run the first scenario
@@ -373,21 +387,24 @@ langwatch agent create 'My Agent' --type http --config '{
 }'
 ```
 
-Then create a scenario, pair it with the agent in a suite, and run it:
+Then create a scenario, file it into a test suite, and run the test suite against the agent:
 
 ```bash
+langwatch test-suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --test-suite 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 ```
+
+`--test-suite` files the scenario into a test suite that exists, by name or by id. The run goes under the run plan named after the test suite and the target, so the next run of the same pair joins the same history.
 
 ## 6. Verify the run
 
-Open the run in the **Simulations** section of your project. A connected setup shows:
+Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - A trace link on each turn in the run detail, opening the agent's own spans for that turn.

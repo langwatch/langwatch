@@ -1,235 +1,268 @@
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
+import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
-  type AttachGrantsCommandData,
-  attachGrantsCommandDataSchema,
-  type CompleteCutoverCommandData,
-  completeCutoverCommandDataSchema,
-  type ProveMigrationParityCommandData,
-  proveMigrationParityCommandDataSchema,
-  type RecordMigrationTenantStateCommandData,
-  type RollBackCutoverCommandData,
-  recordMigrationTenantStateCommandDataSchema,
-  rollBackCutoverCommandDataSchema,
+  type AttachGrantCommandData,
+  attachGrantCommandDataSchema,
+  type ChangeGrantRoleCommandData,
+  type ChangeRolePermissionsCommandData,
+  changeGrantRoleCommandDataSchema,
+  changeRolePermissionsCommandDataSchema,
+  type DefineRoleCommandData,
+  type DeleteRoleCommandData,
+  defineRoleCommandDataSchema,
+  deleteRoleCommandDataSchema,
+  type RevokeGrantCommandData,
+  revokeGrantCommandDataSchema,
 } from "../schemas/commands";
 import {
-  ATTACH_GRANTS_COMMAND_TYPE,
-  AUTHZ_GRANTS_AGGREGATE_TYPE,
+  ATTACH_GRANT_COMMAND_TYPE,
+  AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-  COMPLETE_CUTOVER_COMMAND_TYPE,
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
+  CHANGE_GRANT_ROLE_COMMAND_TYPE,
+  CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
+  DEFINE_ROLE_COMMAND_TYPE,
+  DELETE_ROLE_COMMAND_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
-  PROVE_MIGRATION_PARITY_COMMAND_TYPE,
-  RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
-  ROLL_BACK_CUTOVER_COMMAND_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  REVOKE_GRANT_COMMAND_TYPE,
+  ROLE_DEFINED_EVENT_TYPE,
+  ROLE_DELETED_EVENT_TYPE,
+  ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "../schemas/constants";
 import type {
-  CutoverCompletedEvent,
-  CutoverRolledBackEvent,
   GrantAttachedEvent,
-  MigrationParityProvedEvent,
-  MigrationTenantStateChangedEvent,
+  GrantRevokedEvent,
+  GrantRoleChangedEvent,
+  RoleDefinedEvent,
+  RoleDeletedEvent,
+  RolePermissionsChangedEvent,
 } from "../schemas/events";
 
 /**
- * The grants ledger's commands are pure appends: validate, stamp identity,
- * emit. `aggregateId = organizationId` on every event, and every event's
- * `idempotencyKey` is `<commandId>:<index>` (decision 23) so a retried
- * command dedupes at the event store while distinct actions never collide.
+ * The grant commands are pure appends: validate, stamp identity, emit.
  *
- * `attachGrants` is the batched writer the migrations ride (decision 9):
- * one command, one event per fact, one store call — each event's
- * `occurredAt` carries that fact's OWN business time, which is how a
- * backfilled grant keeps the legacy row's createdAt while `createdAt`
- * (ledger-accepted time) stays honest.
+ * ADR-110 — a grant is its own aggregate and so is a role, so every handler
+ * here takes its `aggregateId` from the entity the command is about. The
+ * organization is the TENANT of each event (the stream it is persisted under
+ * and the routing key that places it) and the aggregate of nothing. That is
+ * the whole fix: with `aggregateId = organizationId` one aggregate's fold
+ * state was every grant the organization had ever held, and each event batch
+ * re-read all of them, so an import decelerated as it grew and could never
+ * finish inside any timeout.
+ *
+ * One command names one entity, never a batch: a batch would straddle
+ * aggregates. The import sends one command per grant instead, which is what
+ * lets them fold concurrently.
+ *
+ * Every event's `idempotencyKey` is `<commandId>:<index>`, so a retried
+ * command dedupes at the event store while distinct actions never collide.
+ * A command that emits one event always uses index 0.
  */
 
-function eventIdempotencyKey({
-  commandId,
-  index,
-}: {
-  commandId: string;
-  index: number;
-}): string {
-  return `${commandId}:${index}`;
-}
-
-export class AttachGrantsCommand
-  implements
-    CommandHandler<Command<AttachGrantsCommandData>, GrantAttachedEvent>
+export class AttachGrantCommand
+  implements CommandHandler<Command<AttachGrantCommandData>, GrantAttachedEvent>
 {
   static readonly schema = defineCommandSchema(
-    ATTACH_GRANTS_COMMAND_TYPE,
-    attachGrantsCommandDataSchema,
-    "Record a batch of access facts for one organization",
+    ATTACH_GRANT_COMMAND_TYPE,
+    attachGrantCommandDataSchema,
+    "Record one access fact",
   );
 
-  static getAggregateId(payload: AttachGrantsCommandData): string {
-    return payload.organizationId;
+  static getAggregateId(payload: AttachGrantCommandData): string {
+    return payload.grant.grantId;
   }
 
   async handle(
-    command: Command<AttachGrantsCommandData>,
+    command: Command<AttachGrantCommandData>,
   ): Promise<GrantAttachedEvent[]> {
-    const { organizationId, commandId, grants } = command.data;
-    return grants.map(({ occurredAtMs, ...grant }, index) =>
+    const { commandId, grant } = command.data;
+    const { occurredAtMs, ...data } = grant;
+    return [
       EventUtils.createEvent<GrantAttachedEvent>({
-        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
-        aggregateId: organizationId,
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: grant.grantId,
         tenantId: createTenantId(command.tenantId),
         type: GRANT_ATTACHED_EVENT_TYPE,
         version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: grant,
+        data,
+        metadata: {},
+        // The fact's OWN business time — an imported grant keeps the legacy
+        // row's createdAt while `createdAt` (accepted time) stays honest.
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class ChangeGrantRoleCommand
+  implements
+    CommandHandler<Command<ChangeGrantRoleCommandData>, GrantRoleChangedEvent>
+{
+  static readonly schema = defineCommandSchema(
+    CHANGE_GRANT_ROLE_COMMAND_TYPE,
+    changeGrantRoleCommandDataSchema,
+    "Change the role one grant confers",
+  );
+
+  static getAggregateId(payload: ChangeGrantRoleCommandData): string {
+    return payload.grantId;
+  }
+
+  async handle(
+    command: Command<ChangeGrantRoleCommandData>,
+  ): Promise<GrantRoleChangedEvent[]> {
+    const { commandId, grantId, from, to, actor, occurredAtMs } = command.data;
+    return [
+      EventUtils.createEvent<GrantRoleChangedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: grantId,
+        tenantId: createTenantId(command.tenantId),
+        type: GRANT_ROLE_CHANGED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { grantId, from, to, actor },
         metadata: {},
         occurredAt: occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index }),
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
       }),
-    );
+    ];
   }
 }
 
-export class ProveMigrationParityCommand
+export class RevokeGrantCommand
+  implements CommandHandler<Command<RevokeGrantCommandData>, GrantRevokedEvent>
+{
+  static readonly schema = defineCommandSchema(
+    REVOKE_GRANT_COMMAND_TYPE,
+    revokeGrantCommandDataSchema,
+    "Revoke one grant",
+  );
+
+  static getAggregateId(payload: RevokeGrantCommandData): string {
+    return payload.grantId;
+  }
+
+  async handle(
+    command: Command<RevokeGrantCommandData>,
+  ): Promise<GrantRevokedEvent[]> {
+    const { commandId, grantId, reason, actor, occurredAtMs } = command.data;
+    return [
+      EventUtils.createEvent<GrantRevokedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: grantId,
+        tenantId: createTenantId(command.tenantId),
+        type: GRANT_REVOKED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { grantId, ...(reason ? { reason } : {}), actor },
+        metadata: {},
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class DefineRoleCommand
+  implements CommandHandler<Command<DefineRoleCommandData>, RoleDefinedEvent>
+{
+  static readonly schema = defineCommandSchema(
+    DEFINE_ROLE_COMMAND_TYPE,
+    defineRoleCommandDataSchema,
+    "Record one role definition",
+  );
+
+  static getAggregateId(payload: DefineRoleCommandData): string {
+    return payload.role.roleId;
+  }
+
+  async handle(
+    command: Command<DefineRoleCommandData>,
+  ): Promise<RoleDefinedEvent[]> {
+    const { commandId, role, actor } = command.data;
+    const { occurredAtMs, ...data } = role;
+    return [
+      EventUtils.createEvent<RoleDefinedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: role.roleId,
+        tenantId: createTenantId(command.tenantId),
+        type: ROLE_DEFINED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { ...data, actor },
+        metadata: {},
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class ChangeRolePermissionsCommand
   implements
     CommandHandler<
-      Command<ProveMigrationParityCommandData>,
-      MigrationParityProvedEvent
+      Command<ChangeRolePermissionsCommandData>,
+      RolePermissionsChangedEvent
     >
 {
   static readonly schema = defineCommandSchema(
-    PROVE_MIGRATION_PARITY_COMMAND_TYPE,
-    proveMigrationParityCommandDataSchema,
-    "Record a per-organization parity proof; an empty diff list means clean",
+    CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE,
+    changeRolePermissionsCommandDataSchema,
+    "Change the permissions one role confers",
   );
 
-  static getAggregateId(payload: ProveMigrationParityCommandData): string {
-    return payload.organizationId;
+  static getAggregateId(payload: ChangeRolePermissionsCommandData): string {
+    return payload.roleId;
   }
 
   async handle(
-    command: Command<ProveMigrationParityCommandData>,
-  ): Promise<MigrationParityProvedEvent[]> {
-    const { organizationId, commandId, diffs } = command.data;
-    return [
-      EventUtils.createEvent<MigrationParityProvedEvent>({
-        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
-        aggregateId: organizationId,
-        tenantId: createTenantId(command.tenantId),
-        type: MIGRATION_PARITY_PROVED_EVENT_TYPE,
-        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: { diffs },
-        metadata: {},
-        occurredAt: command.data.occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
-      }),
-    ];
-  }
-}
-
-export class CompleteCutoverCommand
-  implements
-    CommandHandler<Command<CompleteCutoverCommandData>, CutoverCompletedEvent>
-{
-  static readonly schema = defineCommandSchema(
-    COMPLETE_CUTOVER_COMMAND_TYPE,
-    completeCutoverCommandDataSchema,
-    "Flip one organization onto the engine after a clean parity proof",
-  );
-
-  static getAggregateId(payload: CompleteCutoverCommandData): string {
-    return payload.organizationId;
-  }
-
-  async handle(
-    command: Command<CompleteCutoverCommandData>,
-  ): Promise<CutoverCompletedEvent[]> {
-    const { organizationId, commandId, actor } = command.data;
-    return [
-      EventUtils.createEvent<CutoverCompletedEvent>({
-        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
-        aggregateId: organizationId,
-        tenantId: createTenantId(command.tenantId),
-        type: CUTOVER_COMPLETED_EVENT_TYPE,
-        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: { actor },
-        metadata: {},
-        occurredAt: command.data.occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
-      }),
-    ];
-  }
-}
-
-export class RollBackCutoverCommand
-  implements
-    CommandHandler<Command<RollBackCutoverCommandData>, CutoverRolledBackEvent>
-{
-  static readonly schema = defineCommandSchema(
-    ROLL_BACK_CUTOVER_COMMAND_TYPE,
-    rollBackCutoverCommandDataSchema,
-    "Put one organization back on its legacy path",
-  );
-
-  static getAggregateId(payload: RollBackCutoverCommandData): string {
-    return payload.organizationId;
-  }
-
-  async handle(
-    command: Command<RollBackCutoverCommandData>,
-  ): Promise<CutoverRolledBackEvent[]> {
-    const { organizationId, commandId, actor, reason } = command.data;
-    return [
-      EventUtils.createEvent<CutoverRolledBackEvent>({
-        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
-        aggregateId: organizationId,
-        tenantId: createTenantId(command.tenantId),
-        type: CUTOVER_ROLLED_BACK_EVENT_TYPE,
-        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: { actor, reason },
-        metadata: {},
-        occurredAt: command.data.occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
-      }),
-    ];
-  }
-}
-
-export class RecordMigrationTenantStateCommand
-  implements
-    CommandHandler<
-      Command<RecordMigrationTenantStateCommandData>,
-      MigrationTenantStateChangedEvent
-    >
-{
-  static readonly schema = defineCommandSchema(
-    RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
-    recordMigrationTenantStateCommandDataSchema,
-    "Witness one runner lifecycle transition for one organization",
-  );
-
-  static getAggregateId(
-    payload: RecordMigrationTenantStateCommandData,
-  ): string {
-    return payload.organizationId;
-  }
-
-  async handle(
-    command: Command<RecordMigrationTenantStateCommandData>,
-  ): Promise<MigrationTenantStateChangedEvent[]> {
-    const { organizationId, commandId, migrationName, status, report, actor } =
+    command: Command<ChangeRolePermissionsCommandData>,
+  ): Promise<RolePermissionsChangedEvent[]> {
+    const { commandId, roleId, permissions, actor, occurredAtMs } =
       command.data;
     return [
-      EventUtils.createEvent<MigrationTenantStateChangedEvent>({
-        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
-        aggregateId: organizationId,
+      EventUtils.createEvent<RolePermissionsChangedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: roleId,
         tenantId: createTenantId(command.tenantId),
-        type: MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
+        type: ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
         version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-        data: { migrationName, status, report, actor },
+        data: { roleId, permissions, actor },
         metadata: {},
-        occurredAt: command.data.occurredAtMs,
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class DeleteRoleCommand
+  implements CommandHandler<Command<DeleteRoleCommandData>, RoleDeletedEvent>
+{
+  static readonly schema = defineCommandSchema(
+    DELETE_ROLE_COMMAND_TYPE,
+    deleteRoleCommandDataSchema,
+    "Delete one role definition",
+  );
+
+  static getAggregateId(payload: DeleteRoleCommandData): string {
+    return payload.roleId;
+  }
+
+  async handle(
+    command: Command<DeleteRoleCommandData>,
+  ): Promise<RoleDeletedEvent[]> {
+    const { commandId, roleId, actor, occurredAtMs } = command.data;
+    return [
+      EventUtils.createEvent<RoleDeletedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: roleId,
+        tenantId: createTenantId(command.tenantId),
+        type: ROLE_DELETED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { roleId, actor },
+        metadata: {},
+        occurredAt: occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
       }),
     ];

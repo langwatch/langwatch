@@ -37,6 +37,10 @@ class GetApiSimulationRunsResponse200RunsItem:
         duration_in_ms (float):
         platform_url (str):
         total_cost (float | Unset):
+        note (None | str | Unset): One short line saying why the run was started, as given when it was queued. Null on a
+            run started without one. Absent on servers that predate run notes.
+        scenario_version (int | None | Unset): The version of the scenario at the moment the run was queued. Null on
+            runs recorded before versions existed. Absent on servers that predate scenario versions.
     """
 
     scenario_id: str
@@ -52,6 +56,8 @@ class GetApiSimulationRunsResponse200RunsItem:
     duration_in_ms: float
     platform_url: str
     total_cost: float | Unset = UNSET
+    note: None | str | Unset = UNSET
+    scenario_version: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -94,6 +100,18 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         total_cost = self.total_cost
 
+        note: None | str | Unset
+        if isinstance(self.note, Unset):
+            note = UNSET
+        else:
+            note = self.note
+
+        scenario_version: int | None | Unset
+        if isinstance(self.scenario_version, Unset):
+            scenario_version = UNSET
+        else:
+            scenario_version = self.scenario_version
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -114,6 +132,10 @@ class GetApiSimulationRunsResponse200RunsItem:
         )
         if total_cost is not UNSET:
             field_dict["totalCost"] = total_cost
+        if note is not UNSET:
+            field_dict["note"] = note
+        if scenario_version is not UNSET:
+            field_dict["scenarioVersion"] = scenario_version
 
         return field_dict
 
@@ -181,6 +203,24 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         total_cost = d.pop("totalCost", UNSET)
 
+        def _parse_note(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        note = _parse_note(d.pop("note", UNSET))
+
+        def _parse_scenario_version(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        scenario_version = _parse_scenario_version(d.pop("scenarioVersion", UNSET))
+
         get_api_simulation_runs_response_200_runs_item = cls(
             scenario_id=scenario_id,
             batch_run_id=batch_run_id,
@@ -195,6 +235,8 @@ class GetApiSimulationRunsResponse200RunsItem:
             duration_in_ms=duration_in_ms,
             platform_url=platform_url,
             total_cost=total_cost,
+            note=note,
+            scenario_version=scenario_version,
         )
 
         get_api_simulation_runs_response_200_runs_item.additional_properties = d

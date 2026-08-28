@@ -154,9 +154,12 @@ unhealthy, a named pipeline's breaker guarantees exactly this much:
 
 Named pipelines: `authz_grants` (ADR-092 §13 — grant writes per day, not
 traces per second; its revocation class is defined there). The identity
-pipeline is expected to join under its own deliverable (identity programme
-D02), with its own volume analysis. No other pipeline gets this: high-volume
-pipelines stall and drain, which is the correct behavior for them.
+pipeline was expected to join under its own deliverable (identity programme
+D02); **that deliverable was withdrawn on 2026-08-24** — identity takes
+ADR-110's position instead (every write through the group queue, no inline
+fold), so no amendment applies to it. No other pipeline gets this:
+high-volume pipelines stall and drain, which is the correct behavior for
+them.
 
 ## References
 

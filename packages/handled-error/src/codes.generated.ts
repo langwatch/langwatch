@@ -69,7 +69,7 @@ export const goErrorCodes = {
   circuit_open: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrCodeBlockTimeout — signals the user code subprocess exceeded
-   * NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
+   * NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
    *
    * Also produced as a workflow NodeError type, so this one entry is the copy
    * for both the HTTP failure and the node error event. Its node sites are
@@ -151,7 +151,8 @@ export const goErrorCodes = {
   guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrIdleTimeout — signals the SSE stream went silent past
-   * NLP_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the connection.
+   * NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the
+   * connection.
    *
    * @source services/nlpgo/domain/errors.go
    */
@@ -243,6 +244,18 @@ export const goErrorCodes = {
    */
   model_not_allowed: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrModelNotRecognized — means the request named a model that matches
+   * nothing this key can place: no provider declares it, its name matches no
+   * vendor the gateway can guess from, and the key holds more than one
+   * provider that told us what it serves. Sending it down the chain anyway
+   * makes every vendor answer for a model it never had, and the caller reads
+   * the last vendor's error instead of the real problem. Distinct from
+   * model_provider_not_bound, which is a provider the caller DID name.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_not_recognized: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrProviderNotBound — means the request names a provider (explicit
    * "provider/model" prefix or alias) that has no credential slot on this VK.
    * Dispatching anyway would hand a mismatched credential to the provider
@@ -312,6 +325,60 @@ export const goErrorCodes = {
    */
   policy_violation: { service: "aigateway", httpStatus: 403 },
   /**
+   * ErrProviderConfigInvalid — means the provider slot is configured in a way
+   * that cannot serve THIS request: no key declares the requested model, a
+   * deployment map is missing, or the provider does not implement the
+   * operation. Terminal, and the remediation is in the customer's model
+   * provider settings rather than in the request.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_config_invalid: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrProviderConnectionFailed — means the request never got to the provider:
+   * DNS failure, connection refused, transport error. Retryable and the
+   * provider's (or the network's) fault, unlike the config and credential
+   * codes above, which repeat identically on every attempt.
+   *
+   * Deliberately not "provider_unreachable": that slug is already an app code,
+   * thrown when a credential CHECK finds nothing answering
+   * (providerValidation.ts), and its customer copy says the key was never
+   * checked. One slug cannot carry both meanings, and the copy for either
+   * would be wrong on the other's path.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_connection_failed: { service: "aigateway", httpStatus: 502 },
+  /**
+   * ErrProviderCredentialInvalid — means the credentials configured for a
+   * model provider cannot produce an authenticated call at all — a Vertex
+   * service account that yields no OAuth token source, AWS credentials the
+   * signer cannot retrieve. The request never reaches the provider, so there
+   * is no upstream verdict to forward and no retry that can help: every
+   * credential in the chain fails the same way. Terminal and the customer's to
+   * fix, so it must not carry provider_timeout's retryable 504.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_credential_invalid: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrProviderCredentialRejected — means the credential reached the provider
+   * and the provider refused it (401/403). Distinct from
+   * provider_credential_invalid, which never got that far: this one proves the
+   * credential is well-formed and says the account behind it is the problem —
+   * expired, revoked, or lacking permission for the operation.
+   *
+   * Reserved: no path emits it today. A provider that refuses a credential
+   * answers with a status, and errFromBifrost forwards every answered error
+   * verbatim before classification runs, so the 401/403 arrives as itself.
+   * Registered anyway (status, fault, remediation, presentation copy) so a
+   * path that does not forward — a pre-dispatch credential refresh, a plugin
+   * rejection — has a code to use without minting a new slug.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_credential_rejected: { service: "aigateway", httpStatus: 401 },
+  /**
    * ErrProviderError
    *
    * @source services/aigateway/domain/errors.go
@@ -329,6 +396,34 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   rate_limited: { service: "aigateway", httpStatus: 429 },
+  /**
+   * ErrRealtimeRegistryUnavailable — means the control plane could not record
+   * the session, so the gateway refused to mint one. This is a deliberate
+   * departure from the budget fail-open rule: an unrecorded session is voice
+   * nobody can bill and a cap nobody can enforce.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_registry_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrRealtimeSessionLimit — means the virtual key already holds as many open
+   * realtime voice sessions as its realtime.maxOpenSessions allows. A voice
+   * session bills for as long as it runs, so the arrival-rate limits do not
+   * bound it and this is the only cap that does.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_session_limit: { service: "aigateway", httpStatus: 429 },
+  /**
+   * ErrRequestAbandoned — means the caller disconnected or its deadline
+   * expired before the provider answered. It is a verdict about the caller,
+   * not about the credential: it must neither advance the fallback chain nor
+   * move the circuit breaker, or one client hanging up repeatedly would open
+   * the breaker on a healthy provider.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  request_abandoned: { service: "aigateway", httpStatus: 499 },
   /**
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
