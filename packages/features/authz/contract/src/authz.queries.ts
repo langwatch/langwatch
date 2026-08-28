@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  authzDenialReasonSchema,
   authzDecisionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
@@ -65,6 +66,7 @@ export const permissionDecisionSchema = z
   .object({
     permitted: z.boolean(),
     organizationRole: organizationRoleSchema.nullable(),
+    denialReason: authzDenialReasonSchema.optional(),
   })
   .strict();
 export type PermissionDecision = z.infer<typeof permissionDecisionSchema>;
@@ -73,6 +75,7 @@ export const authzCheckByIdsOutputSchema = z
   .object({
     allowed: z.boolean(),
     organizationRole: organizationRoleSchema.nullable(),
+    denialReason: authzDenialReasonSchema.optional(),
   })
   .strict();
 export type AuthzCheckByIdsOutput = z.infer<typeof authzCheckByIdsOutputSchema>;
@@ -91,6 +94,7 @@ export const authzCanAnyByIdsOutputSchema = z
     allowed: z.boolean(),
     matchedPermission: authzPermissionSchema.optional(),
     organizationRole: organizationRoleSchema.nullable(),
+    denialReason: authzDenialReasonSchema.optional(),
   })
   .strict();
 export type AuthzCanAnyByIdsOutput = z.infer<typeof authzCanAnyByIdsOutputSchema>;

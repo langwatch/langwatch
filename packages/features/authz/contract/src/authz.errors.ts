@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AuthzDenialReason, AuthzScopeRef } from "./authz";
 
 export const AUTHZ_PROBLEM_CODES = [
+  "validation_error",
   "permission_denied",
   "lite_member_restricted",
   "project_permission_denied",
@@ -79,6 +80,20 @@ export class PermissionDeniedError extends HandledError {
 
   get denialReason(): AuthzDenialReason {
     return this.meta.denialReason as AuthzDenialReason;
+  }
+}
+
+/** A named scope field had no usable id, so the client can correct its input. */
+export class BlankScopeIdError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor({ field }: { field: string }) {
+    super("validation_error", "The request did not name a scope to act in.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { fieldErrors: { [field]: ["Required"] } },
+    });
+    this.name = "BlankScopeIdError";
   }
 }
 

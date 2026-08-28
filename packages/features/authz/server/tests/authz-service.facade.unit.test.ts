@@ -68,6 +68,54 @@ describe("AuthzService portable facade", () => {
     ).rejects.toBeInstanceOf(PermissionDeniedError);
   });
 
+  it("preserves a membership-disabled denial through the compatibility decision", async () => {
+    const { service } = makeService({
+      reader: makeReader({
+        tryFindOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: true }),
+      }),
+    });
+
+    await expect(
+      service.getDecision({
+        userId: "member-1",
+        permission: "organization:view",
+        scope: { tier: "organization", id: ORG },
+      }),
+    ).resolves.toEqual({
+      permitted: false,
+      organizationRole: null,
+      denialReason: "membership-disabled",
+    });
+  });
+
+  it("keeps the primary denial reason when none of a declared permission set allows", async () => {
+    const { service } = makeService({
+      reader: makeReader({
+        tryFindProjectLineage: vi.fn().mockResolvedValue({
+          teamId: TEAM,
+          organizationId: ORG,
+        }),
+        tryFindOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: true }),
+      }),
+    });
+
+    await expect(
+      service.getProjectAnyDecision({
+        userId: "member-1",
+        projectId: PROJECT,
+        permissions: ["traces:view", "datasets:view"],
+      }),
+    ).resolves.toEqual({
+      permitted: false,
+      organizationRole: null,
+      denialReason: "membership-disabled",
+    });
+  });
+
   it("fences project API-key checks to the resolved organization", async () => {
     const { service } = makeService({
       reader: makeReader({

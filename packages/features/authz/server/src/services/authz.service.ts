@@ -276,7 +276,11 @@ export class AuthzService extends AuthzServiceContract {
     principal: AuthzPrincipalRef;
     permission: AuthzPermission;
     ceiling?: boolean;
-  }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
+  }): Promise<{
+    allowed: boolean;
+    organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDecision["denialReason"];
+  }> {
     const scope = await this.tryResolveScope({
       projectId,
       teamId,
@@ -314,6 +318,7 @@ export class AuthzService extends AuthzServiceContract {
     return {
       allowed: decision.allowed,
       organizationRole: grants.organizationRole,
+      ...(decision.denialReason ? { denialReason: decision.denialReason } : {}),
     };
   }
 
@@ -334,6 +339,7 @@ export class AuthzService extends AuthzServiceContract {
     allowed: boolean;
     matchedPermission?: AuthzPermission;
     organizationRole: OrganizationRoleOrNull;
+    denialReason?: AuthzDecision["denialReason"];
   }> {
     const scope = await this.collector.tryResolveScopeRef({ projectId });
     if (!scope) {
@@ -361,26 +367,35 @@ export class AuthzService extends AuthzServiceContract {
       }),
     ]);
     const demoProjectId = this.snapshots.tryDemoProjectId();
-    const matched = permissions.find(
-      (permission) =>
-        this.engine.decideWithCeiling({
-          keyGrants: grants,
-          ownerGrants,
-          permission,
-          scope,
-          demoProjectId,
-        }).allowed,
-    );
+    let matched: AuthzPermission | undefined;
+    let firstDenied: AuthzDecision | undefined;
+    for (const permission of permissions) {
+      const decision = this.engine.decideWithCeiling({
+        keyGrants: grants,
+        ownerGrants,
+        permission,
+        scope,
+        demoProjectId,
+      });
+      if (decision.allowed) {
+        matched = permission;
+        break;
+      }
+      firstDenied ??= decision;
+    }
     const result: {
       allowed: boolean;
       matchedPermission?: AuthzPermission;
       organizationRole: OrganizationRoleOrNull;
+      denialReason?: AuthzDecision["denialReason"];
     } = {
       allowed: matched !== undefined,
       organizationRole: grants.organizationRole,
     };
     if (matched) {
       result.matchedPermission = matched;
+    } else if (firstDenied?.denialReason) {
+      result.denialReason = firstDenied.denialReason;
     }
 
     return result;
@@ -510,6 +525,7 @@ export class AuthzService extends AuthzServiceContract {
     return {
       permitted: result.allowed,
       organizationRole: result.organizationRole,
+      ...(result.denialReason ? { denialReason: result.denialReason } : {}),
     };
   }
 
@@ -527,6 +543,7 @@ export class AuthzService extends AuthzServiceContract {
     return {
       permitted: result.allowed,
       organizationRole: result.organizationRole,
+      ...(result.denialReason ? { denialReason: result.denialReason } : {}),
     };
   }
 

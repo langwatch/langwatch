@@ -3,6 +3,7 @@ import * as contract from "../src/index";
 import {
   ALL_PERMISSIONS,
   type Authorized,
+  BlankScopeIdError,
   authzDecisionSchema,
   authzOffboardInputSchema,
   authzPermissionSchema,
@@ -95,5 +96,17 @@ describe("the portable AuthZ contract", () => {
       scope: { tier: "project", id: "project_1" },
     };
     expect(forged.scope.id).toBe("project_1");
+  });
+
+  it("keeps blank scope ids in the established customer-correctable error envelope", () => {
+    const error = new BlankScopeIdError({ field: "projectId" });
+
+    expect(error).toMatchObject({
+      code: "validation_error",
+      message: "The request did not name a scope to act in.",
+      fault: "customer",
+      httpStatus: 400,
+      meta: { fieldErrors: { projectId: ["Required"] } },
+    });
   });
 });

@@ -88,7 +88,8 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const { permitted, organizationRole } = await ctx.app.permissions.getDecision({
+      const { permitted, organizationRole, denialReason } =
+        await ctx.app.permissions.getDecision({
         userId: ctx.session.user.id,
         permission,
         scope,
@@ -98,6 +99,7 @@ export const checkDeclaredPermission = ({
           permission,
           scope,
           organizationRole,
+          denialReason,
         });
       }
       // Legacy parity: the organization tier never carried a role onto the
@@ -135,16 +137,18 @@ export const checkDeclaredPermissionAny = (
         input,
         via: "projectId",
       });
-      const { permitted, organizationRole } = await ctx.app.permissions.getProjectAnyDecision({
-        userId: ctx.session.user.id,
-        projectId,
-        permissions,
-      });
+      const { permitted, organizationRole, denialReason } =
+        await ctx.app.permissions.getProjectAnyDecision({
+          userId: ctx.session.user.id,
+          projectId,
+          permissions,
+        });
       if (!permitted) {
         throw deniedError({
           permission: permissions[0],
           scope: { tier: "project", id: projectId },
           organizationRole,
+          denialReason,
         });
       }
       ctx.organizationRole = organizationRole;

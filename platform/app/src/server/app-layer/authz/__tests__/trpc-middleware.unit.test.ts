@@ -13,11 +13,17 @@
  * and left the client rendering "unknown error" for a denial it could have
  * named.
  */
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import {
+  BlankScopeIdError,
+  PermissionDeniedError,
+} from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  MembershipDisabledError,
+} from "~/server/app-layer/permissions/errors";
 
 /**
  * Severity is behaviour here, not decoration: the blank-id split exists so a
@@ -323,6 +329,23 @@ describe("checkDeclaredPermission", () => {
       expect(error.cause).toBeInstanceOf(LiteMemberRestrictedError);
     });
 
+    it("preserves the membership-disabled cause from the decision", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+        denialReason: "membership-disabled",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "proj-1" }) as never,
+        ),
+      );
+
+      expect(error.cause).toBeInstanceOf(MembershipDisabledError);
+      expect((error.cause as MembershipDisabledError).code).toBe("membership_disabled");
+    });
+
     it("denies at the organization tier without a lite-member special case", async () => {
       hasOrganizationPermission.mockResolvedValue(false);
       const error = await rejection(() =>
@@ -361,6 +384,23 @@ describe("checkDeclaredPermissionAny", () => {
     expect((error.cause as PermissionDeniedError).meta).toMatchObject({
       permission: "traces:view",
     });
+  });
+
+  it("preserves a membership-disabled cause from an any-of decision", async () => {
+    resolveProjectPermissionAny.mockResolvedValue({
+      permitted: false,
+      organizationRole: null,
+      denialReason: "membership-disabled",
+    });
+
+    const error = await rejection(() =>
+      checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
+        paramsFor({ projectId: "proj-1" }) as never,
+      ),
+    );
+
+    expect(error.cause).toBeInstanceOf(MembershipDisabledError);
+    expect((error.cause as MembershipDisabledError).code).toBe("membership_disabled");
   });
 
   /** @scenario "A blank project id on a multi-permission check is answered the same way" */
