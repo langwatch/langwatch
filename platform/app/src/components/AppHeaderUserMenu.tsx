@@ -28,22 +28,20 @@ const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
 };
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
-  legacy: "Old navigation",
   "product-switcher": "Product switcher",
   "icon-rail": "Icon rail",
 };
 
-/** The order the modes are offered in, oldest first. */
 const NAVIGATION_MODES = Object.keys(
   NAVIGATION_MODE_LABELS,
 ) as NavigationMode[];
 
 /**
  * The avatar button and its dropdown in the top-right of the app header.
- * Shared by the legacy chrome and the navigation-v2 shells so the account
- * entries, the graphics override and the navigation-mode picker stay
- * identical in every mode. Self-contained: it resolves its own session,
- * flags and stores so a shell only decides where the avatar sits.
+ * Shared by both navigation shells so the account entries, the graphics
+ * override and the navigation-mode picker stay identical in every mode.
+ * Self-contained: it resolves its own session, flags and stores so a
+ * shell only decides where the avatar sits.
  *
  * Spec: specs/navigation/navigation-modes.feature
  */
@@ -56,11 +54,7 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const {
-    project,
-    organization,
-    isLoading: isOrganizationLoading,
-  } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -75,35 +69,20 @@ export function AppHeaderUserMenu({
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
-      // The landing destination is decided at the organization, and
-      // governance.resolveHome reads the flag with the project opted
-      // out. The menu link matches so a project-scoped rule cannot
-      // send a person to a page that resolves as unavailable.
       projectId: NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
   );
 
-  // The navigation-mode picker only appears once the v2 flag is on; the
-  // preference itself lives on the device (see navigationModeStore). The
-  // gate matches useNavigationMode, which resolves the flag at user level
-  // for a user with no organization: that persona reaches the new shells
-  // on /me, so it must also reach the control that selects them.
-  const { enabled: navigationV2Enabled } = useFeatureFlag(
-    "release_ui_navigation_v2_enabled",
-    {
-      projectId: project?.id ?? NOT_TARGETED,
-      organizationId: organization?.id,
-      enabled: !isOrganizationLoading,
-    },
-  );
+  // The navigation-mode preference lives on the device (see
+  // navigationModeStore).
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
   const setStoredNavigationMode = useNavigationModeStore(
     (s) => s.setStoredMode,
   );
-  // The picker only shows with the flag on, where a device that never
-  // picked runs the default mode. It reports that, not the old chrome.
+  // A device that never picked runs the default mode; the picker reports
+  // that, not an empty choice.
   const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   const graphicsQualityOverride = useGraphicsQualityOverrideStore(
@@ -180,32 +159,28 @@ export function AppHeaderUserMenu({
               <Menu.Item value="settings" asChild>
                 <Link href="/settings">Settings</Link>
               </Menu.Item>
-              {navigationV2Enabled && (
-                <Menu.Root
-                  positioning={{ placement: "right-start", gutter: 2 }}
-                >
-                  <Menu.TriggerItem value="navigation-mode">
-                    <PanelsTopLeft size={14} />
-                    Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
-                  </Menu.TriggerItem>
-                  <Menu.Content>
-                    <Menu.RadioItemGroup
-                      value={currentNavigationMode}
-                      onValueChange={(e) => {
-                        const mode = e.value as NavigationMode;
-                        setStoredNavigationMode(mode);
-                        trackEvent("navigation_mode_change", { mode });
-                      }}
-                    >
-                      {NAVIGATION_MODES.map((mode) => (
-                        <Menu.RadioItem key={mode} value={mode}>
-                          {NAVIGATION_MODE_LABELS[mode]}
-                        </Menu.RadioItem>
-                      ))}
-                    </Menu.RadioItemGroup>
-                  </Menu.Content>
-                </Menu.Root>
-              )}
+              <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                <Menu.TriggerItem value="navigation-mode">
+                  <PanelsTopLeft size={14} />
+                  Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
+                </Menu.TriggerItem>
+                <Menu.Content>
+                  <Menu.RadioItemGroup
+                    value={currentNavigationMode}
+                    onValueChange={(e) => {
+                      const mode = e.value as NavigationMode;
+                      setStoredNavigationMode(mode);
+                      trackEvent("navigation_mode_change", { mode });
+                    }}
+                  >
+                    {NAVIGATION_MODES.map((mode) => (
+                      <Menu.RadioItem key={mode} value={mode}>
+                        {NAVIGATION_MODE_LABELS[mode]}
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioItemGroup>
+                </Menu.Content>
+              </Menu.Root>
               <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                 <Menu.TriggerItem value="reduced-graphics">
                   <Monitor size={14} />
@@ -222,13 +197,13 @@ export function AppHeaderUserMenu({
                     }
                   >
                     <Menu.RadioItem value="auto">
-                      Auto — adapts to this device on its own
+                      Auto, adapts to this device on its own
                     </Menu.RadioItem>
                     <Menu.RadioItem value="on">
-                      On — always keep things responsive
+                      On, always keep things responsive
                     </Menu.RadioItem>
                     <Menu.RadioItem value="off">
-                      Off — always show full decorative effects
+                      Off, always show full decorative effects
                     </Menu.RadioItem>
                   </Menu.RadioItemGroup>
                 </Menu.Content>
