@@ -112,7 +112,7 @@ func New(opts Options) (*Executor, error) {
 		opts.Python = "python3"
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 60 * time.Second
+		opts.DefaultTimeout = 600 * time.Second
 	}
 	// Secure default: a nil allowlist means "the caller didn't opt out of
 	// the safe default", NOT "inherit everything". A non-nil empty slice is

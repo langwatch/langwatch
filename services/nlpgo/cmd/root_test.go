@@ -135,9 +135,9 @@ func TestResolveSandboxPython_HonorsTheUnprefixedImageSetting(t *testing.T) {
 // TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout pins the operator
 // knob to the executor that enforces it. `CodeBlockTimeoutSeconds` was
 // declared, defaulted and documented but never read: `codeblock.New` was
-// called without `DefaultTimeout`, so the executor's own 60s fallback won
-// every time and a long-running code block could not be given more room
-// from configuration.
+// called without `DefaultTimeout`, so the executor's own default fallback
+// won every time and a long-running code block could not be given more
+// room from configuration.
 func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	getenv := func(string) string { return "" }
 
@@ -153,10 +153,10 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 	}
 }
 
-// TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault guards the
+// TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault guards the
 // wiring against turning an unset knob into a zero-length — that is,
 // already-expired — timeout.
-func TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault(t *testing.T) {
+func TestNewCodeExecutor_UnsetTimeoutKeepsTheTenMinuteDefault(t *testing.T) {
 	getenv := func(string) string { return "" }
 
 	exec, err := newCodeExecutor(nlpgo.EngineConfig{
@@ -165,7 +165,7 @@ func TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
-	if got, want := exec.DefaultTimeout(), 60*time.Second; got != want {
+	if got, want := exec.DefaultTimeout(), 600*time.Second; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v", got, want)
 	}
 }
@@ -174,7 +174,7 @@ func TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault(t *testing.T) {
 // negative NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS must not become a negative duration.
 // codeblock.Execute feeds this straight into context.WithTimeout, so a
 // negative value would produce an already-expired context and kill every
-// code block instantly. Zero defers to codeblock.New's 60s fallback.
+// code block instantly. Zero defers to codeblock.New's 600s fallback.
 func TestResolveCodeBlockTimeout(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -212,7 +212,7 @@ func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
 	if got := exec.DefaultTimeout(); got <= 0 {
 		t.Errorf("DefaultTimeout() = %v; want a positive duration", got)
 	}
-	if got, want := exec.DefaultTimeout(), 60*time.Second; got != want {
+	if got, want := exec.DefaultTimeout(), 600*time.Second; got != want {
 		t.Errorf("DefaultTimeout() = %v; want %v", got, want)
 	}
 }

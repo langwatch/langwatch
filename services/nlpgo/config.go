@@ -105,7 +105,13 @@ func defaultConfig() Config {
 			// anchored both at 12min (under Lambda's 15min cap with
 			// margin for the outer connection to drain).
 			StreamIdleTimeoutSeconds: 720,
-			CodeBlockTimeoutSeconds:  60,
+			// 10min: raised from 60s because 60s was breaking legitimate
+			// user code blocks. Kept strictly below StreamIdleTimeoutSeconds
+			// (12min) rather than matched to it, since a long-running code
+			// block emits no SSE events while it runs and a ceiling at or
+			// above the idle timeout would race the stream shutting down
+			// mid-run.
+			CodeBlockTimeoutSeconds: 600,
 			// 12min for every block that calls out of the process, for the
 			// same reason the idle timeout above is 12min: a customer agent
 			// backend, sub-workflow or evaluator chain legitimately runs
