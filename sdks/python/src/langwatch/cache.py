@@ -25,7 +25,8 @@ from langwatch.utils.exceptions import (
 from langwatch.utils.initialization import ensure_setup
 
 CacheValue = Union[str, Dict[str, Any], List[Any]]
-"""What an entry holds: text, or a dict or list, which travels as JSON text."""
+"""What an entry holds: text, or a dict or list of what JSON can carry, which
+travels as JSON text."""
 
 
 def _quote(value: str) -> str:
@@ -73,7 +74,11 @@ def _raise_for_status(response: httpx.Response) -> None:
 
 
 def _encode(value: CacheValue) -> str:
-    """The text the platform stores: a str as is, a dict or list as JSON."""
+    """The text the platform stores: a str as is, a dict or list as JSON.
+
+    A dict or list must hold what JSON can carry, so a member of another type
+    raises a TypeError here, and a key that is not a string is stored as one.
+    """
     if isinstance(value, str):
         return value
     if isinstance(value, (dict, list)):
@@ -86,7 +91,15 @@ def _encode(value: CacheValue) -> str:
 
 def _decode(text: str) -> CacheValue:
     """The value the caller stored: JSON text of a dict or list comes back
-    parsed, any other text comes back as it is."""
+    parsed, any other text comes back as it is.
+
+    The entry holds text and nothing else, so text that is itself a JSON
+    object or array cannot be told apart from a dict the SDK stored, and it
+    reads back parsed too. Type metadata would tell them apart, but only for
+    the entries this SDK wrote: the route, the REST callers and the other
+    SDKs all read the same plain text, and an envelope would be unreadable to
+    them.
+    """
     stripped = text.lstrip()
     if stripped.startswith("{") or stripped.startswith("["):
         try:
@@ -127,8 +140,10 @@ class CacheFacade:
         the same way, so the calling code has one branch rather than a
         try/except around every read.
 
-        A dict or list stored through `set` or `claim` comes back parsed;
-        text comes back as it was stored.
+        A dict or list stored through `set` or `claim` comes back parsed.
+        Text comes back as it was stored, unless the text is itself a JSON
+        object or array: the entry holds text alone, so that reads back
+        parsed as well.
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
@@ -148,8 +163,9 @@ class CacheFacade:
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
-            value: What to store: text, or a dict or list, which is stored as
-                JSON and comes back parsed. It is encrypted server-side.
+            value: What to store: text, or a dict or list of what JSON can
+                carry, which is stored as JSON and comes back parsed. It is
+                encrypted server-side.
             ttl_seconds: How long the entry stays readable. The project's
                 default applies when this is not given.
         """
@@ -178,8 +194,9 @@ class CacheFacade:
 
         Args:
             name: Entry name (UPPER_SNAKE_CASE).
-            value: What to store: text, or a dict or list, which is stored as
-                JSON and comes back parsed. It is encrypted server-side.
+            value: What to store: text, or a dict or list of what JSON can
+                carry, which is stored as JSON and comes back parsed. It is
+                encrypted server-side.
             ttl_seconds: How long the entry stays readable. The project's
                 default applies when this is not given.
         """

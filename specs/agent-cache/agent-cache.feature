@@ -301,6 +301,16 @@ Feature: The agent cache
       Then the write carries the dict as JSON text
       And reading ACME_SESSION gives the agent the dict back
 
+    # An entry holds text and nothing else, so text that is itself a JSON
+    # object or array cannot be told apart from a dict the SDK stored. Type
+    # metadata would tell them apart, but only for the entries this SDK
+    # wrote; the route, the REST callers and the other SDKs read plain text.
+    @unit
+    Scenario: JSON text an older writer stored reads back parsed
+      Given an entry written over REST holds the text of a JSON object
+      When the agent reads the entry
+      Then it gets the object parsed
+
     @unit
     Scenario: The SDK refuses a value it cannot store before calling the platform
       When the agent stores a number

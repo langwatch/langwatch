@@ -217,6 +217,15 @@ class TestValuesThatAreNotText:
         assert facade_over(stub).get("ACME_NOTE") == "{not json"
         assert facade_over(stub).get("ACME_NUMBER") == "42"
 
+    # @scenario "JSON text an older writer stored reads back parsed"
+    def test_json_text_an_older_writer_stored_reads_back_parsed(self):
+        stub = CacheStub(
+            stored={"ACME_MODE": '{"mode":"legacy"}', "ACME_STEPS": '["one"]'}
+        )
+
+        assert facade_over(stub).get("ACME_MODE") == {"mode": "legacy"}
+        assert facade_over(stub).get("ACME_STEPS") == ["one"]
+
     # @scenario "The SDK refuses a value it cannot store before calling the platform"
     def test_a_value_of_another_type_is_refused_before_any_call(self):
         stub = CacheStub()
