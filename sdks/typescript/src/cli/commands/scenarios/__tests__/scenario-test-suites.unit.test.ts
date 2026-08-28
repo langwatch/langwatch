@@ -191,9 +191,13 @@ describe("filing a scenario into a test suite from the command line", () => {
       expect(result!.data).toMatchObject({ testSuiteId: "suite_xyz" });
     });
 
-    /** @scenario "Unfile a scenario from its test suite" */
-    it("takes the scenario out of its test suite with --no-test-suite", async () => {
-      mockScenarioUpdate.mockResolvedValue(makeScenario({ testSuiteId: null }));
+    /** @scenario "Take a scenario out of the test suite it is in" */
+    it("clears the test suite, and reads back the Default the platform files it into", async () => {
+      // The platform keeps every scenario in exactly one suite, so a cleared
+      // test suite comes back as the project's Default rather than as none.
+      mockScenarioUpdate.mockResolvedValue(
+        makeScenario({ testSuiteId: "suite_default" }),
+      );
 
       const result = await updateScenarioCommand("scenario_abc123", {
         noTestSuite: true,
@@ -202,7 +206,7 @@ describe("filing a scenario into a test suite from the command line", () => {
       expect(mockScenarioUpdate).toHaveBeenCalledWith("scenario_abc123", {
         testSuiteId: null,
       });
-      expect(result!.data).toMatchObject({ testSuiteId: null });
+      expect(result!.data).toMatchObject({ testSuiteId: "suite_default" });
       expect(mockSuitesList).not.toHaveBeenCalled();
     });
 

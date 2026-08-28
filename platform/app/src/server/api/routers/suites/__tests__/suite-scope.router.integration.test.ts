@@ -106,7 +106,7 @@ describe("the scope of a run plan over tRPC", () => {
   );
 
   describe("when the plan covers a rule", () => {
-    /** @scenario "A plan scoped to all scenarios runs every active scenario" */
+    /** @scenario "A plan keeps the scope it was given" */
     it("is created with no scenario named", async () => {
       const plan = await caller.suites.create({
         projectId,
@@ -122,7 +122,7 @@ describe("the scope of a run plan over tRPC", () => {
       expect(plan.scenarioIds).toEqual([]);
     });
 
-    /** @scenario "A plan scoped to labels runs the scenarios carrying them" */
+    /** @scenario "A plan keeps the scope it was given" */
     it("takes a new rule on update", async () => {
       const plan = await caller.suites.create({
         projectId,

@@ -30,6 +30,12 @@ Feature: Dynamic run plan scopes
     Then all three scenarios are scheduled
 
   @integration
+  Scenario: A plan keeps the scope it was given
+    Given a run plan created with a scope
+    When the scope is changed to another mode
+    Then the plan reads back with the new scope
+
+  @integration
   Scenario: A plan scoped to test suites runs the scenarios filed in them
     Given two test suites, each with one scenario
     And a run plan scoped to the first test suite

@@ -23116,7 +23116,7 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
-                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null unfiles the scenario. */
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
                 };
             };
@@ -23318,7 +23318,7 @@ export interface operations {
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
                     }[];
-                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null unfiles the scenario. */
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
                 };
             };

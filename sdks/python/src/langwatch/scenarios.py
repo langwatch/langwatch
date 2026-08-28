@@ -63,7 +63,8 @@ class _Unset:
 
 _UNSET = _Unset()
 """Marks a field the caller did not give. ``None`` is a value of its own on
-``testSuiteId``: it unfiles the scenario, so it cannot double as the default."""
+``testSuiteId``: it clears the test suite the scenario names, so it cannot
+double as the default."""
 
 
 TestSuiteId = Union[str, None, _Unset]
@@ -133,8 +134,8 @@ class ScenariosFacade:
             name: Name for the scenario.
             description: Optional description.
             test_suite_id: The test suite to file the scenario in. It must name
-                a live test suite of the same project. ``None`` leaves the
-                scenario unfiled.
+                a live test suite of the same project. ``None`` files the
+                scenario into the project's Default test suite.
             **kwargs: Additional fields to include in the request body.
 
         Returns:
@@ -165,8 +166,8 @@ class ScenariosFacade:
             scenario_id: The scenario ID to update.
             params: Dictionary of fields to update.
             test_suite_id: The test suite to file the scenario in. Left out,
-                the scenario keeps the test suite it is in. ``None`` unfiles
-                it.
+                the scenario keeps the test suite it is in. ``None`` files it
+                into the project's Default test suite.
 
         Returns:
             Dictionary containing the updated scenario data.

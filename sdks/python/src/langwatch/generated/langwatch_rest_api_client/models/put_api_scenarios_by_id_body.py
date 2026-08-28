@@ -28,7 +28,7 @@ class PutApiScenariosByIdBody:
             scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
             encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
         test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
-            suite of the same project. null unfiles the scenario.
+            suite of the same project. null files the scenario into the project's Default test suite.
     """
 
     name: str | Unset = UNSET

@@ -91,7 +91,7 @@ describe("buildAtomFilters", () => {
     });
   });
 
-  describe("the dedup subquery window", () => {
+  describe("when the query dedups a run to its latest version", () => {
     /**
      * StartedAt moves between versions of one run, so a dedup scope bounded
      * exactly to the window can drop the true latest version out of its own
@@ -231,7 +231,7 @@ describe("the key a target folds under", () => {
     });
   });
 
-  describe("the names a run reports", () => {
+  describe("when a run reports an agent beside a simulator and a judge", () => {
     /**
      * A run wires in a user simulator and a judge as well, and neither is what
      * the run tests, so only the agent role may name the target.
@@ -242,7 +242,7 @@ describe("the key a target folds under", () => {
     });
   });
 
-  describe("the filter on targets", () => {
+  describe("when the query filters on target keys", () => {
     /**
      * A run opens with no metadata and gains it when its started event lands,
      * so the key it folds under can differ between versions of one run and may

@@ -64,7 +64,7 @@ Feature: Scenario CLI Commands
   # ============================================================================
   # Test suite membership (Agent Testing v2)
   # ============================================================================
-  # A scenario belongs to at most one test suite. The domain rules are
+  # A scenario belongs to exactly one test suite. The domain rules are
   # in specs/suites/test-suites.feature and
   # specs/scenarios/scenario-test-suite-assignment.feature.
 
@@ -83,10 +83,11 @@ Feature: Scenario CLI Commands
     And it no longer belongs to the test suite it was in
 
   @unit
-  Scenario: Unfile a scenario from its test suite
+  Scenario: Take a scenario out of the test suite it is in
     Given my project has a scenario inside a test suite
     When I run "langwatch scenario update <scenario-id> --no-test-suite"
-    Then the scenario belongs to no test suite
+    Then the request clears the test suite the scenario names
+    And the platform files the scenario into the project's Default suite
 
   @unit
   Scenario: Create a scenario with a test suite that does not exist
