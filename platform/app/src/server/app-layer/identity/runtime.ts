@@ -138,6 +138,7 @@ import {
 import { SessionClaimsService } from "./session-claims.service";
 import { SessionInventoryService } from "./session-inventory.service";
 import { SignUpHealthService } from "./sign-up-health.service";
+import { SignUpIdentifierService } from "./sign-up-identifier";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
 import {
   deploymentOffersTwoStepVerification,
@@ -856,6 +857,15 @@ export function connectionGrandfatherMigration(): IdentitySsoConnectionGrandfath
 }
 
 /**
+ * The identifier a password sign-up owes (ADR-117 §6), composed per call like
+ * every other identity write surface — the ledger it commits through resolves
+ * the pipeline handle lazily, so it must not be built at module load.
+ */
+export function signUpIdentifier(): SignUpIdentifierService {
+  return new SignUpIdentifierService(identityService());
+}
+
+/**
  * Sign-up's address confirmation (D13, ADR-117 §6). Composed per call like
  * the write surface above: it reaches the mailer, and the mailer is the one
  * dependency a test routinely replaces.
@@ -872,11 +882,21 @@ export function signUpVerification(): SignUpVerificationService {
       createCredentialAccount: async ({ email, passwordHash }) => {
         // Nobody has been asked for a name on this path: the person typed an
         // address and a password into a log-in form. Onboarding asks.
-        await createCredentialUser({
+        const created = await createCredentialUser({
           prisma,
           name: null,
           email,
           passwordHash,
+        });
+        // Stated here rather than left to the backfill: the front door reads
+        // the projection, so an account with no identifier is an account the
+        // door says does not exist — and this path's whole purpose is to hand
+        // somebody an account they can immediately sign in to.
+        await signUpIdentifier().attachCredentialIdentifier({
+          userId: created.id,
+          email,
+          accountId: created.accountId,
+          occurredAtMs: created.accountCreatedAt.getTime(),
         });
       },
       markAddressConfirmed: async ({ email }) => {

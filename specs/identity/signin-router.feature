@@ -70,6 +70,14 @@ Feature: The identifier-first sign-in router - one auth screens, routed by data
     And the routing log records the domain and never the address
 
   @unit
+  Scenario: An account the sign-up form just made is not mistaken for no account
+    Given "home.net" belongs to no ACTIVE connection
+    And somebody registers "new@home.net" through the sign-up form
+    When "new@home.net" is submitted to the router
+    Then the decision offers the password
+    And the decision never routes to sign-up with the reason code "identifier_unknown"
+
+  @unit
   Scenario: The methods offered are the ones that account holds
     Given "home.net" belongs to no ACTIVE connection
     And the account for "sam@home.net" holds a passkey and no password

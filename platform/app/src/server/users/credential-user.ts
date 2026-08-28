@@ -79,6 +79,21 @@ export function belongsToSomebody(row: {
  * the credential is taken and keeps only the hash until the address is
  * verified, so there is never a plaintext password at rest anywhere.
  */
+/**
+ * The rows a credential sign-up wrote, as the identity attach needs them.
+ *
+ * The account's own id and `createdAt` ride out rather than being re-read,
+ * because the identifier the caller states next must derive from THIS row:
+ * the backfill links by `Account.id` and takes `occurredAt` from
+ * `Account.createdAt`, so anything else produces a second projection row for
+ * one credential instead of converging on one.
+ */
+export interface CreatedCredentialUser {
+  id: string;
+  accountId: string;
+  accountCreatedAt: Date;
+}
+
 export async function createCredentialUser({
   prisma,
   name,
@@ -90,10 +105,10 @@ export async function createCredentialUser({
   name: string | null;
   email: string;
   passwordHash: string;
-}): Promise<{ id: string }> {
+}): Promise<CreatedCredentialUser> {
   const created = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({ data: { name, email } });
-    await tx.account.create({
+    const account = await tx.account.create({
       data: {
         userId: user.id,
         type: "credential",
@@ -106,14 +121,18 @@ export async function createCredentialUser({
         password: passwordHash,
       },
     });
-    return user;
+    return { user, account };
   });
 
   // Email-mode signups bypass the BetterAuth user-create hooks, so the
   // `signed_up` analytics event fires here instead.
-  trackServerEvent({ userId: created.id, event: "signed_up" });
+  trackServerEvent({ userId: created.user.id, event: "signed_up" });
 
-  return { id: created.id };
+  return {
+    id: created.user.id,
+    accountId: created.account.id,
+    accountCreatedAt: created.account.createdAt,
+  };
 }
 
 /**

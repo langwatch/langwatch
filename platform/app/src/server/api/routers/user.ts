@@ -16,7 +16,10 @@ import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { signUpVerification } from "~/server/app-layer/identity/runtime";
+import {
+  signUpIdentifier,
+  signUpVerification,
+} from "~/server/app-layer/identity/runtime";
 import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
@@ -214,6 +217,18 @@ export const userRouter = createTRPCRouter({
         name: name ?? null,
         email,
         passwordHash: await hash(password, 10),
+      });
+
+      // The front door routes on the identifier projection, so an account is
+      // reachable only once its credential is a stated fact. This is the one
+      // account-creating path no ceremony sees — it writes through Prisma
+      // rather than through better-auth's storage adapter — so it states the
+      // identifier itself, from the row it just wrote.
+      await signUpIdentifier().attachCredentialIdentifier({
+        userId: newUser.id,
+        email,
+        accountId: newUser.accountId,
+        occurredAtMs: newUser.accountCreatedAt.getTime(),
       });
 
       // An address an emailed link already proved does not get asked again.
