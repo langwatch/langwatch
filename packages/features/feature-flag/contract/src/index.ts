@@ -37,6 +37,8 @@ export type {
   FeatureFlagTarget,
   FeatureFlagTargetInput,
 } from "./feature-flag-target";
+export type { FeatureFlagTargetId, NotTargeted } from "./feature-flag-targeting";
+export { NOT_TARGETED, toRuleContextId } from "./feature-flag-targeting";
 export {
   FeatureFlagExperimentUnavailableError,
   UnknownFeatureFlagError,

@@ -4,7 +4,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NOT_TARGETED } from "../../server/featureFlag/targeting";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { CLIENT_FLAG_STALE_TIME_MS, useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
