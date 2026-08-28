@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PostApiSuitesByIdDuplicateResponse201
     | PostApiSuitesByIdDuplicateResponse400
@@ -108,7 +108,7 @@ def sync_detailed(
     | PostApiSuitesByIdDuplicateResponse422
     | PostApiSuitesByIdDuplicateResponse500
 ]:
-    """Duplicate a suite (run plan)
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
 
     Args:
         id (str):
@@ -135,7 +135,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PostApiSuitesByIdDuplicateResponse201
     | PostApiSuitesByIdDuplicateResponse400
@@ -145,7 +145,7 @@ def sync(
     | PostApiSuitesByIdDuplicateResponse500
     | None
 ):
-    """Duplicate a suite (run plan)
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
 
     Args:
         id (str):
@@ -167,7 +167,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PostApiSuitesByIdDuplicateResponse201
     | PostApiSuitesByIdDuplicateResponse400
@@ -176,7 +176,7 @@ async def asyncio_detailed(
     | PostApiSuitesByIdDuplicateResponse422
     | PostApiSuitesByIdDuplicateResponse500
 ]:
-    """Duplicate a suite (run plan)
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
 
     Args:
         id (str):
@@ -201,7 +201,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PostApiSuitesByIdDuplicateResponse201
     | PostApiSuitesByIdDuplicateResponse400
@@ -211,7 +211,7 @@ async def asyncio(
     | PostApiSuitesByIdDuplicateResponse500
     | None
 ):
-    """Duplicate a suite (run plan)
+    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
 
     Args:
         id (str):

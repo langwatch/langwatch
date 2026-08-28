@@ -37,11 +37,10 @@ describe("SuiteRunService", () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
-      service = new SuiteRunService(
-        new NullSuiteRunReadRepository(),
-        startSuiteRunCommand,
-        queueSimulationRunCommand,
-      );
+      service = new SuiteRunService(new NullSuiteRunReadRepository(), {
+        startSuiteRun: startSuiteRunCommand,
+        queueSimulationRun: queueSimulationRunCommand,
+      });
     });
 
     describe("when a run is started with one scenario and one target", () => {
@@ -129,13 +128,13 @@ describe("SuiteRunService", () => {
           repeatCount: 1,
           skippedArchived: { scenarios: [], targets: [] },
           idempotencyKey: "idem-note-1",
-          note: "switched judge to the stricter rubric",
+          note: "switched judge to the stricter criterion",
         });
 
         expect(queueSimulationRunCommand).toHaveBeenCalledTimes(6);
         for (const call of queueSimulationRunCommand.mock.calls) {
           expect(call[0].metadata.note).toBe(
-            "switched judge to the stricter rubric",
+            "switched judge to the stricter criterion",
           );
         }
       });

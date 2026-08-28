@@ -136,7 +136,7 @@ export class SuiteTargetsRequiredError extends SuiteDomainError {
 }
 
 /**
- * Thrown when a run plan's scope covers no test case at all.
+ * Thrown when a run plan's scope covers no scenario at all.
  *
  * Distinct from {@link AllScenariosArchivedError}: that one says the cases the
  * plan named are archived, this one says the rule the plan carries matches
@@ -147,7 +147,7 @@ export class SuiteScopeEmptyError extends SuiteDomainError {
   declare readonly code: "suite_scope_empty";
 
   constructor() {
-    super("This run plan covers no test case. Widen its scope, then run.", {
+    super("This run plan covers no scenario. Widen its scope, then run.", {
       code: "suite_scope_empty",
       httpStatus: 422,
     });
@@ -161,7 +161,7 @@ export class SuiteScopeNotAllowedError extends SuiteDomainError {
 
   constructor() {
     super(
-      "A test suite runs the test cases filed in it, so it takes no scope.",
+      "A test suite runs the scenarios filed in it, so it takes no scope.",
       {
         code: "suite_scope_not_allowed",
         httpStatus: 422,

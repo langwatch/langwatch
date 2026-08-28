@@ -37,10 +37,30 @@
  */
 
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { createHash } from "crypto";
-import { PROVENANCE_ATTR_SOURCE } from "../ingestKeyProvenance.utils";
+import {
+  assembleTraceRequest,
+  type ConversationRoutingProfile,
+  type ConversationSeeds,
+  deriveConversationIdentity,
+  hashId,
+  intAttr,
+  KNOWN_AGENT_IDENTITIES,
+  type KnownAgentIdentity,
+  msToNano,
+  type OtlpJsonAttr,
+  type OtlpJsonSpan,
+  originAttrs,
+  type RoutingOrigin,
+  stringAttr,
+} from "./conversationTraceAssembly";
 import { TERMINAL_MESSAGE_STATUSES } from "./databricksGenie.puller";
 import type { NormalizedPullEvent } from "./pullerAdapter";
+
+export {
+  type ConversationRoutingProfile,
+  KNOWN_AGENT_IDENTITIES,
+  type KnownAgentIdentity,
+};
 
 /** Root span (the turn itself, `llm`-typed so the estimator runs). */
 export const GENIE_MESSAGE_SPAN_NAME = "databricks_genie.message" as const;
@@ -58,49 +78,12 @@ export const GENIE_AGENT_MODEL = "databricks/genie" as const;
 /** The action Genie's own profile counts as a conversation. */
 export const GENIE_QUERY_ACTION = "genie_query" as const;
 
-/**
- * Every agent a routing profile is allowed to name.
- *
- * Decision 14(d) rests on the agent identity never resolving in the pricing
- * table, which held for free while it was one constant nobody outside this
- * file could reach. Now that a profile carries it, a free-form string would
- * hand that property away: a source naming `openai/gpt-4o` would put a real
- * price on a conversation nobody was charged for. Keeping the set closed
- * moves the question to review time — adding an agent here is the moment to
- * check the name cannot match a price.
- */
-export const KNOWN_AGENT_IDENTITIES = [
-  GENIE_AGENT_MODEL,
-  "microsoft/copilot-studio",
-] as const;
-
-export type KnownAgentIdentity = (typeof KNOWN_AGENT_IDENTITIES)[number];
-
-/**
- * What one source contributes to the shape of a routed conversation.
- *
- * These four were Databricks constants while Genie was the only source that
- * routed. They travel with the source now so a second source's conversations
- * are not filed under a product the customer does not have — and, in the case
- * of `conversationAction`, so that one source's events can never be rendered
- * as another's.
- */
-export interface ConversationRoutingProfile {
-  /** The puller action that marks an event as a conversation to route. */
-  conversationAction: string;
-  /** Product label for the agent that answered. Never a priced model. */
-  agentModel: KnownAgentIdentity;
-  /** Value of `langwatch.source` — where this conversation came from. */
-  provenanceSource: string;
-  /** OTLP scope name for the batch this source produces. */
-  scopeName: string;
-}
-
 export const GENIE_ROUTING_PROFILE: ConversationRoutingProfile = {
   conversationAction: GENIE_QUERY_ACTION,
   agentModel: GENIE_AGENT_MODEL,
   provenanceSource: GENIE_PROVENANCE_SOURCE,
   scopeName: "langwatch.ingestion.databricks_genie",
+  identityNamespace: "genie",
 };
 
 /**
@@ -168,31 +151,6 @@ function toMs(value: number | null | undefined): number | null {
   return value < MS_THRESHOLD ? value * 1000 : value;
 }
 
-function msToNano(ms: number): string {
-  return `${Math.round(ms)}000000`;
-}
-
-/** 16-byte trace id / 8-byte span id, hex, derived from stable coordinates. */
-function hashId(material: string, hexLength: 32 | 16): string {
-  return createHash("sha256")
-    .update(material)
-    .digest("hex")
-    .slice(0, hexLength);
-}
-
-type OtlpJsonAttr = {
-  key: string;
-  value: { stringValue?: string; intValue?: number };
-};
-
-function stringAttr(key: string, value: string): OtlpJsonAttr {
-  return { key, value: { stringValue: value } };
-}
-
-function intAttr(key: string, value: number): OtlpJsonAttr {
-  return { key, value: { intValue: value } };
-}
-
 /**
  * Flatten the query thoughts into one reasoning text, UNDERSTANDING →
  * DATA_SOURCING → STEPS, unknown types appended in arrival order rather
@@ -228,31 +186,8 @@ export function flattenThoughts(
   return [...known, ...unknown].join("\n\n");
 }
 
-/**
- * The context the mapper stamps as receiver-authoritative origin. Matches
- * the push-mode receiver's `stampOriginAttrs` keys so the governance fold
- * and OCSF projections filter routed traces exactly like pushed ones.
- */
-export interface GenieRoutingOrigin {
-  ingestionSourceId: string;
-  organizationId: string;
-  sourceType: string;
-  /** What this source contributes to the conversations it routes. */
-  profile: ConversationRoutingProfile;
-}
-
-function originAttrs(origin: GenieRoutingOrigin) {
-  return [
-    stringAttr("langwatch.origin.kind", "ingestion_source"),
-    stringAttr("langwatch.ingestion_source.id", origin.ingestionSourceId),
-    stringAttr(
-      "langwatch.ingestion_source.organization_id",
-      origin.organizationId,
-    ),
-    stringAttr("langwatch.ingestion_source.source_type", origin.sourceType),
-    stringAttr(PROVENANCE_ATTR_SOURCE, origin.profile.provenanceSource),
-  ];
-}
+/** Kept as a name existing callers already import. */
+export type GenieRoutingOrigin = RoutingOrigin;
 
 function parsePayload(event: NormalizedPullEvent): GenieMessagePayload {
   try {
@@ -301,27 +236,8 @@ export function mapGenieEventsToTraceRequest({
     .filter((event) => !!event.action && event.action === wanted)
     .filter((event) => isSettledForRouting(event))
     .flatMap((event) => mapMessage(event, origin));
-  if (spans.length === 0) return null;
-  return {
-    resourceSpans: [
-      {
-        resource: { attributes: [], droppedAttributesCount: 0 },
-        scopeSpans: [
-          {
-            scope: { name: origin.profile.scopeName },
-            spans,
-          },
-        ],
-      },
-    ],
-  } as IExportTraceServiceRequest;
+  return assembleTraceRequest(spans, origin.profile);
 }
-
-// The OTLP span shape assembled here is validated downstream by
-// `spanSchema` (schemas/otlp.ts); typing as the transformer interface would
-// force protobuf-flavored fields (Uint8Array ids) the JSON path doesn't use.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OtlpJsonSpan = any;
 
 /** Identity, timing, status, and origin derived once per message. */
 interface GenieMessageFrame {
@@ -383,18 +299,19 @@ function frameOf(
     payload.auto_regenerate_count > 0
       ? payload.auto_regenerate_count
       : 0;
-  // Every derived identity is namespaced by the ingestion source.
+  // Which fields name what; the shared assembly namespaces and hashes them.
   //
-  // `conversation_id` and `message_id` are unique WITHIN a Genie workspace, and
-  // one destination project can receive pulls from more than one source. Two
-  // sources are two independent identifier domains, so an unqualified seed
-  // gambles on their values never meeting — and the failure is silent in all
-  // three directions: equal span ids dedupe the second conversation away at
-  // `tenant:trace:span` (first write wins, permanently — the Redis gate is only
-  // the fast path), and an equal thread id interleaves two workspaces' turns
-  // into one rendered conversation.
-  const identityNamespace = `genie:${origin.ingestionSourceId}`;
-  const spanSeed = `${identityNamespace}:${conversationId}:${messageId}:${regenCount}`;
+  // A Genie trace is one question and its answer, so a message id is part of
+  // naming the trace. A thread is the conversation those questions belong to.
+  // A span additionally carries the regeneration count, so a regenerated
+  // answer becomes a new attempt under the same trace rather than overwriting
+  // the first one.
+  const seeds: ConversationSeeds = {
+    trace: [conversationId, messageId],
+    thread: [conversationId],
+    span: [conversationId, messageId, regenCount],
+  };
+  const identity = deriveConversationIdentity(origin, seeds);
   // Both timestamp sources can be garbage (mapToOcsfRow guards the same
   // field). NaN here would serialize as "NaN000000" and fail spanSchema,
   // dropping the whole conversation — degrade to pull time instead.
@@ -409,10 +326,10 @@ function frameOf(
     conversationId,
     messageId,
     regenCount,
-    traceId: hashId(`${identityNamespace}:${conversationId}:${messageId}`, 32),
-    threadId: `${origin.ingestionSourceId}:${conversationId}`,
-    spanSeed,
-    rootSpanId: hashId(`${spanSeed}:root`, 16),
+    traceId: identity.traceId,
+    threadId: identity.threadId,
+    spanSeed: identity.spanSeed,
+    rootSpanId: identity.rootSpanId,
     startMs,
     endMs: Math.max(toMs(payload.last_updated_timestamp) ?? startMs, startMs),
     status,
@@ -461,26 +378,35 @@ function rootAttributesOf(
   const reasoning = flattenThoughts(attachments);
   if (reasoning) assistantMessage.reasoning_content = reasoning;
   return [
-    stringAttr("langwatch.span.type", "llm"),
-    stringAttr("langwatch.thread.id", frame.threadId),
-    stringAttr(
-      "langwatch.input",
-      JSON.stringify({
+    stringAttr({ key: "langwatch.span.type", value: "llm" }),
+    stringAttr({ key: "langwatch.thread.id", value: frame.threadId }),
+    stringAttr({
+      key: "langwatch.input",
+      value: JSON.stringify({
         type: "chat_messages",
         value: [{ role: "user", content: question }],
       }),
-    ),
-    stringAttr(
-      "langwatch.output",
-      JSON.stringify({ type: "chat_messages", value: [assistantMessage] }),
-    ),
+    }),
+    stringAttr({
+      key: "langwatch.output",
+      value: JSON.stringify({
+        type: "chat_messages",
+        value: [assistantMessage],
+      }),
+    }),
     // Agent identity, not a priced model (Decision 14(d) pins no price match).
     // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
     // true — at compile time only. Every profile is a code literal the
     // compiler checks, so nothing re-checks this at runtime.
-    stringAttr("gen_ai.request.model", frame.origin.profile.agentModel),
-    stringAttr("databricks.genie.message_id", frame.messageId),
-    stringAttr("databricks.genie.conversation_id", frame.conversationId),
+    stringAttr({
+      key: "gen_ai.request.model",
+      value: frame.origin.profile.agentModel,
+    }),
+    stringAttr({ key: "databricks.genie.message_id", value: frame.messageId }),
+    stringAttr({
+      key: "databricks.genie.conversation_id",
+      value: frame.conversationId,
+    }),
     ...originAttrs(frame.origin),
     ...optionalRootAttributes(event, frame),
   ];
@@ -498,18 +424,26 @@ function optionalRootAttributes(
     frame.payload.user_id != null
       ? String(frame.payload.user_id)
       : extraString(event, "actorUserId");
-  if (rawUserId) attributes.push(stringAttr("langwatch.user.id", rawUserId));
+  if (rawUserId)
+    attributes.push(stringAttr({ key: "langwatch.user.id", value: rawUserId }));
   if (frame.status) {
-    attributes.push(stringAttr("databricks.genie.status", frame.status));
+    attributes.push(
+      stringAttr({ key: "databricks.genie.status", value: frame.status }),
+    );
   }
   if (frame.regenCount > 0) {
     attributes.push(
-      intAttr("databricks.genie.auto_regenerate_count", frame.regenCount),
+      intAttr({
+        key: "databricks.genie.auto_regenerate_count",
+        value: frame.regenCount,
+      }),
     );
   }
   const spaceId = extraString(event, "spaceId");
   if (spaceId) {
-    attributes.push(stringAttr("databricks.genie.space_id", spaceId));
+    attributes.push(
+      stringAttr({ key: "databricks.genie.space_id", value: spaceId }),
+    );
   }
   const statementIds = queryAttachmentsOf(attachments)
     .map((attachment) => attachment.query?.statement_id)
@@ -518,10 +452,10 @@ function optionalRootAttributes(
     // ALL statement ids (Decision 12): the display-time join key to the
     // warehouse spend ledger — a multi-statement answer never undercounts.
     attributes.push(
-      stringAttr(
-        "databricks.genie.statement_ids",
-        JSON.stringify(statementIds),
-      ),
+      stringAttr({
+        key: "databricks.genie.statement_ids",
+        value: JSON.stringify(statementIds),
+      }),
     );
   }
   const vizPointers = attachments
@@ -530,10 +464,10 @@ function optionalRootAttributes(
   if (vizPointers.length > 0) {
     // A pointer, not chart data — stored, never rendered (Decision 12).
     attributes.push(
-      stringAttr(
-        "databricks.genie.viz_query_attachment_ids",
-        JSON.stringify(vizPointers),
-      ),
+      stringAttr({
+        key: "databricks.genie.viz_query_attachment_ids",
+        value: JSON.stringify(vizPointers),
+      }),
     );
   }
   // `suggested_questions` are deliberately never read: Genie's offered
@@ -564,14 +498,19 @@ function queryStepSpan(
   // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
   // and lands at `params.langwatch.params.*`, where no reader looks.
   const stepAttrs = [
-    stringAttr("tool_name", attachment.query?.description || "SQL query"),
-    stringAttr("full_command", attachment.query?.query ?? ""),
+    stringAttr({
+      key: "tool_name",
+      value: attachment.query?.description || "SQL query",
+    }),
+    stringAttr({ key: "full_command", value: attachment.query?.query ?? "" }),
   ];
   if (attachment.query?.statement_id) {
-    stepAttrs.push(stringAttr("statement_id", attachment.query.statement_id));
+    stepAttrs.push(
+      stringAttr({ key: "statement_id", value: attachment.query.statement_id }),
+    );
   }
   if (typeof rowCount === "number") {
-    stepAttrs.push(intAttr("row_count", rowCount));
+    stepAttrs.push(intAttr({ key: "row_count", value: rowCount }));
   }
   return {
     traceId: frame.traceId,
@@ -582,7 +521,7 @@ function queryStepSpan(
     startTimeUnixNano: msToNano(frame.startMs),
     endTimeUnixNano: msToNano(frame.endMs),
     attributes: [
-      stringAttr("langwatch.span.type", "tool"),
+      stringAttr({ key: "langwatch.span.type", value: "tool" }),
       ...stepAttrs,
       ...originAttrs(frame.origin),
     ],

@@ -208,6 +208,11 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "suite", plural: "suites" },
   },
+  "run-plan": {
+    surface: "simulations",
+    digestStrategy: "id-ref",
+    noun: { singular: "run plan", plural: "run plans" },
+  },
   prompt: {
     surface: "prompts",
     digestStrategy: "id-ref",

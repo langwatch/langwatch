@@ -50,7 +50,7 @@ Connect my agent to LangWatch simulations
 You are using LangWatch for your AI agent project. Follow these instructions.
 
 IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
-Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
 # Connect Your Agent to LangWatch Simulations
 
@@ -196,28 +196,31 @@ The body template renders as a Liquid template on every turn. The URL and header
 | `{{ params.NAME }}` | A run parameter the scenario declares |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
 
-Then create one scenario about something this agent really handles, pair it with the agent in a suite, and run it:
+Then create a test suite, create one scenario about something this agent really handles, file it into the suite, and run the suite against the agent:
 
 ```bash
+langwatch suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --folder 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch suite run 'Smoke' --target http:<agent-id> --wait
 ```
 
 - Write the situation and criteria from the agent's real behavior in this codebase, not from the example above. Include at least one criterion about a tool call or a lookup, which the judge verifies against the traces from Step 4.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma; rephrase instead.
-- `--targets` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config.
+- `--folder` files the scenario into a test suite that already exists, by name or by id. Create the suite first.
+- `--target` takes `http:<agent-id>` where `<agent-id>` is the id `langwatch agent create` returned (also in `langwatch agent list --format json`). It is never a URL; the URL lives in the agent's config. Repeat `--target` for a second agent or prompt.
+- The run goes under the run plan named after the suite and the target. A later run of the same pair joins the same history, so the pass rate over time is readable in **Agent Testing > Results**.
 - `--wait` blocks until the run finishes and exits non-zero when it fails. Use it here: the report in Step 7 needs the result.
 
 ## Step 7: Report the result
 
 Report to the user:
 
-- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the same path on their own instance when self-hosted).
+- The Agent Testing page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/agent-testing`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
@@ -252,8 +255,8 @@ How to handle:
 - Do NOT skip trace adoption because the endpoint "already returns the answer". The reply text cannot prove a tool call happened; the trace can.
 - Do NOT append a list of tools used to the response text so the judge can "see" them. That grades a self-report instead of evidence; adopt `traceparent` and the trace carries the real calls.
 - Do NOT point the agent's tracing at a different LangWatch project than the one running the scenarios. The judge finds nothing there.
-- Do NOT invent an agent id or pass a URL as the suite target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
-- Do NOT comma-separate `--targets` on `suite create`. It is space-separated and variadic; `--scenarios` is the comma-separated one.
+- Do NOT invent an agent id or pass a URL as the run target. `http:` is followed by the Agent id from `langwatch agent create` or `langwatch agent list --format json`.
+- Do NOT pass `--folder` a suite the project does not hold. The command refuses it; create the suite first with `langwatch suite create`.
 - Do NOT guess the deployment URL or quietly default to localhost. Step 5 is a question for the user; ask and wait.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
 ````
@@ -314,13 +317,13 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs nothing else.
+For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 <Tabs>
   <Tab title="Python">
@@ -384,21 +387,24 @@ langwatch agent create 'My Agent' --type http --config '{
 }'
 ```
 
-Then create a scenario, pair it with the agent in a suite, and run it:
+Then create a scenario, file it into a test suite, and run the suite against the agent:
 
 ```bash
+langwatch suite create 'Smoke'
+
 langwatch scenario create 'Order status question' \
   --situation "A customer asks about the status of a recent order" \
-  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate"
+  --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
+  --folder 'Smoke'
 
-langwatch suite create 'Smoke' --scenarios <scenario-id> --targets http:<agent-id>
-
-langwatch suite run <suite-id> --wait
+langwatch suite run 'Smoke' --target http:<agent-id> --wait
 ```
+
+`--folder` files the scenario into a test suite that exists, by name or by id. The run goes under the run plan named after the suite and the target, so the next run of the same pair joins the same history.
 
 ## 6. Verify the run
 
-Open the run in the **Simulations** section of your project. A connected setup shows:
+Open the run in **Agent Testing > Results**. A connected setup shows:
 
 - The conversation transcript, with the reply text your `outputPath` extracted.
 - A trace link on each turn in the run detail, opening the agent's own spans for that turn.

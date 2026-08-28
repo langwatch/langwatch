@@ -289,6 +289,27 @@ export class ScenarioRepository {
   }
 
   /**
+   * The names of the given scenarios, archived ones left out.
+   *
+   * A folder's detail view reads its members through this: the folder's
+   * `scenarioIds` cache holds active members, and an archived folder keeps a
+   * snapshot that may name cases archived since, which the view must not show.
+   */
+  async findActiveNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.scenario.findMany({
+      where: {
+        id: { in: input.ids },
+        projectId: input.projectId,
+        archivedAt: null,
+      },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
    * Find everything a run needs to know about a scenario before scheduling it:
    * its name for the queued row, the parameters it declares, and the text those
    * parameters are rendered into.

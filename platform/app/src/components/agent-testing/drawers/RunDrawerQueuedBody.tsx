@@ -2,7 +2,7 @@
  * What the run drawer reads while the run has no state yet: queued, or the
  * read that failed.
  *
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
  */
 
 import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";

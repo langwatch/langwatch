@@ -6,7 +6,7 @@ import type { CommandResult } from "../../../utils/output";
 import { createCliScenariosService } from "../cli-scenarios-service";
 
 /**
- * One saved version of a test case, with the content it saved.
+ * One saved version of a scenario, with the content it saved.
  *
  * @see specs/scenarios/scenario-versioning.feature
  */

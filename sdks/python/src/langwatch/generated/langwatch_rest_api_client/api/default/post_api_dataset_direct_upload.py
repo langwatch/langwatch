@@ -38,7 +38,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Start a direct browser→S3 dataset upload (returns a presigned PUT)
 
@@ -61,7 +61,7 @@ def sync_detailed(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Start a direct browser→S3 dataset upload (returns a presigned PUT)
 

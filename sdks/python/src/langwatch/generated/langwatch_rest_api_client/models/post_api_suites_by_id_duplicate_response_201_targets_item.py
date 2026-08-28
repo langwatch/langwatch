@@ -17,8 +17,8 @@ T = TypeVar("T", bound="PostApiSuitesByIdDuplicateResponse201TargetsItem")
 class PostApiSuitesByIdDuplicateResponse201TargetsItem:
     """
     Attributes:
-        type_ (PostApiSuitesByIdDuplicateResponse201TargetsItemType):
-        reference_id (str):
+        type_ (PostApiSuitesByIdDuplicateResponse201TargetsItemType): What kind of thing the scenarios run against.
+        reference_id (str): The id of the prompt, agent or workflow to run against.
     """
 
     type_: PostApiSuitesByIdDuplicateResponse201TargetsItemType

@@ -9,7 +9,7 @@ Feature: A run records the test case version it used
     run says.
 
     The version is recorded the same way for a run started from a test suite,
-    from a custom run plan, and for a one-off run of a single case.
+    from a custom run plan, and for a run of a single case.
 
     How versions are made is in specs/scenarios/scenario-versioning.feature.
 
@@ -23,9 +23,9 @@ Feature: A run records the test case version it used
     And the run of the second case records version 7
 
   @integration
-  Scenario: A one-off run of a single case records that case version
+  Scenario: A single-case run records that case version
     Given a test case at version 5
-    When Run is chosen on its row and a target is confirmed
+    When a run of that case is started against a target
     Then the run records version 5
 
   @integration
@@ -65,8 +65,8 @@ Feature: A run records the test case version it used
   # --- The target reference on the same record ---
 
   @unit
-  Scenario: A one-off run records which target it ran against
-    Given a one-off run against an HTTP agent
+  Scenario: A single-case run records which target it ran against
+    Given a single-case run against an HTTP agent
     When the run is queued
     Then the run records the target it ran against and the kind of that target
 

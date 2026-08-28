@@ -35,6 +35,10 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
         timestamp (float):
         updated_at (float):
         duration_in_ms (float):
+        note (None | str): One short line saying why the run was started, as given when it was queued. Null on a run
+            started without one.
+        scenario_version (int | None): The version of the scenario at the moment the run was queued. Null on runs
+            recorded before versions existed.
         platform_url (str):
         total_cost (float | Unset):
     """
@@ -50,6 +54,8 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
     timestamp: float
     updated_at: float
     duration_in_ms: float
+    note: None | str
+    scenario_version: int | None
     platform_url: str
     total_cost: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -90,6 +96,12 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         duration_in_ms = self.duration_in_ms
 
+        note: None | str
+        note = self.note
+
+        scenario_version: int | None
+        scenario_version = self.scenario_version
+
         platform_url = self.platform_url
 
         total_cost = self.total_cost
@@ -109,6 +121,8 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
                 "timestamp": timestamp,
                 "updatedAt": updated_at,
                 "durationInMs": duration_in_ms,
+                "note": note,
+                "scenarioVersion": scenario_version,
                 "platformUrl": platform_url,
             }
         )
@@ -177,6 +191,20 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         duration_in_ms = d.pop("durationInMs")
 
+        def _parse_note(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        note = _parse_note(d.pop("note"))
+
+        def _parse_scenario_version(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        scenario_version = _parse_scenario_version(d.pop("scenarioVersion"))
+
         platform_url = d.pop("platformUrl")
 
         total_cost = d.pop("totalCost", UNSET)
@@ -193,6 +221,8 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
             timestamp=timestamp,
             updated_at=updated_at,
             duration_in_ms=duration_in_ms,
+            note=note,
+            scenario_version=scenario_version,
             platform_url=platform_url,
             total_cost=total_cost,
         )

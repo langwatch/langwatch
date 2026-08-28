@@ -1,5 +1,5 @@
 /**
- * The parts of the test case dialog: its heading, the four questions it asks,
+ * The parts of the scenario dialog: its heading, the four questions it asks,
  * the blocks its chips open, and the line of actions at its foot.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -21,7 +21,7 @@ import {
 import { Play } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
-import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
 import { CustomizeChips } from "../shared/CustomizeChips";
@@ -53,16 +53,16 @@ export function CaseModalHeader({
   openHistoryOnOpen?: boolean;
 }) {
   return (
-    <Dialog.Header
+    <Drawer.Header
       borderBottomWidth="1px"
       borderColor="border"
       paddingX={5}
       paddingY={3.5}
       display="block"
     >
-      <Dialog.Title fontSize="14px" fontWeight="semibold">
-        {isEditing ? "Edit test case" : "New test case"}
-      </Dialog.Title>
+      <Drawer.Title fontSize="14px" fontWeight="semibold">
+        {isEditing ? "Edit scenario" : "New scenario"}
+      </Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
@@ -73,8 +73,8 @@ export function CaseModalHeader({
           initialOpen={openHistoryOnOpen}
         />
       )}
-      <Dialog.CloseTrigger />
-    </Dialog.Header>
+      <Drawer.CloseTrigger />
+    </Drawer.Header>
   );
 }
 
@@ -127,7 +127,7 @@ function TitleAndSuiteRow({
 }
 
 /** What the user is trying to do, and what the judge must check. */
-function SituationAndRubrics({
+function SituationAndCriteria({
   draft,
   setDraft,
 }: {
@@ -150,17 +150,17 @@ function SituationAndRubrics({
       </Box>
 
       <Box>
-        <FieldLabel>Rubrics · one per line</FieldLabel>
+        <FieldLabel>Criteria · one per line</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
           rows={4}
           resize="none"
-          aria-label="Rubrics"
+          aria-label="Criteria"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
           }
-          value={draft.rubrics}
-          onChange={(event) => setDraft({ rubrics: event.target.value })}
+          value={draft.criteria}
+          onChange={(event) => setDraft({ criteria: event.target.value })}
         />
         <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
           The judge scores each line as pass or fail on the finished
@@ -220,7 +220,7 @@ export function CaseModalFields({
   if (editor.isLoading) return <CaseModalSkeleton />;
 
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" gap={4} minHeight="full">
       {editor.staleVersion !== null && (
         <StaleVersionNotice
           currentVersion={editor.staleVersion}
@@ -228,8 +228,13 @@ export function CaseModalFields({
         />
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
-      <SituationAndRubrics draft={draft} setDraft={setDraft} />
-      <CustomizeSection editor={editor} />
+      <SituationAndCriteria draft={draft} setDraft={setDraft} />
+      {/* The chip row sits pinned to the bottom of the scroll area, so the
+          gap between the last question and the footer belongs to it, not to
+          empty space. */}
+      <Box marginTop="auto">
+        <CustomizeSection editor={editor} />
+      </Box>
     </VStack>
   );
 }
@@ -239,7 +244,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft } = editor;
 
   return (
-    <Dialog.Footer
+    <Drawer.Footer
       borderTopWidth="1px"
       borderColor="border"
       paddingX={5}
@@ -286,7 +291,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
           Save &amp; Run
         </SmallButton>
       </HStack>
-    </Dialog.Footer>
+    </Drawer.Footer>
   );
 }
 
@@ -418,7 +423,7 @@ function CustomizeSection({ editor }: { editor: CaseEditorState }) {
         />
       )}
       <CustomizeChips
-        title="Customize test case"
+        title="Customize scenario"
         chips={customize.chips}
         testId="customize-case-chips"
       />
@@ -457,7 +462,7 @@ function StaleVersionNotice({
       data-testid="scenario-stale-version"
     >
       <Text fontSize="13px" fontWeight="medium">
-        This test case changed since it was opened
+        This scenario changed since it was opened
       </Text>
       <Text fontSize="11.5px" color={FG_MUTED}>
         Somebody else saved{" "}

@@ -1,14 +1,18 @@
 /**
- * The table of test cases: the name, the labels and the last result, with a
+ * The table of scenarios of the open suite: the name and the labels, with a
  * Run button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
  * without a vertical rule between them, so a long list of cases reads as a
  * list of names rather than as a spreadsheet.
  *
- * In All test cases the rows sit under their test suite, unfiled cases last.
- * Under one suite the rows are flat, and the time and the cost of the last run
- * read beside the verdict.
+ * The table carries no last result: authoring stays here and results live on
+ * the Results tab. A person who wants the last run of a row reaches it from
+ * the row menu.
+ *
+ * A row carries no Edit button. Clicking the row opens the editor and Edit
+ * stays in the row menu, so the editor is reachable two ways without a third
+ * control on every line.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -17,6 +21,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   chakra,
   HStack,
   Skeleton,
@@ -25,57 +30,43 @@ import {
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical } from "lucide-react";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
-import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
-import { FolderHeaderRow } from "../shared/FolderHeaderRow";
-import { LastResultLabel } from "../shared/LastResultLabel";
-import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { MenuActionLabel } from "./MenuActionLabel";
 import { RunCaseButton } from "./RunCaseButton";
-import {
-  type CaseGroup,
-  criteriaOf,
-  summaryFromLastResults,
-  type TestCase,
-  type TestSuiteEntry,
-  UNFILED_GROUP_ID,
-} from "./test-cases";
+import type { TestCase } from "./test-cases";
 
 /** The last result of a case, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
- * The columns of the table. Under one suite the last result column carries the
- * time and the cost as well, so it is wider there.
+ * The columns of the table: the case name takes the free space, the row
+ * actions take what they need on the right. A checkbox column is added at
+ * the start of every row when the table is in selection mode.
  */
-const WIDE_COLUMNS = "minmax(0,1fr) 290px 112px";
-const NARROW_COLUMNS = "minmax(0,1fr) 170px 112px";
+const BASE_COLUMNS = "minmax(0,1fr) auto";
+const CHECKBOX_COLUMN = "24px";
 /** A set that runs from code has no controls, and a last run column instead. */
-const EXTERNAL_COLUMNS = "minmax(0,1fr) 290px 110px";
+const EXTERNAL_COLUMNS = "minmax(0,1fr) 110px";
 
 export type CasesTableProps = {
-  groups: CaseGroup[];
-  /** True in All test cases, where each suite heads its own rows. */
-  showGroupHeadings: boolean;
-  lastResults: Map<string, CaseLastResult>;
-  /** True while the last-result cells are still on their way. */
-  isLastResultsLoading: boolean;
-  /** The test suites a case can be moved into. */
-  suites: TestSuiteEntry[];
+  /** The scenarios of the open suite, in order. */
+  cases: TestCase[];
   canManage: boolean;
-  runningCaseId?: string | null;
-  onSelectSuite: (suiteId: string) => void;
+  /** True when the table shows checkboxes for a bulk move-to-suite. */
+  isSelectionMode: boolean;
+  selectedIds: Set<string>;
+  hasLastRunByCase: (scenarioId: string) => boolean;
+  onToggleSelected: (scenarioId: string) => void;
+  /** Enters selection mode with this row pre-checked. */
+  onStartMoveToSuite: (scenarioId: string) => void;
   onRowClick: (testCase: TestCase) => void;
   /** Opens the run dialog for the case. */
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  /** Opens the version history drawer of the case. */
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 };
@@ -127,139 +118,103 @@ function TableHeaderRow({
 }
 
 export function CasesTable({
-  groups,
-  showGroupHeadings,
-  lastResults,
-  isLastResultsLoading,
-  suites,
+  cases,
   canManage,
-  runningCaseId,
-  onSelectSuite,
+  isSelectionMode,
+  selectedIds,
+  hasLastRunByCase,
+  onToggleSelected,
+  onStartMoveToSuite,
   onRowClick,
   onRunCase,
   onEdit,
-  onHistory,
   onDuplicate,
-  onMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
-  const templateColumns = showGroupHeadings ? NARROW_COLUMNS : WIDE_COLUMNS;
+  const templateColumns = isSelectionMode
+    ? `${CHECKBOX_COLUMN} ${BASE_COLUMNS}`
+    : BASE_COLUMNS;
 
   return (
     <TableCard data-testid="agent-testing-cases-table">
       <TableHeaderRow templateColumns={templateColumns}>
-        <Text as="span">Test case</Text>
-        <Text as="span">Last result</Text>
+        {isSelectionMode && <Text as="span" />}
+        <Text as="span">Scenario</Text>
         <Text as="span" />
       </TableHeaderRow>
 
-      {groups.map((group, index) => (
-        <Box key={group.id}>
-          {showGroupHeadings && (
-            <FolderHeaderRow
-              name={group.name}
-              caseCount={group.cases.length}
-              templateColumns={templateColumns}
-              aggregateSpan={2}
-              separated={index > 0}
-              onClick={
-                group.id === UNFILED_GROUP_ID
-                  ? undefined
-                  : () => onSelectSuite(group.id)
-              }
-            >
-              <GroupAggregate group={group} lastResults={lastResults} />
-            </FolderHeaderRow>
-          )}
-          <Box
-            css={{
-              "& > * + *": {
-                borderTopWidth: "1px",
-                borderTopColor: "var(--chakra-colors-border-muted)",
-              },
-            }}
-          >
-            {group.cases.map((testCase) => (
-              <CaseRow
-                key={testCase.id}
-                testCase={testCase}
-                templateColumns={templateColumns}
-                lastResult={lastResults.get(testCase.id)}
-                isLastResultsLoading={isLastResultsLoading}
-                showMetricsInline={!showGroupHeadings}
-                suites={suites}
-                canManage={canManage}
-                isRunning={runningCaseId === testCase.id}
-                onRowClick={onRowClick}
-                onRunCase={onRunCase}
-                onEdit={onEdit}
-                onHistory={onHistory}
-                onDuplicate={onDuplicate}
-                onMoveToSuite={onMoveToSuite}
-                onOpenLastRun={onOpenLastRun}
-                onArchive={onArchive}
-              />
-            ))}
-          </Box>
-        </Box>
-      ))}
+      <Box
+        css={{
+          "& > * + *": {
+            borderTopWidth: "1px",
+            borderTopColor: "var(--chakra-colors-border-muted)",
+          },
+        }}
+      >
+        {cases.map((testCase) => (
+          <CaseRow
+            key={testCase.id}
+            testCase={testCase}
+            templateColumns={templateColumns}
+            canManage={canManage}
+            hasLastRun={hasLastRunByCase(testCase.id)}
+            isSelectionMode={isSelectionMode}
+            isSelected={selectedIds.has(testCase.id)}
+            onToggleSelected={onToggleSelected}
+            onStartMoveToSuite={onStartMoveToSuite}
+            onRowClick={onRowClick}
+            onRunCase={onRunCase}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            onOpenLastRun={onOpenLastRun}
+            onArchive={onArchive}
+          />
+        ))}
+      </Box>
     </TableCard>
   );
-}
-
-/** How the last run of a whole group went, beside its name. */
-function GroupAggregate({
-  group,
-  lastResults,
-}: {
-  group: CaseGroup;
-  lastResults: Map<string, CaseLastResult>;
-}) {
-  const groupResults = group.cases
-    .map((testCase) => lastResults.get(testCase.id))
-    .filter((result): result is CaseLastResult => !!result);
-
-  if (groupResults.length === 0) return null;
-
-  return <RunMetricsSummary summary={summaryFromLastResults(groupResults)} />;
 }
 
 function CaseRow({
   testCase,
   templateColumns,
-  lastResult,
-  isLastResultsLoading,
-  showMetricsInline,
-  suites,
   canManage,
-  isRunning,
+  hasLastRun,
+  isSelectionMode,
+  isSelected,
+  onToggleSelected,
+  onStartMoveToSuite,
   onRowClick,
   onRunCase,
   onEdit,
-  onHistory,
   onDuplicate,
-  onMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
   templateColumns: string;
-  lastResult?: CaseLastResult;
-  isLastResultsLoading: boolean;
-  showMetricsInline: boolean;
-  suites: TestSuiteEntry[];
   canManage: boolean;
-  isRunning: boolean;
+  hasLastRun: boolean;
+  isSelectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelected: (scenarioId: string) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
   onRowClick: (testCase: TestCase) => void;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
+  const handleRowClick = () => {
+    if (isSelectionMode) {
+      onToggleSelected(testCase.id);
+      return;
+    }
+    onRowClick(testCase);
+  };
+
   return (
     <Box
       display="grid"
@@ -270,9 +225,22 @@ function CaseRow({
       paddingY="10px"
       cursor="pointer"
       _hover={{ background: ROW_HOVER_BG }}
-      onClick={() => onRowClick(testCase)}
+      onClick={handleRowClick}
       data-testid={`case-row-${testCase.name}`}
     >
+      {isSelectionMode && (
+        <Box onClick={(event) => event.stopPropagation()}>
+          <Checkbox.Root
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelected(testCase.id)}
+            aria-label={`Select ${testCase.name}`}
+            data-testid={`case-row-${testCase.name}-checkbox`}
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+          </Checkbox.Root>
+        </Box>
+      )}
       <HStack gap={1.5} minWidth={0} flexWrap="wrap">
         <chakra.button
           type="button"
@@ -291,158 +259,84 @@ function CaseRow({
         <TagList labels={testCase.labels} tone="pastel" />
       </HStack>
 
-      <LastResultCell
-        lastResult={lastResult}
-        isLoading={isLastResultsLoading}
-        showMetricsInline={showMetricsInline}
+      <CaseRowActions
+        testCase={testCase}
+        canManage={canManage}
+        hasLastRun={hasLastRun}
+        onRunCase={onRunCase}
+        onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onStartMoveToSuite={onStartMoveToSuite}
+        onOpenLastRun={onOpenLastRun}
+        onArchive={onArchive}
       />
-
-      <HStack
-        gap={1}
-        justify="flex-end"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {canManage && (
-          <RunCaseButton
-            caseName={testCase.name}
-            isRunning={isRunning}
-            onOpen={() => onRunCase(testCase)}
-          />
-        )}
-        <CaseRowActionsMenu
-          testCase={testCase}
-          suites={suites}
-          canManage={canManage}
-          hasLastRun={!!lastResult}
-          onEdit={onEdit}
-          onHistory={onHistory}
-          onDuplicate={onDuplicate}
-          onMoveToSuite={onMoveToSuite}
-          onOpenLastRun={onOpenLastRun}
-          onArchive={onArchive}
-        />
-      </HStack>
     </Box>
   );
 }
 
-/**
- * What the last run of a case said. Empty while the results are on their way,
- * so the rows are drawn before the verdicts arrive.
- *
- * Under one test suite the time and the cost read beside the verdict. In All
- * test cases the column is narrower, so they read on hover instead.
- */
-function LastResultCell({
-  lastResult,
-  isLoading,
-  showMetricsInline,
-}: {
-  lastResult?: CaseLastResult;
-  isLoading: boolean;
-  showMetricsInline: boolean;
-}) {
-  if (!lastResult) {
-    if (isLoading) return <Skeleton height="16px" width="90px" />;
-    return <Box data-testid="last-result-empty" />;
-  }
-
-  const label = (
-    <LastResultLabel
-      status={lastResult.status}
-      results={criteriaOf(lastResult)}
-    />
-  );
-  const metrics = (
-    <ResultMetricsInline
-      durationInMs={lastResult.durationInMs}
-      totalCost={lastResult.totalCost}
-    />
-  );
-  const hasMetrics =
-    typeof lastResult.durationInMs === "number" ||
-    typeof lastResult.totalCost === "number";
-
-  if (showMetricsInline) {
-    return (
-      <HStack gap={2.5} minWidth={0}>
-        {label}
-        {metrics}
-      </HStack>
-    );
-  }
-
-  return (
-    <Tooltip content={metrics} disabled={!hasMetrics}>
-      <HStack gap={2.5} minWidth={0}>
-        {label}
-      </HStack>
-    </Tooltip>
-  );
-}
-
-/** The submenu that files a case under one of the test suites, or under none. */
-function MoveToSuiteSubmenu({
+function CaseRowActions({
   testCase,
-  suites,
-  onMoveToSuite,
+  canManage,
+  hasLastRun,
+  onRunCase,
+  onEdit,
+  onDuplicate,
+  onStartMoveToSuite,
+  onOpenLastRun,
+  onArchive,
 }: {
   testCase: TestCase;
-  suites: TestSuiteEntry[];
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  canManage: boolean;
+  hasLastRun: boolean;
+  onRunCase: (testCase: TestCase) => void;
+  onEdit: (testCase: TestCase) => void;
+  onDuplicate: (testCase: TestCase) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
+  onOpenLastRun: (testCase: TestCase) => void;
+  onArchive: (testCase: TestCase) => void;
 }) {
-  const stop = (event: React.MouseEvent) => event.stopPropagation();
-
   return (
-    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-      <Menu.TriggerItem value="move-to-suite">Move to suite</Menu.TriggerItem>
-      <Menu.Content>
-        {suites.map((suite) => (
-          <Menu.Item
-            key={suite.id}
-            value={`move-${suite.id}`}
-            onClick={(event) => {
-              stop(event);
-              onMoveToSuite(testCase, suite.id);
-            }}
-          >
-            {suite.name}
-          </Menu.Item>
-        ))}
-        <Menu.Item
-          value="move-unfiled"
-          onClick={(event) => {
-            stop(event);
-            onMoveToSuite(testCase, null);
-          }}
-        >
-          No test suite
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
+    <HStack
+      gap={1}
+      justify="flex-end"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {canManage && (
+        <RunCaseButton
+          caseName={testCase.name}
+          onOpen={() => onRunCase(testCase)}
+        />
+      )}
+      <CaseRowActionsMenu
+        testCase={testCase}
+        canManage={canManage}
+        hasLastRun={hasLastRun}
+        onEdit={onEdit}
+        onDuplicate={onDuplicate}
+        onStartMoveToSuite={onStartMoveToSuite}
+        onOpenLastRun={onOpenLastRun}
+        onArchive={onArchive}
+      />
+    </HStack>
   );
 }
 
 function CaseRowActionsMenu({
   testCase,
-  suites,
   canManage,
   hasLastRun,
   onEdit,
-  onHistory,
   onDuplicate,
-  onMoveToSuite,
+  onStartMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
-  suites: TestSuiteEntry[];
   canManage: boolean;
   hasLastRun: boolean;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
@@ -472,7 +366,7 @@ function CaseRowActionsMenu({
               onEdit(testCase);
             }}
           >
-            Edit
+            <MenuActionLabel action="edit">Edit</MenuActionLabel>
           </Menu.Item>
         )}
         {canManage && (
@@ -483,7 +377,7 @@ function CaseRowActionsMenu({
               onDuplicate(testCase);
             }}
           >
-            Duplicate
+            <MenuActionLabel action="duplicate">Duplicate</MenuActionLabel>
           </Menu.Item>
         )}
         {hasLastRun && (
@@ -494,35 +388,34 @@ function CaseRowActionsMenu({
               onOpenLastRun(testCase);
             }}
           >
-            Open last run
+            <MenuActionLabel action="openLastRun">
+              Open last run
+            </MenuActionLabel>
           </Menu.Item>
         )}
         {canManage && (
-          <MoveToSuiteSubmenu
-            testCase={testCase}
-            suites={suites}
-            onMoveToSuite={onMoveToSuite}
-          />
+          <Menu.Item
+            value="move-to-suite"
+            onClick={(event) => {
+              stop(event);
+              onStartMoveToSuite(testCase.id);
+            }}
+          >
+            <MenuActionLabel action="moveToSuite">
+              Move to suite...
+            </MenuActionLabel>
+          </Menu.Item>
         )}
-        <Menu.Item
-          value="history"
-          onClick={(event) => {
-            stop(event);
-            onHistory(testCase);
-          }}
-        >
-          History
-        </Menu.Item>
         {canManage && (
           <Menu.Item
             value="archive"
-            color="orange.500"
+            color="red.600"
             onClick={(event) => {
               stop(event);
               onArchive(testCase);
             }}
           >
-            Archive
+            <MenuActionLabel action="archive">Archive</MenuActionLabel>
           </Menu.Item>
         )}
       </Menu.Content>
@@ -541,8 +434,7 @@ export function ExternalCasesTable({
   return (
     <TableCard data-testid="agent-testing-external-cases-table">
       <TableHeaderRow templateColumns={EXTERNAL_COLUMNS}>
-        <Text as="span">Test case</Text>
-        <Text as="span" />
+        <Text as="span">Scenario</Text>
         <Text as="span" textAlign="right">
           Last run
         </Text>
@@ -575,7 +467,6 @@ export function ExternalCasesTable({
             <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
               {externalCase.name}
             </Text>
-            <Box />
             <Text
               fontSize="11px"
               color={FG_MUTED}

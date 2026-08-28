@@ -313,6 +313,10 @@ describe("simulationRunnerRouter.run", () => {
           endpoint: "http://localhost:3000",
           apiKey: "test-api-key",
         },
+        resolvedModels: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
       });
     });
 
@@ -381,11 +385,16 @@ describe("simulationRunnerRouter.run", () => {
           endpoint: "http://localhost:3000",
           apiKey: "test-api-key",
         },
+        resolvedModels: {
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5",
+        },
       });
     });
 
     describe("when run is called without explicit setId", () => {
-      /** @scenario "A single test case run goes to the project internal run set" */
+      /** @scenario "A scenario run that names no run set goes to the internal run set" */
+      /** @scenario "A run naming no set goes to this project's one-off bucket" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
@@ -402,7 +411,7 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
-      /** @scenario "A one-off batch carries the name of the test case that ran" */
+      /** @scenario "A batch of the internal run set carries the name of the scenario that ran" */
       it("stamps the scenario name onto the queued run", async () => {
         await caller.run(defaultInput);
 
@@ -421,6 +430,21 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
+      /** @scenario "A run of a single case records the models the validation prefetch resolved" */
+      it("records the models the prefetch resolved on the queued run", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata: { langwatch: Record<string, unknown> };
+        };
+        expect(queued.metadata.langwatch.resolvedSimulatorModel).toBe(
+          "openai/gpt-5-mini",
+        );
+        expect(queued.metadata.langwatch.resolvedJudgeModel).toBe(
+          "openai/gpt-5",
+        );
+      });
+
       it("returns scenarioRunId alongside existing fields", async () => {
         const result = await caller.run(defaultInput);
 
@@ -435,6 +459,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called with explicit setId", () => {
+      /** @scenario "A run naming an external set is allowed" */
       it("preserves the user-provided set ID in queueRun", async () => {
         const inputWithSetId = {
           ...defaultInput,
@@ -476,6 +501,48 @@ describe("simulationRunnerRouter.run", () => {
           batchRunId: "batch_test_123",
           scenarioRunId: "scenariorun_test_456",
         });
+      });
+    });
+
+    describe("when run is called naming a set the platform reserves", () => {
+      // The internal namespace holds the one-off bucket and every run plan's
+      // address. A run written into a plan's address is read as that plan's
+      // own history, so it would move its pass rate, its cost and its trend.
+      /** @scenario "A run naming a run plan's set address is refused" */
+      it("refuses a run plan's set address with scenario_reserved_set_id", async () => {
+        await expect(
+          caller.run({
+            ...defaultInput,
+            setId: "__internal__suite_abc123__suite",
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "scenario_reserved_set_id" },
+        });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A run naming another project's one-off set is refused" */
+      it("refuses another project's one-off set", async () => {
+        await expect(
+          caller.run({
+            ...defaultInput,
+            setId: getOnPlatformSetId("proj_someone_else"),
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "scenario_reserved_set_id" },
+        });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A run naming this project's own one-off set is allowed" */
+      it("allows this project's own one-off set", async () => {
+        const setId = getOnPlatformSetId(defaultInput.projectId);
+
+        const result = await caller.run({ ...defaultInput, setId });
+
+        expect(result).toMatchObject({ scheduled: true, setId });
       });
     });
 
@@ -541,7 +608,7 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when the run carries a note", () => {
       /** @scenario "The note is written under the top-level note key of the run metadata" */
-      /** @scenario "A note on a single test case run is stored with that run" */
+      /** @scenario "A note on a single scenario run is stored with that run" */
       it("writes the note under the top-level note key of the run metadata", async () => {
         await caller.run({ ...defaultInput, note: "nightly regression" });
 
@@ -619,15 +686,20 @@ describe("simulationRunnerRouter.run", () => {
             targetReferenceId: "prompt_123",
             targetType: "prompt",
             scenarioVersion: 5,
+            actorId: "user_test_123",
+            actorLabel: "user",
+            resolvedSimulatorModel: "openai/gpt-5-mini",
+            resolvedJudgeModel: "openai/gpt-5",
           },
         });
       });
     });
 
     describe("the reserved langwatch namespace on a one-off run", () => {
-      /** @scenario "A one-off run records which target it ran against" */
-      /** @scenario "A one-off run of a single case records that case version" */
-      it("records the target, its kind and the scenario version read at queue time", async () => {
+      /** @scenario "A single-case run records which target it ran against" */
+      /** @scenario "A single-case run records that case version" */
+      /** @scenario "A one-off run started in the app records the person who started it" */
+      it("records the target, its kind, the case version read at queue time and the person who started it", async () => {
         await caller.run(defaultInput);
 
         expect(mockQueueRun).toHaveBeenCalledWith(
@@ -637,10 +709,29 @@ describe("simulationRunnerRouter.run", () => {
                 targetReferenceId: "prompt_123",
                 targetType: "prompt",
                 scenarioVersion: 5,
+                actorId: "user_test_123",
+                actorLabel: "user",
+                resolvedSimulatorModel: "openai/gpt-5-mini",
+                resolvedJudgeModel: "openai/gpt-5",
               },
             }),
           }),
         );
+      });
+
+      /** @scenario "The actor sits beside the scenario version, not at the top level" */
+      it("keeps the actor inside the reserved namespace and off the top level", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata: Record<string, unknown>;
+        };
+        expect(queued.metadata).not.toHaveProperty("actorId");
+        expect(queued.metadata).not.toHaveProperty("actorLabel");
+        expect(queued.metadata.langwatch).toMatchObject({
+          actorId: "user_test_123",
+          actorLabel: "user",
+        });
       });
     });
   });

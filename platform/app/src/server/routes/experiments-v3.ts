@@ -38,7 +38,10 @@ import {
   ExperimentVersionNotFoundError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  ExperimentService,
+  type WorkbenchActor,
+} from "~/server/experiments/experiment.service";
 import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
@@ -48,9 +51,13 @@ import {
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
+import { runResultsWriterFor } from "~/server/experiments-v3/execution/runResultsWriter";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { createRunStateMirror } from "~/server/experiments-v3/execution/runStateMirror";
-import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
+import {
+  planSavedRunCarryOver,
+  prepareSavedStateExecution,
+} from "~/server/experiments-v3/execution/savedStateExecution";
 import {
   type ExecutionScope,
   executionRequestSchema,
@@ -369,6 +376,24 @@ secured.access(sessionAuth).post(
       experimentSlug: request.experimentSlug ?? "",
     });
 
+    // The page saves these cells too, and it is the faster of the two. The
+    // server writes them so the board does not depend on the tab surviving:
+    // a background tab holds its save timer, and a dropped connection loses
+    // the cells the page was holding, while the run reads as complete.
+    const actor: WorkbenchActor = {
+      ...(session.user?.id ? { userId: session.user.id } : {}),
+      label: "user",
+    };
+    const resultsWriter = runResultsWriterFor({
+      persistence: { experiments: getApp().experiments, actor },
+      projectId,
+      experimentId: request.experimentId,
+      scope: request.scope,
+      data: request.data,
+      datasetId: request.dataset_id,
+      parameters: request.parameters,
+    });
+
     return streamSSE(c, async (stream) => {
       try {
         const isFullRun = request.scope.type === "full";
@@ -386,16 +411,26 @@ secured.access(sessionAuth).post(
           loadedWorkflows,
           concurrency: request.concurrency,
           seedTargetOutputs: request.seedTargetOutputs,
+          // The board as the page had it, minus what this run produces. The
+          // page sends it rather than the server reading the saved state,
+          // because the page can be ahead of its own autosave and the run has
+          // to hold what the person is looking at.
+          carriedOverCells: request.carriedOverCells,
         });
 
         for await (const event of orchestrator) {
-          // The store first, the customer second. The `execution_started`
-          // frame names the run, and the page hands that id to a poller as
-          // soon as it reads it, so a frame released before the store knows
-          // the run makes the first poll read 404 on a healthy run. Ordering
-          // it this way keeps the store a superset of what the page has seen.
-          // The mirror swallows its own failures, so a store outage still
-          // cannot stop the run.
+          // The board first, then the run store, then the customer. The cells
+          // go in before the run reports it ended, for the same reason the
+          // backend runner writes them first: a caller that reads "done" and
+          // then reads the workbench finds them there. The writer swallows its
+          // own failures, so a write that fails costs the page a refresh and
+          // never the run.
+          await resultsWriter?.record(event);
+          // The `execution_started` frame names the run, and the page hands
+          // that id to a poller as soon as it reads it, so a frame released
+          // before the store knows the run makes the first poll read 404 on a
+          // healthy run. Ordering it this way keeps the store a superset of
+          // what the page has seen. The mirror swallows its own failures too.
           await mirror.record(event);
           await stream.writeSSE({
             data: JSON.stringify(event),
@@ -678,6 +713,11 @@ secured.access(apiKeyAuthRun).post(
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
 
+    // The board the run carries in. Its board is the saved workbench state,
+    // which is the only board there is when no tab is open. A full run carries
+    // nothing, because it covers every cell itself.
+    const carriedOverCells = planSavedRunCarryOver({ prepared, scope });
+
     const acceptHeader = c.req.header("Accept") ?? "";
     const isSSE = acceptHeader.includes("text/event-stream");
 
@@ -702,6 +742,7 @@ secured.access(apiKeyAuthRun).post(
             loadedAgents: loadedAgents as Map<string, TypedAgent>,
             loadedEvaluators,
             loadedWorkflows,
+            ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
           });
 
           for await (const event of orchestrator) {
@@ -751,6 +792,7 @@ secured.access(apiKeyAuthRun).post(
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
       loadedEvaluators,
       loadedWorkflows,
+      ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
       // A run of the saved dataset fills the cells the workbench shows. The
       // app-layer service is the one that tells the tenant the experiment
       // moved, which is what makes an open page pick the cells up.

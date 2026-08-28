@@ -74,7 +74,7 @@ describe("reconcileFolderMembership", () => {
       });
     });
 
-    /** @scenario "A test case belongs to at most one folder" */
+    /** @scenario "A scenario belongs to at most one folder" */
     it("derives membership from the case's single folderId, so a case is in one folder only", async () => {
       // The member query filters on folderId equality: a case naming folder A
       // can never be counted into folder B's recompute.

@@ -30,6 +30,27 @@ const comesBefore = (first: Element, second: Element) =>
     first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
   );
 
+/** The CSS the emitted classes of an element carry, as one string. */
+const rulesFor = (element: Element): string => {
+  const classes = Array.from(element.classList);
+  const texts: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let cssRules: CSSRuleList;
+    try {
+      cssRules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of Array.from(cssRules)) texts.push(rule.cssText);
+  }
+  for (const style of Array.from(document.querySelectorAll("style"))) {
+    texts.push(style.textContent ?? "");
+  }
+  return texts
+    .filter((text) => classes.some((className) => text.includes(className)))
+    .join("\n");
+};
+
 describe("<AgentTestingHeader/>", () => {
   afterEach(cleanup);
 
@@ -44,11 +65,29 @@ describe("<AgentTestingHeader/>", () => {
       expect(comesBefore(title, tabs)).toBe(true);
     });
 
+    /** @scenario "The selected tab is underlined on the header's own border" */
+    it("runs the tabs the full height of the header", () => {
+      renderHeader({ tab: "results" });
+
+      // The underline is drawn at the foot of the trigger, so a trigger that
+      // fills the header puts it on the header's own bottom border. The height
+      // is a rule on the emitted class rather than an inline style, so the
+      // rules of that class are what the assertion reads.
+      const list = screen.getByRole("tablist");
+      const tabs = screen.getAllByRole("tab");
+
+      for (const element of [list, ...tabs]) {
+        expect(rulesFor(element)).toMatch(
+          /height:\s*(100%|var\(--chakra-sizes-full\))/,
+        );
+      }
+    });
+
     /** @scenario "Each tab name carries how many rows it holds" */
     it("counts the cases and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 
-      expect(screen.getByRole("tab", { name: /Test cases/ })).toHaveTextContent(
+      expect(screen.getByRole("tab", { name: /Scenarios/ })).toHaveTextContent(
         "12",
       );
       expect(screen.getByRole("tab", { name: /Results/ })).toHaveTextContent(
@@ -57,11 +96,11 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "The header holds the title and the tabs on one line" */
-    it("offers the Test cases tab and the Results tab", () => {
+    it("offers the Scenarios tab and the Results tab", () => {
       renderHeader();
 
       const tabNames = screen.getAllByRole("tab").map((tab) => tab.textContent);
-      expect(tabNames).toEqual(["Test cases", "Results"]);
+      expect(tabNames).toEqual(["Scenarios", "Results"]);
     });
 
     it("marks the open tab", () => {
@@ -84,15 +123,15 @@ describe("<AgentTestingHeader/>", () => {
     });
   });
 
-  describe("given the Test cases tab is open", () => {
+  describe("given the Scenarios tab is open", () => {
     /** @scenario "The header carries no action on either tab" */
     it("offers no action of its own", () => {
       renderHeader({ tab: "cases" });
 
-      // New test case belongs to the panel header, beside the set it files
+      // New scenario belongs to the panel header, beside the set it files
       // into, so the page header carries nothing here.
       expect(
-        screen.queryByRole("button", { name: /New test case/ }),
+        screen.queryByRole("button", { name: /New scenario/ }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /New run plan/i }),
@@ -106,13 +145,13 @@ describe("<AgentTestingHeader/>", () => {
     it("reads the name of the plan, with what the plan is beside it", () => {
       renderHeader({
         tab: "results",
-        openPlan: { name: "Checkout", note: "Test suite" },
+        openPlan: { name: "Checkout", note: "Run plan" },
       });
 
       const title = screen.getByRole("heading", { name: "Checkout" });
       expect(title).toBeInTheDocument();
       expect(screen.getByTestId("agent-testing-title-note")).toHaveTextContent(
-        "Test suite",
+        "Run plan",
       );
       expect(comesBefore(title, screen.getByRole("tablist"))).toBe(true);
       expect(
@@ -124,7 +163,7 @@ describe("<AgentTestingHeader/>", () => {
     it("reads Agent Testing again once the plan is left", () => {
       const view = renderHeader({
         tab: "results",
-        openPlan: { name: "Checkout", note: "Test suite" },
+        openPlan: { name: "Checkout", note: "Run plan" },
       });
 
       view.rerender(

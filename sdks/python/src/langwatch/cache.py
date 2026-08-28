@@ -109,6 +109,35 @@ class CacheFacade:
         _raise_for_status(response)
         return response.json()
 
+    def claim(self, name: str, value: str, ttl_seconds: Optional[int] = None) -> bool:
+        """
+        Take a name, but only if the project does not hold it yet.
+
+        Answers True when this call stored the value, and False when the name
+        was already held, which leaves the held value alone. Losing is an
+        ordinary answer rather than a refusal, so the calling code reads a
+        boolean instead of catching an exception.
+
+        Rows that start together all read an empty cache and all do the work
+        the entry was meant to save. This is how one row does that work while
+        the rows beside it wait and then read what it stored.
+
+        Args:
+            name: Entry name (UPPER_SNAKE_CASE).
+            value: What to store. It is encrypted server-side.
+            ttl_seconds: How long the entry stays readable. The project's
+                default applies when this is not given.
+        """
+        body: Dict[str, Any] = {"value": value}
+        if ttl_seconds is not None:
+            body["ttl_seconds"] = ttl_seconds
+
+        response = self._http().post(
+            f"/api/agent-cache/{_quote(name)}/claim", json=body
+        )
+        _raise_for_status(response)
+        return bool(response.json()["claimed"])
+
     def delete(self, name: str) -> Dict[str, Any]:
         """Remove an entry. A name the project does not hold is not an error."""
         response = self._http().delete(f"/api/agent-cache/{_quote(name)}")

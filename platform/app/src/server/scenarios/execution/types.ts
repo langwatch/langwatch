@@ -166,6 +166,17 @@ export const CodeAgentDataSchema = z.object({
    * leaves every turn doing its own work.
    */
   sandboxApiKey: z.string().optional(),
+  /**
+   * Wall-clock budget for the agent's Python, in milliseconds, sent to the
+   * engine as the code node's `timeout_ms` parameter.
+   *
+   * It can only SHORTEN the run: the code executor clamps every per-node
+   * request to the operator's ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 60s when unset), so a value
+   * above that ceiling is silently ignored. Absent leaves the engine on the
+   * operator default.
+   */
+  timeoutMs: z.number().int().positive().optional(),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 

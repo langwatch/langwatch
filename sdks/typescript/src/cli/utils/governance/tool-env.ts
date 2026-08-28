@@ -40,7 +40,7 @@ export interface ToolEnv {
  * users who can't go through the gateway at all (Claude Max
  * subscription, no swappable API key); they paste the OTEL env
  * block from the /me drawer manually. See
- * docs/ai-governance/track-your-claude-code-usage.mdx (Path A vs
+ * docs/coding-agents/claude-code-usage.mdx (Path A vs
  * Path B).
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {

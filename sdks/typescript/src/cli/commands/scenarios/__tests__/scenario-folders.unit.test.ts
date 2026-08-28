@@ -1,14 +1,16 @@
 /**
- * Filing a test case into a test suite folder from the command line.
+ * Filing a scenario into a test suite from the command line.
  *
- * The folder is named by id or by name, and it is resolved through the suites
- * API before the case is written, so a folder that names nothing leaves no
- * half-filed case behind.
+ * The suite is named by id or by name, and it is resolved through the test
+ * suites API before the case is written, so a name that matches nothing leaves
+ * no half-filed case behind.
  *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
+
+const mockSuitesList = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -19,14 +21,9 @@ vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
   };
 });
 
-vi.mock("@/client-sdk/services/suites", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/suites")>();
-  return {
-    ...actual,
-    SuitesApiService: vi.fn(),
-  };
-});
+vi.mock("../../test-suites/cli-test-suites-service", () => ({
+  createCliTestSuitesService: vi.fn(() => ({ list: mockSuitesList })),
+}));
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -47,7 +44,6 @@ vi.mock("ora", () => ({
 }));
 
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
-import { SuitesApiService } from "@/client-sdk/services/suites";
 import { createScenarioCommand } from "../create";
 import { updateScenarioCommand } from "../update";
 import { listScenariosCommand } from "../list";
@@ -80,29 +76,26 @@ const makeFolder = (overrides: Record<string, unknown> = {}) => ({
   id: "folder_abc",
   name: "Refunds",
   slug: "refunds",
-  kind: "folder" as const,
-  description: null,
   scenarioIds: [],
-  targets: [],
-  repeatCount: 1,
-  labels: [],
+  scenarioCount: 0,
+  archivedAt: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z",
+  platformUrl: "https://app.langwatch.ai/proj-1/agent-testing",
   ...overrides,
 });
 
-describe("filing a test case into a folder from the command line", () => {
+describe("filing a scenario into a folder from the command line", () => {
   let mockScenarioCreate: ReturnType<typeof vi.fn>;
   let mockScenarioUpdate: ReturnType<typeof vi.fn>;
   let mockScenarioGetAll: ReturnType<typeof vi.fn>;
-  let mockSuitesGetAll: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockScenarioCreate = vi.fn().mockResolvedValue(makeScenario());
     mockScenarioUpdate = vi.fn().mockResolvedValue(makeScenario());
     mockScenarioGetAll = vi.fn().mockResolvedValue([]);
-    mockSuitesGetAll = vi.fn().mockResolvedValue([]);
+    mockSuitesList.mockResolvedValue([]);
 
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
@@ -115,18 +108,6 @@ describe("filing a test case into a folder from the command line", () => {
         getVersion: vi.fn(),
       } as unknown as ScenariosApiService;
     });
-    vi.mocked(SuitesApiService).mockImplementation(function () {
-      return {
-        getAll: mockSuitesGetAll,
-        get: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        duplicate: vi.fn(),
-        run: vi.fn(),
-        delete: vi.fn(),
-      } as unknown as SuitesApiService;
-    });
-
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -135,9 +116,9 @@ describe("filing a test case into a folder from the command line", () => {
   });
 
   describe("createScenarioCommand() with --folder", () => {
-    /** @scenario "Create a scenario inside a test suite folder" */
+    /** @scenario "Create a scenario inside a test suite" */
     it("creates the scenario inside that folder", async () => {
-      mockSuitesGetAll.mockResolvedValue([makeFolder()]);
+      mockSuitesList.mockResolvedValue([makeFolder()]);
       mockScenarioCreate.mockResolvedValue(
         makeScenario({ folderId: "folder_abc" }),
       );
@@ -147,16 +128,16 @@ describe("filing a test case into a folder from the command line", () => {
         folder: "folder_abc",
       });
 
-      expect(mockSuitesGetAll).toHaveBeenCalledWith({ kind: "folder" });
+      expect(mockSuitesList).toHaveBeenCalled();
       expect(mockScenarioCreate).toHaveBeenCalledWith(
         expect.objectContaining({ folderId: "folder_abc" }),
       );
       expect(result!.data).toMatchObject({ folderId: "folder_abc" });
     });
 
-    /** @scenario "Create a scenario inside a test suite folder" */
+    /** @scenario "Create a scenario inside a test suite" */
     it("names the folder in the confirmation", async () => {
-      mockSuitesGetAll.mockResolvedValue([makeFolder()]);
+      mockSuitesList.mockResolvedValue([makeFolder()]);
       mockScenarioCreate.mockResolvedValue(
         makeScenario({ folderId: "folder_abc" }),
       );
@@ -172,9 +153,9 @@ describe("filing a test case into a folder from the command line", () => {
       );
     });
 
-    /** @scenario "Create a scenario with a folder id that does not exist" */
+    /** @scenario "Create a scenario with a test suite that does not exist" */
     it("refuses a folder that names nothing, and creates no scenario", async () => {
-      mockSuitesGetAll.mockResolvedValue([]);
+      mockSuitesList.mockResolvedValue([]);
 
       await expect(
         createScenarioCommand("Login Flow", {
@@ -190,9 +171,9 @@ describe("filing a test case into a folder from the command line", () => {
   });
 
   describe("updateScenarioCommand() with --folder", () => {
-    /** @scenario "Move a scenario to another test suite folder" */
+    /** @scenario "Move a scenario to another test suite" */
     it("moves the scenario into the named folder", async () => {
-      mockSuitesGetAll.mockResolvedValue([
+      mockSuitesList.mockResolvedValue([
         makeFolder({ id: "folder_xyz", name: "Chargebacks" }),
       ]);
       mockScenarioUpdate.mockResolvedValue(
@@ -210,7 +191,7 @@ describe("filing a test case into a folder from the command line", () => {
       expect(result!.data).toMatchObject({ folderId: "folder_xyz" });
     });
 
-    /** @scenario "Unfile a scenario from its test suite folder" */
+    /** @scenario "Unfile a scenario from its test suite" */
     it("takes the scenario out of its folder with --no-folder", async () => {
       mockScenarioUpdate.mockResolvedValue(makeScenario({ folderId: null }));
 
@@ -222,7 +203,7 @@ describe("filing a test case into a folder from the command line", () => {
         folderId: null,
       });
       expect(result!.data).toMatchObject({ folderId: null });
-      expect(mockSuitesGetAll).not.toHaveBeenCalled();
+      expect(mockSuitesList).not.toHaveBeenCalled();
     });
 
     /** @scenario "Combining --folder and --no-folder is rejected" */
@@ -247,7 +228,7 @@ describe("filing a test case into a folder from the command line", () => {
         makeScenario({ id: "scenario_1", folderId: "folder_abc" }),
         makeScenario({ id: "scenario_2", folderId: null }),
       ]);
-      mockSuitesGetAll.mockResolvedValue([makeFolder()]);
+      mockSuitesList.mockResolvedValue([makeFolder()]);
 
       const result = await listScenariosCommand();
       result!.table();

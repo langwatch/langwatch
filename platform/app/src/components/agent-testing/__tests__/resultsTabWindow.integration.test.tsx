@@ -37,6 +37,21 @@ const emptyResults = vi.hoisted(() => ({
   freshness: { data: undefined },
   batchCount: { data: { count: 0 } },
   list: { data: [] as unknown[] },
+  overview: {
+    data: {
+      totals: {
+        executions: 0,
+        runCount: 0,
+        passRate: null,
+        failingScenarios: 0,
+        cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 0 },
+        series: [] as unknown[],
+      },
+      groups: [] as unknown[],
+    },
+    isLoading: false,
+  },
+  atoms: { data: { atoms: [] as unknown[], hasMore: false }, isLoading: false },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -49,11 +64,33 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       getAll: { useQuery: mockSuitesGetAll },
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
+      // The row menu of a run plan archives it, through the suite call for a
+      // plan and the folder call for a test suite.
+      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      folders: {
+        archive: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+      // The results list names the scenario and the labels of every run it
+      // lists, so the tab reads the scenarios of the project too.
+      getAll: { useQuery: () => ({ data: [] }) },
+      getCodeScenarios: { useQuery: () => ({ data: [] }) },
+      getResultsOverview: { useQuery: () => emptyResults.overview },
+      getResultAtoms: { useQuery: () => emptyResults.atoms },
       getExternalSetSummaries: {
         useQuery: () => emptyResults.externalSets,
       },
@@ -77,6 +114,13 @@ vi.mock("~/utils/api", () => ({
       getAllPromptsForProject: { useQuery: () => emptyResults.list },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+    // The settings row names whoever started a run from the organization
+    // roster, so the column reads this even when no run names a person.
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
   },
 }));
 

@@ -35,7 +35,7 @@ export interface ScenarioPickerFolder {
 }
 
 /** What the group of cases filed in no test suite reads as. */
-export const PICKER_UNFILED_GROUP_NAME = "Unfiled test cases";
+export const PICKER_UNFILED_GROUP_NAME = "No test suite";
 
 export interface ScenarioPickerProps {
   /** Filtered list of scenarios to display. */

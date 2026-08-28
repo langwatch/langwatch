@@ -15,17 +15,15 @@ a {
 	box-sizing: border-box;
 }
 
-label {
+// Override Chakra UI default annoying overrides. A segmented control draws
+// its tabs as labels over hidden radios, and those are buttons to the person
+// reading them, so they keep the pointer the component asks for.
+label:not(.chakra-segment-group__item) {
 	cursor: auto !important;
 }
 
-// Override Chakra UI default annoying overrides
 label {
 	user-select: auto !important;
-}
-
-label {
-	cursor: auto !important;
 }
 
 .fade-in {

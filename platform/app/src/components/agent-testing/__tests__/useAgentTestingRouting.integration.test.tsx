@@ -52,11 +52,20 @@ describe("useAgentTestingRouting", () => {
   afterEach(cleanup);
 
   describe("given the page address", () => {
-    it("opens on the Test cases tab with every case", () => {
+    /** @scenario "An address that names no suite opens the first suite of the rail" */
+    it("opens on the Scenarios tab naming no suite, so the first one is opened", () => {
       const { result } = renderHook(() => useAgentTestingRouting());
 
       expect(result.current.tab).toBe("cases");
-      expect(result.current.selection).toEqual({ kind: "all" });
+      expect(result.current.selection).toEqual({ kind: "suite", slug: null });
+    });
+
+    it("writes the bare address back for a state that names no suite", () => {
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectSuite({ kind: "suite", slug: null });
+
+      expect(lastPush().address).toBe("/demo/agent-testing");
     });
 
     /** @scenario "The selected tab, suite and period are held in the address" */
@@ -173,6 +182,23 @@ describe("useAgentTestingRouting", () => {
       const { result } = renderHook(() => useAgentTestingRouting());
 
       result.current.selectRun("batch-2");
+
+      expect(lastPush().address).toBe(
+        "/demo/agent-testing/results/nightly/batch-2",
+      );
+    });
+  });
+
+  describe("when a run of another plan is chosen from the list", () => {
+    /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */
+    it("names that plan and that run in one address change", () => {
+      openAt("/demo/agent-testing/results", { path: ["results"] });
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectPlanRun({
+        planSlug: "nightly",
+        batchRunId: "batch-2",
+      });
 
       expect(lastPush().address).toBe(
         "/demo/agent-testing/results/nightly/batch-2",

@@ -9,6 +9,7 @@ import {
 } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
+import { runActorLabelSchema } from "../run-actor";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -73,6 +74,47 @@ export const langwatchMetadataSchema = z.object({
    * @see specs/scenarios/scenario-version-on-runs.feature
    */
   scenarioVersion: z.number().int().optional(),
+  /**
+   * The simulation models the run plan was CONFIGURED with, stamped at queue
+   * time. Absent when the plan names none and the project default is used,
+   * and absent on runs recorded before this was stamped. Both read back as
+   * "this configuration named no model", which is what a person chose.
+   *
+   * Not the model the run resolved to: the same choice has to key the same
+   * way after a project default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /**
+   * The simulation models the run RESOLVED, stamped at queue time: the run
+   * plan's choice, else the case's own choice, else the project default for
+   * that role.
+   *
+   * This is what a person reads back off the run. The project default changes
+   * over time, so a run that recorded only the configured value cannot say
+   * which model judged it a month later.
+   *
+   * Absent when the project had no model set for the role, and absent on runs
+   * recorded before this was stamped. Both read the same way.
+   *
+   * @see specs/scenarios/resolved-run-models-on-runs.feature
+   */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /**
+   * Who started the run: the platform user id, and the surface that person
+   * acted through. Stamped at queue time, and absent whenever the caller
+   * named no person, which is every project-key and SDK run.
+   *
+   * The id and not a name, so a run still points at the right person after
+   * they rename themselves.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
 });
 
 /**

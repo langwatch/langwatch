@@ -6,7 +6,6 @@
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
- * @see specs/suites/one-off-runs-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -20,7 +19,11 @@ import {
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { RunPlanDetail } from "../results/RunPlanDetail";
+import { RUN_AGAIN_LABEL } from "../results/RunPlanDetailHeader";
+import { PROJECT_DEFAULT_MODEL } from "../results/RunSettingsBlock";
+import { RunsSidebarEntry } from "../results/RunsSidebarEntry";
 import type { RunPlan } from "../results/run-plans";
+import { passRateColor } from "../shared/pass-rate-color";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
@@ -30,6 +33,24 @@ const mockCancelJob = vi.hoisted(() => vi.fn());
 const mockCancelBatchRun = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+// Honors `enabled` the way the real query does, so a test proves both that
+// the roster reaches the row and that it is not fetched when no name is
+// wanted.
+const mockGetOrganizationMembers = vi.hoisted(() =>
+  vi.fn((_input: unknown, options?: { enabled?: boolean }) =>
+    options?.enabled === false
+      ? { data: undefined }
+      : {
+          data: {
+            members: [
+              { user: { id: "user_omar", name: "Omar Haddad", image: null } },
+              // A member with no name of their own never reaches the row.
+              { user: { id: "user_nameless", name: null, image: null } },
+            ],
+          },
+        },
+  ),
+);
 const mockGetSuiteById = vi.hoisted(() =>
   vi.fn(() => ({
     data: {
@@ -56,6 +77,9 @@ vi.mock("~/utils/api", () => ({
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
+      // The run dialog lists the previous configurations of the scope it
+      // opens on, which it reads off the runs.
+      getRunConfigurations: { useQuery: vi.fn(() => ({ data: [] })) },
       getSuiteRunFreshness: { useQuery: mockFreshnessQuery },
       getScenarioSetBatchRunCount: { useQuery: mockGetBatchRunCount },
       cancelJob: {
@@ -73,11 +97,18 @@ vi.mock("~/utils/api", () => ({
     },
     agents: { getAll: { useQuery: vi.fn(() => ({ data: [] })) } },
     suites: {
+      // The run dialog offers the previous configurations of a scope, which
+      // it reads from the run plans and the test suites of the project.
+      getAll: { useQuery: () => ({ data: [] }) },
+      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      create: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
       getById: { useQuery: mockGetSuiteById },
       run: {
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
-      runAll: {
+      runPlan: {
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
       update: {
@@ -91,8 +122,37 @@ vi.mock("~/utils/api", () => ({
       getAllForProjectForFrontend: {
         useQuery: vi.fn(() => ({ data: [], isLoading: false })),
       },
+      // The run settings block reads a model back through LLMModelDisplay,
+      // which takes the provider icon from the providers of the project.
+      listAllForProjectForFrontend: {
+        useQuery: vi.fn(() => ({
+          data: {
+            providers: [
+              {
+                provider: "openai",
+                enabled: true,
+                customKeys: null,
+                models: null,
+                embeddingsModels: null,
+                customModels: null,
+                customEmbeddingsModels: null,
+                deploymentMapping: null,
+                extraHeaders: null,
+              },
+            ],
+          },
+          isLoading: false,
+        })),
+      },
     },
     export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+    // The settings row names a teammate from the organization roster, the
+    // same query the other non-admin member pickers read.
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: mockGetOrganizationMembers,
+      },
+    },
   },
 }));
 
@@ -103,6 +163,7 @@ vi.mock("~/hooks/useCan", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
+    organization: { id: "org_1" },
   }),
 }));
 
@@ -118,6 +179,17 @@ vi.mock("~/utils/formatTimeAgo", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 
+// The settings block names the reader by comparing the run's actor with the
+// signed-in user, so the test controls who is reading.
+const VIEWER_USER_ID = "user_lena";
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => ({
+    data: { user: { id: VIEWER_USER_ID } },
+    status: "authenticated",
+    update: vi.fn(),
+  }),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -129,6 +201,8 @@ const suitePlan: RunPlan = {
   slug: "checkout",
   name: "Checkout",
   kind: "suite",
+  scopeKind: "folders",
+  scopeLabel: "3 scenarios",
   scenarioSetId: SUITE_SET_ID,
   suiteId: "suite_1",
   caseCount: 3,
@@ -169,7 +243,7 @@ function threeBatches(): ScenarioRunData[] {
       batchRunId: "batch_3",
       scenarioRunId: "run_3",
       timestamp: NOW,
-      metadata: { note: "switched judge to the stricter rubric" },
+      metadata: { note: "switched judge to the stricter criterion" },
     }),
     makeRun({
       batchRunId: "batch_2",
@@ -229,12 +303,6 @@ describe("<RunPlanDetail/>", () => {
       viewMode: "table",
       pendingRun: null,
       cancellingJobId: null,
-      caseEditor: {
-        open: false,
-        scenarioId: null,
-        folderId: null,
-        showHistory: false,
-      },
     });
     mockGetBatchRunCount.mockReturnValue({ data: { count: 3 } });
     mockFreshnessQuery.mockReturnValue({ data: undefined });
@@ -285,7 +353,7 @@ describe("<RunPlanDetail/>", () => {
     const entry = screen.getByTestId("runs-sidebar-item-batch_3");
     expect(within(entry).getByText("Run #3")).toBeInTheDocument();
     expect(
-      within(entry).getByText("switched judge to the stricter rubric"),
+      within(entry).getByText("switched judge to the stricter criterion"),
     ).toBeInTheDocument();
     expect(within(entry).getByText("2h ago")).toBeInTheDocument();
     expect(within(entry).getByText("100%")).toBeInTheDocument();
@@ -297,7 +365,7 @@ describe("<RunPlanDetail/>", () => {
 
     const entry = screen.getByTestId("runs-sidebar-item-batch_3");
     const note = within(entry).getByTestId("runs-sidebar-item-batch_3-note");
-    expect(note).toHaveTextContent("switched judge to the stricter rubric");
+    expect(note).toHaveTextContent("switched judge to the stricter criterion");
     expect(within(entry).getByText("2h ago")).toBeInTheDocument();
     expect(within(entry).getByText("100%")).toBeInTheDocument();
   });
@@ -452,26 +520,23 @@ describe("<RunPlanDetail/>", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu of a result opens the editor of the test case" */
-  it("opens the editor of the test case from the row menu", async () => {
+  /** @scenario "The row menu of a result opens the editor of the scenario" */
+  it("opens the editor of the scenario from the row menu", async () => {
     const user = userEvent.setup();
     setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
     renderDetail();
 
     await user.click(screen.getByRole("button", { name: /^Actions for / }));
     await user.click(
-      await screen.findByRole("menuitem", { name: "Edit test case" }),
+      await screen.findByRole("menuitem", { name: "Edit scenario" }),
     );
 
-    expect(useAgentTestingStore.getState().caseEditor).toEqual({
-      open: true,
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "scen_7",
-      folderId: null,
-      showHistory: false,
     });
   });
 
-  /** @scenario "The row menu of a result runs the test case again on its own" */
+  /** @scenario "The row menu of a result runs the scenario again on its own" */
   it("offers the conversation and a rerun on the row menu", async () => {
     const user = userEvent.setup();
     setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
@@ -483,29 +548,52 @@ describe("<RunPlanDetail/>", () => {
       await screen.findByRole("menuitem", { name: "Open the conversation" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Rerun this test case" }),
+      screen.getByRole("menuitem", { name: "Rerun this scenario" }),
     ).toBeInTheDocument();
   });
 
-  /** @scenario "A test suite is run from the header of its run plan" */
-  it("opens the run dialog on the suite from the header Run control", async () => {
+  /** @scenario "A run plan is run again from the header of its results" */
+  it("opens the run dialog on the plan from the header Run control", async () => {
     const user = userEvent.setup();
     renderDetail();
 
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit run plan" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByTestId("run-plan-button"));
 
     const dialog = await screen.findByTestId("run-dialog");
     expect(dialog).toHaveTextContent("Run · Checkout");
   });
 
-  /** @scenario "A set that runs from code has no Run and no Edit" */
-  it("offers neither Run nor Edit on a set that runs from code", () => {
+  /** @scenario "Edit run plan opens the run dialog on the configuration of the plan" */
+  it("opens the plan in the run dialog from Edit run plan, left of Run", async () => {
+    const user = userEvent.setup();
+    const { props } = renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const edit = within(line).getByTestId("edit-run-plan-button");
+    const run = within(line).getByTestId("run-plan-button");
+    expect(edit).toHaveTextContent("Edit run plan");
+    expect(
+      edit.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(edit);
+    // The dialog host holds the plan the id names, so the page hands it the
+    // suite of the open plan rather than opening an empty dialog.
+    expect(props.onEditPlan).toHaveBeenCalledWith("suite_1");
+  });
+
+  /** @scenario "A set that runs from code has no Run and no Edit run plan" */
+  it("offers neither Run nor Edit run plan on a set that runs from code", () => {
     renderDetail({
       plan: {
         slug: "external:nightly-ci",
         name: "nightly-ci",
         kind: "external",
+        scopeKind: "external",
+        scopeLabel: "from code",
         scenarioSetId: "nightly-ci",
         suiteId: null,
         caseCount: null,
@@ -515,7 +603,7 @@ describe("<RunPlanDetail/>", () => {
 
     expect(screen.queryByTestId("run-plan-button")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Edit" }),
+      screen.queryByTestId("edit-run-plan-button"),
     ).not.toBeInTheDocument();
   });
 
@@ -559,8 +647,44 @@ describe("<RunPlanDetail/>", () => {
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
     expect(
-      within(sidebar).getByRole("button", { name: /Run plans/ }),
+      within(sidebar).getByRole("button", { name: /Results/ }),
     ).toBeInTheDocument();
+  });
+
+  // The three read left to right in one order. They are found by their own
+  // handles and compared by document position, so a header that put the note
+  // before the pass block would fail rather than pass on the order the
+  // assertions are written in.
+  /** @scenario "The run header reads the run, then the pass block, then the note" */
+  it("reads the run number, then the pass block, then the note", () => {
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const number = within(line).getByText("Run #3");
+    const pass = within(line).getByTestId("run-metrics-summary");
+    const note = within(line).getByTestId("run-summary-note");
+
+    expect(
+      number.compareDocumentPosition(pass) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      pass.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  /** @scenario "The runs sidebar holds only the back link and the run list" */
+  it("holds only the back link and the runs, never the name of the plan", () => {
+    renderDetail();
+
+    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    expect(
+      within(sidebar).getByRole("button", { name: /Results/ }),
+    ).toBeInTheDocument();
+    expect(within(sidebar).getByText("Run #3")).toBeInTheDocument();
+
+    // The plan name is the page title while the plan is open, so repeating it
+    // in the rail would say the same thing twice on one screen.
+    expect(within(sidebar).queryByText("Checkout")).not.toBeInTheDocument();
   });
 
   /** @scenario "The results header holds the run and the actions on one line" */
@@ -576,13 +700,76 @@ describe("<RunPlanDetail/>", () => {
     const name = within(line).getByText("Run #3");
     const summary = within(line).getByTestId("run-metrics-summary");
     const note = within(line).getByTestId("run-summary-note");
-    const age = within(line).getByText(/ago$/);
+    const settings = within(line).getByTestId("run-settings-toggle");
     const toggle = within(line).getByTestId("view-mode-toggle");
+    const edit = within(line).getByTestId("edit-run-plan-button");
+    const runControl = within(line).getByTestId("run-plan-button");
 
     expect(positionOf(name)).toBeLessThan(positionOf(summary));
     expect(positionOf(summary)).toBeLessThan(positionOf(note));
-    expect(positionOf(note)).toBeLessThan(positionOf(age));
-    expect(positionOf(age)).toBeLessThan(positionOf(toggle));
+    expect(positionOf(note)).toBeLessThan(positionOf(settings));
+    expect(positionOf(settings)).toBeLessThan(positionOf(toggle));
+    expect(positionOf(toggle)).toBeLessThan(positionOf(edit));
+    expect(positionOf(edit)).toBeLessThan(positionOf(runControl));
+  });
+
+  /**
+   * The layout is read off the emitted rules, because jsdom lays nothing out.
+   * Three of them carry the whole rule: the actions never shrink, the run
+   * summary takes what is left and may shrink to nothing, and the line packs
+   * to its right end, which is where the actions stay if it ever has to break.
+   */
+  /** @scenario "A note never moves the actions of the header line" */
+  it("keeps the actions at the right end however long the note is", () => {
+    const longNote = "n".repeat(200);
+    setRuns([makeRun({ batchRunId: "batch_3", metadata: { note: longNote } })]);
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const summary = within(line).getByTestId("run-summary-run");
+    const actions = within(line).getByTestId("run-summary-actions");
+
+    expect(line).toHaveStyle({ justifyContent: "flex-end" });
+    expect(actions).toHaveStyle({ flexShrink: "0" });
+    expect(summary).toHaveStyle({ flexGrow: "1" });
+
+    // The note is what gives the space back, and the whole of it stays
+    // readable on the note itself.
+    const note = within(line).getByTestId("run-summary-note");
+    expect(note).toHaveAttribute("title", longNote);
+    expect(note).toHaveStyle({ textOverflow: "ellipsis", minWidth: "0px" });
+  });
+
+  /** @scenario "The run control of an open run offers to run it again" */
+  it("reads Run again on the control of an open run", () => {
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    expect(within(line).getByTestId("run-plan-button")).toHaveTextContent(
+      RUN_AGAIN_LABEL,
+    );
+    expect(
+      within(line).queryByRole("button", { name: "Run" }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The header line does not repeat when the run started" */
+  it("leaves how long ago the run started off the header line", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    expect(within(line).queryByText("2h ago")).not.toBeInTheDocument();
+
+    // The rail still says it, and the settings block says it again with the
+    // date, so nothing was lost by taking it off the line.
+    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    expect(within(sidebar).getAllByText("2h ago").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+    expect(screen.getByTestId("run-settings-started")).toHaveTextContent(
+      "2h ago",
+    );
   });
 
   /** @scenario "The run header shows the note of the selected run" */
@@ -592,7 +779,7 @@ describe("<RunPlanDetail/>", () => {
     const line = screen.getByTestId("run-summary-line");
     expect(within(line).getByText("Run #3")).toBeInTheDocument();
     expect(within(line).getByTestId("run-summary-note")).toHaveTextContent(
-      "switched judge to the stricter rubric",
+      "switched judge to the stricter criterion",
     );
   });
 
@@ -798,9 +985,14 @@ describe("<RunPlanDetail/>", () => {
       "/api/export/scenario-runs/download",
       expect.objectContaining({ method: "POST" }),
     );
-    const body = JSON.parse(
-      (fetchSpy.mock.calls[0]![1] as { body: string }).body,
-    ) as { scenarioSetId: string; mode: string };
+    // Picked by URL, not by position: the page fetches other things too.
+    const exportCall = fetchSpy.mock.calls.find(
+      (call) => call[0] === "/api/export/scenario-runs/download",
+    );
+    const body = JSON.parse((exportCall![1] as { body: string }).body) as {
+      scenarioSetId: string;
+      mode: string;
+    };
     expect(body.scenarioSetId).toBe(SUITE_SET_ID);
     expect(body.mode).toBe("full");
   });
@@ -816,44 +1008,356 @@ describe("<RunPlanDetail/>", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });
 
-  /** @scenario "Each run under One-off runs is named for the test case that ran" */
-  /** @scenario "The finished one-off run is listed under One-off runs" */
-  it("names a one-off run after the test case that ran", async () => {
+  /**
+   * One batch of three runs of one scenario against one target, started with
+   * one parameter and both simulation models named. The repeat count is the
+   * number of runs sharing a scenario and a target, so three runs is a repeat
+   * count of three.
+   */
+  function configuredBatch(
+    langwatch: Record<string, unknown> = {
+      targetReferenceId: "agent_1",
+      targetType: "http",
+      simulatorModel: "openai/gpt-5-mini",
+      judgeModel: "openai/gpt-5",
+    },
+    extraMetadata: Record<string, unknown> = {
+      parameters: { region: "eu-central" },
+    },
+  ): ScenarioRunData[] {
+    return ["run_a", "run_b", "run_c"].map((scenarioRunId) =>
+      makeRun({
+        batchRunId: "batch_3",
+        scenarioRunId,
+        metadata: { langwatch, ...extraMetadata } as never,
+      }),
+    );
+  }
+
+  /** @scenario "The run settings stay hidden until they are asked for" */
+  it("keeps the run settings off until the toggle is used", () => {
+    setRuns(configuredBatch());
+    renderDetail();
+
+    const toggle = screen.getByTestId("run-settings-toggle");
+    expect(toggle).toHaveTextContent("Show run settings");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("run-settings-block")).not.toBeInTheDocument();
+    // Nothing pushed the results down: the table is what reads under the
+    // header line.
+    expect(screen.getByTestId("run-results-table")).toBeInTheDocument();
+  });
+
+  /** @scenario "The toggle turns the run settings block on and off" */
+  it("turns the block on with the toggle and off again", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    const toggle = screen.getByTestId("run-settings-toggle");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(toggle);
+    expect(screen.getByTestId("run-settings-block")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(toggle);
+    expect(screen.queryByTestId("run-settings-block")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  /** @scenario "The run settings block says what the run was configured with" */
+  it("reads the parameters, the repeat count and both models", async () => {
+    const user = userEvent.setup();
+    setRuns(configuredBatch());
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    expect(within(block).getByTestId("run-settings-started")).toHaveTextContent(
+      "2h ago",
+    );
+    // A parameter value is a literal, so it reads in a monospace font.
+    const parameter = within(block).getByText("region = eu-central");
+    expect(parameter.tagName).toBe("CODE");
+
+    expect(within(block).getByTestId("run-settings-repeat")).toHaveTextContent(
+      "3 times",
+    );
+
+    const simulator = within(block).getByTestId("run-settings-simulator");
+    expect(simulator).toHaveTextContent("gpt-5-mini");
+    expect(simulator.querySelector("svg")).not.toBeNull();
+
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("gpt-5");
+    expect(judge.querySelector("svg")).not.toBeNull();
+  });
+
+  /** @scenario "The block names the models the run really ran on" */
+  /** @scenario "The run settings read the resolved model, not the configured one" */
+  it("names the models the run resolved, never the project default", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        resolvedSimulatorModel: "openai/gpt-5-mini",
+        resolvedJudgeModel: "openai/gpt-5",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    const simulator = within(block).getByTestId("run-settings-simulator");
+    expect(simulator).toHaveTextContent("gpt-5-mini");
+    expect(simulator.querySelector("svg")).not.toBeNull();
+
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("gpt-5");
+    expect(judge.querySelector("svg")).not.toBeNull();
+
+    expect(block).not.toHaveTextContent(PROJECT_DEFAULT_MODEL);
+  });
+
+  /** @scenario "The judge always reads, and a run that named no model reads the project default" */
+  it("reads the judge as the project default on a run that stamped no model", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({ targetReferenceId: "agent_1", targetType: "http" }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
+    // Such a run judged on the default model of the project, so the row says
+    // that rather than reading as if no judge had run at all.
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("Project default model");
+    expect(judge).not.toHaveTextContent(/no model/i);
+    expect(PROJECT_DEFAULT_MODEL).toBe("Project default model");
+    // The simulator reads only when the run named one, so a run that named
+    // neither model keeps the block to the judge alone.
+    expect(
+      within(block).queryByTestId("run-settings-simulator"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A run with no parameters and no repeat reads neither" */
+  it("reads neither parameters nor a repeat count when the run had none", async () => {
     const user = userEvent.setup();
     setRuns([
       makeRun({
-        batchRunId: "batch_b",
-        scenarioRunId: "run_b",
-        name: "Angry refund request",
-      }),
-      makeRun({
-        batchRunId: "batch_a",
+        batchRunId: "batch_3",
         scenarioRunId: "run_a",
-        scenarioId: "scen_2",
-        name: "Edge: empty cart",
-        timestamp: NOW - 86_400_000,
+        metadata: {
+          langwatch: { targetReferenceId: "agent_1", targetType: "http" },
+        } as never,
       }),
     ]);
-    const { props } = renderDetail({
-      plan: {
-        slug: "one-off-runs",
-        name: "One-off runs",
-        kind: "one-off",
-        scenarioSetId: "__internal__proj_1__on-platform-scenarios",
-        suiteId: null,
-        caseCount: null,
-        lastRun: null,
-      },
-    });
+    renderDetail();
 
-    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const block = screen.getByTestId("run-settings-block");
     expect(
-      within(sidebar).getByText("Angry refund request"),
-    ).toBeInTheDocument();
-    expect(within(sidebar).getByText("Edge: empty cart")).toBeInTheDocument();
+      within(block).queryByTestId("run-settings-parameters"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(block).queryByTestId("run-settings-repeat"),
+    ).not.toBeInTheDocument();
+    // The judge still reads, which is the point of the block.
+    expect(within(block).getByTestId("run-settings-judge")).toBeInTheDocument();
+  });
 
-    await user.click(within(sidebar).getByText("Edge: empty cart"));
-    expect(props.onSelectRun).toHaveBeenCalledWith("batch_a");
+  /** @scenario "The first row of the block says when the run started and who started it" */
+  it("says when the run started and that the reader started it, on one row", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: VIEWER_USER_ID,
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    // One row, not two: the person reads at the end of the row the time is on.
+    expect(screen.getAllByTestId("run-settings-started")).toHaveLength(1);
+    expect(started.textContent?.trim().endsWith("You")).toBe(true);
+    // The reader names themselves, so the roster is never asked for.
+    expect(mockGetOrganizationMembers).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ enabled: true }),
+    );
+  });
+
+  /** @scenario "A run started by a teammate reads that teammate's name" */
+  it("names the teammate who started the run, from the organization roster", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_omar",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("Omar Haddad");
+    // Somebody else started it, so the reader is not named.
+    expect(started).not.toHaveTextContent("You");
+    expect(started).not.toHaveTextContent("user_omar");
+    // The roster was asked for, against this organization.
+    expect(mockGetOrganizationMembers).toHaveBeenCalledWith(
+      { organizationId: "org_1" },
+      expect.objectContaining({ enabled: true }),
+    );
+  });
+
+  /** @scenario "A run whose person matches no member reads the time alone" */
+  it("reads the time alone for a person no membership holds", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_departed",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    expect(started).not.toHaveTextContent("Unknown");
+    expect(started).not.toHaveTextContent("user_departed");
+    // The row ends at the time, with no separator left behind it.
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
+  });
+
+  /** @scenario "A run whose person matches no member reads the time alone" */
+  it("reads the time alone for a member whose row carries no name", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_nameless",
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
+  });
+
+  /** @scenario "A run started with a key that names no person shows only the time" */
+  it("reads the time alone when the run recorded no person", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    expect(started).not.toHaveTextContent("You");
+    expect(started).not.toHaveTextContent("Unknown");
+    // The row ends at the time, with no separator left behind it.
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
+  });
+
+  /** @scenario "A run started through the CLI names the CLI, not a person" */
+  it("names the CLI on a run started through it, and invents no name", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_omar",
+        actorLabel: "cli",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("CLI");
+    // The run stores an id, so no name is made up from it, and the surface
+    // answers for the run even when the roster holds that id.
+    expect(started).not.toHaveTextContent("user_omar");
+    expect(started).not.toHaveTextContent("Omar Haddad");
+    expect(started).not.toHaveTextContent("You");
+  });
+
+  /** @scenario "The note stays in the header line and never moves into the block" */
+  it("keeps the note in the header line when the settings are shown", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch(
+        {
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          judgeModel: "openai/gpt-5",
+        },
+        { note: "switched judge to the stricter criterion" },
+      ),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    expect(
+      within(screen.getByTestId("run-summary-line")).getByTestId(
+        "run-summary-note",
+      ),
+    ).toHaveTextContent("switched judge to the stricter criterion");
+    expect(screen.getByTestId("run-settings-block")).not.toHaveTextContent(
+      "switched judge",
+    );
   });
 
   it("opens the run detail drawer when a result row is chosen", async () => {
@@ -894,5 +1398,61 @@ describe("<RunPlanDetail/>", () => {
     expect(
       screen.queryByTestId("runs-sidebar-pending"),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("<RunsSidebarEntry/>", () => {
+  afterEach(cleanup);
+
+  /** @scenario "The runs sidebar reads a pass rate on the same scale as the tables" */
+  it("reads a pass rate on the colour scale the whole surface shares", () => {
+    render(
+      <>
+        <RunsSidebarEntry
+          title="Run #2"
+          note={null}
+          timeAgo="now"
+          passRate={90}
+          passedCount={null}
+          isSelected={false}
+          testId="entry-90"
+        />
+        <RunsSidebarEntry
+          title="Run #1"
+          note={null}
+          timeAgo="now"
+          passRate={60}
+          passedCount={null}
+          isSelected={false}
+          testId="entry-60"
+        />
+      </>,
+      { wrapper: Wrapper },
+    );
+
+    const colorOf = (element: Element) =>
+      window.getComputedStyle(element).color;
+    const backgroundOf = (element: Element) =>
+      window.getComputedStyle(element).backgroundColor;
+
+    const ninety = screen.getByTestId("entry-90-result");
+    const sixty = screen.getByTestId("entry-60-result");
+    const ninetyText = within(ninety).getByTestId("pass-rate-text");
+    const sixtyText = within(sixty).getByTestId("pass-rate-text");
+
+    // Both rates sit in the same band of the surface's scale, so the raw
+    // gradient of a rate would give them two colours and the scale gives
+    // them one.
+    // The scale answers a theme token; the element carries it as the
+    // variable the theme emits for it.
+    const tokenVar = (token: string) =>
+      `var(--chakra-colors-${token.replace(".", "-")})`;
+    expect(colorOf(ninetyText)).toBe(tokenVar(passRateColor(90)));
+    expect(colorOf(sixtyText)).toBe(tokenVar(passRateColor(60)));
+    expect(colorOf(ninetyText)).toBe(colorOf(sixtyText));
+
+    expect(backgroundOf(screen.getByTestId("entry-90-result-dot"))).toBe(
+      colorOf(ninetyText),
+    );
   });
 });

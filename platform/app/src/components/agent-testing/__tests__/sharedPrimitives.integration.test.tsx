@@ -116,8 +116,7 @@ describe("<FolderHeaderRow/>", () => {
       <FolderHeaderRow
         name="Checkout"
         caseCount={4}
-        templateColumns="minmax(0,1fr) 170px 112px"
-        aggregateSpan={2}
+        templateColumns="minmax(0,1fr) auto"
         {...props}
       />,
       { wrapper: Wrapper },
@@ -127,19 +126,20 @@ describe("<FolderHeaderRow/>", () => {
     renderRow();
 
     expect(screen.getByText("Checkout")).toBeInTheDocument();
-    expect(screen.getByLabelText("4 test cases")).toBeInTheDocument();
+    expect(screen.getByLabelText("4 scenarios")).toBeInTheDocument();
   });
 
   it("counts one case as one", () => {
     renderRow({ caseCount: 1 });
 
-    expect(screen.getByLabelText("1 test case")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 scenario")).toBeInTheDocument();
   });
 
-  it("carries the aggregate it is given", () => {
-    renderRow({ children: <span>Pass 100%</span> });
+  it("carries no result summary beside the name", () => {
+    renderRow();
 
-    expect(screen.getByText("Pass 100%")).toBeInTheDocument();
+    expect(screen.queryByText(/pass/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-metrics-summary")).not.toBeInTheDocument();
   });
 
   it("opens the folder when the row is chosen", async () => {

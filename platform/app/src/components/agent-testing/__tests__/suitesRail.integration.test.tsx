@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The rail of the Test cases tab: All test cases, the test suites, the sets
- * that run from code, and the period picker at its foot.
+ * The rail of the Scenarios tab: the test suites, the sets that run from code,
+ * the period picker at its foot, and the one dialog that names a suite.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/suite-folders.feature
@@ -13,13 +13,13 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
-import { CasesPanel } from "../cases/CasesPanel";
+import { SuiteNameDialog } from "../cases/SuiteNameDialog";
 import { SuiteRail } from "../cases/SuiteRail";
 import {
-  groupCasesByFolder,
-  type TestCase,
+  orderSuitesDefaultFirst,
   type TestSuiteEntry,
 } from "../cases/test-cases";
+import type { SuiteLastRun } from "../cases/useTestCasesData";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -42,6 +42,16 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const THIRTY_DAYS = computeRelativeWindow("30d", new Date());
 
+/** The last run of a suite, as the rail is handed it. */
+function makeLastRun(overrides: Partial<SuiteLastRun> = {}): SuiteLastRun {
+  return {
+    batchRunId: "batch_1",
+    scenarioSetId: "__internal__suite_refunds__suite",
+    lastRunAt: new Date("2026-07-08T09:30:00.000Z").getTime(),
+    ...overrides,
+  };
+}
+
 function makeSuite(overrides: Partial<TestSuiteEntry> = {}): TestSuiteEntry {
   return {
     id: "suite_1",
@@ -56,18 +66,21 @@ function renderRail(
   overrides: Partial<React.ComponentProps<typeof SuiteRail>> = {},
 ) {
   const props: React.ComponentProps<typeof SuiteRail> = {
-    selection: { kind: "all" },
+    selectedSuiteId: null,
+    selectedExternalSetId: null,
     suites: [makeSuite()],
     externalSets: [],
     canManage: true,
-    suiteIdsWithRuns: new Set<string>(["suite_1"]),
+    lastRunBySuiteId: new Map<string, SuiteLastRun>([
+      ["suite_1", makeLastRun()],
+    ]),
     collapsed: false,
     onToggleCollapsed: vi.fn(),
     onSelect: vi.fn(),
-    onCreateSuite: vi.fn(),
+    onNewSuite: vi.fn(),
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
-    onEditSuite: vi.fn(),
+    onRenameSuite: vi.fn(),
     onOpenLastRun: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
@@ -88,11 +101,22 @@ async function openSuiteMenu(suiteName: string) {
   return user;
 }
 
+/** The rail entries, in reading order. */
+function railEntries(): string[] {
+  const rail = screen.getByTestId("agent-testing-suite-rail");
+  return within(rail)
+    .getAllByRole("button")
+    .map((element) => element.getAttribute("data-testid"))
+    .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
+}
+
 describe("the test suites rail", () => {
   afterEach(cleanup);
 
-  /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
-  it("lists All test cases, then the test suites, then the external sets", () => {
+  // --- What is listed ---
+
+  /** @scenario "The rail lists the test suites, then the external sets" */
+  it("lists the test suites, then the external sets, and no counts", () => {
     renderRail({
       suites: [
         makeSuite(),
@@ -103,15 +127,7 @@ describe("the test suites rail", () => {
 
     expect(screen.getByText("Test Suites")).toBeInTheDocument();
     expect(screen.getByText("From Code")).toBeInTheDocument();
-
-    const rail = screen.getByTestId("agent-testing-suite-rail");
-    const entries = within(rail)
-      .getAllByRole("button")
-      .map((element) => element.getAttribute("data-testid"))
-      .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
-
-    expect(entries).toEqual([
-      "suite-rail-item-All test cases",
+    expect(railEntries()).toEqual([
       "suite-rail-item-Refunds",
       "suite-rail-item-Checkout",
       "suite-rail-item-nightly-ci",
@@ -119,17 +135,87 @@ describe("the test suites rail", () => {
 
     // No row carries a count and no row carries a time: how many cases a set
     // holds reads beside the panel title, once.
-    for (const entry of entries) {
+    for (const entry of railEntries()) {
       expect(screen.getByTestId(entry).textContent).not.toMatch(/\d/);
     }
   });
 
-  /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
-  it("keeps the row menu beside the selection control, not inside it", () => {
+  /** @scenario "The rail offers no root list of every scenario" */
+  it("offers no All scenarios entry and no heading that leads anywhere", () => {
     renderRail({
-      suites: [makeSuite({ id: "suite_1", name: "Refunds", slug: "refunds" })],
-      externalSets: [],
+      suites: [makeSuite()],
+      externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
+
+    expect(
+      screen.queryByTestId("suite-rail-item-All scenarios"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("All scenarios")).not.toBeInTheDocument();
+    // The headings are plain labels: their destination is gone.
+    expect(screen.getByText("Test Suites").tagName).not.toBe("BUTTON");
+    expect(screen.getByText("From Code").tagName).not.toBe("BUTTON");
+  });
+
+  /** @scenario "The Default suite is listed first" */
+  it("moves Default to the front and keeps the rest in their order", () => {
+    // The migration wrote Default last, so the read hands it over last.
+    const asRead = [
+      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
+      makeSuite(),
+      makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
+    ];
+
+    renderRail({ suites: orderSuitesDefaultFirst(asRead) });
+
+    expect(railEntries()).toEqual([
+      "suite-rail-item-Default",
+      "suite-rail-item-Checkout",
+      "suite-rail-item-Refunds",
+    ]);
+  });
+
+  it("leaves a renamed Default where the read put it", () => {
+    const asRead = [
+      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
+      makeSuite({
+        id: "suite_default",
+        name: "Everything else",
+        slug: "default",
+      }),
+    ];
+
+    expect(orderSuitesDefaultFirst(asRead).map((suite) => suite.name)).toEqual([
+      "Checkout",
+      "Everything else",
+    ]);
+  });
+
+  /** @scenario "The Default suite carries the actions of an ordinary suite" */
+  it("gives Default the same row menu as any other suite", async () => {
+    renderRail({
+      suites: [
+        makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
+      ],
+      lastRunBySuiteId: new Map<string, SuiteLastRun>([
+        ["suite_default", makeLastRun()],
+      ]),
+    });
+    await openSuiteMenu("Default");
+
+    const items = (await screen.findAllByRole("menuitem")).map(
+      (item) => item.textContent,
+    );
+    expect(items).toEqual([
+      "New scenario",
+      "Run suite",
+      "Rename",
+      "Open last run",
+      "Archive suite",
+    ]);
+  });
+
+  it("keeps the row menu beside the selection control, not inside it", () => {
+    renderRail();
 
     const select = screen.getByTestId("suite-rail-item-Refunds");
     expect(select.tagName).toBe("BUTTON");
@@ -166,14 +252,13 @@ describe("the test suites rail", () => {
     const { props, view } = renderRail({ suites: [] });
 
     await user.click(screen.getByRole("button", { name: "New Test Suite" }));
-    await user.type(await screen.findByLabelText("Test suite name"), "Refunds");
-    await user.click(screen.getByRole("button", { name: "Create" }));
-
-    expect(props.onCreateSuite).toHaveBeenCalledWith("Refunds");
+    expect(props.onNewSuite).toHaveBeenCalled();
 
     view.rerender(<SuiteRail {...props} suites={[makeSuite()]} />);
     expect(screen.getByTestId("suite-rail-item-Refunds")).toBeInTheDocument();
   });
+
+  // --- The row menu ---
 
   /** @scenario "The row menu of a test suite offers its five actions in order" */
   it("offers its five actions in order", async () => {
@@ -184,9 +269,9 @@ describe("the test suites rail", () => {
       (item) => item.textContent,
     );
     expect(items).toEqual([
-      "New test case",
+      "New scenario",
       "Run suite",
-      "Edit suite",
+      "Rename",
       "Open last run",
       "Archive suite",
     ]);
@@ -201,16 +286,32 @@ describe("the test suites rail", () => {
       await screen.findByRole("menuitem", { name: "Open last run" }),
     );
 
-    // The tab answers this by opening the Results tab on that suite, where the
-    // newest run of the plan is the one selected.
     expect(props.onOpenLastRun).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "refunds" }),
     );
   });
 
+  /** @scenario "Every action of the rail row menu carries its icon" */
+  it("carries an icon on every action of the row menu", async () => {
+    renderRail();
+    await openSuiteMenu("Refunds");
+
+    const icons = (await screen.findAllByRole("menuitem")).map((item) =>
+      item.querySelector("svg")?.getAttribute("class"),
+    );
+
+    expect(icons).toEqual([
+      expect.stringContaining("lucide-plus"),
+      expect.stringContaining("lucide-play"),
+      expect.stringContaining("lucide-pencil"),
+      expect.stringContaining("lucide-list-checks"),
+      expect.stringContaining("lucide-archive"),
+    ]);
+  });
+
   /** @scenario "Open last run is not offered for a suite that never ran" */
   it("does not offer Open last run for a suite that never ran", async () => {
-    renderRail({ suiteIdsWithRuns: new Set<string>() });
+    renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
     await openSuiteMenu("Refunds");
 
     expect(
@@ -236,7 +337,7 @@ describe("the test suites rail", () => {
     expect(within(dialog).getByText("Refunds")).toBeInTheDocument();
     expect(
       within(dialog).getByText(
-        "The test cases in it are archived as well. Test runs are preserved.",
+        "The scenarios in it are archived as well. Test runs are preserved.",
       ),
     ).toBeInTheDocument();
 
@@ -276,15 +377,16 @@ describe("the test suites rail", () => {
     ).not.toBeInTheDocument();
   });
 
+  // --- Selection ---
+
   /** @scenario "Choosing a suite filters the case table to that suite" */
-  it("filters the case table to the chosen suite and marks it as selected", async () => {
+  it("asks for the chosen suite and marks the open one as selected", async () => {
     const user = userEvent.setup();
-    const { props, view } = renderRail({
-      suites: [
-        makeSuite(),
-        makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
-      ],
-    });
+    const suites = [
+      makeSuite(),
+      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
+    ];
+    const { props, view } = renderRail({ suites });
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
     expect(props.onSelect).toHaveBeenCalledWith({
@@ -293,39 +395,32 @@ describe("the test suites rail", () => {
     });
 
     view.rerender(
-      <SuiteRail
-        {...props}
-        suites={[
-          makeSuite(),
-          makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
-        ]}
-        selection={{ kind: "suite", slug: "refunds" }}
-      />,
+      <SuiteRail {...props} suites={suites} selectedSuiteId="suite_1" />,
     );
     expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute(
       "aria-current",
       "true",
     );
-
-    const refundsCase = makeCase({ id: "case_1", name: "Double charge" });
-    const checkoutCase = makeCase({
-      id: "case_2",
-      name: "Card declined",
-      folderId: "suite_2",
-    });
-    render(
-      <CasesPanel
-        {...casesPanelProps({
-          selection: { kind: "suite", slug: "refunds" },
-          title: "Refunds",
-          groups: [{ id: "suite_1", name: "Refunds", cases: [refundsCase] }],
-        })}
-      />,
-      { wrapper: Wrapper },
+    expect(screen.getByTestId("suite-rail-item-Checkout")).not.toHaveAttribute(
+      "aria-current",
     );
+  });
 
-    expect(screen.getByText("Double charge")).toBeInTheDocument();
-    expect(screen.queryByText(checkoutCase.name)).not.toBeInTheDocument();
+  it("marks the first suite while the address names none, because that is the one open", () => {
+    // The address alone cannot know the rail, so the rail is told which suite
+    // the tab resolved to rather than which one was asked for.
+    renderRail({
+      suites: [
+        makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
+        makeSuite(),
+      ],
+      selectedSuiteId: "suite_default",
+    });
+
+    expect(screen.getByTestId("suite-rail-item-Default")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
   });
 
   /** @scenario "Choosing an external set opens its results" */
@@ -342,9 +437,124 @@ describe("the test suites rail", () => {
       setId: "nightly-ci",
     });
     expect(
-      screen.queryByRole("menuitem", { name: "Edit suite" }),
+      screen.queryByRole("menuitem", { name: "Rename" }),
     ).not.toBeInTheDocument();
   });
+
+  // --- The suite editor ---
+
+  describe("when the suite editor is opened", () => {
+    function renderEditor(
+      overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {},
+    ) {
+      const props: React.ComponentProps<typeof SuiteNameDialog> = {
+        open: true,
+        initialName: "Refunds",
+        onClose: vi.fn(),
+        onConfirm: vi.fn(),
+        ...overrides,
+      };
+      render(<SuiteNameDialog {...props} />, { wrapper: Wrapper });
+      return { props };
+    }
+
+    /** @scenario "Rename opens a small centered dialog holding only a Name field" */
+    it("opens a small centered dialog holding only a Name field", () => {
+      renderEditor();
+
+      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
+      expect(within(dialog).getByText("Rename test suite")).toBeInTheDocument();
+      const name = within(dialog).getByLabelText("Test suite name");
+      expect(name).toHaveValue("Refunds");
+      expect(within(dialog).getAllByRole("textbox")).toHaveLength(1);
+    });
+
+    /** @scenario "The name dialog carries no targets, no models, no repeat count and no evaluators" */
+    it("carries no targets, no models, no repeat count and no tab strip", () => {
+      renderEditor();
+
+      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
+      for (const gone of [
+        "General",
+        "Simulation models",
+        "Execution",
+        "User simulator",
+        "Judge",
+        "Repeat count",
+        "Labels",
+      ]) {
+        expect(within(dialog).queryByText(gone)).not.toBeInTheDocument();
+      }
+      expect(within(dialog).queryByRole("tab")).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The name dialog does not manage which scenarios are in the suite" */
+    it("lists no scenarios and offers no way to add or remove one", () => {
+      renderEditor();
+
+      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
+      expect(within(dialog).queryByText("Scenarios")).not.toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole("button", { name: "Add scenarios" }),
+      ).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Saving the name dialog renames the suite" */
+    it("renames the suite on save", async () => {
+      const user = userEvent.setup();
+      const { props } = renderEditor();
+
+      const name = screen.getByLabelText("Test suite name");
+      await user.clear(name);
+      await user.type(name, "Refunds and returns");
+      await user.click(screen.getByTestId("suite-name-confirm"));
+
+      expect(props.onConfirm).toHaveBeenCalledWith("Refunds and returns");
+    });
+
+    /** @scenario "The name dialog refuses an empty name" */
+    it("refuses an empty name and saves nothing", async () => {
+      const user = userEvent.setup();
+      const { props } = renderEditor();
+
+      await user.clear(screen.getByLabelText("Test suite name"));
+      await user.click(screen.getByTestId("suite-name-confirm"));
+
+      expect(screen.getByTestId("suite-name-problem")).toHaveTextContent(
+        "A test suite needs a name.",
+      );
+      expect(props.onConfirm).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The name dialog offers no destructive action" */
+    it("offers only Cancel and Save", () => {
+      renderEditor();
+
+      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
+      const actions = within(dialog)
+        .getAllByRole("button")
+        .map((button) => button.textContent)
+        .filter((label) => !!label);
+      expect(actions).toEqual(["Cancel", "Save"]);
+    });
+
+    /** @scenario "Naming the first test suite opens it" */
+    it("reads as a create when it is opened on no suite", async () => {
+      const user = userEvent.setup();
+      const { props } = renderEditor({ initialName: "" });
+
+      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
+      expect(within(dialog).getByText("New test suite")).toBeInTheDocument();
+      await user.type(screen.getByLabelText("Test suite name"), "Refunds");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(props.onConfirm).toHaveBeenCalledWith("Refunds");
+    });
+  });
+
+  // --- The period picker ---
 
   /** @scenario "The period picker sits at the foot of the rail and starts at thirty days" */
   it("puts a compact thirty day period picker at the foot of the rail", () => {
@@ -391,50 +601,3 @@ describe("the test suites rail", () => {
     expect(screen.getByText("Try voice agent simulations")).toBeInTheDocument();
   });
 });
-
-function makeCase(overrides: Partial<TestCase> = {}): TestCase {
-  return {
-    id: "case_1",
-    name: "Double charge",
-    labels: [],
-    folderId: "suite_1",
-    createdAt: new Date("2026-02-06T10:00:00.000Z"),
-    lastUpdatedById: null,
-    ...overrides,
-  };
-}
-
-function casesPanelProps(
-  overrides: Partial<React.ComponentProps<typeof CasesPanel>> = {},
-): React.ComponentProps<typeof CasesPanel> {
-  return {
-    selection: { kind: "all" },
-    title: "All test cases",
-    groups: groupCasesByFolder({ cases: [], suites: [] }),
-    externalCases: [],
-    isLoading: false,
-    lastResults: new Map(),
-    isLastResultsLoading: false,
-    suites: [],
-    canManage: true,
-    projectHasNoCases: false,
-    allLabels: [],
-    activeLabels: [],
-    onToggleLabel: vi.fn(),
-    onRunSet: vi.fn(),
-    onNewTestCase: vi.fn(),
-    onSelectSuite: vi.fn(),
-    onRowClick: vi.fn(),
-    onRunCase: vi.fn(),
-    onEdit: vi.fn(),
-    onHistory: vi.fn(),
-    onDuplicate: vi.fn(),
-    onMoveToSuite: vi.fn(),
-    onOpenLastRun: vi.fn(),
-    onArchive: vi.fn(),
-    onOpenExternalCase: vi.fn(),
-    onEditSuite: vi.fn(),
-    onOpenExternalResults: vi.fn(),
-    ...overrides,
-  };
-}

@@ -1,5 +1,5 @@
 /**
- * The one place a run plan's scope becomes a list of test cases.
+ * The one place a run plan's scope becomes a list of scenarios.
  *
  * A dynamic scope is a rule, so the list it means changes as cases are
  * written, filed, labelled and archived. It is resolved when the run starts,
@@ -43,17 +43,7 @@ export async function resolveAndCacheScope({
 }): Promise<string[]> {
   await tx.$executeRaw`SELECT id FROM "SimulationSuite" WHERE id = ${suiteId} AND "projectId" = ${projectId} FOR UPDATE`;
 
-  const rows = await tx.scenario.findMany({
-    where: {
-      projectId,
-      archivedAt: null,
-      ...(scope.mode === "folders" && { folderId: { in: scope.folderIds } }),
-      ...(scope.mode === "labels" && { labels: { hasSome: scope.labels } }),
-    },
-    select: { id: true },
-    orderBy: { createdAt: "asc" },
-  });
-  const scenarioIds = rows.map((row) => row.id);
+  const scenarioIds = await readScopeScenarioIds({ projectId, scope, tx });
 
   await tx.simulationSuite.update({
     where: { id: suiteId, projectId },
@@ -64,7 +54,36 @@ export async function resolveAndCacheScope({
 }
 
 /**
- * The test cases a run of this plan covers.
+ * The project's active scenarios a dynamic scope matches, oldest first.
+ *
+ * The read alone, with no plan row involved. A run started under a name
+ * resolves what it covers through this before its plan exists, and the plan is
+ * then written with the list that came back.
+ */
+export async function readScopeScenarioIds({
+  projectId,
+  scope,
+  tx,
+}: {
+  projectId: string;
+  scope: SuiteScope;
+  tx: Pick<ScopeMembershipClient, "scenario">;
+}): Promise<string[]> {
+  const rows = await tx.scenario.findMany({
+    where: {
+      projectId,
+      archivedAt: null,
+      ...(scope.mode === "folders" && { folderId: { in: scope.folderIds } }),
+      ...(scope.mode === "labels" && { labels: { hasSome: scope.labels } }),
+    },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((row) => row.id);
+}
+
+/**
+ * The scenarios a run of this plan covers.
  *
  * A dynamic scope is resolved and cached in one transaction; a static one is
  * the list the plan already holds, returned untouched.

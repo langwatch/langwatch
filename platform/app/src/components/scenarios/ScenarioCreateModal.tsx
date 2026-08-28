@@ -33,13 +33,13 @@ export interface ScenarioCreateModalProps {
 
 const MODAL_TITLE = "Create new scenario";
 /** What Agent Testing calls the same modal. */
-const AGENT_TESTING_MODAL_TITLE = "New test case";
+const AGENT_TESTING_MODAL_TITLE = "New scenario";
 const MODAL_PLACEHOLDER =
   "Explain your agent, its goals and what behavior you want to test.";
 const GENERATING_TEXT = "Drafting your scenario…";
-const AGENT_TESTING_GENERATING_TEXT = "Drafting your test case…";
+const AGENT_TESTING_GENERATING_TEXT = "Drafting your scenario…";
 const PROMPT_LABEL = "What should this simulation prove?";
-const AGENT_TESTING_PROMPT_LABEL = "What should this test case prove?";
+const AGENT_TESTING_PROMPT_LABEL = "What should this scenario prove?";
 
 const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
   {

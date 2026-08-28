@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
-import { SuitesApiService } from "@/client-sdk/services/suites";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
@@ -19,12 +19,13 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
   try {
     const scenarios = await service.getAll();
 
-    // The scenario carries a folder id; the folder carries the name a person
-    // reads. A project that files nothing keeps the request it always made.
+    // The scenario carries a test suite id; the suite carries the name a
+    // person reads. A project that files nothing keeps the request it always
+    // made.
     const folderNameById = new Map<string, string>();
     if (scenarios.some((scenario) => scenario.folderId)) {
-      const folders = await new SuitesApiService().getAll({ kind: "folder" });
-      for (const folder of folders) folderNameById.set(folder.id, folder.name);
+      const suites = await createCliTestSuitesService().list();
+      for (const suite of suites) folderNameById.set(suite.id, suite.name);
     }
 
     spinner.succeed(

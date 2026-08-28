@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Agent Testing address is behind the release flag AND behind permission
- * to read test cases. The flag decides whether the address exists at all, and
+ * to read scenarios. The flag decides whether the address exists at all, and
  * it grants nothing on its own.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -64,6 +64,7 @@ vi.mock("~/hooks/usePreloadDrawer", () => ({
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
+  setFlowCallbacks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useSimulationUpdateListener", () => ({
@@ -81,6 +82,12 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      // The run dialog host reads the plan a stored run plan opens on.
+      getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       // Left unread, so the tab strip carries no count and the guard is the
       // only thing this file is checking.
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
@@ -102,6 +109,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -179,15 +190,15 @@ describe("the Agent Testing address", () => {
         screen.getByRole("heading", { name: "Agent Testing" }),
       ).toBeInTheDocument();
       const tabNames = screen.getAllByRole("tab").map((tab) => tab.textContent);
-      expect(tabNames).toEqual(["Test cases", "Results"]);
+      expect(tabNames).toEqual(["Scenarios", "Results"]);
     });
 
-    describe("and the person may not read test cases", () => {
+    describe("and the person may not read scenarios", () => {
       beforeEach(() => {
         state.permitted = false;
       });
 
-      /** @scenario "A person without permission to read test cases cannot open the page" */
+      /** @scenario "A person without permission to read scenarios cannot open the page" */
       it("refuses the page, so the flag alone grants nothing", () => {
         render(<AgentTestingRoute />, { wrapper: Wrapper });
 

@@ -26,6 +26,9 @@ export async function handleGetSimulationRun(params: {
     lines.push(`**Cost**: $${run.totalCost.toFixed(4)}`);
   }
   lines.push(`**Started**: ${new Date(run.timestamp).toISOString()}`);
+  if (run.note) {
+    lines.push(`**Note**: ${run.note}`);
+  }
 
   if (run.results) {
     lines.push("\n## Results");

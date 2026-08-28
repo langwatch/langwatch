@@ -229,7 +229,7 @@ function DeclaredSecretRow({
           isSecret
           disabled
           onToggle={() => undefined}
-          label={`${definition.name} is declared secret by the test cases`}
+          label={`${definition.name} is declared secret by the scenarios`}
           testId={`run-dialog-parameter-lock-${definition.name}`}
         />
         <chakra.span width="13px" flexShrink={0} />

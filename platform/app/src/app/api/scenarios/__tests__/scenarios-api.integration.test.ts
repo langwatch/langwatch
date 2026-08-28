@@ -8,6 +8,7 @@ import type {
   Team,
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { DEFAULT_SUITE_NAME } from "~/server/suites/default-suite";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
@@ -317,7 +318,7 @@ describe("Scenarios API", () => {
     });
 
     describe("when a scenario is updated with folderId null", () => {
-      it("unfiles it", async () => {
+      it("files it into the Default suite", async () => {
         const folder = await createFolder("Refunds");
         const created = await helpers.api.post("/api/scenarios", {
           name: "Refund case",
@@ -332,7 +333,16 @@ describe("Scenarios API", () => {
 
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.folderId).toBeNull();
+
+        const defaultSuite = await prisma.simulationSuite.findFirst({
+          where: {
+            projectId: testProjectId,
+            kind: "folder",
+            name: DEFAULT_SUITE_NAME,
+          },
+        });
+        expect(body.folderId).toBe(defaultSuite?.id);
+        expect(defaultSuite?.scenarioIds).toEqual([id]);
 
         const stored = await prisma.simulationSuite.findFirst({
           where: { id: folder.id, projectId: testProjectId },

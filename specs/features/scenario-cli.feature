@@ -64,34 +64,34 @@ Feature: Scenario CLI Commands
   # ============================================================================
   # Test suite membership (Agent Testing v2)
   # ============================================================================
-  # A scenario belongs to at most one test suite folder. The domain rules are
+  # A scenario belongs to at most one test suite. The domain rules are
   # in specs/suites/suite-folders.feature and
   # specs/scenarios/scenario-folder-assignment.feature.
 
   @unit
-  Scenario: Create a scenario inside a test suite folder
-    Given my project has a test suite folder "folder_abc"
+  Scenario: Create a scenario inside a test suite
+    Given my project has a test suite "folder_abc"
     When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder folder_abc"
     Then the scenario is created inside that folder
     And the confirmation names the folder
 
   @unit
-  Scenario: Move a scenario to another test suite folder
-    Given my project has a scenario and a test suite folder "folder_xyz"
+  Scenario: Move a scenario to another test suite
+    Given my project has a scenario and a test suite "folder_xyz"
     When I run "langwatch scenario update <scenario-id> --folder folder_xyz"
     Then the scenario is moved to that folder
     And it no longer belongs to the folder it was in
 
   @unit
-  Scenario: Unfile a scenario from its test suite folder
+  Scenario: Unfile a scenario from its test suite
     Given my project has a scenario inside a folder
     When I run "langwatch scenario update <scenario-id> --no-folder"
     Then the scenario belongs to no folder
 
   @unit
-  Scenario: Create a scenario with a folder id that does not exist
+  Scenario: Create a scenario with a test suite that does not exist
     When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder nonexistent-id"
-    Then I see an error that the folder was not found
+    Then I see an error that the test suite was not found
     And no scenario is created
 
   @unit
@@ -102,15 +102,48 @@ Feature: Scenario CLI Commands
 
   @unit
   Scenario: List scenarios shows the folder each one belongs to
-    Given my project has scenarios inside and outside test suite folders
+    Given my project has scenarios inside and outside test suites
     When I run "langwatch scenario list"
     Then the table has a folder column
     And a scenario with no folder reads as unfiled
 
   # ============================================================================
-  # Run notes (Agent Testing v2)
+  # Running one scenario (Agent Testing v2)
   # ============================================================================
-  # The note travels with the batch. See specs/suites/run-notes.feature.
+  # Running a scenario is sugar over a run plan: one request, scoped to the one
+  # case. No suite is created for it, and none is deleted afterwards. The
+  # platform files the run under a plan named after the scenario and the target
+  # unless a name is sent. See specs/features/run-plan-cli.feature.
+
+  @unit
+  Scenario: Run a scenario against a target
+    Given my project has a scenario "Login Flow" and an HTTP agent
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
+    Then one run request is sent, scoped to that one case
+    And no test suite is created or deleted
+    And I see the plan name, the job count and the batch run ID
+
+  @unit
+  Scenario: Run a scenario against more than one target
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --target prompt:prompt_xyz"
+    Then the run is scheduled against both targets
+
+  @unit
+  Scenario: Run a scenario under a plan name
+    Given my project has a run plan named "Login checks"
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --name 'Login checks'"
+    Then the run joins that plan
+
+  @unit
+  Scenario: Run a scenario more than once
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --repeat 3"
+    Then the configuration carries the repeat count
+
+  @unit
+  Scenario: Run a scenario with no target
+    When I run "langwatch scenario run <scenario-id>"
+    Then I see an error that at least one --target is needed
+    And no run is scheduled
 
   @unit
   Scenario: Run a scenario with a note
@@ -129,6 +162,11 @@ Feature: Scenario CLI Commands
   Scenario: Run a scenario with a note of only spaces
     When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note '   '"
     Then the run is scheduled with no note
+
+  @unit
+  Scenario: Running a scenario declares the command line as its surface
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
+    Then the request carries the header "X-LangWatch-Surface: cli"
 
   # ============================================================================
   # Versions (Agent Testing v2)

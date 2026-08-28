@@ -43,6 +43,25 @@ describe("buildChildProcessEnv", () => {
       expect(env.LANGWATCH_ENDPOINT).toBe("http://localhost:9999");
     });
 
+    it("forwards the platform's fetch ceiling so the adapter in the child can read it", () => {
+      // This allowlist is the only route from the operator's environment into
+      // the child; without the entry NLP_FETCH_MAX_TIMEOUT_MS is settable but
+      // never observed, and the adapter silently keeps its 15-minute default.
+      const previous = process.env.NLP_FETCH_MAX_TIMEOUT_MS;
+      process.env.NLP_FETCH_MAX_TIMEOUT_MS = "1800000";
+      try {
+        expect(buildChildProcessEnv({}).NLP_FETCH_MAX_TIMEOUT_MS).toBe(
+          "1800000",
+        );
+      } finally {
+        if (previous === undefined) {
+          delete process.env.NLP_FETCH_MAX_TIMEOUT_MS;
+        } else {
+          process.env.NLP_FETCH_MAX_TIMEOUT_MS = previous;
+        }
+      }
+    });
+
     it("drops variables with no value rather than passing them as undefined", () => {
       const env = buildChildProcessEnv({ SOME_UNSET_VAR: undefined });
 

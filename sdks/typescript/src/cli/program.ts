@@ -65,20 +65,46 @@ const NOTE_FLAG_HELP =
 
 /** Help for the `--folder` flag on the scenario write commands. */
 const FOLDER_FLAG_HELP =
-  "The test suite folder to file this test case in, named by ID or by name.";
+  "The test suite to file this scenario in, named by ID or by name.";
 
 /**
- * Help for the three scope flags of the suite write commands. They answer one
- * question, so only one of them may be given.
+ * Help for the four scope flags of `run-plan run`. They answer one question,
+ * so exactly one of them must be given.
  */
 const SCOPE_ALL_FLAG_HELP =
-  "Cover every active test case of the project. The set is read again at each run, so a test case written later runs too.";
+  "Run every active scenario of the project. The set is read again at each run, so a scenario written later runs too.";
 
-const SCOPE_FOLDER_FLAG_HELP =
-  "Cover the test cases filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
+const SCOPE_SUITE_FLAG_HELP =
+  "Run the scenarios filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
 
 const SCOPE_LABEL_FLAG_HELP =
-  "Cover the test cases carrying this label. Repeat the flag for more than one.";
+  "Run the scenarios carrying this label. Repeat the flag for more than one.";
+
+const SCOPE_SCENARIO_FLAG_HELP =
+  "Run this scenario, named by ID. Repeat the flag for more than one.";
+
+/**
+ * Help for the flags a run command shares. `--target` repeats one value per
+ * occurrence for the same reason `--param` does: a variadic option keeps
+ * eating argv until the next flag.
+ */
+const TARGET_FLAG_HELP =
+  "What to run against, written <type>:<referenceId>, for example http:agent_abc123. The types are prompt, http, code and workflow. Repeat the flag for more than one.";
+
+const RUN_NAME_FLAG_HELP =
+  "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
+
+const REPEAT_FLAG_HELP =
+  "How many times to run each scenario against each target, from 1 to 5.";
+
+const SIMULATOR_MODEL_FLAG_HELP =
+  "The model that plays the user in this run. Left out, the project default is used.";
+
+const JUDGE_MODEL_FLAG_HELP =
+  "The model that judges this run against the criteria. Left out, the project default is used.";
+
+const IDEMPOTENCY_KEY_FLAG_HELP =
+  "Key that makes this run safe to retry. Two requests carrying the same key schedule one run.";
 
 /**
  * Reads the `--folder` / `--no-folder` pair.
@@ -1613,7 +1639,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
       .option("--evaluator <name>", "Show only this evaluator's column")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20"),
+      .option("--limit <n>", "Maximum rows to print in the table; the JSON answer always carries every row (default 20)", "20"),
     async (
       experiment: string,
       options: {
@@ -2822,7 +2848,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
     .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
     .option("--folder <folder>", FOLDER_FLAG_HELP)
-    .option("--no-folder", "Take the test case out of its test suite folder")
+    .option("--no-folder", "Take the scenario out of its test suite")
     .option("-f, --format <format>", "Output format: table (default) or json", "table");
 
   const readScenarioFolderFlags = trackFolderFlags(scenarioUpdateCmd);
@@ -2845,18 +2871,21 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   scenarioCmd
     .command("run <id>")
-    .description("Run a scenario against a target (agent or prompt)")
-    .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
-    .option("--wait", "Wait for the scenario run to complete")
+    .description("Run one scenario against one or more targets")
+    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+    .option("--name <name>", RUN_NAME_FLAG_HELP)
+    .option("--repeat <n>", REPEAT_FLAG_HELP)
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("--note <text>", NOTE_FLAG_HELP)
+    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+    .option("--wait", "Wait for the run to complete")
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[]; note?: string }) => {
+    .action(async (id: string, options: { target?: string[]; name?: string; repeat?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
 
-  // Version history of a test case. Nested under `scenario` because a version
+  // Version history of a scenario. Nested under `scenario` because a version
   // is a state of one case, never a resource of its own.
   const scenarioVersionCmd = scenarioCmd
     .command("version")
@@ -2896,156 +2925,147 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Add suite (run plan) command group
-  const suiteCmd = program
-    .command("suite")
-    .description("Manage suites (run plans) — scenario × target execution plans");
+  // Run plans. A run plan is a named configuration: a scope, targets, a repeat
+  // count and the two models. The name is its identity, so running under a
+  // name already in use joins that plan's history.
+  const runPlanCmd = program
+    .command("run-plan")
+    .description("Run scenarios and read the plans those runs are filed under");
 
-  emitsResult(
-    suiteCmd
-      .command("list")
-      .description("List all suites in the project")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
-      const { listSuitesCommand: impl } = await import("./commands/suites/list.js");
-      return impl();
-    },
-  );
-
-  emitsResult(
-    suiteCmd
-      .command("get <id>")
-      .description("Get suite details by ID")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { getSuiteCommand: impl } = await import("./commands/suites/get.js");
-      return impl(id);
-    },
-  );
-
-  emitsResult(
-    suiteCmd
-      .command("create <name>")
-      .description("Create a new suite (run plan)")
-      .option("--scenarios <ids>", "Comma-separated scenario IDs. Not needed when the plan is given a scope")
-      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
-      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
-      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
-      .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
-      .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
-      .option("--labels <labels>", "Comma-separated labels")
-      .option("--description <desc>", "Suite description")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
-      const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
-      return impl(name, options);
-    },
-  );
-
-  emitsResult(
-    suiteCmd
-      .command("update <id>")
-      .description("Update a suite (run plan)")
-      .option("--name <name>", "New suite name")
-      .option("--scenarios <ids>", "New comma-separated scenario IDs")
-      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
-      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
-      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
-      .option("--targets <targets...>", "New targets as <type>:<referenceId>")
-      .option("--repeat-count <n>", "New repeat count")
-      .option("--labels <labels>", "New comma-separated labels")
-      .option("--description <desc>", "New description")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
-      const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
-      return impl(id, options);
-    },
-  );
-
-  emitsResult(
-    suiteCmd
-      .command("duplicate <id>")
-      .description("Duplicate a suite")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
-      const { duplicateSuiteCommand: impl } = await import("./commands/suites/duplicate.js");
-      return impl(id);
-    },
-  );
-
-  suiteCmd
-    .command("run <id>")
-    .description("Execute a suite run — schedules all scenario × target × repeat jobs")
-    .option("--wait", "Wait for the suite run to complete before returning")
+  runPlanCmd
+    .command("run")
+    .description("Run a configuration under a name")
+    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+    .option("--all", SCOPE_ALL_FLAG_HELP)
+    .option("--suite <name-or-id>", SCOPE_SUITE_FLAG_HELP, collectParam)
+    .option("--label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
+    .option("--scenario <id>", SCOPE_SCENARIO_FLAG_HELP, collectParam)
+    .option("--name <name>", RUN_NAME_FLAG_HELP)
+    .option("--repeat <n>", REPEAT_FLAG_HELP)
+    .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+    .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("--note <text>", NOTE_FLAG_HELP)
+    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+    .option("--wait", "Wait for the run to complete")
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[]; note?: string }) => {
-      const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl({ id, options });
+    .action(async (options: { target?: string[]; all?: boolean; suite?: string[]; label?: string[]; scenario?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
+      const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
+      await impl(options);
     });
 
   emitsResult(
-    suiteCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a suite")
+    runPlanCmd
+      .command("list")
+      .description("List the run plans of the project")
+      .option("--archived", "Include archived run plans")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { archived?: boolean }) => {
+      const { listRunPlansCommand: impl } = await import("./commands/run-plans/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    runPlanCmd
+      .command("get <id>")
+      .description("Read one run plan")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
-      const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
+      const { getRunPlanCommand: impl } = await import("./commands/run-plans/get.js");
       return impl(id);
     },
   );
 
-  // Test suite folders. Nested under `suite` because a folder IS a suite: it
-  // holds the test cases filed into it and runs through the same path a run
-  // plan does, with `langwatch suite run <folder-id>`.
-  const suiteFolderCmd = suiteCmd
-    .command("folder")
-    .description("Manage test suite folders, the groups a test case is filed in");
+  emitsResult(
+    runPlanCmd
+      .command("archive <id>")
+      .description("Archive a run plan, keeping its run history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { archiveRunPlanCommand: impl } = await import("./commands/run-plans/archive.js");
+      return impl(id);
+    },
+  );
+
+  // Test suites. A test suite is a folder of scenarios: a name and the cases
+  // filed in it. It holds no targets, so a run carries them.
+  const suiteCmd = program
+    .command("suite")
+    .description("Manage test suites, the folders a scenario is filed in");
 
   emitsResult(
-    suiteFolderCmd
+    suiteCmd
       .command("list")
-      .description("List the test suite folders in the project")
+      .description("List the test suites of the project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
-      const { listFoldersCommand: impl } = await import("./commands/suites/folders/list.js");
+      const { listTestSuitesCommand: impl } = await import("./commands/test-suites/list.js");
       return impl();
     },
   );
 
   emitsResult(
-    suiteFolderCmd
+    suiteCmd
       .command("create <name>")
-      .description("Create an empty test suite folder")
+      .description("Create an empty test suite")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (name: string) => {
-      const { createFolderCommand: impl } = await import("./commands/suites/folders/create.js");
+      const { createTestSuiteCommand: impl } = await import("./commands/test-suites/create.js");
       return impl(name);
     },
   );
 
   emitsResult(
-    suiteFolderCmd
-      .command("rename <folder> <name>")
-      .description("Rename a test suite folder")
+    suiteCmd
+      .command("get <suite>")
+      .description("Read one test suite, named by ID or by name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (folder: string, name: string) => {
-      const { renameFolderCommand: impl } = await import("./commands/suites/folders/rename.js");
-      return impl(folder, name);
+    async (suite: string) => {
+      const { getTestSuiteCommand: impl } = await import("./commands/test-suites/get.js");
+      return impl(suite);
     },
   );
 
   emitsResult(
-    suiteFolderCmd
-      .command("delete <folder>")
-      .description("Archive a test suite folder and every test case filed in it")
+    suiteCmd
+      .command("rename <suite> <name>")
+      .description("Rename a test suite, keeping its slug")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (folder: string) => {
-      const { deleteFolderCommand: impl } = await import("./commands/suites/folders/delete.js");
-      return impl(folder);
+    async (suite: string, name: string) => {
+      const { renameTestSuiteCommand: impl } = await import("./commands/test-suites/rename.js");
+      return impl(suite, name);
     },
   );
+
+  emitsResult(
+    suiteCmd
+      .command("archive <suite>")
+      .description("Archive a test suite and every scenario filed in it")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (suite: string) => {
+      const { archiveTestSuiteCommand: impl } = await import("./commands/test-suites/archive.js");
+      return impl(suite);
+    },
+  );
+
+  suiteCmd
+    .command("run <suite>")
+    .description("Run every scenario filed in a test suite against the given targets")
+    .option("--target <target>", TARGET_FLAG_HELP, collectParam)
+    .option("--name <name>", RUN_NAME_FLAG_HELP)
+    .option("--repeat <n>", REPEAT_FLAG_HELP)
+    .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
+    .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+    .option("--note <text>", NOTE_FLAG_HELP)
+    .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
+    .option("--wait", "Wait for the run to complete")
+    .option("-f, --format <format>", "Output format: table (default) or json", "table")
+    .action(async (suite: string, options: { target?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
+      const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");
+      await impl({ reference: suite, options });
+    });
 
   // Add graph command group
   const graphCmd = program

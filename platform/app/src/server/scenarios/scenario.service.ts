@@ -8,6 +8,7 @@ import {
   type ScenarioVersion,
 } from "~/generated/prisma/client";
 import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
+import { ensureDefaultSuiteId } from "../suites/default-suite";
 import {
   assertAssignableFolder,
   type FolderMembershipClient,
@@ -155,19 +156,30 @@ export class ScenarioService {
       },
       async (span) => {
         logger.debug({ projectId: input.projectId }, "Creating scenario");
-        const folderId = input.folderId ?? null;
+        // No scenario is loose: a create that names no suite files into the
+        // project's Default, which is created here on the first such write.
+        // Resolved before the transaction opens, because the create behind it
+        // can lose a race and Postgres aborts a transaction on the unique
+        // violation that reports it.
+        const folderId =
+          input.folderId ??
+          (await ensureDefaultSuiteId({
+            projectId: input.projectId,
+            prisma: this.prisma,
+          }));
         const actor = options?.actor ?? actorFor(input.lastUpdatedById);
         // One transaction holds the row, its v1 version and the folder
         // membership, so a create that fails part way leaves nothing behind.
         const result = await this.prisma.$transaction(async (tx) => {
-          if (folderId !== null) {
-            await assertAssignableFolder({
-              projectId: input.projectId,
-              folderId,
-              tx,
-            });
-          }
-          const created = await this.repository.create(input, tx);
+          await assertAssignableFolder({
+            projectId: input.projectId,
+            folderId,
+            tx,
+          });
+          const created = await this.repository.create(
+            { ...input, folderId },
+            tx,
+          );
           await this.repository.createVersionRow(
             {
               scenarioId: created.id,
@@ -184,13 +196,11 @@ export class ScenarioService {
             },
             tx,
           );
-          if (folderId) {
-            await reconcileFolderMembership({
-              projectId: input.projectId,
-              folderId,
-              tx,
-            });
-          }
+          await reconcileFolderMembership({
+            projectId: input.projectId,
+            folderId,
+            tx,
+          });
           return created;
         });
         span.setAttribute("scenario.id", result.id);
@@ -312,14 +322,43 @@ export class ScenarioService {
           { projectId: params.projectId, scenarioId: params.id },
           "Updating scenario",
         );
+        const data = await this.withResolvedFolder({
+          projectId: params.projectId,
+          data: params.data,
+        });
         // One transaction holds the row, the version row and both folders'
         // member lists, so a write that fails part way leaves all of them
         // untouched.
         return await this.prisma.$transaction(async (tx) =>
-          this.applyUpdate(tx, params),
+          this.applyUpdate(tx, { ...params, data }),
         );
       },
     );
+  }
+
+  /**
+   * Turns "no suite" into the project's Default suite.
+   *
+   * A caller that clears `folderId` is asking to take the scenario out of the
+   * suite it is in, not to make it loose: every scenario belongs to exactly
+   * one suite. An update that names no `folderId` at all is left alone, since
+   * it is not a move.
+   *
+   * Resolved before the caller's transaction opens, for the reason
+   * {@link ensureDefaultSuiteId} documents.
+   */
+  private async withResolvedFolder(params: {
+    projectId: string;
+    data: UpdateScenarioInput;
+  }): Promise<UpdateScenarioInput> {
+    if (params.data.folderId !== null) return params.data;
+    return {
+      ...params.data,
+      folderId: await ensureDefaultSuiteId({
+        projectId: params.projectId,
+        prisma: this.prisma,
+      }),
+    };
   }
 
   /** The body of one update, inside the caller's transaction. */
@@ -608,7 +647,8 @@ export class ScenarioService {
   }
 
   /**
-   * Files a scenario into a folder, or unfiles it with folderId null.
+   * Files a scenario into a folder. A null folderId files it into the
+   * project's Default suite rather than leaving it in no suite at all.
    * The scenario keeps everything else, run history included.
    */
   async moveToFolder(params: {

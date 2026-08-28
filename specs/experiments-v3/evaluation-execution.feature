@@ -82,6 +82,26 @@ Feature: Evaluation execution - UI
     And 2 out of 3 rows pass "exact_match"
     Then the target header for "my-prompt" shows "67% pass rate"
 
+  # A pass rate is worked out over the rows that answered. A column that stopped
+  # at 30 of 40 rows therefore reports a rate for those 30, and on its own that
+  # figure reads as the column's score. Two columns then look comparable while
+  # they describe different parts of the dataset, and the reader acts on the
+  # comparison. The count was already drawn while a run was in progress and
+  # disappeared the moment the run stopped, which is exactly when the figure
+  # starts being read as final.
+
+  @integration
+  Scenario: A score over part of the dataset says how much it covers
+    Given a column that has results for 30 of the dataset's 40 rows
+    And the run is no longer in progress
+    Then the header shows the score together with "30/40"
+
+  @integration
+  Scenario: A score over the whole dataset stands on its own
+    Given a column that has results for every row of the dataset
+    And the run is no longer in progress
+    Then the header shows the score with no row count beside it
+
   @unimplemented
   Scenario: Aggregate stats update in real-time
     When I click the "Evaluate" button

@@ -18,7 +18,7 @@ Feature: Test case versions
   # --- Numbering ---
 
   @integration
-  Scenario: A new test case starts at version 1
+  Scenario: A new scenario starts at version 1
     When a test case is created
     Then the case reads as version 1
     And its history holds one entry named Created
@@ -92,7 +92,7 @@ Feature: Test case versions
   # --- Cases that existed before versions ---
 
   @integration
-  Scenario: A test case created before versions existed shows a made-up first entry
+  Scenario: A scenario created before versions existed shows a made-up first entry
     Given a test case stored before version history existed
     When its history is opened
     Then one entry is shown, named Created and numbered version 1

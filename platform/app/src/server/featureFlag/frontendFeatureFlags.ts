@@ -105,8 +105,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
   "release_ui_comparison_leaderboard_enabled",
-  // The Agent Testing v2 interface: one page with Test cases and Results
-  // tabs, test suites as folders, run notes, test case versions, and the
+  // The Agent Testing v2 interface: one page with Scenarios and Results
+  // tabs, test suites as folders, run notes, scenario versions, and the
   // wide run drawer (specs/features/agent-testing/). Off by default and
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.

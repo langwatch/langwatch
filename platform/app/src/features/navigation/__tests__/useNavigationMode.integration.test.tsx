@@ -4,16 +4,17 @@
  * Spec: specs/navigation/navigation-modes.feature
  */
 
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   loadStoredNavigationMode,
+  NAVIGATION_MODE_STORAGE_KEY,
   useNavigationModeStore,
 } from "../navigationModeStore";
 import { useNavigationMode } from "../useNavigationMode";
 
-const STORAGE_KEY = "langwatch:navigation-mode:v1";
+const STORAGE_KEY = NAVIGATION_MODE_STORAGE_KEY;
 
 beforeEach(() => {
   localStorage.clear();
@@ -36,6 +37,36 @@ describe("useNavigationMode", () => {
 
       const { result } = renderHook(() => useNavigationMode());
 
+      expect(result.current).toBe("icon-rail");
+    });
+  });
+
+  describe("when localStorage carries a mode before the first render", () => {
+    /**
+     * The first client render must match the server render. The server has
+     * no localStorage, so it renders the default. If the store read
+     * localStorage at module init instead, an icon-rail reader would
+     * hydrate the wrong shell against the server's product-switcher DOM.
+     *
+     * @scenario The first client frame matches the server default and the stored mode applies after mount
+     */
+    it("renders the default on the first frame and the stored mode after mount", async () => {
+      localStorage.setItem(STORAGE_KEY, "icon-rail");
+
+      let firstFrame: string | undefined;
+      const { result, rerender } = renderHook(() => {
+        const mode = useNavigationMode();
+        firstFrame ??= mode;
+        return mode;
+      });
+
+      expect(firstFrame).toBe("product-switcher");
+
+      // The mount effect runs after the first paint; a rerender picks up
+      // the applied stored mode.
+      await act(async () => {
+        rerender();
+      });
       expect(result.current).toBe("icon-rail");
     });
   });

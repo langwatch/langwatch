@@ -50,7 +50,6 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
   });
 
   const selection = useSelectedBatch({
-    plan,
     batches,
     batchRunId: props.batchRunId,
   });
@@ -64,7 +63,6 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
       data-testid="agent-testing-run-plan-detail"
     >
       <RunsSidebar
-        plan={plan}
         runs={batches}
         selectedBatchRunId={selection.selectedBatch?.batchRunId ?? null}
         pendingBatchRunId={pendingBatchRunId}

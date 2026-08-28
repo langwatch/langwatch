@@ -212,6 +212,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       switch (event.type) {
         case "execution_started":
           setRunId(event.runId);
+          // This page owns the run from here on. A run that writes its cells
+          // back advances the saved version, and the page adopts that bump
+          // rather than reading its own run's write as a stranger's.
+          useEvaluationsV3Store.getState().rememberRunStartedHere(event.runId);
           setProgress({ completed: 0, total: event.total });
           setResults({
             runId: event.runId,

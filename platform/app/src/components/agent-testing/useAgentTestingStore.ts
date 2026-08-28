@@ -41,17 +41,6 @@ interface RouterLike {
 
 type QueryLike = Record<string, string | string[] | undefined>;
 
-/** The case the editor dialog is open on, if any. */
-export type CaseEditorTarget = {
-  open: boolean;
-  /** The case being edited, or nothing for a new one. */
-  scenarioId: string | null;
-  /** The suite a new case starts in. */
-  folderId: string | null;
-  /** True when the case was opened to read its versions. */
-  showHistory: boolean;
-};
-
 /**
  * A run that was just started and has no rows yet. The set it belongs to
  * travels with it, so only the run plan that started it shows the entry.
@@ -72,13 +61,6 @@ export type OpenPlanTitle = {
   note: string;
 };
 
-const CLOSED_CASE_EDITOR: CaseEditorTarget = {
-  open: false,
-  scenarioId: null,
-  folderId: null,
-  showHistory: false,
-};
-
 export interface AgentTestingState {
   viewMode: AgentTestingViewMode;
   railCollapsed: boolean;
@@ -88,7 +70,6 @@ export interface AgentTestingState {
   pendingRun: PendingRun | null;
   /** The run whose cancel is in flight, so its button can say so. */
   cancellingJobId: string | null;
-  caseEditor: CaseEditorTarget;
   /** The run plan the page is open on, or nothing on the list itself. */
   openPlanTitle: OpenPlanTitle | null;
 
@@ -101,8 +82,6 @@ export interface AgentTestingState {
   setPendingRun: (run: PendingRun | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
   setOpenPlanTitle: (title: OpenPlanTitle | null) => void;
-  openCaseEditor: (target: Partial<Omit<CaseEditorTarget, "open">>) => void;
-  closeCaseEditor: () => void;
 
   syncToUrl: (router: RouterLike) => void;
   hydrateFromUrl: (query: QueryLike) => void;
@@ -158,7 +137,6 @@ export function createAgentTestingStore() {
     lastRunTarget: null,
     pendingRun: null,
     cancellingJobId: null,
-    caseEditor: CLOSED_CASE_EDITOR,
     openPlanTitle: null,
 
     setViewMode: (value) => set({ viewMode: value }),
@@ -199,15 +177,6 @@ export function createAgentTestingStore() {
     setCancellingJobId: (jobId) => set({ cancellingJobId: jobId }),
 
     setOpenPlanTitle: (title) => set({ openPlanTitle: title }),
-
-    openCaseEditor: ({
-      scenarioId = null,
-      folderId = null,
-      showHistory = false,
-    }) =>
-      set({ caseEditor: { open: true, scenarioId, folderId, showHistory } }),
-
-    closeCaseEditor: () => set({ caseEditor: CLOSED_CASE_EDITOR }),
 
     syncToUrl: (router) => {
       const { viewMode } = get();

@@ -2071,6 +2071,258 @@
         ]
       }
     },
+    "/api/agent-cache/{name}/claim": {
+      "post": {
+        "operationId": "postApiAgentCacheByNameClaim",
+        "description": "Store a value under a name only if the project does not hold that name yet. The answer says whether this caller is the one that took it: `claimed` is true when the value was written, and false when the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.",
+        "responses": {
+          "200": {
+            "description": "Claim resolved, taken or not",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "claimed": {
+                      "type": "boolean"
+                    },
+                    "ttl_seconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "claimed",
+                    "ttl_seconds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ttl_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 86400
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/agents": {
       "get": {
         "operationId": "getApiAgents",
@@ -46772,6 +47024,23 @@
                               },
                               "scenarioVersion": {
                                 "type": "integer"
+                              },
+                              "simulatorModel": {
+                                "type": "string"
+                              },
+                              "judgeModel": {
+                                "type": "string"
+                              },
+                              "actorId": {
+                                "type": "string"
+                              },
+                              "actorLabel": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api",
+                                  "cli"
+                                ]
                               }
                             },
                             "required": [
@@ -52619,7 +52888,8 @@
     "/api/suites": {
       "get": {
         "operationId": "getApiSuites",
-        "description": "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
         "responses": {
           "200": {
             "description": "Success",
@@ -52727,7 +52997,7 @@
                             "type": "null"
                           }
                         ],
-                        "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                        "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                       },
                       "targets": {
                         "type": "array",
@@ -52741,10 +53011,12 @@
                                 "http",
                                 "code",
                                 "workflow"
-                              ]
+                              ],
+                              "description": "What kind of thing the scenarios run against."
                             },
                             "referenceId": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "The id of the prompt, agent or workflow to run against."
                             }
                           },
                           "required": [
@@ -52901,7 +53173,8 @@
       },
       "post": {
         "operationId": "postApiSuites",
-        "description": "Create a new suite (run plan)",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).",
         "responses": {
           "201": {
             "description": "Suite created",
@@ -53007,7 +53280,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53021,10 +53294,12 @@
                               "http",
                               "code",
                               "workflow"
-                            ]
+                            ],
+                            "description": "What kind of thing the scenarios run against."
                           },
                           "referenceId": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "The id of the prompt, agent or workflow to run against."
                           }
                         },
                         "required": [
@@ -53252,7 +53527,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "targets": {
                     "type": "array",
@@ -53266,10 +53541,12 @@
                             "http",
                             "code",
                             "workflow"
-                          ]
+                          ],
+                          "description": "What kind of thing the scenarios run against."
                         },
                         "referenceId": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "The id of the prompt, agent or workflow to run against."
                         }
                       },
                       "required": [
@@ -53310,7 +53587,8 @@
     "/api/suites/{id}": {
       "get": {
         "operationId": "getApiSuitesById",
-        "description": "Get a suite (run plan) by its ID",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.",
         "responses": {
           "200": {
             "description": "Success",
@@ -53416,7 +53694,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53430,10 +53708,12 @@
                               "http",
                               "code",
                               "workflow"
-                            ]
+                            ],
+                            "description": "What kind of thing the scenarios run against."
                           },
                           "referenceId": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "The id of the prompt, agent or workflow to run against."
                           }
                         },
                         "required": [
@@ -53535,6 +53815,10 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The domain error code, when the refusal names one."
                     }
                   },
                   "required": [
@@ -53605,7 +53889,8 @@
       },
       "patch": {
         "operationId": "patchApiSuitesById",
-        "description": "Update a suite (run plan)",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).",
         "responses": {
           "200": {
             "description": "Suite updated",
@@ -53711,7 +53996,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53725,10 +54010,12 @@
                               "http",
                               "code",
                               "workflow"
-                            ]
+                            ],
+                            "description": "What kind of thing the scenarios run against."
                           },
                           "referenceId": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "The id of the prompt, agent or workflow to run against."
                           }
                         },
                         "required": [
@@ -53830,6 +54117,10 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The domain error code, when the refusal names one."
                     }
                   },
                   "required": [
@@ -53964,7 +54255,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "scenarioIds": {
                     "type": "array",
@@ -53985,10 +54276,12 @@
                             "http",
                             "code",
                             "workflow"
-                          ]
+                          ],
+                          "description": "What kind of thing the scenarios run against."
                         },
                         "referenceId": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "The id of the prompt, agent or workflow to run against."
                         }
                       },
                       "required": [
@@ -54032,7 +54325,8 @@
       },
       "delete": {
         "operationId": "deleteApiSuitesById",
-        "description": "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.",
         "responses": {
           "200": {
             "description": "Suite archived",
@@ -54110,6 +54404,10 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The domain error code, when the refusal names one."
                     }
                   },
                   "required": [
@@ -54182,7 +54480,8 @@
     "/api/suites/{id}/duplicate": {
       "post": {
         "operationId": "postApiSuitesByIdDuplicate",
-        "description": "Duplicate a suite (run plan)",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).",
         "responses": {
           "201": {
             "description": "Suite duplicated",
@@ -54288,7 +54587,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -54302,10 +54601,12 @@
                               "http",
                               "code",
                               "workflow"
-                            ]
+                            ],
+                            "description": "What kind of thing the scenarios run against."
                           },
                           "referenceId": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "The id of the prompt, agent or workflow to run against."
                           }
                         },
                         "required": [
@@ -54407,6 +54708,10 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The domain error code, when the refusal names one."
                     }
                   },
                   "required": [
@@ -54479,7 +54784,8 @@
     "/api/suites/{id}/run": {
       "post": {
         "operationId": "postApiSuitesByIdRun",
-        "description": "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
+        "deprecated": true,
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.",
         "responses": {
           "200": {
             "description": "Suite run scheduled",
@@ -54542,10 +54848,12 @@
                                   "http",
                                   "code",
                                   "workflow"
-                                ]
+                                ],
+                                "description": "What kind of thing the scenarios run against."
                               },
                               "referenceId": {
-                                "type": "string"
+                                "type": "string",
+                                "description": "The id of the prompt, agent or workflow to run against."
                               }
                             },
                             "required": [
@@ -54635,6 +54943,10 @@
                     },
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The domain error code, when the refusal names one."
                     }
                   },
                   "required": [
@@ -54697,6 +55009,59 @@
                   "idempotencyKey": {
                     "type": "string"
                   },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent."
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "prompt",
+                            "http",
+                            "code",
+                            "workflow"
+                          ],
+                          "description": "What kind of thing the scenarios run against."
+                        },
+                        "referenceId": {
+                          "type": "string",
+                          "description": "The id of the prompt, agent or workflow to run against."
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "referenceId"
+                      ]
+                    },
+                    "description": "The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own."
+                  },
+                  "repeatCount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "How many times each scenario and target pairing runs, between 1 and 5. Used only when the id names a test suite."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The model that plays the user for every scenario in the run. Used only when the id names a test suite."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The model that judges every scenario in the run. Used only when the id names a test suite."
+                  },
                   "parameters": {
                     "type": "object",
                     "additionalProperties": {
@@ -54735,6 +55100,1757 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/run-plans": {
+      "get": {
+        "operationId": "listRunPlans",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The run plan id."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The run plan name. This is the plan's identity: a run started under this name joins this plan."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "The plan's address in the platform. It is kept when the plan is renamed, so run history never moves."
+                      },
+                      "scope": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "all"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "folders"
+                              },
+                              "folderIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "folderIds"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "labels"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "labels"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "cases"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          }
+                        ],
+                        "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      },
+                      "scenarioIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The scenarios the last run of this plan covered."
+                      },
+                      "targets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prompt",
+                                "http",
+                                "code",
+                                "workflow"
+                              ],
+                              "description": "What kind of thing the scenarios run against."
+                            },
+                            "referenceId": {
+                              "type": "string",
+                              "description": "The id of the prompt, agent or workflow to run against."
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "referenceId"
+                          ]
+                        },
+                        "description": "What the plan runs against, in the order the results show."
+                      },
+                      "repeatCount": {
+                        "type": "number",
+                        "description": "How many times each scenario and target pairing runs."
+                      },
+                      "simulatorModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The model that plays the user, or null for the scenario or project default."
+                      },
+                      "judgeModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The model that judges the run, or null for the scenario or project default."
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The labels the plan carries."
+                      },
+                      "archivedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "When the plan was archived, or null while it is active."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "When the plan was created."
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "description": "When the plan was last written."
+                      },
+                      "platformUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Where to open this run plan in the LangWatch platform."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "slug",
+                      "scope",
+                      "scenarioIds",
+                      "targets",
+                      "repeatCount",
+                      "simulatorModel",
+                      "judgeModel",
+                      "labels",
+                      "archivedAt",
+                      "createdAt",
+                      "updatedAt",
+                      "platformUrl"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.",
+        "tags": [
+          "Run Plans"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "schema": {
+              "type": "string",
+              "default": "false"
+            },
+            "description": "Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/run-plans/run": {
+      "post": {
+        "operationId": "runRunPlan",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scheduled": {
+                      "type": "boolean",
+                      "description": "True once the runs are queued."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The id of this batch. Every run started here carries it."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The result set the batch is filed under in the platform."
+                    },
+                    "jobCount": {
+                      "type": "number",
+                      "description": "How many runs were queued."
+                    },
+                    "skippedArchived": {
+                      "type": "object",
+                      "properties": {
+                        "scenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Scenarios left out because they are archived."
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Targets left out because they are archived."
+                        }
+                      },
+                      "required": [
+                        "scenarios",
+                        "targets"
+                      ],
+                      "description": "What the run left out, and why."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scenarioRunId": {
+                            "type": "string",
+                            "description": "The id of this single run."
+                          },
+                          "scenarioId": {
+                            "type": "string",
+                            "description": "The scenario that was run."
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "prompt",
+                                  "http",
+                                  "code",
+                                  "workflow"
+                                ],
+                                "description": "What kind of thing the scenarios run against."
+                              },
+                              "referenceId": {
+                                "type": "string",
+                                "description": "The id of the prompt, agent or workflow to run against."
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "referenceId"
+                            ],
+                            "description": "What it was run against."
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The scenario name, when known."
+                          }
+                        },
+                        "required": [
+                          "scenarioRunId",
+                          "scenarioId",
+                          "target",
+                          "name"
+                        ]
+                      },
+                      "description": "Every run this call queued."
+                    },
+                    "runPlanId": {
+                      "type": "string",
+                      "description": "The run plan this run was filed under."
+                    },
+                    "planName": {
+                      "type": "string",
+                      "description": "The name that plan answers to."
+                    },
+                    "created": {
+                      "type": "boolean",
+                      "description": "True when this run created the plan, false when it joined a plan already there."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to watch this run in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "scheduled",
+                    "batchRunId",
+                    "setId",
+                    "jobCount",
+                    "skippedArchived",
+                    "items",
+                    "runPlanId",
+                    "planName",
+                    "created",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.",
+        "tags": [
+          "Run Plans"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The run plan this run joins or creates. A run plan is identified by its name, so sending the same name again replaces that plan's configuration with this one. Leave it out and the name is derived from what the run covers and what it runs against. Up to 200 characters."
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "all"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "folders"
+                              },
+                              "folderIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "folderIds"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "labels"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "labels"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "cases"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          }
+                        ],
+                        "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      },
+                      "targets": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "prompt",
+                                "http",
+                                "code",
+                                "workflow"
+                              ],
+                              "description": "What kind of thing the scenarios run against."
+                            },
+                            "referenceId": {
+                              "type": "string",
+                              "description": "The id of the prompt, agent or workflow to run against."
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "referenceId"
+                          ]
+                        },
+                        "description": "The prompts, agents or workflows every scenario runs against."
+                      },
+                      "repeatCount": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "description": "How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1."
+                      },
+                      "simulatorModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default."
+                      },
+                      "judgeModel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default."
+                      },
+                      "scenarioIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time."
+                      }
+                    },
+                    "required": [
+                      "scope",
+                      "targets"
+                    ],
+                    "description": "What this run covers and what it runs against. Written onto the run plan the name resolves."
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "description": "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters."
+                  }
+                },
+                "required": [
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/run-plans/{id}": {
+      "get": {
+        "operationId": "getRunPlan",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The run plan id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The run plan name. This is the plan's identity: a run started under this name joins this plan."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The plan's address in the platform. It is kept when the plan is renamed, so run history never moves."
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "folderIds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "labels"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The scenarios the last run of this plan covered."
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "prompt",
+                              "http",
+                              "code",
+                              "workflow"
+                            ],
+                            "description": "What kind of thing the scenarios run against."
+                          },
+                          "referenceId": {
+                            "type": "string",
+                            "description": "The id of the prompt, agent or workflow to run against."
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "referenceId"
+                        ]
+                      },
+                      "description": "What the plan runs against, in the order the results show."
+                    },
+                    "repeatCount": {
+                      "type": "number",
+                      "description": "How many times each scenario and target pairing runs."
+                    },
+                    "simulatorModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The model that plays the user, or null for the scenario or project default."
+                    },
+                    "judgeModel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The model that judges the run, or null for the scenario or project default."
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The labels the plan carries."
+                    },
+                    "archivedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the plan was archived, or null while it is active."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the plan was created."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the plan was last written."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to open this run plan in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "scope",
+                    "scenarioIds",
+                    "targets",
+                    "repeatCount",
+                    "simulatorModel",
+                    "judgeModel",
+                    "labels",
+                    "archivedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found.",
+        "tags": [
+          "Run Plans"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run plan id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "archiveRunPlan",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The run plan that was archived."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true once the plan is archived."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "archived"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.",
+        "tags": [
+          "Run Plans"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run plan id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/run-plans/{id}/run": {
+      "post": {
+        "operationId": "rerunRunPlan",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scheduled": {
+                      "type": "boolean",
+                      "description": "True once the runs are queued."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The id of this batch. Every run started here carries it."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The result set the batch is filed under in the platform."
+                    },
+                    "jobCount": {
+                      "type": "number",
+                      "description": "How many runs were queued."
+                    },
+                    "skippedArchived": {
+                      "type": "object",
+                      "properties": {
+                        "scenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Scenarios left out because they are archived."
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Targets left out because they are archived."
+                        }
+                      },
+                      "required": [
+                        "scenarios",
+                        "targets"
+                      ],
+                      "description": "What the run left out, and why."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scenarioRunId": {
+                            "type": "string",
+                            "description": "The id of this single run."
+                          },
+                          "scenarioId": {
+                            "type": "string",
+                            "description": "The scenario that was run."
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "prompt",
+                                  "http",
+                                  "code",
+                                  "workflow"
+                                ],
+                                "description": "What kind of thing the scenarios run against."
+                              },
+                              "referenceId": {
+                                "type": "string",
+                                "description": "The id of the prompt, agent or workflow to run against."
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "referenceId"
+                            ],
+                            "description": "What it was run against."
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The scenario name, when known."
+                          }
+                        },
+                        "required": [
+                          "scenarioRunId",
+                          "scenarioId",
+                          "target",
+                          "name"
+                        ]
+                      },
+                      "description": "Every run this call queued."
+                    },
+                    "runPlanId": {
+                      "type": "string",
+                      "description": "The run plan this run was filed under."
+                    },
+                    "planName": {
+                      "type": "string",
+                      "description": "The name that plan answers to."
+                    },
+                    "created": {
+                      "type": "boolean",
+                      "description": "True when this run created the plan, false when it joined a plan already there."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to watch this run in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "scheduled",
+                    "batchRunId",
+                    "setId",
+                    "jobCount",
+                    "skippedArchived",
+                    "items",
+                    "runPlanId",
+                    "planName",
+                    "created",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
+        "summary": "Run a plan again",
+        "tags": [
+          "Run Plans"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run plan id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "description": "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/test-suites": {
+      "get": {
+        "operationId": "listTestSuites",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The test suite id."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The test suite name."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "The suite's address in the platform. It is kept when the suite is renamed."
+                      },
+                      "scenarioIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The scenarios filed in this suite, in the order it shows them."
+                      },
+                      "scenarioCount": {
+                        "type": "number",
+                        "description": "How many scenarios are filed in it."
+                      },
+                      "archivedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "When the suite was archived, or null while it is active."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "When the suite was created."
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "description": "When the suite was last written."
+                      },
+                      "platformUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Where to open this test suite in the LangWatch platform."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "slug",
+                      "scenarioIds",
+                      "scenarioCount",
+                      "archivedAt",
+                      "createdAt",
+                      "updatedAt",
+                      "platformUrl"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family.",
+        "tags": [
+          "Test Suites"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "schema": {
+              "type": "string",
+              "default": "false"
+            },
+            "description": "Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTestSuite",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The test suite id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The test suite name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The suite's address in the platform. It is kept when the suite is renamed."
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The scenarios filed in this suite, in the order it shows them."
+                    },
+                    "scenarioCount": {
+                      "type": "number",
+                      "description": "How many scenarios are filed in it."
+                    },
+                    "archivedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the suite was archived, or null while it is active."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the suite was created."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the suite was last written."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to open this test suite in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "scenarioIds",
+                    "scenarioCount",
+                    "archivedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run.",
+        "tags": [
+          "Test Suites"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The test suite name, as it reads in the platform."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/test-suites/{id}": {
+      "get": {
+        "operationId": "getTestSuite",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The test suite id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The test suite name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The suite's address in the platform. It is kept when the suite is renamed."
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The scenarios filed in this suite, in the order it shows them."
+                    },
+                    "scenarioCount": {
+                      "type": "number",
+                      "description": "How many scenarios are filed in it."
+                    },
+                    "archivedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the suite was archived, or null while it is active."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the suite was created."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the suite was last written."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to open this test suite in the LangWatch platform."
+                    },
+                    "scenarios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The scenario id."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The scenario name."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "description": "The active scenarios filed in this suite. An archived scenario is left out."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "scenarioIds",
+                    "scenarioCount",
+                    "archivedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "scenarios"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
+        "summary": "Read one test suite",
+        "tags": [
+          "Test Suites"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The test suite id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "renameTestSuite",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The test suite id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The test suite name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The suite's address in the platform. It is kept when the suite is renamed."
+                    },
+                    "scenarioIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The scenarios filed in this suite, in the order it shows them."
+                    },
+                    "scenarioCount": {
+                      "type": "number",
+                      "description": "How many scenarios are filed in it."
+                    },
+                    "archivedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the suite was archived, or null while it is active."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the suite was created."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the suite was last written."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to open this test suite in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "scenarioIds",
+                    "scenarioCount",
+                    "archivedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Rename a test suite. The slug is kept, so links and run history stay where they are.",
+        "tags": [
+          "Test Suites"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The test suite id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The test suite name, as it reads in the platform."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "archiveTestSuite",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The test suite that was archived."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true once the suite is archived."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "archived"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.",
+        "tags": [
+          "Test Suites"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The test suite id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/test-suites/{id}/run": {
+      "post": {
+        "operationId": "runTestSuite",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scheduled": {
+                      "type": "boolean",
+                      "description": "True once the runs are queued."
+                    },
+                    "batchRunId": {
+                      "type": "string",
+                      "description": "The id of this batch. Every run started here carries it."
+                    },
+                    "setId": {
+                      "type": "string",
+                      "description": "The result set the batch is filed under in the platform."
+                    },
+                    "jobCount": {
+                      "type": "number",
+                      "description": "How many runs were queued."
+                    },
+                    "skippedArchived": {
+                      "type": "object",
+                      "properties": {
+                        "scenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Scenarios left out because they are archived."
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Targets left out because they are archived."
+                        }
+                      },
+                      "required": [
+                        "scenarios",
+                        "targets"
+                      ],
+                      "description": "What the run left out, and why."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scenarioRunId": {
+                            "type": "string",
+                            "description": "The id of this single run."
+                          },
+                          "scenarioId": {
+                            "type": "string",
+                            "description": "The scenario that was run."
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "prompt",
+                                  "http",
+                                  "code",
+                                  "workflow"
+                                ],
+                                "description": "What kind of thing the scenarios run against."
+                              },
+                              "referenceId": {
+                                "type": "string",
+                                "description": "The id of the prompt, agent or workflow to run against."
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "referenceId"
+                            ],
+                            "description": "What it was run against."
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The scenario name, when known."
+                          }
+                        },
+                        "required": [
+                          "scenarioRunId",
+                          "scenarioId",
+                          "target",
+                          "name"
+                        ]
+                      },
+                      "description": "Every run this call queued."
+                    },
+                    "runPlanId": {
+                      "type": "string",
+                      "description": "The run plan this run was filed under."
+                    },
+                    "planName": {
+                      "type": "string",
+                      "description": "The name that plan answers to."
+                    },
+                    "created": {
+                      "type": "boolean",
+                      "description": "True when this run created the plan, false when it joined a plan already there."
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Where to watch this run in the LangWatch platform."
+                    }
+                  },
+                  "required": [
+                    "scheduled",
+                    "batchRunId",
+                    "setId",
+                    "jobCount",
+                    "skippedArchived",
+                    "items",
+                    "runPlanId",
+                    "planName",
+                    "created",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
+        "summary": "Run a test suite",
+        "tags": [
+          "Test Suites"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The test suite id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "prompt",
+                            "http",
+                            "code",
+                            "workflow"
+                          ],
+                          "description": "What kind of thing the scenarios run against."
+                        },
+                        "referenceId": {
+                          "type": "string",
+                          "description": "The id of the prompt, agent or workflow to run against."
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "referenceId"
+                      ]
+                    },
+                    "description": "The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The run plan this run joins or creates. Leave it out and the name is derived from the suite name and the targets."
+                  },
+                  "repeatCount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1."
+                  },
+                  "simulatorModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The model that plays the user for every scenario in this run. Leave it out for the scenario or project default."
+                  },
+                  "judgeModel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The model that judges every scenario in this run. Leave it out for the scenario or project default."
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "description": "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters."
+                  }
+                },
+                "required": [
+                  "targets"
+                ]
+              }
+            }
+          }
+        },
         "security": [
           {
             "project_api_key": []

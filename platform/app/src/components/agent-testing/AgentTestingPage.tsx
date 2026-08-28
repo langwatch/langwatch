@@ -1,5 +1,5 @@
 /**
- * Agent Testing: one page with the test cases and the results in tabs.
+ * Agent Testing: one page with the scenarios and the results in tabs.
  *
  * The page is the only mount point of the live-run subscription and of the
  * case editor, and every move inside it is a shallow address push, so a run
@@ -18,12 +18,13 @@ import { AgentTestingHeader } from "./AgentTestingHeader";
 import { AgentTestingCaseEditor } from "./cases/AgentTestingCaseEditor";
 import { TestCasesTab } from "./cases/TestCasesTab";
 import { ResultsTab } from "./results/ResultsTab";
+import { RunPlanDialogHost } from "./run/RunPlanDialogHost";
 import { useAgentTestingLiveUpdates } from "./useAgentTestingLiveUpdates";
 import { useHydrateViewFromUrl } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
-/** How many test cases and how many run plans the tabs count. */
+/** How many scenarios and how many run plans the tabs count. */
 function useTabCounts(projectId: string) {
   const { data: scenarios } = api.scenarios.getAll.useQuery(
     { projectId },
@@ -39,9 +40,8 @@ function useTabCounts(projectId: string) {
 
 export function AgentTestingPage() {
   const { project } = useOrganizationTeamProject();
-  // The rows open a run's detail and the Test Runs list opens the run plan
-  // editor, two separate downloads. Fetch them while the person reads the page.
-  usePreloadDrawer("scenarioRunDetail", "agentTestingPlanEditor");
+  // The rows open a run's detail; fetch it while the person reads the page.
+  usePreloadDrawer("scenarioRunDetail");
 
   const routing = useAgentTestingRouting();
   useHydrateViewFromUrl();
@@ -71,6 +71,7 @@ export function AgentTestingPage() {
         </VStack>
 
         <AgentTestingCaseEditor />
+        <RunPlanDialogHost />
       </DashboardLayout>
     </NowProvider>
   );

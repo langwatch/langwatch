@@ -192,6 +192,45 @@ function ObserveSection({
   );
 }
 
+function SimulationsFallbackGroup({
+  showExpanded,
+  project,
+  pathname,
+}: ProjectSectionProps) {
+  return (
+    <CollapsibleMenuGroup
+      icon={featureIcons.simulations.icon}
+      label={projectRoutes.simulations.title}
+      project={project}
+      showLabel={showExpanded}
+      children={[
+        {
+          icon: featureIcons.scenarios.icon,
+          label: projectRoutes.scenarios.title,
+          ...projectScopedDestination({
+            path: projectRoutes.scenarios.path,
+            label: projectRoutes.scenarios.title,
+            project,
+          }),
+          isActive: pathname.includes("/simulations/scenarios"),
+        },
+        {
+          icon: featureIcons.simulation_runs.icon,
+          label: projectRoutes.simulation_runs.title,
+          ...projectScopedDestination({
+            path: projectRoutes.simulation_runs.path,
+            label: projectRoutes.simulation_runs.title,
+            project,
+          }),
+          isActive:
+            pathname.includes("/simulations") &&
+            !pathname.includes("/simulations/scenarios"),
+        },
+      ]}
+    />
+  );
+}
+
 function TestSection({
   showExpanded,
   project,
@@ -202,16 +241,22 @@ function TestSection({
   // One destination replaces the Simulations group, and the two cannot both
   // be offered: they address the same runs through different routes, so a menu
   // holding both would give a person two links to the same work.
-  const { enabled: agentTestingEnabled } = useFeatureFlag(
-    "release_ui_agent_testing_v2_enabled",
-    {
+  // A rule may name the project or the organization, so the read waits until
+  // both ids are known.
+  const flagReadCanRun = !!project?.id && !!organization?.id;
+  const { enabled: agentTestingEnabled, isLoading: flagReadLoading } =
+    useFeatureFlag("release_ui_agent_testing_v2_enabled", {
       projectId: project?.id,
       organizationId: organization?.id,
-      // Both ids come from the same workspace query, and a rule may name
-      // either one, so the read waits until both are known.
-      enabled: !!project?.id && !!organization?.id,
-    },
-  );
+      enabled: flagReadCanRun,
+    });
+  const { isLoading: workspaceLoading } = useOrganizationTeamProject();
+  // Hide the choice only while the answer is still on its way. An account with
+  // no project yet never gets an answer, and its menu still lists every
+  // destination, so a loaded workspace with no ids falls back to Simulations.
+  const agentTestingFlagLoading = workspaceLoading
+    ? true
+    : flagReadCanRun && flagReadLoading;
 
   return (
     <SidebarSection
@@ -220,7 +265,7 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      {agentTestingEnabled ? (
+      {agentTestingFlagLoading ? null : agentTestingEnabled ? (
         <PageMenuLink
           path={projectRoutes.agent_testing.path}
           icon={featureIcons.agent_testing.icon}
@@ -230,35 +275,11 @@ function TestSection({
           showLabel={showExpanded}
         />
       ) : (
-        <CollapsibleMenuGroup
-          icon={featureIcons.simulations.icon}
-          label={projectRoutes.simulations.title}
+        <SimulationsFallbackGroup
+          showExpanded={showExpanded}
           project={project}
-          showLabel={showExpanded}
-          children={[
-            {
-              icon: featureIcons.scenarios.icon,
-              label: projectRoutes.scenarios.title,
-              ...projectScopedDestination({
-                path: projectRoutes.scenarios.path,
-                label: projectRoutes.scenarios.title,
-                project,
-              }),
-              isActive: pathname.includes("/simulations/scenarios"),
-            },
-            {
-              icon: featureIcons.simulation_runs.icon,
-              label: projectRoutes.simulation_runs.title,
-              ...projectScopedDestination({
-                path: projectRoutes.simulation_runs.path,
-                label: projectRoutes.simulation_runs.title,
-                project,
-              }),
-              isActive:
-                pathname.includes("/simulations") &&
-                !pathname.includes("/simulations/scenarios"),
-            },
-          ]}
+          organization={organization}
+          pathname={pathname}
         />
       )}
 

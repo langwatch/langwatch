@@ -89,6 +89,12 @@ export function buildChildProcessEnv(
       process.env.NODE_COMPILE_CACHE ?? SCENARIO_CHILD_COMPILE_CACHE_DIR,
     COREPACK_ENABLE_DOWNLOAD_PROMPT:
       process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
+    // The platform's ceiling on how long a turn may hold a socket open, read
+    // by the code agent adapter INSIDE the child (`resolveMaxFetchTimeoutMs`).
+    // Forwarded raw: this allowlist is the only route from the operator's
+    // environment into the child, and the child runs under
+    // SKIP_ENV_VALIDATION, so `~/env.mjs` would apply no default here.
+    NLP_FETCH_MAX_TIMEOUT_MS: process.env.NLP_FETCH_MAX_TIMEOUT_MS,
     ...scenarioVars,
   };
 

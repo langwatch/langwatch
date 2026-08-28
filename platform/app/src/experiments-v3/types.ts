@@ -626,6 +626,20 @@ export type EvaluationsV3State = {
    * workbench reloads silently and never sets this.
    */
   staleWorkbench?: { serverVersion: number; actorLabel?: string };
+  /**
+   * The runs this page started, by id.
+   *
+   * A run writes its cells into the saved workbench state, which advances the
+   * counter. Without knowing which runs are its own, the page reads that bump
+   * as somebody else's write, stands down, and asks the reader to reload over
+   * unsaved edits the run had nothing to do with. The page already holds every
+   * cell such a run produced, because it streamed them, so a version its own
+   * run wrote is adopted rather than reloaded.
+   *
+   * Not persisted, and absent server-side: it describes an open page, not the
+   * experiment.
+   */
+  runsStartedHere?: string[];
   name: string;
 
   // Multiple datasets with active selection
@@ -664,6 +678,8 @@ export type EvaluationsV3Actions = {
   setStaleWorkbench: (
     stale: { serverVersion: number; actorLabel?: string } | undefined,
   ) => void;
+  /** Records that this page started a run, so it can adopt that run's write. */
+  rememberRunStartedHere: (runId: string) => void;
 
   // Dataset management actions
   addDataset: (dataset: DatasetReference) => void;
@@ -1008,6 +1024,7 @@ export const createInitialUIState = (): UIState => ({
 
 export const createInitialState = (): EvaluationsV3State => ({
   name: "New Evaluation",
+  runsStartedHere: [],
   datasets: [createInitialDataset()],
   activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],

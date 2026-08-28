@@ -1,6 +1,6 @@
 /**
- * The right half of the Test cases tab: what is selected, the cases in it,
- * and how the whole set last did.
+ * The right half of the Scenarios tab: the suite that is open, the cases in
+ * it, and the way into a recent run of it.
  *
  * The panel is a view over what it is given, so the reads and the writes stay
  * in TestCasesTab and every rule here can be read on its own.
@@ -9,18 +9,14 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
+import type { Period } from "~/components/PeriodSelector";
 import { CONTENT_COLUMN_GUTTER, ContentColumn } from "../shared/ContentColumn";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { CasesPanelBody } from "./CasesPanelBody";
 import { CasesPanelHeader } from "./CasesPanelHeader";
 import type { CaseLastResult } from "./CasesTable";
 import { SUITE_RAIL_WIDTH } from "./SuiteRail";
-import type { CaseGroup, TestCase, TestSuiteEntry } from "./test-cases";
-
-export {
-  ALL_CASES_LAST_RUN_LABEL,
-  SUITE_LAST_RUN_LABEL,
-} from "./LastRunLine";
+import type { TestCase, TestSuiteEntry } from "./test-cases";
 
 export type ExternalCaseRow = {
   scenarioId: string;
@@ -30,9 +26,10 @@ export type ExternalCaseRow = {
 
 export type CasesPanelProps = {
   selection: AgentTestingSelection;
-  /** The name of the selected set, as the header reads it. */
+  /** The name of the open suite or set, as the header reads it. */
   title: string;
-  groups: CaseGroup[];
+  /** The scenarios of the open suite, in order. */
+  cases: TestCase[];
   /** The cases of an external set, when one is selected. */
   externalCases: ExternalCaseRow[];
   isLoading: boolean;
@@ -40,36 +37,47 @@ export type CasesPanelProps = {
   isLastResultsLoading: boolean;
   suites: TestSuiteEntry[];
   canManage: boolean;
-  /** True when the whole project holds no test case at all. */
+  /** The open test suite, or nothing while the project holds none, which is day zero. */
+  suite: TestSuiteEntry | null;
+  /**
+   * Every scenario filed under the open suite, whatever the label filter
+   * shows. The recent runs under the table are the runs that covered one of
+   * them, so they are read from the suite and not from the rows on screen.
+   */
+  suiteScenarioIds: string[];
+  /** The window the runs of the suite are read in. */
+  period: Period;
+  /** False while the project has no agent to test, which comes before a suite. */
+  hasAgent: boolean;
+  /** True when the whole project holds no scenario at all. */
   projectHasNoCases: boolean;
   allLabels: string[];
   activeLabels: string[];
   onToggleLabel: (label: string) => void;
-  runningCaseId?: string | null;
   isRunningSet?: boolean;
   onRunSet: () => void;
   onNewTestCase: () => void;
-  onSelectSuite: (suiteId: string) => void;
+  /** Asks for the name of a new test suite. */
+  onNewSuite: () => void;
+  /** Opens the flow that connects the agent to be tested. */
+  onConnectAgent: () => void;
   onRowClick: (testCase: TestCase) => void;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
-  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
   onOpenExternalCase: (scenarioId: string) => void;
-  /** Opens the editor of the selected test suite. */
-  onEditSuite: () => void;
-  /** Opens the results of the selected set that runs from code. */
-  onOpenExternalResults: () => void;
+  /** Opens the name dialog on the open test suite. */
+  onRenameSuite: () => void;
 };
 
 export function CasesPanel(props: CasesPanelProps) {
   const isExternal = props.selection.kind === "external";
   const caseCount = isExternal
     ? props.externalCases.length
-    : props.groups.reduce((total, group) => total + group.cases.length, 0);
+    : props.cases.length;
 
   return (
     <ContentColumn
@@ -81,11 +89,7 @@ export function CasesPanel(props: CasesPanelProps) {
         isExternal={isExternal}
         caseCount={caseCount}
       />
-      <CasesPanelBody
-        {...props}
-        isExternal={isExternal}
-        caseCount={caseCount}
-      />
+      <CasesPanelBody {...props} isExternal={isExternal} />
     </ContentColumn>
   );
 }

@@ -38,6 +38,7 @@ const OTHER_PROFILE: ConversationRoutingProfile = {
   agentModel: "microsoft/copilot-studio",
   provenanceSource: "copilot_studio",
   scopeName: "langwatch.ingestion.copilot_studio",
+  identityNamespace: "copilot_studio",
 };
 
 function conversationEvent(action: string): NormalizedPullEvent {

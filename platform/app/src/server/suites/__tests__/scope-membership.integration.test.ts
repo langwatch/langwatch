@@ -144,8 +144,8 @@ beforeEach(async () => {
 });
 
 describe("what a run plan covers", () => {
-  describe("when the plan covers all test cases", () => {
-    /** @scenario "A plan scoped to all test cases runs every active case" */
+  describe("when the plan covers all scenarios", () => {
+    /** @scenario "A plan scoped to all scenarios runs every active case" */
     it("runs every active case of the project", async () => {
       const cases = [
         await createCase({ name: "One" }),
@@ -162,7 +162,7 @@ describe("what a run plan covers", () => {
       );
     });
 
-    /** @scenario "Archived test cases are left out of a dynamic scope" */
+    /** @scenario "Archived scenarios are left out of a dynamic scope" */
     it("leaves an archived case out", async () => {
       const kept = await createCase({ name: "Kept" });
       const gone = await createCase({ name: "Gone" });
@@ -198,7 +198,7 @@ describe("what a run plan covers", () => {
       expect(scheduledScenarioIds()).toEqual(new Set([inFirst.id]));
     });
 
-    /** @scenario "A test case added later runs on the next run" */
+    /** @scenario "A scenario added later runs on the next run" */
     it("picks up a case filed after the first run", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -286,7 +286,7 @@ describe("what a run plan covers", () => {
       expect(scheduledScenarioIds()).toEqual(new Set([wanted.id]));
     });
 
-    /** @scenario "A test case that loses the label drops out of the plan" */
+    /** @scenario "A scenario that loses the label drops out of the plan" */
     it("drops a case whose label was taken off", async () => {
       const dropped = await createCase({ name: "One", labels: ["checkout"] });
       const kept = await createCase({ name: "Two", labels: ["checkout"] });

@@ -78,6 +78,47 @@ function genieEvent(): NormalizedPullEvent {
   };
 }
 
+const COPILOT_SOURCE = {
+  ...SOURCE,
+  id: "source-copilot",
+  sourceType: "copilot_studio_dataverse",
+};
+
+function copilotEvent(): NormalizedPullEvent {
+  return {
+    source_event_id: "row-1",
+    event_timestamp: "2026-08-25T19:14:34Z",
+    actor: "",
+    action: "copilot_conversation",
+    target: "engineering-agent",
+    cost_usd: "0",
+    tokens_input: 0,
+    tokens_output: 0,
+    raw_payload: JSON.stringify({
+      conversationtranscriptid: "row-1",
+      name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+      conversationstarttime: "2026-08-25T19:14:34Z",
+      metadata: JSON.stringify({ BatchId: 0 }),
+      content: JSON.stringify({
+        activities: [
+          {
+            id: "c1955eab-a6c8-42ea-9c72-6ff22994543d",
+            type: "message",
+            timestampMs: 1_787_685_284_913,
+            from: {
+              id: "0c6d08e2-882b-1ca1-8a8c-dad72374f3a3",
+              role: 1,
+              aadObjectId: "f6481ec4-e30f-4bf3-954f-2a8f29bb1c4a",
+            },
+            text: "How do I reset my laptop?",
+          },
+        ],
+      }),
+    }),
+    extra: { botName: "engineering-agent" },
+  };
+}
+
 beforeEach(() => {
   projectFindFirst.mockReset();
   handleOtlpTraceRequest.mockReset();
@@ -122,6 +163,41 @@ describe("given a source with a live trace destination", () => {
         },
         select: { id: true },
       });
+    });
+  });
+
+  describe("when the source is a Copilot source rather than a Genie one", () => {
+    /**
+     * A source's profile and the mapper that reads its payloads travel
+     * together. Chosen independently they can disagree, and the way that
+     * fails is quiet: the profile would match the action, the wrong mapper
+     * would find none of the fields it expects, and the run would report
+     * success having routed nothing.
+     */
+    it("reads it with the Copilot mapper, not the Genie one", async () => {
+      await routeConversationsToTraceDestination({
+        events: [copilotEvent()],
+        source: COPILOT_SOURCE,
+      });
+
+      expect(handleOtlpTraceRequest).toHaveBeenCalledTimes(1);
+      const [tenantId, request] = handleOtlpTraceRequest.mock.calls[0]!;
+      expect(tenantId).toBe("proj-dest");
+      const scope = request.resourceSpans?.[0]?.scopeSpans?.[0];
+      expect(scope?.scope?.name).toBe(
+        "langwatch.ingestion.copilot_studio_dataverse",
+      );
+      expect(JSON.stringify(scope?.spans)).toContain(
+        "How do I reset my laptop?",
+      );
+    });
+
+    it("routes nothing when handed the other source's conversations", async () => {
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: COPILOT_SOURCE,
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
   });
 

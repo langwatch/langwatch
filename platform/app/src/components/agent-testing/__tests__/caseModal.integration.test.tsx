@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The test case dialog of the Agent Testing page: what it asks, what its
+ * The scenario dialog of the Agent Testing page: what it asks, what its
  * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -18,7 +18,7 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTestingCaseEditor } from "../cases/AgentTestingCaseEditor";
-import { useAgentTestingStore } from "../useAgentTestingStore";
+import { AgentTestingCaseEditorDrawer } from "../cases/AgentTestingCaseEditorDrawer";
 
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
@@ -62,6 +62,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: emptyQuery },
       getById: { useQuery: mockGetById },
       getLastResultSummaries: { useQuery: emptyQuery },
@@ -75,10 +79,11 @@ vi.mock("~/utils/api", () => ({
     },
     suites: {
       folders: { getAll: { useQuery: mockFoldersGetAll } },
+      getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      runAll: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
@@ -101,12 +106,30 @@ vi.mock("~/hooks/useCan", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
+const mockDrawerParams = vi.hoisted(() => ({
+  current: {} as Record<string, string>,
+}));
+const mockDrawerOpenFor = vi.hoisted(() => ({ current: "" }));
+const flowCallbacksStore = vi.hoisted(
+  () => ({}) as Record<string, Record<string, unknown>>,
+);
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
-    setFlowCallbacks: vi.fn(),
+    closeDrawer: () => {
+      mockDrawerOpenFor.current = "";
+    },
+    drawerOpen: (drawer: string) => drawer === mockDrawerOpenFor.current,
+    setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+      flowCallbacksStore[drawer] = callbacks;
+    },
   }),
-  useDrawerParams: () => ({}),
+  useDrawerParams: () => mockDrawerParams.current,
+  getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
+  setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+    flowCallbacksStore[drawer] = callbacks;
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -150,36 +173,52 @@ function storedCase(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("the test case dialog", () => {
+function openDrawerAs(params: {
+  scenarioId?: string;
+  folderId?: string;
+  showHistory?: string;
+}) {
+  mockDrawerParams.current = { ...params } as Record<string, string>;
+  mockDrawerOpenFor.current = "agentTestingCaseEditor";
+}
+
+describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDrawerParams.current = {};
+    mockDrawerOpenFor.current = "";
     mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
     mockGetById.mockReturnValue({
       data: undefined,
       isLoading: false,
       refetch: vi.fn(),
     });
-    useAgentTestingStore.getState().closeCaseEditor();
   });
 
   afterEach(cleanup);
 
   const openNew = () => {
-    render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-    useAgentTestingStore.getState().openCaseEditor({ folderId: REFUNDS.id });
+    openDrawerAs({ folderId: REFUNDS.id });
+    render(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+      { wrapper: Wrapper },
+    );
   };
 
   describe("when a new case is written", () => {
-    /** @scenario "New test case opens the case dialog straight away" */
+    /** @scenario "New scenario opens the case dialog straight away" */
     it("opens on the form itself, with no model-writing step first", async () => {
       openNew();
 
       const dialog = await screen.findByTestId("case-modal");
-      expect(await screen.findByText("New test case")).toBeInTheDocument();
+      expect(await screen.findByText("New scenario")).toBeInTheDocument();
       expect(screen.getByLabelText("Title")).toBeInTheDocument();
       expect(screen.getByLabelText("Test suite")).toBeInTheDocument();
       expect(screen.getByLabelText("Situation")).toBeInTheDocument();
-      expect(screen.getByLabelText("Rubrics")).toBeInTheDocument();
+      expect(screen.getByLabelText("Criteria")).toBeInTheDocument();
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
@@ -206,7 +245,7 @@ describe("the test case dialog", () => {
       expect(screen.queryByTestId("case-models-block")).not.toBeInTheDocument();
 
       const chips = screen.getByTestId("customize-case-chips");
-      expect(chips).toHaveTextContent("Customize test case");
+      expect(chips).toHaveTextContent("Customize scenario");
       expect(
         within(chips).getByTestId("customize-chip-case-parameters"),
       ).toHaveTextContent("Add parameters");
@@ -251,7 +290,7 @@ describe("the test case dialog", () => {
       await screen.findByTestId("case-modal");
 
       await user.type(screen.getByLabelText("Title"), "Angry customer");
-      await user.type(screen.getByLabelText("Rubrics"), "Keeps a calm tone");
+      await user.type(screen.getByLabelText("Criteria"), "Keeps a calm tone");
       await user.click(screen.getByTestId("case-modal-save-and-run"));
 
       expect(mockCreate).toHaveBeenCalledWith(
@@ -278,8 +317,14 @@ describe("the test case dialog", () => {
         isLoading: false,
         refetch: vi.fn(),
       });
-      render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
 
       expect(await screen.findByLabelText("Parameters")).toHaveValue(
         "customer_plan=free",
@@ -316,10 +361,16 @@ describe("the test case dialog", () => {
         isError: false,
         refetch: vi.fn(),
       });
-      render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
 
-      expect(await screen.findByText("Edit test case")).toBeInTheDocument();
+      expect(await screen.findByText("Edit scenario")).toBeInTheDocument();
       const history = screen.getByTestId("case-modal-history");
       expect(history).toHaveTextContent("v4 · History");
 

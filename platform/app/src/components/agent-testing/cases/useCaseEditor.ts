@@ -1,5 +1,5 @@
 /**
- * The state and the writes of the test case editor.
+ * The state and the writes of the scenario editor.
  *
  * The editor is one dialog with one draft in it. It reads the stored case when
  * it opens on one, and it saves with the version it read, so a save over
@@ -37,8 +37,8 @@ import {
 export type CaseDraft = {
   title: string;
   situation: string;
-  /** One rubric per line, as the judge reads them. */
-  rubrics: string;
+  /** One criterion per line, as the judge reads them. */
+  criteria: string;
   labels: string[];
   /** The declared parameters as one `name=value` line. */
   parameters: string;
@@ -52,7 +52,7 @@ export type CaseDraft = {
 const EMPTY_DRAFT: CaseDraft = {
   title: "",
   situation: "",
-  rubrics: "",
+  criteria: "",
   labels: [],
   parameters: "",
   folderId: null,
@@ -67,7 +67,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
   return {
     title: scenario.name,
     situation: scenario.situation,
-    rubrics: scenario.criteria.join("\n"),
+    criteria: scenario.criteria.join("\n"),
     labels: scenario.labels,
     parameters: formatParameterLine(
       parseScenarioParameterDefinitions(scenario.parameters),
@@ -80,11 +80,11 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
   };
 }
 
-/** The rubric lines a draft holds, blank lines dropped. */
-export function rubricsOf(draft: CaseDraft): string[] {
-  return draft.rubrics
+/** The criteria a draft holds, blank lines dropped. */
+export function criteriaOf(draft: CaseDraft): string[] {
+  return draft.criteria
     .split("\n")
-    .map((rubric) => rubric.trim())
+    .map((criterion) => criterion.trim())
     .filter(Boolean);
 }
 
@@ -188,7 +188,7 @@ function useCaseWrites({
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create the scenario" }),
   });
 
   const updateMutation = api.scenarios.update.useMutation({
@@ -205,7 +205,7 @@ function useCaseWrites({
         setStaleVersion(typeof current === "number" ? current : 0);
         return;
       }
-      showErrorToast({ error, fallbackTitle: "Couldn't save the test case" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save the scenario" });
     },
   });
 
@@ -228,7 +228,7 @@ function savePayload({
     projectId,
     name: draft.title.trim(),
     situation: draft.situation.trim(),
-    criteria: rubricsOf(draft),
+    criteria: criteriaOf(draft),
     labels: draft.labels,
     parameters: toParameterDefinitions({
       line: draft.parameters,
@@ -245,9 +245,9 @@ function savePayload({
 /** Says what a save would refuse, or nothing when the draft is complete. */
 function useCaseProblem(draft: CaseDraft): string | null {
   return useMemo(() => {
-    if (!draft.title.trim()) return "A test case needs a title.";
-    if (rubricsOf(draft).length === 0)
-      return "A test case needs at least one rubric.";
+    if (!draft.title.trim()) return "A scenario needs a title.";
+    if (criteriaOf(draft).length === 0)
+      return "A scenario needs at least one criterion.";
     return null;
   }, [draft]);
 }

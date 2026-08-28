@@ -1,5 +1,6 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tag } from "lucide-react";
+import { SmallButton } from "~/components/agent-testing/shared/SmallButton";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverBody,
@@ -7,6 +8,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { pastelSwatchColor } from "~/components/ui/TagPill";
 
 type LabelFilterDropdownProps = {
   allLabels: string[];
@@ -27,21 +29,17 @@ export function LabelFilterDropdown({
   return (
     <PopoverRoot positioning={{ placement: "bottom-start" }}>
       <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant={hasActiveFilters ? "solid" : "outline"}
-          colorPalette={hasActiveFilters ? "blue" : "gray"}
-        >
-          <Tag size={14} />
+        <SmallButton>
+          <Tag size={13} />
           Labels
           {hasActiveFilters && (
-            <Text as="span" fontSize="xs" ml={1}>
+            <Text as="span" fontSize="12px" ml={1}>
               ({activeLabels.length})
             </Text>
           )}
-        </Button>
+        </SmallButton>
       </PopoverTrigger>
-      <PopoverContent width="200px">
+      <PopoverContent width="220px">
         <PopoverBody>
           {allLabels.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
@@ -49,16 +47,27 @@ export function LabelFilterDropdown({
             </Text>
           ) : (
             <VStack align="stretch" gap={2}>
-              {allLabels.map((label) => (
-                <HStack
-                  key={label}
-                  cursor="pointer"
-                  onClick={() => onToggle(label)}
-                >
-                  <Checkbox checked={activeLabels.includes(label)} />
-                  <Text fontSize="sm">{label}</Text>
-                </HStack>
-              ))}
+              {allLabels.map((label) => {
+                const swatch = pastelSwatchColor(label);
+                return (
+                  <HStack
+                    key={label}
+                    cursor="pointer"
+                    onClick={() => onToggle(label)}
+                    gap={2}
+                  >
+                    <Checkbox checked={activeLabels.includes(label)} />
+                    <Box
+                      width="10px"
+                      height="10px"
+                      borderRadius="full"
+                      bg={swatch}
+                      flexShrink={0}
+                    />
+                    <Text fontSize="sm">{label}</Text>
+                  </HStack>
+                );
+              })}
             </VStack>
           )}
         </PopoverBody>

@@ -169,7 +169,11 @@ type Request struct {
 	// every agent wiring it up by hand. The engine scrubs the value out of
 	// captured stdout and stderr, so printing the environment stores nothing.
 	SandboxAPIKey string
-	Timeout       time.Duration
+	// Timeout asks for LESS time than the operator allows; it can never buy
+	// more. Options.DefaultTimeout carries the deployment's ceiling on how
+	// long untrusted customer code may hold a worker, so Execute clamps this
+	// value to it. Zero or negative means "no request of my own".
+	Timeout time.Duration
 }
 
 // Result is what the executor returns.
@@ -207,6 +211,13 @@ const (
 )
 
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
+
+// DefaultTimeout reports the wall-clock timeout the executor applies to a
+// request that does not carry its own Request.Timeout. Exported so the
+// wiring that builds the executor from operator config can be asserted on.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.opts.DefaultTimeout
+}
 
 // childEnv builds the environment handed to the user-code subprocess from
 // the configured allowlist. It always returns a non-nil slice — even when
@@ -248,9 +259,15 @@ func withSandboxCredential(env []string, apiKey, endpoint string) []string {
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
-	timeout := req.Timeout
-	if timeout == 0 {
-		timeout = e.opts.DefaultTimeout
+	// The operator's ceiling wins. A per-request value only ever shortens the
+	// budget: a workflow author must not be able to escape
+	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
+	// their own node. A non-positive request means no request at all — and in
+	// particular keeps a negative duration away from context.WithTimeout,
+	// which would expire the run before the subprocess starts.
+	timeout := e.opts.DefaultTimeout
+	if req.Timeout > 0 && req.Timeout < timeout {
+		timeout = req.Timeout
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
