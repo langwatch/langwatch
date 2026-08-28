@@ -85,19 +85,37 @@ The exit is complete only when all of the following are true:
 
 ### Active, uncommitted slices
 
-| Slice                 | Current fact                                                                                                                                                                                                      | Next gate                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent web/UI          | Two-scope layout, controlled browser port and real platform host are implemented. Agent web has 24 passing tests, UI 10 and host 6.                                                                               | Final exact-path migration review and commit. Retained legacy drawers move in later Agent UI verticals.                               |
-| Trace full-read       | Package mapper preserves normalized spans, legacy events, metrics/errors, metadata, bounded payload recall and privacy markers. Contract has 212 tests and server 1,108.                                          | Review and commit as internal/all-visible. Public viewer protection/edit overlays remain a separate trust-boundary slice.             |
-| Process observability | One Node process logger/tracer graph and idempotent shutdown exist with 123 tests.                                                                                                                                | Review/commit, then construct once in API and worker boot and flush after drain.                                                      |
-| Secret REST           | Supports canonical `/api/v1/secret`, modern alias `/api/secret`, version omission/latest/header semantics and deployed `/api/secrets` REST compatibility. The invented public RPC is removed in the working tree. | Regenerate OpenAPI after the unrelated identity Eventing import blocker is fixed, prove semantic parity and commit.                   |
-| API Secret/Agent      | `@langwatch/trpc` and AuthZ scope-lineage extraction exist; the real process root is being built.                                                                                                                 | Directly cut live Secret and complete Agent tRPC to `apps/api`, with auth/audit/error/log/trace parity and displaced router deletion. |
-| Eventing server       | `@langwatch/eventing/server` now has private Prisma ProcessStore, injected ClickHouse EventStore/repository, retention and a production runtime factory.                                                          | Review/commit, wire the worker and retain old adapters only for named replay/ops/gateway/webhook callers.                             |
-| Enterprise worker     | `@langwatch/enterprise-worker` now composes the managed-provider capability from explicit ports; focused tests/typecheck pass.                                                                                    | Review/commit and wire typed config/credentials into the worker model-provider graph.                                                 |
-| Topic worker          | Topic registers only through `WorkerEventingRuntime`; Eventing owns commands/events, projections, process-manager wakes, intents and redelivery.                                                                  | Install production dependencies and the Trace `assignTopic` consumer, then delete live app Topic registry/runtime/task paths.         |
+| Slice                 | Current fact                                                                                                                                                                                                                                                           | Next gate                                                                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent web/UI          | Two-scope layout, controlled browser port and real platform host are implemented. Agent web has 24 passing tests, UI 10 and host 6.                                                                                                                                    | Final exact-path migration review and commit. Retained legacy drawers move in later Agent UI verticals.                                                         |
+| Trace full-read       | Package mapper preserves normalized spans, legacy events, metrics/errors, metadata, bounded payload recall and privacy markers. Contract has 212 tests and server 1,108.                                                                                               | Review and commit as internal/all-visible. Public viewer protection/edit overlays remain a separate trust-boundary slice.                                       |
+| Process observability | One Node process logger/tracer graph and idempotent shutdown exist with 123 tests.                                                                                                                                                                                     | Review/commit, then construct once in API and worker boot and flush after drain.                                                                                |
+| Secret REST           | The direct REST matrix is being corrected to `/api/v1/secret`, `/api/v1/secrets`, `/api/secret` and `/api/secrets`, with collection/item operations at the base rather than an extra dated/resource namespace. The invented public RPC is removed in the working tree. | Prove explicit `v1`, versionless-latest and optional-header selection, then commit with the known follow-ups below recorded rather than folded into this slice. |
+| API Secret/Agent      | `@langwatch/trpc` and AuthZ scope-lineage extraction exist; the real process root is being built.                                                                                                                                                                      | Directly cut live Secret and complete Agent tRPC to `apps/api`, with auth/audit/error/log/trace parity and displaced router deletion.                           |
+| Eventing server       | `@langwatch/eventing/server` now has private Prisma ProcessStore, injected ClickHouse EventStore/repository, retention and a production runtime factory.                                                                                                               | Review/commit, wire the worker and retain old adapters only for named replay/ops/gateway/webhook callers.                                                       |
+| Enterprise worker     | `@langwatch/enterprise-worker` now composes the managed-provider capability from explicit ports; focused tests/typecheck pass.                                                                                                                                         | Review/commit and wire typed config/credentials into the worker model-provider graph.                                                                           |
+| Topic worker          | Topic registers only through `WorkerEventingRuntime`; Eventing owns commands/events, projections, process-manager wakes, intents and redelivery.                                                                                                                       | Install production dependencies and the Trace `assignTopic` consumer, then delete live app Topic registry/runtime/task paths.                                   |
 
 Nothing in the active table counts as application-exit progress until reviewed
 and committed with its safe `platform/app` deletion boundary.
+
+### Recorded follow-ups
+
+These findings stay visible but do not block the active extraction batches. Pick
+them up as dependency-closed work when their owning wave reaches the affected
+surface. A failing check remains reported as failing even when its repair is
+deferred.
+
+| ID            | Finding and evidence                                                                                                                                                                                                                                     | Owning wave              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `F-API-01`    | OpenAPI generation is stopped by stale identity/Eventing imports. A partial run made the served and docs artefacts diverge and omitted the five deployed `/api/secrets` operations.                                                                      | Wave 3 and Wave 9        |
+| `F-API-02`    | Modern Secret aliases currently reuse operation IDs, and the generator prune list does not cover every alias. Decide the documented alias set, enforce unique IDs and add a whole-document uniqueness check.                                             | Wave 3                   |
+| `F-API-03`    | The global authz declaration sweep currently stops before discovery on an undefined analytics `lwqlTimeWindowSchema`. Agent/Secret focused policy tests are green, but the global sweep has not proved the new package mounts.                           | Wave 2 and Wave 3        |
+| `F-SECRET-01` | TypeScript Secret CLI commands do not forward the resolved project ID when building auth headers for the modern REST calls. Add multi-project/user-key header characterisation.                                                                          | Wave 3 clients           |
+| `F-SECRET-02` | The legacy Secret adapter changed project-key write actor handling and duplicate-error text from `main`. Characterise and decide the compatibility policy before retiring `/api/secrets`.                                                                | Wave 3 compatibility     |
+| `F-TRACE-01`  | The extracted full-read path trusts a stale storage-anchor hint, can return an empty span set, and does not yet preserve every legacy field/nullability case, including earliest start, topic IDs and reserved metrics. It has no production caller yet. | Trace vertical in Wave 6 |
+| `F-OBS-01`    | Process observability and Eventing currently resolve different LangWatch SDK versions. Align one SDK/OTel graph before final process activation.                                                                                                         | Wave 1                   |
+| `F-OBS-02`    | Preserve legacy instrumentation, disabled/no-key behaviour, metrics/profiling and drain-before-flush ordering when API and worker adopt process observability. Add process-level boot/shutdown proof.                                                    | Wave 1                   |
 
 ## Measured exit inventory
 
@@ -195,13 +213,14 @@ User or app composition.
    names/shapes over one Agent service graph.
 6. **API activation:** perform a direct cutover after heavy parity/integration
    testing. Do not add a parallel deployment phase.
-7. **Secret REST:** support `/api/v1/secret` and `/api/secret`; missing path and
-   header version selects latest, an explicit date/`latest` may be in the path,
-   and `X-API-Version` is optional with conflict rejection. `main` OpenAPI proves
-   deployed compatibility is five REST operations on `/api/secrets` and
-   `/api/secrets/{id}`. There is no deployed public Secret RPC; remove the
-   branch-invented `/api/secrets/{version}/secrets.*` family. Internal app tRPC
-   is separate.
+7. **Secret REST:** accept singular and plural resources with and without the
+   explicit version prefix: `/api/v1/secret`, `/api/v1/secrets`, `/api/secret`
+   and `/api/secrets`, plus their item paths. Unversioned paths select the latest
+   version; `X-API-Version` may select `v1`, and path/header disagreement is
+   rejected. `main` OpenAPI proves deployed compatibility is five REST
+   operations on `/api/secrets` and `/api/secrets/{id}`. There is no deployed
+   public Secret RPC; remove the branch-invented
+   `/api/secrets/{version}/secrets.*` family. Internal app tRPC is separate.
 8. **Trace full-read:** keep canonical full-read internal and all-visible.
    Public actor/viewer protection is a separate service/trust boundary that
    composes canonical read, protection and edit overlays later.
@@ -235,16 +254,16 @@ are already green; it need not wait for unrelated features in an earlier wave.
 
 ### Wave 0: reconcile and commit current work
 
-| ID     | Work                                                                                     | Exit gate                                                                                                            |
-| ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | New workspace imports resolve; lock diff contains only required importers/resolutions.                               |
-| `C-02` | Review and commit Agent UI.                                                              | Focused Agent/UI/host proof green; exact displaced page/card/history/copy/push code deleted; retained drawers named. |
-| `C-03` | Review and commit Trace full-read.                                                       | Internal parity mapper proof green; no false public cutover claim.                                                   |
-| `C-04` | Review and commit process observability.                                                 | API/worker-ready Node export, tests and no browser dependency leak.                                                  |
-| `C-05` | Finish Secret REST correction.                                                           | Main REST retained, both modern prefixes/version modes proven, invented RPC removed, semantic OpenAPI accurate.      |
-| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | One live API graph, complete routers, auth/audit/error/log/trace proof and old router deletion.                      |
-| `C-07` | Finish Eventing server and Enterprise worker composition.                                | Production factories and typed ports green; shared legacy adapters retained only for named remaining callers.        |
-| `C-08` | Finish Worker Topic cutover.                                                             | Durable queue/store composition plus Topic and Trace-assignment consumers green; live app Topic paths deleted.       |
+| ID     | Work                                                                                     | Exit gate                                                                                                                                                                    |
+| ------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | New workspace imports resolve; lock diff contains only required importers/resolutions.                                                                                       |
+| `C-02` | Review and commit Agent UI.                                                              | Focused Agent/UI/host proof green; exact displaced page/card/history/copy/push code deleted; retained drawers named.                                                         |
+| `C-03` | Review and commit Trace full-read.                                                       | Internal parity mapper proof green; no false public cutover claim.                                                                                                           |
+| `C-04` | Review and commit process observability.                                                 | API/worker-ready Node export, tests and no browser dependency leak.                                                                                                          |
+| `C-05` | Finish Secret REST correction.                                                           | Four direct singular/plural, versioned/versionless prefixes proven; main REST retained and invented RPC removed. Deferred OpenAPI/client parity findings are recorded above. |
+| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | One live API graph, complete routers, auth/audit/error/log/trace proof and old router deletion.                                                                              |
+| `C-07` | Finish Eventing server and Enterprise worker composition.                                | Production factories and typed ports green; shared legacy adapters retained only for named remaining callers.                                                                |
+| `C-08` | Finish Worker Topic cutover.                                                             | Durable queue/store composition plus Topic and Trace-assignment consumers green; live app Topic paths deleted.                                                               |
 
 ### Wave 1: process foundations
 
