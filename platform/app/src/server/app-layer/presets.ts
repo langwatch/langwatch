@@ -8,6 +8,10 @@ import {
   COST_ROLLUP_COMPARATOR_TARGET_TYPE,
   CostRollupComparatorService,
 } from "@ee/governance/services/costRollupComparator.service";
+import {
+  costSourceFromTargetId,
+  reconcileCostRollupComparatorSchedules,
+} from "@ee/governance/services/costRollupComparatorSchedule";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -1151,9 +1155,10 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // ADR-128: the cost rollup's comparator, on the same calendar scheduler the
-  // reports use. The fire is a tiny trigger — the lane in `targetId`, the day
-  // derived from the slot — so the handler re-derives everything at fire time
-  // rather than acting on a payload minted when the schedule was written.
+  // reports use. The fire is a tiny trigger — the lane read back out of
+  // `targetId`, the day derived from the slot — so the handler re-derives
+  // everything at fire time rather than acting on a payload minted when the
+  // schedule was written.
   //
   // It samples YESTERDAY, not today: a day still being written to is expected
   // to disagree with its own summary, and a watchdog that fires on that is a
@@ -1162,19 +1167,57 @@ export function initializeDefaultApp(options?: {
     const comparator = new CostRollupComparatorService(
       governanceCostRollupRepository,
     );
+    const comparatorLogger = createLogger(
+      "langwatch:governance:cost-rollup:comparator-schedule",
+    );
     schedulerRegistry.register({
       targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
       handler: async (fire) => {
+        const costSource = costSourceFromTargetId(fire.targetId);
+        if (!costSource) {
+          // A row naming a lane we do not have. Comparing the wrong lane would
+          // report drift between two things never meant to match, so say so
+          // and do nothing.
+          comparatorLogger.warn(
+            { targetId: fire.targetId, tenantId: fire.projectId },
+            "Cost rollup comparator fired for an unknown cost source; skipping",
+          );
+          return;
+        }
         const sampled = new Date(fire.slot.getTime() - 86_400_000)
           .toISOString()
           .slice(0, 10);
         await comparator.compareDay({
           tenantId: fire.projectId,
           day: sampled,
-          costSource: fire.targetId as never,
+          costSource,
         });
       },
     });
+
+    // Registering the handler is only half of it: without calendar entries
+    // carrying this targetType the loop never fires it. Boot reconciliation,
+    // fire-and-forget, the same shape as the report schedules below.
+    void reconcileCostRollupComparatorSchedules({
+      prisma,
+      scheduledJobs: new PrismaScheduledJobRepository(prisma),
+      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+      logger: comparatorLogger,
+    })
+      .then(({ created, deactivated }) => {
+        if (created > 0 || deactivated > 0) {
+          comparatorLogger.info(
+            { created, deactivated },
+            "Reconciled cost rollup comparator schedules at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        comparatorLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Cost rollup comparator schedule reconciliation failed at boot (will retry next boot)",
+        );
+      });
   }
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
