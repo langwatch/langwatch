@@ -182,6 +182,18 @@ jobs:
               # Root workspace members the app's `...` closure installs from
               # source — a change there is a change to the app.
               - 'packages/**'
+              # The process apps: apps/api, apps/worker, apps/ui, apps/server.
+              # These were deliberately left out while they were empty shells,
+              # on the same nine-jobs-is-expensive reasoning as charts/** below.
+              # That trade has flipped. The core-application extraction has been
+              # moving the REST transports, the tRPC routers, the worker feature
+              # installers and now the browser code out of platform/app and into
+              # here, so the code these jobs exist to protect increasingly IS
+              # apps/**. Without this line an apps-only change runs zero app CI
+              # and langwatch-app-complete still reports success through
+              # allowed-skips — the exact hole described for the root manifest
+              # above, and it widens with every commit of the migration.
+              - 'apps/**'
               # @langwatch/langyworker tests + typecheck run on unit shard 1;
               # without this a wrapper-only change runs zero app CI.
               - 'services/langyworker/**'
