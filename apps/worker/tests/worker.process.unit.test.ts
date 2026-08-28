@@ -44,6 +44,21 @@ describe("bootWorker", () => {
     expect(mocks.configureLogger).not.toHaveBeenCalled();
   });
 
+  it("rejects an invalid Worker-only storage selection before the process graph exists", async () => {
+    const createComposition = vi.fn();
+
+    await expect(
+      bootWorker({
+        source: { STORED_OBJECTS_BACKEND: "gcs" },
+        createComposition,
+      }),
+    ).rejects.toThrow("Invalid worker configuration");
+
+    expect(createComposition).not.toHaveBeenCalled();
+    expect(mocks.createObservability).not.toHaveBeenCalled();
+    expect(mocks.configureLogger).not.toHaveBeenCalled();
+  });
+
   it("creates one graph and drains Eventing, resources, then observability", async () => {
     const phases: string[] = [];
     const createComposition = vi.fn(async ({ resources }: { resources: ResourceScope }) => {

@@ -93,4 +93,41 @@ describe("WorkerSignalHandlers", () => {
       "worker shutdown failure policy failed",
     );
   });
+
+  it("enforces an executable-owned shutdown deadline while a drain is still pending", async () => {
+    vi.useFakeTimers();
+    try {
+      const source = new Signals();
+      let release: (() => void) | undefined;
+      const close = vi.fn(
+        async () =>
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const logger = { info: vi.fn(), error: vi.fn() };
+      const onDeadline = vi.fn();
+      WorkerSignalHandlers.install({
+        source,
+        close,
+        logger,
+        deadlineMs: 10,
+        onDeadline,
+        onFailure: vi.fn(),
+      });
+
+      source.emit("SIGTERM");
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        { signal: "SIGTERM", deadlineMs: 10 },
+        "worker shutdown exceeded its deadline",
+      );
+      expect(onDeadline).toHaveBeenCalledWith("SIGTERM");
+      release?.();
+      await vi.runAllTimersAsync();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -7,6 +7,10 @@ export {
   type WorkerTopicCompositionOptions,
 } from "./app/worker-production.composition";
 export {
+  createWorkerPrivateInfrastructureComposition,
+  type WorkerPrivateInfrastructurePorts,
+} from "./app/worker-private-infrastructure.composition";
+export {
   WorkerInfrastructureAdapter,
   WorkerStoredObjectStorageFactory,
   WorkerStorageFactoryPort,
@@ -31,6 +35,10 @@ export {
   resolveWorkerConfig,
   workerConfigDefinition,
   type WorkerConfig,
+  type WorkerInfrastructureConfig,
+  type WorkerOutboundProxyConfig,
+  type WorkerShutdownConfig,
+  type WorkerStorageConfig,
 } from "./platform/config/worker.config";
 export {
   WorkerEventingRuntime,
@@ -70,3 +78,10 @@ export {
   type WorkerMainProcessPort,
   type WorkerMainSignals,
 } from "./worker.main";
+export {
+  bootWorkerExecutable,
+  WorkerExecutable,
+  WorkerExecutableCompositionPort,
+  type WorkerExecutableHost,
+  type WorkerExecutableOptions,
+} from "./worker.executable";

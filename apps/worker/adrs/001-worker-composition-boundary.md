@@ -26,12 +26,16 @@ feature handles, worker transports, process infrastructure, or observability.
 That order is required before consumer activation: queued handlers retain their
 stores and diagnostics throughout the drain, while observability remains last.
 
-The physical `platform/app/src/workers.ts` executable therefore still selects
-`createLegacyWorkerPorts()` and `startWorkers()`: it registers the complete
-Eventing graph and owns unrelated worker jobs. The executable can switch only
-when a package-composed full registry mounts Trace (including `assignTopic`)
-and every other shared-queue pipeline, with its durable stores, Group Queue,
-typed execution/configuration, observability, transport, and drain lifecycle.
+`platform/app/src/workers.ts` is now a thin local compatibility launcher: it
+loads the legacy source and platform telemetry, then delegates configuration,
+logging, tracing, fatal-error policy, signals, and shutdown to
+`WorkerExecutable`. `LegacyWorkerExecutableComposition` still selects
+`createLegacyWorkerPorts()` and `startWorkers()` because it alone registers the
+complete Eventing graph and unrelated worker jobs. The executable can remove
+that adapter only when a package-composed full registry mounts Trace (including
+`assignTopic`) and every other shared-queue pipeline, with its durable stores,
+Group Queue, typed execution/configuration, observability, transport, and
+drain lifecycle.
 
 `WorkerStoredObjectStorageRuntimeFactory` is an injectable production
 composition boundary for Group Queue storage, not a live cutover. It receives

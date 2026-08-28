@@ -7,22 +7,27 @@ const redis = {
   disconnect: vi.fn(() => undefined),
 };
 
-vi.mock("@langwatch/redis-client", () => ({
-  RedisConnectionService: class {
-    connectResolved() {
-      return redis;
-    }
-  },
-  RedisShutdownService: class {
-    static create() {
-      return new this();
-    }
+vi.mock("@langwatch/redis-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/redis-client")>();
 
-    shutdown(connection: typeof redis) {
-      connection.disconnect();
-    }
-  },
-}));
+  return {
+    ...actual,
+    RedisConnectionService: class {
+      connectResolved() {
+        return redis;
+      }
+    },
+    RedisShutdownService: class {
+      static create() {
+        return new this();
+      }
+
+      shutdown(connection: typeof redis) {
+        connection.disconnect();
+      }
+    },
+  };
+});
 
 import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
 import { TopicServerInstaller } from "@langwatch/topic-server";
@@ -115,17 +120,24 @@ describe("WorkerProductionComposition infrastructure seam", () => {
           metrics: {} as never,
         },
       });
+      const infrastructure = composition.infrastructure;
+      if (!infrastructure) {
+        throw new Error("Expected Worker infrastructure to be composed");
+      }
+      const infrastructureClose = vi.spyOn(infrastructure, "close");
 
       expect(composition.infrastructure?.redis).toBe(redis);
       expect(eventingCreate.mock.calls[0]?.[0].groupQueue).toBe(
         composition.infrastructure?.queueDependencies,
       );
       expect(topicCreate.mock.calls[0]?.[0].redis).toBe(redis);
+      await resources.close();
+      expect(infrastructureClose).toHaveBeenCalledOnce();
+      expect(redis.disconnect).toHaveBeenCalledOnce();
     } finally {
       eventingCreate.mockRestore();
       topicCreate.mockRestore();
       await resources.close();
-      expect(redis.disconnect).toHaveBeenCalledOnce();
       redis.disconnect.mockClear();
     }
   });

@@ -20,6 +20,8 @@ export class WorkerSignalHandlers {
     source: WorkerSignalSource;
     close: () => Promise<void>;
     logger?: Pick<Logger, "error" | "info">;
+    deadlineMs?: number;
+    onDeadline?: (signal: WorkerShutdownSignal) => void | Promise<void>;
     onComplete?: (signal: WorkerShutdownSignal) => void | Promise<void>;
     onFailure: (error: unknown, signal: WorkerShutdownSignal) => void | Promise<void>;
   }): WorkerSignalHandlers {
@@ -27,6 +29,8 @@ export class WorkerSignalHandlers {
       options.source,
       options.close,
       options.logger,
+      options.deadlineMs,
+      options.onDeadline,
       options.onComplete,
       options.onFailure,
     );
@@ -42,6 +46,10 @@ export class WorkerSignalHandlers {
     private readonly source: WorkerSignalSource,
     private readonly close: () => Promise<void>,
     private readonly logger: Pick<Logger, "error" | "info"> | undefined,
+    private readonly deadlineMs: number | undefined,
+    private readonly onDeadline:
+      | ((signal: WorkerShutdownSignal) => void | Promise<void>)
+      | undefined,
     private readonly onComplete:
       | ((signal: WorkerShutdownSignal) => void | Promise<void>)
       | undefined,
@@ -74,6 +82,15 @@ export class WorkerSignalHandlers {
 
   private async shutdown(signal: WorkerShutdownSignal): Promise<void> {
     this.logger?.info({ signal }, "worker shutdown requested");
+    const deadline = this.deadlineMs
+      ? setTimeout(() => {
+          this.logger?.error(
+            { signal, deadlineMs: this.deadlineMs },
+            "worker shutdown exceeded its deadline",
+          );
+          void this.onDeadline?.(signal);
+        }, this.deadlineMs)
+      : undefined;
     try {
       await this.close();
       this.logger?.info({ signal }, "worker shutdown complete");
@@ -82,6 +99,7 @@ export class WorkerSignalHandlers {
       this.logger?.error({ error, signal }, "worker shutdown failed");
       await this.onFailure(error, signal);
     } finally {
+      if (deadline) clearTimeout(deadline);
       this.dispose();
     }
   }

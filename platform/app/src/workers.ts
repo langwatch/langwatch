@@ -13,12 +13,8 @@ void (async () => {
   const { configureLogger } = await import("@langwatch/observability");
   configureLogger(bootstrap.logger);
 
-  const { AppBoot } = await import("./runtime/app/boot");
-  const { AppBootConfigService, fixedAppBootConfigResolver } = await import("./runtime/config");
   const { setEnvironment } = await import("@langwatch/ksuid");
   const { createLogger } = await import("@langwatch/observability");
-  const { installShutdownHandlers } = await import("./server/shutdown/runGracefulShutdown");
-  const { SHUTDOWN_BUDGET } = await import("./server/shutdown/budget");
 
   setEnvironment(bootstrap.environment);
 
@@ -28,67 +24,31 @@ void (async () => {
   await import("./server/handled-error-wiring");
 
   const logger = createLogger("langwatch:workers");
-  logger.info("starting");
-
-  let booted: { close(): Promise<void> } | undefined;
-
-  installShutdownHandlers((signal) => ({
-    signal,
-    logger,
-    phases: [
-      {
-        name: "worker-runtime",
-        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
-        run: async () => await booted?.close(),
-      },
-    ],
-  }));
 
   try {
-    // Keep process-wide observability available when worker-only HTTP settings
-    // reject boot, matching the former AppBoot.boot(process.env) timing.
-    const appConfig = new AppBootConfigService().resolve(process.env);
-    const appBoot = new AppBoot({
-      config: fixedAppBootConfigResolver(appConfig),
-      compose: async (_config, resources) => {
-        // These imports are intentionally inside compose: config validation has
-        // completed before the App composition or worker transport evaluate.
-        const { WorkerRuntime } = await import("@langwatch/worker/runtime");
-        const { createLegacyWorkerPorts } = await import("./runtime/worker/legacy-worker.adapter");
-        const { initializeWorkerApp } = await import("./server/app-layer/presets");
-        const app = initializeWorkerApp();
-        const ports = createLegacyWorkerPorts(app);
-
-        const runtime = WorkerRuntime.create({
-          ...ports,
-          resources,
-        });
-
-        return {
-          start: () => runtime.start(),
-          close: () => runtime.close(),
-        };
+    const { WorkerExecutable } = await import("@langwatch/worker");
+    const { LegacyWorkerExecutableComposition } =
+      await import("./runtime/worker/legacy-worker.executable.adapter");
+    const { telemetryFlushes } = await import("./server/shutdown/telemetry");
+    const worker = await WorkerExecutable.boot({
+      source: process.env,
+      composition: LegacyWorkerExecutableComposition.create({ source: process.env }),
+      observability: {
+        // Platform instrumentation remains the live telemetry provider until
+        // the complete Eventing registry moves. It flushes through the
+        // physical Worker's process-owned observability shutdown boundary.
+        setup: { langwatch: "disabled" },
+        flushers: telemetryFlushes().map((flush) => ({
+          name: flush.name,
+          shutdown: flush.run,
+        })),
       },
     });
-
-    booted = await appBoot.boot({});
+    await worker.start();
   } catch (error) {
     logger.error({ error }, "failed to start background workers");
     throw error;
   }
-
-  process.on("uncaughtException", (err) => {
-    logger.fatal({ error: err }, "uncaught exception detected");
-    process.exit(1);
-  });
-
-  process.on("unhandledRejection", (reason, promise) => {
-    logger.fatal(
-      { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected",
-    );
-    process.exit(1);
-  });
 })().catch((error: unknown) => {
   const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.stderr.write(`[langwatch:workers] fatal boot failure: ${message}\n`);
