@@ -551,6 +551,13 @@ export const codeComponentSchema = baseComponentSchema.extend({
         message: "Code component must have a 'code' parameter with type 'code'",
       },
     ),
+  /**
+   * Wall-clock budget for this node's code, in milliseconds. Emitted as the
+   * `timeout_ms` node parameter, the same identifier and units the HTTP node
+   * uses. The engine clamps it to the operator ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`), so it can only shorten a run.
+   */
+  timeoutMs: z.number().int().positive().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Which output field to use as the scenario result. When unset, uses the first output. */

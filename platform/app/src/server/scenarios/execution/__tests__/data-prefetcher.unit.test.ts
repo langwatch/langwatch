@@ -933,6 +933,52 @@ describe("prefetchScenarioData", () => {
           ).toBeUndefined();
         });
       });
+
+      describe("when the agent config sets its own code timeout", () => {
+        it("carries it on the adapter data as timeoutMs", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue({
+                ...codeAgent,
+                config: { ...codeAgent.config, timeoutMs: 5000 },
+              }),
+            },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            timeoutMs: 5000,
+          });
+        });
+      });
+
+      describe("when the agent config sets no code timeout", () => {
+        it("leaves timeoutMs off the adapter data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(
+            (result.data.adapterData as { timeoutMs?: number }).timeoutMs,
+          ).toBeUndefined();
+        });
+      });
     });
 
     describe("given code agent has wrong type", () => {

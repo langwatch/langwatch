@@ -933,6 +933,8 @@ const RawCodeAgentConfigSchema = z.object({
     .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
+  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -968,6 +970,7 @@ async function fetchCodeAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
     secrets,
+    timeoutMs: config.timeoutMs,
   };
 }
 

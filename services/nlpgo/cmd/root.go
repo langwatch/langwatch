@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -72,17 +73,8 @@ func Root(ctx context.Context, _ []string) error {
 		zap.Int("allowed_hosts", len(allowedProxyHosts)),
 	)
 
-	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
-	codeExec, err := codeblock.New(codeblock.Options{
-		Python: resolveSandboxPython(cfg.Engine.SandboxPython, os.Getenv),
-		// The instance a code node's LangWatch SDK calls. It is the same URL
-		// the evaluator blocks call back on, and it is injected only next to
-		// a run's own sandbox key.
-		SandboxEndpoint: resolveLangWatchBaseURL(
-			cfg.Engine.LangWatchBaseURL,
-			os.Getenv,
-		),
-	})
+	httpExec := newHTTPExecutor(cfg.Engine, ssrfOpts)
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -113,9 +105,8 @@ func Root(ctx context.Context, _ []string) error {
 
 	// Evaluator + agent-workflow blocks call the LangWatch app's own
 	// HTTP API. Both share the same LangWatchBaseURL.
-	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
-	evalExec := evaluatorblock.New(evaluatorblock.Options{})
-	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
+	evalExec := newEvaluatorExecutor(cfg.Engine)
+	agentWfRunner := newAgentWorkflowRunner(cfg.Engine)
 
 	eng := engine.New(engine.Options{
 		HTTP: httpExec,
@@ -136,6 +127,67 @@ func Root(ctx context.Context, _ []string) error {
 	)
 
 	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+}
+
+// newCodeExecutor builds the code-block executor from the operator-facing
+// engine config. Extracted from Root so the wiring itself — which operator
+// knob reaches which executor option — is reachable from a test without
+// standing up the whole service.
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+	return codeblock.New(codeblock.Options{
+		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
+		// The instance a code node's LangWatch SDK calls. It is the same URL
+		// the evaluator blocks call back on, and it is injected only next to
+		// a run's own sandbox key.
+		SandboxEndpoint: resolveLangWatchBaseURL(
+			engineCfg.LangWatchBaseURL,
+			getenv,
+		),
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.CodeBlockTimeoutSeconds),
+	})
+}
+
+// newHTTPExecutor builds the HTTP-block executor from the operator-facing
+// engine config. `agent_type=http` nodes run through this same executor, so
+// NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS bounds both.
+func newHTTPExecutor(engineCfg nlpgo.EngineConfig, ssrfOpts httpblock.SSRFOptions) *httpblock.Executor {
+	return httpblock.New(httpblock.Options{
+		SSRF:           ssrfOpts,
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.HTTPBlockTimeoutSeconds),
+	})
+}
+
+// newAgentWorkflowRunner builds the `agent_type=workflow` sub-workflow runner
+// from the operator-facing engine config.
+func newAgentWorkflowRunner(engineCfg nlpgo.EngineConfig) *agentblock.WorkflowRunner {
+	return agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.AgentWorkflowTimeoutSeconds),
+	})
+}
+
+// newEvaluatorExecutor builds the evaluator-block executor from the
+// operator-facing engine config.
+func newEvaluatorExecutor(engineCfg nlpgo.EngineConfig) *evaluatorblock.Executor {
+	return evaluatorblock.New(evaluatorblock.Options{
+		DefaultTimeout: resolveTimeoutSeconds(engineCfg.EvaluatorTimeoutSeconds),
+	})
+}
+
+// resolveTimeoutSeconds converts one of the operator's `_SECONDS` engine knobs
+// into the wall-clock timeout the matching executor enforces.
+//
+// A zero or negative value returns zero, which hands the decision back to the
+// executor's own constructor and its documented fallback — one default, in one
+// place. Returning a negative duration instead would build an already-expired
+// context and abandon every call before it started, turning a typo in a config
+// file into a total outage of the feature.
+func resolveTimeoutSeconds(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // resolveLangWatchBaseURL returns the base URL the evaluator and
