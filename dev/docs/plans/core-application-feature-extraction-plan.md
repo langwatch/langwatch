@@ -382,14 +382,27 @@ Worker consumer; that gate remains under `F-WORKER-01`.
 
 New findings recorded during the Wave 3 to 5 fan-out:
 
-`F-CI-02` — **package suites are invisible to CI, and the gap is now larger
-than when `F-CI-01` was written.** `langwatch-app-ci.yml` names packages one by
-one, and no line names `@langwatch/dataset-server`, `@langwatch/monitor-server`,
-`@langwatch/evaluator-server`, `@langwatch/github-server` or
-`@langwatch/secret-server`. Every transport test written during this wave —
-26 for Dataset, 16 for Monitor, 44 for Evaluator, and more arriving — is
-local-only until a workflow line is added. Add the lines with the wave, not
-after it.
+`F-CI-02` — **package suites are invisible to CI, and the real number is far
+worse than `F-CI-01` estimated.** Measured across every workflow, not just
+`langwatch-app-ci.yml`: **162 workspace packages declare a `test` or
+`test:unit` script, 17 are named by any workflow, and 145 are named nowhere —
+132 of them under `packages/`.** Only three workflows name a package suite at
+all (`langwatch-app-ci.yml`, `agent-plugin-ci.yml`, `npx-server-smoke.yml`), and
+`langwatch-app-ci.yml` names them as hand-written steps one at a time, so a new
+package is invisible by default rather than by decision.
+
+This is not a gap beside the extraction; it is a gap in the extraction's own
+feedback loop. Every wave of this plan moves behaviour out of `platform/app` —
+which CI does run — into `packages/features/*`, which it does not. Eighty-six
+transport tests written in a single hour of Wave 3 (Dataset 26, Evaluator 44,
+Monitor 16) execute only on a laptop. The more successful the extraction is, the
+less of the product CI covers.
+
+The fix is not 264 more hand-written steps. It is one discovery-driven job that
+runs every workspace package's suite, so a package cannot be forgotten, plus a
+baseline for the ones that are red today so the inventory can only shrink. Do
+not add that job before measuring the current pass rate across all 132 — a job
+that arrives red and stays red teaches everyone to ignore it.
 
 `F-TRPC-01` — **a moved vertical needs `@trpc/server` in its own manifest.**
 `packages/features/model-provider/server` could not resolve it, which produces
