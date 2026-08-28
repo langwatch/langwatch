@@ -35,12 +35,24 @@ owner. See `dev/lint/ast-grep/README.md`.
 
 The division that keeps review comments worth reading:
 
-| Kind of rule                       | Home                                       |
-| ---------------------------------- | ------------------------------------------ |
-| Expressible as Biome config        | `platform/app/biome.json`                  |
-| Expressible as a syntactic pattern | `/dev/lint/ast-grep/rules/`                |
-| Expressible as a semantic pattern  | `/dev/lint/semgrep/langwatch.yml`          |
-| Genuinely needs judgement          | `path_instructions` in `/.coderabbit.yaml` |
+| Kind of rule                             | Home                                       |
+| ---------------------------------------- | ------------------------------------------ |
+| Expressible as Biome config, `platform/app/**` | `platform/app/biome.jsonc`           |
+| Expressible as oxlint config, `packages/**`    | `/.oxlintrc.architecture.json`       |
+| Expressible as a syntactic pattern       | `/dev/lint/ast-grep/rules/`                |
+| Expressible as a semantic pattern        | `/dev/lint/semgrep/langwatch.yml`          |
+| Genuinely needs judgement                | `path_instructions` in `/.coderabbit.yaml` |
+
+**The first two rows are two linters because they cover disjoint trees, not
+because anyone wanted two.** `/biome.jsonc` scopes the whole Biome workspace to
+`platform/app/**` on purpose (see the comment there), so `packages/**` — where
+the extracted features now live — had no general-purpose linter at all: only
+the `langwatch/*` architecture rules, which police boundaries and say nothing
+about the code inside one. oxlint already walks those paths for the
+architecture rules, so the readability and type-safety rules ride along with it
+rather than adding a fourth tool. A rule that belongs on both trees is
+configured in both, at the severity each tree's baseline supports; the two
+files each carry the measured numbers.
 
 A rule in more than one home gets reported twice — once deterministically and
 once probabilistically — which is how a review thread fills up with mechanics

@@ -22,6 +22,196 @@
         "langwatch/logical-statement-spacing": "error"
       }
     },
+
+    // ------------------------------------------------------------------
+    // CODE QUALITY, packages/** only.
+    //
+    // Biome is the TypeScript linter proper, but /biome.jsonc scopes the
+    // whole Biome workspace to platform/app/** -- deliberately, so a run
+    // started from the repo root checks exactly what `pnpm lint` checks.
+    // That left packages/**, which is where the extracted features now
+    // live, with no general-purpose linter at all: only the langwatch/*
+    // architecture rules above, which police boundaries and say nothing
+    // about whether the code inside a boundary is readable.
+    //
+    // oxlint already walks these paths for the architecture rules, so
+    // these ride along for free rather than adding a fourth tool.
+    //
+    // EVERY RULE HERE IS `error`, AND EVERY ONE WAS MEASURED FIRST.
+    // There is no warn tier: oxlint has no reviewdog wiring here, so a
+    // warning would annotate nothing and block nothing. A rule earns its
+    // place by having a baseline of zero -- either because packages/**
+    // was already clean, or because this change made it clean. That is
+    // what keeps `pnpm lint:architecture` a gate rather than a report.
+    //
+    // Scope stops at packages/**: platform/app/** is Biome's, and
+    // duplicating a rule across both linters reports it twice.
+    // ------------------------------------------------------------------
+    {
+      "files": ["packages/**/*.ts", "packages/**/*.tsx", "packages/**/*.mts", "packages/**/*.cts"],
+      "rules": {
+        // -- Type-unsafety escape hatches ----------------------------
+        // `any` is already covered by dev/lint/ast-grep no-explicit-any.
+        // These are the other ways a type gets thrown away quietly.
+        //
+        // ban-ts-comment is the important one: it bans bare `@ts-ignore`
+        // (which silently does nothing when the line below is already
+        // clean, so it rots invisibly) and requires a >=3 character
+        // reason on every `@ts-expect-error`.
+        "typescript/ban-ts-comment": "error", // baseline 3, fixed here
+        "typescript/no-confusing-non-null-assertion": "error", // baseline 3, fixed here
+        "typescript/no-empty-object-type": "error", // baseline 2, fixed here
+        "typescript/no-unsafe-function-type": "error", // baseline 0
+        "typescript/no-wrapper-object-types": "error", // baseline 0
+        "typescript/no-misused-new": "error", // baseline 0
+        "typescript/no-this-alias": "error", // baseline 0
+        "typescript/no-unnecessary-type-constraint": "error", // baseline 0
+        "typescript/no-duplicate-enum-values": "error", // baseline 0
+        "typescript/prefer-literal-enum-member": "error", // baseline 0
+        "typescript/no-meaningless-void-operator": "error", // baseline 0
+
+        // -- Control flow you can read straight through --------------
+        //
+        // max-depth is the headline. Four nested blocks inside one
+        // function is already the point where a reader has to hold the
+        // whole stack in their head; past that it is the "deeply nested
+        // spaghetti" the coding standards exist to prevent. Baseline at
+        // max 4 was 35 hits in 15 files -- those 15 are pinned at 6 by
+        // the debt register below and can only shrink.
+        "max-depth": ["error", { "max": 4 }],
+
+        // Both lonely-if rules, because they catch opposite shapes and
+        // each one removes a level of nesting:
+        //   eslint  -- `else { if (x) {} }`      -> `else if (x)`
+        //   unicorn -- `if (a) { if (b) {} }`    -> `if (a && b)`
+        "no-lonely-if": "error", // baseline 1, fixed here
+        "unicorn/no-lonely-if": "error", // baseline 10, fixed here
+        "no-else-return": "error", // baseline 6, fixed here
+
+        // -- Constructs that read as a bug ---------------------------
+        "eqeqeq": ["error", "always", { "null": "ignore" }], // baseline 0
+        "no-self-compare": "error", // baseline 0
+        "no-return-assign": "error", // baseline 0
+        "no-constant-binary-expression": "error", // baseline 0
+        "no-unsafe-negation": "error", // baseline 0
+        "no-unneeded-ternary": "error", // baseline 0
+        "no-multi-assign": "error", // baseline 0
+        "no-sequences": "error", // baseline 2, fixed here
+        "no-labels": "error", // baseline 0
+        "guard-for-in": "error", // baseline 0
+        "no-param-reassign": "error", // baseline 6, fixed here
+        "no-useless-assignment": "error", // baseline 3, fixed here
+        "default-param-last": "error", // baseline 1, fixed here
+
+        // -- Errors and constructors ---------------------------------
+        "no-throw-literal": "error", // baseline 2, fixed here
+        "prefer-promise-reject-errors": "error", // baseline 0
+        "no-array-constructor": "error", // baseline 0
+        "no-new-wrappers": "error" // baseline 0
+      }
+    },
+
+    // ------------------------------------------------------------------
+    // MEASURED AND REJECTED, so the next person does not re-litigate them:
+    //
+    //   no-magic-numbers                19882   every threshold and index
+    //   id-length (min 2)                4163   `i`, `j`, `e` are conventional
+    //   require-await                    2351   async-for-interface is a real shape
+    //   typescript/no-non-null-assertion 1797   (489 source, 1308 test)
+    //   no-negated-condition              612   unicorn variant 311
+    //   max-classes-per-file (1)          332
+    //   no-await-in-loop                  388 in 170 files -- and sequential
+    //                                     iteration is often the point
+    //                                     (ordering, backpressure), which a
+    //                                     linter cannot tell from a missed
+    //                                     batch
+    //   no-nested-ternary                 258 in 140 files, no clean role
+    //   no-eq-null                        226   this is the `== null` idiom,
+    //                                     rejected on principle, not on count
+    //   max-params (max 4)                 85 in 69 files; at max 3 it is 241.
+    //                                     CLAUDE.md's named-parameters rule
+    //                                     wants this, but no threshold cheap
+    //                                     enough to adopt is tight enough to
+    //                                     mean anything -- the same trap
+    //                                     platform/app/biome.jsonc documents
+    //   typescript/no-extraneous-class     54 in 47 files
+    //   typescript/no-import-type-side-effects  34 in 33 files
+    //   no-loop-func                        2, and both are the same deliberate
+    //                                     abort-latch: the closure exists in
+    //                                     order to publish itself to the outer
+    //                                     `wake` binding. Adopting the rule
+    //                                     buys a rewrite of correct code or a
+    //                                     suppression, so it buys nothing
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // eqeqeq carries `{ "null": "ignore" }` on purpose. `x == null` is
+    // the idiomatic single check for null-or-undefined and this codebase
+    // uses it deliberately -- 133 of the 226 raw eqeqeq hits were that
+    // idiom, and "fixing" them would have replaced one correct check
+    // with two. With the option on, the baseline is 0.
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // no-shadow: a reused name is one of the cheapest ways to make a
+    // reader mistake one value for another. It is NOT enabled for
+    // packages/** as a whole -- 99 hits across 45 files, concentrated in
+    // web components and test setup. It IS enabled where the domain
+    // lives, which is where a shadowed identifier is most expensive:
+    // contract (already clean, 0 hits) and server source (7 hits across
+    // 5 files, fixed here).
+    //
+    // The remaining debt is web + tests. Narrowing the scope is the
+    // honest version of a baseline: everything inside it is clean and
+    // stays clean, instead of one number nobody reads.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/features/*/contract/src/**/*.ts",
+        "packages/features/*/server/src/**/*.ts",
+        "packages/enterprise/features/*/contract/src/**/*.ts",
+        "packages/enterprise/features/*/server/src/**/*.ts"
+      ],
+      "rules": {
+        "no-shadow": "error"
+      }
+    },
+
+    // ------------------------------------------------------------------
+    // DEBT REGISTER, max-depth only.
+    //
+    // These 15 files nest deeper than 4. They are pinned at 6 rather
+    // than switched off, so the rule still holds them and the list can
+    // only shrink: unnest a file and delete its line; no file can be
+    // added without a reviewer seeing it appear here. Every other file
+    // in packages/**, and every new file anywhere, is held to 4.
+    //
+    // Measured at the time of writing: 35 violations at max 4, 6 at
+    // max 5, 0 at max 6.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/features/analytics/server/src/clickhouse/filter-translator.ts",
+        "packages/features/analytics/server/src/services/analytics.tripwire.ts",
+        "packages/features/experiment/web/src/batch-evaluation-results.types.ts",
+        "packages/features/experiment/web/src/batch-results/comparison-charts.tsx",
+        "packages/features/langy/web/src/behaviour/langy-choices-timeline.ts",
+        "packages/features/ops/server/src/repositories/redis/queue.repository.ts",
+        "packages/features/trace/contract/src/trace-query-analysis.ts",
+        "packages/features/trace/server/src/services/canonical-extraction.rules.ts",
+        "packages/features/trace/server/src/services/canonicalisation/mastra.canonicaliser.ts",
+        "packages/features/trace/server/src/services/gen-ai-span.rules.ts",
+        "packages/features/trace/server/src/services/langwatch-value.rules.ts",
+        "packages/features/trace/server/src/services/trace-attribute-cap.rules.ts",
+        "packages/features/trace/web/src/prompt-attributes.ts",
+        "packages/features/trace/web/src/transcript/block-stack-items.ts",
+        "packages/features/trace/web/src/transcript/content-parser.ts"
+      ],
+      "rules": {
+        "max-depth": ["error", { "max": 6 }]
+      }
+    },
+
     {
       "files": [
         "packages/features/*/server/src/services/**/*.service.ts",

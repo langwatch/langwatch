@@ -5,46 +5,46 @@ snapshots:
       expect(el).toBeTruthy();
     });
   : labels:
-      - source: |-
-          it("renders", () => {
-            expect(el).toBeTruthy();
-          })
-        style: primary
-        start: 0
-        end: 51
+    - source: |-
+        it("renders", () => {
+          expect(el).toBeTruthy();
+        })
+      style: primary
+      start: 0
+      end: 51
   ? |
     it("should check local first", () => {
       expect(resolve()).toBe("local");
     });
   : labels:
-      - source: |-
-          it("should check local first", () => {
-            expect(resolve()).toBe("local");
-          })
-        style: primary
-        start: 0
-        end: 76
+    - source: |-
+        it("should check local first", () => {
+          expect(resolve()).toBe("local");
+        })
+      style: primary
+      start: 0
+      end: 76
   ? |
     it("works", () => {
       expect(run()).toBe(true);
     });
   : labels:
-      - source: |-
-          it("works", () => {
-            expect(run()).toBe(true);
-          })
-        style: primary
-        start: 0
-        end: 50
+    - source: |-
+        it("works", () => {
+          expect(run()).toBe(true);
+        })
+      style: primary
+      start: 0
+      end: 50
   ? |
     test("Should reject an unknown provider", () => {
       expect(fn).toThrow();
     });
   : labels:
-      - source: |-
-          test("Should reject an unknown provider", () => {
-            expect(fn).toThrow();
-          })
-        style: primary
-        start: 0
-        end: 76
+    - source: |-
+        test("Should reject an unknown provider", () => {
+          expect(fn).toThrow();
+        })
+      style: primary
+      start: 0
+      end: 76

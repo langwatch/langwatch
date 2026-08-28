@@ -49,6 +49,63 @@
   //
   // Promote a rule to error once its baseline hits zero, and delete the
   // matching clause from /.coderabbit.yaml so it stops being reported twice.
+  //
+  // ------------------------------------------------------------------------
+  // READABILITY AND TYPE-SAFETY RULES, added on top of the above. Same two
+  // tiers, same doctrine, and every one measured over the six paths `pnpm
+  // lint` actually passes (src, ee, scripts, e2e, prisma, vite) before being
+  // switched on.
+  //
+  // ERROR -- baseline 0 across all six paths, so they block today:
+  //
+  //   noSelfCompare, noConstantBinaryExpressions   an expression that cannot
+  //                                                mean what it says
+  //   noCommaOperator, noLabelVar, noConfusingLabels,
+  //   noUselessLoneBlockStatements                 syntax that reads as
+  //                                                something it is not
+  //   noMisrefactoredShorthandAssign               `a =- b` for `a -= b`
+  //   noThenProperty, useThrowOnlyError            a thenable that is not a
+  //                                                promise; a throw that is
+  //                                                not an Error
+  //
+  // WARN -- measured backlog, so blocking on ADDED lines only (reviewdog
+  // `filter_mode: added` + `fail_level: warning`, exactly as above):
+  //
+  //   noUselessTernary                    2
+  //   useDefaultParameterLast             2
+  //   noUselessCatchBinding               3
+  //   noParameterAssign                   8
+  //   noReturnAssign                     10
+  //   noConfusingVoidType                12
+  //   noAssignInExpressions              26
+  //   noTsIgnore                         28   was "off"; bare @ts-ignore is
+  //                                           silent when the line below is
+  //                                           already clean, so it rots
+  //   useCollapsedIf                     30
+  //   noImplicitAnyLet                   41
+  //   noUselessElse                      51
+  //   noEvolvingTypes                    54
+  //   noDoubleEquals                     56
+  //   noUnusedFunctionParameters         73
+  //   noExcessiveNestedCallbacks         78
+  //                                     ----
+  //                                      474 added to the annotator's input
+  //
+  // MEASURED AND LEFT OFF. Each is a real rule; each has a backlog big enough
+  // that switching it on drowns the annotator, which is how a gate stops being
+  // read -- the same failure this config's `useMaxParams` note describes:
+  //
+  //   noNonNullAssertion               4329
+  //   noNestedTernary                   677
+  //   noShadow                          574   (it IS on for packages/**'s
+  //                                            contract and server layers, in
+  //                                            /.oxlintrc.architecture.json,
+  //                                            where the baseline was 7)
+  //   noAwaitInLoops                    544   sequential iteration is often
+  //                                            the point, and the rule cannot
+  //                                            tell that from a missed batch
+  //   noNegationElse                    443
+  // ------------------------------------------------------------------------
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -100,7 +157,11 @@
       "preset": "none",
       "complexity": {
         "noBannedTypes": "error",
+        "noCommaOperator": "error",
+        "noUselessLoneBlockStatements": "error",
         "noUselessThisAlias": "error",
+        "noUselessTernary": "warn",
+        "noUselessCatchBinding": "warn",
         "noUselessTypeConstraint": "error",
         "useLiteralKeys": "error",
         "useOptionalChain": "error",
@@ -125,11 +186,13 @@
         "noNextAsyncClientComponent": "warn",
         "noPrecisionLoss": "error",
         "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "warn",
         "noUnusedVariables": "warn",
       },
       "nursery": {
         "noFloatingPromises": "error",
         "noMisusedPromises": "error",
+        "noExcessiveNestedCallbacks": "warn",
       },
       "performance": {
         "noImgElement": "off",
@@ -152,8 +215,13 @@
             },
           },
         },
+        "noParameterAssign": "warn",
+        "noUselessElse": "warn",
         "useArrayLiterals": "error",
         "useAsConstAssertion": "error",
+        "useCollapsedIf": "warn",
+        "useDefaultParameterLast": "warn",
+        "useThrowOnlyError": "error",
         "useConsistentArrayType": "off",
         "useConsistentTypeDefinitions": "off",
         "useForOf": "error",
@@ -163,16 +231,28 @@
         "useShorthandFunctionType": "error",
       },
       "suspicious": {
+        "noAssignInExpressions": "warn",
+        "noConfusingLabels": "error",
+        "noConfusingVoidType": "warn",
+        "noConstantBinaryExpressions": "error",
         "noDocumentImportInPage": "error",
+        "noDoubleEquals": "warn",
         "noEmptyBlockStatements": "error",
         "noEmptyInterface": "error",
+        "noEvolvingTypes": "warn",
         "noForIn": "error",
         "noExplicitAny": "off",
         "noExtraNonNullAssertion": "error",
         "noHeadImportInDocument": "error",
+        "noImplicitAnyLet": "warn",
+        "noLabelVar": "error",
         "noMisleadingInstantiator": "error",
+        "noMisrefactoredShorthandAssign": "error",
         "noNonNullAssertedOptionalChain": "error",
-        "noTsIgnore": "off",
+        "noReturnAssign": "warn",
+        "noSelfCompare": "error",
+        "noThenProperty": "error",
+        "noTsIgnore": "warn",
         "noUnsafeDeclarationMerging": "error",
         "useAdjacentOverloadSignatures": "error",
         "useAwait": "off",

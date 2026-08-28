@@ -3,21 +3,21 @@ snapshots:
   ? |
     expect(TIMEOUT_MS).toBe(TIMEOUT_MS);
   : labels:
-      - source: expect(TIMEOUT_MS).toBe(TIMEOUT_MS)
-        style: primary
-        start: 0
-        end: 35
+    - source: expect(TIMEOUT_MS).toBe(TIMEOUT_MS)
+      style: primary
+      start: 0
+      end: 35
   ? |
     expect(config.retries).toEqual(config.retries);
   : labels:
-      - source: expect(config.retries).toEqual(config.retries)
-        style: primary
-        start: 0
-        end: 46
+    - source: expect(config.retries).toEqual(config.retries)
+      style: primary
+      start: 0
+      end: 46
   ? |
     expect(true).toBe(true);
   : labels:
-      - source: expect(true).toBe(true)
-        style: primary
-        start: 0
-        end: 23
+    - source: expect(true).toBe(true)
+      style: primary
+      start: 0
+      end: 23

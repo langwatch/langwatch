@@ -7,22 +7,22 @@ snapshots:
       });
     });
   : labels:
-      - source: |-
-          describe("header stripping", () => {
-              it("drops the BOM", () => {});
-            })
-        style: primary
-        start: 37
-        end: 113
-      - source: |-
-          describe("csv-serializer", () => {
-            describe("header stripping", () => {
-              it("drops the BOM", () => {});
-            });
+    - source: |-
+        describe("header stripping", () => {
+            it("drops the BOM", () => {});
           })
-        style: secondary
-        start: 0
-        end: 117
+      style: primary
+      start: 37
+      end: 113
+    - source: |-
+        describe("csv-serializer", () => {
+          describe("header stripping", () => {
+            it("drops the BOM", () => {});
+          });
+        })
+      style: secondary
+      start: 0
+      end: 117
   ? |
     describe("getAzureBlobToken", () => {
       describe("invalidateAzureBlobToken", () => {
@@ -30,22 +30,22 @@ snapshots:
       });
     });
   : labels:
-      - source: |-
-          describe("invalidateAzureBlobToken", () => {
-              it("clears the cached token", () => {});
-            })
-        style: primary
-        start: 40
-        end: 134
-      - source: |-
-          describe("getAzureBlobToken", () => {
-            describe("invalidateAzureBlobToken", () => {
-              it("clears the cached token", () => {});
-            });
+    - source: |-
+        describe("invalidateAzureBlobToken", () => {
+            it("clears the cached token", () => {});
           })
-        style: secondary
-        start: 0
-        end: 138
+      style: primary
+      start: 40
+      end: 134
+    - source: |-
+        describe("getAzureBlobToken", () => {
+          describe("invalidateAzureBlobToken", () => {
+            it("clears the cached token", () => {});
+          });
+        })
+      style: secondary
+      start: 0
+      end: 138
   ? |
     describe("stored-objects", () => {
       describe("given an Azure destination", () => {
@@ -55,22 +55,22 @@ snapshots:
       });
     });
   : labels:
-      - source: |-
-          describe("digest handling", () => {
-                it("asserts the digest independently", () => {});
-              })
-        style: primary
-        start: 88
-        end: 186
-      - source: |-
-          describe("given an Azure destination", () => {
-              describe("digest handling", () => {
-                it("asserts the digest independently", () => {});
-              });
+    - source: |-
+        describe("digest handling", () => {
+              it("asserts the digest independently", () => {});
             })
-        style: secondary
-        start: 37
-        end: 192
+      style: primary
+      start: 88
+      end: 186
+    - source: |-
+        describe("given an Azure destination", () => {
+            describe("digest handling", () => {
+              it("asserts the digest independently", () => {});
+            });
+          })
+      style: secondary
+      start: 37
+      end: 192
   ? |
     describe("teardownScan", () => {
       describe("should reject bare deletes", () => {
@@ -78,19 +78,19 @@ snapshots:
       });
     });
   : labels:
-      - source: |-
-          describe("should reject bare deletes", () => {
-              it("returns a violation", () => {});
-            })
-        style: primary
-        start: 35
-        end: 127
-      - source: |-
-          describe("teardownScan", () => {
-            describe("should reject bare deletes", () => {
-              it("returns a violation", () => {});
-            });
+    - source: |-
+        describe("should reject bare deletes", () => {
+            it("returns a violation", () => {});
           })
-        style: secondary
-        start: 0
-        end: 131
+      style: primary
+      start: 35
+      end: 127
+    - source: |-
+        describe("teardownScan", () => {
+          describe("should reject bare deletes", () => {
+            it("returns a violation", () => {});
+          });
+        })
+      style: secondary
+      start: 0
+      end: 131

@@ -5,52 +5,52 @@ snapshots:
       process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
     );
   : labels:
-      - source: |-
-          const isTestcontainersOnly = !!(
-            process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-          );
-        style: primary
-        start: 0
-        end: 102
+    - source: |-
+        const isTestcontainersOnly = !!(
+          process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
+        );
+      style: primary
+      start: 0
+      end: 102
   ? |
     const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
   : labels:
-      - source: const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-        style: primary
-        start: 0
-        end: 63
+    - source: const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+      style: primary
+      start: 0
+      end: 63
   ? |
     describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)("suite", () => {});
   : labels:
-      - source: describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)("suite", () => {})
-        style: primary
-        start: 0
-        end: 67
+    - source: describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)("suite", () => {})
+      style: primary
+      start: 0
+      end: 67
   ? |
     describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
   : labels:
-      - source: describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)("suite", () => {})
-        style: primary
-        start: 0
-        end: 69
+    - source: describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)("suite", () => {})
+      style: primary
+      start: 0
+      end: 69
   ? |
     describe.skipIf(isTestcontainersOnly)("suite", () => {});
   : labels:
-      - source: describe.skipIf(isTestcontainersOnly)("suite", () => {})
-        style: primary
-        start: 0
-        end: 56
+    - source: describe.skipIf(isTestcontainersOnly)("suite", () => {})
+      style: primary
+      start: 0
+      end: 56
   ? |
     describe.skipIf(process.env.CI_CLICKHOUSE_URL)("suite", () => {});
   : labels:
-      - source: describe.skipIf(process.env.CI_CLICKHOUSE_URL)("suite", () => {})
-        style: primary
-        start: 0
-        end: 65
+    - source: describe.skipIf(process.env.CI_CLICKHOUSE_URL)("suite", () => {})
+      style: primary
+      start: 0
+      end: 65
   ? |
     describe.skipIf(process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
   : labels:
-      - source: describe.skipIf(process.env.TEST_CLICKHOUSE_URL)("suite", () => {})
-        style: primary
-        start: 0
-        end: 67
+    - source: describe.skipIf(process.env.TEST_CLICKHOUSE_URL)("suite", () => {})
+      style: primary
+      start: 0
+      end: 67

@@ -3,14 +3,14 @@ snapshots:
   ? |
     it("rejects a malformed cursor", () => {});
   : labels:
-      - source: it("rejects a malformed cursor", () => {})
-        style: primary
-        start: 0
-        end: 42
+    - source: it("rejects a malformed cursor", () => {})
+      style: primary
+      start: 0
+      end: 42
   ? |
     test("seeds the catalog", async () => {});
   : labels:
-      - source: test("seeds the catalog", async () => {})
-        style: primary
-        start: 0
-        end: 41
+    - source: test("seeds the catalog", async () => {})
+      style: primary
+      start: 0
+      end: 41

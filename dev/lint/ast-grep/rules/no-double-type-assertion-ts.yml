@@ -1,0 +1,36 @@
+id: no-double-type-assertion-ts
+message: >
+  `x as unknown as T` switches the type checker off completely. A single
+  `as T` still has to prove the two types overlap; routing through
+  `unknown` removes even that. In a contract package -- the domain's own
+  type surface -- a double cast means the declared type is wrong. Fix the
+  type, narrow with a type guard, or use a single assertion. See
+  dev/docs/CODING_STANDARDS.md.
+severity: error
+language: TypeScript
+rule:
+  # An assertion whose operand is itself an assertion to `unknown`. Both
+  # `has` clauses are direct-child (the default), so `f(x as unknown) as T`
+  # -- where the inner cast is an argument rather than the operand -- is not
+  # matched, and neither is a plain `a as B as C`.
+  kind: as_expression
+  has:
+    kind: as_expression
+    has:
+      kind: predefined_type
+      regex: "^unknown$"
+files:
+  - "packages/features/*/contract/src/**/*.ts"
+  - "packages/enterprise/features/*/contract/src/**/*.ts"
+ignores:
+  # The evaluator catalogue spreads a GENERATED map over a native one and
+  # asserts the result covers every key of a zod-derived union. TypeScript
+  # cannot correlate the spread's keys with `keyof Evaluators`, and a single
+  # assertion is rejected outright ("types do not sufficiently overlap"), so
+  # here the double cast expresses an invariant that is real. Removing it
+  # means retyping the generated catalogue, not editing this line.
+  - "**/evaluator/contract/src/evaluators.ts"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/__tests__/**"
+  - "**/__fixtures__/**"

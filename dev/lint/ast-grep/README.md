@@ -36,6 +36,7 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 | `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                     | test files                                               |
 | `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                | test files                                               |
 | `no-empty-test` + `-tsx`                | `it("…", () => {})` — always green, counts as coverage                                             | test files                                               |
+| `no-double-type-assertion` + `-tsx`     | `x as unknown as T` — a single `as T` still proves overlap; routing via `unknown` removes even that | `packages/**/contract/src/**` (**`error`**)              |
 
 The BDD/boolean/fetch trio was added because they were the three largest
 mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —
@@ -52,8 +53,21 @@ any function named `fit(...)`, including a production zoom hook. Each rule that 
 from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
 reported twice, once deterministically and once probabilistically.
 
-All rules are `severity: warning` during rollout. Promote per-rule to `error`
-once its baseline is verifiably clean.
+Most rules are `severity: warning` during rollout. Promote per-rule to `error`
+once its baseline is verifiably clean — **severity is what makes a rule a
+gate**: `ast-grep scan` exits 0 on a tree whose only findings are warnings, so
+a `warning` here annotates and blocks nothing.
+
+`no-double-type-assertion` is the first `error` rule. It is scoped to the
+contract layer rather than the whole repo because that is where its baseline
+is clean: `as unknown as` appears 59 times in `packages/**` source (31 files)
+and 187 times in `platform/app/src`, but only twice under
+`packages/**/contract/src/**` — one was a cast around `URL`, which the
+package's own `lib` already declares (removed), and the other is the evaluator
+catalogue, where TypeScript rejects even a single assertion and the rule's
+`ignores` records why. A contract package IS the domain's type surface, so a
+double cast there is the type system being switched off at the one place the
+types are the product.
 
 ## Every rule is proven by a fixture
 

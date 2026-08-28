@@ -1,0 +1,44 @@
+id: no-double-type-assertion-ts
+snapshots:
+  const a = value as unknown as Widget;:
+    labels:
+    - source: value as unknown as Widget
+      style: primary
+      start: 10
+      end: 36
+    - source: unknown
+      style: secondary
+      start: 19
+      end: 26
+    - source: value as unknown
+      style: secondary
+      start: 10
+      end: 26
+  'const b = (globalThis as unknown as { URL: UrlCtor }).URL;':
+    labels:
+    - source: 'globalThis as unknown as { URL: UrlCtor }'
+      style: primary
+      start: 11
+      end: 52
+    - source: unknown
+      style: secondary
+      start: 25
+      end: 32
+    - source: globalThis as unknown
+      style: secondary
+      start: 11
+      end: 32
+  return payload as unknown as Record<string, string>;:
+    labels:
+    - source: payload as unknown as Record<string, string>
+      style: primary
+      start: 7
+      end: 51
+    - source: unknown
+      style: secondary
+      start: 18
+      end: 25
+    - source: payload as unknown
+      style: secondary
+      start: 7
+      end: 25

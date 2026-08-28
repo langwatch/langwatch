@@ -3,80 +3,80 @@ snapshots:
   ? |
     const authorTyped: boolean = event.author === user.id;
   : labels:
-      - source: "authorTyped: boolean = event.author === user.id"
-        style: primary
-        start: 6
-        end: 53
-      - source: boolean
-        style: secondary
-        start: 19
-        end: 26
-      - source: boolean
-        style: secondary
-        start: 19
-        end: 26
-      - source: authorTyped
-        style: secondary
-        start: 6
-        end: 17
+    - source: 'authorTyped: boolean = event.author === user.id'
+      style: primary
+      start: 6
+      end: 53
+    - source: boolean
+      style: secondary
+      start: 19
+      end: 26
+    - source: boolean
+      style: secondary
+      start: 19
+      end: 26
+    - source: authorTyped
+      style: secondary
+      start: 6
+      end: 17
   ? |
     function publish(channelPublic: boolean) {}
   : labels:
-      - source: "channelPublic: boolean"
-        style: primary
-        start: 17
-        end: 39
-      - source: boolean
-        style: secondary
-        start: 32
-        end: 39
-      - source: boolean
-        style: secondary
-        start: 32
-        end: 39
-      - source: channelPublic
-        style: secondary
-        start: 17
-        end: 30
+    - source: 'channelPublic: boolean'
+      style: primary
+      start: 17
+      end: 39
+    - source: boolean
+      style: secondary
+      start: 32
+      end: 39
+    - source: boolean
+      style: secondary
+      start: 32
+      end: 39
+    - source: channelPublic
+      style: secondary
+      start: 17
+      end: 30
   ? |
     interface Budget {
       perMember: boolean;
     }
   : labels:
-      - source: "perMember: boolean"
-        style: primary
-        start: 21
-        end: 39
-      - source: boolean
-        style: secondary
-        start: 32
-        end: 39
-      - source: boolean
-        style: secondary
-        start: 32
-        end: 39
-      - source: perMember
-        style: secondary
-        start: 21
-        end: 30
+    - source: 'perMember: boolean'
+      style: primary
+      start: 21
+      end: 39
+    - source: boolean
+      style: secondary
+      start: 32
+      end: 39
+    - source: boolean
+      style: secondary
+      start: 32
+      end: 39
+    - source: perMember
+      style: secondary
+      start: 21
+      end: 30
   ? |
     interface Seeded {
       seeded: boolean;
     }
   : labels:
-      - source: "seeded: boolean"
-        style: primary
-        start: 21
-        end: 36
-      - source: boolean
-        style: secondary
-        start: 29
-        end: 36
-      - source: boolean
-        style: secondary
-        start: 29
-        end: 36
-      - source: seeded
-        style: secondary
-        start: 21
-        end: 27
+    - source: 'seeded: boolean'
+      style: primary
+      start: 21
+      end: 36
+    - source: boolean
+      style: secondary
+      start: 29
+      end: 36
+    - source: boolean
+      style: secondary
+      start: 29
+      end: 36
+    - source: seeded
+      style: secondary
+      start: 21
+      end: 27
