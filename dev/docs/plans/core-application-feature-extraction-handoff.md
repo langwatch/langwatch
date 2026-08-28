@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Hand-off checkpoint:** `6d86932ce9`
+**Hand-off checkpoint:** `3d1166d8cc`
 
 **Frontend integration baseline:** `13a0805bf3`
 
@@ -29,6 +29,15 @@ tidier. Reusable domain, server and browser behaviour belongs in singular
 feature packages. `apps/api`, `apps/worker` and `apps/ui` own process
 composition only.
 
+At this checkpoint Agent web/UI and Trace full-read are review-ready but
+uncommitted. The generic tRPC/AuthZ extraction, Secret REST, process
+observability, and Worker Eventing/Topic mount are implemented but still need
+their named composition and workspace-link gates. `apps/api` is not yet a live
+server: it has a typed Secret caller pilot, but Agent, request policy, logging
+and tracing are not mounted. The new worker has the Eventing lifecycle but not
+the production durable stores/Group Queue/Trace-assignment consumer and
+external capability graph. The main ledger records exact proof and decisions.
+
 ## Committed checkpoint
 
 The following work is committed and must not be rebuilt in the application:
@@ -43,6 +52,9 @@ The following work is committed and must not be rebuilt in the application:
   callbacks.
 - `13a0805bf3` integrates the Prompt frontend boundary, exact `apps/ui` shell,
   frontend architecture lint and Design System Storybook.
+- `410c5dc1eb` enforces the two-scope feature-web layout and exact
+  screen/surface boundaries with 20 passing architecture fixtures.
+- `3d1166d8cc` adds the semantic OpenAPI 3 JSON comparison tool and CI coverage.
 - `6d86932ce9` makes modern public REST and internal tRPC separate thin
   transports over one feature service graph. It records ownership, validation,
   authorisation, limits, error and compatibility rules in ADR-128.
@@ -86,8 +98,8 @@ Current intended surface:
 - `PUT /api/v1/secret/{date|latest?}/secrets/:id`
 - `DELETE /api/v1/secret/{date|latest?}/secrets/:id`
 - version `2026-08-24`, also accepted through `X-API-Version`;
-- the deprecated Secret REST and public RPC routes are intentionally removed;
-  internal tRPC compatibility remains.
+- the deprecated Secret REST and public RPC routes remain as thin compatibility
+  mounts for released callers; internal tRPC compatibility remains.
 
 The feature adapter uses the sealed fluent API with `withInput`, `withOutput`,
 an explicit permission decision and `.handle`. Input is capped at 16 KiB.
@@ -120,20 +132,20 @@ Proof reported before the frontend integration:
 
 The post-integration migration review found these blockers:
 
-1. live TypeScript, Python, Go and MCP consumers still call removed
-   `/api/secrets` and `/api/secrets/latest/secrets.*` URLs;
-2. the served and documented OpenAPI artefacts still describe the removed
-   routes and omit the new REST surface;
+1. live TypeScript, Python, Go and MCP consumers still call the retained
+   `/api/secrets` and `/api/secrets/latest/secrets.*` compatibility URLs;
+2. platform and docs OpenAPI now remove both legacy Secret paths and contain
+   only the six modern `/api/v1/secret` paths; full docs page generation remains
+   blocked by unrelated stale Roles `endpointOrder` entries;
 3. `feature-map.json`, the OpenAPI route exclusions and one architecture
    baseline entry still describe the old route; and
 4. real authentication and permission refusal behaviour is not covered by the
    mocked route suite.
 
-The feature spec also has seven unbound scenarios, so parity currently reports
-vacuous 0/0. Do not delete compatibility routes until callers are migrated, or
-retain a thin compatibility transport and record it explicitly. Add focused
-Bearer plus `X-Project-Id`, permission-refusal, project-mismatch and
-infrastructure-error sanitisation coverage before approval.
+The feature spec still has unbound scenarios, so parity is not completion proof.
+Keep compatibility routes until callers migrate. Add focused Bearer plus
+`X-Project-Id`, permission-refusal, project-mismatch and infrastructure-error
+sanitisation coverage before approval.
 
 Commit Secret separately from the tRPC pilot and Agent UI.
 
@@ -152,22 +164,38 @@ root still mounts `platform/app/src/server/api/routers/secrets.ts`, while the ne
 `ApiApplication` is not composed by a running process. Global auth, audit,
 trace and error middleware parity has not been proved.
 
-No agent currently owns this batch. Review it against ADR-128 before changing
-or committing it. In particular, do not import a feature server router or the
-whole `AppRouter` into a web package and do not describe the current pilot as a
-production cutover. Keep this commit separate from Secret REST and Agent UI.
+The accepted API keeps tRPC separate in dedicated `@langwatch/trpc`. Generic
+root creation and runtime/type tests now exist. AuthZ owns scope-lineage policy
+over its repository; the old app Prisma guard and test are deleted. Focused
+AuthZ proof passes, while workspace links and the missing blank-scope error
+export block full tRPC/app proof. `apps/api` still needs the real server,
+Secret/Agent mounts, request policy and process logging/tracing. The live root
+is unchanged, so this remains compatibility preparation, not a production
+cutover. Keep this commit separate from Secret REST and Agent UI.
+
+## Active Trace full-read lane
+
+Trace full-read is ready for root migration review. Its package-owned mapper
+preserves normalized stored fields, bounded and deduplicated payload recall,
+legacy event identity/timestamps, metrics/errors, metadata and privacy markers.
+The new service is internal-only with an explicit all-visible policy. Public
+viewer-specific protection, annotations and edit overlays remain deliberate app
+residuals, so this batch does not delete those live reads.
 
 ## Active frontend batch: Agent
 
 Agent reusable presentation and browser behaviour are partially moved into
-`@langwatch/agent-web`. The batch is not currently type-correct and must not be
-staged. Before the frontend merge, focused proof was green:
+`@langwatch/agent-web`. The architectural blockers are closed and focused
+checks are green, but the batch remains uncommitted and must not be described
+as committed. Focused proof covers:
 
-- Agent web typecheck and 22 tests;
-- `apps/ui` typecheck and 7 tests; and
+- Agent web typecheck and 24 tests;
+- `apps/ui` typecheck and 10 tests;
+- the real platform Agent host's 6 tests; and
 - focused `git diff --check`.
 
-The Agent migration review found four parity and architecture blockers:
+The Agent migration review found four parity and architecture blockers; all
+four are now closed in the working tree:
 
 1. push-to-copies stopped invalidating/reloading the visible Agent list;
 2. extracted Agent cards lost the app-owned
@@ -177,28 +205,32 @@ The Agent migration review found four parity and architecture blockers:
 4. the Agent RPC port and adapter were initially placed at the forbidden
    `apps/ui/src` root.
 
-A partial repair moved the port and adapter to
-`apps/ui/src/platform/agent`, grouped the management-page inputs into named
+A repair moved the port and adapter to
+`apps/ui/src/features/agent`, grouped the management-page inputs into named
 data/navigation/feedback/lifecycle/card ports, removed the `Pick`, and requests
-an `agentsChanged` lifecycle action after push, copy and sync. This repair is
-incomplete:
-
-- the platform host still passes the old 13 props and does not implement the
-  new ports;
-- the app-owned Langy card wrapper is not restored;
-- the management-page tests still use the old props;
-- the adapter test still imports the deleted root paths; and
-- post-push refresh, Langy composition, dialog parity and the remaining adapter
-  mappings lack coverage.
-
-No other agent currently owns `apps/ui/src/platform/agent`, its root exports or
-its adapter test. Treat them as part of this Agent batch, not the Secret tRPC
-pilot.
+an `agentsChanged` lifecycle action after push, copy and sync. The platform
+host now consumes the named ports, Langy card composition and post-push refresh
+proof are green, and the focused Agent web, `apps/ui`, adapter and
+frontend-boundary checks pass. No commit has been made; keep this Agent batch
+separate from the Secret tRPC pilot.
 
 Keep the one `platform/app/src/runtime/ui/features/agent-ui-host.adapter.tsx`
 host only while it is required for composition. Do not move reusable Agent
 behaviour back into the application. Re-run Agent web, `apps/ui`, frontend
 architecture lint and residue checks before committing this batch.
+
+The web architecture contract is committed at `410c5dc1eb` with its exact four
+ADR/spec/linter/test files; focused typecheck, Oxfmt and diff are green with
+20/20 tests. Recursive closure permits screen-to-own-narrow-surface and
+surface-to-package-global-portable-model edges. Agent is the complete pilot
+implementation but remains unstaged/uncommitted pending root migration review:
+Agent web has 24 tests/typecheck, `apps/ui` has 10 tests/typecheck, and
+frontend-only lint is green; intended platform Agent production deletions are
+in the slice. The refined two-scope proposal has shared roots
+`{model,behavior,ui,screens,surfaces}`, while each feature may use
+`features/<feature>/{model,behavior,ui}`. This layout is active but unproven;
+Agent web is the pilot, its current behavior remains uncommitted, and no final
+folder names are asserted until the pilot proves them.
 
 ## UI architecture records
 
@@ -226,8 +258,8 @@ still report:
 - Prompt web typecheck passes;
 - all 14 frontend-boundary lint fixtures pass;
 - Secret contract and Secret server typechecks pass;
-- Agent web typecheck fails because `agent-management-page.test.tsx` still uses
-  the old prop shape;
+- Agent web typecheck and focused Agent tests pass after the controlled-port
+  repair; this remains uncommitted proof, not a committed checkpoint;
 - `apps/api` typecheck fails in `packages/api/src/capabilities.ts` because one
   callback does not return on every path and `BodyInit` is absent from that
   app's TypeScript library surface.
@@ -235,19 +267,36 @@ still report:
 `git diff --check` passes. These red checks are current integration blockers,
 not unrelated diagnostics and not green proof.
 
+Every parity-proven vertical must delete its safely displaced `platform/app`
+production paths in a coherent exact-path commit. Compatibility preparation is
+not a substitute for deletion; do not claim a cutover until the corresponding
+paths and residual imports are removed and verified.
+
 ## Immediate sequence
 
-1. Decide Secret URL compatibility, migrate or protect every live SDK/MCP
-   caller, regenerate OpenAPI/docs, remove stale maps/baselines, add real auth
-   coverage, then rerun and commit the Secret REST cut separately.
-2. Complete the Agent controlled-port host, restore Langy card composition and
-   parity coverage, then rerun and commit the Agent UI vertical separately.
-3. Reconcile the non-production `apps/api` tRPC pilot with ADR-128, prove the
-   real app middleware boundary and commit it separately. Do not call this a
-   production cutover until the running root is rewired.
-4. Update the main exit ledger with the real commit hashes and committed
+1. Review and commit the Agent UI vertical separately, preserving the green
+   controlled-port, Langy composition and refresh proof.
+2. Resolve Secret real-auth coverage and run migration review; retain old
+   mounts. OpenAPI artefacts are corrected, while full docs page generation
+   waits on the unrelated Roles ordering blocker. Commit the REST vertical
+   separately.
+3. Reconcile the non-production tRPC split with ADR-128 in dedicated
+   `@langwatch/trpc`: the Secret parallel root is fixed, with `apps/api` owning
+   one typed root injected into Secret. Prove final workspace-link/lock and
+   typecheck reconciliation plus real middleware parity; keep permission
+   vocabulary/decision and scope lineage in AuthZ while `apps/api` retains
+   session/request/audit/log/trace policy. Commit separately; do not call this
+   a production cutover until the running root is rewired.
+4. Finish the uncommitted Topic/Eventing vertical. The package installer and
+   `WorkerEventingRuntime` mount now exist: EventSourcing owns queue readiness,
+   projections, process-manager wakes, intents, redelivery/idempotency and
+   shutdown. Compose the durable stores, Group Queue, Trace assignment
+   consumer, model/ClickHouse/Langevals/Redis/metrics/config and process
+   observability before deleting displaced `platform/app` Topic paths. There is
+   no compatibility import in the new worker graph.
+5. Update the main exit ledger with the real commit hashes and committed
    `platform/app` file counts.
-5. Continue with the next dependency-closed vertical from that ledger. Do not
+6. Continue with the next dependency-closed vertical from that ledger. Do not
    begin another broad reformat, spec move, or architecture rewrite first.
 
 Before any migration commit, use the feature-migration review gates: behaviour

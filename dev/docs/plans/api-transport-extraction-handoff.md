@@ -4,7 +4,7 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Checkpoint:** `6d86932ce9`
+**Checkpoint:** `3d1166d8cc`
 
 This is the restart guide for the public REST, internal tRPC and Secret
 transport work. It supplements the
@@ -46,6 +46,31 @@ Feature web packages never import feature server routers or the complete
 `AppRouter`. `apps/ui` owns the real tRPC adapter and supplies a small browser
 port.
 
+## Adjacent extraction facts
+
+Trace full-read is ready for root migration review. Its package-owned mapper
+preserves normalized spans, legacy event identity/timestamps, metrics/errors,
+metadata, bounded payload recall and privacy markers. The current audience is
+internal-only with an explicit all-visible policy; public viewer-specific
+protection, annotations and edit overlays remain deliberate app residuals.
+The tRPC split uses dedicated `@langwatch/trpc` (ADR-128 keeps tRPC separate),
+and AuthZ now owns scope-lineage policy over its repository. The old app Prisma
+guard is deleted. Focused AuthZ checks pass; workspace links and the missing
+blank-scope error export still block the full tRPC/app proof. The Secret typed
+caller pilot uses one injected root, but `apps/api` still lacks a real logged,
+traced server with Secret and Agent mounted.
+Evaluation execution remains blocked on Trace composition and mapping; its
+schema/ADR repair is complete, but evaluation-server typecheck is blocked by
+`TestTraceService` lacking the new full-read methods. Worker physical-entrypoint
+inventory and the first Eventing mount are complete but uncommitted.
+`WorkerEventingRuntime` owns queue readiness, command/event dispatch,
+projections, process-manager wakes, intents, redelivery/idempotency and
+shutdown. Topic registers on that runtime and owns seeds/manual dispatch.
+Production stores, Group Queue, Trace assignment consumption and the remaining
+model/ClickHouse/Langevals/Redis/metrics/config graph are not composed, so the
+live `platform/app` Topic path remains. There is no app-layer import in the new
+worker graph.
+
 ## Committed foundation
 
 - `9a98835d5f` proves handled-error provenance, adds default-false retryability,
@@ -77,7 +102,9 @@ The working tree contains a modern Secret REST adapter and application mount:
 - `platform/app/src/app/api/v1/secret` is the temporary live composition;
 - existing auth and API-key middleware have a narrow throwing mode for the
   modern handled-error boundary; and
-- the former Secret public REST/RPC implementation is deleted in the tree.
+- the former Secret implementation is split into modern REST plus retained
+  unversioned REST/public RPC compatibility adapters; no released caller is
+  forced onto the modern path in this batch.
 
 The intended operations are list, get, create, replace and delete at version
 `2026-08-24`. Multi-project, PAT and admin credentials select their project
@@ -88,10 +115,11 @@ Earlier focused route proof passed 9/9, and Secret contract/server checks were
 green. That proof is not sufficient to commit the cut. The migration review
 found these blockers:
 
-1. live TypeScript, Python, Go and MCP callers still use the removed legacy
+1. live TypeScript, Python, Go and MCP callers still use the retained legacy
    URLs;
-2. served and generated OpenAPI still describes the old routes and omits the
-   modern ones;
+2. platform and docs OpenAPI now remove both legacy Secret paths and contain
+   only the six modern `/api/v1/secret` paths; full docs page generation remains
+   blocked by unrelated stale Roles `endpointOrder` entries;
 3. feature maps, exclusions and one architecture baseline entry still name the
    old route;
 4. route tests mock the real authentication and permission refusal boundary;
@@ -100,15 +128,22 @@ found these blockers:
 5. all seven Secret scenarios are unbound, so parity currently reports a
    meaningless 0/0.
 
-Do not delete compatibility endpoints while live callers remain. Either move
-every caller in the same reviewed batch or retain a thin, explicitly named
-compatibility adapter with no business logic.
+Keep compatibility endpoints while live callers remain. They are now thin,
+explicitly named adapters with no business logic. Migrate callers only in a
+separate reviewed client batch.
+
+The Go OpenAPI semantic comparison tool is committed at `3d1166d8cc`. It handles
+recursive components and Path Item references, structural validation and OAS
+3.1 boolean schemas, and has Go test/race/vet/golangci coverage. Current
+HEAD-to-worktree facts are platform 10 removed legacy RPC and 15 added modern
+operations, docs 5 removed and 15 added; broad `origin/main` drift predates the
+worktree.
 
 ## Uncommitted internal tRPC pilot
 
 The tree also contains:
 
-- `packages/features/secret/server/src/api/internal/secret.internal-trpc.api.ts`;
+- `packages/features/secret/server/src/api/app-trpc/secret.api.ts`;
 - `apps/api/src/api.application.ts`; and
 - `apps/api/tests/api.application.secret-trpc.integration.test.ts`.
 
@@ -119,9 +154,11 @@ response shapes. Review found no intrinsic architecture or security defect in
 the pilot.
 
 It is not a production cutover. The running platform still mounts its old
-Secret tRPC router, and global auth, audit, trace and handled-error middleware
-parity has not been demonstrated in `apps/api`. Do not delete the live router
-or advertise `ApiApplication` as live until that composition is real.
+Secret and Agent tRPC routers. `@langwatch/trpc` now provides the reusable typed
+root, but global auth, audit, trace, logging and handled-error policy has not
+been composed in `apps/api`, and Agent has not been mounted there. Do not delete
+the live routers or advertise `ApiApplication` as live until the real server and
+its parity tests exist.
 
 ## Current red checks
 
@@ -129,25 +166,33 @@ These were rerun immediately before this hand-off:
 
 ```text
 pnpm --filter @langwatch/platform-api typecheck
-  packages/api/src/capabilities.ts:119  not all code paths return
-  packages/api/src/capabilities.ts:137  BodyInit is absent from the app TS libs
+  cannot resolve the new @langwatch/trpc, @langwatch/eventing,
+  @langwatch/topic-{contract,server} and @langwatch/trace-contract workspace
+  links; Secret callback inference failures are downstream of that missing root
 
 pnpm --filter @langwatch/agent-web typecheck
-  agent-management-page.test.tsx still uses the old prop shape
+  passes; Agent focused checks are green but remain uncommitted
 
-pnpm --filter @langwatch/ui typecheck
-  the Agent adapter test imports two deleted root-level modules
+pnpm --filter @langwatch/evaluation-server typecheck
+  passes
 ```
 
-The two UI failures belong to the separate Agent batch. Do not fix or stage
-them with API transport work. The `apps/api` failure must be cleared before the
-tRPC pilot can be called type-correct.
+Web architecture contract `410c5dc1eb` focused typecheck/Oxfmt/diff and 20/20
+tests are green. Agent is complete but unstaged/uncommitted pending root review;
+Agent web has 24 tests/typecheck, `apps/ui` has 10 tests/typecheck, and
+frontend-only lint is green. The tRPC app modules and no-any checks are green,
+but typecheck awaits final workspace-link/lock reconciliation. Evaluation server
+now typechecks against the full-read seam.
 
 ## Working-tree boundaries
 
 The tree is shared. Secret REST, the tRPC pilot and Agent UI overlap in package
 manifests and `pnpm-lock.yaml`, but they are separate commits. Stage exact paths
 or hunks and inspect the cached diff. Never use `git add .`.
+
+Each parity-proven vertical must delete its safely displaced `platform/app`
+production paths in a coherent exact-path commit. Compatibility preparation is
+not a substitute for that deletion.
 
 The recovery stash is `stash@{0}: codex backend and frontend integration work
 2026-08-28`. It has already been applied. Do not apply it again.
@@ -159,14 +204,23 @@ was published as draft PR 7536.
 
 1. Repair the two `@langwatch/api` type errors without weakening its public
    types or adding DOM globals to feature contracts.
-2. Resolve Secret compatibility callers, OpenAPI/maps and real auth coverage;
-   bind the seven scenarios.
+2. Review and commit Agent UI readiness in its separate batch, then resolve Secret docs
+   API-reference residuals and real auth coverage while retaining old mounts;
+   bind the Secret scenarios.
 3. Run feature-migration-review, focused typechecks/tests, Oxfmt, Oxc,
    architecture lint, test-quality review and `git diff --check`; commit the
    Secret REST vertical alone.
-4. Prove `apps/api` middleware parity and the running composition boundary;
-   commit the internal tRPC pilot separately.
-5. Update the exit ledger with real commit hashes and committed deletion
+4. Resolve the dedicated `@langwatch/trpc` workspace-link/lock and typecheck
+   seam, prove `apps/api` middleware parity and the running composition
+   boundary, with AuthZ owning permission vocabulary/decision and scope
+   lineage; commit the internal tRPC pilot separately.
+5. Start the uncommitted Topic clustering/Eventing lane as the first
+   dependency-closed process-manager slice: wire one package installer into the
+   API producer and worker consumer roots, delete displaced `platform/app`
+   Topic registration/production, and keep worker composition under
+   `apps/worker/src/{app,platform,features}` with testing support and no
+   compatibility path, legacy loader or legacy import.
+6. Update the exit ledger with real commit hashes and committed deletion
    counts, then rebase at the planned batch boundary.
 
 At this checkpoint the branch is 461 commits ahead of and three commits behind
