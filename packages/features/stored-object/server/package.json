@@ -14,6 +14,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./storage": {
+      "types": "./src/storage.ts",
+      "default": "./src/storage.ts"
+    },
     "./public-api": {
       "types": "./src/api/public/stored-object.api.ts",
       "default": "./src/api/public/stored-object.api.ts"
@@ -35,6 +39,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "hono": "^4.12.27"

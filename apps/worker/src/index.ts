@@ -8,6 +8,7 @@ export {
 } from "./app/worker-production.composition";
 export {
   WorkerInfrastructureAdapter,
+  WorkerStoredObjectStorageFactory,
   WorkerStorageFactoryPort,
   type WorkerInfrastructureAdapterOptions,
   type WorkerStorageLease,

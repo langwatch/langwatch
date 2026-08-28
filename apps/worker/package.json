@@ -37,6 +37,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",

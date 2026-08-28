@@ -30,6 +30,11 @@ import {
 import { OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import type { RedisConfigResolution } from "@langwatch/redis-client";
+import {
+  StoredObjectDestinationPolicy,
+  StoredObjectProjectS3ConfigPort,
+  StoredObjectStorageRuntime,
+} from "@langwatch/stored-object-server/storage";
 
 class NoProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {
@@ -80,6 +85,12 @@ const redisConfig: RedisConfigResolution = {
   warnings: [],
 };
 
+class NoPrivateS3Config extends StoredObjectProjectS3ConfigPort {
+  async tryGet(): Promise<Readonly<{ bucket: string }> | null> {
+    return null;
+  }
+}
+
 describe("WorkerInfrastructureAdapter", () => {
   it("constructs AWS, Redis, and the borrowed queue dependency projection", async () => {
     const resources = new ResourceScope();
@@ -123,5 +134,43 @@ describe("WorkerInfrastructureAdapter", () => {
     await expect(adapter.close()).rejects.toThrow("storage close failed");
     expect(awsClose).toHaveBeenCalledOnce();
     expect(redisDisconnect).toHaveBeenCalledOnce();
+    redisDisconnect.mockRestore();
+    awsClose.mockRestore();
+  });
+
+  it("adapts the canonical Stored Object runtime when no custom factory is supplied", async () => {
+    const resources = new ResourceScope();
+    redis.disconnect.mockClear();
+    const driver = {
+      put: async () => undefined,
+      get: async () => {
+        throw new Error("not implemented");
+      },
+      delete: async () => undefined,
+      exists: async () => false,
+    };
+    let receivedAws: unknown;
+    const runtime = StoredObjectStorageRuntime.create({
+      destination: StoredObjectDestinationPolicy.create({
+        selection: { backend: "file", localFilesystemRoot: "/tmp/langwatch" },
+        projects: new NoPrivateS3Config(),
+      }),
+      s3ForProject: (_projectId, aws) => {
+        receivedAws = aws;
+        return driver;
+      },
+      fileForProject: () => driver,
+    });
+    const adapter = WorkerInfrastructureAdapter.create({
+      resources,
+      redis: redisConfig,
+      outboundProxy: new NoProxy(),
+      storageRuntime: runtime,
+    });
+
+    expect(adapter.queueDependencies.objectStoreFor?.("project-1")).toBeDefined();
+    expect(receivedAws).toBe(adapter.aws);
+    await resources.close();
+    expect(redis.disconnect).toHaveBeenCalledOnce();
   });
 });

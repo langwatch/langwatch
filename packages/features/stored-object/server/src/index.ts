@@ -1,6 +1,23 @@
 export { StoredObjectsInternalApi } from "./api/internal/stored-object.api";
 export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup.runtime";
 export {
+  StoredObjectDestinationPolicy,
+  StoredObjectAzureDestinationPort,
+  StoredObjectProjectS3ConfigPort,
+  type StoredObjectStorageSelection,
+} from "./adapters/stored-object-destination.policy";
+export {
+  StoredObjectStorageRegistry,
+  type StoredObjectStorageDriver,
+  type StoredObjectStorageDriverFactory,
+} from "./adapters/stored-object-storage.registry";
+export {
+  StoredObjectProjectDestinationResolverPort,
+  StoredObjectStorageRuntime,
+  type StoredObjectStorageProject,
+  type StoredObjectStorageRuntimeOptions,
+} from "./adapters/stored-object-storage.runtime";
+export {
   StoredObjectsPublicApi,
   STORED_OBJECTS_PUBLIC_API_VERSION,
   type StoredObjectsPublicApp,

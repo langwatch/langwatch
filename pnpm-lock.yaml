@@ -305,6 +305,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
+      '@langwatch/stored-object-server':
+        specifier: workspace:*
+        version: link:../../packages/features/stored-object/server
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition
@@ -4018,6 +4021,9 @@ importers:
 
   packages/features/stored-object/server:
     dependencies:
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../../aws-client
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../api

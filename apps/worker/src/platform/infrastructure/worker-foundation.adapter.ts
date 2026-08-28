@@ -11,6 +11,7 @@ import {
   type RedisConfigResolution,
   type RedisLogger,
 } from "@langwatch/redis-client";
+import { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
 import { ResourceScope } from "@langwatch/runtime-composition";
 
 /** Named construction port for the storage implementation owned by a host. */
@@ -23,6 +24,30 @@ export abstract class WorkerStorageFactoryPort {
   abstract create(options: { aws: AwsClientProcessRuntime }): WorkerStorageLease;
 }
 
+/** Adapts the canonical Stored Object project view to Group Queue's port. */
+export class WorkerStoredObjectStorageFactory extends WorkerStorageFactoryPort {
+  static create(options: {
+    runtime: StoredObjectStorageRuntime;
+  }): WorkerStoredObjectStorageFactory {
+    return new WorkerStoredObjectStorageFactory(options.runtime);
+  }
+
+  private constructor(private readonly runtime: StoredObjectStorageRuntime) {
+    super();
+  }
+
+  create(_options: { aws: AwsClientProcessRuntime }): WorkerStorageLease {
+    return {
+      storage: {
+        objectStoreFor: (projectId) => this.runtime.forProject(projectId, _options.aws).objectStore,
+        resolveDestination: (projectId) =>
+          this.runtime.forProject(projectId, _options.aws).resolveDestination(),
+      },
+      close: async () => {},
+    };
+  }
+}
+
 export type WorkerInfrastructureAdapterOptions = {
   resources: ResourceScope;
   redis: RedisConfigResolution;
@@ -30,6 +55,7 @@ export type WorkerInfrastructureAdapterOptions = {
   queuePolicy?: GroupQueuePolicy;
   outboundProxy: OutboundProxyResolverPort;
   storage?: WorkerStorageFactoryPort;
+  storageRuntime?: StoredObjectStorageRuntime;
 };
 
 /**
@@ -49,7 +75,12 @@ export class WorkerInfrastructureAdapter {
     const aws = AwsClientProcessRuntime.create({ outboundProxy: options.outboundProxy });
     let storage: WorkerStorageLease | undefined;
     try {
-      storage = options.storage?.create({ aws });
+      const storageFactory =
+        options.storage ??
+        (options.storageRuntime
+          ? WorkerStoredObjectStorageFactory.create({ runtime: options.storageRuntime })
+          : undefined);
+      storage = storageFactory?.create({ aws });
       const queue = GroupQueueDependenciesAdapter.create({
         redis,
         policy: options.queuePolicy,
