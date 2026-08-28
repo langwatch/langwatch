@@ -6,6 +6,11 @@
 
 **Working checkpoint:** `1956fe0c06`
 
+**Current execution wave:** Wave 1, process foundations
+
+Complete the current wave gate before starting work from a later wave. Parallel
+work is allowed only between independent items inside the current wave.
+
 **Goal:** delete `platform/app` after its UI, API, worker, configuration,
 backend, tests, assets and deployment responsibilities have canonical owners.
 
@@ -305,22 +310,21 @@ commit.
 
 ## Continuous execution order
 
-Items in the same wave may run concurrently when their path ownership is
-independent. A later wave may start for a feature whose explicit dependencies
-are already green; it need not wait for unrelated features in an earlier wave.
+Items in the current wave may run concurrently when their path ownership is
+independent. Do not start a later wave until the current wave gate is complete.
 
 ### Wave 0: reconcile and commit current work
 
-| ID     | Work                                                                                     | Exit gate                                                                                                                                                                      |
-| ------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | **Committed for API and Worker/Topic.** Continue exact-hunk attribution for later shared-tree slices.                                                                          |
-| `C-02` | Review and commit Agent UI.                                                              | **Committed `2d5066fcd7`.** Retained drawers and coverage/documentation follow-ups are recorded above.                                                                         |
-| `C-03` | Review and commit Trace full-read.                                                       | **Committed `7cca0848fb` as preparation, not cutover.** The internal/all-visible boundary has no production caller; `F-TRACE-01` remains.                                      |
-| `C-04` | Review and commit process observability.                                                 | **Committed `bcf05be631`.** Process adoption and the two observability follow-ups remain in Wave 1 and the active API/worker slices.                                           |
-| `C-05` | Finish Secret REST correction.                                                           | **Committed `faf6db77e1`.** All four direct prefixes are present; deferred generated-artefact, client and compatibility findings are recorded above.                           |
-| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | **Package adapters committed `02457aaebd`; physical activation remains.** Add the listener/lifecycle and policy parity, then delete compatibility routers.                     |
-| `C-07` | Finish Eventing server and Enterprise worker composition.                                | **Committed `555ec3fe07` and `8e57032744`.** Production factories are ready for the active Worker Topic composition batch.                                                     |
-| `C-08` | Finish Worker Topic cutover.                                                             | **Eventing-only producer path committed `39f1de6dff`; physical activation remains.** Mount the full shared registry before enabling consumers or deleting the live app worker. |
+| ID     | Work                                                                                     | Exit gate                                                                                                                                                                                                   |
+| ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `C-01` | Reconcile workspace links and `pnpm-lock.yaml` after all active manifest writers finish. | **Committed for API and Worker/Topic.** Continue exact-hunk attribution for later shared-tree slices.                                                                                                       |
+| `C-02` | Review and commit Agent UI.                                                              | **Committed `2d5066fcd7`.** Retained drawers and coverage/documentation follow-ups are recorded above.                                                                                                      |
+| `C-03` | Review and commit Trace full-read.                                                       | **Committed `7cca0848fb` as preparation, not cutover.** The internal/all-visible boundary has no production caller; `F-TRACE-01` remains.                                                                   |
+| `C-04` | Review and commit process observability.                                                 | **Committed `bcf05be631`.** Process adoption and the two observability follow-ups remain in Wave 1 and the active API/worker slices.                                                                        |
+| `C-05` | Finish Secret REST correction.                                                           | **Committed `faf6db77e1`.** All four direct prefixes are present; deferred generated-artefact, client and compatibility findings are recorded above.                                                        |
+| `C-06` | Finish tRPC/AuthZ/API Secret+Agent direct cutover.                                       | **Wave 0 complete.** Package adapters are committed in `02457aaebd`; listener/policy foundations are committed in `f1baea7011`. Physical API activation and compatibility-router deletion remain in Wave 3. |
+| `C-07` | Finish Eventing server and Enterprise worker composition.                                | **Committed `555ec3fe07` and `8e57032744`.** Production factories are ready for the active Worker Topic composition batch.                                                                                  |
+| `C-08` | Finish Worker Topic cutover.                                                             | **Wave 0 complete.** Eventing-only Topic dispatch is committed in `39f1de6dff`; Trace registration follows in `cd28835a7b`. Full shared-registry activation remains in Wave 4.                              |
 
 ### Wave 1: process foundations
 
