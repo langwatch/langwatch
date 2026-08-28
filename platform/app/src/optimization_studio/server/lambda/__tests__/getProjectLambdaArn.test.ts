@@ -673,4 +673,61 @@ describe("getProjectLambdaArn", () => {
       );
     });
   });
+
+
+  describe("error discrimination", () => {
+    /** @scenario AWS errors are matched by exception name, not message text */
+    it("recognizes ResourceConflictException by name", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce({
+          name: "ResourceConflictException",
+          message: "An update is in progress",
+        });
+
+      const arn = await getProjectLambdaArn("error-by-name");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+    });
+
+    /** @scenario AWS errors fall back to message matching for older SDK versions */
+    it("recognizes update-in-progress by message as fallback", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce(
+          new Error("An update is in progress"),
+        );
+
+      const arn = await getProjectLambdaArn("error-by-message");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+    });
+
+    /** @scenario Unrelated errors are not swallowed */
+    it("throws unrelated errors", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce(
+          new Error("Access Denied"),
+        );
+
+      await expect(getProjectLambdaArn("error-unrelated")).rejects.toThrow(
+        "Access Denied",
+      );
+    });
+  });
+
 });
