@@ -385,11 +385,11 @@ const isLambdaUpdateInProgressError = (error: unknown): boolean => {
     return false;
   }
   const err = error as any;
-  if (err.name === \"ResourceConflictException\") {
+  if (err.name === "ResourceConflictException") {
     return true;
   }
   // Fallback: check message for older SDK versions
-  return error.message.includes(\"An update is in progress\");
+  return error.message.includes("An update is in progress");
 };
 
 /**
