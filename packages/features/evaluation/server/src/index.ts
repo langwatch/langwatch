@@ -28,7 +28,10 @@ export {
 export {
   EvaluationInputsOffloadService,
   EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY,
+  STORED_OBJECT_MARKER_KEY,
+  isStoredObjectMarker,
   type EvaluationInputOffloadConfig,
+  type StoredObjectInputsMarker,
 } from "./services/evaluation-inputs-offload.service";
 export {
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -36,11 +39,6 @@ export {
   EVAL_INPUTS_PREVIEW_BYTES,
   EVAL_INPUTS_STORED_OBJECT_PURPOSE,
 } from "./services/evaluation-inputs-offload.service";
-export {
-  STORED_OBJECT_MARKER_KEY,
-  isStoredObjectMarker,
-  type StoredObjectInputsMarker,
-} from "./schemas/stored-object-inputs.schema";
 export { ExecuteEvaluationCommand } from "./intents/evaluation-execution.intent";
 export { EvaluationService, type EvaluationServiceOptions } from "./services/evaluation.service";
 export {
