@@ -19,7 +19,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { mintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -134,7 +134,7 @@ describe("Feature: the agent cache", () => {
     });
     projectId = project.id;
 
-    const apiKeyService = ApiKeyService.create(prisma);
+    const apiKeyService = getApp().apiKeys;
     manageToken = (
       await apiKeyService.create({
         name: `agent-cache-manage-${nanoid(6)}`,
@@ -172,7 +172,7 @@ describe("Feature: the agent cache", () => {
     ).token;
 
     sandboxToken = await mintAgentSandboxApiKey({
-      prisma,
+      apiKeys: getApp().apiKeys,
       projectId,
       organizationId: testOrganization.id,
     });

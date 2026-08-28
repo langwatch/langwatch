@@ -1402,7 +1402,7 @@ async function mintRunSandboxApiKey({
   const organizationId = project?.team?.organizationId;
   if (!organizationId) return undefined;
 
-  return tryMintAgentSandboxApiKey({ prisma, projectId, organizationId });
+  return tryMintAgentSandboxApiKey({ apiKeys: getApp().apiKeys, projectId, organizationId });
 }
 
 /**

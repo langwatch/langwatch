@@ -5,6 +5,10 @@
  * Spec: specs/agent-cache/agent-cache.feature
  */
 
+import {
+  AGENT_SANDBOX_API_KEY_NAME,
+  type ApiKeyService,
+} from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -12,16 +16,13 @@ import {
   reapExpiredAgentSandboxApiKeys,
   tryMintAgentSandboxApiKey,
 } from "../agent-sandbox-key";
-import { ApiKeyService } from "../api-key.service";
-import { AGENT_SANDBOX_API_KEY_NAME } from "../reserved-names";
 
 const create = vi.fn();
 
-vi.spyOn(ApiKeyService, "create").mockImplementation(
-  () => ({ create }) as unknown as ApiKeyService,
-);
-
-const prisma = {} as PrismaClient;
+// The mint takes the composed capability now rather than building one from a
+// Prisma client, so the double is the capability itself and no module needs
+// spying on.
+const apiKeys = { create } as unknown as ApiKeyService;
 
 describe("the agent sandbox key", () => {
   beforeEach(() => {
@@ -36,7 +37,7 @@ describe("the agent sandbox key", () => {
     describe("when a run asks for one", () => {
       it("asks for the manage grain and nothing else", async () => {
         await mintAgentSandboxApiKey({
-          prisma,
+          apiKeys,
           projectId: "project_1",
           organizationId: "organization_1",
         });
@@ -59,7 +60,7 @@ describe("the agent sandbox key", () => {
 
       it("binds the key to a lifetime", async () => {
         await mintAgentSandboxApiKey({
-          prisma,
+          apiKeys,
           projectId: "project_1",
           organizationId: "organization_1",
         });
@@ -78,7 +79,7 @@ describe("the agent sandbox key", () => {
 
         await expect(
           tryMintAgentSandboxApiKey({
-            prisma,
+            apiKeys,
             projectId: "project_1",
             organizationId: "organization_1",
           }),

@@ -1,7 +1,6 @@
+import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ApiKeyService } from "./api-key.service";
-import { AGENT_SANDBOX_API_KEY_NAME } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
@@ -38,16 +37,15 @@ export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = [
  * stored. Nothing logs it.
  */
 export async function mintAgentSandboxApiKey({
-  prisma,
+  apiKeys,
   projectId,
   organizationId,
 }: {
-  prisma: PrismaClient;
+  apiKeys: ApiKeyService;
   projectId: string;
   organizationId: string;
 }): Promise<string> {
-  const service = ApiKeyService.create(prisma);
-  const { token } = await service.create({
+  const { token } = await apiKeys.create({
     isSystemManaged: true,
     name: AGENT_SANDBOX_API_KEY_NAME,
     description:
@@ -75,17 +73,17 @@ export async function mintAgentSandboxApiKey({
  * `undefined`, never a thrown error that would stop the run.
  */
 export async function tryMintAgentSandboxApiKey({
-  prisma,
+  apiKeys,
   projectId,
   organizationId,
 }: {
-  prisma: PrismaClient;
+  apiKeys: ApiKeyService;
   projectId: string;
   organizationId: string;
 }): Promise<string | undefined> {
   try {
     return await mintAgentSandboxApiKey({
-      prisma,
+      apiKeys,
       projectId,
       organizationId,
     });
