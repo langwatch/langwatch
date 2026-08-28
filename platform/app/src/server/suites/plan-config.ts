@@ -49,7 +49,7 @@ function targetKey(target: SuiteTarget): string {
 /**
  * What a scope covers, as one comparable string.
  *
- * `cases` folds in the scenario ids, which the scope shape itself does not
+ * `scenarios` folds in the scenario ids, which the scope shape itself does not
  * carry (they live in `SimulationSuite.scenarioIds`). Without them two
  * hand-picked scopes over different scenarios would take the same key and offer
  * each other the wrong history.
@@ -62,12 +62,12 @@ export function scopeKey(params: {
   switch (scope.mode) {
     case "all":
       return "all";
-    case "folders":
-      return `folders:${sortedList(scope.folderIds)}`;
+    case "test_suites":
+      return `testSuites:${sortedList(scope.testSuiteIds)}`;
     case "labels":
       return `labels:${sortedList(scope.labels)}`;
-    case "cases":
-      return `cases:${sortedList(params.scenarioIds ?? [])}`;
+    case "scenarios":
+      return `scenarios:${sortedList(params.scenarioIds ?? [])}`;
   }
 }
 
@@ -121,7 +121,7 @@ function sortedList(values: string[]): string {
 /**
  * Reduces a scope to the one form the project agrees on.
  *
- * A `folders` scope naming every non-archived folder of the project IS every
+ * A `test suites` scope naming every non-archived test suite of the project IS every
  * scenario of the project, because no scenario is loose any more, so it
  * normalises to `all`. Without this, hand-picking every suite and pressing Run
  * all would land on two different plans that always run the same thing.
@@ -129,7 +129,7 @@ function sortedList(values: string[]): string {
  * This needs the project, so it cannot live in a scope-only helper. Normalise
  * when the config is built, before the key is taken and before it is stored.
  *
- * A `folders` scope naming NO folder is left alone: an empty pick is not
+ * A `test suites` scope naming NO test suite is left alone: an empty pick is not
  * everything.
  */
 export async function normalizePlanScope(params: {
@@ -138,27 +138,28 @@ export async function normalizePlanScope(params: {
   prisma: PrismaClient;
 }): Promise<SuiteScope> {
   const { scope } = params;
-  if (scope.mode !== "folders") return scope;
+  if (scope.mode !== "test_suites") return scope;
 
-  const named = new Set(scope.folderIds);
-  if (named.size === 0) return { mode: "folders", folderIds: [] };
+  const named = new Set(scope.testSuiteIds);
+  if (named.size === 0) return { mode: "test_suites", testSuiteIds: [] };
 
-  const folders = await params.prisma.simulationSuite.findMany({
+  const testSuites = await params.prisma.simulationSuite.findMany({
     where: {
       projectId: params.projectId,
-      kind: "folder",
+      kind: "test_suite",
       archivedAt: null,
     },
     select: { id: true },
   });
-  // An archived folder holds no active scenario, so a scope may be exhaustive
+  // An archived test suite holds no active scenario, so a scope may be exhaustive
   // without naming it.
-  const coversEveryFolder =
-    folders.length > 0 && folders.every((folder) => named.has(folder.id));
+  const coversEveryTestSuite =
+    testSuites.length > 0 &&
+    testSuites.every((testSuite) => named.has(testSuite.id));
 
-  return coversEveryFolder
+  return coversEveryTestSuite
     ? { mode: "all" }
-    : { mode: "folders", folderIds: [...named].sort() };
+    : { mode: "test_suites", testSuiteIds: [...named].sort() };
 }
 
 /** Reads a stored scope back, refusing nothing: see parseSuiteScope. */

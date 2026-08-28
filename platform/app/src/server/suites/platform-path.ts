@@ -39,7 +39,7 @@ export async function suitePlatformPath({
     organizationId,
   });
 
-  if (kind === "folder") {
+  if (kind === "test_suite") {
     return agentTesting ? `/agent-testing/suites/${slug}` : "/simulations";
   }
   return agentTesting

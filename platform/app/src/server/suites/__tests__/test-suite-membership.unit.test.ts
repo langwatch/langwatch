@@ -1,21 +1,21 @@
 /**
- * The reconcile choke point and the folder validity guard, against a fake
+ * The reconcile choke point and the test suite validity guard, against a fake
  * transaction client.
  *
- * @see specs/suites/folder-membership-invariant.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suite-membership-invariant.feature
+ * @see specs/suites/test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  assertAssignableFolder,
-  type FolderMembershipClient,
-  reconcileFolderMembership,
-} from "../folder-membership";
+  assertAssignableTestSuite,
+  reconcileTestSuiteMembership,
+  type TestSuiteMembershipClient,
+} from "../test-suite-membership";
 
 function makeTx(overrides?: {
   scenarios?: { id: string }[];
-  folder?: { id: string } | null;
-}): FolderMembershipClient & {
+  testSuite?: { id: string } | null;
+}): TestSuiteMembershipClient & {
   scenarioFindMany: ReturnType<typeof vi.fn>;
   suiteUpdate: ReturnType<typeof vi.fn>;
   suiteFindFirst: ReturnType<typeof vi.fn>;
@@ -25,7 +25,9 @@ function makeTx(overrides?: {
     .fn()
     .mockResolvedValue(overrides?.scenarios ?? []);
   const suiteUpdate = vi.fn().mockResolvedValue({});
-  const suiteFindFirst = vi.fn().mockResolvedValue(overrides?.folder ?? null);
+  const suiteFindFirst = vi
+    .fn()
+    .mockResolvedValue(overrides?.testSuite ?? null);
   const executeRaw = vi.fn().mockResolvedValue(0);
   return {
     scenario: { findMany: scenarioFindMany } as never,
@@ -41,15 +43,15 @@ function makeTx(overrides?: {
   };
 }
 
-describe("reconcileFolderMembership", () => {
-  describe("when the folder holds archived and active cases", () => {
+describe("reconcileTestSuiteMembership", () => {
+  describe("when the test suite holds archived and active scenarios", () => {
     /** @scenario "Recomputing membership counts only active scenarios" */
-    it("recomputes the member list from active cases only", async () => {
+    it("recomputes the member list from active scenarios only", async () => {
       const tx = makeTx({ scenarios: [{ id: "scen_1" }, { id: "scen_2" }] });
 
-      await reconcileFolderMembership({
+      await reconcileTestSuiteMembership({
         projectId: "proj_1",
-        folderId: "folder_1",
+        testSuiteId: "test_suite_1",
         tx,
       });
 
@@ -63,48 +65,48 @@ describe("reconcileFolderMembership", () => {
         expect.objectContaining({
           where: {
             projectId: "proj_1",
-            folderId: "folder_1",
+            testSuiteId: "test_suite_1",
             archivedAt: null,
           },
         }),
       );
       expect(tx.suiteUpdate).toHaveBeenCalledWith({
-        where: { id: "folder_1", projectId: "proj_1" },
+        where: { id: "test_suite_1", projectId: "proj_1" },
         data: { scenarioIds: ["scen_1", "scen_2"] },
       });
     });
 
-    /** @scenario "A scenario belongs to at most one test suite" */
-    it("derives membership from the case's single folderId, so a case is in one folder only", async () => {
-      // The member query filters on folderId equality: a case naming folder A
-      // can never be counted into folder B's recompute.
+    /** @scenario "A scenario belongs to exactly one test suite" */
+    it("derives membership from the scenario's single testSuiteId, so a scenario is in one test suite only", async () => {
+      // The member query filters on testSuiteId equality: a scenario naming test suite A
+      // can never be counted into test suite B's recompute.
       const tx = makeTx({ scenarios: [] });
 
-      await reconcileFolderMembership({
+      await reconcileTestSuiteMembership({
         projectId: "proj_1",
-        folderId: "folder_b",
+        testSuiteId: "test_suite_b",
         tx,
       });
 
       const where = tx.scenarioFindMany.mock.calls[0]?.[0]?.where;
-      expect(where.folderId).toBe("folder_b");
+      expect(where.testSuiteId).toBe("test_suite_b");
       expect(tx.suiteUpdate).toHaveBeenCalledWith({
-        where: { id: "folder_b", projectId: "proj_1" },
+        where: { id: "test_suite_b", projectId: "proj_1" },
         data: { scenarioIds: [] },
       });
     });
   });
 });
 
-describe("assertAssignableFolder", () => {
-  describe("when the id names an active folder of the project", () => {
+describe("assertAssignableTestSuite", () => {
+  describe("when the id names an active test suite of the project", () => {
     it("passes", async () => {
-      const tx = makeTx({ folder: { id: "folder_1" } });
+      const tx = makeTx({ testSuite: { id: "test_suite_1" } });
 
       await expect(
-        assertAssignableFolder({
+        assertAssignableTestSuite({
           projectId: "proj_1",
-          folderId: "folder_1",
+          testSuiteId: "test_suite_1",
           tx,
         }),
       ).resolves.toBeUndefined();
@@ -112,9 +114,9 @@ describe("assertAssignableFolder", () => {
       expect(tx.suiteFindFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            id: "folder_1",
+            id: "test_suite_1",
             projectId: "proj_1",
-            kind: "folder",
+            kind: "test_suite",
             archivedAt: null,
           },
         }),
@@ -123,16 +125,16 @@ describe("assertAssignableFolder", () => {
   });
 
   describe("when the id names anything else", () => {
-    it("refuses with scenario_folder_not_found", async () => {
-      const tx = makeTx({ folder: null });
+    it("refuses with scenario_test_suite_not_found", async () => {
+      const tx = makeTx({ testSuite: null });
 
       await expect(
-        assertAssignableFolder({
+        assertAssignableTestSuite({
           projectId: "proj_1",
-          folderId: "suite_custom",
+          testSuiteId: "suite_custom",
           tx,
         }),
-      ).rejects.toMatchObject({ code: "scenario_folder_not_found" });
+      ).rejects.toMatchObject({ code: "scenario_test_suite_not_found" });
     });
   });
 });

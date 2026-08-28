@@ -306,7 +306,7 @@ export const APP_ERROR_CODES = [
   "saved_workbench_chart_definition_invalid",
   "saved_workbench_chart_not_found",
   "saved_workbench_chart_specification_refused",
-  "scenario_folder_not_found",
+  "scenario_test_suite_not_found",
   "scenario_parameter_missing",
   "scenario_parameter_template_invalid",
   "scenario_parameter_unknown",

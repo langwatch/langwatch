@@ -1,11 +1,11 @@
 /**
  * @vitest-environment node
  *
- * Running a folder goes through the run plan path: the execution settings
+ * Running a test suite goes through the run plan path: the execution settings
  * travel with the request, the run plan they resolve holds them, and the
- * folder row learns nothing.
+ * test suite row learns nothing.
  *
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 import { nanoid } from "nanoid";
 import type { Mock } from "vitest";
@@ -22,8 +22,8 @@ import { SuiteService } from "../suite.service";
 import { getSuiteSetId } from "../suite-set-id";
 import type { SuiteTarget } from "../types";
 
-const projectId = `test-folder-run-${nanoid(8)}`;
-const organizationId = "test-folder-run-org";
+const projectId = `test-suite-run-${nanoid(8)}`;
+const organizationId = "test-suite-run-org";
 
 let startSuiteRun: Mock<(data: StartSuiteRunCommandData) => Promise<void>>;
 let queueSimulationRun: Mock<(data: QueueRunCommandData) => Promise<void>>;
@@ -32,10 +32,10 @@ const scenarioService = ScenarioService.create(prisma);
 
 async function createCase({
   name,
-  folderId,
+  testSuiteId,
 }: {
   name: string;
-  folderId?: string;
+  testSuiteId?: string;
 }) {
   return scenarioService.create({
     projectId,
@@ -43,7 +43,7 @@ async function createCase({
     situation: "A customer asks for help",
     criteria: ["The agent helps"],
     labels: [],
-    ...(folderId !== undefined && { folderId }),
+    ...(testSuiteId !== undefined && { testSuiteId }),
   });
 }
 
@@ -102,25 +102,25 @@ beforeEach(async () => {
   });
 });
 
-describe("running a folder", () => {
-  describe("when the folder holds active and archived cases", () => {
+describe("running a test suite", () => {
+  describe("when the test suite holds active and archived scenarios", () => {
     /** @scenario "Running a test suite schedules its active scenarios against the chosen targets" */
-    it("schedules active cases x targets and lands in the run plan the run resolved", async () => {
-      const folder = await suiteService.createFolder({
+    it("schedules active scenarios x targets and lands in the run plan the run resolved", async () => {
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      // A second suite keeps the run's scope a folders scope: a scope naming
+      // A second suite keeps the run's scope a test suites scope: a scope naming
       // every suite of the project is the same thing as "all scenarios" and
       // normalises to it.
-      await suiteService.createFolder({ projectId, name: "Checkout" });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
       const active = [];
       for (const name of ["One", "Two", "Three"]) {
-        active.push(await createCase({ name, folderId: folder.id }));
+        active.push(await createCase({ name, testSuiteId: testSuite.id }));
       }
       const archived = await createCase({
         name: "Old",
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
       });
       await scenarioService.archive({ id: archived.id, projectId });
 
@@ -134,7 +134,7 @@ describe("running a folder", () => {
       const result = await suiteService.runTestSuite({
         projectId,
         organizationId,
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
         targets,
         idempotencyKey: `run-${nanoid(6)}`,
       });
@@ -147,13 +147,13 @@ describe("running a folder", () => {
       expect(scheduledScenarioIds).toEqual(
         new Set(active.map((scenario) => scenario.id)),
       );
-      // An archived case is outside what the scope covers, so it is not a
+      // An archived scenario is outside what the scope covers, so it is not a
       // reference the run skipped: it was never named.
       expect(result.skippedArchived.scenarios).toEqual([]);
 
-      // The batch belongs to the run plan, not to the folder.
+      // The batch belongs to the run plan, not to the test suite.
       expect(result.created).toBe(true);
-      expect(result.suiteId).not.toBe(folder.id);
+      expect(result.suiteId).not.toBe(testSuite.id);
       expect(result.setId).toBe(getSuiteSetId(result.suiteId));
 
       const nameOf = new Map([
@@ -168,32 +168,32 @@ describe("running a folder", () => {
       const plan = await prisma.simulationSuite.findFirstOrThrow({
         where: { id: result.suiteId, projectId },
       });
-      expect(plan.kind).toBe("custom");
+      expect(plan.kind).toBe("run_plan");
       expect(plan.targets).toEqual(sortSuiteTargets(targets));
 
-      const folderRow = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+      const testSuiteRow = await prisma.simulationSuite.findFirstOrThrow({
+        where: { id: testSuite.id, projectId },
       });
-      expect(folderRow.targets).toEqual([]);
-      expect(folderRow.repeatCount).toBe(1);
-      expect(folderRow.simulatorModel).toBeNull();
-      expect(folderRow.judgeModel).toBeNull();
+      expect(testSuiteRow.targets).toEqual([]);
+      expect(testSuiteRow.repeatCount).toBe(1);
+      expect(testSuiteRow.simulatorModel).toBeNull();
+      expect(testSuiteRow.judgeModel).toBeNull();
     });
 
     /** @scenario "The target chosen for a test suite run is offered again from the last run plan of that suite" */
     it("leaves the target on the run plan the run resolved", async () => {
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await suiteService.createFolder({ projectId, name: "Checkout" });
-      await createCase({ name: "One", folderId: folder.id });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
+      await createCase({ name: "One", testSuiteId: testSuite.id });
       const agent = await createHttpAgent();
 
       const result = await suiteService.runTestSuite({
         projectId,
         organizationId,
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
         targets: [{ type: "http", referenceId: agent.id }],
         idempotencyKey: `run-${nanoid(6)}`,
       });
@@ -202,30 +202,33 @@ describe("running a folder", () => {
         where: { id: result.suiteId, projectId },
       });
       expect(plan.targets).toEqual([{ type: "http", referenceId: agent.id }]);
-      expect(plan.scope).toEqual({ mode: "folders", folderIds: [folder.id] });
-
-      const folderRow = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+      expect(plan.scope).toEqual({
+        mode: "test_suites",
+        testSuiteIds: [testSuite.id],
       });
-      expect(folderRow.targets).toEqual([]);
+
+      const testSuiteRow = await prisma.simulationSuite.findFirstOrThrow({
+        where: { id: testSuite.id, projectId },
+      });
+      expect(testSuiteRow.targets).toEqual([]);
     });
   });
 
   describe("when no target is chosen", () => {
     /** @scenario "Running a test suite with no target is refused with suite_targets_required" */
     it("refuses with suite_targets_required and schedules nothing", async () => {
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await createCase({ name: "One", folderId: folder.id });
-      await createCase({ name: "Two", folderId: folder.id });
+      await createCase({ name: "One", testSuiteId: testSuite.id });
+      await createCase({ name: "Two", testSuiteId: testSuite.id });
 
       await expect(
         suiteService.runTestSuite({
           projectId,
           organizationId,
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
           targets: [],
           idempotencyKey: `run-${nanoid(6)}`,
         }),
@@ -236,15 +239,18 @@ describe("running a folder", () => {
     });
   });
 
-  describe("when every case in the folder is archived", () => {
+  describe("when every scenario in the test suite is archived", () => {
     /** @scenario "Running a test suite whose scenarios are all archived is refused with suite_scope_empty" */
     it("refuses with suite_scope_empty and schedules nothing", async () => {
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await suiteService.createFolder({ projectId, name: "Checkout" });
-      const scenario = await createCase({ name: "Old", folderId: folder.id });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
+      const scenario = await createCase({
+        name: "Old",
+        testSuiteId: testSuite.id,
+      });
       await scenarioService.archive({ id: scenario.id, projectId });
       const agent = await createHttpAgent();
 
@@ -252,7 +258,7 @@ describe("running a folder", () => {
         suiteService.runTestSuite({
           projectId,
           organizationId,
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
           targets: [{ type: "http", referenceId: agent.id }],
           idempotencyKey: `run-${nanoid(6)}`,
         }),
@@ -262,17 +268,17 @@ describe("running a folder", () => {
     });
   });
 
-  describe("when a folder is run through the id-addressed suite path", () => {
+  describe("when a test suite is run through the id-addressed suite path", () => {
     it("runs the targets the request carries", async () => {
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await suiteService.createFolder({ projectId, name: "Checkout" });
-      await createCase({ name: "One", folderId: folder.id });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
+      await createCase({ name: "One", testSuiteId: testSuite.id });
       const agent = await createHttpAgent();
       const row = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
 
       const result = await suiteService.run({
@@ -284,17 +290,17 @@ describe("running a folder", () => {
       });
 
       expect(result.jobCount).toBe(1);
-      expect(result.setId).not.toBe(getSuiteSetId(folder.id));
+      expect(result.setId).not.toBe(getSuiteSetId(testSuite.id));
     });
 
-    it("refuses a folder run that carries no target", async () => {
-      const folder = await suiteService.createFolder({
+    it("refuses a test suite run that carries no target", async () => {
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await createCase({ name: "One", folderId: folder.id });
+      await createCase({ name: "One", testSuiteId: testSuite.id });
       const row = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
 
       await expect(
@@ -308,30 +314,30 @@ describe("running a folder", () => {
     });
   });
 
-  describe("when a custom run plan spans the cases of several folders", () => {
+  describe("when a run plan spans the scenarios of several test suites", () => {
     /** @scenario "A run plan can span the scenarios of several test suites" */
-    it("runs the four cases and changes neither folder", async () => {
-      const refunds = await suiteService.createFolder({
+    it("runs the four scenarios and changes neither test suite", async () => {
+      const refunds = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      const checkout = await suiteService.createFolder({
+      const checkout = await suiteService.createTestSuite({
         projectId,
         name: "Checkout",
       });
       const cases = [];
-      for (const [name, folderId] of [
+      for (const [name, testSuiteId] of [
         ["R1", refunds.id],
         ["R2", refunds.id],
         ["C1", checkout.id],
         ["C2", checkout.id],
       ] as const) {
-        cases.push(await createCase({ name, folderId }));
+        cases.push(await createCase({ name, testSuiteId }));
       }
       const agent = await createHttpAgent();
       const plan = await suiteService.create({
         projectId,
-        name: "Cross folder nightly",
+        name: "Cross test suite nightly",
         scenarioIds: cases.map((scenario) => scenario.id),
         targets: [{ type: "http", referenceId: agent.id }],
         repeatCount: 1,
@@ -363,12 +369,15 @@ describe("running a folder", () => {
   });
 
   describe("running all scenarios", () => {
-    it("creates the managed suite once, refreshes it, and schedules every active case", async () => {
-      const folder = await suiteService.createFolder({
+    it("creates the managed suite once, refreshes it, and schedules every active scenario", async () => {
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      const filed = await createCase({ name: "Filed", folderId: folder.id });
+      const filed = await createCase({
+        name: "Filed",
+        testSuiteId: testSuite.id,
+      });
       const unfiled = await createCase({ name: "Unfiled" });
       const archived = await createCase({ name: "Archived" });
       await scenarioService.archive({ id: archived.id, projectId });
@@ -394,8 +403,8 @@ describe("running a folder", () => {
       expect(managed.labels).toContain("managed:run-all");
 
       // A second run reuses the same managed suite, and its membership is
-      // read again rather than replayed. A case added after the first run has
-      // to be scheduled, and a case archived after it must not be.
+      // read again rather than replayed. A scenario added after the first run has
+      // to be scheduled, and a scenario archived after it must not be.
       const added = await createCase({ name: "Added later" });
       await scenarioService.archive({ id: unfiled.id, projectId });
       queueSimulationRun.mockClear();

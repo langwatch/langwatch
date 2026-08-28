@@ -5,11 +5,11 @@
  * without naming one files it here, and the project's Default suite is created
  * on that first write if it has none.
  *
- * `Scenario.folderId` stays nullable, so the invariant is enforced here on the
- * write path and not by the column: an archived scenario keeps whatever folder
+ * `Scenario.testSuiteId` stays nullable, so the invariant is enforced here on the
+ * write path and not by the column: an archived scenario keeps whatever test suite
  * it had and may have none, and a code-pushed scenario has no row at all.
  *
- * Default is an ordinary folder-kind suite once it exists. It can be renamed,
+ * Default is an ordinary test suite-kind suite once it exists. It can be renamed,
  * archived and run like any other. A project whose Default was renamed or
  * archived and then writes an unfiled scenario gets a fresh Default, because
  * the scenario still needs a home.
@@ -40,7 +40,7 @@ export type DefaultSuiteClient = Pick<
 /**
  * The project's Default suite, or null.
  *
- * Matched by name rather than by a reserved label, so a folder a person named
+ * Matched by name rather than by a reserved label, so a test suite a person named
  * "Default" themselves is the project's Default rather than a second one beside
  * it. The oldest wins when a project holds two.
  */
@@ -51,7 +51,7 @@ export async function findDefaultSuite(params: {
   return params.prisma.simulationSuite.findFirst({
     where: {
       projectId: params.projectId,
-      kind: "folder",
+      kind: "test_suite",
       archivedAt: null,
       name: { equals: DEFAULT_SUITE_NAME, mode: "insensitive" },
     },
@@ -124,7 +124,7 @@ async function createDefaultSuite(params: {
       projectId: params.projectId,
       name: DEFAULT_SUITE_NAME,
       slug: params.slug,
-      kind: "folder",
+      kind: "test_suite",
       scenarioIds: [],
       targets: [],
       repeatCount: 1,

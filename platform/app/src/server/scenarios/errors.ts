@@ -21,18 +21,18 @@ export class ScenarioNotFoundError extends Error {
 }
 
 /**
- * Thrown when a scenario is filed into something that is not an active folder
- * of the same project: a custom run plan, an archived folder, another
- * project's folder, or an id that names nothing.
+ * Thrown when a scenario is filed into something that is not an active test suite
+ * of the same project: a run plan, an archived test suite, another
+ * project's test suite, or an id that names nothing.
  */
-export class ScenarioFolderNotFoundError extends HandledError {
-  declare readonly code: "scenario_folder_not_found";
+export class ScenarioTestSuiteNotFoundError extends HandledError {
+  declare readonly code: "scenario_test_suite_not_found";
 
   constructor() {
-    super("scenario_folder_not_found", "Test suite folder not found", {
+    super("scenario_test_suite_not_found", "Test suite not found", {
       httpStatus: 404,
     });
-    this.name = "ScenarioFolderNotFoundError";
+    this.name = "ScenarioTestSuiteNotFoundError";
   }
 }
 
@@ -41,7 +41,7 @@ export class ScenarioFolderNotFoundError extends HandledError {
  *
  * Raised only when the caller sent an expected version: a caller that sends
  * none asked for "save over whatever is there", and gets the next number. The
- * refusal happens before the write, so the stored case is exactly as the other
+ * refusal happens before the write, so the stored scenario is exactly as the other
  * save left it. `currentVersion` rides on `meta` so the editor can offer the
  * reload it needs.
  *

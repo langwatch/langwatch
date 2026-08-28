@@ -21,7 +21,7 @@ const projectId = `test-scenario-restore-${nanoid(8)}`;
 const otherProjectId = `${projectId}-other`;
 
 const service = ScenarioService.create(prisma);
-// Folder creation never reaches the run service; a stub keeps the test on
+// Test suite creation never reaches the run service; a stub keeps the test on
 // the datastore path only.
 const suiteService = SuiteService.create({
   prisma,
@@ -30,7 +30,7 @@ const suiteService = SuiteService.create({
 
 const apiActor: ScenarioActor = { userId: null, label: "api" };
 
-/** A case whose situation moved through five saves, one per version. */
+/** A scenario whose situation moved through five saves, one per version. */
 async function createCaseAtVersionFive() {
   const scenario = await service.create(
     {
@@ -191,19 +191,19 @@ describe("restoring a scenario version", () => {
     });
   });
 
-  it("leaves the folder of the case unchanged", async () => {
-    const folder = await suiteService.createFolder({
+  it("leaves the test suite of the scenario unchanged", async () => {
+    const testSuite = await suiteService.createTestSuite({
       projectId,
       name: "Refunds",
     });
     const scenario = await service.create(
       {
         projectId,
-        name: "Filed case",
+        name: "Filed scenario",
         situation: "situation v1",
         criteria: ["The agent helps"],
         labels: [],
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
       },
       { actor: apiActor },
     );
@@ -222,12 +222,12 @@ describe("restoring a scenario version", () => {
 
     const stored = await service.getById({ id: scenario.id, projectId });
     expect(stored?.situation).toBe("situation v1");
-    expect(stored?.folderId).toBe(folder.id);
+    expect(stored?.testSuiteId).toBe(testSuite.id);
   });
 
   describe("failure paths", () => {
     /** @scenario "Restoring a version that does not exist is refused with scenario_version_not_found" */
-    it("refuses an unknown version and leaves the case unchanged", async () => {
+    it("refuses an unknown version and leaves the scenario unchanged", async () => {
       const scenario = await createCaseAtVersionFive();
 
       await expect(
@@ -275,7 +275,7 @@ describe("restoring a scenario version", () => {
     });
 
     /** @scenario "Restoring an archived scenario is refused" */
-    it("refuses to restore into an archived case and keeps it archived", async () => {
+    it("refuses to restore into an archived scenario and keeps it archived", async () => {
       const scenario = await createCaseAtVersionFive();
       await service.archive({ id: scenario.id, projectId });
 

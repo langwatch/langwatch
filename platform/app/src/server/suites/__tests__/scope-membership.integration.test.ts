@@ -29,12 +29,12 @@ const scenarioService = ScenarioService.create(prisma);
 
 async function createCase({
   name,
-  folderId,
+  testSuiteId,
   labels = [],
   project = projectId,
 }: {
   name: string;
-  folderId?: string;
+  testSuiteId?: string;
   labels?: string[];
   project?: string;
 }) {
@@ -44,7 +44,7 @@ async function createCase({
     situation: "A customer asks for help",
     criteria: ["The agent helps"],
     labels,
-    ...(folderId !== undefined && { folderId }),
+    ...(testSuiteId !== undefined && { testSuiteId }),
   });
 }
 
@@ -146,7 +146,7 @@ beforeEach(async () => {
 describe("what a run plan covers", () => {
   describe("when the plan covers all scenarios", () => {
     /** @scenario "A plan scoped to all scenarios runs every active scenario" */
-    it("runs every active case of the project", async () => {
+    it("runs every active scenario of the project", async () => {
       const cases = [
         await createCase({ name: "One" }),
         await createCase({ name: "Two" }),
@@ -163,7 +163,7 @@ describe("what a run plan covers", () => {
     });
 
     /** @scenario "Archived scenarios are left out of a dynamic scope" */
-    it("leaves an archived case out", async () => {
+    it("leaves an archived scenario out", async () => {
       const kept = await createCase({ name: "Kept" });
       const gone = await createCase({ name: "Gone" });
       await scenarioService.archive({ id: gone.id, projectId });
@@ -177,20 +177,20 @@ describe("what a run plan covers", () => {
 
   describe("when the plan covers chosen test suites", () => {
     /** @scenario "A plan scoped to test suites runs the scenarios filed in them" */
-    it("runs the cases filed in them and nothing else", async () => {
-      const first = await suiteService.createFolder({
+    it("runs the scenarios filed in them and nothing else", async () => {
+      const first = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      const second = await suiteService.createFolder({
+      const second = await suiteService.createTestSuite({
         projectId,
         name: "Checkout",
       });
-      const inFirst = await createCase({ name: "One", folderId: first.id });
-      await createCase({ name: "Two", folderId: second.id });
+      const inFirst = await createCase({ name: "One", testSuiteId: first.id });
+      await createCase({ name: "Two", testSuiteId: second.id });
       const plan = await createPlan({
-        mode: "folders",
-        folderIds: [first.id],
+        mode: "test_suites",
+        testSuiteIds: [first.id],
       });
 
       await runPlan(plan);
@@ -199,21 +199,27 @@ describe("what a run plan covers", () => {
     });
 
     /** @scenario "A scenario added later runs on the next run" */
-    it("picks up a case filed after the first run", async () => {
-      const folder = await suiteService.createFolder({
+    it("picks up a scenario filed after the first run", async () => {
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      const first = await createCase({ name: "One", folderId: folder.id });
+      const first = await createCase({
+        name: "One",
+        testSuiteId: testSuite.id,
+      });
       const plan = await createPlan({
-        mode: "folders",
-        folderIds: [folder.id],
+        mode: "test_suites",
+        testSuiteIds: [testSuite.id],
       });
 
       await runPlan(plan);
       expect(scheduledScenarioIds()).toEqual(new Set([first.id]));
 
-      const second = await createCase({ name: "Two", folderId: folder.id });
+      const second = await createCase({
+        name: "Two",
+        testSuiteId: testSuite.id,
+      });
       queueSimulationRun.mockClear();
       await runPlan(await reread(plan));
 
@@ -221,15 +227,18 @@ describe("what a run plan covers", () => {
     });
 
     /** @scenario "The resolved set is written back on the plan" */
-    it("writes the cases the run covered back onto the plan", async () => {
-      const folder = await suiteService.createFolder({
+    it("writes the scenarios the run covered back onto the plan", async () => {
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      const filed = await createCase({ name: "One", folderId: folder.id });
+      const filed = await createCase({
+        name: "One",
+        testSuiteId: testSuite.id,
+      });
       const plan = await createPlan({
-        mode: "folders",
-        folderIds: [folder.id],
+        mode: "test_suites",
+        testSuiteIds: [testSuite.id],
       });
       expect(plan.scenarioIds).toEqual([]);
 
@@ -240,13 +249,13 @@ describe("what a run plan covers", () => {
 
     /** @scenario "A scope cannot name another project's test suite" */
     it("schedules nothing for another project's test suite", async () => {
-      const foreignFolder = await prisma.simulationSuite.create({
+      const foreignTestSuite = await prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: otherProjectId,
           name: "Foreign",
           slug: `foreign-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           repeatCount: 1,
@@ -254,14 +263,14 @@ describe("what a run plan covers", () => {
         },
       });
       await createCase({
-        name: "Foreign case",
-        folderId: foreignFolder.id,
+        name: "Foreign scenario",
+        testSuiteId: foreignTestSuite.id,
         project: otherProjectId,
       });
       await createCase({ name: "Mine" });
       const plan = await createPlan({
-        mode: "folders",
-        folderIds: [foreignFolder.id],
+        mode: "test_suites",
+        testSuiteIds: [foreignTestSuite.id],
       });
 
       await expect(runPlan(plan)).rejects.toMatchObject({
@@ -273,7 +282,7 @@ describe("what a run plan covers", () => {
 
   describe("when the plan covers chosen labels", () => {
     /** @scenario "A plan scoped to labels runs the scenarios carrying them" */
-    it("runs the cases carrying one of them", async () => {
+    it("runs the scenarios carrying one of them", async () => {
       const wanted = await createCase({
         name: "One",
         labels: ["checkout"],
@@ -287,7 +296,7 @@ describe("what a run plan covers", () => {
     });
 
     /** @scenario "A scenario that loses the label drops out of the plan" */
-    it("drops a case whose label was taken off", async () => {
+    it("drops a scenario whose label was taken off", async () => {
       const dropped = await createCase({ name: "One", labels: ["checkout"] });
       const kept = await createCase({ name: "Two", labels: ["checkout"] });
       const plan = await createPlan({ mode: "labels", labels: ["checkout"] });
@@ -307,7 +316,7 @@ describe("what a run plan covers", () => {
     });
 
     /** @scenario "A dynamic scope that covers nothing is refused" */
-    it("refuses a label no case carries", async () => {
+    it("refuses a label no scenario carries", async () => {
       await createCase({ name: "One", labels: ["search"] });
       const plan = await createPlan({ mode: "labels", labels: ["checkout"] });
 
@@ -328,7 +337,7 @@ describe("what a run plan covers", () => {
         projectId,
         name: `Plan ${nanoid(6)}`,
         scenarioIds: [held.id],
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         targets: [{ type: "http", referenceId: agent.id }],
         repeatCount: 1,
         labels: [],
@@ -360,17 +369,17 @@ describe("what a run plan covers", () => {
     });
   });
 
-  describe("when the suite is a test suite folder", () => {
+  describe("when the suite is a test suite", () => {
     /** @scenario "A test suite refuses a scope" */
     it("refuses a scope written on it", async () => {
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
 
       await expect(
         suiteService.update({
-          id: folder.id,
+          id: testSuite.id,
           projectId,
           data: { scope: { mode: "all" } },
         }),
