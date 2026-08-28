@@ -1,4 +1,4 @@
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/trace-contract";
 import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
 import { canReadCapturedContent, type Protections } from "~/server/traces/protections";
 

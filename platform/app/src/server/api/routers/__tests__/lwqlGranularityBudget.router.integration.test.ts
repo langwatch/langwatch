@@ -51,7 +51,7 @@ vi.mock("../../utils", async (importOriginal) => {
 
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { createTestApp } from "~/server/app-layer/presets";
-import { lwqlRouter } from "../analytics/lwql";
+import { lwqlRouter } from "../analytics";
 
 wireDefaultTestApp();
 

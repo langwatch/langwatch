@@ -9,7 +9,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { organizationRouter } from "../organization";
-import { projectRouter } from "../project";
+import { projectRouter } from "~/runtime/app/internal-api/project.router";
 
 /**
  * Router for handling onboarding-related operations.

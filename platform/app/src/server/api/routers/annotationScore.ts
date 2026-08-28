@@ -1,114 +1,52 @@
-import { nanoid } from "nanoid";
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+/**
+ * Process wiring for the `annotationScore.*` tRPC surface.
+ *
+ * The transport itself is package-owned — `AnnotationScoreTrpcApi` in
+ * `@langwatch/annotation-server`, mounted through
+ * `@langwatch/platform-api/app-trpc`. What is left here is the composition
+ * this application still owns: its tRPC root, its authenticated procedure and
+ * its authorization middlewares.
+ */
+import {
+  createAnnotationScoreTrpcRouter,
+  declaredCheckFrom,
+  type AppTrpcPolicyMiddlewares,
+} from "@langwatch/platform-api/app-trpc";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "~/server/app-layer/authz/trpc-middleware";
+import { appTrpcRoot } from "../trpc.root";
+import {
+  auditLogMutations,
+  authProtectedProcedure,
+  enforcePermissionCheck,
+  handledErrorMiddleware,
+  loggerMiddleware,
+  tracerMiddleware,
+} from "../trpc.runtime-policy";
+import { scopeLineageGuard } from "../trpc.scope-lineage-middleware";
 
-export const annotationScoreRouter = createTRPCRouter({
-  upsert: protectedProcedure
-    .input(
-      z.object({
-        annotationScoreId: z.string().optional().nullable(),
-        projectId: z.string(),
-        name: z.string(),
-        dataType: z.enum(["OPTION", "CHECKBOX", "BOOLEAN", "LIKERT", "CATEGORICAL"]),
-        description: z.string().optional().nullable(),
-        options: z.array(z.string()).optional().nullable(),
-        category: z.array(z.string()).optional().nullable(),
-        categoryExplanation: z.array(z.string()).optional().nullable(),
-        radioCheckboxOptions: z.array(z.string()),
-        defaultRadioOption: z.string().optional().nullable(),
-        defaultCheckboxOption: z.array(z.string()).optional().nullable(),
-      }),
-    )
-    .permission("annotations:manage")
-    .mutation(async ({ ctx, input }) => {
-      type OptionType = { label: string; value: string; reason?: string };
-      const options: OptionType[] = [];
+/** This process's concrete policy chain, in the order the mount applies it. */
+const middlewares: AppTrpcPolicyMiddlewares = {
+  tracer: tracerMiddleware,
+  logger: loggerMiddleware,
+  handledError: handledErrorMiddleware,
+  scopeLineageGuard,
+  declaredCheck: declaredCheckFrom({
+    permission: checkDeclaredPermission,
+    permissionAny: checkDeclaredPermissionAny,
+    noPermission: declaredNoPermission,
+    serviceAuthorized: declaredServiceAuthorization,
+  }),
+  enforceCheck: enforcePermissionCheck,
+  auditMutations: auditLogMutations,
+};
 
-      input.radioCheckboxOptions?.forEach((option) => {
-        options.push({ label: option, value: option });
-      });
-
-      const data = {
-        projectId: input.projectId,
-        name: input.name,
-        dataType: input.dataType,
-        description: input.description ?? "",
-        options,
-        defaultValue: {
-          value: input.defaultRadioOption ?? null,
-          options: input.defaultCheckboxOption ?? null,
-        },
-      };
-
-      const scoreId = input.annotationScoreId || nanoid();
-
-      return ctx.app.annotations.upsertScore({
-        id: scoreId,
-        projectId: input.projectId,
-        name: data.name,
-        dataType: data.dataType,
-        description: data.description,
-        options: data.options,
-        defaultValue: data.defaultValue,
-      });
-    }),
-  getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("annotations:view")
-    .query(async ({ ctx, input }) => {
-      return ctx.app.annotations.listScores({ projectId: input.projectId });
-    }),
-  getAllActive: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .permission("annotations:view")
-    .query(async ({ ctx, input }) => {
-      return ctx.app.annotations.listScores({
-        projectId: input.projectId,
-        activeOnly: true,
-      });
-    }),
-  getById: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        scoreId: z.string(),
-      }),
-    )
-    .permission("annotations:view")
-    .query(async ({ ctx, input }) => {
-      return ctx.app.annotations.getScore({
-        id: input.scoreId,
-        projectId: input.projectId,
-      });
-    }),
-  toggle: protectedProcedure
-    .input(
-      z.object({
-        scoreId: z.string(),
-        active: z.boolean(),
-        projectId: z.string(),
-      }),
-    )
-    .permission("annotations:update")
-    .mutation(async ({ ctx, input }) => {
-      return ctx.app.annotations.toggleScore({
-        id: input.scoreId,
-        projectId: input.projectId,
-        active: input.active,
-      });
-    }),
-  delete: protectedProcedure
-    .input(
-      z.object({
-        scoreId: z.string(),
-        projectId: z.string(),
-      }),
-    )
-    .permission("annotations:delete")
-    .mutation(async ({ ctx, input }) => {
-      return ctx.app.annotations.deleteScore({
-        id: input.scoreId,
-        projectId: input.projectId,
-      });
-    }),
+export const annotationScoreRouter = createAnnotationScoreTrpcRouter({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares,
 });

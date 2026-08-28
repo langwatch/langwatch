@@ -1,20 +1,19 @@
+import type { CustomModelEntry, ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import { customModelUpdateInputSchema } from "@langwatch/model-provider-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { isSecretCredentialField } from "../../../../utils/modelProviderHelpers";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import { customModelUpdateInputSchema } from "@langwatch/model-provider-contract";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "../../../modelProviders/__tests__/model-provider-services.test-support";
 import {
   getModelMetadataForFrontend,
   type LegacyModelProviderExecution,
   type ModelMetadataForFrontend,
   mergeCustomModelMetadata,
   prepareLitellmParams as prepareLitellmParamsWithServices,
-} from "../modelProviders";
-import {
-  testManagedProviders,
-  testModelProviders,
-} from "../../../modelProviders/__tests__/model-provider-services.test-support";
+} from "../modelProviders.utils";
 
 /**
  * Unit tests for modelProviders router helper functions

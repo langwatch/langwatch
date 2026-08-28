@@ -17,8 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { lwqlRouter } from "../lwql";
-import { savedWorkbenchChartsRouter } from "../savedWorkbenchCharts";
+import { lwqlRouter, savedWorkbenchChartsRouter } from "../../analytics";
 import { enforceWorkbenchEnabled } from "../workbenchAccessMiddleware";
 
 /** The middleware chain tRPC composed for each procedure, keyed by its name. */

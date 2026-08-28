@@ -21,7 +21,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { applyOverlayToTrace } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";

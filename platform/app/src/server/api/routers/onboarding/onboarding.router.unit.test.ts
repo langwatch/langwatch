@@ -44,7 +44,7 @@ vi.mock("../organization", () => ({
   },
 }));
 
-vi.mock("../project", () => ({
+vi.mock("~/runtime/app/internal-api/project.router", () => ({
   projectRouter: {
     createCaller: vi.fn(() => ({
       create: mockCreateProject,

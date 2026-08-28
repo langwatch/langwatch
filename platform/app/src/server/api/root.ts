@@ -9,6 +9,38 @@ import { ingestionTemplatesRouter } from "./routers/governance/ingestionTemplate
 import { personalSessionsRouter } from "./routers/governance/personalSessions";
 import { sessionPolicyRouter } from "./routers/governance/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
+import {
+  createPinnedTraceTrpcRouter,
+  createPromptTagTrpcRouter,
+  createPromptTrpcRouter,
+  createScenarioTrpcRouter,
+  createShareTrpcRouter,
+  createStoredObjectTrpcRouter,
+  createSuiteTrpcRouter,
+  declaredCheckFrom,
+  type AppTrpcPolicyMiddlewares,
+} from "@langwatch/platform-api/app-trpc";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "~/server/app-layer/authz/trpc-middleware";
+import { fireScenarioCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
+import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
+import { prisma } from "~/server/db";
+import { trackServerEvent } from "~/server/posthog";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { appTrpcRoot } from "./trpc.root";
+import {
+  auditLogMutations,
+  authProtectedProcedure,
+  enforcePermissionCheck,
+  handledErrorMiddleware,
+  loggerMiddleware,
+  tracerMiddleware,
+} from "./trpc.runtime-policy";
+import { scopeLineageGuard } from "./trpc.scope-lineage-middleware";
 import { agentsRouter } from "~/runtime/app/internal-api/agents.router";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
@@ -60,28 +92,21 @@ import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
-import { pinnedTraceRouter } from "./routers/pinnedTrace";
 import { planRouter } from "./routers/plan";
 import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
-import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
-import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
-import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
-import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { ssoConnectionsRouter } from "./routers/ssoConnections";
-import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
-import { suiteRouter } from "./routers/suites";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
 import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
@@ -92,6 +117,54 @@ import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
 import { workflowRouter } from "./routers/workflows";
+
+/** This process's concrete policy chain, in the order the mounts apply it. */
+const appTrpcMiddlewares: AppTrpcPolicyMiddlewares = {
+  tracer: tracerMiddleware,
+  logger: loggerMiddleware,
+  handledError: handledErrorMiddleware,
+  scopeLineageGuard,
+  declaredCheck: declaredCheckFrom({
+    permission: checkDeclaredPermission,
+    permissionAny: checkDeclaredPermissionAny,
+    noPermission: declaredNoPermission,
+    serviceAuthorized: declaredServiceAuthorization,
+  }),
+  enforceCheck: enforcePermissionCheck,
+  auditMutations: auditLogMutations,
+};
+
+/** What every package-owned mount needs from this process. */
+const appTrpcMount = {
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares: appTrpcMiddlewares,
+};
+
+const shareRouter = createShareTrpcRouter(appTrpcMount);
+const pinnedTraceRouter = createPinnedTraceTrpcRouter(appTrpcMount);
+const suiteRouter = createSuiteTrpcRouter(appTrpcMount);
+const storedObjectsRouter = createStoredObjectTrpcRouter(appTrpcMount);
+const promptTagsRouter = createPromptTagTrpcRouter(appTrpcMount);
+
+const promptsRouter = createPromptTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    // Fire-and-forget: nurturing may not fail a create.
+    afterPromptCreated: ({ projectId, userId }) =>
+      afterPromptCreated({ prisma, projectId, userId }),
+  },
+});
+
+const scenarioRouter = createScenarioTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    trackScenarioCreated: ({ userId, projectId }) =>
+      trackServerEvent({ userId, event: "scenario_created", projectId }),
+    fireScenarioCreatedNurturing,
+    captureException,
+  },
+});
 
 const coreRouters = {
   agents: agentsRouter,

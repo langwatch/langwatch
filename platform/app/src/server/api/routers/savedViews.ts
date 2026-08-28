@@ -1,155 +1,85 @@
-import { z } from "zod";
+/**
+ * Process wiring for the `savedViews.*` tRPC surface.
+ *
+ * The transport itself is package-owned — `SavedViewTrpcApi` in
+ * `@langwatch/dashboard-server`, mounted through
+ * `@langwatch/platform-api/app-trpc`. What is left here is the composition
+ * this application still owns: its tRPC root, its authenticated procedure, its
+ * authorization middlewares, and the saved-view lifecycle, which stays
+ * application-owned while that vertical is drained into the Dashboard package.
+ */
+import {
+  createSavedViewTrpcRouter,
+  declaredCheckFrom,
+  type AppTrpcPolicyMiddlewares,
+} from "@langwatch/platform-api/app-trpc";
 import type { Prisma } from "~/generated/prisma/client";
-import { savedViewErrorHandler } from "../../saved-views/middleware";
+import {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} from "~/server/app-layer/authz/trpc-middleware";
+import { prisma } from "../../db";
+import { withSavedViewErrorHandling } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { appTrpcRoot } from "../trpc.root";
+import {
+  auditLogMutations,
+  authProtectedProcedure,
+  enforcePermissionCheck,
+  handledErrorMiddleware,
+  loggerMiddleware,
+  tracerMiddleware,
+} from "../trpc.runtime-policy";
+import { scopeLineageGuard } from "../trpc.scope-lineage-middleware";
+
+/** This process's concrete policy chain, in the order the mount applies it. */
+const middlewares: AppTrpcPolicyMiddlewares = {
+  tracer: tracerMiddleware,
+  logger: loggerMiddleware,
+  handledError: handledErrorMiddleware,
+  scopeLineageGuard,
+  declaredCheck: declaredCheckFrom({
+    permission: checkDeclaredPermission,
+    permissionAny: checkDeclaredPermissionAny,
+    noPermission: declaredNoPermission,
+    serviceAuthorized: declaredServiceAuthorization,
+  }),
+  enforceCheck: enforcePermissionCheck,
+  auditMutations: auditLogMutations,
+};
 
 /**
- * Saved Views Router - Manages saved view CRUD operations for traces page
- *
- * ARCHITECTURE:
- * - Router: Thin orchestration layer (input validation, permissions, error mapping)
- * - Service: Business logic (auto-seeding, order management, validation)
- * - Repository: Data access layer (Prisma queries with projectId multitenancy)
+ * `withSavedViewErrorHandling` wraps each call rather than sitting in the tRPC
+ * chain, so the domain errors keep mapping to the same `NOT_FOUND` the router
+ * raised before the transport moved.
  */
-export const savedViewsRouter = createTRPCRouter({
-  /**
-   * Gets all saved views for a project.
-   * Auto-seeds with default origin views on first access.
-   */
-  getAll: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        // Storage shape to read. Omit for the legacy default
-        // ("v1-traces-filter") so existing callers keep working;
-        // traces v2 passes "v2-traces-lens" to scope to its own rows.
-        kind: z.string().optional(),
-      }),
-    )
-    .permission("traces:view")
-    .use(savedViewErrorHandler)
-    .query(async ({ ctx, input }) => {
-      const service = SavedViewService.create(ctx.prisma);
-      return await service.getAll({
-        projectId: input.projectId,
-        userId: ctx.session.user.id,
-        kind: input.kind,
-      });
-    }),
+const savedViews = SavedViewService.create(prisma);
 
-  /**
-   * Creates a new saved view.
-   * When scope is "myself", the view is personal (only visible to the creator).
-   * When scope is "project" (default), the view is shared with all team members.
-   */
-  create: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        name: z.string().min(1).max(255),
-        filters: z.record(z.string(), z.unknown()),
-        query: z.string().optional(),
-        period: z
-          .object({
-            relativeDays: z.number().optional(),
-            startDate: z.string().optional(),
-            endDate: z.string().optional(),
-          })
-          .optional(),
-        scope: z.enum(["project", "myself"]).default("project"),
-        // Storage shape. Omit for the legacy default
-        // ("v1-traces-filter"). Traces v2 passes "v2-traces-lens".
-        kind: z.string().optional(),
-        // Optional client-provided id. Traces v2 generates lens ids
-        // locally so the in-store active id keeps pointing at the same
-        // row after the server roundtrip completes — otherwise the
-        // active lens would be invalidated by the refetch (server id
-        // ≠ client id) and the tab strip would snap back to the first
-        // built-in. Accepts strings that look like client-side lens
-        // ids (`custom-...`). Server still generates one if omitted.
-        id: z.string().min(1).max(128).optional(),
-      }),
-    )
-    .permission("traces:view")
-    .use(savedViewErrorHandler)
-    .mutation(async ({ ctx, input }) => {
-      const service = SavedViewService.create(ctx.prisma);
-      return await service.createView({
-        projectId: input.projectId,
-        input: {
-          id: input.id,
-          name: input.name,
-          filters: input.filters as Prisma.InputJsonValue,
-          query: input.query,
-          period: input.period as Prisma.InputJsonValue | undefined,
-          userId: input.scope === "myself" ? ctx.session.user.id : undefined,
-          kind: input.kind,
-        },
-      });
-    }),
-
-  /**
-   * Deletes a saved view.
-   */
-  delete: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        viewId: z.string(),
-      }),
-    )
-    .permission("traces:view")
-    .use(savedViewErrorHandler)
-    .mutation(async ({ ctx, input }) => {
-      const service = SavedViewService.create(ctx.prisma);
-      return await service.delete({
-        projectId: input.projectId,
-        viewId: input.viewId,
-        userId: ctx.session.user.id,
-      });
-    }),
-
-  /**
-   * Renames a saved view.
-   */
-  rename: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        viewId: z.string(),
-        name: z.string().min(1).max(255),
-      }),
-    )
-    .permission("traces:view")
-    .use(savedViewErrorHandler)
-    .mutation(async ({ ctx, input }) => {
-      const service = SavedViewService.create(ctx.prisma);
-      return await service.rename({
-        projectId: input.projectId,
-        viewId: input.viewId,
-        name: input.name,
-        userId: ctx.session.user.id,
-      });
-    }),
-
-  /**
-   * Reorders saved views by updating their order field.
-   */
-  reorder: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        viewIds: z.array(z.string()),
-      }),
-    )
-    .permission("traces:view")
-    .use(savedViewErrorHandler)
-    .mutation(async ({ ctx, input }) => {
-      const service = SavedViewService.create(ctx.prisma);
-      return await service.reorder({
-        projectId: input.projectId,
-        viewIds: input.viewIds,
-      });
-    }),
+export const savedViewsRouter = createSavedViewTrpcRouter({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  middlewares,
+  ports: {
+    savedViews: {
+      getAll: (input) => withSavedViewErrorHandling(() => savedViews.getAll(input)),
+      create: ({ projectId, ...view }) =>
+        withSavedViewErrorHandling(() =>
+          savedViews.createView({
+            projectId,
+            input: {
+              ...view,
+              filters: view.filters as Prisma.InputJsonValue,
+              ...(view.period === undefined
+                ? {}
+                : { period: view.period as Prisma.InputJsonValue }),
+            },
+          }),
+        ),
+      delete: (input) => withSavedViewErrorHandling(() => savedViews.delete(input)),
+      rename: (input) => withSavedViewErrorHandling(() => savedViews.rename(input)),
+      reorder: (input) => withSavedViewErrorHandling(() => savedViews.reorder(input)),
+    },
+  },
 });

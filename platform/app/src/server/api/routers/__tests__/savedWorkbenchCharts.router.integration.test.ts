@@ -47,7 +47,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
-import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
+import { savedWorkbenchChartsRouter } from "../analytics";
 
 const featureFlags = MemoryFeatureFlagService.create();
 const testApp = createTestApp({ featureFlags });
@@ -339,6 +339,8 @@ describe("the saved workbench chart router", () => {
 
   describe("given a chart saved in another project", () => {
     describe("when the member names its id on their own project", () => {
+      /** @scenario "Another project's saved chart is not readable" */
+      /** @scenario "Another project's saved chart cannot be edited or deleted" */
       /** @scenario "Every procedure answers only for the project in the request" */
       it("answers not found, exactly as for an id that never existed", async () => {
         const theirs = await stranger.create({

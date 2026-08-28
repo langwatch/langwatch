@@ -61,7 +61,7 @@ import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { changeTraceNameInputSchema } from "@langwatch/trace-contract";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "@langwatch/trace-contract";
 import { buildDisplayInput, stringifySpanIO } from "~/server/tracer/spanIOStringify";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,

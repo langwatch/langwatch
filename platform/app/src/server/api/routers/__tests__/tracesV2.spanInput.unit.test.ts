@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDisplayInput } from "~/server/tracer/spanIOStringify";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 
 type InputParts = Pick<Span, "input" | "params">;
 

@@ -17,9 +17,15 @@
     "./runtime": {
       "types": "./src/api.runtime.ts",
       "default": "./src/api.runtime.ts"
+    },
+    "./app-trpc": {
+      "types": "./src/app-trpc/index.ts",
+      "default": "./src/app-trpc/index.ts"
     }
   },
   "scripts": {
+    "start": "tsx --env-file-if-exists=../../.env src/api.entrypoint.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env src/api.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
@@ -28,25 +34,43 @@
     "@hono/node-server": "^2.0.6",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-server": "workspace:*",
+    "@langwatch/annotation-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/api-key-server": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/auth-server": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/dashboard-server": "workspace:*",
+    "@langwatch/evaluation-server": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/experiment-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-server": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/organization-server": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/prompt-server": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/scenario-server": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secret-server": "workspace:*",
+    "@langwatch/share-server": "workspace:*",
+    "@langwatch/stored-object-server": "workspace:*",
+    "@langwatch/suite-server": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trpc": "workspace:*",
+    "@langwatch/user-server": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
     "@trpc/server": "^11.18.0",
     "hono": "^4.10.7",
@@ -55,6 +79,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

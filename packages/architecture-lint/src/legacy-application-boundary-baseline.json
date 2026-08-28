@@ -7,15 +7,6 @@
         "~/prompts/schemas/version-metadata-schema",
         "~/prompts/types"
       ],
-      "platform/app/src/app/api/prompts/[[...route]]/app.v1.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
-      "platform/app/src/app/api/prompts/[[...route]]/schemas/inputs.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
-      "platform/app/src/app/api/prompts/[[...route]]/schemas/outputs.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
       "platform/app/src/app/api/shared/platform-url.ts": ["~/env.mjs"],
       "platform/app/src/app/api/workflows/post_event/post-event.ts": [
         "../../../../optimization_studio/server/addEnvs",
@@ -25,11 +16,7 @@
       "platform/app/src/server/analytics/utils.ts": ["../../hooks/useFilterParams"],
       "platform/app/src/server/api-key/api-key-token.utils.ts": ["~/env.mjs"],
       "platform/app/src/server/api/rbac.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/analytics/dataForFilter.ts": ["~/hooks/useFilterParams"],
       "platform/app/src/server/api/routers/currency.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/experiments.ts": [
-        "../../../experiments-v3/types/persistence"
-      ],
       "platform/app/src/server/api/routers/httpProxy.ts": [
         "~/optimization_studio/server/addEnvs",
         "~/optimization_studio/types/events"
@@ -37,7 +24,6 @@
       "platform/app/src/server/api/routers/license.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/organization.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/personalVirtualKeys.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/prompts/prompts.trpc-router.ts": ["~/prompts/schemas"],
       "platform/app/src/server/api/routers/publicEnv.ts": ["../../../env.mjs"],
       "platform/app/src/server/api/routers/subscription.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/tracesV2.ts": [
@@ -136,18 +122,6 @@
       "platform/app/src/server/nlpgo/nlpgoFetch.ts": ["../../optimization_studio/server/lambda"],
       "platform/app/src/server/notifications/usage-limit.service.ts": ["../../env.mjs"],
       "platform/app/src/server/posthog.ts": ["../env.mjs"],
-      "platform/app/src/server/prompt-config/prompt-version.service.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
-      "platform/app/src/server/prompt-config/prompt.service.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
-      "platform/app/src/server/prompt-config/repositories/llm-config-version-schema.ts": [
-        "~/prompts/schemas/field-schemas"
-      ],
-      "platform/app/src/server/prompt-config/repositories/prompt-tag.repository.ts": [
-        "~/prompts/constants/tags"
-      ],
       "platform/app/src/server/routes/auth-cli.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/auth.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/cron.ts": ["~/env.mjs"],
@@ -201,25 +175,6 @@
     "browser-to-backend": {
       "platform/app/src/components/AddDatasetRecordDrawer.tsx": ["../server/datasets/types"],
       "platform/app/src/components/AddOrEditDatasetDrawer.tsx": ["../server/datasets/types"],
-      "platform/app/src/components/agents/AgentCodeEditorDrawer.tsx": [
-        "~/server/agents/agent-fields",
-        "~/server/scenarios/execution/resolve-field-mappings"
-      ],
-      "platform/app/src/components/agents/AgentHttpEditorDrawer.tsx": [
-        "~/server/agents/agent-fields",
-        "~/server/scenarios/execution/resolve-field-mappings"
-      ],
-      "platform/app/src/components/agents/AgentListDrawer.tsx": ["~/server/agents/agent-fields"],
-      "platform/app/src/components/agents/AgentWorkflowEditorDrawer.tsx": [
-        "~/server/agents/agent-fields",
-        "~/server/scenarios/execution/resolve-field-mappings"
-      ],
-      "platform/app/src/components/agents/useWorkflowTargetAgentData.ts": [
-        "~/server/agents/agent-fields"
-      ],
-      "platform/app/src/components/agents/WorkflowSelectorDrawer.tsx": [
-        "~/server/agents/agent-fields"
-      ],
       "platform/app/src/components/analytics/CustomGraph.tsx": [
         "../../server/analytics/registry",
         "../../server/api/root",
@@ -242,8 +197,7 @@
       ],
       "platform/app/src/components/annotations/annotationRow.ts": [
         "~/server/annotations/annotationAnchor",
-        "~/server/annotations/annotationAnchorLabel",
-        "~/server/tracer/types"
+        "~/server/annotations/annotationAnchorLabel"
       ],
       "platform/app/src/components/checks/CheckConfigForm.tsx": [
         "../../server/evaluations/evaluationMappings",
@@ -260,8 +214,6 @@
       "platform/app/src/components/checks/EvaluationManualIntegration.tsx": [
         "../../server/evaluations/evaluators"
       ],
-      "platform/app/src/components/checks/EvaluationStatus.tsx": ["../../server/tracer/types"],
-      "platform/app/src/components/checks/evaluationSummaryCounts.ts": ["~/server/tracer/types"],
       "platform/app/src/components/checks/EvaluatorSelection.tsx": [
         "../../server/evaluations/evaluatorDisplayNames",
         "../../server/evaluations/evaluators"
@@ -301,8 +253,7 @@
       "platform/app/src/components/datasets/CopyDatasetDialog.tsx": ["../../server/api/rbac"],
       "platform/app/src/components/datasets/DatasetMappingPreview.tsx": [
         "../../server/datasets/types",
-        "../../server/tracer/tracesMapping",
-        "~/server/tracer/types"
+        "../../server/tracer/tracesMapping"
       ],
       "platform/app/src/components/datasets/DatasetPickerList.tsx": [
         "~/server/datasets/record-count",
@@ -711,23 +662,18 @@
       ],
       "platform/app/src/components/traces/EvaluationStatusItem.tsx": [
         "../../server/evaluations/getEvaluator",
-        "../../server/tracer/types",
         "~/server/evaluations/evaluators"
       ],
-      "platform/app/src/components/traces/RenderInputOutput.tsx": ["~/server/tracer/types"],
       "platform/app/src/components/traces/SpanDetails.tsx": [
-        "../../server/tracer/types",
         "../../server/traces/findPromptReferenceInAncestors"
       ],
       "platform/app/src/components/traces/ThreadMapping.tsx": [
         "../../server/datasets/types",
-        "../../server/tracer/tracesMapping",
-        "~/server/tracer/types"
+        "../../server/tracer/tracesMapping"
       ],
       "platform/app/src/components/traces/TracesMapping.tsx": [
         "../../server/datasets/types",
-        "../../server/tracer/tracesMapping",
-        "~/server/tracer/types"
+        "../../server/tracer/tracesMapping"
       ],
       "platform/app/src/components/ui/ContentPrivacyMarkers.tsx": [
         "~/server/api/routers/tracesV2.schemas"
@@ -861,9 +807,6 @@
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/spanInputSeed.ts": [
         "~/server/tracer/spanIOStringify"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/SpanNameTypeEditor.tsx": [
-        "~/server/tracer/types"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useSpanCorrection.ts": [
         "~/server/api/routers/tracesV2.schemas",
@@ -1024,7 +967,6 @@
       "platform/app/src/features/traces-v2/hooks/useTraceEditOverlay.ts": [
         "~/server/traces/edit-overlay/traceEditOverlay.schemas"
       ],
-      "platform/app/src/features/traces-v2/hooks/useTraceEvaluations.ts": ["~/server/tracer/types"],
       "platform/app/src/features/traces-v2/hooks/useTraceEvents.ts": [
         "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation"
       ],
@@ -1053,13 +995,11 @@
       ],
       "platform/app/src/features/traces-v2/stores/traceEditStore.ts": [
         "~/server/tracer/spanIOStringify",
-        "~/server/tracer/types",
         "~/server/traces/edit-overlay/traceEditOverlay.schemas"
       ],
       "platform/app/src/features/traces-v2/utils/errorSpans.ts": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/utils/legacyTraceToTurn.ts": ["~/server/tracer/types"],
       "platform/app/src/hooks/savedViewsLogic.ts": ["../server/filters/types"],
       "platform/app/src/hooks/useAcceptInviteOnce.ts": ["~/server/invites/errors"],
       "platform/app/src/hooks/useAvailableEvaluators.ts": ["../server/evaluations/evaluators"],
@@ -1081,12 +1021,11 @@
         "../server/modelProviders/customModel.schema"
       ],
       "platform/app/src/hooks/useModelProvidersSettings.ts": [
-        "../server/api/routers/modelProviders"
+        "../server/api/routers/modelProviders.utils"
       ],
       "platform/app/src/hooks/useOpsSSE.ts": ["~/server/app-layer/ops/types"],
       "platform/app/src/hooks/useOrganizationTeamProject.ts": ["../server/api/rbac"],
       "platform/app/src/hooks/useProjectsForCopy.ts": ["~/server/api/rbac"],
-      "platform/app/src/hooks/useProjectSpanNames.ts": ["../server/tracer/types"],
       "platform/app/src/hooks/useProviderFormSubmit.ts": [
         "../server/modelProviders/customModel.schema"
       ],
@@ -1102,7 +1041,6 @@
         "~/server/scenarios/internal-set-id",
         "~/server/scenarios/scenario-event.enums"
       ],
-      "platform/app/src/hooks/useSpanTreeLoader.ts": ["~/server/tracer/types"],
       "platform/app/src/hooks/useSSESubscription.ts": ["~/server/api/root"],
       "platform/app/src/instrumentation.node.ts": [
         "./server/profiling/startProfiling",
@@ -1156,7 +1094,6 @@
       "platform/app/src/pages/[project]/analytics/evaluations.tsx": [
         "../../../server/evaluations/getEvaluator"
       ],
-      "platform/app/src/pages/[project]/annotations/all.tsx": ["~/server/tracer/types"],
       "platform/app/src/pages/[project]/datasets.tsx": [
         "../../server/api/root",
         "../../server/datasets/record-count",
@@ -1232,9 +1169,6 @@
         "../../../server/prompt-config/repositories/llm-config-version-schema"
       ],
       "platform/app/src/prompts/hooks/useRenamePromptHandle.ts": ["~/server/prompt-config"],
-      "platform/app/src/prompts/prompt-playground/components/chat/PromptPlaygroundChat.tsx": [
-        "~/server/tracer/types"
-      ],
       "platform/app/src/prompts/prompt-playground/components/prompt-browser/ExperimentFromPlaygroundButton.tsx": [
         "~/server/prompt-config/prompt.service"
       ],
@@ -1250,12 +1184,6 @@
       "platform/app/src/prompts/prompt-playground/hooks/useHandleSavePrompt.ts": [
         "~/server/prompt-config"
       ],
-      "platform/app/src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts": [
-        "~/server/tracer/types"
-      ],
-      "platform/app/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts": [
-        "~/server/tracer/types"
-      ],
       "platform/app/src/prompts/providers/types.ts": ["~/server/prompt-config"],
       "platform/app/src/prompts/schemas/field-schemas.ts": ["~/server/prompt-config/enums"],
       "platform/app/src/prompts/schemas/form-schema.ts": [
@@ -1270,7 +1198,6 @@
       ],
       "platform/app/src/prompts/VersionHistoryListPopover.tsx": ["~/server/prompt-config"],
       "platform/app/src/stores/upgradeModalStore.ts": ["../server/license-enforcement/types"],
-      "platform/app/src/task.ts": ["./server/app-layer/app"],
       "platform/app/src/tasks.generated.ts": [
         "./tasks/backfillAnnotationsToClickhouse",
         "./tasks/backfillDatasetContentToS3",

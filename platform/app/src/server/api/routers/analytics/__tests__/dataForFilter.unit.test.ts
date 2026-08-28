@@ -2,8 +2,8 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
-import { createInnerTRPCContext, createTRPCRouter } from "../../../trpc";
-import { dataForFilter } from "../dataForFilter";
+import { createInnerTRPCContext } from "../../../trpc";
+import { analyticsRouter } from "../../analytics";
 
 vi.mock("../../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../rbac")>();
@@ -34,8 +34,6 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 const getFilterOptions = vi.fn();
 const mockedGetApp = vi.mocked(getApp);
 
-const testRouter = createTRPCRouter({ dataForFilter });
-
 function buildCaller() {
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user-1" }, expires: "1" } as any,
@@ -44,7 +42,7 @@ function buildCaller() {
     permissionChecked: true,
     publiclyShared: false,
   });
-  return testRouter.createCaller(ctx);
+  return analyticsRouter.createCaller(ctx);
 }
 
 const baseInput = {

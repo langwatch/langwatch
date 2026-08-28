@@ -64,7 +64,7 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { createTestApp } from "~/server/app-layer/presets";
-import { lwqlRouter } from "../analytics/lwql";
+import { lwqlRouter } from "../analytics";
 
 const featureFlags = MemoryFeatureFlagService.create();
 const testApp = createTestApp({ featureFlags });

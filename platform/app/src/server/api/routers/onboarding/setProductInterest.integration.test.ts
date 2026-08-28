@@ -21,7 +21,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 vi.mock("../organization", () => ({
   organizationRouter: { createCaller: vi.fn(() => ({})) },
 }));
-vi.mock("../project", () => ({
+vi.mock("~/runtime/app/internal-api/project.router", () => ({
   projectRouter: { createCaller: vi.fn(() => ({})) },
 }));
 

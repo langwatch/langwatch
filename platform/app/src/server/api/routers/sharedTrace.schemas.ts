@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { evaluationSchema } from "~/server/tracer/types";
+import { evaluationSchema } from "@langwatch/trace-contract";
 
 /**
  * How many spans' full detail one share payload may carry. The share page
