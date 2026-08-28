@@ -497,6 +497,38 @@ describe("Feature: Run Plans REST API", () => {
         expect(queueSimulationRun).not.toHaveBeenCalled();
       });
     });
+
+    describe("when it names a model with no provider prefix", () => {
+      /** @scenario "A run plan model that is not a provider/model id is refused" */
+      it("answers 422 validation_error naming the field and schedules nothing", async () => {
+        const { scenario, agent } = await runnable();
+
+        const res = await api.post(`${BASE}/run`, {
+          config: {
+            scope: { mode: "scenarios" },
+            scenarioIds: [scenario.id],
+            targets: [{ type: "http", referenceId: agent.id }],
+            simulatorModel: "latest",
+          },
+          idempotencyKey: "run-plan-key-model",
+        });
+
+        expect(res.status).toBe(422);
+        const body = (await res.json()) as {
+          code: string;
+          reasons?: { code: string; meta?: { field?: string } }[];
+        };
+        expect(body.code).toBe("validation_error");
+        expect(body.reasons ?? []).toContainEqual(
+          expect.objectContaining({
+            code: "schema_failure",
+            meta: expect.objectContaining({ field: "config.simulatorModel" }),
+          }),
+        );
+        expect(startSuiteRun).not.toHaveBeenCalled();
+        expect(queueSimulationRun).not.toHaveBeenCalled();
+      });
+    });
   });
 
   // ── run a stored plan ──────────────────────────────────────────────────────
