@@ -307,8 +307,7 @@ describe("getProjectLambdaArn", () => {
         (call: any[]) => call[0] instanceof UpdateFunctionConfigurationCommand,
       );
 
-    /** @scenario A pre-existing Lambda carrying a stale env var is reconciled,
-     *  without clobbering env vars this code does not manage */
+    /** @scenario A pre-existing Lambda carrying a stale env var is reconciled without clobbering unmanaged vars */
     it("updates drifted env vars and preserves unmanaged ones", async () => {
       const drifted = {
         ...mockLambdaConfig,
@@ -390,8 +389,7 @@ describe("getProjectLambdaArn", () => {
       expect(configUpdateCalls(send)).toHaveLength(0);
     });
 
-    /** @scenario AWS rejects a config update while a code update is in flight,
-     *  so the code update must land (poll) before the config update is sent */
+    /** @scenario The code update lands and is polled to completion before the config update is sent */
     it("waits for the code update to land before updating configuration", async () => {
       const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
 
@@ -435,8 +433,7 @@ describe("getProjectLambdaArn", () => {
       expect(pollsBetween.length).toBeGreaterThanOrEqual(1);
     });
 
-    /** @scenario A concurrent update makes AWS reject the reconcile; the
-     *  resolution still succeeds rather than surfacing the error to Studio */
+    /** @scenario A concurrent update makes AWS reject the reconcile but resolution still succeeds */
     it("swallows an in-progress conflict on the configuration update", async () => {
       const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
 
