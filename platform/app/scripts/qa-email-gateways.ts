@@ -10,7 +10,7 @@
 import { sendEmail } from "../src/server/mailer/emailSender";
 import { AppAwsClientConfiguration } from "../src/runtime/app/aws-client.composition";
 import { AppMailerRuntime } from "../src/runtime/app/mailer.runtime";
-import { resolveAppMailerConfiguration } from "../src/runtime/app/mailer.private-config";
+import { resolveAppMailConfiguration } from "../src/runtime/app/mailer.private-config";
 import { parseOutboundProxyConfig } from "../src/server/outboundProxy";
 import { sendRenderedTriggerEmail } from "../src/server/mailer/triggerEmail";
 
@@ -18,11 +18,12 @@ const MAILPIT = "http://127.0.0.1:8025";
 
 const outboundProxy = parseOutboundProxyConfig(process.env);
 const aws = AppAwsClientConfiguration.create(outboundProxy);
+const mailConfiguration = resolveAppMailConfiguration({
+  ...process.env,
+  BASE_HOST: process.env.BASE_HOST ?? "http://localhost",
+});
 const mailer = AppMailerRuntime.create({
-  configuration: resolveAppMailerConfiguration({
-    ...process.env,
-    BASE_HOST: process.env.BASE_HOST ?? "http://localhost",
-  }),
+  configuration: mailConfiguration.mailer,
   aws,
   outboundProxy,
 });
@@ -104,6 +105,8 @@ async function scenarioPlainAlert() {
     projectId: "project-qa",
     subject: "Alerta: transbordo para humano acima do limite",
     html: "<h1>Quantidade de transbordos teste alerta</h1><p>Current value: 476 (threshold: gt 3)</p>",
+    baseHost: mailConfiguration.runtime.baseHost,
+    nextauthSecret: mailConfiguration.runtime.nextauthSecret,
   });
 
   const list = await messages();

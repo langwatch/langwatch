@@ -7,7 +7,6 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  patchZodOpenapi,
   requires,
   resolvePersonalCaller,
   type SecuredApp,
@@ -18,8 +17,6 @@ import {
   meUsageQuerySchema,
   meUsageResponseSchema,
 } from "./me-rest.schemas";
-
-patchZodOpenapi();
 
 /**
  * Resolving the organization behind a personal workspace when the credential
@@ -173,13 +170,16 @@ function registerProjectRoute(secured: SecuredApp<{ Variables: AppRestProjectVar
         },
       },
     }),
-    (c) => {
-      const project = c.get("project");
+    async (c) => {
+      const identity = c.get("project");
+      // The context carries who the project is, not how it is configured, so
+      // the personal-workspace flag comes from the service that owns it.
+      const project = await services.projects().tryGetById(identity.id);
       return c.json({
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        isPersonal: project.isPersonal === true,
+        id: identity.id,
+        name: identity.name,
+        slug: identity.slug,
+        isPersonal: project?.isPersonal === true,
       });
     },
   );

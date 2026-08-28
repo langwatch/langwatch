@@ -109,3 +109,18 @@ export {
   type VirtualKeyTrpcContext,
   type VirtualKeyTrpcPorts,
 } from "./api/app-trpc/virtual-key.api";
+
+/**
+ * The public REST family this feature owns, and the seam it reaches its
+ * process through. The process supplies the bound REST security service and
+ * the ports below; the routes, wire casing and access declarations are the
+ * feature's, so the REST and tRPC doors cannot drift apart.
+ */
+export { createGatewayPlatformRestApp } from "./api/app-rest/gateway-platform.api";
+export type {
+  GatewayPlatformRestPorts,
+  GatewayRestActor,
+  GatewayRestVirtualKeyBudgetInput,
+  GatewayRestVirtualKeyReads,
+  GatewayRestVirtualKeyWrites,
+} from "./ports/gateway-platform-rest.port";

@@ -34,7 +34,6 @@ import {
   createFamilyErrorHandler,
   ForbiddenError,
   NotFoundError,
-  patchZodOpenapi,
   requires,
   requiresOnProject,
   type SecuredApp,
@@ -49,8 +48,6 @@ import {
   REGENERATE_PROJECT_API_KEY,
   UPDATE_PROJECT,
 } from "./project-rest.openapi";
-
-patchZodOpenapi();
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),

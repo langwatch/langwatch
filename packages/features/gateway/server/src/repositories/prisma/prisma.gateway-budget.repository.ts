@@ -65,7 +65,7 @@ import {
   type GatewayProjectBudgetReadInput,
   type GatewayVirtualKeyProjectScope,
 } from "../gateway-budget.repository";
-import type { ProjectName } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 
 const logger = createLogger("langwatch:gateway:budget-service");
 
@@ -312,7 +312,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   async resolveScopeTargets(
     budgets: Array<{ scopeType: string; scopeId: string }>,
     organizationId: string | null,
-    projects: ProjectName[],
+    projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
     const targets = await resolveScopeTargetsBatch(

@@ -23,12 +23,15 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.826.0",
     "@aws-sdk/s3-request-presigner": "^3.826.0",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
+    "hono-openapi": "^1.3.1",
     "nanoid": "^5.1.5",
     "papaparse": "^5.5.3",
     "zod": "^4.0.0"

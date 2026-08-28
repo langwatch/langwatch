@@ -19,7 +19,7 @@ import {
   type OrgAdminResolution,
   type PaginatedProjects,
   type Project,
-  type ProjectName,
+  type ProjectIdentity,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -229,6 +229,10 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.tryGetOrganizationId(projectId);
   }
 
+  tryGetIdentity(id: string): Promise<ProjectIdentity | null> {
+    return this.repository.tryFindIdentity(id);
+  }
+
   tryGetById(projectId: string): Promise<Project | null> {
     return this.repository.tryGetById(projectId);
   }
@@ -420,7 +424,7 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.findAllByTeam(input);
   }
 
-  listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]> {
+  listNamesByIds(input: { projectIds: string[] }): Promise<ProjectIdentity[]> {
     const parsed = projectNamesByIdsInputSchema.parse(input);
 
     return this.repository.findNamesByIds([...new Set(parsed.projectIds)]);

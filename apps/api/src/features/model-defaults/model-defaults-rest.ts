@@ -2,12 +2,9 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
-  patchZodOpenapi,
   type SecuredApp,
 } from "../../app-rest";
 import { registerModelDefaultsRoutes } from "./model-defaults-rest.v1";
-
-patchZodOpenapi();
 
 /**
  * Hono app for /api/model-defaults — REST CRUD for ModelDefaultConfig rows so

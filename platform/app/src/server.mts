@@ -65,7 +65,13 @@ void (async () => {
         resources,
       });
       const { startApp } = await import("./start");
-      const { resolveUiPublicBootstrap } = await import("@langwatch/ui/public-config");
+      // The projection subpath, not the barrel: `resolveUiPublicBootstrap`
+      // reads server env, so it is deliberately kept off `./public-config`.
+      // `.mts` sits outside the tsgo project, so getting this wrong fails at
+      // boot rather than at compile time.
+      const { resolveUiPublicBootstrap } = await import(
+        "@langwatch/ui/public-config/projection"
+      );
       const publicConfig = resolveUiPublicBootstrap(process.env).publicConfig;
       return {
         // startApp owns the single AppRuntime.start call and binds HTTP only

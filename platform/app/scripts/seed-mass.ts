@@ -39,7 +39,7 @@ import {
   type ReservedTraceMetadata,
   reservedTraceMetadataSchema,
   spanValidatorSchema,
-} from "../src/server/tracer/types";
+} from "@langwatch/trace-contract";
 import { CollectorSpanUtils } from "../src/server/traces/collectorSpan.utils";
 import { buildMassMetrics, MASS_METRICS_SCOPE } from "./seed-lib/mass-metrics";
 import { buildMassTimeline, type MassTimeline } from "./seed-lib/mass-timeline";

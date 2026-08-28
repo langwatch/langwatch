@@ -86,8 +86,8 @@ if (isMain) {
   }
   const bodies = deriveSetupSkillBodies(REPO_ROOT);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  // Tab indentation matches the biome formatter, so a regenerated file
-  // never trips the format gate.
+  // Tab indentation matches the checked-in artifact, so a regenerated file
+  // is byte-identical whenever nothing changed.
   fs.writeFileSync(OUT, JSON.stringify(bodies, null, "\t") + "\n");
   const bytes = Object.values(bodies).reduce((sum, b) => sum + b.length, 0);
   console.log(

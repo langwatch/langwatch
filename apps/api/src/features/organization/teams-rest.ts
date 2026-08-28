@@ -13,13 +13,10 @@ import {
   type AppRestOrganizationVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),

@@ -13,3 +13,14 @@ export {
   type EvaluatorCopyCommand,
   type EvaluatorReplicationPorts,
 } from "./api/app-trpc/evaluator-replication.api";
+export {
+  createEvaluatorsRestApp,
+  type EvaluatorAppVariables,
+  type EvaluatorOrganizationVariables,
+} from "./api/app-rest/evaluator.api";
+export {
+  apiResponseEvaluatorSchema,
+  type ApiResponseEvaluator,
+  createEvaluatorInputSchema,
+  updateEvaluatorInputSchema,
+} from "./api/app-rest/evaluator.schemas";

@@ -99,6 +99,7 @@ class TestProjects extends ProjectService {
   getOrganizationId = unavailable<ProjectService["getOrganizationId"]>();
   tryGetOrganizationId = async (projectId: string): Promise<string | undefined> =>
     projectId === "project-1" ? "org-1" : undefined;
+  tryGetIdentity = unavailable<ProjectService["tryGetIdentity"]>();
   tryGetById = unavailable<ProjectService["tryGetById"]>();
   tryGetSummaryById = unavailable<ProjectService["tryGetSummaryById"]>();
   getWithTeam = unavailable<ProjectService["getWithTeam"]>();

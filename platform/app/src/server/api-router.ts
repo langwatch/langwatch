@@ -88,7 +88,7 @@ import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { platformUrl } from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "../app/api/simulation-runs/scenario-run-platform-url";
-import type { Project } from "~/generated/prisma/client";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import {
   assertWebhookEndpointsEntitled,
@@ -146,7 +146,7 @@ import { zodErrorMessage } from "~/utils/zodErrorMessage";
  * sees organization-scoped keys, its own team's keys and its own project's —
  * and not a sibling team's. The same rule the tRPC list uses.
  */
-function membershipForProjectCredential(project: Project): MembershipSet {
+function membershipForProjectCredential(project: ProjectIdentity): MembershipSet {
   return {
     isOrgMember: true,
     isOrgAdmin: false,

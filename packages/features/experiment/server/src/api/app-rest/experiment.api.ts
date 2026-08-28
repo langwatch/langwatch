@@ -24,28 +24,25 @@
  * run history.
  */
 
-import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
-import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  patchZodOpenapi,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
-import { createBlankWorkbenchState } from "./experiment-rest.blank-workbench-state";
+} from "@langwatch/api/rest";
+import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
+import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod";
+import { createBlankWorkbenchState } from "./experiment.blank-workbench-state";
 import {
   createExperimentBodySchema,
   createExperimentResponseSchema,
   handledErrorEnvelopeSchema,
-} from "./experiment-rest.schemas";
-import { workbenchActorFrom } from "./experiment-rest.workbench-actor";
-
-patchZodOpenapi();
+} from "./experiment.schemas";
+import { workbenchActorFrom } from "./experiment.workbench-actor";
 
 const logger = createLogger("langwatch:api:experiments");
 
@@ -196,7 +193,7 @@ export function createExperimentsRestApp(options: {
             })
           : {};
 
-      const experiments = paged.map((experiment) => {
+      const summaries = paged.map((experiment) => {
         const aggregate = runAggregates[experiment.id] ?? {
           runsCount: 0,
           lastRunAt: null,
@@ -210,7 +207,7 @@ export function createExperimentsRestApp(options: {
 
       const offset = (page - 1) * pageSize;
       return c.json({
-        experiments,
+        experiments: summaries,
         pagination: {
           page,
           pageSize,

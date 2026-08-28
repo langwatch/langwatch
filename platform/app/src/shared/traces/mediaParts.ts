@@ -26,7 +26,11 @@ import {
   parseBase64DataUri,
   visitContentPart,
 } from "~/shared/content-parts/visit-content-part";
-import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import {
+  isMediaPartRole,
+  type MediaPartRole,
+  type TraceMediaRef,
+} from "@langwatch/trace-contract";
 
 /**
  * A single renderable media content part, as produced after content
@@ -58,30 +62,6 @@ export type MediaPartData =
  * reached by both or by neither.
  */
 export const MAX_MEDIA_WALK_DEPTH = 8;
-
-/**
- * Chat roles a media part can be attributed to. Same vocabulary the
- * transcript parser accepts for a message envelope; anything else is treated
- * as "no role", which every consumer reads as "show it wherever it would have
- * shown before roles existed".
- */
-export const MEDIA_PART_ROLES = [
-  "system",
-  "user",
-  "assistant",
-  "tool",
-  "developer",
-  "function",
-] as const;
-
-export type MediaPartRole = (typeof MEDIA_PART_ROLES)[number];
-
-const MEDIA_PART_ROLE_SET: ReadonlySet<string> = new Set(MEDIA_PART_ROLES);
-
-/** True for a role string the walk is willing to attribute a part to. */
-export function isMediaPartRole(value: unknown): value is MediaPartRole {
-  return typeof value === "string" && MEDIA_PART_ROLE_SET.has(value);
-}
 
 /**
  * A collected media part together with the chat message the walk found it

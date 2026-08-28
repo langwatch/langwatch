@@ -7,7 +7,7 @@ import { runWithContext } from "@langwatch/observability/context";
 import type { SecretService } from "@langwatch/secret-contract";
 import { SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
 import { TRPCError, type TRPCDefaultErrorShape } from "@trpc/server";
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";

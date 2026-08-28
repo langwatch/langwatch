@@ -15,7 +15,7 @@ import {
   type InternalProject,
   type PaginatedProjects,
   type Project,
-  type ProjectName,
+  type ProjectIdentity,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -297,7 +297,31 @@ export class PrismaProjectRepository extends ProjectRepository {
     return rows.map((row) => this.mapProjectRequired(row));
   }
 
-  async findNamesByIds(projectIds: string[]): Promise<ProjectName[]> {
+  async tryFindIdentity(id: string): Promise<ProjectIdentity | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        teamId: true,
+        team: { select: { organizationId: true } },
+      },
+    });
+    if (!project) {
+      return null;
+    }
+
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      teamId: project.teamId,
+      organizationId: project.team.organizationId,
+    };
+  }
+
+  async findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]> {
     if (projectIds.length === 0) {
       return [];
     }

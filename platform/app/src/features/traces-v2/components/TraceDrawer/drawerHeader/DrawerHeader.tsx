@@ -43,6 +43,7 @@ import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigatio
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import {
+  EditableTraceName,
   formatAbsoluteTime,
   formatCost,
   formatDuration,
@@ -67,7 +68,6 @@ import { EditedOriginalToggle } from "../editMode/EditedOriginalToggle";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
-import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
 import { type CategorizedPin, type PinCategory, renderPinPills } from "./PinStrip";
 import { ShareTraceDialog } from "./ShareTraceDialog";
@@ -969,8 +969,9 @@ export const DrawerHeader = memo(function DrawerHeader({
             </MenuRoot>
           )}
           <TraceIdChip traceId={trace.traceId} />
-          {readOnly ? (
-            // Renaming is a mutation; a share viewer has no session to make it.
+          {readOnly || !project ? (
+            // Renaming is a mutation; a share viewer has no session to make it,
+            // and without a resolved project there is no tenant to make it in.
             <Text
               fontSize="sm"
               fontWeight="600"
@@ -981,6 +982,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             </Text>
           ) : (
             <EditableTraceName
+              projectId={project.id}
               traceId={trace.traceId}
               titleText={titleText}
               titleIsFallback={titleIsFallback}

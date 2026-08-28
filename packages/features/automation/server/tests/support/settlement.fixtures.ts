@@ -171,6 +171,9 @@ class SettlementAutomationService extends AutomationService {
   getById(): never {
     return unavailable();
   }
+  tryGetIdentity(): never {
+    return unavailable();
+  }
   tryGetById(): never {
     return unavailable();
   }

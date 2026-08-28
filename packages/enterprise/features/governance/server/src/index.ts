@@ -109,3 +109,11 @@ export {
   RoutingPolicyTrpcApi,
   type RoutingPolicyTrpcContext,
 } from "./api/app-trpc/routing-policy.api";
+
+/**
+ * The public REST family this feature owns. The process supplies the bound
+ * REST security service and resolvers for the governance and project
+ * services; the base path, access declarations, schemas and delegation are
+ * the feature's.
+ */
+export { createGovernanceRestApp } from "./api/app-rest/governance.api";

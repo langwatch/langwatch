@@ -9,6 +9,16 @@
  * and BUILT (for the OpenAPI document and the route-authorization audits) by a
  * process that has none.
  */
+import { requires } from "@langwatch/api";
+import {
+  type AppRestProjectVariables,
+  type AppRestSecurity,
+  badRequestSchema,
+  baseResponses,
+  type PlatformUrlBuilder,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/api/rest";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
   ModelNotConfiguredError,
@@ -21,31 +31,16 @@ import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
-  type AppRestProjectVariables,
-  type AppRestSecurity,
-  badRequestSchema,
-  baseResponses,
-  patchZodOpenapi,
-  type PlatformUrlBuilder,
-  requires,
-  type SecuredApp,
-  validator as zValidator,
-} from "../../app-rest";
-import {
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
-} from "./evaluator-rest.schemas";
+} from "./evaluator.schemas";
 
 const apiResponseEvaluatorWithPlatformUrlSchema = apiResponseEvaluatorSchema.extend({
   platformUrl: z.string().url(),
 });
 
 const logger = createLogger("langwatch:api:evaluators");
-
-patchZodOpenapi();
-
-patchZodOpenapi();
 
 /**
  * The organization the authenticated project belongs to, on the request
@@ -105,14 +100,14 @@ export function createEvaluatorsRestApp(options: {
 
       logger.info({ projectId: project.id }, "Getting all evaluators for project");
 
-      const evaluators = await service.getAllWithFields({
+      const rows = await service.getAllWithFields({
         projectId: project.id,
       });
 
       return c.json(
         apiResponseEvaluatorSchema
           .array()
-          .parse(evaluators)
+          .parse(rows)
           .map((e) => ({
             ...e,
             platformUrl: platformUrl({

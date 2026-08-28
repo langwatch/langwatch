@@ -2,7 +2,7 @@ import type { Context, ErrorHandler } from "hono";
 
 import { createLogger } from "@langwatch/observability";
 
-import type { ApiErrorBody } from "./app-rest.schemas";
+import type { ApiErrorBody } from "./schemas.js";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**

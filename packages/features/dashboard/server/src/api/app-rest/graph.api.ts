@@ -1,19 +1,16 @@
-import type { DashboardService } from "@langwatch/dashboard-contract";
-import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  patchZodOpenapi,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
-
-patchZodOpenapi();
+} from "@langwatch/api/rest";
+import type { DashboardService } from "@langwatch/dashboard-contract";
+import { createLogger } from "@langwatch/observability";
+import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod";
 
 const logger = createLogger("langwatch:api:graphs");
 

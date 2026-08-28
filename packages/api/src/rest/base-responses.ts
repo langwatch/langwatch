@@ -6,8 +6,8 @@ import {
   conflictSchema,
   errorSchema,
   unauthorizedSchema,
-} from "./app-rest.schemas";
-import type { RouteResponse } from "./app-rest.response-types";
+} from "./schemas.js";
+import type { RouteResponse } from "./response-types.js";
 
 /**
  * The documented errors for the families that predate the canonical envelope,

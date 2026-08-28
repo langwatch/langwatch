@@ -1053,7 +1053,6 @@
   "src/server/auth0/__tests__/passwordService.integration.test.ts": 279,
   "src/server/app-layer/authz/__tests__/registry.unit.test.ts": 44,
   "src/server/app-layer/authz/repositories/__tests__/authz-grants.prisma.repository.unit.test.ts": 84,
-  "src/server/aws/__tests__/awsClientConfig.unit.test.ts": 60,
   "src/server/better-auth/__tests__/hooks.test.ts": 62,
   "src/server/better-auth/__tests__/passwordReset.test.ts": 11,
   "src/server/better-auth/__tests__/resetRecoversOauthUser.test.ts": 352,

@@ -12,7 +12,7 @@
  * budgets are being labelled.
  */
 import { scopeTargetKey } from "@langwatch/gateway-contract";
-import type { ProjectName } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -37,7 +37,7 @@ export async function resolveScopeTargetsBatch(
   prisma: PrismaClient,
   budgets: Array<{ scopeType: string; scopeId: string }>,
   organizationId: string | null,
-  projects: ProjectName[],
+  projects: ProjectIdentity[],
   virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
 ): Promise<Map<string, BudgetScopeTargetInfo>> {
   const ids: Record<string, Set<string>> = {
@@ -133,7 +133,7 @@ function addProjectTargets({
 }: {
   out: Map<string, BudgetScopeTargetInfo>;
   idSet: Set<string>;
-  projectsById: Map<string, ProjectName>;
+  projectsById: Map<string, ProjectIdentity>;
 }): void {
   for (const id of idSet) {
     const project = projectsById.get(id);
@@ -156,7 +156,7 @@ async function addVirtualKeyTargets({
   projectsById,
   projectScopeIdByVirtualKeyId,
 }: AddTargetArgs & {
-  projectsById: Map<string, ProjectName>;
+  projectsById: Map<string, ProjectIdentity>;
   projectScopeIdByVirtualKeyId: Map<string, string>;
 }): Promise<void> {
   if (idSet.size === 0 || !organizationId) return;
@@ -243,7 +243,7 @@ async function addAttributedUserTargets({
   idSet,
   organizationId,
   projectsById,
-}: AddTargetArgs & { projectsById: Map<string, ProjectName> }): Promise<void> {
+}: AddTargetArgs & { projectsById: Map<string, ProjectIdentity> }): Promise<void> {
   // A per-person template anchors on a virtual key or a project, and the
   // scopeId alone does not say which, so both are asked for and the key
   // wins where an id somehow matches both.

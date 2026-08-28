@@ -24,12 +24,9 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:events");
 

@@ -14,18 +14,15 @@
  * formatting, the DTO shapes — lives in `@langwatch/gateway-server` and is
  * imported directly rather than passed through here.
  */
+import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GatewayService, GuardrailAttachment } from "@langwatch/gateway-contract";
-import type {
-  GatewayVirtualKeyScope,
-  VirtualKeySnakeDto,
-  VirtualKeyWithScopes,
-} from "@langwatch/gateway-server";
 import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
-import type { Project } from "@langwatch/prisma-client/generated";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { z } from "zod";
 
-import type { IdempotentRunner } from "../../app-rest";
+import type { VirtualKeySnakeDto } from "../adapters/gateway-virtual-key-dto.adapter";
+import type { GatewayVirtualKeyScope, VirtualKeyWithScopes } from "./gateway-virtual-key.port";
 
 /**
  * The identity a write authorizes as, in whatever vocabulary the process's own
@@ -164,12 +161,12 @@ export type GatewayPlatformRestPorts = Readonly<{
    * can be shorter than `limit` without meaning the walk is done.
    */
   visibleToProjectCredential(input: {
-    project: Project;
+    project: ProjectIdentity;
     virtualKeys: readonly VirtualKeyWithScopes[];
   }): VirtualKeyWithScopes[];
   /** One key under that same visibility rule, or the not-found refusal. */
   requireVisibleVirtualKey(input: {
-    project: Project;
+    project: ProjectIdentity;
     id: string;
     organizationId: string;
   }): Promise<VirtualKeyWithScopes>;

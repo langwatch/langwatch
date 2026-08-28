@@ -40,7 +40,7 @@ import {
 import {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
-} from "../features/agent/agent-legacy-rest";
+} from "@langwatch/agent-server";
 import { createApiKeysRestApp } from "../features/api-key/api-keys-rest";
 import { createTriggerRestApp } from "../features/automation/trigger-rest";
 import { createRoleBindingsRestApp } from "../features/authz/role-bindings-rest";
@@ -56,15 +56,17 @@ import { createDashboardsRestApp } from "../features/dashboard/dashboard-rest";
 import {
   createDatasetRestApp,
   type DatasetDirectUploadAuthorizer,
-} from "../features/dataset/dataset-rest";
+} from "@langwatch/dataset-server";
 import { createScimTokensRestApp } from "../features/enterprise-scim/scim-tokens-rest";
-import { createEvaluatorsRestApp } from "../features/evaluator/evaluator-rest";
-import { createExperimentsRestApp } from "../features/experiment/experiment-rest";
-import { createGovernanceRestApp } from "../features/governance/governance-rest";
-import { createGraphsRestApp } from "../features/graphs/graphs-rest";
-import { createMonitorRestApp } from "../features/monitor/monitor-rest";
-import { createGatewayPlatformRestApp } from "../features/gateway/gateway-platform-rest";
-import type { GatewayPlatformRestPorts } from "../features/gateway/gateway-platform-rest.ports";
+import { createEvaluatorsRestApp } from "@langwatch/evaluator-server";
+import { createExperimentsRestApp } from "@langwatch/experiment-server";
+import { createGovernanceRestApp } from "@langwatch/enterprise-api";
+import { createGraphsRestApp } from "@langwatch/dashboard-server";
+import { createMonitorRestApp } from "@langwatch/monitor-server";
+import {
+  createGatewayPlatformRestApp,
+  type GatewayPlatformRestPorts,
+} from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp } from "../features/gateway/gateway-spend-rest";
 import type { GatewaySpendRestPorts } from "../features/gateway/gateway-spend-rest.ports";
 import { createEventsRestApp, type TrackedEventPorts } from "../features/trace/events-rest";
@@ -104,12 +106,15 @@ import {
 import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
 import { createSuiteRestApp } from "../features/suite/suite-rest";
 import { createWebhookRestApp, type WebhookRestServices } from "../features/webhook/webhook-rest";
-import type { ApiErrorBody } from "./app-rest.schemas";
-import type { AppRestBroadcast } from "./app-rest.broadcast";
-import type { AppRestManagementAuditPort } from "./app-rest.management-audit";
-import type { PlatformUrlBuilder } from "./app-rest.platform-url";
-import type { AppRestRbacVocabulary } from "./app-rest.rbac-vocabulary";
-import type { AppRestSecurity } from "./app-rest.security";
+import type {
+  ApiErrorBody,
+  AppRestBroadcast,
+  AppRestManagementAuditPort,
+  AppRestRbacVocabulary,
+  AppRestSecurity,
+  MountableRestApp,
+  PlatformUrlBuilder,
+} from "@langwatch/api/rest";
 
 /**
  * The capabilities the REST families this package owns dispatch through.
@@ -539,17 +544,6 @@ export function createAppRestFeatures(options: {
     }),
   ];
 }
-
-/**
- * A family's Hono app as a mount target.
- *
- * Each family carries its own request-context shape, and Hono's environment
- * parameter is invariant, so no single concrete `Hono<E>` accepts them all.
- * This is the same erasure Hono's own `route()` signature performs on the
- * sub-app it mounts: the parent reads nothing out of the child's environment,
- * so nothing is lost and the caller needs no cast of its own.
- */
-export type MountableRestApp = Hono<any, any, any>;
 
 /**
  * Service providers for a caller that only needs the families BUILT, never

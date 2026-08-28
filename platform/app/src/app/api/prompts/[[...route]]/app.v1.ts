@@ -7,7 +7,6 @@ import {
   badRequestSchema,
   baseResponses,
   conflictResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   successSchema,
@@ -39,8 +38,6 @@ import { buildStandardSuccessResponse, handlePossibleConflictError } from "./uti
 import { handleSystemPromptHandledErrors } from "./utils/handle-system-prompt-handled-errors";
 
 const logger = createLogger("langwatch:api:prompts");
-
-patchZodOpenapi();
 
 // Define types for our Hono context variables
 export type PromptAppVariables = AuthMiddlewareVariables &

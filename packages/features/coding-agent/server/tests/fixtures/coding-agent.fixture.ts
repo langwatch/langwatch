@@ -643,6 +643,10 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
+  async tryGetIdentity(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
   async tryGetById(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }

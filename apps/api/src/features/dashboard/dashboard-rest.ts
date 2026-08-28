@@ -7,14 +7,11 @@ import {
   BadRequestError,
   createFamilyErrorHandler,
   NotFoundError,
-  patchZodOpenapi,
   type PlatformUrlBuilder,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 // -- Validation schemas --
 

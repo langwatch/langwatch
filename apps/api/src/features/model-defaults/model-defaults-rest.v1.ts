@@ -7,7 +7,6 @@ import {
   anyAuthenticated,
   type AppRestProjectVariables,
   baseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
@@ -20,8 +19,6 @@ import {
 } from "./model-defaults-rest.schemas";
 
 const logger = createLogger("langwatch:api:model-defaults");
-
-patchZodOpenapi();
 
 /**
  * Uniform error mapping for the default-model write handlers: a typed

@@ -187,11 +187,6 @@ export const UNPUBLISHED = [
   },
 
   {
-    match: "POST /api/export/traces/download",
-    category: "internal",
-    why: "the dashboard's download button, authenticated by a browser session rather than an API key. An API-key holder cannot reach it; /api/traces/search is the programmatic equivalent",
-  },
-  {
     match: "POST /api/export/scenario-runs/download",
     category: "internal",
     why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
@@ -252,10 +247,5 @@ export const UNPUBLISHED = [
     match: "POST /api/langy/conversations/{conversationId}/messages",
     category: "gap",
     why: "the continuation half of the same dark surface: an authenticated caller reaches the same flag check and the same 404, and it becomes publishable on the same trigger (#6821)",
-  },
-  {
-    match: "POST /api/rpc.discover",
-    category: "gap",
-    why: "the RPC catalogue, a projection of this document filtered to dotted operations. It should be published once a family actually adopts RPC naming and the catalogue stops being empty — describing an operation whose response is always `{operations: []}` teaches a reader nothing",
   },
 ] as const satisfies readonly Exclusion[];

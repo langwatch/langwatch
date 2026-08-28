@@ -193,6 +193,10 @@ export class TestProjectService extends ProjectService {
     return unsupported();
   }
 
+  tryGetIdentity(): never {
+    return unsupported();
+  }
+
   tryGetById(): never {
     return unsupported();
   }

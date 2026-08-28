@@ -13,7 +13,7 @@ import type {
   UpdateGatewayBudgetInput,
   GatewayBudgetWithSeats,
 } from "@langwatch/gateway-contract";
-import type { ProjectName, TraceDestinationProject } from "@langwatch/project-contract";
+import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
 import type {
   GatewayBudgetCheckInput,
   GatewayBudgetCheckResult,
@@ -126,7 +126,7 @@ export abstract class GatewayBudgetRepository {
   abstract resolveScopeTargets(
     budgets: Array<{ scopeType: string; scopeId: string }>,
     organizationId: string | null,
-    projects: ProjectName[],
+    projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
   abstract listVirtualKeyProjectScopes(input: {

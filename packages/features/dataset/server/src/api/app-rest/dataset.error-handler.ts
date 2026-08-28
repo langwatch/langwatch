@@ -1,9 +1,9 @@
+import { errorSchema, HttpError, InternalServerError } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelForRequest } from "@langwatch/observability/request";
 import type { Context, ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { errorSchema, HttpError, InternalServerError } from "../../app-rest";
 
 const logger = createLogger("langwatch:api:dataset:errors");
 

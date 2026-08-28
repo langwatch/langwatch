@@ -76,6 +76,7 @@ import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.se
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { DatasetNormalizationWorkerPort } from "@langwatch/dataset-contract";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import type { GatewaySpendEventsPort } from "@langwatch/gateway-server";
 import {
   incrementAutomationMatchRecordsTotal,
@@ -172,6 +173,37 @@ import {
   settlementGraceMs,
 } from "@langwatch/gateway-server";
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
+import { EventingAgentSandboxMaintenanceAdapter } from "@langwatch/api-key-server";
+import {
+  type ConnectionTeardownPort,
+  createIdentityPipeline,
+  createJoinRequestPipeline,
+  createScimSyncPipeline,
+  createSsoConnectionPipeline,
+  type IdentityFoldState,
+  type JoinRequestFoldState,
+  type JoinRequestLifecyclePort,
+  type MfaFoldState,
+  type ScimSyncFoldState,
+  type SsoConnectionFoldState,
+} from "@langwatch/identity-eventing";
+import {
+  IdentityGuards,
+  type IdentityHeadsRepository,
+  type IdentityReservationRepository,
+  type IdentityUsersRepository,
+  type JoinRequestReadRepository,
+  JoinRequestGuards,
+  type MfaEnrollmentRepository,
+  MfaGuards,
+  type ScimSyncReadRepository,
+  ScimSyncGuards,
+  type SsoBreakGlassBindingRepository,
+  type SsoConnectionReadRepository,
+  type SsoConnectionStrandingRepository,
+  SsoConnectionGuards,
+  type SsoPlatformOperatorRepository,
+} from "@langwatch/identity-server";
 import {
   EventingLangyConversationAdapter,
   EventingLangyMaintenanceAdapter,
@@ -395,6 +427,50 @@ export interface PipelineRepositories {
   processStore: ProcessStore;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionCapability;
+  /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
+  identityProjection: StateProjectionStore<IdentityFoldState>;
+  /** Postgres reads the identity guards run against (ADR-101 §2). */
+  identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
+  /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
+  mfaProjection: StateProjectionStore<MfaFoldState>;
+  /** Postgres reads the two-step verification guards run against (D06). */
+  mfaEnrollments: MfaEnrollmentRepository;
+  /** The connection pipeline's `SsoConnection` head + cursor (D04). */
+  ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
+  /** Postgres reads the connection guards run against (ADR-117 §5). */
+  ssoConnectionReads: SsoConnectionReadRepository;
+  /** Who a teardown would strand, read over the identity heads. */
+  ssoConnectionStranding: SsoConnectionStrandingRepository;
+  /** Activation's break-glass precondition (D05 hardens it). */
+  ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** How the teardown grace wake dispatches its completion command. */
+  ssoConnectionTeardown: ConnectionTeardownPort;
+  /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
+  scimSyncProjection: StateProjectionStore<ScimSyncFoldState>;
+  /** Postgres reads the directory-sync guards run against (D08). */
+  scimSyncReads: ScimSyncReadRepository;
+  /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
+  joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  /** Postgres reads the join-request guards run against (ADR-117, D12). */
+  joinRequestReads: JoinRequestReadRepository;
+  /** How the reminder and expiry wakes reach the world. */
+  joinRequestLifecycle: JoinRequestLifecyclePort;
 }
 
 export interface PipelineRegistryDeps {
@@ -613,6 +689,19 @@ export class PipelineRegistry {
       }).buildProcessing(),
     );
 
+    // Code agent credential maintenance, on the same footing. A sandbox key is
+    // minted per run and nothing revokes it at the end of one, so this sweep
+    // is what retires it.
+    this.deps.eventSourcing.register(
+      EventingAgentSandboxMaintenanceAdapter.create({
+        sandboxKeyReap: {
+          reap: () => reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }).build(),
+    );
+
     // Pull-request linkage maintenance, on the same footing. It used to be a
     // `setTimeout` chain on every replica with no lock, so the fleet ran the
     // same cross-tenant scan N times every ten minutes.
@@ -722,6 +811,74 @@ export class PipelineRegistry {
     // with no deploy.
     const authzPipeline = this.deps.eventSourcing.register(this.deps.authz.pipeline);
     this.deps.authz.connect(authzPipeline.commands);
+    // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
+    // writer dispatches these commands until the identity adapter lands, and
+    // the adapter's per-user write gate itself ships closed until a user's
+    // backfill (PR 2) latches — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createIdentityPipeline({
+        identityProjectionStore: this.deps.repositories.identityProjection,
+        identityGuards: new IdentityGuards(
+          this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
+        ),
+        // Two-step verification rides this same aggregate (D06), so its
+        // commands share the per-person lane rather than racing it. Ships
+        // dark: `MFA_ENROLLMENT_OPEN` defaults to `off`, so the two-factor
+        // plugin is not registered and nothing dispatches these.
+        mfaProjectionStore: this.deps.repositories.mfaProjection,
+        mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
+      }),
+    );
+    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
+    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
+    // projection and no `Organization.ssoDomain` write stops. Its only
+    // production writer until D05 is the grandfather migration, which is
+    // paced by per-organization enrollment like every other in-place
+    // migration — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createSsoConnectionPipeline({
+        connectionProjectionStore: this.deps.repositories.ssoConnectionProjection,
+        connectionGuards: new SsoConnectionGuards({
+          connections: this.deps.repositories.ssoConnectionReads,
+          breakGlass: this.deps.repositories.ssoBreakGlassBindings,
+          stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
+        }),
+        teardown: this.deps.repositories.ssoConnectionTeardown,
+      }),
+    );
+    // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`
+    // defaults off, so no SCIM request path dispatches these commands and
+    // the previous write path is unchanged — a deploy changes nothing on its
+    // own. Its projection is what makes a failed apply visible with the
+    // connection, the operation and a reason code, so it is registered
+    // whether the flag is on or not: a history nobody writes to costs
+    // nothing, and one that only exists once the flag flips would have no
+    // past to show on the day it mattered.
+    this.deps.eventSourcing.register(
+      createScimSyncPipeline({
+        scimSyncProjectionStore: this.deps.repositories.scimSyncProjection,
+        scimSyncGuards: new ScimSyncGuards({
+          syncs: this.deps.repositories.scimSyncReads,
+        }),
+      }),
+    );
+
+    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
+    // defaults off, so nothing dispatches a join command, no interstitial
+    // renders and no admin panel appears — a deploy changes nothing on its
+    // own, and rollback is the flag.
+    this.deps.eventSourcing.register(
+      createJoinRequestPipeline({
+        joinRequestProjectionStore: this.deps.repositories.joinRequestProjection,
+        joinRequestGuards: new JoinRequestGuards({
+          requests: this.deps.repositories.joinRequestReads,
+        }),
+        lifecycle: this.deps.repositories.joinRequestLifecycle,
+      }),
+    );
 
     logger.info("All pipelines registered");
 

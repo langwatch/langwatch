@@ -6,7 +6,7 @@ import {
   projectSchema,
   type InternalProject,
   type Project,
-  type ProjectName,
+  type ProjectIdentity,
   type ProjectWithTeam,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
@@ -99,7 +99,8 @@ class StubRepository extends ProjectRepository {
   >(async () => ({ id: "team_1", isPersonal: false }));
   tryFindBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
-  findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectName[]>>(async () => []);
+  findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
+  tryFindIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
   create = vi.fn(async () => applicationProject);
   tryGetById = vi.fn(async () => applicationProject);

@@ -28,19 +28,16 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    tracesV2: {
-      header: {
-        // Capture the query input then keep the popover in its loading
-        // state so we assert the forwarded hint without needing a full
-        // trace payload to render the metrics body.
-        useQuery: (input: HeaderInput) => {
-          capturedHeaderInputs.push(input);
-          return { data: undefined, isLoading: true };
-        },
-      },
-    },
+// The popover's body and its `tracesV2.header` read now live in
+// `@langwatch/trace-web` as `TracePeekSummary`. This file still owns the
+// partition-pruning hint, so capture what the hover hands the summary; that the
+// summary forwards it to the header query is asserted in the package, beside
+// the query.
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
+  TracePeekSummary: (input: HeaderInput) => {
+    capturedHeaderInputs.push(input);
+    return null;
   },
 }));
 
@@ -79,7 +76,7 @@ describe("TraceIdPeek", () => {
     });
 
     describe("when the trigger is hovered", () => {
-      it("forwards the hint to the peek summary fetch", async () => {
+      it("forwards the hint to the peek summary", async () => {
         render(<TraceIdPeek traceId="trace-1" occurredAtMs={1_700_000_000_000} />, {
           wrapper: Wrapper,
         });
@@ -110,7 +107,7 @@ describe("TraceIdPeek", () => {
     });
 
     describe("when the trigger is hovered", () => {
-      it("omits the occurredAtMs hint on the peek summary fetch", async () => {
+      it("omits the occurredAtMs hint on the peek summary", async () => {
         render(<TraceIdPeek traceId="trace-1" />, { wrapper: Wrapper });
 
         await userEvent.hover(screen.getByRole("button"));

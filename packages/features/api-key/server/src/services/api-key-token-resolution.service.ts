@@ -135,7 +135,7 @@ export class ApiKeyTokenResolutionService {
     if (!projectId) {
       return null;
     }
-    const project = await this.options.projects.tryGetWithTeam(projectId);
+    const project = await this.options.projects.tryGetIdentity(projectId);
     return project
       ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project })
       : null;
@@ -167,8 +167,8 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
 
-    const project = await this.options.projects.tryGetWithTeam(effectiveProjectId);
-    if (!project || project.team.organizationId !== apiKey.organizationId) {
+    const project = await this.options.projects.tryGetIdentity(effectiveProjectId);
+    if (!project || project.organizationId !== apiKey.organizationId) {
       return null;
     }
 

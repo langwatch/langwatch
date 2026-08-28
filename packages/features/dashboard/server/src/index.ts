@@ -23,3 +23,10 @@ export {
   type SavedWorkbenchChartTrpcContext,
   type SavedWorkbenchChartTrpcPorts,
 } from "./api/app-trpc/saved-workbench-chart.api";
+
+/**
+ * The public REST family this feature owns. The process supplies the bound
+ * REST security service and a resolver for the dashboard service; the base
+ * path, access declarations, schemas and delegation are the feature's.
+ */
+export { createGraphsRestApp } from "./api/app-rest/graph.api";

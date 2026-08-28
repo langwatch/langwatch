@@ -2,7 +2,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ApiErrorEnvelope } from "~/app/api/shared/canonical-error";
-import type { Project } from "~/generated/prisma/client";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import {
   requireApiKeyPermission as createRequireApiKeyPermission,
   createUnifiedAuthMiddleware,
@@ -13,7 +13,7 @@ import {
  * Extended to include optional API-key fields from the unified middleware.
  */
 export type AuthMiddlewareVariables = {
-  project: Project;
+  project: ProjectIdentity;
   apiKeyId?: string;
   apiKeyUserId?: string;
   apiKeyOrganizationId?: string;

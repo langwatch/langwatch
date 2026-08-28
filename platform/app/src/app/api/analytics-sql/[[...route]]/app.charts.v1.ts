@@ -132,7 +132,7 @@ const updateChartSchema = z
   // spec generator: without this the published schema accepts `{}` while the
   // API refuses it, and a mock server built from the spec disagrees with the
   // real one. Stated here so the emitted document carries the same rule.
-  .openapi({ minProperties: 1 });
+  .meta({ minProperties: 1 });
 
 // Response schemas exist for the published OpenAPI document. The service owns
 // the types; these describe them to a consumer reading the spec, and stay loose

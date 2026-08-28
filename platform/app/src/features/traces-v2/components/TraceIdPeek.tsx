@@ -1,26 +1,10 @@
-import {
-  Box,
-  Circle,
-  HoverCard,
-  HStack,
-  Icon,
-  Portal,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HoverCard, Icon, Portal } from "@chakra-ui/react";
 import { Eye } from "lucide-react";
 import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-  STATUS_COLORS,
-} from "@langwatch/trace-web";
+import { TracePeekSummary } from "@langwatch/trace-web";
 
 interface TracePreviewHoverCardProps {
   traceId: string;
@@ -54,6 +38,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   occurredAtMs,
   placement = "bottom-start",
 }) => {
+  const { project } = useOrganizationTeamProject();
   const [hasHovered, setHasHovered] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -78,8 +63,12 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
             background="bg.panel"
             boxShadow="lg"
           >
-            {hasHovered && (
-              <PeekPopoverContent traceId={traceId} occurredAtMs={occurredAtMs} />
+            {hasHovered && project && (
+              <TracePeekSummary
+                projectId={project.id}
+                traceId={traceId}
+                occurredAtMs={occurredAtMs}
+              />
             )}
           </HoverCard.Content>
         </HoverCard.Positioner>
@@ -144,150 +133,3 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId, occurredAtMs 
     </TracePreviewHoverCard>
   );
 };
-
-function PeekPopoverContent({
-  traceId,
-  occurredAtMs,
-}: {
-  traceId: string;
-  occurredAtMs?: number;
-}) {
-  const { project } = useOrganizationTeamProject();
-
-  const { data: trace, isLoading } = api.tracesV2.header.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId,
-      ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
-      // The popover only ever shows a 2-line clamp of input/output — never
-      // worth the extra spans read full resolution costs.
-      full: false,
-    },
-    { enabled: !!project?.id, staleTime: 300_000 },
-  );
-
-  if (isLoading || !trace) {
-    return (
-      <VStack align="stretch" gap={2} padding={3}>
-        <Skeleton height="16px" width="60%" borderRadius="sm" />
-        <Skeleton height="12px" width="80%" borderRadius="sm" />
-        <Skeleton height="12px" width="40%" borderRadius="sm" />
-      </VStack>
-    );
-  }
-
-  const statusColor = STATUS_COLORS[trace.status] as string;
-
-  return (
-    <VStack align="stretch" gap={0}>
-      {/* Header */}
-      <HStack padding={3} gap={2}>
-        <Circle size="8px" bg={statusColor} flexShrink={0} />
-        <Text textStyle="sm" fontWeight="semibold" truncate flex={1}>
-          {trace.traceName || trace.name}
-        </Text>
-      </HStack>
-
-      {/* Metrics */}
-      <HStack paddingX={3} paddingBottom={2} gap={3} flexWrap="wrap">
-        <PopoverMetric label="Duration" value={formatDuration(trace.durationMs)} />
-        {(trace.totalCost ?? 0) > 0 && (
-          <PopoverMetric label="Cost" value={formatCost(trace.totalCost ?? 0)} />
-        )}
-        {trace.totalTokens > 0 && (
-          <PopoverMetric label="Tokens" value={formatTokens(trace.totalTokens)} />
-        )}
-        {trace.models.length > 0 && (
-          <PopoverMetric label="Model" value={trace.models[0]!} />
-        )}
-        <PopoverMetric label="Spans" value={String(trace.spanCount)} />
-      </HStack>
-
-      <Box height="1px" bg="border.muted" />
-
-      {/* I/O Preview */}
-      {(trace.input || trace.output) && (
-        <VStack align="stretch" gap={1} padding={3}>
-          {trace.input && (
-            <Box>
-              <Text
-                textStyle="2xs"
-                fontWeight="medium"
-                color="fg.muted"
-                marginBottom={0.5}
-              >
-                Input
-              </Text>
-              <Text
-                textStyle="xs"
-                color="fg"
-                lineClamp={2}
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {trace.input}
-              </Text>
-            </Box>
-          )}
-          {trace.output && (
-            <Box>
-              <Text
-                textStyle="2xs"
-                fontWeight="medium"
-                color="fg.muted"
-                marginBottom={0.5}
-              >
-                Output
-              </Text>
-              <Text
-                textStyle="xs"
-                color="fg"
-                lineClamp={2}
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {trace.output}
-              </Text>
-            </Box>
-          )}
-        </VStack>
-      )}
-
-      {/* Error */}
-      {trace.error && (
-        <Box paddingX={3} paddingBottom={2}>
-          <Box padding={2} borderRadius="sm" bg="red.subtle">
-            <Text textStyle="xs" color="red.fg" lineClamp={2}>
-              {trace.error}
-            </Text>
-          </Box>
-        </Box>
-      )}
-
-      <Box height="1px" bg="border.muted" />
-
-      {/* Footer */}
-      <HStack padding={2} paddingX={3} justify="space-between">
-        <Text textStyle="2xs" color="fg.subtle">
-          {traceId.slice(0, 16)}...
-        </Text>
-        <Text textStyle="2xs" color="fg.subtle">
-          {trace.serviceName}
-        </Text>
-      </HStack>
-    </VStack>
-  );
-}
-
-function PopoverMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <HStack gap={1}>
-      <Text textStyle="2xs" color="fg.subtle">
-        {label}:
-      </Text>
-      <Text textStyle="2xs" color="fg" fontWeight="medium">
-        {value}
-      </Text>
-    </HStack>
-  );
-}

@@ -36,14 +36,11 @@ import {
   idempotentReplayHeaders,
   type IdempotentRunner,
   IDEMPOTENCY_KEY_HEADER,
-  patchZodOpenapi,
   readIdempotencyKey,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 /**
  * Everything the webhook platform's REST surface dispatches through, resolved

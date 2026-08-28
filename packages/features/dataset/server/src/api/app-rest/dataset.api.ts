@@ -14,6 +14,21 @@
  * Spec: packages/features/dataset/specs/.
  */
 import { Readable } from "node:stream";
+import { handlerManagedAuth, requires } from "@langwatch/api";
+import {
+  type AppRestProjectVariables,
+  type AppRestSecurity,
+  BadRequestError,
+  baseResponses,
+  buildStandardSuccessResponse,
+  errorSchema,
+  InternalServerError,
+  NotFoundError,
+  type PlatformUrlBuilder,
+  type SecuredApp,
+  UnprocessableEntityError,
+  validator as zValidator,
+} from "@langwatch/api/rest";
 import {
   datasetColumnsSchema,
   datasetColumnTypeSchema,
@@ -27,27 +42,8 @@ import {
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import {
-  type AppRestProjectVariables,
-  type AppRestSecurity,
-  BadRequestError,
-  baseResponses,
-  buildStandardSuccessResponse,
-  errorSchema,
-  handlerManagedAuth,
-  InternalServerError,
-  NotFoundError,
-  patchZodOpenapi,
-  type PlatformUrlBuilder,
-  requires,
-  type SecuredApp,
-  UnprocessableEntityError,
-  validator as zValidator,
-} from "../../app-rest";
-import { createDatasetErrorHandler } from "./dataset-rest.error-handler";
-import { datasetOutputSchema } from "./dataset-rest.schemas";
-
-patchZodOpenapi();
+import { createDatasetErrorHandler } from "./dataset.error-handler";
+import { datasetOutputSchema } from "./dataset.schemas";
 
 /**
  * The read ceiling for `GET /api/dataset/:slugOrId`, which answers with the
@@ -691,8 +687,7 @@ export function createDatasetRestApp(options: {
         .object({
           entries: z
             .array(z.record(z.string(), z.any()))
-            // @ts-ignore
-            .openapi({
+            .meta({
               example: [
                 {
                   input: "hi",
@@ -701,8 +696,7 @@ export function createDatasetRestApp(options: {
               ],
             }),
         })
-        // @ts-ignore
-        .openapi({ ref: "DatasetPostEntries" }),
+        .meta({ id: "DatasetPostEntries" }),
     ),
     async (c) => {
       const { slug } = c.req.param();

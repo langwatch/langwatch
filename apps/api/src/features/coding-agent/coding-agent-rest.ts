@@ -13,13 +13,10 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  patchZodOpenapi,
   requires,
   resolvePersonalCaller,
   type SecuredApp,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 /**
  * The caller's cut of a cross-project read: which projects they may see and

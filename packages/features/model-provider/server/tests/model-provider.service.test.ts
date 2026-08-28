@@ -345,6 +345,10 @@ class Projects extends ProjectService {
     return this.notUsed();
   }
 
+  tryGetIdentity() {
+    return this.notUsed();
+  }
+
   tryGetById() {
     return this.notUsed();
   }

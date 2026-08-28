@@ -17,26 +17,11 @@
  */
 
 import {
-  collectAnnotatedMediaParts,
   isMediaPartRole,
   type MediaPartRole,
-} from "~/shared/traces/mediaParts";
-
-export interface TraceMediaRef {
-  kind: "audio" | "image" | "video" | "file";
-  url: string;
-  filename?: string;
-  /** Carried for `file` refs so the attachment chip can pick its icon. */
-  mimeType?: string;
-  /**
-   * Role of the chat message the part was found under. A voice turn puts the
-   * caller's recording and the agent's reply in the same span payload, so the
-   * summary strips need this to show each side its own media. Absent for parts
-   * outside a message envelope and for traces ingested before roles were
-   * recorded, which every consumer treats as "belongs wherever it used to".
-   */
-  role?: MediaPartRole;
-}
+  type TraceMediaRef,
+} from "@langwatch/trace-contract";
+import { collectAnnotatedMediaParts } from "~/shared/traces/mediaParts";
 
 /** Which summary strip a ref belongs on. */
 export type TraceMediaSide = "input" | "output";
@@ -68,9 +53,6 @@ export function mediaRefBelongsToSide(ref: TraceMediaRef, side: TraceMediaSide):
 }
 
 export const MAX_TRACE_MEDIA_REFS = 4;
-
-export const RESERVED_INPUT_MEDIA_REFS = "langwatch.reserved.media_refs.input";
-export const RESERVED_OUTPUT_MEDIA_REFS = "langwatch.reserved.media_refs.output";
 
 function kindFromMime(mimeType: string): TraceMediaRef["kind"] {
   const mime = mimeType.toLowerCase();

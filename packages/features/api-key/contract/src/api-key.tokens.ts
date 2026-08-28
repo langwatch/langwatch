@@ -46,8 +46,15 @@ export const apiKeyTokenResolutionInputSchema = z
   .strict();
 export type ApiKeyTokenResolutionInput = z.infer<typeof apiKeyTokenResolutionInputSchema>;
 
+/**
+ * A resolved credential names its project, it does not carry the project.
+ *
+ * Resolution runs on every authenticated request, so this is the identity —
+ * five indexed columns — and not the configured project with its team row.
+ * A caller that needs configuration asks `ProjectService`.
+ */
 const resolvedApiKeyProjectShape = {
-  project: projectWithTeamSchema,
+  project: projectIdentitySchema,
 };
 
 export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
@@ -107,5 +114,5 @@ export type ResolvedOrganizationApiKeyToken = Extract<
   OrganizationApiKeyResolution,
   { ok: true }
 >["resolved"];
-import { projectWithTeamSchema } from "@langwatch/project-contract";
+import { projectIdentitySchema } from "@langwatch/project-contract";
 import { z } from "zod";

@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Tests for dev/scripts/check-queue.mjs, the machine-wide slot the whole-repo
- * checks (typecheck, lint, format) run under so parallel tsgo and biome runs
+ * checks (typecheck, lint, format) run under so parallel tsgo and oxlint runs
  * across worktrees and agents cannot take the machine down.
  *
  * The wrapper is a concurrency mechanism, so it is driven as a real process:
@@ -309,7 +309,6 @@ describe("check queue", () => {
         "typecheck:tests",
         "lint",
         "lint:fix",
-        "lint:plugins",
         "format",
       ]) {
         // Named first, because a script that has been renamed or deleted

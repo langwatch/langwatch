@@ -17,6 +17,23 @@
  * decision and arrives as `actorForCredential`.
  */
 
+import { apiKeyPermission } from "@langwatch/api";
+import {
+  apiErrorBody,
+  apiErrorSchema,
+  type AppRestProjectVariables,
+  type AppRestSecurity,
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyKeyParameter,
+  idempotentJson,
+  idempotentReplayHeaders,
+  readIdempotencyKey,
+  requestTraceIds,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
@@ -30,50 +47,33 @@ import type {
   GatewayCacheRuleResource,
 } from "@langwatch/gateway-contract";
 import { parseVirtualKeyConfig, virtualKeyConfigSchema } from "@langwatch/gateway-contract";
+import { toBudgetDto } from "../../adapters/gateway-budget-dto.adapter";
 import {
-  decodePageCursor,
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
-  type GatewayVirtualKeyScope,
+  resourceMetadataSchema,
+} from "../../adapters/gateway-resource-metadata.adapter";
+import type { VirtualKeySnakeDto } from "../../adapters/gateway-virtual-key-dto.adapter";
+import { startOfCurrentMonthUTC } from "../../adapters/gateway-window.adapter";
+import { toStoredEnum, toWireEnum } from "../../adapters/gateway-wire-enums.adapter";
+import { USD_DISPLAY_STRING_FORMAT } from "../../adapters/gateway-wire-money.adapter";
+import {
+  decodePageCursor,
   nextPageCursor,
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
-  resourceMetadataSchema,
-  startOfCurrentMonthUTC,
-  toBudgetDto,
-  toStoredEnum,
-  toWireEnum,
-  USD_DISPLAY_STRING_FORMAT,
-  type VirtualKeySnakeDto,
-  type VirtualKeyWithScopes,
-} from "@langwatch/gateway-server";
-import {
-  apiErrorBody,
-  apiErrorSchema,
-  apiKeyPermission,
-  type AppRestProjectVariables,
-  type AppRestSecurity,
-  canonicalBaseResponses,
-  canonicalConflictResponses,
-  IDEMPOTENCY_KEY_HEADER,
-  idempotencyKeyParameter,
-  idempotentJson,
-  idempotentReplayHeaders,
-  patchZodOpenapi,
-  readIdempotencyKey,
-  requestTraceIds,
-  type SecuredApp,
-  validator as zValidator,
-} from "../../app-rest";
+} from "../../adapters/gateway-wire-pagination.adapter";
+import type {
+  GatewayVirtualKeyScope,
+  VirtualKeyWithScopes,
+} from "../../ports/gateway-virtual-key.port";
 import type {
   GatewayPlatformRestPorts,
   GatewayRestActor,
   GatewayRestVirtualKeyBudgetInput,
-} from "./gateway-platform-rest.ports";
+} from "../../ports/gateway-platform-rest.port";
 
 const logger = createLogger("langwatch:api:gateway-platform");
-
-patchZodOpenapi();
 
 // ── Wire enums ──────────────────────────────────────────────────────────
 // Every enum this surface publishes and accepts is lower_snake_case, input

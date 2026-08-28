@@ -39,6 +39,9 @@ class Projects extends ProjectService {
     return "org_1";
   }
 
+  tryGetIdentity(): never {
+    throw new Error("Not used by this test");
+  }
   tryGetById(): never {
     throw new Error("Not used by this test");
   }

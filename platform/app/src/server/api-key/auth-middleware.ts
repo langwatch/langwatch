@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { appFromContext } from "~/app/api/middleware/app-context";
@@ -10,7 +11,7 @@ import {
   authRefusalBody,
   canonicalErrorFor,
 } from "~/app/api/shared/canonical-error";
-import type { Organization, PrismaClient, Project } from "~/generated/prisma/client";
+import type { Organization, PrismaClient } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
@@ -36,7 +37,7 @@ const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
  * Variables set by the unified auth middleware.
  */
 export type UnifiedAuthVariables = {
-  project: Project;
+  project: ProjectIdentity;
   /** Set when the request was authenticated via API key (not legacy project key) */
   apiKeyId?: string;
   /** The user ID from the API key (not set for legacy project keys) */
@@ -684,7 +685,7 @@ export async function enforceApiKeyCeiling({
     scope: {
       type: "project",
       id: resolved.project.id,
-      teamId: resolved.project.team.id,
+      teamId: resolved.project.teamId,
     },
     permission,
   });

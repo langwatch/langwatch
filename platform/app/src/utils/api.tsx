@@ -11,10 +11,12 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { createTRPCClient } from "@trpc/client";
+import { createTRPCClient, getUntypedClient } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
+import { asFeatureApiClient } from "@langwatch/platform-api-client";
+import { traceApi, type TraceApiMap } from "@langwatch/trace-web";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { AppRouter } from "~/server/api/root";
 import {
   showAiCallFailedToast,
@@ -252,13 +254,33 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
     }),
   );
 
+  // Every feature web package's hooks run on their own `createTRPCReact`
+  // instance, typed by that feature's own procedure map. Handing each of them
+  // THIS client rather than one of their own is what keeps batching, links,
+  // auth and the WebSocket shared, and passing the same `queryClient` is what
+  // makes their caches one cache with this one — tRPC keys on the procedure
+  // path, so `traceApi.tracesV2.header` and `api.tracesV2.header` are the same
+  // entry. See dev/docs/best_practices/feature-web-data-access.md.
+  //
+  // Mount one Provider per feature package here. This is the composition root
+  // for browser transport; a feature package must never build a client itself.
+  const featureApiClient = useMemo(
+    () => getUntypedClient(trpcClientInstance),
+    [trpcClientInstance],
+  );
+
   return (
     <api.Provider client={trpcClientInstance} queryClient={queryClient}>
       <WorkflowApiProvider queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <ModelProviderCrossTabSync />
-          {children}
-        </QueryClientProvider>
+        <traceApi.Provider
+          client={asFeatureApiClient<TraceApiMap>(featureApiClient)}
+          queryClient={queryClient}
+        >
+          <QueryClientProvider client={queryClient}>
+            <ModelProviderCrossTabSync />
+            {children}
+          </QueryClientProvider>
+        </traceApi.Provider>
       </WorkflowApiProvider>
     </api.Provider>
   );

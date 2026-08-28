@@ -15,14 +15,11 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  patchZodOpenapi,
   type PlatformUrlBuilder,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:triggers");
 

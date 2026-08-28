@@ -4,7 +4,7 @@ import type {
   InternalProject,
   PaginatedProjects,
   Project,
-  ProjectName,
+  ProjectIdentity,
   ProjectWithTeam,
   SearchProjectsResult,
   TraceSharingConfig,
@@ -65,7 +65,8 @@ export abstract class ProjectRepository {
     projectIds?: string[];
   }): Promise<PaginatedProjects>;
   abstract findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
-  abstract findNamesByIds(projectIds: string[]): Promise<ProjectName[]>;
+  abstract findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
+  abstract tryFindIdentity(id: string): Promise<ProjectIdentity | null>;
   abstract findIdsByOrganization(organizationId: string): Promise<string[]>;
   abstract findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   abstract tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;

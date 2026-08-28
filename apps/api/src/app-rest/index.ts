@@ -1,48 +1,35 @@
 /**
  * The application's REST boundary, owned by the API process.
  *
- * A REST feature in this package imports everything it needs from here: the
- * access-policy vocabulary (`@langwatch/api`) and the route-policy registry
- * (`@langwatch/api/rest`), the request validator and OpenAPI response
- * vocabulary, and the type of the REST service its mount will hand it.
+ * The kit itself no longer lives here. The request validator, the error
+ * vocabulary, the response schemas, the idempotency wire contract, the
+ * correlation handles, the family error handlers and the port TYPES a family
+ * declares are all `@langwatch/api/rest`, because a REST family that lives in
+ * `packages/features/<f>/server/src/api/rest` needs exactly the same ones and
+ * a package may not import an application.
  *
- * That service is NOT a module-level singleton. Building one needs
+ * What this barrel still owns is the mount: {@link createAppRestFeatures},
+ * which binds every family to one process's services and ports. The re-exports
+ * below are the not-yet-moved families' one import site; a family that has
+ * moved imports from `@langwatch/api`, `@langwatch/api/rest` and its own
+ * feature package instead.
+ *
+ * The REST service is NOT a module-level singleton. Building one needs
  * authentication that reads API keys, sessions and role bindings out of a
  * database, plus the application's own error taxonomy for the two envelopes;
- * a process supplies those to {@link createAppRestSecurity} once and passes the
+ * a process supplies those to `createAppRestSecurity` once and passes the
  * result to each feature's mount. That keeps the invariant the service exists
  * for — a route cannot be registered without declaring an access policy, and
  * the policy's enforcement is bound before the route is built — while letting
  * the feature live in a package that has no database of its own.
  */
 export {
-  type AppRestSecurity,
-  type AppRestSecurityPorts,
-  createAppRestSecurity,
-} from "./app-rest.security";
-export type { AppRestOrganizationVariables, AppRestProjectVariables } from "./app-rest.variables";
-export {
   type AppRestFeaturePorts,
   type AppRestFeatureServices,
   createAppRestFeatures,
-  type MountableRestApp,
   portsUnavailableOffRequestPath,
   servicesUnavailableOffRequestPath,
 } from "./app-rest.features";
-export { MANAGEMENT_API_VERSION } from "./app-rest.management-version";
-export {
-  type AppRestManagementAuditPort,
-  emitManagementAudit,
-  managementActor,
-} from "./app-rest.management-audit";
-export { createCanonicalFamilyErrorHandler } from "./app-rest.canonical-family-error-handler";
-export { createFamilyErrorHandler } from "./app-rest.family-error-handler";
-export type { AppRestRbacVocabulary } from "./app-rest.rbac-vocabulary";
-export {
-  PersonalProjectKeyRequiredError,
-  PersonalUsageKeyMismatchError,
-  resolvePersonalCaller,
-} from "./app-rest.personal-caller";
 
 export {
   type AccessPolicy,
@@ -60,41 +47,46 @@ export {
   requires,
   requiresOnProject,
 } from "@langwatch/api";
-export {
-  type ApiErrorEnvelope,
-  allRegisteredRoutes,
-  documentedPathOf,
-  familyFromBasePath,
-  getRoutePolicy,
-  isHttpMethod,
-  type RegisteredRoute,
-  registerRoutePolicy,
-  type RestApiVersionedFamily,
-  SecuredApp,
-  type SecuredVerbs,
-  type SecurityRequirement,
-  securityForCredentialClass,
-  type VersionedEndpointMeta,
-} from "@langwatch/api/rest";
 
 export {
+  type ApiErrorBody,
+  type ApiErrorEnvelope,
+  API_ERROR_TYPE_BY_STATUS,
+  allRegisteredRoutes,
+  apiErrorBody,
+  apiErrorSchema,
+  apiErrorType,
+  type AppRestBroadcast,
+  type AppRestManagementAuditPort,
+  type AppRestOrganizationVariables,
+  type AppRestProjectVariables,
+  type AppRestRbacVocabulary,
+  type AppRestSecurity,
+  type AppRestSecurityPorts,
+  BadRequestError,
+  badRequestSchema,
   baseResponses,
   buildStandardSuccessResponse,
   canonicalBaseResponses,
   canonicalConflictResponses,
   canonicalUnprocessableResponses,
+  coerceToEpoch,
   conflictResponses,
-} from "./app-rest.base-responses";
-export {
-  BadRequestError,
+  conflictSchema,
+  createAppRestSecurity,
+  createCanonicalFamilyErrorHandler,
+  createFamilyErrorHandler,
+  documentedPathOf,
+  emitManagementAudit,
+  errorSchema,
+  FALLBACK_API_ERROR_TYPE,
+  familyFromBasePath,
+  type FieldViolation,
+  flexibleDateSchema,
   ForbiddenError,
+  getRoutePolicy,
+  hiddenValidator,
   HttpError,
-  InternalServerError,
-  NotFoundError,
-  UnauthorizedError,
-  UnprocessableEntityError,
-} from "./app-rest.http-errors";
-export {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAY_HEADER,
   type IdempotentHandlerResult,
@@ -103,40 +95,38 @@ export {
   idempotencyKeyParameter,
   idempotentJson,
   idempotentReplayHeaders,
+  InternalServerError,
+  isHttpMethod,
+  jsonResponse,
+  managementActor,
+  MANAGEMENT_API_VERSION,
   MAX_KEY_LENGTH,
   MIN_KEY_LENGTH,
-  readIdempotencyKey,
-} from "./app-rest.idempotency";
-export type { AppRestBroadcast } from "./app-rest.broadcast";
-export {
-  jsonResponse,
+  type MountableRestApp,
+  NotFoundError,
+  PersonalProjectKeyRequiredError,
+  PersonalUsageKeyMismatchError,
+  type PlatformUrlBuilder,
   rateLimitedResponse,
+  readIdempotencyKey,
+  type RegisteredRoute,
+  registerRoutePolicy,
+  RequestValidationError,
+  requestTraceIds,
+  resolvePersonalCaller,
+  type RestApiVersionedFamily,
+  type RouteResponse,
   safeMediaType,
   sanitizeFilenameSegment,
+  SecuredApp,
+  type SecuredVerbs,
+  type SecurityRequirement,
+  securityForCredentialClass,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
-} from "./app-rest.media-response";
-export type { PlatformUrlBuilder } from "./app-rest.platform-url";
-export type { RouteResponse } from "./app-rest.response-types";
-export { requestTraceIds } from "./app-rest.trace-ids";
-export {
-  API_ERROR_TYPE_BY_STATUS,
-  type ApiErrorBody,
-  apiErrorBody,
-  apiErrorSchema,
-  apiErrorType,
-  badRequestSchema,
-  coerceToEpoch,
-  conflictSchema,
-  errorSchema,
-  FALLBACK_API_ERROR_TYPE,
-  flexibleDateSchema,
   successSchema,
+  UnauthorizedError,
   unauthorizedSchema,
-} from "./app-rest.schemas";
-export {
-  type FieldViolation,
-  hiddenValidator,
-  RequestValidationError,
+  UnprocessableEntityError,
   validator,
-} from "./app-rest.validation";
-export { patchZodOpenapi } from "./app-rest.zod-openapi";
+  type VersionedEndpointMeta,
+} from "@langwatch/api/rest";

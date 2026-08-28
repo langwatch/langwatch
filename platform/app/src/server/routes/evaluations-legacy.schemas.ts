@@ -16,9 +16,6 @@
  */
 
 import { z } from "zod";
-import { patchZodOpenapi } from "@langwatch/platform-api/app-rest";
-
-patchZodOpenapi();
 
 export const evaluateRequestSchema = z.object({
   data: z

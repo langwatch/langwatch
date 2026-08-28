@@ -7,12 +7,12 @@
  * pinned by `code` rather than by the sentence they carry: the words are copy
  * and the client renders its own, but the code is what a caller branches on.
  *
- * @see apps/api/src/app-rest/app-rest.personal-caller.ts
+ * @see packages/api/src/rest/personal-caller.ts
  */
 
 import { describe, expect, it } from "vitest";
 
-import { resolvePersonalCaller } from "../src/app-rest/app-rest.personal-caller";
+import { resolvePersonalCaller } from "@langwatch/api/rest";
 
 const OWNER_ID = "user_owner";
 

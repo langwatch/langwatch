@@ -27,7 +27,12 @@ async function probe(secret: string) {
     ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
     : null;
 
-  const materialiser = new GatewayConfigMaterialiser(prisma, app.projects, null);
+  const materialiser = new GatewayConfigMaterialiser(
+    prisma,
+    app.projects,
+    null,
+    app.gateway.service,
+  );
   const bundle = await materialiser.materialise(vk);
 
   console.log(`\n=== ${vk.name} (${vk.id}) ===`);
@@ -47,9 +52,7 @@ async function probe(secret: string) {
   );
   console.log(`  → bundle.project_id:        ${bundle.project_id ?? "null"}`);
   console.log(`  → bundle.team_id:           ${bundle.team_id ?? "null"}`);
-  console.log(
-    `  → bundle.providers[].type:  [${bundle.providers.map((p) => p.type).join(", ")}]`,
-  );
+  console.log(`  → bundle.providers[].type:  [${bundle.providers.map((p) => p.type).join(", ")}]`);
   console.log(
     `  → bundle.fallback.chain:    [${bundle.fallback.chain.map((id) => id.slice(0, 8) + "…").join(", ")}]`,
   );

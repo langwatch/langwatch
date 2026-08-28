@@ -2,9 +2,9 @@ import {
   createRestApiService,
   type RestApiService,
   type RestApiServicePorts,
-} from "@langwatch/api/rest";
+} from "./security/rest-api-service.js";
 
-import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./app-rest.variables";
+import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.js";
 
 /**
  * Everything the REST composition needs from the process it runs in.
@@ -30,7 +30,7 @@ export type AppRestSecurity = RestApiService<AppRestProjectVariables, AppRestOrg
  * Bind the REST service builder to one process's authentication, logging,
  * tracing and error rendering.
  *
- * Called once, at composition time. A REST feature in this package takes the
+ * Called once, at composition time. A REST feature takes the
  * result as an argument rather than importing a module-level singleton, so a
  * feature can be mounted into a second process (tests, the standalone API
  * process) against different enforcement without touching the feature.

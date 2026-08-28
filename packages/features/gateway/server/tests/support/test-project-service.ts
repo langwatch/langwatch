@@ -21,6 +21,12 @@ export class TestProjectService extends ProjectService {
   getOrganizationId() {
     return this.unsupported();
   }
+  tryGetOrganizationId() {
+    return this.unsupported();
+  }
+  tryGetIdentity() {
+    return this.unsupported();
+  }
   tryGetById() {
     return this.unsupported();
   }

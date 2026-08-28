@@ -3,8 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { HttpError, InternalServerError } from "./app-rest.http-errors";
-import { errorSchema } from "./app-rest.schemas";
+import { HttpError, InternalServerError } from "./http-errors.js";
+import { errorSchema } from "./schemas.js";
 
 /**
  * A family's own `onError`: its domain mapping layered over the process's

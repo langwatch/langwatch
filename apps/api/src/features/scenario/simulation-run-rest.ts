@@ -11,13 +11,10 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:simulation-runs");
 
@@ -100,7 +97,7 @@ const batchSummarySchema = z.object({
     )
     // Machine-readable beside the sentence: a generated client marks the field
     // deprecated from this, not from the prose.
-    .openapi({ deprecated: true }),
+    .meta({ deprecated: true }),
   isComplete: z.boolean().describe("True when every run of the batch reached a terminal status."),
   note: z
     .string()

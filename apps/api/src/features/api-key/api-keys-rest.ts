@@ -18,7 +18,6 @@ import {
   type AppRestSecurity,
   createFamilyErrorHandler,
   emitManagementAudit,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
@@ -30,8 +29,6 @@ import {
   REVOKE_API_KEY,
   UPDATE_API_KEY,
 } from "./api-keys-rest.openapi";
-
-patchZodOpenapi();
 
 const bindingSchema = z.object({
   role: z

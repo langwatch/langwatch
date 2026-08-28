@@ -17,7 +17,7 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { RequestValidationError } from "./app-rest.validation";
+import { RequestValidationError } from "./validation.js";
 
 /** The header a caller sends to make a create replayable. */
 export const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";

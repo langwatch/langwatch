@@ -18,13 +18,10 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   canonicalBaseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
 } from "../../app-rest";
-
-patchZodOpenapi();
 
 /**
  * The limits the surface publishes and enforces.

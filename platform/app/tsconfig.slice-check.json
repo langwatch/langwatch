@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.tsgo.json",
+  "compilerOptions": {
+    "incremental": false,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/slice-check.tsbuildinfo"
+  },
+  "include": [],
+  "files": [
+    "src/server/api/routers/annotation.ts",
+    "src/server/api/routers/annotationScore.ts",
+    "src/runtime/app/features/automation-adapters/automation-persist-action.adapter.ts"
+  ]
+}

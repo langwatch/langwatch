@@ -39,7 +39,7 @@ import {
 } from "@langwatch/langy-contract";
 import { prisma } from "~/server/db";
 import type { PromptService } from "@langwatch/prompt-contract";
-import { PostgresPromptAdapter } from "@langwatch/prompt-server";
+import { AppPromptRuntime } from "~/runtime/app/features/prompt";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** repo-root/langwatch/scripts → repo root → services/.../AGENTS.md */
@@ -64,9 +64,7 @@ function parseArgs(argv: string[]): Args {
   };
   const projectId = get("--project") ?? process.env.LANGY_PROMPT_PROJECT_ID ?? "";
   if (!projectId) {
-    throw new Error(
-      "Missing project: pass --project <projectId> or set LANGY_PROMPT_PROJECT_ID",
-    );
+    throw new Error("Missing project: pass --project <projectId> or set LANGY_PROMPT_PROJECT_ID");
   }
   return {
     projectId,
@@ -155,7 +153,10 @@ async function main() {
       (args.dryRun ? " [DRY RUN]" : ""),
   );
 
-  const service = PostgresPromptAdapter.create({ database: prisma }).build();
+  // This standalone maintenance script has no composed model-provider service.
+  // Prompt persistence retains its historical default-model fallback here only;
+  // ordinary app composition always injects the model-provider contract.
+  const service = AppPromptRuntime.create({ database: prisma }).build();
 
   const targets: Array<{ handle: string; prompt: string }> = [
     { handle: LANGY_PROMPT_HANDLES.agentDefinition, prompt: agentDefinition },

@@ -136,7 +136,7 @@ async function authorizeTurn(c: Context) {
   const surfaceOpen = await c.app.featureFlags.isEnabled("release_langy_api_key_turns_enabled", {
     kind: "project",
     projectId: resolved.project.id,
-    organizationId: resolved.project.team.organizationId,
+    organizationId: resolved.project.organizationId,
   });
   if (!surfaceOpen) return { dark: true as const };
 

@@ -25,6 +25,12 @@ export {
   GovernanceSignalDeliveryPort,
   GovernanceSignalStoragePort,
 } from "./governance/governance-signals.adapter";
+/**
+ * The governance REST family, reached through this composition rather than
+ * directly: the API application may depend on the Enterprise API composition
+ * and not on an Enterprise feature server.
+ */
+export { createGovernanceRestApp } from "@langwatch/enterprise-governance-server";
 
 export type EnterpriseApiCompositionOptions = {
   licensing?: LicensingService;

@@ -6,7 +6,7 @@ import type {
   OrgAdminResolution,
   PaginatedProjects,
   Project,
-  ProjectName,
+  ProjectIdentity,
   ProjectIdsByOrganizationInput,
   ProjectNamesByIdsInput,
   ProjectWithTeam,
@@ -29,6 +29,13 @@ export abstract class ProjectService {
   abstract isPresenceEnabled(input: ProjectPresenceInput): Promise<boolean>;
 
   abstract getById(id: string): Promise<Project>;
+  /**
+   * Reads only who the project is — the value a request boundary carries.
+   *
+   * Five indexed columns and no team row, because this runs once per
+   * authenticated request. Absent when the project does not exist.
+   */
+  abstract tryGetIdentity(id: string): Promise<ProjectIdentity | null>;
   /** Returns the owning organization or throws when the project does not exist. */
   abstract getOrganizationId(projectId: string): Promise<string>;
   /** Compatibility tenant lookup; unknown or orphaned projects are absent. */
@@ -60,7 +67,7 @@ export abstract class ProjectService {
     projectIds?: string[];
   }): Promise<PaginatedProjects>;
   abstract listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
-  abstract listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectName[]>;
+  abstract listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
   /** Includes archived projects because durable spend remains attributable to them. */
   abstract listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   /** Lists active projects reached by the supplied organization/team/project scopes. */

@@ -1,5 +1,5 @@
 import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz-contract";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context, Hono, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
 import type { RestVersionSelector } from "./rest-version-selector.js";
@@ -103,6 +103,17 @@ export interface BaseApp<TProject = unknown> {
     prisma: unknown;
   };
 }
+
+/**
+ * A family's Hono app as a mount target.
+ *
+ * Each family carries its own request-context shape, and Hono's environment
+ * parameter is invariant, so no single concrete `Hono<E>` accepts them all.
+ * This is the same erasure Hono's own `route()` signature performs on the
+ * sub-app it mounts: the parent reads nothing out of the child's environment,
+ * so nothing is lost and the caller needs no cast of its own.
+ */
+export type MountableRestApp = Hono<any, any, any>;
 
 // ---------------------------------------------------------------------------
 // Endpoint documentation (withDocs)

@@ -9,24 +9,21 @@ import {
   listAgentsQuerySchema,
   updateAgentRequestSchema,
 } from "@langwatch/agent-contract";
-import type { LegacyAgentsRestApi } from "@langwatch/agent-server/legacy-rest";
-import type { ErrorHandler } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
-
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
   NotFoundError,
-  patchZodOpenapi,
-  requires,
   type SecuredApp,
   UnprocessableEntityError,
   validator as zValidator,
-} from "../../app-rest";
+} from "@langwatch/api/rest";
+import type { ErrorHandler } from "hono";
+import { describeRoute, resolver } from "hono-openapi";
+import { nanoid } from "nanoid";
 
-patchZodOpenapi();
+import type { LegacyAgentsRestApi } from "../legacy-rest/agent.api";
 
 /**
  * The platform's own address for ONE agent: the agents page with the editor

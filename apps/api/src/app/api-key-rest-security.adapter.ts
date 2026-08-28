@@ -91,8 +91,8 @@ export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
       organizationId: input.request.organizationId,
       scope: {
         type: "project",
-        id: input.request.projectId,
-        teamId: input.request.teamId,
+        id: input.request.project.id,
+        teamId: input.request.project.teamId,
       },
       permission: input.permission,
     });
@@ -117,14 +117,14 @@ export class ApiKeyRestSecurityAdapter extends ApiRestSecurityPort {
         path: input.path,
         input: {
           method: input.method,
-          projectId: input.request.projectId,
+          projectId: input.request.project.id,
           status: input.status,
         },
         error: null,
       });
     } catch (error) {
       this.logger.error(
-        { error, method: input.method, path: input.path, projectId: input.request.projectId },
+        { error, method: input.method, path: input.path, projectId: input.request.project.id },
         "REST request audit failed after a successful response",
       );
     }
@@ -135,7 +135,6 @@ type CurrentApiKeyRequest = ApiRestAuthenticatedRequest &
   Readonly<{
     apiKeyId: string;
     organizationId: string;
-    teamId: string;
     isLangySessionKey: boolean;
   }>;
 
@@ -143,7 +142,7 @@ function authenticatedRequest(
   resolved: ResolvedApiKeyToken,
 ): ApiRestAuthenticatedRequest | CurrentApiKeyRequest {
   const base = {
-    projectId: resolved.project.id,
+    project: resolved.project,
     actor: resolved.type === "apiKey" && resolved.userId ? { id: resolved.userId } : null,
   };
   if (resolved.type === "legacyProjectKey") {
@@ -154,7 +153,6 @@ function authenticatedRequest(
     ...base,
     apiKeyId: resolved.apiKeyId,
     organizationId: resolved.organizationId,
-    teamId: resolved.project.team.id,
     isLangySessionKey: resolved.isLangySessionKey ?? false,
   };
 }
@@ -169,7 +167,7 @@ function refuseApiKeyCeiling(request: CurrentApiKeyRequest, permission: AuthzPer
   const meta = {
     apiKeyId: request.apiKeyId,
     userId: request.actor?.id ?? null,
-    projectId: request.projectId,
+    projectId: request.project.id,
   };
   const langy = request.isLangySessionKey ? classifyForLangy(permission) : null;
   if (langy && langy.disposition !== "granted") {

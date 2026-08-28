@@ -5,7 +5,7 @@
  * settings UI, the RBAC resolver and the custom-role validator all read — and
  * the module that owns it also owns the legacy org-exclusive set the roles API
  * publishes. A transport package that imported it would drag the whole RBAC
- * tree behind `@langwatch/platform-api`, so the process hands the three facts
+ * tree behind `@langwatch/api`, so the process hands the three facts
  * over instead and everything the `/api/roles` family publishes is derived
  * from them here.
  *

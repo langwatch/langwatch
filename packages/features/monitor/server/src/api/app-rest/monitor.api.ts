@@ -1,21 +1,17 @@
-import { monitorSettingsSchema, type MonitorService } from "@langwatch/monitor-contract";
-import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
-
+import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  patchZodOpenapi,
   type PlatformUrlBuilder,
-  requires,
   type SecuredApp,
   validator as zValidator,
-} from "../../app-rest";
-
-patchZodOpenapi();
+} from "@langwatch/api/rest";
+import { monitorSettingsSchema, type MonitorService } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
+import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod";
 
 const logger = createLogger("langwatch:api:monitors");
 

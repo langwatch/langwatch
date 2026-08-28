@@ -9,7 +9,6 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
@@ -18,8 +17,6 @@ import {
   apiResponseModelProvidersSchema,
   updateModelProviderInputSchema,
 } from "./model-provider-rest.schemas";
-
-patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:model-providers");
 

@@ -15,9 +15,11 @@ import type { MiddlewareHandler } from "hono";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { getRoutePolicy } from "../src/app-rest";
-import { MANAGEMENT_API_VERSION } from "../src/app-rest/app-rest.management-version";
-import { createAppRestSecurity } from "../src/app-rest/app-rest.security";
+import {
+  createAppRestSecurity,
+  getRoutePolicy,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 
 const executionOrder: string[] = [];
 

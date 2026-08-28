@@ -47,7 +47,6 @@ import {
   type AppRestSecurity,
   BadRequestError,
   canonicalBaseResponses,
-  patchZodOpenapi,
   requires,
   type SecuredApp,
   validator as zValidator,
@@ -60,8 +59,6 @@ import {
 } from "./gateway-spend-rest.contract";
 
 const logger = createLogger("langwatch:api:gateway-spend");
-
-patchZodOpenapi();
 
 /**
  * The spend-events reader, or the process's own refusal.
@@ -88,7 +85,7 @@ function requireSpendEvents(ports: GatewaySpendRestPorts): GatewaySpendEventsSer
  * minimum of -9007199254740991 and so documents a negative epoch as
  * acceptable while the server refuses it.
  */
-const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).openapi({
+const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).meta({
   description:
     "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
   example: 1782864000000,
@@ -270,7 +267,7 @@ const groupBySchema = z
     }
     return keys as SpendGroupByKey[];
   })
-  .openapi({
+  .meta({
     description: `One or two dimensions, comma separated: ${SPEND_GROUP_BY_KEYS.join(", ")}. A dimension may not repeat. Each row's \`key\` is the first dimension's value and \`group\` names them all, so two rows may share a key.`,
     example: "model,end_user",
   });
@@ -306,7 +303,7 @@ const queryBoolean = z
     });
     return z.NEVER;
   })
-  .openapi({
+  .meta({
     description: [
       `${QUERY_BOOLEAN_TRUE.join(", ")} for yes;`,
       `${QUERY_BOOLEAN_FALSE.filter(Boolean).join(", ")} or omitted for no.`,
@@ -346,7 +343,7 @@ const spendSummariesQuerySchema = z
     // serves those envelopes.
     status: spendSummaryStatusFilter
       .optional()
-      .openapi({ description: SPEND_SUMMARY_STATUS_DESCRIPTION }),
+      .meta({ description: SPEND_SUMMARY_STATUS_DESCRIPTION }),
   })
   // An inverted window is an empty window, so a caller who swapped the two
   // reads a confident zero and reconciles against it. /spend-events has

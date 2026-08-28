@@ -106,7 +106,12 @@ vi.mock("../../../AddToAnnotationQueueDialog", () => ({
 
 vi.mock("../ShareTraceDialog", () => ({ ShareTraceDialog: () => null }));
 
-vi.mock("../EditableTraceName", () => ({
+// `EditableTraceName` moved into `@langwatch/trace-web`, where it runs a real
+// tRPC mutation and would need a transport Provider this test has no reason to
+// mount. Partially mock the barrel so everything else it exports — notably
+// `usePinnedAttributesStore`, which this test drives — stays real.
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
   EditableTraceName: ({ value }: { value: string }) => <span>{value}</span>,
 }));
 

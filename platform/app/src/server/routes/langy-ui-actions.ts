@@ -90,7 +90,7 @@ async function authorizeUiRequest(c: Context) {
   const surfaceOpen = await c.app.featureFlags.isEnabled("release_langy_ui_actions", {
     kind: "project",
     projectId: resolved.project.id,
-    organizationId: resolved.project.team.organizationId,
+    organizationId: resolved.project.organizationId,
   });
   if (!surfaceOpen) return { dark: true as const };
 

@@ -13,6 +13,12 @@ export {
   type BatchRecordTrpcPorts,
 } from "./api/app-trpc/batch-record.api";
 export {
+  createDatasetRestApp,
+  type DatasetDirectUploadAuthorization,
+  type DatasetDirectUploadAuthorizer,
+} from "./api/app-rest/dataset.api";
+export { createDatasetErrorHandler } from "./api/app-rest/dataset.error-handler";
+export {
   PostgresDatasetAdapter,
   type PostgresDatasetAdapterOptions,
 } from "./adapters/postgres.dataset.adapter";

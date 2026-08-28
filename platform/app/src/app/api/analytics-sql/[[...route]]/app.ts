@@ -15,11 +15,8 @@
  */
 
 import { createProjectApp } from "~/server/api/security";
-import { patchZodOpenapi } from "@langwatch/platform-api/app-rest";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
 import { registerLangWatchQLRoutes } from "./app.v1";
-
-patchZodOpenapi();
 
 const secured = createProjectApp({
   basePath: "/api/v1/projects",

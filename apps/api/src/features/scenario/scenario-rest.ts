@@ -2,13 +2,10 @@ import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
-  patchZodOpenapi,
   type PlatformUrlBuilder,
   type SecuredApp,
 } from "../../app-rest";
 import { registerScenarioRoutes } from "./scenario-rest.v1";
-
-patchZodOpenapi();
 
 /**
  * REST for the scenarios (test cases) a project defines, and their version

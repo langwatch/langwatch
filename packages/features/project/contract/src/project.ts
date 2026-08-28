@@ -172,7 +172,18 @@ export interface SearchProjectsResult {
   slug: string;
 }
 
-export const projectNameSchema = z
+/**
+ * Who a project is, and nothing about how it is configured.
+ *
+ * This is the value a request boundary carries. Authenticating a credential
+ * has to name the project it belongs to, and the transport has to answer
+ * "which tenant, which team, which organization" — five indexed columns.
+ * Carrying the whole project there instead would read two full rows and
+ * validate thirty fields on every authenticated request, to serve handlers
+ * that overwhelmingly want an id. A handler that needs configuration asks
+ * {@link ProjectService} for it, which is the read it would have made anyway.
+ */
+export const projectIdentitySchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
@@ -181,7 +192,7 @@ export const projectNameSchema = z
     organizationId: z.string().min(1),
   })
   .strict();
-export type ProjectName = z.infer<typeof projectNameSchema>;
+export type ProjectIdentity = z.infer<typeof projectIdentitySchema>;
 
 export const projectNamesByIdsInputSchema = z
   .object({ projectIds: z.array(z.string().min(1)) })

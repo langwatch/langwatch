@@ -31,16 +31,13 @@ import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { ProjectService } from "@langwatch/project-contract";
+import { apiKeyPermission } from "@langwatch/api";
 import {
-  apiKeyPermission,
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  patchZodOpenapi,
   type SecuredApp,
-} from "../../app-rest";
-
-patchZodOpenapi();
+} from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:governance");
 

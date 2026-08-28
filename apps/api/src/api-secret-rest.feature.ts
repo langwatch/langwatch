@@ -1,4 +1,4 @@
-import { createRestService, RestVersionSelector } from "@langwatch/api";
+import { createRestService, RestVersionSelector } from "@langwatch/api/rest";
 import type { SecretService } from "@langwatch/secret-contract";
 import { SecretPublicRestApi } from "@langwatch/secret-server";
 import { Hono } from "hono";

@@ -10,6 +10,7 @@ export class TestProjectService extends ProjectService {
   isPresenceEnabled = unsupported<ProjectService["isPresenceEnabled"]>();
   getById = unsupported<ProjectService["getById"]>();
   getOrganizationId = unsupported<ProjectService["getOrganizationId"]>();
+  tryGetIdentity = unsupported<ProjectService["tryGetIdentity"]>();
   tryGetById = unsupported<ProjectService["tryGetById"]>();
   tryGetSummaryById = unsupported<ProjectService["tryGetSummaryById"]>();
   getWithTeam = unsupported<ProjectService["getWithTeam"]>();

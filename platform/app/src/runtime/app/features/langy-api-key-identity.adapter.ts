@@ -35,7 +35,7 @@ export async function resolveLangyKeyIdentity(input: {
   const allowed = await hasLangyAccess({
     user: { id: userId },
     projectId: input.resolved.project.id,
-    organizationId: input.resolved.project.team.organizationId,
+    organizationId: input.resolved.project.organizationId,
     featureFlags: input.featureFlags,
   });
   if (!allowed) {

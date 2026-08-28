@@ -12,9 +12,6 @@
  */
 
 import { z } from "zod";
-import { patchZodOpenapi } from "../../app-rest";
-
-patchZodOpenapi();
 
 /** Run lifecycle as the poll endpoint reports it. */
 export const runStatusSchema = z.enum(["pending", "running", "completed", "failed", "stopped"]);
@@ -390,7 +387,7 @@ const workbenchVersionSchema = z.object({
     .boolean()
     .describe("True for the single autosave row, which every ordinary save rewrites in place"),
   commitMessage: z.string().nullable(),
-  authorLabel: z.string().describe("Who wrote it: user, langy or api").openapi({ example: "user" }),
+  authorLabel: z.string().describe("Who wrote it: user, langy or api").meta({ example: "user" }),
   authorId: z.string().nullable().describe("User id, when a person wrote it"),
   createdAt: z.string().describe("ISO 8601 timestamp of the first write"),
   updatedAt: z

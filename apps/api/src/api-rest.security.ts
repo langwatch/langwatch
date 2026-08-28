@@ -1,11 +1,20 @@
-import { AuthenticatedActorRequiredError, type RequestActor } from "@langwatch/api";
+import { AuthenticatedActorRequiredError } from "@langwatch/api";
+import { type RequestActor } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ApiActor } from "./api.application";
 
-/** One project credential resolved at the API process's REST boundary. */
+/**
+ * One project credential resolved at the API process's REST boundary.
+ *
+ * The identity the credential resolved to travels, because authenticating it
+ * already established it and authorization needs the team and organization it
+ * names. Configuration does not: a handler that needs it asks
+ * `ProjectService`.
+ */
 export type ApiRestAuthenticatedRequest = Readonly<{
-  projectId: string;
+  project: ProjectIdentity;
   actor: ApiActor | null;
 }>;
 
@@ -50,7 +59,7 @@ export class ApiRestSecurityPolicy {
     return async (context, next) => {
       const request = await this.port.authenticate(context.req.raw);
       this.requests.set(context, request);
-      context.set("project", { id: request.projectId });
+      context.set("project", request.project);
       await next();
       if (context.res.status >= 200 && context.res.status < 300) {
         await this.complete(context, request);

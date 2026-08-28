@@ -377,7 +377,7 @@ describe("collectRegisteredRoutes", () => {
 
     it("keeps direct Hono routes direct when they use a framework helper", () => {
       write("secrets/app.ts", [
-        'import { RestVersionSelector } from "@langwatch/api";',
+        'import { RestVersionSelector } from "@langwatch/api/rest";',
         'const app = createProjectApp({ basePath: "/api/secrets" });',
         'app.get("/", describeRoute({}), listSecrets);',
       ]);
@@ -394,7 +394,7 @@ describe("collectRegisteredRoutes", () => {
       // reading only declared basePaths finds none, skips the file, and every
       // route in it is missing from the reference with nothing to notice.
       write("roles/app.ts", [
-        'import { createService } from "@langwatch/api";',
+        'import { createService } from "@langwatch/api/rest";',
         "",
         'export const app = createService({ name: "roles" })',
         '  .registerRoute("get", "/", "2026-08-07", list, (b) => b.withOutput(RoleList))',
@@ -417,7 +417,7 @@ describe("collectRegisteredRoutes", () => {
       // `/api/roles/2026-08-07` and `/api/roles/latest`. There is no bare
       // alias for the gate to collapse them onto.
       write("roles/app.ts", [
-        'import { createService } from "@langwatch/api";',
+        'import { createService } from "@langwatch/api/rest";',
         "",
         'export const app = createService({ name: "roles" })',
         '  .registerRoute("get", "/", "2026-01-01", list, (b) => b.withOutput(RoleList))',
@@ -438,7 +438,7 @@ describe("collectRegisteredRoutes", () => {
     it("resolves a version named by a shared constant", () => {
       write("version.ts", ['export const MANAGEMENT_API_VERSION = "2026-08-07";']);
       write("roles/app.ts", [
-        'import { createService } from "@langwatch/api";',
+        'import { createService } from "@langwatch/api/rest";',
         'import { MANAGEMENT_API_VERSION } from "./version";',
         "",
         'export const app = createService({ name: "roles" })',
@@ -454,7 +454,7 @@ describe("collectRegisteredRoutes", () => {
 
     it("flags the family, so a report can name the fix that family needs", () => {
       write("roles/app.ts", [
-        'import { createService } from "@langwatch/api";',
+        'import { createService } from "@langwatch/api/rest";',
         "",
         'export const app = createService({ name: "roles" })',
         '  .registerRoute("get", "/", "2026-08-07", list, (b) => b.withOutput(RoleList))',
@@ -474,7 +474,7 @@ describe("collectRegisteredRoutes", () => {
 
     it("carries a withdrawal through to the route table, from its version onward", () => {
       write("roles/app.ts", [
-        'import { createService } from "@langwatch/api";',
+        'import { createService } from "@langwatch/api/rest";',
         "",
         'export const app = createService({ name: "roles" })',
         '  .registerRoute("get", "/:id/legacy", "2026-01-01", read, (b) => b.withOutput(Legacy))',

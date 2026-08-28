@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Tests for dev/scripts/install-check-shims.mjs, which routes direct tsgo /
- * tsc / biome invocations through the check queue so `pnpm exec tsgo -p ...`
+ * tsc invocations through the check queue so `pnpm exec tsgo -p ...`
  * cannot start a fourth 4 GiB run behind the counter's back.
  *
  * Driven as real processes: the installer runs against a scratch bin directory
@@ -152,7 +152,7 @@ describe("check-queue bin shims", () => {
 
       /** @scenario "A subcommand or a flag's value is not a target" */
       it("counts a run whose only operands are a subcommand or a flag value", () => {
-        // `biome check --write` checks everything under the cwd; reading
+        // A bare subcommand checks everything under the cwd; reading
         // `check` as the file to check would let it run uncounted.
         expect(counted({ name: "tsgo", args: ["check", "--write"] })).toBe(true);
         expect(counted({ name: "tsgo", args: ["--pretty", "false"] })).toBe(true);

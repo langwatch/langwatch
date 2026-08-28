@@ -19,3 +19,27 @@ export {
   type ExperimentTrpcContext,
   type ExperimentTrpcPorts,
 } from "./api/app-trpc/experiment.api";
+export { createExperimentsRestApp } from "./api/app-rest/experiment.api";
+export { createBlankWorkbenchState } from "./api/app-rest/experiment.blank-workbench-state";
+export { workbenchActorFrom } from "./api/app-rest/experiment.workbench-actor";
+export {
+  createExperimentBodySchema,
+  createExperimentResponseSchema,
+  experimentInitBadRequestSchema,
+  experimentInitForbiddenSchema,
+  experimentInitResponseSchema,
+  handledErrorEnvelopeSchema,
+  listRunsResponseSchema,
+  listWorkbenchVersionsResponseSchema,
+  restoreWorkbenchVersionResponseSchema,
+  runResultsResponseSchema,
+  runStatusResponseSchema,
+  runStatusSchema,
+  saveWorkbenchStateBodySchema,
+  saveWorkbenchStateResponseSchema,
+  staleWorkbenchStateErrorSchema,
+  startRunResponseSchema,
+  workbenchStateResponseSchema,
+  workbenchStateSchema,
+  workbenchVersionProbeResponseSchema,
+} from "./api/app-rest/experiment.schemas";

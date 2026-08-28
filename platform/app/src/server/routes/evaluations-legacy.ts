@@ -33,7 +33,6 @@ import { listCustomEvaluators } from "@langwatch/platform-api/app-trpc";
 import { createServiceApp } from "~/server/api/security";
 import {
   handlerManagedAuth,
-  patchZodOpenapi,
   publicEndpoint,
 } from "@langwatch/platform-api/app-rest";
 import {
@@ -103,8 +102,6 @@ import {
   legacySentenceErrorSchema,
   requestBodySchema,
 } from "./misc.schemas";
-
-patchZodOpenapi();
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const AUTH_REASON = "project API key resolved in-handler";
