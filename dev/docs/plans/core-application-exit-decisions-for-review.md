@@ -6634,6 +6634,105 @@ Neither is a lane's business.
 
 ---
 
+## 271. Phase 3 stops at four couplings, and five lanes found the same four
+
+The single most important finding of the browser wave, recorded because it is
+easy to mistake the remainder for unfinished work. Five lanes — trace, langy,
+agent-testing, ops/gateway and prompt/studio — ran independently and each
+concluded, unprompted, that its slice stops at the same place:
+
+```
+~/utils/api                      the tRPC client
+~/hooks/useOrganizationTeamProject
+~/hooks/useDrawer
+~/components/ui/{link,dialog,drawer,toaster,FieldInfoTooltip}
+```
+
+**No `packages/features/*/web` package binds tRPC. None of the twenty declares
+it.** The one existing answer, a port/adapter in `apps/ui/src/features/agent`,
+is one feature deep.
+
+The scale: trace's `types/` has 122 inbound edges and cannot move until an
+annotation row has a real DTO instead of `RouterOutputs[...]`; `agent-testing`
+makes 20 `~/utils/api` imports, 21 of `useOrganizationTeamProject` and 11 of
+`useDrawer`; the optimization studio's residue is *by design* the composition
+adapters over `workflow/web`, which already owns the graph state, node
+registry, properties panels and editor.
+
+**No further browser lane was dispatched.** Ten agents on an unsettled pattern
+produce ten different patterns, and this one recurs in every remaining slice. A
+reference lane is establishing it with a working implementation and a written
+rule first.
+
+**Review:** the decision to make is where a feature web package gets its data —
+a declared port with an app-supplied adapter, a shared typed client, or hooks
+staying in the app while logic and components move. Judge candidates against a
+feature with 37 query call sites, end-to-end types, cache-key and invalidation
+semantics, and whether a package can be unit-tested without a server.
+
+## 272. A dropped constant would have silently changed customer-visible copy
+
+`PICKER_UNFILED_GROUP_NAME` was lost when `ScenarioPicker` moved into its
+package, leaving two importers pointing at a symbol that existed in no build.
+The obvious repair was the surviving neighbour, `UNFILED_GROUP_NAME`.
+
+It reads **"Unfiled test cases"**. The lost constant read **"No test suite"**.
+Substituting would have compiled, passed review, and changed what a customer
+sees. Recovered from history and restored to the package with its copy intact.
+
+**Review:** worth remembering as a class. A missing constant is the one kind of
+break where the compiler tells you something is wrong but the cheapest fix is
+silently wrong. Check `git log -S` before substituting a neighbour.
+
+## 273. 168 stale baseline entries removed, line-precise
+
+Both legacy baselines carried entries for files that no longer exist — far more
+than this wave created, because earlier waves left theirs behind too. A stale
+entry is a hard error in the architecture lint, not a warning, so these were
+not optional bookkeeping.
+
+Pruned by matching each entry's path against the filesystem, writing only after
+`JSON.parse` succeeds, and never re-serialising: a JSON round-trip reformats
+these files and buries the real change under hundreds of spurious lines, which
+happened once already on this branch. Result: **0 insertions, 345 deletions.**
+
+**Review:** the count is the check. Any insertion in a baseline diff means the
+file was reformatted and the change should be redone.
+
+## 274. The playground tab store was split, not moved whole
+
+The brief said move a store and its consumers together or not at all. The file
+turned out to be two things: 810 lines of pure zustand/persist logic and an
+11-line wrapper whose only app coupling was reading the project id for the
+store key.
+
+The package owns the store; `platform/app` keeps a 21-line adapter at the same
+path under the same name, so all 28 consumer call sites are unchanged.
+Module-level instance caching moved whole, so there is still exactly one cache
+— splitting that would have given two stores silently disagreeing.
+
+**Alternative not taken:** keeping it in `platform/app` until a session port
+exists. Defensible; the seam was judged clean because the app half now has the
+same shape as the already-established `useAgentPickerFlow` adapter.
+
+## 275. `vi.mock` on a moved module is not a specifier swap
+
+Twenty-six mock sites pointed at modules that are now one package. Rewriting
+the specifier alone would have been wrong in a way that **passes**: mocking a
+package barrel with a one-key factory and no `importOriginal` replaces every
+other export the graph reads from it, so unrelated components silently receive
+`undefined`.
+
+Each is now `async (importOriginal) => ({ ...(await importOriginal()), … })`.
+Five needed hand work: four use a block factory rather than an object literal,
+and one mocked two modules that are now the same package — two `vi.mock` calls
+on one specifier means the second silently wins.
+
+**Review:** this is the failure mode to check first in any test that was green
+before a move and is green after. Green is not evidence here.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
