@@ -67,32 +67,40 @@ describe("Feature: the agent cache", () => {
     "X-Project-Id": forProjectId,
   });
 
-  const readEntry = (name: string, token: string) =>
+  const readEntry = ({ name, token }: { name: string; token: string }) =>
     app.request(`/api/agent-cache/${name}`, { headers: headersFor({ token }) });
 
-  const writeEntry = (
-    name: string,
-    token: string,
-    body: Record<string, unknown>,
-  ) =>
+  const writeEntry = ({
+    name,
+    token,
+    body,
+  }: {
+    name: string;
+    token: string;
+    body: Record<string, unknown>;
+  }) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "PUT",
       headers: { ...headersFor({ token }), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-  const claimEntry = (
-    name: string,
-    token: string,
-    body: Record<string, unknown>,
-  ) =>
+  const claimEntry = ({
+    name,
+    token,
+    body,
+  }: {
+    name: string;
+    token: string;
+    body: Record<string, unknown>;
+  }) =>
     app.request(`/api/agent-cache/${name}/claim`, {
       method: "POST",
       headers: { ...headersFor({ token }), "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-  const removeEntry = (name: string, token: string) =>
+  const removeEntry = ({ name, token }: { name: string; token: string }) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "DELETE",
       headers: headersFor({ token }),
@@ -280,12 +288,16 @@ describe("Feature: the agent cache", () => {
     describe("when it stores a value and reads it back", () => {
       /** @scenario "A stored entry is read back by its name" */
       it("answers the value that was stored", async () => {
-        const written = await writeEntry(ENTRY_NAME, manageToken, {
-          value: ENTRY_VALUE,
+        const written = await writeEntry({
+          name: ENTRY_NAME,
+          token: manageToken,
+          body: {
+            value: ENTRY_VALUE,
+          },
         });
         expect(written.status).toBe(200);
 
-        const res = await readEntry(ENTRY_NAME, manageToken);
+        const res = await readEntry({ name: ENTRY_NAME, token: manageToken });
         expect(res.status).toBe(200);
         expect((await res.json()) as unknown).toEqual({
           name: ENTRY_NAME,
@@ -295,10 +307,21 @@ describe("Feature: the agent cache", () => {
 
       /** @scenario "A second write replaces the entry" */
       it("replaces the value on the second write", async () => {
-        await writeEntry("ACME_REPLACED", manageToken, { value: "first" });
-        await writeEntry("ACME_REPLACED", manageToken, { value: "second" });
+        await writeEntry({
+          name: "ACME_REPLACED",
+          token: manageToken,
+          body: { value: "first" },
+        });
+        await writeEntry({
+          name: "ACME_REPLACED",
+          token: manageToken,
+          body: { value: "second" },
+        });
 
-        const res = await readEntry("ACME_REPLACED", manageToken);
+        const res = await readEntry({
+          name: "ACME_REPLACED",
+          token: manageToken,
+        });
         expect(((await res.json()) as { value: string }).value).toBe("second");
       });
     });
@@ -306,17 +329,23 @@ describe("Feature: the agent cache", () => {
     describe("when the entry's lifetime passes", () => {
       /** @scenario "An entry stops answering once its lifetime passes" */
       it("answers a read after the lifetime as a miss", async () => {
-        await writeEntry("ACME_BRIEF", manageToken, {
-          value: "gone-soon",
-          ttl_seconds: 5,
+        await writeEntry({
+          name: "ACME_BRIEF",
+          token: manageToken,
+          body: {
+            value: "gone-soon",
+            ttl_seconds: 5,
+          },
         });
-        expect((await readEntry("ACME_BRIEF", manageToken)).status).toBe(200);
+        expect(
+          (await readEntry({ name: "ACME_BRIEF", token: manageToken })).status,
+        ).toBe(200);
 
         // The route floor is 5 seconds; the in-memory store expires on a
         // wall-clock read, so waiting past it is the only way to observe it.
         await sleep(5_100);
 
-        const res = await readEntry("ACME_BRIEF", manageToken);
+        const res = await readEntry({ name: "ACME_BRIEF", token: manageToken });
         expect(res.status).toBe(404);
       }, 15_000);
     });
@@ -324,7 +353,10 @@ describe("Feature: the agent cache", () => {
     describe("when it reads a name the project does not hold", () => {
       /** @scenario "A name the project does not hold is refused as not found" */
       it("refuses with the cache_entry_not_found code", async () => {
-        const res = await readEntry("ACME_NEVER_STORED", manageToken);
+        const res = await readEntry({
+          name: "ACME_NEVER_STORED",
+          token: manageToken,
+        });
         expect(res.status).toBe(404);
         expect(
           ((await res.json()) as { error: { code: string } }).error.code,
@@ -335,37 +367,57 @@ describe("Feature: the agent cache", () => {
     describe("when it removes an entry", () => {
       /** @scenario "Removing an entry the project does not hold succeeds" */
       it("succeeds whether or not the name was held", async () => {
-        await writeEntry("ACME_DROPPED", manageToken, { value: "x" });
-        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(
-          200,
-        );
-        expect((await readEntry("ACME_DROPPED", manageToken)).status).toBe(404);
-        expect((await removeEntry("ACME_DROPPED", manageToken)).status).toBe(
-          200,
-        );
+        await writeEntry({
+          name: "ACME_DROPPED",
+          token: manageToken,
+          body: { value: "x" },
+        });
+        expect(
+          (await removeEntry({ name: "ACME_DROPPED", token: manageToken }))
+            .status,
+        ).toBe(200);
+        expect(
+          (await readEntry({ name: "ACME_DROPPED", token: manageToken }))
+            .status,
+        ).toBe(404);
+        expect(
+          (await removeEntry({ name: "ACME_DROPPED", token: manageToken }))
+            .status,
+        ).toBe(200);
       });
     });
 
     describe("when the request is outside the accepted bounds", () => {
       /** @scenario "A value past the size limit is refused" */
       it("refuses a value past the size limit", async () => {
-        const res = await writeEntry("ACME_TOO_BIG", manageToken, {
-          value: "x".repeat(MAX_VALUE_BYTES + 1),
+        const res = await writeEntry({
+          name: "ACME_TOO_BIG",
+          token: manageToken,
+          body: {
+            value: "x".repeat(MAX_VALUE_BYTES + 1),
+          },
         });
         expect(res.status).toBe(400);
       });
 
       /** @scenario "A name outside the accepted shape is refused" */
       it("refuses a name outside the accepted shape", async () => {
-        const res = await readEntry("acme-session", manageToken);
+        const res = await readEntry({
+          name: "acme-session",
+          token: manageToken,
+        });
         expect(res.status).toBe(400);
       });
 
       /** @scenario "A lifetime outside the accepted range is refused" */
       it("refuses a lifetime outside the accepted range", async () => {
-        const res = await writeEntry("ACME_LONG", manageToken, {
-          value: "x",
-          ttl_seconds: 1,
+        const res = await writeEntry({
+          name: "ACME_LONG",
+          token: manageToken,
+          body: {
+            value: "x",
+            ttl_seconds: 1,
+          },
         });
         expect(res.status).toBe(400);
       });
@@ -376,8 +428,12 @@ describe("Feature: the agent cache", () => {
     describe("when the project holds no entry under that name", () => {
       /** @scenario "A claim on a free name is taken" */
       it("takes the name and stores the value", async () => {
-        const res = await claimEntry("ACME_CLAIM_FREE", manageToken, {
-          value: "won-it",
+        const res = await claimEntry({
+          name: "ACME_CLAIM_FREE",
+          token: manageToken,
+          body: {
+            value: "won-it",
+          },
         });
         expect(res.status).toBe(200);
         expect((await res.json()) as unknown).toMatchObject({
@@ -385,7 +441,10 @@ describe("Feature: the agent cache", () => {
           claimed: true,
         });
 
-        const read = await readEntry("ACME_CLAIM_FREE", manageToken);
+        const read = await readEntry({
+          name: "ACME_CLAIM_FREE",
+          token: manageToken,
+        });
         expect(((await read.json()) as { value: string }).value).toBe("won-it");
       });
     });
@@ -393,17 +452,28 @@ describe("Feature: the agent cache", () => {
     describe("when the project already holds that name", () => {
       /** @scenario "A claim on a held name leaves the held value alone" */
       it("does not take the name and leaves the held value alone", async () => {
-        await writeEntry("ACME_CLAIM_HELD", manageToken, { value: "first" });
+        await writeEntry({
+          name: "ACME_CLAIM_HELD",
+          token: manageToken,
+          body: { value: "first" },
+        });
 
-        const res = await claimEntry("ACME_CLAIM_HELD", manageToken, {
-          value: "second",
+        const res = await claimEntry({
+          name: "ACME_CLAIM_HELD",
+          token: manageToken,
+          body: {
+            value: "second",
+          },
         });
         expect(res.status).toBe(200);
         expect(((await res.json()) as { claimed: boolean }).claimed).toBe(
           false,
         );
 
-        const read = await readEntry("ACME_CLAIM_HELD", manageToken);
+        const read = await readEntry({
+          name: "ACME_CLAIM_HELD",
+          token: manageToken,
+        });
         expect(((await read.json()) as { value: string }).value).toBe("first");
       });
     });
@@ -411,9 +481,13 @@ describe("Feature: the agent cache", () => {
     describe("when the claimed entry's lifetime passes", () => {
       /** @scenario "A name is free again once its lifetime passes" */
       it("lets the next caller take the name", async () => {
-        const first = await claimEntry("ACME_CLAIM_BRIEF", manageToken, {
-          value: "gone-soon",
-          ttl_seconds: 5,
+        const first = await claimEntry({
+          name: "ACME_CLAIM_BRIEF",
+          token: manageToken,
+          body: {
+            value: "gone-soon",
+            ttl_seconds: 5,
+          },
         });
         expect(((await first.json()) as { claimed: boolean }).claimed).toBe(
           true,
@@ -423,8 +497,12 @@ describe("Feature: the agent cache", () => {
         // observe the name coming free again.
         await sleep(5_100);
 
-        const second = await claimEntry("ACME_CLAIM_BRIEF", manageToken, {
-          value: "the-next-one",
+        const second = await claimEntry({
+          name: "ACME_CLAIM_BRIEF",
+          token: manageToken,
+          body: {
+            value: "the-next-one",
+          },
         });
         expect(((await second.json()) as { claimed: boolean }).claimed).toBe(
           true,
@@ -437,8 +515,12 @@ describe("Feature: the agent cache", () => {
       it("takes the name exactly once", async () => {
         const responses = await Promise.all(
           Array.from({ length: 8 }, (_, index) =>
-            claimEntry("ACME_CLAIM_RACE", manageToken, {
-              value: `row-${index}`,
+            claimEntry({
+              name: "ACME_CLAIM_RACE",
+              token: manageToken,
+              body: {
+                value: `row-${index}`,
+              },
             }),
           ),
         );
@@ -450,7 +532,10 @@ describe("Feature: the agent cache", () => {
         expect(winners).toHaveLength(1);
 
         const winnerIndex = outcomes.findIndex((outcome) => outcome.claimed);
-        const read = await readEntry("ACME_CLAIM_RACE", manageToken);
+        const read = await readEntry({
+          name: "ACME_CLAIM_RACE",
+          token: manageToken,
+        });
         expect(((await read.json()) as { value: string }).value).toBe(
           `row-${winnerIndex}`,
         );
@@ -487,9 +572,17 @@ describe("Feature: the agent cache", () => {
     describe("when a viewer reads and writes an entry", () => {
       /** @scenario "A caller without the manage grain is refused" */
       it("refuses a viewer", async () => {
-        expect((await readEntry(ENTRY_NAME, viewerToken)).status).toBe(403);
         expect(
-          (await writeEntry(ENTRY_NAME, viewerToken, { value: "x" })).status,
+          (await readEntry({ name: ENTRY_NAME, token: viewerToken })).status,
+        ).toBe(403);
+        expect(
+          (
+            await writeEntry({
+              name: ENTRY_NAME,
+              token: viewerToken,
+              body: { value: "x" },
+            })
+          ).status,
         ).toBe(403);
       });
     });
@@ -509,12 +602,19 @@ describe("Feature: the agent cache", () => {
     describe("when it writes an entry and reads it back", () => {
       /** @scenario "The sandbox key reaches the agent cache" */
       it("reaches the agent cache", async () => {
-        const written = await writeEntry("ACME_FROM_SANDBOX", sandboxToken, {
-          value: "written-in-the-sandbox",
+        const written = await writeEntry({
+          name: "ACME_FROM_SANDBOX",
+          token: sandboxToken,
+          body: {
+            value: "written-in-the-sandbox",
+          },
         });
         expect(written.status).toBe(200);
 
-        const res = await readEntry("ACME_FROM_SANDBOX", sandboxToken);
+        const res = await readEntry({
+          name: "ACME_FROM_SANDBOX",
+          token: sandboxToken,
+        });
         expect(res.status).toBe(200);
         expect(((await res.json()) as { value: string }).value).toBe(
           "written-in-the-sandbox",
@@ -579,11 +679,18 @@ describe("Feature: the agent cache", () => {
         });
         expect(mintedAfter).toBe(mintedBefore + 1);
 
-        const written = await writeEntry("ACME_FROM_SHARED_KEY", second, {
-          value: "written-with-the-shared-key",
+        const written = await writeEntry({
+          name: "ACME_FROM_SHARED_KEY",
+          token: second,
+          body: {
+            value: "written-with-the-shared-key",
+          },
         });
         expect(written.status).toBe(200);
-        const res = await readEntry("ACME_FROM_SHARED_KEY", second);
+        const res = await readEntry({
+          name: "ACME_FROM_SHARED_KEY",
+          token: second,
+        });
         expect(res.status).toBe(200);
         expect(((await res.json()) as { value: string }).value).toBe(
           "written-with-the-shared-key",
