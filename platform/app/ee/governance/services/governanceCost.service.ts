@@ -13,9 +13,14 @@
  * when its repository is absent, and for a usage dashboard that is fine. Here
  * it would be a lie about money: `$0.00` is a claim that nothing was spent, and
  * it charts as a real free day. So every absence in this file is `null` and the
- * DTO says which kind of absence it is. There is no `?? 0` in this service, and
- * adding one is the defect `specs/governance/governance-cost-screen.feature`
- * exists to prevent.
+ * DTO says which kind of absence it is.
+ *
+ * Exactly one `?? 0` survives, in `totalFor`, and it is there to narrow a type
+ * rather than to supply a figure: the rows it runs over have already been
+ * filtered to those whose `amountNanoUsd !== null`, so the branch cannot be
+ * taken and no absent amount can reach it. Any OTHER `?? 0` — one that could
+ * actually fire on missing data — is the defect
+ * `specs/governance/governance-cost-screen.feature` exists to prevent.
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
