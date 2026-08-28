@@ -75,6 +75,43 @@ function cellParams(cell: GovernanceCostRollupCell): Record<string, unknown> {
   };
 }
 
+/**
+ * Every payload column collapsed to the version that won, shared by the two
+ * reads that return whole rows. One list rather than two identical ones: a
+ * dedup rule fixed in one copy and missed in the other is a table that answers
+ * differently depending on which method asked it.
+ *
+ * The two Nullable columns go through `tuple(...)` and come back out with
+ * `.1`, and they are the only ones that need it. `argMax` SKIPS rows whose
+ * first argument is NULL, so a cell restated from priced to unpriced would
+ * otherwise read back at its OLD price — the winning version passed over for
+ * being NULL, the superseded one returned in its place, and a figure the
+ * provider withdrew put back on the screen. A tuple is never NULL, so no
+ * version is ever skipped and the NULL the winner actually held survives.
+ */
+const LATEST_PAYLOAD_COLUMNS = [
+  "argMax(OrganizationId, EventTimestamp) AS OrganizationId",
+  "argMax(ExactOrEstimate, EventTimestamp) AS ExactOrEstimate",
+  "argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS AmountNanoUsd",
+  "argMax(AmountNanoMinor, EventTimestamp) AS AmountNanoMinor",
+  "argMax(TokensInput, EventTimestamp) AS TokensInput",
+  "argMax(TokensOutput, EventTimestamp) AS TokensOutput",
+  "argMax(TokensCacheRead, EventTimestamp) AS TokensCacheRead",
+  "argMax(TokensCacheWrite, EventTimestamp) AS TokensCacheWrite",
+  "argMax(RequestCount, EventTimestamp) AS RequestCount",
+  "argMax(RevisionCount, EventTimestamp) AS RevisionCount",
+  "argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS PreviousAmountNanoUsd",
+  "argMax(PulledItemsJson, EventTimestamp) AS PulledItemsJson",
+  "argMax(Version, EventTimestamp) AS Version",
+  "argMax(AppliedEventIds, EventTimestamp) AS AppliedEventIds",
+  "argMax(CreatedAt, EventTimestamp) AS CreatedAt",
+  "argMax(LastEventOccurredAt, EventTimestamp) AS LastEventOccurredAt",
+  // Aliased away from the column name: an alias shadowing the EventTimestamp
+  // column is resolved inside every argMax above it, which ClickHouse rejects
+  // as an aggregate within an aggregate.
+  "max(EventTimestamp) AS LatestEventTimestamp",
+] as const;
+
 /** ClickHouse renders Int64/UInt64 as strings in JSONEachRow. */
 function int(value: unknown): number {
   return Number(value ?? 0);
@@ -159,26 +196,7 @@ export class GovernanceCostRollupClickHouseRepository {
       query: `
         SELECT
           ${KEY_COLUMNS.join(",\n          ")},
-          argMax(OrganizationId, EventTimestamp)        AS OrganizationId,
-          argMax(ExactOrEstimate, EventTimestamp)       AS ExactOrEstimate,
-          argMax(AmountNanoUsd, EventTimestamp)         AS AmountNanoUsd,
-          argMax(AmountNanoMinor, EventTimestamp)       AS AmountNanoMinor,
-          argMax(TokensInput, EventTimestamp)           AS TokensInput,
-          argMax(TokensOutput, EventTimestamp)          AS TokensOutput,
-          argMax(TokensCacheRead, EventTimestamp)       AS TokensCacheRead,
-          argMax(TokensCacheWrite, EventTimestamp)      AS TokensCacheWrite,
-          argMax(RequestCount, EventTimestamp)          AS RequestCount,
-          argMax(RevisionCount, EventTimestamp)         AS RevisionCount,
-          argMax(PreviousAmountNanoUsd, EventTimestamp) AS PreviousAmountNanoUsd,
-          argMax(PulledItemsJson, EventTimestamp)       AS PulledItemsJson,
-          argMax(Version, EventTimestamp)               AS Version,
-          argMax(AppliedEventIds, EventTimestamp)       AS AppliedEventIds,
-          argMax(CreatedAt, EventTimestamp)             AS CreatedAt,
-          argMax(LastEventOccurredAt, EventTimestamp)   AS LastEventOccurredAt,
-          -- Aliased away from the column name: an alias shadowing the
-          -- EventTimestamp column is resolved inside every argMax above it,
-          -- which ClickHouse rejects as an aggregate within an aggregate.
-          max(EventTimestamp)                           AS LatestEventTimestamp
+          ${LATEST_PAYLOAD_COLUMNS.join(",\n          ")}
         FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
         WHERE ${CELL_PREDICATE}
         GROUP BY ${KEY_COLUMNS.join(", ")}
@@ -205,26 +223,7 @@ export class GovernanceCostRollupClickHouseRepository {
       query: `
         SELECT
           ${KEY_COLUMNS.join(",\n          ")},
-          argMax(OrganizationId, EventTimestamp)        AS OrganizationId,
-          argMax(ExactOrEstimate, EventTimestamp)       AS ExactOrEstimate,
-          argMax(AmountNanoUsd, EventTimestamp)         AS AmountNanoUsd,
-          argMax(AmountNanoMinor, EventTimestamp)       AS AmountNanoMinor,
-          argMax(TokensInput, EventTimestamp)           AS TokensInput,
-          argMax(TokensOutput, EventTimestamp)          AS TokensOutput,
-          argMax(TokensCacheRead, EventTimestamp)       AS TokensCacheRead,
-          argMax(TokensCacheWrite, EventTimestamp)      AS TokensCacheWrite,
-          argMax(RequestCount, EventTimestamp)          AS RequestCount,
-          argMax(RevisionCount, EventTimestamp)         AS RevisionCount,
-          argMax(PreviousAmountNanoUsd, EventTimestamp) AS PreviousAmountNanoUsd,
-          argMax(PulledItemsJson, EventTimestamp)       AS PulledItemsJson,
-          argMax(Version, EventTimestamp)               AS Version,
-          argMax(AppliedEventIds, EventTimestamp)       AS AppliedEventIds,
-          argMax(CreatedAt, EventTimestamp)             AS CreatedAt,
-          argMax(LastEventOccurredAt, EventTimestamp)   AS LastEventOccurredAt,
-          -- Aliased away from the column name: an alias shadowing the
-          -- EventTimestamp column is resolved inside every argMax above it,
-          -- which ClickHouse rejects as an aggregate within an aggregate.
-          max(EventTimestamp)                           AS LatestEventTimestamp
+          ${LATEST_PAYLOAD_COLUMNS.join(",\n          ")}
         FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
         WHERE TenantId = {tenantid:String}
           AND Day = {day:String}
@@ -279,6 +278,10 @@ export class GovernanceCostRollupClickHouseRepository {
    * must come back NULL, because 0 is a claim that nothing was spent. Cells
    * without an amount are counted separately so a caller can say which.
    *
+   * The inner `argMax` wraps the amount in a tuple for the reason spelled out
+   * on `LATEST_PAYLOAD_COLUMNS`: without it a cell restated to unpriced is
+   * totalled at the price it used to carry.
+   *
    * The `Day` range prunes partitions (`PARTITION BY toYYYYMM(Day)`), and
    * TenantId leads the predicate because nothing else here is unique across
    * tenants.
@@ -308,7 +311,7 @@ export class GovernanceCostRollupClickHouseRepository {
         FROM (
           SELECT
             ${KEY_COLUMNS.join(",\n            ")},
-            argMax(AmountNanoUsd, EventTimestamp) AS LatestAmountNanoUsd
+            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
           FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
           WHERE TenantId = {tenantid:String}
             AND Day >= {fromday:Date}
