@@ -15,6 +15,7 @@ import type { SuiteRunService } from "~/server/app-layer/suites/suite-run.servic
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
+import { findDefaultSuite } from "../default-suite";
 import { reconcileFolderMembership } from "../folder-membership";
 import { SuiteService } from "../suite.service";
 
@@ -154,12 +155,82 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "A case created from the All test cases view starts unfiled" */
-    it("leaves a case created without a folder unfiled", async () => {
+    /** @scenario "A case created without naming a test suite is filed into Default" */
+    /** @scenario "A scenario created with no suite is filed into Default" */
+    it("files a case created without a folder into Default", async () => {
       const scenario = await createCase({ name: "Unfiled" });
 
-      expect(scenario.folderId).toBeNull();
+      const defaultSuite = await findDefaultSuite({ projectId, prisma });
+      expect(defaultSuite).not.toBeNull();
+      expect(scenario.folderId).toBe(defaultSuite?.id);
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([scenario.id]);
       expect(await invariantBreaks()).toEqual([]);
+    });
+
+    /** @scenario "A second scenario created with no suite reuses the same Default" */
+    it("reuses one Default suite for every case created without a folder", async () => {
+      const first = await createCase({ name: "First" });
+      const second = await createCase({ name: "Second" });
+
+      expect(second.folderId).toBe(first.folderId);
+      const defaults = await prisma.simulationSuite.findMany({
+        where: { projectId, kind: "folder", name: "Default", archivedAt: null },
+      });
+      expect(defaults).toHaveLength(1);
+      expect(await folderScenarioIds(first.folderId!)).toEqual([
+        first.id,
+        second.id,
+      ]);
+    });
+
+    /** @scenario "A scenario created with a suite named is filed there, not in Default" */
+    it("creates no Default suite when the case names a folder", async () => {
+      const refunds = await createFolder("Refunds");
+      const scenario = await createCase({
+        name: "Refund",
+        folderId: refunds.id,
+      });
+
+      expect(scenario.folderId).toBe(refunds.id);
+      expect(await findDefaultSuite({ projectId, prisma })).toBeNull();
+    });
+
+    /** @scenario "Two scenarios created at the same time share one Default suite" */
+    it("shares one Default suite between two concurrent creates", async () => {
+      const [first, second] = await Promise.all([
+        createCase({ name: "First" }),
+        createCase({ name: "Second" }),
+      ]);
+
+      const defaults = await prisma.simulationSuite.findMany({
+        where: { projectId, kind: "folder", name: "Default", archivedAt: null },
+      });
+      expect(defaults).toHaveLength(1);
+      expect(first.folderId).toBe(defaults[0]!.id);
+      expect(second.folderId).toBe(defaults[0]!.id);
+      expect(await invariantBreaks()).toEqual([]);
+    });
+
+    /** @scenario "A Default suite created while another suite already owns the slug takes a numbered slug" */
+    it("takes a numbered slug when another suite already owns 'default'", async () => {
+      await suiteService.create({
+        projectId,
+        name: "Default",
+        kind: "custom",
+        scenarioIds: [],
+        targets: [],
+        repeatCount: 1,
+        labels: [],
+      });
+
+      const scenario = await createCase({ name: "Unfiled" });
+
+      const defaultSuite = await prisma.simulationSuite.findFirst({
+        where: { id: scenario.folderId!, projectId },
+      });
+      expect(defaultSuite?.kind).toBe("folder");
+      expect(defaultSuite?.name).toBe("Default");
+      expect(defaultSuite?.slug).not.toBe("default");
     });
   });
 
@@ -185,22 +256,48 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "Unfiling a case removes it from its folder" */
-    it("unfiles a case with a null folder and keeps it listed", async () => {
+    /** @scenario "Filing a scenario out of Default updates both suites" */
+    it("moves a case out of Default and updates both suites", async () => {
+      const stays = await createCase({ name: "Stays" });
+      const moves = await createCase({ name: "Moves" });
+      const defaultSuite = await findDefaultSuite({ projectId, prisma });
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([
+        stays.id,
+        moves.id,
+      ]);
+      const refunds = await createFolder("Refunds");
+
+      await scenarioService.moveToFolder({
+        scenarioId: moves.id,
+        projectId,
+        folderId: refunds.id,
+      });
+
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([stays.id]);
+      expect(await folderScenarioIds(refunds.id)).toEqual([moves.id]);
+      expect(await invariantBreaks()).toEqual([]);
+    });
+
+    /** @scenario "Taking a case out of its folder files it into Default" */
+    /** @scenario "Removing a scenario from its suite files it into Default instead of leaving it loose" */
+    it("files a case into Default when it is taken out of its folder", async () => {
       const refunds = await createFolder("Refunds");
       const scenario = await createCase({
         name: "Refund",
         folderId: refunds.id,
       });
 
-      const unfiled = await scenarioService.moveToFolder({
+      const moved = await scenarioService.moveToFolder({
         scenarioId: scenario.id,
         projectId,
         folderId: null,
       });
 
-      expect(unfiled.folderId).toBeNull();
+      const defaultSuite = await findDefaultSuite({ projectId, prisma });
+      expect(defaultSuite).not.toBeNull();
+      expect(moved.folderId).toBe(defaultSuite?.id);
       expect(await folderScenarioIds(refunds.id)).toEqual([]);
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([scenario.id]);
       const listed = await scenarioService.getAll({ projectId });
       expect(listed.map((s) => s.id)).toContain(scenario.id);
       expect(await invariantBreaks()).toEqual([]);

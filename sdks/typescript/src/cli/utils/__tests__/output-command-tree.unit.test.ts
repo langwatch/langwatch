@@ -72,6 +72,7 @@ describe("the real command tree", () => {
     // human-interactive `--wait` polls whose completion has no structured payload.
     const unmigrated = [
       ["dataset", "download"],
+      ["run-plan", "run"],
       ["suite", "run"],
       ["scenario", "run"],
     ];
@@ -153,6 +154,7 @@ describe("the real command tree", () => {
       ["trace export", "writes its own jsonl/csv/json, to a file when asked"],
 
       // Human-interactive `--wait` polls: no structured completion payload.
+      ["run-plan run", "human-interactive --wait poll"],
       ["suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 

@@ -1,0 +1,257 @@
+from typing import Any
+from urllib.parse import quote
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.post_api_workflows_by_workflow_id_run_body import PostApiWorkflowsByWorkflowIdRunBody
+from ...models.post_api_workflows_by_workflow_id_run_response_200 import PostApiWorkflowsByWorkflowIdRunResponse200
+from ...models.post_api_workflows_by_workflow_id_run_response_400 import PostApiWorkflowsByWorkflowIdRunResponse400
+from ...models.post_api_workflows_by_workflow_id_run_response_401 import PostApiWorkflowsByWorkflowIdRunResponse401
+from ...models.post_api_workflows_by_workflow_id_run_response_403 import PostApiWorkflowsByWorkflowIdRunResponse403
+from ...models.post_api_workflows_by_workflow_id_run_response_404 import PostApiWorkflowsByWorkflowIdRunResponse404
+from ...types import Response, safe_http_status
+
+
+def _get_kwargs(
+    workflow_id: str,
+    *,
+    body: PostApiWorkflowsByWorkflowIdRunBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
+    _kwargs: dict[str, Any] = {
+        "method": "post",
+        "url": "/api/workflows/{workflow_id}/run".format(
+            workflow_id=quote(str(workflow_id), safe=""),
+        ),
+    }
+
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+    | None
+):
+    if response.status_code == 200:
+        response_200 = PostApiWorkflowsByWorkflowIdRunResponse200.from_dict(response.json())
+
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = PostApiWorkflowsByWorkflowIdRunResponse400.from_dict(response.json())
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = PostApiWorkflowsByWorkflowIdRunResponse401.from_dict(response.json())
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = PostApiWorkflowsByWorkflowIdRunResponse403.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = PostApiWorkflowsByWorkflowIdRunResponse404.from_dict(response.json())
+
+        return response_404
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
+    return Response(
+        status_code=safe_http_status(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    workflow_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByWorkflowIdRunBody,
+) -> Response[
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+]:
+    """Run a workflow
+
+     Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
+    published version; address a specific version with the `{versionId}` form of this path.
+
+    Args:
+        workflow_id (str):
+        body (PostApiWorkflowsByWorkflowIdRunBody): The workflow's input fields, named as the
+            workflow's entry node names them
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404]
+    """
+
+    kwargs = _get_kwargs(
+        workflow_id=workflow_id,
+        body=body,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    workflow_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByWorkflowIdRunBody,
+) -> (
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+    | None
+):
+    """Run a workflow
+
+     Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
+    published version; address a specific version with the `{versionId}` form of this path.
+
+    Args:
+        workflow_id (str):
+        body (PostApiWorkflowsByWorkflowIdRunBody): The workflow's input fields, named as the
+            workflow's entry node names them
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404
+    """
+
+    return sync_detailed(
+        workflow_id=workflow_id,
+        client=client,
+        body=body,
+    ).parsed
+
+
+async def asyncio_detailed(
+    workflow_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByWorkflowIdRunBody,
+) -> Response[
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+]:
+    """Run a workflow
+
+     Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
+    published version; address a specific version with the `{versionId}` form of this path.
+
+    Args:
+        workflow_id (str):
+        body (PostApiWorkflowsByWorkflowIdRunBody): The workflow's input fields, named as the
+            workflow's entry node names them
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404]
+    """
+
+    kwargs = _get_kwargs(
+        workflow_id=workflow_id,
+        body=body,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    workflow_id: str,
+    *,
+    client: AuthenticatedClient,
+    body: PostApiWorkflowsByWorkflowIdRunBody,
+) -> (
+    PostApiWorkflowsByWorkflowIdRunResponse200
+    | PostApiWorkflowsByWorkflowIdRunResponse400
+    | PostApiWorkflowsByWorkflowIdRunResponse401
+    | PostApiWorkflowsByWorkflowIdRunResponse403
+    | PostApiWorkflowsByWorkflowIdRunResponse404
+    | None
+):
+    """Run a workflow
+
+     Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
+    published version; address a specific version with the `{versionId}` form of this path.
+
+    Args:
+        workflow_id (str):
+        body (PostApiWorkflowsByWorkflowIdRunBody): The workflow's input fields, named as the
+            workflow's entry node names them
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404
+    """
+
+    return (
+        await asyncio_detailed(
+            workflow_id=workflow_id,
+            client=client,
+            body=body,
+        )
+    ).parsed

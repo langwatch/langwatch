@@ -3,7 +3,7 @@
  * layout the window allows, and the version of the case the run used.
  *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 

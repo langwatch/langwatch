@@ -172,6 +172,25 @@ describe("SuiteRepository", () => {
       });
     });
 
+    describe("when the caller asks for archived rows too", () => {
+      it("drops the archivedAt filter", async () => {
+        (
+          prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([]);
+
+        await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["custom"],
+          includeArchived: true,
+        });
+
+        expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
+          where: { projectId: "proj_1", kind: { in: ["custom"] } },
+          orderBy: { updatedAt: "desc" },
+        });
+      });
+    });
+
     describe("given a project with no suites", () => {
       it("returns an empty array", async () => {
         (

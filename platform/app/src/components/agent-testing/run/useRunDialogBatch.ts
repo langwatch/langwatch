@@ -1,25 +1,31 @@
 /**
- * The four ways a run starts: a one-off case, a stored test suite, every case
- * at once, and the choice between them.
+ * How a run starts.
+ *
+ * Every entry point queues the same way: a name and a configuration go to the
+ * server, which resolves the name onto a run plan. A run of one scenario is an
+ * ordinary run plan too, named after that scenario and the agent it goes
+ * against, so running the same pair again stacks a second run on the same plan
+ * and the plan grows a trend.
  *
  * A refusal the server can name reads inside the dialog. Only failures with
  * nothing structured to say fall back to a toast.
  *
  * @see specs/features/agent-testing/run-dialog.feature
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
+ * @see specs/suites/run-plan-identity-by-name.feature
  */
 
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useRef } from "react";
+import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRunScenario } from "~/hooks/useRunScenario";
 import { writeScenarioTarget } from "~/hooks/useScenarioTarget";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { useAgentTestingStore } from "../useAgentTestingStore";
+import { type RunScope, toSuiteScope } from "./run-configuration";
+import type { RunStartedInfo } from "./run-dialog-types";
 import type { RunDialogSubmitInput, SuiteTargets } from "./useRunDialogSubmit";
 
 type RunAttempt = {
@@ -60,172 +66,166 @@ export type BatchRunInput = RunDialogSubmitInput & {
   projectId: string;
   suiteTargets: SuiteTargets;
   noteInput: string | undefined;
-  persistTargetChoice: () => Promise<void>;
   surfaceError: (error: unknown) => void;
 };
 
-/** The start-up poll of a one-off run, which settles well or not. */
-function useCaseRunScenario({
-  subject,
-  onCaseRunSettled,
-}: Pick<BatchRunInput, "subject" | "onCaseRunSettled">) {
-  const { project } = useOrganizationTeamProject();
-  const scenarioId = subject?.kind === "case" ? subject.scenarioId : null;
-
-  const settleCaseRun = useCallback(() => {
-    if (scenarioId) onCaseRunSettled?.(scenarioId);
-  }, [scenarioId, onCaseRunSettled]);
-
-  return useRunScenario({
-    projectId: project?.id,
-    projectSlug: project?.slug,
-    onQueued: () => undefined,
-    onRunComplete: settleCaseRun,
-    onRunFailed: settleCaseRun,
-  });
+/**
+ * The one scenario a run covers, when a hand-picked scope names exactly one.
+ *
+ * A run of one scenario opens straight into the run drawer, and the row it was
+ * started from remembers the agent it went against. Everything else about it
+ * is an ordinary plan run.
+ */
+function soleScenarioOf(scope: RunScope): string | null {
+  if (scope.mode !== "cases" || scope.caseIds.length !== 1) return null;
+  return scope.caseIds[0] ?? null;
 }
 
-/** A one-off run of a single test case, started from the dialog. */
-function useCaseRun(input: BatchRunInput) {
-  const { target, projectId, noteInput, runParameters } = input;
-  const { onRunStarted, onClose, setMissingProvider } = input;
-  const setLastRunTarget = useAgentTestingStore(
-    (state) => state.setLastRunTarget,
-  );
-  const { hasEnabledProviders } = useModelProvidersSettings({
-    projectId: projectId || undefined,
-  });
-  const { runScenario, isRunning: isCaseRunning } = useCaseRunScenario(input);
-
-  const runCase = useCallback(
-    (scenarioId: string) => {
-      if (!target) return;
-      if (!hasEnabledProviders) {
-        setMissingProvider(true);
-        return;
-      }
-      writeScenarioTarget({ projectId, scenarioId, target });
-      setLastRunTarget(target);
-      const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-      void runScenario({
-        scenarioId,
-        target,
-        batchRunId,
-        note: noteInput,
-        parameters: runParameters,
-      });
-      onRunStarted({
-        batchRunId,
-        scenarioSetId: getOnPlatformSetId(projectId),
-        scenarioId,
-        targetId: target.id,
-      });
-      onClose();
-    },
-    [
-      target,
-      hasEnabledProviders,
-      projectId,
-      runScenario,
-      noteInput,
-      runParameters,
-      onRunStarted,
-      onClose,
-      setLastRunTarget,
-      setMissingProvider,
-    ],
-  );
-
-  return { runCase, isCaseRunning };
+/**
+ * Remembers the agent the run went against.
+ *
+ * The dialog opens on the last agent of the whole page, and a scenario row
+ * opens on the last agent of that scenario, so a run of one scenario writes
+ * both.
+ */
+function rememberTarget({
+  projectId,
+  target,
+  soleScenarioId,
+  setLastRunTarget,
+}: {
+  projectId: string;
+  target: TargetValue;
+  soleScenarioId: string | null;
+  setLastRunTarget: (target: TargetValue) => void;
+}): void {
+  if (!target) return;
+  setLastRunTarget(target);
+  if (soleScenarioId) {
+    writeScenarioTarget({ projectId, scenarioId: soleScenarioId, target });
+  }
 }
 
-/** Queues the run of a saved test suite, after its target is written down. */
-function useQueueSuiteRun(input: BatchRunInput) {
-  const runSuite = api.suites.run.useMutation();
-  const { projectId, noteInput, runParameters } = input;
-  const { onRunStarted, persistTargetChoice } = input;
-
-  const queueSuiteRun = useCallback(
-    async (suiteId: string, attempt: RunAttempt) => {
-      await persistTargetChoice();
-      const result = await runSuite.mutateAsync({
-        projectId,
-        id: suiteId,
-        idempotencyKey: attempt.idempotencyKey,
-        batchRunId: attempt.batchRunId,
-        note: noteInput,
-        parameters: runParameters,
-      });
-      onRunStarted({
-        batchRunId: result.batchRunId ?? attempt.batchRunId,
-        scenarioSetId: getSuiteSetId(suiteId),
-      });
-    },
-    [
-      projectId,
-      noteInput,
-      runParameters,
-      onRunStarted,
-      persistTargetChoice,
-      runSuite,
-    ],
-  );
-
-  return { queueSuiteRun, isSuitePending: runSuite.isPending };
+/**
+ * What the caller learns once a plan run is queued.
+ *
+ * The run set is the plan's own, so the drawer and the runs rail read the run
+ * back under that plan. A run of one scenario also names it and the agent, so
+ * the drawer can open on the run before the run has an id.
+ */
+function runStartedInfoOf({
+  batchRunId,
+  suiteId,
+  soleScenarioId,
+  target,
+}: {
+  batchRunId: string;
+  suiteId: string;
+  soleScenarioId: string | null;
+  target: TargetValue;
+}): RunStartedInfo {
+  return {
+    batchRunId,
+    scenarioSetId: getSuiteSetId(suiteId),
+    ...(soleScenarioId
+      ? {
+          scenarioId: soleScenarioId,
+          ...(target ? { targetId: target.id } : {}),
+        }
+      : {}),
+  };
 }
 
-/** Queues a run of every test case, targets and all, in one request. */
-function useQueueAllRun(input: BatchRunInput) {
-  const runAll = api.suites.runAll.useMutation();
-  const { projectId, target, suiteTargets, noteInput, runParameters } = input;
-  const { onRunStarted } = input;
+/**
+ * Queues a run under the name the dialog holds.
+ *
+ * This is the one path every entry point takes: the server resolves the name,
+ * joins the plan of that name or creates one, writes the configuration onto it
+ * and runs it. Nothing is read off a test suite row, which is what keeps a
+ * suite a pure grouping.
+ */
+function useQueuePlanRun(input: BatchRunInput) {
+  const runPlan = api.suites.runPlan.useMutation();
+  const { projectId, target, noteInput, runParameters, suiteTargets } = input;
+  const { onRunStarted, runName, scope, scopedScenarioIds } = input;
+  const { repeatCount, simulatorModel, judgeModel } = input;
   const setLastRunTarget = useAgentTestingStore(
     (state) => state.setLastRunTarget,
   );
 
-  const queueAllRun = useCallback(
+  const queuePlanRun = useCallback(
     async (attempt: RunAttempt) => {
-      if (target) setLastRunTarget(target);
-      const result = await runAll.mutateAsync({
+      const soleScenarioId = soleScenarioOf(scope);
+      rememberTarget({ projectId, target, soleScenarioId, setLastRunTarget });
+      const result = await runPlan.mutateAsync({
         projectId,
+        name: runName.trim(),
+        config: {
+          scope: toSuiteScope(scope),
+          // Only a hand-picked scope names its scenarios; every other one
+          // resolves against the project at run time.
+          ...(scope.mode === "cases" ? { scenarioIds: scopedScenarioIds } : {}),
+          targets: suiteTargets ?? [],
+          repeatCount,
+          simulatorModel,
+          judgeModel,
+        },
         idempotencyKey: attempt.idempotencyKey,
         batchRunId: attempt.batchRunId,
-        targets: suiteTargets,
         note: noteInput,
         parameters: runParameters,
       });
-      onRunStarted({ batchRunId: result.batchRunId ?? attempt.batchRunId });
+      onRunStarted(
+        runStartedInfoOf({
+          batchRunId: result.batchRunId ?? attempt.batchRunId,
+          suiteId: result.suiteId,
+          soleScenarioId,
+          target,
+        }),
+      );
     },
     [
       projectId,
       target,
+      runName,
+      scope,
+      scopedScenarioIds,
       suiteTargets,
+      repeatCount,
+      simulatorModel,
+      judgeModel,
       noteInput,
       runParameters,
       onRunStarted,
       setLastRunTarget,
-      runAll,
+      runPlan,
     ],
   );
 
-  return { queueAllRun, isAllPending: runAll.isPending };
+  return { queuePlanRun, isPlanPending: runPlan.isPending };
 }
 
-/** Starts the run the subject asks for, and holds the attempt behind it. */
+/** Starts the run the dialog holds, and holds the attempt behind it. */
 export function useBatchRun(input: BatchRunInput) {
   const { subject, projectId, onClose, surfaceError } = input;
   const { setInlineError, setMissingProvider } = input;
   const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
-  const { runCase, isCaseRunning } = useCaseRun(input);
-  const { queueSuiteRun, isSuitePending } = useQueueSuiteRun(input);
-  const { queueAllRun, isAllPending } = useQueueAllRun(input);
+  const { queuePlanRun, isPlanPending } = useQueuePlanRun(input);
+  const { hasEnabledProviders } = useModelProvidersSettings({
+    projectId: projectId || undefined,
+  });
   // One identity per attempt, not per click. The dialog stays open when the
   // call fails, and a request that timed out may already be accepted, so a
   // retry has to carry the same key or the server queues a second batch.
   // Editing the note, the parameters or the targets starts a new attempt.
   const attemptKey = JSON.stringify([
     subject,
+    input.runName,
+    input.scope,
     input.suiteTargets,
+    input.repeatCount,
+    input.simulatorModel,
+    input.judgeModel,
     input.noteInput,
     input.runParameters,
   ]);
@@ -234,17 +234,15 @@ export function useBatchRun(input: BatchRunInput) {
     if (!subject || !projectId) return;
     setInlineError(null);
     setMissingProvider(false);
-    if (subject.kind === "case") {
-      runCase(subject.scenarioId);
+    // Refused before an attempt is taken, so the person can set a provider up
+    // and press Run again on the same identity.
+    if (!hasEnabledProviders) {
+      setMissingProvider(true);
       return;
     }
     const attempt = takeRunAttempt(attemptKey);
     try {
-      if (subject.kind === "suite") {
-        await queueSuiteRun(subject.suiteId, attempt);
-      } else {
-        await queueAllRun(attempt);
-      }
+      await queuePlanRun(attempt);
       clearRunAttempt();
       onClose();
     } catch (error) {
@@ -254,20 +252,15 @@ export function useBatchRun(input: BatchRunInput) {
     subject,
     projectId,
     attemptKey,
-    runCase,
+    hasEnabledProviders,
     takeRunAttempt,
     clearRunAttempt,
-    queueSuiteRun,
-    queueAllRun,
+    queuePlanRun,
     onClose,
     setInlineError,
     setMissingProvider,
     surfaceError,
   ]);
 
-  return {
-    run,
-    isPending: isSuitePending || isAllPending,
-    isRunning: isSuitePending || isAllPending || isCaseRunning,
-  };
+  return { run, isBusy: isPlanPending };
 }

@@ -30,7 +30,7 @@ export type RunPlanRunResultsProps = {
   cancel: ReturnType<typeof useRunPlanCancel>;
   viewMode: ReturnType<typeof useRunPlanViewMode>["viewMode"];
   periodControls: Pick<PeriodControls, "period" | "setRelativePeriod">;
-  /** Runs one test case again, from its result row. */
+  /** Runs one scenario again, from its result row. */
   onRerunCase?: (scenarioRun: ScenarioRunData) => void;
 };
 

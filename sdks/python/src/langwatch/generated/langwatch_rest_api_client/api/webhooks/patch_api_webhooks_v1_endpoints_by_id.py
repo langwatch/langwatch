@@ -12,13 +12,13 @@ from ...models.patch_api_webhooks_v1_endpoints_by_id_response_401 import PatchAp
 from ...models.patch_api_webhooks_v1_endpoints_by_id_response_403 import PatchApiWebhooksV1EndpointsByIdResponse403
 from ...models.patch_api_webhooks_v1_endpoints_by_id_response_404 import PatchApiWebhooksV1EndpointsByIdResponse404
 from ...models.patch_api_webhooks_v1_endpoints_by_id_response_500 import PatchApiWebhooksV1EndpointsByIdResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+    body: PatchApiWebhooksV1EndpointsByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,8 +29,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -109,8 +108,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiWebhooksV1EndpointsByIdBody,
 ) -> Response[
     PatchApiWebhooksV1EndpointsByIdResponse200
     | PatchApiWebhooksV1EndpointsByIdResponse400
@@ -121,12 +120,14 @@ def sync_detailed(
 ]:
     """Update a webhook endpoint
 
-     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
-    pauses; re-enabling does not re-send the gap, replay covers it)
+     Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
+    pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change:
+    batches already planned against the old transport are in flight, so a move means a new endpoint
+    alongside this one until it has drained.
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
+        body (PatchApiWebhooksV1EndpointsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,8 +152,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiWebhooksV1EndpointsByIdBody,
 ) -> (
     PatchApiWebhooksV1EndpointsByIdResponse200
     | PatchApiWebhooksV1EndpointsByIdResponse400
@@ -164,12 +165,14 @@ def sync(
 ):
     """Update a webhook endpoint
 
-     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
-    pauses; re-enabling does not re-send the gap, replay covers it)
+     Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
+    pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change:
+    batches already planned against the old transport are in flight, so a move means a new endpoint
+    alongside this one until it has drained.
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
+        body (PatchApiWebhooksV1EndpointsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -189,8 +192,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiWebhooksV1EndpointsByIdBody,
 ) -> Response[
     PatchApiWebhooksV1EndpointsByIdResponse200
     | PatchApiWebhooksV1EndpointsByIdResponse400
@@ -201,12 +204,14 @@ async def asyncio_detailed(
 ]:
     """Update a webhook endpoint
 
-     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
-    pauses; re-enabling does not re-send the gap, replay covers it)
+     Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
+    pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change:
+    batches already planned against the old transport are in flight, so a move means a new endpoint
+    alongside this one until it has drained.
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
+        body (PatchApiWebhooksV1EndpointsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -229,8 +234,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiWebhooksV1EndpointsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiWebhooksV1EndpointsByIdBody,
 ) -> (
     PatchApiWebhooksV1EndpointsByIdResponse200
     | PatchApiWebhooksV1EndpointsByIdResponse400
@@ -242,12 +247,14 @@ async def asyncio(
 ):
     """Update a webhook endpoint
 
-     Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled`
-    pauses; re-enabling does not re-send the gap, replay covers it)
+     Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled`
+    pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change:
+    batches already planned against the old transport are in flight, so a move means a new endpoint
+    alongside this one until it has drained.
 
     Args:
         id (str):
-        body (PatchApiWebhooksV1EndpointsByIdBody | Unset):
+        body (PatchApiWebhooksV1EndpointsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -180,14 +180,14 @@ First, you need to create an agent adapter that implements your agent logic. For
   </Tab>
 </Tabs>
 
-Once you run this code, you will see a new scenario run appear in the **Simulations** section of your LangWatch project.
+Once you run this code, you will see a new scenario run appear under **Agent Testing > Results** in your LangWatch project.
 
 ## 4. Grouping Your Sets and Batches
 
 While optional, we strongly recommend setting stable identifiers for your scenarios, sets, and batches for better organization and tracking in LangWatch.
 
 - **`id`**: A unique and stable identifier for your scenario. If not provided, it's often generated from the `name`, which can be brittle if you rename the test.
-- **`setId`**: Groups related scenarios into a test suite. This corresponds to the "Simulation Set" in the UI.
+- **`setId`**: Groups related scenarios into a set. The set appears under **Agent Testing > Results**.
 - **`batchId`**: Groups all scenarios that were run together in a single execution (e.g., a single CI job). You can use a CI environment variable like `process.env.GITHUB_RUN_ID` for this.
 
 <Tabs>

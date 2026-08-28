@@ -106,8 +106,8 @@ describe("the scope of a run plan over tRPC", () => {
   );
 
   describe("when the plan covers a rule", () => {
-    /** @scenario "A plan scoped to all test cases runs every active case" */
-    it("is created with no test case named", async () => {
+    /** @scenario "A plan scoped to all scenarios runs every active case" */
+    it("is created with no scenario named", async () => {
       const plan = await caller.suites.create({
         projectId,
         name: `Everything ${nanoid(6)}`,
@@ -161,7 +161,7 @@ describe("the scope of a run plan over tRPC", () => {
     });
   });
 
-  describe("when the plan names its test cases", () => {
+  describe("when the plan names its scenarios", () => {
     /** @scenario "A plan scoped to a hand-picked list runs exactly that list" */
     it("refuses a plan that names none", async () => {
       await expect(

@@ -23,12 +23,12 @@ import {
   vi,
 } from "vitest";
 import { ScenarioRunDetailDrawer } from "~/components/simulations/ScenarioRunDetailDrawer";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import { AgentTestingRunDrawer } from "../drawers/AgentTestingRunDrawer";
-import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
@@ -62,6 +62,10 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getRunState: { useQuery: mockGetRunState },
       getById: { useQuery: mockGetScenario },
       getByIdIncludingArchived: { useQuery: mockGetScenario },
@@ -75,6 +79,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       folders: { getAll: { useQuery: emptyQuery } },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
@@ -207,6 +215,14 @@ function setRunState(
   mockGetRunState.mockReturnValue({ data: state, error: error ?? null });
 }
 
+/**
+ * The CSS variable Chakra emits for a colour token, so a test can state the
+ * colour it wants by the token the code holds rather than by a literal.
+ */
+function cssVarOfToken(token: string) {
+  return `var(--chakra-colors-${token.replace(".", "-")})`;
+}
+
 function setWindowWidth(width: number) {
   Object.defineProperty(window, "innerWidth", {
     configurable: true,
@@ -263,7 +279,9 @@ describe("the wide run detail drawer", () => {
     expect(
       within(conversation).getByText("I want my money back"),
     ).toBeInTheDocument();
-    expect(within(results).getByText("Results")).toBeInTheDocument();
+    expect(
+      within(results).getByTestId("run-verdict-status-line"),
+    ).toBeInTheDocument();
   });
 
   /** @scenario "On a narrow screen the results stay under the conversation" */
@@ -278,7 +296,7 @@ describe("the wide run detail drawer", () => {
     const text = stacked.textContent ?? "";
     expect(text.indexOf("I want my money back")).toBeGreaterThanOrEqual(0);
     expect(text.indexOf("I want my money back")).toBeLessThan(
-      text.indexOf("Results"),
+      text.indexOf("Verdict:"),
     );
   });
 
@@ -306,7 +324,9 @@ describe("the wide run detail drawer", () => {
     expect(
       within(stacked).getByText("I want my money back"),
     ).toBeInTheDocument();
-    expect(within(stacked).getByText("Results")).toBeInTheDocument();
+    expect(
+      within(stacked).getByTestId("run-verdict-status-line"),
+    ).toBeInTheDocument();
   });
 
   /** @scenario "Both parts scroll on their own in the side-by-side layout" */
@@ -330,7 +350,7 @@ describe("the wide run detail drawer", () => {
 
     const assertContent = () => {
       expect(screen.getByText("I want my money back")).toBeInTheDocument();
-      expect(screen.getAllByText(/Criteria/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/criteria/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText("6.3s").length).toBeGreaterThan(0);
       expect(screen.getAllByText("$0.004200").length).toBeGreaterThan(0);
     };
@@ -343,22 +363,24 @@ describe("the wide run detail drawer", () => {
     assertContent();
   });
 
-  /** @scenario "The drawer header offers Edit for the test case that ran" */
-  /** @scenario "The drawer offers Rerun and Edit for that case" */
-  it("offers Rerun and Edit in the header, and Edit opens the case editor", async () => {
+  /** @scenario "The drawer header opens the case editor from one labelled button" */
+  /** @scenario "The drawer header offers Open Scenario for the scenario that ran" */
+  /** @scenario "The drawer offers Open Scenario for that case" */
+  it("offers one Open Scenario button that opens the case editor", async () => {
     const user = userEvent.setup();
     renderWide();
 
     expect(
-      screen.getByRole("button", { name: "Run again" }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Edit scenario" }));
+      screen.queryByRole("button", { name: "Run again" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit scenario" }),
+    ).not.toBeInTheDocument();
 
-    expect(useAgentTestingStore.getState().caseEditor).toEqual({
-      open: true,
+    await user.click(screen.getByRole("button", { name: "Open Scenario" }));
+
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "case_1",
-      folderId: null,
-      showHistory: false,
     });
   });
 
@@ -476,8 +498,8 @@ describe("the wide run detail drawer", () => {
 
   // --- The results panel ---
 
-  /** @scenario "The results read as one flat list of the criteria" */
-  it("reads the criteria as one list in the order the case declares them", () => {
+  /** @scenario "The results split the criteria into passed and failed sections" */
+  it("splits the criteria into a passed section over a failed section", () => {
     mockGetScenario.mockReturnValue({
       data: {
         id: "case_1",
@@ -494,6 +516,7 @@ describe("the wide run detail drawer", () => {
     });
     setRunState(
       makeRunState({
+        status: ScenarioRunStatus.FAILED,
         results: {
           verdict: Verdict.FAILURE,
           metCriteria: ["stays polite", "offers the refund"],
@@ -504,33 +527,143 @@ describe("the wide run detail drawer", () => {
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
-    const text = panel.textContent ?? "";
-    expect(text.indexOf("stays polite")).toBeLessThan(
-      text.indexOf("names the refund window"),
+    const passed = within(panel).getByTestId("run-verdict-passed-criteria");
+    const failed = within(panel).getByTestId("run-verdict-failed-criteria");
+    expect(within(passed).getByText("Passed criteria")).toBeInTheDocument();
+    expect(within(failed).getByText("Failed criteria")).toBeInTheDocument();
+    // The two rows in the passed section keep the order the case declares.
+    const passedText = passed.textContent ?? "";
+    expect(passedText.indexOf("stays polite")).toBeLessThan(
+      passedText.indexOf("offers the refund"),
     );
-    expect(text.indexOf("names the refund window")).toBeLessThan(
-      text.indexOf("offers the refund"),
-    );
-    // Met and unmet are one list, not two headed sections.
-    expect(within(panel).queryByText(/Met Criteria/i)).not.toBeInTheDocument();
+    // The failed section holds only its own criteria.
     expect(
-      within(panel).queryByText(/Unmet Criteria/i),
-    ).not.toBeInTheDocument();
+      within(failed).getByText("names the refund window"),
+    ).toBeInTheDocument();
+    expect(within(failed).queryByText("stays polite")).not.toBeInTheDocument();
+    // Passed sits above failed.
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("Passed criteria")).toBeLessThan(
+      text.indexOf("Failed criteria"),
+    );
+    // Icons match: two green checks, one red cross.
     expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);
     expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
   });
 
-  /** @scenario "The results panel is headed Results and repeats no chip" */
-  it("heads the panel Results and repeats nothing from the chip strip", () => {
+  /** @scenario "A pass run hides the Failed criteria section" */
+  it("hides the Failed criteria section on a run that met every criterion", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.SUCCESS,
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: ["stays polite", "offers the refund"],
+          unmetCriteria: [],
+        },
+      }),
+    );
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
-    expect(within(panel).getByText("Results")).toBeInTheDocument();
+    expect(
+      within(panel).getByTestId("run-verdict-passed-criteria"),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByTestId("run-verdict-failed-criteria"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByText("Failed criteria"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A fail run hides the Passed criteria section" */
+  it("hides the Passed criteria section on a run that missed every criterion", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.FAILED,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: ["stays polite", "offers the refund"],
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    expect(
+      within(panel).getByTestId("run-verdict-failed-criteria"),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByTestId("run-verdict-passed-criteria"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByText("Passed criteria"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The verdict line reads over the criteria" */
+  it("reads a Verdict line over the criteria and repeats nothing from the chip strip", () => {
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const statusLine = within(panel).getByTestId("run-verdict-status-line");
+    expect(within(statusLine).getByText("Verdict:")).toBeInTheDocument();
+    expect(
+      within(statusLine).getByTestId("run-verdict-status-passed"),
+    ).toHaveTextContent("PASSED");
+    // The verdict is the answer, so it reads first; the criteria under it
+    // are how the judge got there.
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("Verdict:")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Verdict:")).toBeLessThan(
+      text.indexOf("Passed criteria"),
+    );
     expect(panel).not.toHaveTextContent(/LLM judge/i);
     expect(panel).not.toHaveTextContent(/success rate/i);
     expect(panel).not.toHaveTextContent("6.3s");
     // The terminal log box is gone.
     expect(screen.queryByText("test-results.log")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The verdict reads the colour every other surface gives the status" */
+  it("draws the verdict in the colour the status config holds", () => {
+    renderWide();
+
+    const passedColor = cssVarOfToken(
+      SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
+    );
+    const panel = screen.getByTestId("run-verdict-panel");
+    expect(within(panel).getByTestId("run-verdict-status-passed")).toHaveStyle({
+      color: passedColor,
+    });
+
+    const passedSection = within(panel).getByTestId(
+      "run-verdict-passed-criteria",
+    );
+    expect(
+      within(passedSection).getByText("Passed criteria").parentElement,
+    ).toHaveStyle({ color: passedColor });
+  });
+
+  /** @scenario "A failed run reads FAILED in the verdict line" */
+  it("reads FAILED in red at the top of the panel on a failed run", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.FAILED,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: ["stays polite"],
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const failed = within(panel).getByTestId("run-verdict-status-failed");
+    expect(failed).toHaveTextContent("FAILED");
   });
 
   /** @scenario "What the judge said about the run as a whole reads last" */

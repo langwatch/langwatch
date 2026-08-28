@@ -90,7 +90,14 @@ Feature: A test suite is a folder of test cases
   # --- Case membership ---
 
   @unit
-  Scenario: A test case belongs to at most one folder
+  Scenario: A folder reads back with the cases filed in it
+    Given a folder holding two active cases and one archived case
+    When the folder is read for its detail view
+    Then the folder row comes back with the name of each active case
+    And the archived case is left out
+
+  @unit
+  Scenario: A scenario belongs to at most one folder
     Given a test case in the folder "Refunds"
     When the case is moved to the folder "Checkout"
     Then the case is in "Checkout" only
@@ -119,3 +126,28 @@ Feature: A test suite is a folder of test cases
     Then they see every folder in the project
     But creating a folder is refused with "insufficient_permissions"
     And archiving a folder is refused with "insufficient_permissions"
+
+  # --- What the folder editor may save ---
+
+  @unit
+  Scenario: The suite editor refuses execution settings on a folder suite
+    Given a folder suite in the project
+    When the suite editor saves a name and labels
+    Then the folder shows the saved values on the next read
+    And the folder keeps its address the person opened it under
+    When the suite editor saves targets, a repeat count or a model override
+    Then the change is refused with "validation_error"
+    And the refusal names every execution field the request carried
+
+    A folder holds what it collects, never how a run of it is executed. The
+    targets, the repeat count and the models travel with each run and are
+    written onto the run plan that run resolves. See
+    specs/suites/folder-run-plan-reuse.feature.
+
+  @unit
+  Scenario: The suite editor refuses to broaden a folder into a code-owned suite
+    Given a folder suite in the project
+    When the suite editor tries to change what the folder collects to a plain rule
+    Then the change is refused with "suite_scope_not_allowed"
+    When the suite editor tries to name the cases directly
+    Then the change is refused with "validation_error"

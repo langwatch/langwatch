@@ -11,11 +11,10 @@ import {
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";
-import { batchNote, type RunPlan } from "./run-plans";
+import { batchNote } from "./run-plans";
 import { runTitle } from "./run-titles";
 
 export type RunsSidebarBatchEntryProps = {
-  plan: RunPlan;
   batch: BatchRun;
   /** Where the run sits in the window, which gives it its number. */
   index: number;
@@ -26,7 +25,6 @@ export type RunsSidebarBatchEntryProps = {
 };
 
 export function RunsSidebarBatchEntry({
-  plan,
   batch,
   index,
   totalBatchCount,
@@ -41,8 +39,6 @@ export function RunsSidebarBatchEntry({
   return (
     <RunsSidebarEntry
       title={runTitle({
-        plan,
-        batch,
         index,
         totalCount: totalBatchCount,
         loadedCount,

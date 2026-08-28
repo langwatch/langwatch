@@ -1,36 +1,39 @@
 /**
- * The suites rail of the Test cases tab, wired to the tab model.
+ * The suites rail of the Scenarios tab, wired to the tab model.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
 import { SuiteRail } from "./SuiteRail";
+import { useOpenSuiteLastRun } from "./useOpenSuiteLastRun";
 import type { TestCasesTabModel } from "./useTestCasesTab";
 
 export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
-  const { base, data, suiteMutations, run } = model;
+  const { base, data, view, suiteMutations, suiteDialog, run } = model;
   const { periodPicker } = base;
+  const isExternal = base.selection.kind === "external";
+  const openSuiteLastRun = useOpenSuiteLastRun({
+    suites: data.suites,
+    lastRunBySuiteId: data.lastRunBySuiteId,
+  });
 
   return (
     <SuiteRail
-      selection={base.selection}
+      selectedSuiteId={isExternal ? null : (view.selectedSuite?.id ?? null)}
+      selectedExternalSetId={isExternal ? view.externalSetId : null}
       suites={data.suites}
       externalSets={data.externalSets}
       isLoading={data.isLoading}
       canManage={base.canManage}
-      suiteIdsWithRuns={data.suiteIdsWithRuns}
+      lastRunBySuiteId={data.lastRunBySuiteId}
       collapsed={base.isRailCollapsed}
       onToggleCollapsed={base.toggleRail}
       onSelect={base.selectSuite}
-      onCreateSuite={suiteMutations.createSuite}
+      onNewSuite={suiteDialog.openNew}
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
-      onEditSuite={(suiteId) =>
-        suiteMutations.setSuiteToRename(
-          data.suites.find((suite) => suite.id === suiteId) ?? null,
-        )
-      }
-      onOpenLastRun={(suite) => base.selectPlan(suite.slug)}
+      onRenameSuite={suiteDialog.openRename}
+      onOpenLastRun={openSuiteLastRun}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}
       period={periodPicker.period}

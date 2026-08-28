@@ -1,6 +1,11 @@
 /**
- * What the Test cases tab shows for the current selection: the suite it names,
- * the rows under it, the label filter, and the cases of an external set.
+ * What the Scenarios tab shows: the suite that is open, the rows under it, the
+ * label filter, and the cases of an external set.
+ *
+ * One suite is always open. Which one is resolved in a single expression: the
+ * suite the address names, or the first of the rail. That one expression is
+ * what serves an address naming no suite, an address naming a suite that was
+ * archived, and the ordinary case, so none of them needs a branch of its own.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -10,56 +15,17 @@ import type { Period } from "~/components/PeriodSelector";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import type { ExternalCaseRow } from "./CasesPanel";
 import {
-  type CaseGroup,
   filterCasesByLabels,
-  groupCasesByFolder,
   type TestCase,
   type TestSuiteEntry,
 } from "./test-cases";
 import { useExternalSetCases } from "./useTestCasesData";
 
-type CaseGroupsOptions = {
-  cases: TestCase[];
-  suites: TestSuiteEntry[];
-  selection: AgentTestingSelection;
-  selectedSuite: TestSuiteEntry | null;
-  activeLabels: string[];
-};
-
-/** The rows the table draws, scoped to the selection and the label filter. */
-function useCaseGroups({
-  cases,
-  suites,
-  selection,
-  selectedSuite,
-  activeLabels,
-}: CaseGroupsOptions): CaseGroup[] {
-  const visibleCases = useMemo(() => {
-    const scoped =
-      selection.kind === "suite"
-        ? cases.filter((testCase) => testCase.folderId === selectedSuite?.id)
-        : cases;
-    return filterCasesByLabels(scoped, activeLabels);
-  }, [cases, selection, selectedSuite, activeLabels]);
-
-  return useMemo(
-    () =>
-      selection.kind === "suite"
-        ? [
-            {
-              id: selectedSuite?.id ?? "",
-              name: selectedSuite?.name ?? "",
-              cases: visibleCases,
-            },
-          ]
-        : groupCasesByFolder({ cases: visibleCases, suites }),
-    [selection, selectedSuite, visibleCases, suites],
-  );
-}
-
 export type TestCasesView = {
+  /** The suite that is open, or nothing while the project has none. */
   selectedSuite: TestSuiteEntry | null;
-  groups: CaseGroup[];
+  /** The rows of the open suite, after the label filter. */
+  cases: TestCase[];
   /** The id of the selected external set, or the empty string. */
   externalSetId: string;
   externalCases: ExternalCaseRow[];
@@ -90,17 +56,18 @@ export function useTestCasesView({
     });
 
   const selectedSuite = useMemo<TestSuiteEntry | null>(() => {
-    if (selection.kind !== "suite") return null;
-    return suites.find((suite) => suite.slug === selection.slug) ?? null;
+    const namedSlug = selection.kind === "suite" ? selection.slug : null;
+    return (
+      suites.find((suite) => suite.slug === namedSlug) ?? suites[0] ?? null
+    );
   }, [selection, suites]);
 
-  const groups = useCaseGroups({
-    cases,
-    suites,
-    selection,
-    selectedSuite,
-    activeLabels,
-  });
+  const visibleCases = useMemo(() => {
+    const held = cases.filter(
+      (testCase) => testCase.folderId === selectedSuite?.id,
+    );
+    return filterCasesByLabels(held, activeLabels);
+  }, [cases, selectedSuite, activeLabels]);
 
   const toggleLabel = useCallback((label: string) => {
     setActiveLabels((current) =>
@@ -112,7 +79,7 @@ export function useTestCasesView({
 
   return {
     selectedSuite,
-    groups,
+    cases: visibleCases,
     externalSetId,
     externalCases,
     isExternalLoading,

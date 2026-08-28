@@ -23,7 +23,7 @@ Feature: Dynamic run plan scopes
     And an unknown mode is refused
 
   @integration
-  Scenario: A plan scoped to all test cases runs every active case
+  Scenario: A plan scoped to all scenarios runs every active case
     Given a project with three active test cases
     And a run plan scoped to all test cases
     When the plan is run
@@ -50,7 +50,7 @@ Feature: Dynamic run plan scopes
     Then only the held test case is scheduled
 
   @integration
-  Scenario: A test case added later runs on the next run
+  Scenario: A scenario added later runs on the next run
     Given a run plan scoped to a test suite
     And the plan has run once
     When a new test case is filed into that test suite
@@ -58,7 +58,7 @@ Feature: Dynamic run plan scopes
     Then the new test case is scheduled too
 
   @integration
-  Scenario: A test case that loses the label drops out of the plan
+  Scenario: A scenario that loses the label drops out of the plan
     Given a run plan scoped to the label "checkout"
     And a test case carrying that label
     When the label is taken off the test case
@@ -66,7 +66,7 @@ Feature: Dynamic run plan scopes
     Then the test case is not scheduled
 
   @integration
-  Scenario: Archived test cases are left out of a dynamic scope
+  Scenario: Archived scenarios are left out of a dynamic scope
     Given a run plan scoped to all test cases
     And one of the test cases is archived
     When the plan is run

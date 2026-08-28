@@ -10,7 +10,6 @@
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getRoutePath } from "~/utils/routes";
@@ -56,7 +55,6 @@ function ConfigureAgentsLink() {
       data-testid="run-dialog-configure-agents"
     >
       Configure
-      <ExternalLink size={11} />
     </chakra.a>
   );
 }
@@ -66,7 +64,7 @@ export function TargetSection(props: TargetSectionProps) {
   const { mode, agents, prompts, target, onSelect } = props;
 
   return (
-    <VStack align="stretch" gap={0}>
+    <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
       <FieldLabel>
         {mode === "prompts" ? "Prompt to be tested" : "Agent to be tested"}
         {mode === "prompts" ? (

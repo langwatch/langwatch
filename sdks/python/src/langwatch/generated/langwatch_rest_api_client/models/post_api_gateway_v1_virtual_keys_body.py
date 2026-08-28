@@ -30,6 +30,8 @@ class PostApiGatewayV1VirtualKeysBody:
         trace_project_id (None | str | Unset):
         routing_policy_id (None | str | Unset):
         routing_mode (PostApiGatewayV1VirtualKeysBodyRoutingMode | Unset):
+        expires_at (str | Unset): When the key stops serving. Omit it and the key never expires. A date that has already
+            passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival.
         budget (None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset):
         config (PostApiGatewayV1VirtualKeysBodyConfig | Unset):
         external_id (None | str | Unset):
@@ -44,6 +46,7 @@ class PostApiGatewayV1VirtualKeysBody:
     trace_project_id: None | str | Unset = UNSET
     routing_policy_id: None | str | Unset = UNSET
     routing_mode: PostApiGatewayV1VirtualKeysBodyRoutingMode | Unset = UNSET
+    expires_at: str | Unset = UNSET
     budget: None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset = UNSET
     config: PostApiGatewayV1VirtualKeysBodyConfig | Unset = UNSET
     external_id: None | str | Unset = UNSET
@@ -89,6 +92,8 @@ class PostApiGatewayV1VirtualKeysBody:
         if not isinstance(self.routing_mode, Unset):
             routing_mode = self.routing_mode.value
 
+        expires_at = self.expires_at
+
         budget: dict[str, Any] | None | Unset
         if isinstance(self.budget, Unset):
             budget = UNSET
@@ -132,6 +137,8 @@ class PostApiGatewayV1VirtualKeysBody:
             field_dict["routing_policy_id"] = routing_policy_id
         if routing_mode is not UNSET:
             field_dict["routing_mode"] = routing_mode
+        if expires_at is not UNSET:
+            field_dict["expires_at"] = expires_at
         if budget is not UNSET:
             field_dict["budget"] = budget
         if config is not UNSET:
@@ -202,6 +209,8 @@ class PostApiGatewayV1VirtualKeysBody:
         else:
             routing_mode = PostApiGatewayV1VirtualKeysBodyRoutingMode(_routing_mode)
 
+        expires_at = d.pop("expires_at", UNSET)
+
         def _parse_budget(data: object) -> None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset:
             if data is None:
                 return data
@@ -254,6 +263,7 @@ class PostApiGatewayV1VirtualKeysBody:
             trace_project_id=trace_project_id,
             routing_policy_id=routing_policy_id,
             routing_mode=routing_mode,
+            expires_at=expires_at,
             budget=budget,
             config=config,
             external_id=external_id,

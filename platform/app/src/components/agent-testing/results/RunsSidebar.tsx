@@ -2,6 +2,10 @@
  * The runs of one run plan, newest first: the number of the run, the note the
  * person left with it, how long ago it started and how it went.
  *
+ * The way back and the run list, and nothing else. The name of the plan reads
+ * as the page title while the plan is open, so repeating it here would say the
+ * same thing twice on one screen.
+ *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
@@ -13,13 +17,11 @@ import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { PeriodControls } from "./period-controls";
 import { RunsSidebarBatchEntry } from "./RunsSidebarBatchEntry";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";
-import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches } from "./useRunPlanBatches";
 
 export const RUNS_SIDEBAR_WIDTH = 230;
 
 export type RunsSidebarProps = {
-  plan: RunPlan;
   runs: Pick<
     RunPlanBatches,
     "batchRuns" | "totalBatchCount" | "hasMore" | "loadMore" | "isLoading"
@@ -48,15 +50,13 @@ function PendingEntry() {
 }
 
 function RunsList({
-  plan,
   runs,
   selectedBatchRunId,
   onSelectRun,
   isPendingShown,
-}: Pick<
-  RunsSidebarProps,
-  "plan" | "runs" | "selectedBatchRunId" | "onSelectRun"
-> & { isPendingShown: boolean }) {
+}: Pick<RunsSidebarProps, "runs" | "selectedBatchRunId" | "onSelectRun"> & {
+  isPendingShown: boolean;
+}) {
   const { batchRuns, isLoading, hasMore, loadMore, totalBatchCount } = runs;
   const isEmptyShown = !isLoading && batchRuns.length === 0 && !isPendingShown;
 
@@ -65,7 +65,6 @@ function RunsList({
       {batchRuns.map((batch, index) => (
         <RunsSidebarBatchEntry
           key={batch.batchRunId}
-          plan={plan}
           batch={batch}
           index={index}
           totalBatchCount={totalBatchCount}
@@ -100,7 +99,6 @@ function RunsList({
 }
 
 export function RunsSidebar({
-  plan,
   runs,
   selectedBatchRunId,
   pendingBatchRunId,
@@ -136,13 +134,12 @@ export function RunsSidebar({
         marginBottom={1}
         onClick={onBack}
       >
-        <ArrowLeft size={13} /> Run plans
+        <ArrowLeft size={13} /> Results
       </Button>
 
       {isPendingShown ? <PendingEntry /> : null}
 
       <RunsList
-        plan={plan}
         runs={runs}
         selectedBatchRunId={selectedBatchRunId}
         onSelectRun={onSelectRun}

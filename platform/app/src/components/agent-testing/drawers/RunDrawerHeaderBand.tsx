@@ -6,8 +6,8 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
-import { Button, Heading, HStack, VStack } from "@chakra-ui/react";
-import { Square } from "lucide-react";
+import { Button, Heading, HStack, Icon, VStack } from "@chakra-ui/react";
+import { Edit2, Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { CopyIdChip } from "~/components/simulations/CopyIdChip";
 import { RunCriteriaChip } from "~/components/simulations/RunCriteriaChip";
@@ -17,8 +17,8 @@ import { hasNoResults } from "~/components/simulations/scenario-run-status.utils
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Drawer } from "~/components/ui/drawer";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
+import { CASE_EDITOR_DRAWER } from "../cases/drawerKeys";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
-import { useAgentTestingStore } from "../useAgentTestingStore";
 import type {
   RunDetail,
   RunDrawerState,
@@ -75,7 +75,6 @@ function HeaderActions({
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
   const { scenarioData } = detail;
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
   // Without a trace there is no conversation to reach, and a run that ends
   // before it answers has none worth opening.
   const isTraceReachable =
@@ -87,15 +86,30 @@ function HeaderActions({
       mode: "conversation",
     });
 
+  const openCaseEditor = () =>
+    scenarioData &&
+    detail.openDrawer(CASE_EDITOR_DRAWER, {
+      scenarioId: scenarioData.id,
+    });
+
   return (
     <HStack gap={1} flexShrink={0}>
+      {scenarioData && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={openCaseEditor}
+          data-testid="run-drawer-open-scenario"
+        >
+          <Icon as={Edit2} boxSize={3.5} />
+          Open Scenario
+        </Button>
+      )}
       <ScenarioRunActions
         scenario={scenarioData}
         isRunning={detail.isRunning}
-        onRunAgain={detail.handleRunAgainClick}
-        onEditScenario={() =>
-          scenarioData && openCaseEditor({ scenarioId: scenarioData.id })
-        }
+        onRunAgain={null}
+        onEditScenario={null}
         onOpenThread={isTraceReachable ? openThread : null}
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}
         dejaViewHref={detail.dejaView.href ?? null}

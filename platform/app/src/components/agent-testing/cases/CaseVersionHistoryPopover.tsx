@@ -47,7 +47,7 @@ export function CaseVersionHistoryPopover({
           variant="ghost"
           fontSize="12px"
           color={FG_MUTED}
-          title="Every version of this test case"
+          title="Every version of this scenario"
           data-testid="case-modal-history"
         >
           <History size={12} />v{version} · History

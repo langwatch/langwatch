@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -211,6 +214,244 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
+  // The family is a deprecated alias of /api/v1/run-plans and
+  // /api/v1/test-suites. Every response says so, and so does the document.
+  describe("Deprecation of the suites family", () => {
+    describe("when any endpoint answers", () => {
+      /** @scenario "Every suites response carries the deprecation headers" */
+      it("carries the deprecation headers on every route", async () => {
+        const suite = await createSuite({ name: "Headers" });
+        const folder = await prisma.simulationSuite.create({
+          data: {
+            id: `suite_${nanoid()}`,
+            projectId: testProjectId,
+            name: "Headers folder",
+            slug: `headers-folder-${nanoid(6)}`,
+            kind: "folder",
+            scenarioIds: [],
+            targets: [],
+            labels: [],
+          },
+        });
+        const scenario = await createScenario("Headers scenario");
+
+        const responses = [
+          await helpers.api.get("/api/suites"),
+          await helpers.api.get(`/api/suites/${suite.id}`),
+          await helpers.api.post("/api/suites", {
+            name: `Headers create ${nanoid(6)}`,
+            scenarioIds: [scenario.id],
+            targets: [{ type: "http", referenceId: "agent_abc" }],
+          }),
+          await helpers.api.patch(`/api/suites/${suite.id}`, {
+            name: `Headers renamed ${nanoid(6)}`,
+          }),
+          await helpers.api.post(`/api/suites/${suite.id}/duplicate`, {}),
+          await helpers.api.post(`/api/suites/${folder.id}/run`, {}),
+          await helpers.api.delete(`/api/suites/${suite.id}`),
+        ];
+
+        for (const res of responses) {
+          expect(res.headers.get("Deprecation")).toBe("true");
+          expect(res.headers.get("Link")).toBe(
+            '</api/v1/run-plans>; rel="successor-version"',
+          );
+        }
+      });
+
+      /** @scenario "A refused suites request still carries the deprecation headers" */
+      it("carries them on a refusal too", async () => {
+        const res = await helpers.api.get("/api/suites/suite_nonexistent");
+
+        expect(res.status).toBe(404);
+        expect(res.headers.get("Deprecation")).toBe("true");
+      });
+    });
+
+    describe("when the published document is read", () => {
+      /** @scenario "The suites operations are marked deprecated in the document" */
+      it("marks every suites operation deprecated and names the successors", () => {
+        const document = JSON.parse(
+          readFileSync(
+            join(
+              dirname(fileURLToPath(import.meta.url)),
+              "../../openapiLangWatch.json",
+            ),
+            "utf8",
+          ),
+        ) as {
+          paths: Record<
+            string,
+            Record<string, { deprecated?: boolean; description?: string }>
+          >;
+        };
+
+        const operations = Object.entries(document.paths).flatMap(
+          ([path, item]) =>
+            path === "/api/suites" || path.startsWith("/api/suites/")
+              ? Object.entries(item)
+                  .filter(([method]) =>
+                    ["get", "post", "put", "patch", "delete"].includes(method),
+                  )
+                  .map(([method, operation]) => ({
+                    key: `${method.toUpperCase()} ${path}`,
+                    operation,
+                  }))
+              : [],
+        );
+
+        expect(operations.length).toBeGreaterThan(0);
+        for (const { key, operation } of operations) {
+          expect(operation.deprecated, key).toBe(true);
+          expect(operation.description, key).toContain(
+            "use /api/v1/run-plans and /api/v1/test-suites",
+          );
+        }
+      });
+    });
+  });
+
+  // A folder holds no execution settings, so a run of one states them. A run
+  // plan holds its own, so a run of one that states them is refused.
+  describe("Running through the alias", () => {
+    async function createFolderWithOneCase() {
+      const folder = await prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Refunds",
+          slug: `refunds-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+      const scenario = await createScenario("Refund Flow");
+      await prisma.scenario.updateMany({
+        where: { id: scenario.id, projectId: testProjectId },
+        data: { folderId: folder.id },
+      });
+      await prisma.simulationSuite.updateMany({
+        where: { id: folder.id, projectId: testProjectId },
+        data: { scenarioIds: [scenario.id] },
+      });
+      return folder;
+    }
+
+    describe("when the id names a test suite and the body carries targets", () => {
+      /** @scenario "Running a test suite through the alias takes its targets from the body" */
+      it("schedules the runs against the plan the suite and target name", async () => {
+        const folder = await createFolderWithOneCase();
+        // A scope that names every folder of the project is the whole
+        // project, and normalises to "all" before the plan name is derived. A
+        // second folder keeps this a folder run, which the name reads from.
+        await prisma.simulationSuite.create({
+          data: {
+            id: `suite_${nanoid()}`,
+            projectId: testProjectId,
+            name: "Checkout",
+            slug: `checkout-${nanoid(6)}`,
+            kind: "folder",
+            scenarioIds: [],
+            targets: [],
+            labels: [],
+          },
+        });
+        const agent = await prisma.agent.create({
+          data: {
+            projectId: testProjectId,
+            name: "dev-agent",
+            type: "http",
+            config: {
+              url: "https://example.com/chat",
+              method: "POST",
+              headers: [],
+              bodyTemplate: '{"message": "{{input}}"}',
+            },
+          },
+        });
+
+        const res = await helpers.api.post(`/api/suites/${folder.id}/run`, {
+          idempotencyKey: "alias-folder-run-1",
+          targets: [{ type: "http", referenceId: agent.id }],
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toMatchObject({ scheduled: true, jobCount: 1 });
+        expect(queueSimulationRun).toHaveBeenCalledTimes(1);
+
+        const plan = await prisma.simulationSuite.findFirst({
+          where: {
+            projectId: testProjectId,
+            kind: "custom",
+            name: "Refunds dev-agent",
+          },
+        });
+        expect(plan).not.toBeNull();
+      });
+    });
+
+    describe("when the id names a test suite and the body carries no target", () => {
+      /** @scenario "Running a test suite through the alias with no target answers suite_targets_required" */
+      it("answers 400 naming the code", async () => {
+        const folder = await createFolderWithOneCase();
+
+        const res = await helpers.api.post(`/api/suites/${folder.id}/run`, {
+          idempotencyKey: "alias-folder-run-2",
+        });
+
+        expect(res.status).toBe(400);
+        expect((await res.json()).code).toBe("suite_targets_required");
+      });
+    });
+
+    describe("when the id names a run plan and the body carries targets", () => {
+      /** @scenario "Running a run plan through the alias with targets answers validation_error" */
+      it("answers 400 naming the code", async () => {
+        const plan = await createSuite({ name: "Nightly" });
+
+        const res = await helpers.api.post(`/api/suites/${plan.id}/run`, {
+          idempotencyKey: "alias-plan-run-1",
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("validation_error");
+        expect(body.fieldErrors).toHaveProperty("targets");
+      });
+    });
+
+    describe("when a test suite is updated with targets", () => {
+      /** @scenario "Updating a test suite through the alias with targets answers validation_error" */
+      it("answers 400 naming the code", async () => {
+        const folder = await prisma.simulationSuite.create({
+          data: {
+            id: `suite_${nanoid()}`,
+            projectId: testProjectId,
+            name: "Refunds update",
+            slug: `refunds-update-${nanoid(6)}`,
+            kind: "folder",
+            scenarioIds: [],
+            targets: [],
+            labels: [],
+          },
+        });
+
+        const res = await helpers.api.patch(`/api/suites/${folder.id}`, {
+          targets: [{ type: "http", referenceId: "agent_abc" }],
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("validation_error");
+        expect(body.fieldErrors).toHaveProperty("targets");
+      });
+    });
+  });
+
   describe("GET /api/suites", () => {
     describe("when no suites exist", () => {
       it("returns an empty array", async () => {
@@ -383,7 +624,7 @@ describe("Feature: Suites REST API", () => {
       expect(stored?.archivedAt).not.toBeNull();
     });
 
-    it("archives every test case filed in it", async () => {
+    it("archives every scenario filed in it", async () => {
       const { folder, cases } = await createFolderWithCases("Refunds", 2);
 
       await helpers.api.delete(`/api/suites/${folder.id}`);
@@ -602,6 +843,27 @@ describe("Feature: Suites REST API", () => {
       });
     });
 
+    describe("when the key behind the run belongs to no person", () => {
+      /** @scenario "A REST run with a key that belongs to no person records no actor" */
+      it("records no actor on the queued run", async () => {
+        const { suite } = await createRunnableSuite();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-actor-1",
+        });
+
+        expect(res.status).toBe(200);
+        expect(queueSimulationRun).toHaveBeenCalledTimes(1);
+        const langwatch = (
+          queueSimulationRun.mock.calls[0]![0].metadata as {
+            langwatch: Record<string, unknown>;
+          }
+        ).langwatch;
+        expect(langwatch).not.toHaveProperty("actorId");
+        expect(langwatch).not.toHaveProperty("actorLabel");
+      });
+    });
+
     describe("when the run carries a note", () => {
       async function createRunnableSuiteWithThreeCasesAndTwoTargets() {
         const first = await createScenario("Refund Flow");
@@ -634,14 +896,14 @@ describe("Feature: Suites REST API", () => {
 
         const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
           idempotencyKey: "run-key-note-1",
-          note: "switched judge to the stricter rubric",
+          note: "switched judge to the stricter criterion",
         });
 
         expect(res.status).toBe(200);
         expect(queueSimulationRun).toHaveBeenCalledTimes(6);
         for (const call of queueSimulationRun.mock.calls) {
           expect(call[0].metadata).toMatchObject({
-            note: "switched judge to the stricter rubric",
+            note: "switched judge to the stricter criterion",
           });
         }
       });

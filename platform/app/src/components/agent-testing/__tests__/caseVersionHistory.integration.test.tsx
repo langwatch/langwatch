@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Test case history in the interface: the version chip in the editor, the
+ * Scenario history in the interface: the version chip in the editor, the
  * version list with its restore, and the stale-save offer.
  *
  * @see specs/features/agent-testing/case-version-history.feature
@@ -42,6 +42,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       create: {
         useMutation: () => ({
           mutateAsync: mocks.mockCreateMutateAsync,
@@ -90,7 +94,13 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    suites: { folders: { getAll: { useQuery: () => ({ data: [] }) } } },
+    suites: {
+      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: {
       getAllPromptsForProject: {
@@ -320,7 +330,7 @@ describe("the version chip in the case editor", () => {
 
     const notice = await screen.findByTestId("scenario-stale-version");
     expect(notice).toHaveTextContent(
-      "This test case changed since it was opened",
+      "This scenario changed since it was opened",
     );
     expect(notice).toHaveTextContent("version 6");
     // The reload replaces the form, so the offer has to say the edits go.

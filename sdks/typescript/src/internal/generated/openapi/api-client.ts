@@ -3267,10 +3267,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.
+         */
         get: operations["getApiSuites"];
         put?: never;
-        /** @description Create a new suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+         */
         post: operations["postApiSuites"];
         delete?: never;
         options?: never;
@@ -3285,15 +3291,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a suite (run plan) by its ID */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+         */
         get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
-        /** @description Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.
+         */
         delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
-        /** @description Update a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+         */
         patch: operations["patchApiSuitesById"];
         trace?: never;
     };
@@ -3306,7 +3321,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Duplicate a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
+         */
         post: operations["postApiSuitesByIdDuplicate"];
         delete?: never;
         options?: never;
@@ -3323,8 +3341,143 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
+         */
         post: operations["postApiSuitesByIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family. */
+        get: operations["listRunPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against. */
+        post: operations["runRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found. */
+        get: operations["getRunPlan"];
+        put?: never;
+        post?: never;
+        /** @description Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are. */
+        delete: operations["archiveRunPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a plan again
+         * @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.
+         */
+        post: operations["rerunRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
+        get: operations["listTestSuites"];
+        put?: never;
+        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        post: operations["createTestSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one test suite
+         * @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.
+         */
+        get: operations["getTestSuite"];
+        put?: never;
+        post?: never;
+        /** @description Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live. */
+        delete: operations["archiveTestSuite"];
+        options?: never;
+        head?: never;
+        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
+        patch: operations["renameTestSuite"];
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a test suite
+         * @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.
+         */
+        post: operations["runTestSuite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -22197,6 +22350,11 @@ export interface operations {
                             targetType: "prompt" | "http" | "code" | "workflow";
                             simulationSuiteId?: string;
                             scenarioVersion?: number;
+                            simulatorModel?: string;
+                            judgeModel?: string;
+                            actorId?: string;
+                            /** @enum {string} */
+                            actorLabel?: "user" | "api" | "cli";
                         };
                     } & {
                         [key: string]: unknown;
@@ -24783,7 +24941,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -24800,8 +24958,12 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
                         }[];
                         repeatCount: number;
@@ -24883,7 +25045,7 @@ export interface operations {
                     description?: string;
                     /** @default [] */
                     scenarioIds?: string[];
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -24901,8 +25063,12 @@ export interface operations {
                     };
                     /** @default [] */
                     targets?: {
-                        /** @enum {string} */
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
                         type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
                     }[];
                     /** @default 1 */
@@ -24930,7 +25096,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -24947,8 +25113,12 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
                         }[];
                         repeatCount: number;
@@ -25038,7 +25208,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -25055,8 +25225,12 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
                         }[];
                         repeatCount: number;
@@ -25101,6 +25275,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -25186,6 +25362,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -25229,7 +25407,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -25247,8 +25425,12 @@ export interface operations {
                     };
                     scenarioIds?: string[];
                     targets?: {
-                        /** @enum {string} */
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
                         type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
                         referenceId: string;
                     }[];
                     repeatCount?: number;
@@ -25274,7 +25456,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -25291,8 +25473,12 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
                         }[];
                         repeatCount: number;
@@ -25337,6 +25523,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -25394,7 +25582,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -25411,8 +25599,12 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
                             type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
                             referenceId: string;
                         }[];
                         repeatCount: number;
@@ -25457,6 +25649,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -25499,6 +25693,24 @@ export interface operations {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent. */
+                    name?: string;
+                    /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
+                    targets?: {
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
+                        referenceId: string;
+                    }[];
+                    /** @description How many times each scenario and target pairing runs, between 1 and 5. Used only when the id names a test suite. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in the run. Used only when the id names a test suite. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in the run. Used only when the id names a test suite. */
+                    judgeModel?: string | null;
                     /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
                     parameters?: {
                         [key: string]: string | number | boolean;
@@ -25528,8 +25740,12 @@ export interface operations {
                             scenarioRunId: string;
                             scenarioId: string;
                             target: {
-                                /** @enum {string} */
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
                                 type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
                                 referenceId: string;
                             };
                             name: string | null;
@@ -25570,6 +25786,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -25594,6 +25812,720 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listRunPlans: {
+        parameters: {
+            query?: {
+                /** @description Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    runRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The run plan this run joins or creates. A run plan is identified by its name, so sending the same name again replaces that plan's configuration with this one. Leave it out and the name is derived from what the run covers and what it runs against. Up to 200 characters. */
+                    name?: string;
+                    /** @description What this run covers and what it runs against. Written onto the run plan the name resolves. */
+                    config: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        };
+                        /** @description The prompts, agents or workflows every scenario runs against. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                        repeatCount?: number;
+                        /** @description The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        judgeModel?: string | null;
+                        /** @description The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time. */
+                        scenarioIds?: string[];
+                    };
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow";
+                            /** @description The id of the prompt, agent or workflow to run against. */
+                            referenceId: string;
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the plan is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    rerunRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    listTestSuites: {
+        parameters: {
+            query?: {
+                /** @description Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    createTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                        /** @description The active scenarios filed in this suite. An archived scenario is left out. */
+                        scenarios: {
+                            /** @description The scenario id. */
+                            id: string;
+                            /** @description The scenario name. */
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    archiveTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the suite is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    renameTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    runTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. */
+                    targets: {
+                        /**
+                         * @description What kind of thing the scenarios run against.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow";
+                        /** @description The id of the prompt, agent or workflow to run against. */
+                        referenceId: string;
+                    }[];
+                    /** @description The run plan this run joins or creates. Leave it out and the name is derived from the suite name and the targets. */
+                    name?: string;
+                    /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in this run. Leave it out for the scenario or project default. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in this run. Leave it out for the scenario or project default. */
+                    judgeModel?: string | null;
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow";
+                                /** @description The id of the prompt, agent or workflow to run against. */
+                                referenceId: string;
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
                     };
                 };
             };

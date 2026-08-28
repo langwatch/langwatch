@@ -6,9 +6,9 @@
  * never remounts and the live-run subscription it holds is never dropped.
  *
  * Addresses:
- *   /agent-testing                                  Test cases, all cases
- *   /agent-testing/suites/:suiteSlug                Test cases, one suite
- *   /agent-testing/external/:setId                  Test cases, external set
+ *   /agent-testing                                  Scenarios, the first suite
+ *   /agent-testing/suites/:suiteSlug                Scenarios, one suite
+ *   /agent-testing/external/:setId                  Scenarios, external set
  *   /agent-testing/results                          Results, run plans list
  *   /agent-testing/results/:planSlug                Results, one plan
  *   /agent-testing/results/:planSlug/:batchRunId    Results, one run
@@ -26,14 +26,16 @@ export const RESULTS_SEGMENT = "results" as const;
 export const SUITES_SEGMENT = "suites" as const;
 export const EXTERNAL_SEGMENT = "external" as const;
 
-/** The plan slug of the synthesized plan that holds the one-off runs. */
-export const ONE_OFF_RUNS_PLAN_SLUG = "one-off-runs" as const;
-
 export type AgentTestingTab = "cases" | "results";
 
+/**
+ * What the Scenarios tab is open on. A `suite` with no slug is an address that
+ * names no suite yet: the tab opens the first suite of the rail, which the
+ * address alone cannot know. The same arm covers an address naming a suite
+ * that no longer exists, so a stale link degrades instead of rendering broken.
+ */
 export type AgentTestingSelection =
-  | { kind: "all" }
-  | { kind: "suite"; slug: string }
+  | { kind: "suite"; slug: string | null }
   | { kind: "external"; setId: string };
 
 export type AgentTestingRoutingState = {
@@ -54,13 +56,16 @@ export type AgentTestingRouting = AgentTestingRoutingState & {
   selectSuite: (selection: AgentTestingSelection) => void;
   selectPlan: (planSlug: string | null) => void;
   selectRun: (batchRunId: string | null) => void;
+  /** Land on one run of one plan in a single address change. */
+  selectPlanRun: (target: { planSlug: string; batchRunId: string }) => void;
 };
 
-const ALL_CASES: AgentTestingSelection = { kind: "all" };
+/** The address names no suite, so the tab opens the first one of the rail. */
+const UNNAMED_SUITE: AgentTestingSelection = { kind: "suite", slug: null };
 
 const DEFAULT_STATE: AgentTestingRoutingState = {
   tab: "cases",
-  selection: ALL_CASES,
+  selection: UNNAMED_SUITE,
   planSlug: null,
   batchRunId: null,
 };
@@ -90,7 +95,7 @@ export function deriveAgentTestingRouting(
   if (segments[0] === RESULTS_SEGMENT) {
     return {
       tab: "results",
-      selection: ALL_CASES,
+      selection: UNNAMED_SUITE,
       planSlug: segments[1] ?? null,
       batchRunId: segments[2] ?? null,
     };
@@ -124,6 +129,7 @@ export function buildAgentTestingSegments(
   }
 
   if (state.selection.kind === "suite") {
+    if (!state.selection.slug) return [];
     return [SUITES_SEGMENT, state.selection.slug];
   }
   if (state.selection.kind === "external") {
@@ -236,7 +242,7 @@ export function useAgentTestingRouting(): AgentTestingRouting {
   const setTab = useCallback(
     (tab: AgentTestingTab) => {
       // Each tab opens on its own root: the Results tab drops the plan and the
-      // run it held, and the Test cases tab opens on all cases.
+      // run it held, and the Scenarios tab opens on the first suite.
       push({ ...DEFAULT_STATE, tab });
     },
     [push],
@@ -268,6 +274,13 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     [push, state.planSlug],
   );
 
+  const selectPlanRun = useCallback(
+    ({ planSlug, batchRunId }: { planSlug: string; batchRunId: string }) => {
+      push({ ...DEFAULT_STATE, tab: "results", planSlug, batchRunId });
+    },
+    [push],
+  );
+
   return {
     ...state,
     isReady,
@@ -275,5 +288,6 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     selectSuite,
     selectPlan,
     selectRun,
+    selectPlanRun,
   };
 }

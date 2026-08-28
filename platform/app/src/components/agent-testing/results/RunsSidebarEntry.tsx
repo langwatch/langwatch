@@ -10,11 +10,9 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import {
-  getPassRateGradientColor,
-  PassRateCircle,
-} from "~/components/shared/PassRateIndicator";
 import { FG_MUTED } from "../shared/design";
+import { PassRateText } from "../shared/PassRateText";
+import { passRateColor } from "../shared/pass-rate-color";
 
 export type RunsSidebarEntryProps = {
   title: string;
@@ -53,7 +51,13 @@ function EntryNote({
   );
 }
 
-/** How the run went: the circle is the one place the outcome reads. */
+/**
+ * How the run went: the dot and the percentage beside it.
+ *
+ * Both take their colour from {@link passRateColor}, the one scale the whole
+ * surface reads, so a rate here cannot read green while the same rate reads
+ * amber in the plan table.
+ */
 function EntryResult({
   passRate,
   passedCount,
@@ -82,14 +86,14 @@ function EntryResult({
 
   return (
     <HStack gap={1} data-testid={`${testId}-result`}>
-      <PassRateCircle passRate={passRate} size="6px" />
-      <Text
-        fontSize="10.5px"
-        fontWeight="semibold"
-        color={getPassRateGradientColor(passRate)}
-      >
-        {passRate === null ? "-" : `${Math.round(passRate)}%`}
-      </Text>
+      <Box
+        boxSize="6px"
+        borderRadius="full"
+        flexShrink={0}
+        backgroundColor={passRateColor(passRate)}
+        data-testid={`${testId}-result-dot`}
+      />
+      <PassRateText passRate={passRate} fontSize="10.5px" />
       {passedCount !== null ? (
         <Text fontSize="10.5px" color={FG_MUTED}>
           · {passedCount} passed

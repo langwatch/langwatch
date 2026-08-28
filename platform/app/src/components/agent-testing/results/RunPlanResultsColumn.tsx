@@ -11,6 +11,7 @@ import type { RunPlanDetailProps } from "./RunPlanDetail";
 import { RunPlanDetailHeader } from "./RunPlanDetailHeader";
 import { RunPlanResultsDialogs } from "./RunPlanResultsDialogs";
 import { RunPlanRunResults } from "./RunPlanRunResults";
+import { RunSettingsBlock } from "./RunSettingsBlock";
 import { RUNS_SIDEBAR_WIDTH } from "./RunsSidebar";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
@@ -39,6 +40,11 @@ export function RunPlanResultsColumn({
     exportRuns,
     isExportDisabled,
     run,
+    runSettings,
+    runStartedLabel,
+    runStartedByLabel,
+    isRunSettingsShown,
+    toggleRunSettings,
     runDialog,
   } = useRunPlanResultsColumn({ plan, batches, selection, periodControls });
 
@@ -60,7 +66,17 @@ export function RunPlanResultsColumn({
           isExportDisabled={isExportDisabled}
           onEditPlan={onEditPlan}
           onRunPlan={canManage ? runDialog.runPlan : undefined}
+          isRunSettingsShown={isRunSettingsShown}
+          onToggleRunSettings={toggleRunSettings}
         />
+
+        {isRunSettingsShown && runSettings ? (
+          <RunSettingsBlock
+            settings={runSettings}
+            startedLabel={runStartedLabel}
+            startedByLabel={runStartedByLabel}
+          />
+        ) : null}
 
         <RunPlanRunResults
           plan={plan}

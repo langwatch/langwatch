@@ -37,6 +37,7 @@ import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
@@ -44,6 +45,7 @@ import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
@@ -172,7 +174,9 @@ export function createApiRouter() {
   api.route("/", secretsApp);
   api.route("/", agentCacheApp);
   api.route("/", simulationRunsApp);
-  api.route("/", suitesApp);
+  api.route("/", suitesApp); // deprecated alias of the two families below
+  api.route("/", runPlansApp); // /api/v1/run-plans
+  api.route("/", testSuitesApp); // /api/v1/test-suites
   api.route("/", teamsApp);
   api.route("/", webhookPlatformApp);
   api.route("/", gatewaySpendApp);

@@ -26,7 +26,7 @@ export function RailSectionHeading({
   return (
     <Text
       paddingLeft="10px"
-      paddingTop={spaced ? 2 : 1.5}
+      paddingTop={spaced ? 4 : 1.5}
       paddingBottom={0.5}
       fontSize="10px"
       fontWeight="semibold"
@@ -41,7 +41,7 @@ export function RailSectionHeading({
 
 export type RailItemProps = {
   label: string;
-  /** Absent on the row that stands for every test case. */
+  /** The folder icon of a test suite, or the code icon of an external set. */
   icon?: React.ReactNode;
   selected: boolean;
   collapsed: boolean;

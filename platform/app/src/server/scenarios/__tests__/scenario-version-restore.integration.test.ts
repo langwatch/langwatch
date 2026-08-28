@@ -274,7 +274,7 @@ describe("restoring a scenario version", () => {
       expect(stored?.version).toBe(5);
     });
 
-    /** @scenario "Restoring an archived test case is refused" */
+    /** @scenario "Restoring an archived scenario is refused" */
     it("refuses to restore into an archived case and keeps it archived", async () => {
       const scenario = await createCaseAtVersionFive();
       await service.archive({ id: scenario.id, projectId });

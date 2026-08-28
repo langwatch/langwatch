@@ -1,5 +1,5 @@
-Feature: Test case history in the interface
-  As a person who edits a test case
+Feature: Scenario history in the interface
+  As a person who edits a scenario
   I want to see its version and open its history
   So that I can tell what I changed and go back if I need to
 
@@ -19,13 +19,13 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: The editor shows the current version beside the case name
-    Given a test case at version 4
+    Given a scenario at version 4
     When its editor is opened
     Then a chip beside the name reads version 4
 
   @integration
   Scenario: The chip goes up after a save
-    Given a test case at version 4 open in the editor
+    Given a scenario at version 4 open in the editor
     When a field is changed and the case is saved
     Then the chip reads version 5
 
@@ -40,7 +40,7 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: History opens a popover listing the versions newest first
-    Given a test case with three versions open in the editor
+    Given a scenario with three versions open in the editor
     When History is chosen
     Then a popover lists version 3, version 2 and version 1 in that order
     And the case editor stays open under it
@@ -62,17 +62,17 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: A case that never had a save shows one Created entry
-    Given a test case saved before version history existed
+    Given a scenario saved before version history existed
     When History is opened
     Then one entry reads Created at version 1
     And it carries the date the case was created
 
   @integration
-  Scenario: History opens from the row menu of a test case
-    Given a test case with three versions in the table
-    When History is chosen on its row menu
-    Then the editor of that case opens
-    And its history popover is already open
+  Scenario: The row menu of a scenario offers no History item
+    Given a scenario with three versions in the table
+    When its row menu is opened
+    Then no "History" action is offered
+    And the versions read inside the editor of that scenario
 
   @integration
   Scenario: The run drawer offers no History control
@@ -85,7 +85,7 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: Restore writes a new version and lists the new one on top
-    Given the history popover with a test case at version 5
+    Given the history popover with a scenario at version 5
     When version 2 is restored
     Then the popover lists a new version 6 at the top
     And the editor reads the content of version 2
@@ -116,7 +116,7 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: A save that lost a race says the case changed
-    Given a test case open in the editor while somebody else saves it
+    Given a scenario open in the editor while somebody else saves it
     When Save is chosen
     Then the editor says the case changed since it was opened
     And it offers to reload the newer version
@@ -124,7 +124,7 @@ Feature: Test case history in the interface
 
   @integration
   Scenario: A history that cannot load says so and offers to retry
-    Given the history of a test case cannot be read
+    Given the history of a scenario cannot be read
     When History is chosen
     Then the popover says the history could not be loaded
     And it offers to try again

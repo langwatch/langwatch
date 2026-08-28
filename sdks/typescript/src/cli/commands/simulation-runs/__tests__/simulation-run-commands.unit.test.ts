@@ -228,7 +228,7 @@ describe("getSimulationRunCommand()", () => {
 });
 
 /**
- * The note belongs to the batch and the version is the test case version the
+ * The note belongs to the batch and the version is the scenario version the
  * run used. Both read as named fields: the run's raw metadata is internal and
  * never part of what the CLI shows or returns.
  *

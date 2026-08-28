@@ -18,7 +18,7 @@ export const SUITE_SCOPE_MODES = ["all", "folders", "labels", "cases"] as const;
 export type SuiteScopeMode = (typeof SUITE_SCOPE_MODES)[number];
 
 export const suiteScopeSchema = z.discriminatedUnion("mode", [
-  /** Every non-archived test case of the project. */
+  /** Every non-archived scenario of the project. */
   z.object({ mode: z.literal("all") }),
   /** The non-archived cases filed in any of these test suites. */
   z.object({ mode: z.literal("folders"), folderIds: z.array(z.string()) }),

@@ -1,5 +1,5 @@
 /**
- * The optional blocks of the test case dialog: the parameters, the turn
+ * The optional blocks of the scenario dialog: the parameters, the turn
  * limits and the model overrides.
  *
  * The dialog asks its four questions and offers the rest as chips, the way the

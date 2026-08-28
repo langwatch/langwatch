@@ -20,6 +20,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
+import { applyConfigurationTo } from "./apply-configuration";
 import type { PromptEntry } from "./PromptPicker";
 import {
   formatParameterLine,
@@ -36,11 +37,18 @@ import {
   toRowsRunParameters,
   toStorableRowParameters,
 } from "./parameter-rows";
+import { type ScopeScenario, scenariosInScope } from "./RunScopeSection";
+import { normaliseRunScope, type RunScope } from "./run-configuration";
 import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
+import { useRunConfigurationHistory } from "./useRunConfigurationHistory";
+import { useRunHistorySeed } from "./useRunHistorySeed";
+import { buildTargetLabels, scopeLabelOf, useRunName } from "./useRunName";
+import { type RunPlanFields, useRunPlanFields } from "./useRunPlanFields";
 
 /** One key per subject the dialog can be open on, "closed" when it is not. */
 function subjectKeyOf(subject: RunDialogSubject | null): string {
   if (!subject) return "closed";
+  if (subject.kind === "plan") return "plan";
   if (subject.kind === "all") return "all";
   if (subject.kind === "suite") return `suite:${subject.suiteId}`;
   return `case:${subject.scenarioId}`;
@@ -55,6 +63,24 @@ function scenarioIdsOfSubject(
   if (subject.kind === "case") return [subject.scenarioId];
   if (subject.kind === "suite") return subject.scenarioIds;
   return allScenarios.map((scenario) => scenario.id);
+}
+
+/** The scenarios in the dialog's scope, which only New run plan can narrow. */
+function scopedScenarioIds({
+  subject,
+  scope,
+  scenarios,
+  allScenarios,
+}: {
+  subject: RunDialogSubject | null;
+  scope: RunScope;
+  scenarios: readonly ScopeScenario[];
+  allScenarios: readonly { id: string }[];
+}): string[] {
+  if (subject?.kind === "plan") {
+    return scenariosInScope({ scope, scenarios });
+  }
+  return scenarioIdsOfSubject(subject, allScenarios);
 }
 
 /**
@@ -82,6 +108,19 @@ function rememberedSecretRows(
   return names.map((name) => ({ name, value: "", secret: true }));
 }
 
+/** The parameter block as the subject remembers it, block by block. */
+function rememberedParameters(subject: RunDialogSubject | null) {
+  const line = rememberedParameterLine(subject);
+  const secretRows = rememberedSecretRows(subject);
+  const hasSecretRows = secretRows.length > 0;
+  return {
+    show: line !== "" || hasSecretRows,
+    line,
+    rowsRequested: hasSecretRows,
+    rows: hasSecretRows ? [...rowsFromLine(line), ...secretRows] : null,
+  };
+}
+
 /** The fields of the dialog, reset whenever it opens on a new subject. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
   const [target, setTarget] = useState<TargetValue>(null);
@@ -99,12 +138,15 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<unknown>(null);
   const [missingProvider, setMissingProvider] = useState(false);
+  // The subject the fields below already hold the opening values of. Anything
+  // that reads the fields waits for this, because the reset runs in an effect
+  // and the render that opens the dialog is one render ahead of it.
+  const [resetFor, setResetFor] = useState("closed");
   const agentTargetBeforePrompt = useRef<TargetValue>(null);
 
   const subjectKey = subjectKeyOf(subject);
   const initialTarget = subject?.initialTarget ?? null;
-  const initialParameterLine = rememberedParameterLine(subject);
-  const initialSecretRows = rememberedSecretRows(subject);
+  const remembered = rememberedParameters(subject);
   useEffect(() => {
     setTarget(initialTarget);
     setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
@@ -112,17 +154,14 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     // is for, so it starts empty every time.
     setShowNote(false);
     setNote("");
-    setShowParams(initialParameterLine !== "" || initialSecretRows.length > 0);
-    setParameterLine(initialParameterLine);
-    setRowsRequested(initialSecretRows.length > 0);
-    setParameterRows(
-      initialSecretRows.length > 0
-        ? [...rowsFromLine(initialParameterLine), ...initialSecretRows]
-        : null,
-    );
+    setShowParams(remembered.show);
+    setParameterLine(remembered.line);
+    setRowsRequested(remembered.rowsRequested);
+    setParameterRows(remembered.rows);
     setSecretValues({});
     setInlineError(null);
     setMissingProvider(false);
+    setResetFor(subjectKey);
     agentTargetBeforePrompt.current = null;
     // Reset exactly once per subject; the target of a subject does not move
     // under an open dialog.
@@ -151,11 +190,12 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setInlineError,
     missingProvider,
     setMissingProvider,
+    resetFor,
     agentTargetBeforePrompt,
   };
 }
 
-type RunDialogFields = ReturnType<typeof useRunDialogFields>;
+export type RunDialogFields = ReturnType<typeof useRunDialogFields>;
 
 /** The agents, the published prompts and the cases the project holds. */
 function useRunDialogChoices(subject: RunDialogSubject | null) {
@@ -173,6 +213,12 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
     { projectId },
     { enabled: isDialogOpen },
   );
+  // Only the New run plan entry point names test suites, but the run name of
+  // every entry point can read one, so the list is read whenever it is open.
+  const { data: folders } = api.suites.folders.getAll.useQuery(
+    { projectId },
+    { enabled: isDialogOpen },
+  );
 
   const publishedPrompts: PromptEntry[] = useMemo(
     () =>
@@ -186,7 +232,24 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
     [prompts],
   );
 
-  return { scenarioAgents, publishedPrompts, allScenarios };
+  const scopeScenarios: ScopeScenario[] = useMemo(
+    () =>
+      (allScenarios ?? []).map((scenario) => ({
+        id: scenario.id,
+        name: scenario.name,
+        folderId: scenario.folderId ?? null,
+        labels: scenario.labels ?? [],
+      })),
+    [allScenarios],
+  );
+
+  return {
+    scenarioAgents,
+    publishedPrompts,
+    allScenarios,
+    folders: folders ?? [],
+    scopeScenarios,
+  };
 }
 
 /** The overrides the run can carry, and the fields that collect them. */
@@ -461,33 +524,47 @@ function useRunDialogTargeting({
   return { selectPrompts, removePromptPicker, handleSetupAgent };
 }
 
-/** The chips that add a note, parameter overrides, or a prompt target. */
+/**
+ * The chips that add the optional parts of a run, in one fixed order.
+ *
+ * A chip is offered while the block it adds is closed, so the row shortens as
+ * the run is customised and each block can be taken away again.
+ */
 function buildCustomizeRunChips({
   fields,
+  planFields,
   hasParameterDefinitions,
   hasPublishedPrompts,
   onAddParameters,
   onRunAgainstPrompt,
 }: {
   fields: RunDialogFields;
+  planFields: RunPlanFields;
   hasParameterDefinitions: boolean;
   hasPublishedPrompts: boolean;
   onAddParameters: () => void;
   onRunAgainstPrompt: () => void;
 }): CustomizeChip[] {
   const chips: CustomizeChip[] = [];
-  if (!fields.showNote) {
-    chips.push({
-      key: "note",
-      label: "Add a note to your run",
-      onAdd: () => fields.setShowNote(true),
-    });
-  }
   if (!fields.showParams && hasParameterDefinitions) {
     chips.push({
       key: "params",
-      label: "Override parameters",
+      label: "Add parameters",
       onAdd: onAddParameters,
+    });
+  }
+  if (!planFields.showCompare && fields.mode === "agents") {
+    chips.push({
+      key: "compare",
+      label: "Compare agents",
+      onAdd: () => planFields.setShowCompare(true),
+    });
+  }
+  if (!fields.showNote) {
+    chips.push({
+      key: "note",
+      label: "Add a note",
+      onAdd: () => fields.setShowNote(true),
     });
   }
   if (fields.mode === "agents" && hasPublishedPrompts) {
@@ -497,27 +574,151 @@ function buildCustomizeRunChips({
       onAdd: onRunAgainstPrompt,
     });
   }
+  if (!planFields.showModels) {
+    chips.push({
+      key: "models",
+      label: "Custom simulation models",
+      onAdd: () => planFields.setShowModels(true),
+    });
+  }
+  if (!planFields.showRepeat) {
+    chips.push({
+      key: "repeat",
+      label: "Run multiple times",
+      onAdd: () => planFields.setShowRepeat(true),
+    });
+  }
   return chips;
 }
 
 /**
- * How many test cases a run of this subject covers, or nothing while the case
+ * How many scenarios a run of this subject covers, or nothing while the case
  * list a "run everything" subject needs is still on its way.
  */
 function caseCountOf(
   subject: RunDialogSubject | null,
   allScenarios: readonly { id: string }[] | undefined,
+  scopedIds: readonly string[],
 ): number | null {
   if (!subject) return null;
+  if (subject.kind === "plan") return scopedIds.length;
   if (subject.kind === "case") return 1;
   if (subject.kind === "suite") return subject.scenarioIds.length;
   return allScenarios?.length ?? null;
 }
 
+/** The targets the run goes against: the agent, and the one it is compared to. */
+function runTargetsOf({
+  target,
+  compareTarget,
+  showCompare,
+}: {
+  target: TargetValue;
+  compareTarget: TargetValue;
+  showCompare: boolean;
+}): NonNullable<TargetValue>[] {
+  const targets: NonNullable<TargetValue>[] = [];
+  if (target) targets.push(target);
+  if (showCompare && compareTarget) targets.push(compareTarget);
+  return targets;
+}
+
+/**
+ * The name of the run, and the configurations this scope already ran with.
+ *
+ * The scope is folded the way the server folds it before the history is read:
+ * a scope naming every test suite of the project IS every scenario, and a
+ * dialog that did not fold it would read the history of a scope its run never
+ * lands in.
+ */
+function useRunDialogNaming({
+  subject,
+  subjectKey,
+  choices,
+  fields,
+  planFields,
+  runTargets,
+}: {
+  subject: RunDialogSubject | null;
+  subjectKey: string;
+  choices: ReturnType<typeof useRunDialogChoices>;
+  fields: RunDialogFields;
+  planFields: RunPlanFields;
+  runTargets: NonNullable<TargetValue>[];
+}) {
+  const targetLabels = useMemo(
+    () =>
+      buildTargetLabels({
+        agents: choices.scenarioAgents,
+        prompts: choices.publishedPrompts,
+      }),
+    [choices.scenarioAgents, choices.publishedPrompts],
+  );
+
+  const runScope = useMemo(
+    () =>
+      normaliseRunScope({
+        scope: planFields.scope,
+        allFolderIds: choices.folders.map((folder) => folder.id),
+      }),
+    [planFields.scope, choices.folders],
+  );
+
+  const history = useRunConfigurationHistory({
+    scope: subject ? runScope : null,
+    isEnabled: !!subject,
+  });
+  const historyEntries = history.entries;
+
+  const name = useRunName({
+    subjectKey,
+    // A stored run plan opens on its own name; every other subject derives one.
+    planName: subject?.kind === "suite" ? (subject.planName ?? null) : null,
+    scopeLabel: subject
+      ? scopeLabelOf({
+          subject,
+          scope: planFields.scope,
+          folders: choices.folders,
+          scenarios: choices.scopeScenarios,
+        })
+      : "",
+    targets: runTargets,
+    targetLabels,
+    entries: historyEntries,
+  });
+
+  const applyConfiguration = useCallback(
+    (key: string) => {
+      const entry = historyEntries.find((candidate) => candidate.key === key);
+      if (!entry) return;
+      applyConfigurationTo({
+        entry,
+        fields,
+        planFields,
+        pinRunName: name.pinRunName,
+      });
+    },
+    [historyEntries, fields, planFields, name.pinRunName],
+  );
+
+  useRunHistorySeed({
+    subject,
+    subjectKey,
+    entries: historyEntries,
+    isLoaded: history.isLoaded,
+    fields,
+    planFields,
+  });
+
+  return { name, runScope, applyConfiguration };
+}
+
 /** Everything an open run dialog holds and offers. */
 export function useRunDialogForm(subject: RunDialogSubject | null) {
+  const subjectKey = subjectKeyOf(subject);
   const choices = useRunDialogChoices(subject);
   const fields = useRunDialogFields(subject);
+  const planFields = useRunPlanFields({ subject, subjectKey });
   const parameters = useRunDialogParameters({
     subject,
     allScenarios: choices.allScenarios,
@@ -527,12 +728,35 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     fields,
     publishedPrompts: choices.publishedPrompts,
   });
+
+  const runTargets = runTargetsOf({
+    target: fields.target,
+    compareTarget: planFields.compareTarget,
+    showCompare: planFields.showCompare,
+  });
+  const naming = useRunDialogNaming({
+    subject,
+    subjectKey,
+    choices,
+    fields,
+    planFields,
+    runTargets,
+  });
+
   const chips = buildCustomizeRunChips({
     fields,
+    planFields,
     hasParameterDefinitions: parameters.parameterDefinitions.length > 0,
     hasPublishedPrompts: choices.publishedPrompts.length > 0,
     onAddParameters: parameters.showParameters,
     onRunAgainstPrompt: targeting.selectPrompts,
+  });
+
+  const scopedIds = scopedScenarioIds({
+    subject,
+    scope: planFields.scope,
+    scenarios: choices.scopeScenarios,
+    allScenarios: choices.allScenarios ?? [],
   });
 
   return {
@@ -540,8 +764,15 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     ...choices,
     ...parameters,
     ...targeting,
+    ...planFields,
+    ...naming.name,
+    applyConfiguration: naming.applyConfiguration,
+    /** The scope the run goes out with, folded the way the server folds it. */
+    runScope: naming.runScope,
+    runTargets,
+    scopedScenarioIds: scopedIds,
     chips,
-    caseCount: caseCountOf(subject, choices.allScenarios),
+    caseCount: caseCountOf(subject, choices.allScenarios, scopedIds),
   };
 }
 

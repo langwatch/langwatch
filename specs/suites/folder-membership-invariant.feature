@@ -31,12 +31,12 @@ Feature: Folder membership never disagrees with itself
     And "Refunds" holds no case
 
   @integration
-  Scenario: Unfiling a case removes it from its folder
+  Scenario: Taking a case out of its folder files it into Default
     Given a case in the folder "Refunds"
-    When the case is unfiled
-    Then the case names no folder
+    When the case is taken out of "Refunds"
+    Then the case names the Default suite as its folder
     And "Refunds" holds no case
-    And the case is still listed in the case list as unfiled
+    And the Default suite holds the case
 
   @integration
   Scenario: Archiving one case drops it from its folder
@@ -95,7 +95,7 @@ Feature: Folder membership never disagrees with itself
 
   @integration
   Scenario: Two cases filed into one folder at the same time both land in it
-    Given a folder "Refunds" and two unfiled test cases
+    Given a folder "Refunds" and two test cases in the Default suite
     When both cases are filed into "Refunds" at the same time
     Then "Refunds" holds both of them
     And neither case is left naming a folder that does not hold it

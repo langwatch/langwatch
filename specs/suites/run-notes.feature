@@ -20,7 +20,7 @@ Feature: A note on a run
   @integration
   Scenario: A note typed in the run dialog is stored with the batch
     Given the run dialog is open for a test suite
-    When "Add a note to your run" is chosen and "switched judge to the stricter rubric" is typed
+    When "Add a note to your run" is chosen and "switched judge to the stricter criterion" is typed
     And the run is confirmed
     Then the batch that starts carries that note
     And every run in the batch carries the same note
@@ -39,16 +39,16 @@ Feature: A note on a run
     And the note reads the same as a note written in the platform dialog
 
   @integration
-  Scenario: A note on a single test case run is stored with that run
-    Given a test case row with a last target already chosen
-    When Run is chosen, a note is typed and the run is confirmed
-    Then the one-off run carries the note
+  Scenario: A note on a single scenario run is stored with that run
+    Given a test case and a target
+    When a run of that case is started with a note
+    Then that run carries the note
 
   # --- Reading a note back ---
 
   @integration
   Scenario: The runs sidebar shows the note under the run entry
-    Given a run plan with a run that carries the note "switched judge to the stricter rubric"
+    Given a run plan with a run that carries the note "switched judge to the stricter criterion"
     When the run plan is opened
     Then the sidebar entry for that run shows the note
     And it also shows how long ago the run started and its pass rate

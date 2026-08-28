@@ -1,5 +1,7 @@
 import { createTRPCRouter } from "~/server/api/trpc";
 import { cancellationRouter } from "./cancellation.router";
+import { resultAtomsRouter } from "./result-atoms.router";
+import { runConfigurationsRouter } from "./run-configurations.router";
 import { scenarioCrudRouter } from "./scenario-crud.router";
 import { scenarioEventsRouter } from "./scenario-events.router";
 import { scenarioVersionRouter } from "./scenario-version.router";
@@ -9,8 +11,8 @@ export { type SimulationTarget } from "./simulation-runner.router";
 
 /**
  * Combined scenarios router.
- * Flat merge of CRUD, events, simulation runner, cancellation and version
- * procedures.
+ * Flat merge of CRUD, events, simulation runner, cancellation, version,
+ * results-atom and run-configuration procedures.
  */
 export const scenarioRouter = createTRPCRouter({
   ...scenarioCrudRouter._def.procedures,
@@ -18,4 +20,6 @@ export const scenarioRouter = createTRPCRouter({
   ...simulationRunnerRouter._def.procedures,
   ...cancellationRouter._def.procedures,
   ...scenarioVersionRouter._def.procedures,
+  ...resultAtomsRouter._def.procedures,
+  ...runConfigurationsRouter._def.procedures,
 });

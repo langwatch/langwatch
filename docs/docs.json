@@ -1256,6 +1256,29 @@
             ]
           },
           {
+            "group": "Run Plans",
+            "pages": [
+              "api-reference/run-plans/overview",
+              "api-reference/run-plans/list-run-plans",
+              "api-reference/run-plans/create-run",
+              "api-reference/run-plans/get-run-plans",
+              "api-reference/run-plans/run-a-plan-again",
+              "api-reference/run-plans/delete-run-plans"
+            ]
+          },
+          {
+            "group": "Test Suites",
+            "pages": [
+              "api-reference/test-suites/overview",
+              "api-reference/test-suites/list-test-suites",
+              "api-reference/test-suites/create-test-suites",
+              "api-reference/test-suites/read-one-test-suite",
+              "api-reference/test-suites/update-test-suites",
+              "api-reference/test-suites/run-a-test-suite",
+              "api-reference/test-suites/delete-test-suites"
+            ]
+          },
+          {
             "group": "Suites",
             "pages": [
               "api-reference/suites/overview",

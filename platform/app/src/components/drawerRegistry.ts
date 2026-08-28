@@ -240,9 +240,9 @@ const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
 });
-const AgentTestingPlanModal = lazyDefault({
-  factory: () => import("./agent-testing/plan/PlanModal"),
-  key: "PlanModal",
+const AgentTestingCaseEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
+  key: "AgentTestingCaseEditorDrawer",
 });
 const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
@@ -323,8 +323,10 @@ export const drawers = {
   scenarioVersionHistory: ScenarioVersionHistoryDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
-  // Agent Testing v2 draws the same run plan in a dialog of its own.
-  agentTestingPlanEditor: AgentTestingPlanModal,
+  // Agent Testing v2 draws the same run plan in a right-side drawer.
+  // Agent Testing v2 case editor, opened from the cases table, the run rows
+  // and the run drawer.
+  agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance

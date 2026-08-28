@@ -7,16 +7,26 @@ import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.js
  * AI-readable digest or raw JSON.
  */
 export async function handleListScenarios(params: {
+  folderId?: string;
   format?: "digest" | "json";
 }): Promise<string> {
-  const scenarios = await apiListScenarios();
+  const all = await apiListScenarios();
+
+  // The REST list takes no folder query, so the filter runs here on the
+  // folderId every scenario already carries in the response.
+  const scenarios =
+    params.folderId !== undefined && Array.isArray(all)
+      ? all.filter((s) => s.folderId === params.folderId)
+      : all;
 
   if (params.format === "json") {
     return JSON.stringify(scenarios, null, 2);
   }
 
   if (!Array.isArray(scenarios) || scenarios.length === 0) {
-    return "No scenarios found in this project.\n\n> Tip: Use `platform_create_scenario` to create your first scenario.";
+    return params.folderId !== undefined
+      ? `No scenarios found in test suite ${params.folderId}.\n\n> Tip: Use \`platform_create_scenario\` with folderId \`${params.folderId}\` to file one there.`
+      : "No scenarios found in this project.\n\n> Tip: Use `platform_create_scenario` to create your first scenario.";
   }
 
   const lines: string[] = [];

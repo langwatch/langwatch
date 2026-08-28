@@ -5,9 +5,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { createCliScenariosService } from "./cli-scenarios-service";
 import {
-  FolderReferenceError,
-  resolveFolderReference,
-} from "../suites/folders/resolveFolder";
+  resolveSuiteReference,
+  SuiteReferenceError,
+} from "../test-suites/resolveSuite";
 
 export const createScenarioCommand = async (
   name: string,
@@ -26,11 +26,11 @@ export const createScenarioCommand = async (
   let folderName: string | undefined;
   if (options.folder !== undefined) {
     try {
-      const folder = await resolveFolderReference({ reference: options.folder });
+      const folder = await resolveSuiteReference({ reference: options.folder });
       folderId = folder.id;
       folderName = folder.name;
     } catch (error) {
-      if (error instanceof FolderReferenceError) {
+      if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
         process.exit(1);
       }

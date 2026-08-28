@@ -15,8 +15,8 @@ T = TypeVar("T", bound="PatchApiSuitesByIdResponse200TargetsItem")
 class PatchApiSuitesByIdResponse200TargetsItem:
     """
     Attributes:
-        type_ (PatchApiSuitesByIdResponse200TargetsItemType):
-        reference_id (str):
+        type_ (PatchApiSuitesByIdResponse200TargetsItemType): What kind of thing the scenarios run against.
+        reference_id (str): The id of the prompt, agent or workflow to run against.
     """
 
     type_: PatchApiSuitesByIdResponse200TargetsItemType

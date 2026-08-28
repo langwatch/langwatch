@@ -1,186 +1,149 @@
-Feature: Suite (Run Plan) CLI Commands
+Feature: Test Suite CLI Commands
   As a developer using LangWatch from the terminal
-  I want to manage suites (run plans) via CLI commands
-  So that I can orchestrate scenario execution against targets without using the UI
+  I want to manage test suites and run them
+  So that a folder of scenarios can be kept and run without using the UI
+
+  A test suite is a folder of scenarios: a name and the cases filed in it. It
+  holds no targets and no configuration. Running one is sugar over a run plan:
+  the targets travel with the request and the platform files the run under a
+  plan named after the suite and its target unless a name is sent.
 
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
 
-  Scenario: List suites
-    Given my project has suites configured
-    When I run "langwatch suite list"
-    Then I see a table of all suites with name, slug, scenario count, and target count
-
-  Scenario: List suites when none exist
-    Given my project has no suites
-    When I run "langwatch suite list"
-    Then I see a message indicating no suites were found
-
-  Scenario: Get suite details by ID
-    Given my project has a suite with name "Regression Suite"
-    When I run "langwatch suite get <suite-id>"
-    Then I see suite details including name, slug, scenarios, targets, and repeat count
-
-  Scenario: Get suite that does not exist
-    When I run "langwatch suite get nonexistent-id"
-    Then I see an error that the suite was not found
-
-  Scenario: Create a suite
-    Given my project has scenarios "scenario_1" and "scenario_2"
-    When I run "langwatch suite create 'Regression Suite' --scenarios scenario_1,scenario_2 --targets http:agent_abc"
-    Then a new suite is created and I see confirmation with its name and ID
-
-  Scenario: Create a suite with repeat count and labels
-    Given my project has scenarios and agents configured
-    When I run "langwatch suite create 'Load Test' --scenarios s1 --targets http:a1 --repeat-count 5 --labels regression,nightly"
-    Then a new suite is created with repeat count 5 and the specified labels
-
-  Scenario: Create a suite without required scenarios
-    When I run "langwatch suite create 'Test' --targets http:agent_1"
-    Then I see an error that the --scenarios option is required
-
-  Scenario: Create a suite without required targets
-    When I run "langwatch suite create 'Test' --scenarios scenario_1"
-    Then I see an error that the --targets option is required
-
-  Scenario: Update a suite
-    Given my project has a suite with name "Regression Suite"
-    When I run "langwatch suite update <suite-id> --name 'Updated Suite'"
-    Then the suite is updated and I see confirmation
-
-  Scenario: Duplicate a suite
-    Given my project has a suite with name "Regression Suite"
-    When I run "langwatch suite duplicate <suite-id>"
-    Then a copy of the suite is created with "(copy)" appended to the name
-
-  Scenario: Run a suite
-    Given my project has a suite with scenarios and active targets
-    When I run "langwatch suite run <suite-id>"
-    Then the suite run is scheduled and I see the job count and batch run ID
-
-  Scenario: Run a suite and wait for completion
-    Given my project has a suite with scenarios and active targets
-    When I run "langwatch suite run <suite-id> --wait"
-    Then the CLI polls until the run completes and shows pass/fail counts
-
-  Scenario: Delete (archive) a suite
-    Given my project has a suite with name "Regression Suite"
-    When I run "langwatch suite delete <suite-id>"
-    Then the suite is archived and I see confirmation
-
-  Scenario: Run a scenario against a target
-    Given my project has a scenario "Login Flow" and an HTTP agent
-    When I run "langwatch scenario run <scenario-id> --target http:agent_abc"
-    Then an ephemeral suite is created, run is scheduled, and the suite is cleaned up
-
-  Scenario: List simulation run results
-    Given my project has completed simulation runs
-    When I run "langwatch simulation-run list"
-    Then I see a list of runs with status, duration, and cost
-
-  Scenario: Get simulation run details
-    Given my project has a completed simulation run
-    When I run "langwatch simulation-run get <run-id>"
-    Then I see full run details including conversation messages, verdict, and criteria
-
-  # ============================================================================
-  # Run notes (Agent Testing v2)
-  # ============================================================================
-  # A note is a short line kept with one batch run. The domain rules are in
-  # specs/suites/run-notes.feature and
-  # specs/suites/run-note-metadata-convention.feature.
+  # ==========================================================================
+  # suite list, create, get, rename, archive
+  # ==========================================================================
 
   @unit
-  Scenario: Run a suite with a note
-    Given my project has a suite with scenarios and active targets
-    When I run "langwatch suite run <suite-id> --note 'nightly regression after the retry fix'"
-    Then the suite run is scheduled with that note
+  Scenario: List test suites
+    Given my project has test suites
+    When I run "langwatch suite list"
+    Then I see a table with the name, ID and scenario count of each suite
+    And run plans are not listed
+
+  @unit
+  Scenario: List test suites when none exist
+    Given my project has no test suites
+    When I run "langwatch suite list"
+    Then I see a message that no test suites were found
+
+  @unit
+  Scenario: Create a test suite
+    When I run "langwatch suite create 'Refunds'"
+    Then a new test suite is created and I see confirmation with its name and ID
+    And it holds no scenarios
+
+  @unit
+  Scenario: Get a test suite by ID
+    Given my project has a test suite "Refunds"
+    When I run "langwatch suite get <suite-id>"
+    Then I see its name, ID and the scenarios filed in it
+
+  @unit
+  Scenario: Get a test suite by name
+    Given my project has a test suite "Refunds"
+    When I run "langwatch suite get Refunds"
+    Then the name is resolved to its ID and I see the same details
+
+  @unit
+  Scenario: Get a test suite that does not exist
+    When I run "langwatch suite get nonexistent-id"
+    Then I see an error that the test suite was not found
+
+  @unit
+  Scenario: Get a name two test suites share
+    Given my project has two test suites named "Refunds"
+    When I run "langwatch suite get Refunds"
+    Then I see an error naming both IDs
+
+  @unit
+  Scenario: Rename a test suite
+    Given my project has a test suite "Refunds"
+    When I run "langwatch suite rename <suite-id> 'Refunds and credits'"
+    Then the suite is renamed and I see confirmation
+    And its slug is kept
+
+  @unit
+  Scenario: Archive a test suite
+    Given my project has a test suite "Refunds" holding two scenarios
+    When I run "langwatch suite archive <suite-id>"
+    Then the suite is archived and I see confirmation
+    And the confirmation says the scenarios filed in it were archived too
+
+  @unit
+  Scenario: Archive a test suite that does not exist
+    When I run "langwatch suite archive nonexistent-id"
+    Then I see an error that the test suite was not found
+
+  # ==========================================================================
+  # suite run
+  # ==========================================================================
+
+  @unit
+  Scenario: Run a test suite
+    Given my project has a test suite with scenarios
+    When I run "langwatch suite run <suite-id> --target http:agent_abc"
+    Then every scenario filed in the suite is run against that target
+    And I see the plan name, the job count and the batch run ID
+
+  @unit
+  Scenario: Run a test suite by name
+    Given my project has a test suite "Refunds"
+    When I run "langwatch suite run Refunds --target http:agent_abc"
+    Then the name is resolved to its ID and the run is scheduled
+
+  @unit
+  Scenario: Run a test suite with no target
+    When I run "langwatch suite run <suite-id>"
+    Then I see an error that at least one --target is needed
+    And no run is scheduled
+
+  @unit
+  Scenario: Run a test suite under a plan name
+    Given my project has a run plan named "Nightly regression"
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --name 'Nightly regression'"
+    Then the run joins that plan
+
+  @unit
+  Scenario: Run a test suite with a repeat count and models
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --repeat 3 --simulator-model openai/gpt-5-mini --judge-model openai/gpt-5-mini"
+    Then the run carries the repeat count and both models
+
+  @unit
+  Scenario: Run a test suite with a note
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --note 'nightly regression after the retry fix'"
+    Then the run is scheduled with that note
     And the confirmation shows the note next to the batch run ID
 
   @unit
-  Scenario: Run a suite with a note and wait for completion
-    Given my project has a suite with scenarios and active targets
-    When I run "langwatch suite run <suite-id> --note 'nightly regression' --wait"
-    Then the run is scheduled with that note
-    And the CLI polls until the run completes and shows pass/fail counts
-
-  @unit
-  Scenario: Run a suite with a note over two hundred characters
-    When I run "langwatch suite run <suite-id> --note '<201 characters>'"
+  Scenario: Run a test suite with a note over two hundred characters
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --note '<201 characters>'"
     Then I see an error that the note is too long
     And no run is scheduled
 
   @unit
-  Scenario: Run a suite with a note of only spaces
-    When I run "langwatch suite run <suite-id> --note '   '"
+  Scenario: Run a test suite with a note of only spaces
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --note '   '"
     Then the run is scheduled with no note
 
-  # ============================================================================
-  # Test suite folders (Agent Testing v2)
-  # ============================================================================
-  # Folder commands are nested under `suite` because a folder is a suite. The
-  # domain rules are in specs/suites/suite-folders.feature.
+  @unit
+  Scenario: Run a test suite and wait for completion
+    When I run "langwatch suite run <suite-id> --target http:agent_abc --wait"
+    Then the CLI polls until every run of the batch has stopped
+    And I see the pass and fail counts
+
+  # ==========================================================================
+  # Command tree
+  # ==========================================================================
 
   @unit
-  Scenario: List test suite folders
-    Given my project has test suite folders
-    When I run "langwatch suite folder list"
-    Then I see a table of folders with name, ID, and scenario count
-    And custom run plans are not listed
+  Scenario: The suite group holds no folder subgroup
+    When I run "langwatch suite --help"
+    Then no "folder" subcommand group is listed
+    And the subcommands are list, create, get, rename, archive and run
 
   @unit
-  Scenario: List test suite folders when none exist
-    Given my project has no test suite folders
-    When I run "langwatch suite folder list"
-    Then I see a message indicating no folders were found
-
-  @unit
-  Scenario: Create a test suite folder
-    When I run "langwatch suite folder create 'Refunds'"
-    Then a new folder is created and I see confirmation with its name and ID
-    And it holds no scenarios
-
-  @unit
-  Scenario: Create a test suite folder with a name another suite already uses
-    Given my project has a run plan named "Refunds"
-    When I run "langwatch suite folder create 'Refunds'"
-    Then the folder is created with a distinct slug
-    And I see confirmation with its name and ID
-
-  @unit
-  Scenario: Rename a test suite folder
-    Given my project has a folder "Refunds"
-    When I run "langwatch suite folder rename <folder-id> 'Refunds and credits'"
-    Then the folder is renamed and I see confirmation
-
-  @unit
-  Scenario: Delete (archive) a test suite folder
-    Given my project has a folder "Refunds" holding two scenarios
-    When I run "langwatch suite folder delete <folder-id>"
-    Then the folder is archived and I see confirmation
-    And the confirmation says its scenarios were archived too
-
-  @unit
-  Scenario: Delete a test suite folder that does not exist
-    When I run "langwatch suite folder delete nonexistent-id"
-    Then I see an error that the folder was not found
-
-  @unit
-  Scenario: Run a test suite folder
-    Given my project has a folder with scenarios and active targets
-    When I run "langwatch suite run <folder-id>"
-    Then a run is scheduled for every scenario of the folder against every active target
-    And I see the job count and batch run ID
-
-  @unit
-  Scenario: Run a test suite folder that has no targets
-    Given my project has a folder with scenarios and no targets
-    When I run "langwatch suite run <folder-id>"
-    Then I see an error that the folder has no target to run against
-    And no run is scheduled
-
-  @unit
-  Scenario: Folder commands stay nested under the suite group
-    When I run "langwatch --help"
-    Then no top-level "folder" command group is listed
-    And "langwatch suite --help" lists the "folder" subcommand group
+  Scenario: Every test suite request declares the command line as its surface
+    When I run any "langwatch suite" command
+    Then the request carries the header "X-LangWatch-Surface: cli"

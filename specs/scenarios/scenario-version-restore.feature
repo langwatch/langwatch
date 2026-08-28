@@ -75,7 +75,7 @@ Feature: Restoring an older test case version
     And the case is unchanged
 
   @integration
-  Scenario: Restoring an archived test case is refused
+  Scenario: Restoring an archived scenario is refused
     Given an archived test case
     When one of its versions is restored
     Then the request is refused
