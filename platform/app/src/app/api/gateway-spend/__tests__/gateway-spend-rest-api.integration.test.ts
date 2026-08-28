@@ -6,7 +6,10 @@ import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterp
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
+import {
+  WebhookEventsClickHouseRepository,
+  WebhookEventsService,
+} from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -67,9 +70,10 @@ vi.mock("~/server/app-layer/app", async () => {
         spendEvents: GatewaySpendEventsService.create(
           new GatewaySpendEventsRepository(resolveTestClickHouseClient),
         ),
-        webhookEvents: WebhookEventsClickHouseRepository.create(
-          resolveTestClickHouseClient,
-        ),
+        webhookEvents: WebhookEventsService.create({
+          prisma: dbForPermissions,
+          repository: WebhookEventsClickHouseRepository.create(resolveTestClickHouseClient),
+        }),
       },
     }),
   };

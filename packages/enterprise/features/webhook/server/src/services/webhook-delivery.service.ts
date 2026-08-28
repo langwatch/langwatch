@@ -13,14 +13,8 @@ import type {
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import {
-  eventMatches,
-  type WebhookEndpointView,
-} from "@langwatch/enterprise-webhook-contract";
-import {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-} from "./webhook-envelope.service";
+import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
+import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
 import type { WebhookDestinationConfig } from "./webhook-destination.service";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
@@ -114,17 +108,12 @@ export type WebhookDispatchResult = {
 };
 
 export interface WebhookDeliveryEndpointService {
-  getActiveByOrganization(input: {
-    organizationId: string;
-  }): Promise<WebhookEndpointView[]>;
+  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   tryGetDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
-  getSigningSecrets(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<string[]>;
+  getSigningSecrets(input: { organizationId: string; endpointId: string }): Promise<string[]>;
   getDestinationConfig(input: {
     organizationId: string;
     endpointId: string;
@@ -146,10 +135,7 @@ function nanoUsdToDecimalString(value: number): string {
   const negative = value < 0;
   const absolute = BigInt(Math.abs(value));
   const whole = absolute / 1_000_000_000n;
-  const fraction = (absolute % 1_000_000_000n)
-    .toString()
-    .padStart(9, "0")
-    .replace(/0+$/, "");
+  const fraction = (absolute % 1_000_000_000n).toString().padStart(9, "0").replace(/0+$/, "");
   return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
 }
 
@@ -410,8 +396,7 @@ function deliverPayloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
     gatewayRequestId: payload.gateway_request_id,
     teamId: "",
     model: resolvedModel(payload, ""),
-    providerKey:
-      payload.model_provider_id || payload.attribution?.model_provider_id || "",
+    providerKey: payload.model_provider_id || payload.attribution?.model_provider_id || "",
     tokensInput: usage.input_tokens,
     tokensOutput: usage.output_tokens,
     tokensCacheRead: usage.cache_read_input_tokens,
@@ -435,11 +420,7 @@ function batchIdFor(
   entries: ReadonlyArray<{ envelope: { id: string }; salt?: string }>,
 ): string {
   const hash = createHash("sha256")
-    .update(
-      entries
-        .map((e) => (e.salt ? `${e.envelope.id}:${e.salt}` : e.envelope.id))
-        .join(","),
-    )
+    .update(entries.map((e) => (e.salt ? `${e.envelope.id}:${e.salt}` : e.envelope.id)).join(","))
     .digest("hex")
     .slice(0, 16);
   return `${endpointId}:${hash}`;
@@ -447,10 +428,7 @@ function batchIdFor(
 
 /** The instant a buffered envelope stops being held by the coalescing
  *  delay. */
-function coalescingDeadline(
-  entry: PendingEnvelope,
-  endpoint: WebhookEndpointView,
-): number {
+function coalescingDeadline(entry: PendingEnvelope, endpoint: WebhookEndpointView): number {
   return entry.appendedAtMs + endpoint.maxBatchDelayMs;
 }
 
@@ -572,9 +550,7 @@ async function flushEndpointStream({
   const existing = await deps.processStore.findByRef<EndpointStreamState>({
     ref,
   });
-  const pending: PendingEnvelope[] = existing?.state.pending
-    ? [...existing.state.pending]
-    : [];
+  const pending: PendingEnvelope[] = existing?.state.pending ? [...existing.state.pending] : [];
   if (append) {
     const item: PendingEnvelope = { envelope: append, appendedAtMs: now };
     if (appendSalt) item.salt = appendSalt;
@@ -691,19 +667,24 @@ function runDeliver(deps: WebhookDeliveryProcessDeps) {
  * inbox source id so re-delivering recently-delivered envelopes cannot
  * collide with their historical batches and silently no-op.
  */
+export type WebhookReplayInput = {
+  organizationId: string;
+  endpoint: WebhookEndpointView;
+  envelope: SendBatchPayload["envelopes"][number];
+  replayId: string;
+};
+
+type WebhookReplayWithDependencies = WebhookReplayInput & {
+  deps: WebhookDeliveryProcessDeps;
+};
+
 async function appendReplayToEndpointStream({
   deps,
   organizationId,
   endpoint,
   envelope,
   replayId,
-}: {
-  deps: WebhookDeliveryProcessDeps;
-  organizationId: string;
-  endpoint: WebhookEndpointView;
-  envelope: SendBatchPayload["envelopes"][number];
-  replayId: string;
-}): Promise<void> {
+}: WebhookReplayWithDependencies): Promise<void> {
   await flushEndpointStream({
     deps,
     organizationId,
@@ -719,10 +700,7 @@ async function appendReplayToEndpointStream({
  * elapsed or in-flight freed) for one endpoint's stream.
  */
 function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
-  return async (
-    payload: FlushEndpointPayload,
-    _context: IntentContext,
-  ): Promise<void> => {
+  return async (payload: FlushEndpointPayload, _context: IntentContext): Promise<void> => {
     const endpoint = await deps.endpoints.tryGetDeliverable({
       organizationId: payload.organizationId,
       endpointId: payload.endpointId,
@@ -1256,10 +1234,8 @@ export class WebhookDeliveryService {
     return deliverPayloadToRow(payload);
   }
 
-  static async appendReplayToEndpointStream(
-    input: Parameters<typeof appendReplayToEndpointStream>[0],
-  ): Promise<void> {
-    await appendReplayToEndpointStream(input);
+  async appendReplayToEndpointStream(input: WebhookReplayInput): Promise<void> {
+    await appendReplayToEndpointStream({ ...input, deps: this.deps });
   }
 
   runDeliver(): ReturnType<typeof runDeliver> {

@@ -1,6 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentService } from "@langwatch/agent-contract";
-import type { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
+import type {
+  WebhookEndpointRuntime,
+  WebhookDeliveryService,
+  WebhookEventsService,
+  WebhookHealthService,
+} from "~/runtime/app/features/webhooks";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { AppShutdownResources } from "./app";
@@ -33,7 +38,7 @@ import type { GatewayService } from "@langwatch/gateway-server";
 import type { GatewayVirtualKeySpendPort } from "@langwatch/gateway-server";
 import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
 import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import type { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
+import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import type { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
 import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
@@ -200,10 +205,14 @@ export interface AppDependencies {
     /** Reconciliation reads for the spend-events pull API and its tRPC
      *  ledger-screen counterpart (ADR-072). */
     spendEvents: GatewaySpendEventsService | undefined;
-    /** The webhook platform's emitted-events log (`gateway_spend` read
-     *  through the webhook envelope shape), shared by the REST events
-     *  list/get endpoints and spend-events replay. */
-    webhookEvents: WebhookEventsClickHouseRepository | undefined;
+    /** The process-owned emitted-events capability shared by REST and replay. */
+    webhookEvents: WebhookEventsService | undefined;
+    /** Endpoint mutation/read capability constructed once with the process store. */
+    webhookEndpoints: WebhookEndpointRuntime;
+    /** Endpoint delivery health capability sharing the same durable process store. */
+    webhookHealth: WebhookHealthService;
+    /** The process-owned delivery/outbox capability for replay and intent execution. */
+    webhookDelivery: WebhookDeliveryService | undefined;
   };
   /** The values a filter can offer, read from the trace store. */
   filters: {
@@ -271,7 +280,7 @@ export interface AppDependencies {
   /** Canonical-first User avatar reads with a bounded historical fallback. */
   userAvatarObjects: AppUserAvatarReadCompatibilityAdapter;
   /** The cross-tenant first step for historical file URLs without a project id. */
-  storedObjectOwners: StoredObjectOwnerLookupService;
+  storedObjectOwners: StoredObjectOwnerResolver;
   /** The operator-only `/api/ops/clickhouse/explain` endpoint's service —
    *  no tenant scoping, by design (see the repository's own doc comment).
    *  A service rather than the repository it reads, so the route calls a

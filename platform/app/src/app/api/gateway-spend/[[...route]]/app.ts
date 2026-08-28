@@ -1,4 +1,3 @@
-import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
@@ -6,9 +5,8 @@ import {
 import { spendRowToEnvelope } from "~/runtime/app/features/webhooks";
 import { eventMatches } from "@langwatch/enterprise-webhook-contract";
 import {
-  appendReplayToEndpointStream,
   type SendBatchPayload,
-  type WebhookDeliveryProcessDeps,
+  type WebhookDeliveryService,
 } from "~/runtime/app/features/webhooks";
 import { type WebhookEndpointView } from "~/runtime/app/features/webhooks";
 import { WebhookEventsService } from "~/runtime/app/features/webhooks";
@@ -22,9 +20,6 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
-import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
-import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { applicableEndUserCaps } from "@langwatch/gateway-server";
 import {
   decodeSpendEventsCursor,
@@ -651,7 +646,7 @@ const replayBodySchema = z
 async function appendWindowToEndpointStream({
   events,
   endpoint,
-  deliveryDeps,
+  delivery,
   organizationId,
   fromMs,
   toMs,
@@ -659,7 +654,7 @@ async function appendWindowToEndpointStream({
 }: {
   events: WebhookEventsService;
   endpoint: WebhookEndpointView;
-  deliveryDeps: WebhookDeliveryProcessDeps;
+  delivery: WebhookDeliveryService;
   organizationId: string;
   fromMs: number;
   toMs: number;
@@ -683,8 +678,7 @@ async function appendWindowToEndpointStream({
     // than error out: the response reports what actually went out.
     const shippable = matching.slice(0, REPLAY_MAX_ENVELOPES - replayed);
     for (const envelope of shippable) {
-      await appendReplayToEndpointStream({
-        deps: deliveryDeps,
+      await delivery.appendReplayToEndpointStream({
         organizationId,
         endpoint,
         envelope: envelope as SendBatchPayload["envelopes"][number],
@@ -722,8 +716,8 @@ secured.access(requires("gatewaySpend:manage")).post(
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
 
-    const endpoints = createEnterpriseWebhookEndpointService({ prisma });
-    const endpoint = await endpoints.getDeliverable({
+    const endpoints = c.app.gateway.webhookEndpoints;
+    const endpoint = await endpoints.tryGetDeliverable({
       organizationId: organization.id,
       endpointId: body.endpoint_id,
     });
@@ -731,21 +725,12 @@ secured.access(requires("gatewaySpend:manage")).post(
       throw new BadRequestError("unknown or inactive endpoint for this organization");
     }
 
-    const webhookEventsRepository = getApp().gateway.webhookEvents;
-    if (!webhookEventsRepository) {
+    const events = c.app.gateway.webhookEvents;
+    if (!events) {
       throw new ClickHouseUnavailableError();
     }
-    const events = new WebhookEventsService({
-      prisma,
-      repository: webhookEventsRepository,
-    });
-    const deliveryDeps: WebhookDeliveryProcessDeps = {
-      processStore: new PrismaProcessStore(prisma),
-      endpoints,
-      pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts({ prisma, now }),
-      dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
-      getPlan: (organizationId) => getApp().planProvider.getActivePlan({ organizationId }),
-    };
+    const delivery = c.app.gateway.webhookDelivery;
+    if (!delivery) throw new ClickHouseUnavailableError();
 
     // One replay identity per call: it salts batch ids and inbox source
     // ids so redelivered envelopes cannot collide with their historical
@@ -762,7 +747,7 @@ secured.access(requires("gatewaySpend:manage")).post(
     const replayed = await appendWindowToEndpointStream({
       events,
       endpoint,
-      deliveryDeps,
+      delivery,
       organizationId: organization.id,
       fromMs: body.from,
       toMs: body.to,

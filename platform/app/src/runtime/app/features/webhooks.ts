@@ -57,10 +57,6 @@ export const isEndpointStreamKey = (processKey: string): boolean =>
 export const deliverPayloadToRow = (payload: DeliverPayload) =>
   WebhookDeliveryService.payloadToRow(payload);
 
-export const appendReplayToEndpointStream = (
-  input: Parameters<typeof WebhookDeliveryService.appendReplayToEndpointStream>[0],
-): Promise<void> => WebhookDeliveryService.appendReplayToEndpointStream(input);
-
 export const runDeliver = (deps: WebhookDeliveryProcessDeps) =>
   WebhookDeliveryService.create(deps).runDeliver();
 

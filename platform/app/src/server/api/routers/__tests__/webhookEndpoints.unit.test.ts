@@ -6,8 +6,17 @@
  * @see specs/webhooks/webhook-endpoints.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  EntitlementService,
+  type Plan,
+  type ResolvePlanInput,
+} from "@langwatch/entitlement-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { AppWebhookAccessRuntime } from "~/runtime/app/features/webhooks";
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
+import { getApp } from "~/server/app-layer/app";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext } from "../../trpc";
 import { webhookEndpointsRouter } from "../webhookEndpoints";
 
@@ -34,34 +43,46 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (value: string) => value.replace(/^encrypted:/, ""),
 }));
 
-// Every checkOrganizationPermission call records its permission string and
-// denies the ones a test put into `denied`, so each procedure's scope
-// mapping is asserted against the real wiring, not a copy of it.
+// The composed permission service is real, while its two request-boundary
+// decisions are controlled here. This keeps the router's declared-permission
+// wiring under test without requiring membership fixtures.
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
-        seenPermissions.push(permission);
-        return !denied.has(permission);
-      },
-    ),
-  };
-});
+const enabledPlan: Plan = {
+  planSource: "free",
+  type: "free",
+  name: "Free",
+  free: true,
+  maxMembers: 1,
+  maxMembersLite: 0,
+  maxMessagesPerMonth: 0,
+  canPublish: false,
+  webhookEndpointsEnabled: true,
+  prices: { USD: 0, EUR: 0 },
+};
 
-const getActivePlan = vi.fn();
+const getActivePlan = vi.fn<(input: ResolvePlanInput) => Promise<Plan>>();
+
+class TestEntitlementService extends EntitlementService {
+  async getActivePlan(input: ResolvePlanInput): Promise<Plan> {
+    return getActivePlan(input);
+  }
+}
+
+let permissions: ReturnType<typeof appPermissionsService>;
+let webhookEndpoints: ReturnType<typeof createEnterpriseWebhookEndpointService>;
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
-      permissions: appPermissionsService(),
+      permissions,
       planProvider: { getActivePlan },
+      gateway: {
+        webhookEndpoints,
+        webhookHealth: { health: vi.fn() },
+      },
     }),
   };
 });
@@ -95,12 +116,21 @@ function buildMockPrisma() {
 }
 
 function buildCaller(prisma: PrismaClient) {
+  permissions = appPermissionsService(prisma);
+  vi.spyOn(permissions, "checkScopeLineage").mockResolvedValue({ kind: "consistent" });
+  vi.spyOn(permissions, "getDecision").mockImplementation(async ({ permission }) => {
+    seenPermissions.push(permission);
+    return { permitted: !denied.has(permission), organizationRole: null };
+  });
+  webhookEndpoints = createEnterpriseWebhookEndpointService({ prisma });
+  const app = getApp();
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_1" }, expires: "1" },
     req: undefined,
     res: undefined,
     permissionChecked: false,
     publiclyShared: false,
+    app,
   });
   ctx.prisma = prisma;
   return webhookEndpointsRouter.createCaller(ctx);
@@ -111,7 +141,12 @@ describe("webhookEndpointsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: true });
+    getActivePlan.mockResolvedValue(enabledPlan);
+    AppWebhookAccessRuntime.install(new TestEntitlementService());
+  });
+
+  afterEach(() => {
+    AppWebhookAccessRuntime.clear();
   });
 
   /** @scenario Read procedures require the view scope and mutations the manage scope */
@@ -144,11 +179,9 @@ describe("webhookEndpointsRouter", () => {
 
   /** @scenario Sessions of organizations without the plan flag are refused */
   it("refuses every procedure when the plan lacks the entitlement", async () => {
-    getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: false });
+    getActivePlan.mockResolvedValue({ ...enabledPlan, webhookEndpointsEnabled: false });
     const caller = buildCaller(buildMockPrisma());
-    await expect(caller.list({ organizationId: ORG_ID })).rejects.toThrow(
-      /enterprise feature/i,
-    );
+    await expect(caller.list({ organizationId: ORG_ID })).rejects.toThrow(/enterprise feature/i);
   });
 
   /** @scenario The session surface returns the secret only from create and roll mutations */

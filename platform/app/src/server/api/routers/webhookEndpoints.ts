@@ -1,4 +1,3 @@
-import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 /**
  * tRPC router for Org Settings > Webhooks. Session-auth sibling of the
  * org-key REST surface at /api/webhooks/v1: same service, same RBAC
@@ -18,11 +17,8 @@ import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,
 } from "~/runtime/app/features/webhooks";
-import { WebhookHealthService } from "~/runtime/app/features/webhooks";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -63,10 +59,6 @@ const assertWebhooksPlan = async (organizationId: string): Promise<void> => {
   }
 };
 
-function service(prisma: PrismaClient) {
-  return createEnterpriseWebhookEndpointService({ prisma });
-}
-
 /** Map service errors onto tRPC codes so the UI gets actionable messages. */
 async function translating<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -101,7 +93,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
       return next();
     })
     .query(({ ctx, input }) =>
-      service(ctx.prisma).getAll({ organizationId: input.organizationId }),
+      ctx.app.gateway.webhookEndpoints.getAll({ organizationId: input.organizationId }),
     ),
 
   deliveries: protectedProcedure
@@ -118,7 +110,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .query(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).getDeliveries({
+        ctx.app.gateway.webhookEndpoints.getDeliveries({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
           limit: input.limit,
@@ -146,7 +138,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).create({
+        ctx.app.gateway.webhookEndpoints.create({
           organizationId: input.organizationId,
           destinationKind: input.destinationKind,
           url: input.url,
@@ -168,10 +160,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .query(({ ctx, input }) =>
       translating(() =>
-        WebhookHealthService.create({
-          endpoints: service(ctx.prisma),
-          processStore: new PrismaProcessStore(ctx.prisma),
-        }).health({
+        ctx.app.gateway.webhookHealth.health({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
         }),
@@ -201,7 +190,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).update({
+        ctx.app.gateway.webhookEndpoints.update({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
           destinationKind: input.destinationKind,
@@ -224,7 +213,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).rollSecret({
+        ctx.app.gateway.webhookEndpoints.rollSecret({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
         }),
@@ -240,7 +229,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).enable({
+        ctx.app.gateway.webhookEndpoints.enable({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
         }),
@@ -256,7 +245,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).disable({
+        ctx.app.gateway.webhookEndpoints.disable({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
         }),
@@ -272,7 +261,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     })
     .mutation(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).archive({
+        ctx.app.gateway.webhookEndpoints.archive({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
         }),

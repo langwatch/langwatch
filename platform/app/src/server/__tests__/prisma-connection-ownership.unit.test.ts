@@ -139,6 +139,13 @@ describe("Prisma process ownership", () => {
     expect(production.indexOf("const prisma = globalPrisma")).toBeGreaterThan(
       production.indexOf("configurePrismaConnection"),
     );
+    expect(production).toContain("const prismaConnection = getPrismaConnection()");
+    expect(production).toContain(
+      "PrismaProcessStore.create({ database: prismaConnection.client })",
+    );
+    expect(presets).toContain(
+      "PrismaProcessStore.create({ database: testPrismaConnection.client })",
+    );
     expect(app).toContain("await existing.close()");
   });
 });

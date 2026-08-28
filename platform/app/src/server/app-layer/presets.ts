@@ -61,6 +61,9 @@ import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/gov
 import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
 import {
   WebhookEventsClickHouseRepository,
+  WebhookDeliveryService,
+  WebhookEventsService,
+  WebhookHealthService,
   type WebhookDeliveryProcessDeps,
 } from "~/runtime/app/features/webhooks";
 import {
@@ -1490,8 +1493,12 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const webhookEndpointService = createEnterpriseWebhookEndpointService({
     prisma,
   });
+  const webhookHealth = WebhookHealthService.create({
+    endpoints: webhookEndpointService,
+    processStore,
+  });
   installEnterpriseWebhookAccess(planProvider);
-  const webhookDelivery: WebhookDeliveryProcessDeps | undefined = clickhouseEnabled
+  const webhookDeliveryDeps: WebhookDeliveryProcessDeps | undefined = clickhouseEnabled
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
@@ -1500,6 +1507,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
         dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
         getPlan: (organizationId: string) => planProvider.getActivePlan({ organizationId }),
       }
+    : undefined;
+  const webhookDelivery = webhookDeliveryDeps
+    ? WebhookDeliveryService.create(webhookDeliveryDeps)
     : undefined;
 
   // The gateway's ClickHouse-backed repositories, built once and handed out
@@ -1521,6 +1531,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     : undefined;
   const gatewayWebhookEventsRepository = clickhouseEnabled
     ? WebhookEventsClickHouseRepository.create(resolveClickHouseClient)
+    : undefined;
+  const webhookEvents = gatewayWebhookEventsRepository
+    ? WebhookEventsService.create({ prisma, repository: gatewayWebhookEventsRepository })
     : undefined;
 
   // Gateway budget debits ride the spend pipeline and share its ClickHouse
@@ -1979,7 +1992,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewaySpend,
-    webhookDelivery,
+    webhookDelivery: webhookDeliveryDeps,
     gatewayDebits,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
@@ -2401,7 +2414,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       changes: gatewayChanges,
       virtualKeySpend: gatewayVirtualKeySpend,
       spendEvents: gatewaySpend ? GatewaySpendEventsService.create(gatewaySpend.port) : undefined,
-      webhookEvents: gatewayWebhookEventsRepository,
+      webhookEvents,
+      webhookEndpoints: webhookEndpointService,
+      webhookHealth,
+      webhookDelivery,
     },
     filters: {
       options: new FilterService(
@@ -2855,6 +2871,11 @@ export function createTestApp(
       processStore: testProcessStore,
     }),
   });
+  const testWebhookEndpoints = createEnterpriseWebhookEndpointService({ prisma: testPrisma });
+  const testWebhookHealth = WebhookHealthService.create({
+    endpoints: testWebhookEndpoints,
+    processStore: testProcessStore,
+  });
   const testDataRetention: DataRetentionDependencies = testDataRetentionService;
   const testScim = PostgresScimAdapter.create({
     database: testPrisma,
@@ -3060,6 +3081,9 @@ export function createTestApp(
       virtualKeySpend: undefined,
       spendEvents: undefined,
       webhookEvents: undefined,
+      webhookEndpoints: testWebhookEndpoints,
+      webhookHealth: testWebhookHealth,
+      webhookDelivery: undefined,
     },
     filters: { options: new FilterService(null) },
     clickhouse: {

@@ -1,4 +1,3 @@
-import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { randomUUID } from "node:crypto";
 import {
   assertWebhookEndpointsEntitled,
@@ -8,12 +7,9 @@ import { WEBHOOK_EVENT_TYPES } from "@langwatch/enterprise-webhook-contract";
 import {
   type SqsDestinationInput,
   type WebhookEndpointView,
+  type WebhookEndpointRuntime,
 } from "~/runtime/app/features/webhooks";
-import {
-  WebhookEventNotFoundError,
-  WebhookEventsService,
-} from "~/runtime/app/features/webhooks";
-import { WebhookHealthService } from "~/runtime/app/features/webhooks";
+import { WebhookEventNotFoundError, WebhookEventsService } from "~/runtime/app/features/webhooks";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
@@ -26,17 +22,12 @@ import {
 } from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-server";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
-import {
-  canonicalBaseResponses,
-  canonicalConflictResponses,
-} from "../../shared/base-responses";
+import { canonicalBaseResponses, canonicalConflictResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   idempotencyKeyParameter,
@@ -48,24 +39,20 @@ import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const endpoints = createEnterpriseWebhookEndpointService({ prisma });
-const health = WebhookHealthService.create({
-  endpoints,
-  processStore: new PrismaProcessStore(prisma),
-});
-
 /**
  * Resolved per call rather than at module scope, so every route shares the
- * one repository `getApp()` hands out instead of minting its own, and the
+ * process-composed repository instead of minting its own, and the
  * deployment's ClickHouse configuration is read at request time, not once
  * at import time. Undefined on a deployment without ClickHouse — the
  * emitted-events log has no fallback store — which this reports the same
  * way the old inline resolver did: a plain "not configured" refusal.
  */
-function requireEventsService(): WebhookEventsService {
-  const repository = getApp().gateway.webhookEvents;
-  if (!repository) throw new Error("ClickHouse is not configured");
-  return new WebhookEventsService({ prisma, repository });
+function requireEventsService(app: {
+  gateway: { webhookEvents: WebhookEventsService | undefined };
+}): WebhookEventsService {
+  const service = app.gateway.webhookEvents;
+  if (!service) throw new Error("ClickHouse is not configured");
+  return service;
 }
 
 /**
@@ -430,9 +417,7 @@ function sqsFromBody(sqs: {
     ...(sqs.role_arn !== undefined ? { roleArn: sqs.role_arn } : {}),
     ...(sqs.external_id !== undefined ? { externalId: sqs.external_id } : {}),
     ...(sqs.access_key_id !== undefined ? { accessKeyId: sqs.access_key_id } : {}),
-    ...(sqs.secret_access_key !== undefined
-      ? { secretAccessKey: sqs.secret_access_key }
-      : {}),
+    ...(sqs.secret_access_key !== undefined ? { secretAccessKey: sqs.secret_access_key } : {}),
   };
 }
 
@@ -485,14 +470,17 @@ function testFireBody(now: Date): string {
 /** Record a test fire's outcome. The test itself ran, so a delivery-log
  *  hiccup must not convert the documented 200-with-result contract into a
  *  500. */
-async function recordTestFire(attempt: {
-  organizationId: string;
-  endpointId: string;
-  dispatchId: string;
-  outcome: "success" | "terminal";
-  responseStatus?: number;
-  error?: string;
-}): Promise<void> {
+async function recordTestFire(
+  endpoints: WebhookEndpointRuntime,
+  attempt: {
+    organizationId: string;
+    endpointId: string;
+    dispatchId: string;
+    outcome: "success" | "terminal";
+    responseStatus?: number;
+    error?: string;
+  },
+): Promise<void> {
   try {
     await endpoints.recordDeliveryAttempt({
       ...attempt,
@@ -547,7 +535,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
       key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
       validatedBody: body,
       handler: async () => {
-        const { endpoint, secret } = await endpoints.create({
+        const { endpoint, secret } = await c.app.gateway.webhookEndpoints.create({
           organizationId: organization.id,
           ...destinationFromBody(body),
           enabledEvents: body.enabled_events,
@@ -579,7 +567,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const list = await endpoints.getAll({ organizationId: organization.id });
+    const list = await c.app.gateway.webhookEndpoints.getAll({ organizationId: organization.id });
     return c.json({ data: list.map(endpointResponse) });
   },
 );
@@ -598,7 +586,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const endpoint = await endpoints.getById({
+    const endpoint = await c.app.gateway.webhookEndpoints.getById({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
     });
@@ -615,10 +603,7 @@ secured.access(requires("webhookEndpoints:manage")).patch(
     description:
       "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
     responses: {
-      ...okResponse(
-        "The endpoint as it now stands",
-        z.object({ data: endpointDtoSchema }),
-      ),
+      ...okResponse("The endpoint as it now stands", z.object({ data: endpointDtoSchema })),
       ...notFoundResponse,
     },
   }),
@@ -637,7 +622,7 @@ secured.access(requires("webhookEndpoints:manage")).patch(
       body.max_batch_delay_ms !== undefined ||
       body.max_in_flight !== undefined;
     let endpoint = hasFieldUpdate
-      ? await endpoints.update({
+      ? await c.app.gateway.webhookEndpoints.update({
           organizationId: organization.id,
           endpointId,
           destinationKind: body.destination_kind,
@@ -648,18 +633,18 @@ secured.access(requires("webhookEndpoints:manage")).patch(
           maxBatchDelayMs: body.max_batch_delay_ms,
           maxInFlight: body.max_in_flight,
         })
-      : await endpoints.getById({
+      : await c.app.gateway.webhookEndpoints.getById({
           organizationId: organization.id,
           endpointId,
         });
     const requestedStatus = body.status && toStoredEnum(body.status);
     if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
-      endpoint = await endpoints.disable({
+      endpoint = await c.app.gateway.webhookEndpoints.disable({
         organizationId: organization.id,
         endpointId,
       });
     } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
-      endpoint = await endpoints.enable({
+      endpoint = await c.app.gateway.webhookEndpoints.enable({
         organizationId: organization.id,
         endpointId,
       });
@@ -685,7 +670,7 @@ secured.access(requires("webhookEndpoints:manage")).delete(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    await endpoints.archive({
+    await c.app.gateway.webhookEndpoints.archive({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
     });
@@ -711,7 +696,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const { endpoint, secret } = await endpoints.rollSecret({
+    const { endpoint, secret } = await c.app.gateway.webhookEndpoints.rollSecret({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
     });
@@ -739,11 +724,11 @@ secured.access(requires("webhookEndpoints:manage")).post(
     const organization = c.get("organization") as Organization;
     const endpointId = c.req.param("id");
     const [secrets, destination] = await Promise.all([
-      endpoints.getSigningSecrets({
+      c.app.gateway.webhookEndpoints.getSigningSecrets({
         organizationId: organization.id,
         endpointId,
       }),
-      endpoints.getDestinationConfig({
+      c.app.gateway.webhookEndpoints.getDestinationConfig({
         organizationId: organization.id,
         endpointId,
       }),
@@ -763,7 +748,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
         isTestFire: true,
       });
       const delivered = result.verdict === "success";
-      await recordTestFire({
+      await recordTestFire(c.app.gateway.webhookEndpoints, {
         organizationId: organization.id,
         endpointId,
         dispatchId,
@@ -783,7 +768,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
       // The full message goes to the delivery log for the operator; the
       // response carries a sanitized summary so internal dispatch wording
       // and transport details never reach the caller verbatim.
-      await recordTestFire({
+      await recordTestFire(c.app.gateway.webhookEndpoints, {
         organizationId: organization.id,
         endpointId,
         dispatchId,
@@ -835,7 +820,7 @@ secured.access(requires("webhookEndpoints:view")).get(
       }
       cursor = { firedAt: new Date(parsedMs), id };
     }
-    const page = await endpoints.getDeliveries({
+    const page = await c.app.gateway.webhookEndpoints.getDeliveries({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
       limit,
@@ -869,16 +854,13 @@ secured.access(requires("webhookEndpoints:view")).get(
     description:
       "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
     responses: {
-      ...okResponse(
-        "The endpoint's delivery health",
-        z.object({ data: healthDtoSchema }),
-      ),
+      ...okResponse("The endpoint's delivery health", z.object({ data: healthDtoSchema })),
       ...notFoundResponse,
     },
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const report = await health.health({
+    const report = await c.app.gateway.webhookHealth.health({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
     });
@@ -948,7 +930,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     // The service maps emitted types to row statuses and serves an empty
     // page for unknown types, so consumers can probe forward-compatibly
     // without an error.
-    const page = await requireEventsService().getEmittedEvents({
+    const page = await requireEventsService(c.app).getEmittedEvents({
       organizationId: organization.id,
       fromMs: query.from,
       toMs: query.to,
@@ -978,7 +960,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const event = await requireEventsService().getEmittedEventById({
+    const event = await requireEventsService(c.app).tryGetEmittedEventById({
       organizationId: organization.id,
       id: c.req.param("id"),
     });

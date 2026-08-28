@@ -9,7 +9,10 @@ import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
 import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/governance/governance-trace-activity.adapter";
 import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
-import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
+import {
+  WebhookEventsClickHouseRepository,
+  WebhookEventsService,
+} from "~/runtime/app/features/webhooks";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
   AppEvaluationExecutionPort,
@@ -254,7 +257,10 @@ export function installClickHouseTestApp({
       spendEvents: GatewaySpendEventsService.create(
         GatewaySpendEventsClickHouseAdapter.create(requiredGateway),
       ),
-      webhookEvents: WebhookEventsClickHouseRepository.create(required),
+      webhookEvents: WebhookEventsService.create({
+        prisma,
+        repository: WebhookEventsClickHouseRepository.create(required),
+      }),
     },
     governance,
     organizations: baseApp.organizations,

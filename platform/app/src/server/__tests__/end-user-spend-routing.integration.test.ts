@@ -18,7 +18,10 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
+import {
+  WebhookEventsClickHouseRepository,
+  WebhookEventsService,
+} from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -60,7 +63,10 @@ vi.mock("~/server/app-layer/app", async () => {
         spendEvents: GatewaySpendEventsService.create(
           GatewaySpendEventsClickHouseAdapter.create(async () => chClient),
         ),
-        webhookEvents: WebhookEventsClickHouseRepository.create(async () => chClient),
+        webhookEvents: WebhookEventsService.create({
+          prisma: dbForPermissions,
+          repository: WebhookEventsClickHouseRepository.create(async () => chClient),
+        }),
       },
     }),
   };
