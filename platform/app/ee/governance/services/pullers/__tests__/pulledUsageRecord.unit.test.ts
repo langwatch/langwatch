@@ -20,6 +20,9 @@ const SOURCE: PulledUsageSourceAttribution = {
   teamId: "team_platform",
 };
 
+/** The org's hidden governance project — where the row is stored (ADR-128). */
+const GOV_PROJECT_ID = "proj_governance_acme";
+
 const OBSERVED_AT = new Date("2026-08-06T09:00:00.000Z");
 
 function usageEvent({
@@ -61,6 +64,7 @@ describe("building one pulled usage record", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -80,6 +84,7 @@ describe("building one pulled usage record", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -91,6 +96,7 @@ describe("building one pulled usage record", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent(),
         source: { ...SOURCE, teamId: null },
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -99,10 +105,27 @@ describe("building one pulled usage record", () => {
       // outright rather than attributed one level up.
       expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBeNull();
-      // Every existing pull writer lands under the hidden governance project.
-      // A cost record must not: that project is invisible to the customer, so
-      // filing their money there is worse than admitting we do not know.
-      expect(record?.projectId).toBeNull();
+      // The home is where the row is stored, and it does not move with the
+      // owner: a source that names no team still lands under the org's
+      // governance project, and the money still belongs to the org.
+      expect(record?.projectId).toBe(GOV_PROJECT_ID);
+    });
+
+    it("stores the row under the governance home without attributing to it", () => {
+      const record = buildPulledUsageRecord({
+        event: usageEvent(),
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(record?.projectId).toBe(GOV_PROJECT_ID);
+      // The two must not collapse into one another: a home that also became
+      // the owner would file a customer's money where they cannot see it.
+      expect(record?.organizationId).toBe("org_acme");
+      expect(record?.teamId).toBe("team_platform");
+      expect(record?.teamId).not.toBe(GOV_PROJECT_ID);
+      expect(record?.organizationId).not.toBe(GOV_PROJECT_ID);
     });
 
     it("carries a provider-reported cost as exact when the adapter says so", () => {
@@ -117,6 +140,7 @@ describe("building one pulled usage record", () => {
           hint: { costBasis: "provider_reported", costStatus: "exact" },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -139,6 +163,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -151,6 +176,7 @@ describe("building one pulled usage record", () => {
       const first = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const corrected = buildPulledUsageRecord({
@@ -162,6 +188,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: new Date("2026-08-07T09:00:00.000Z"),
       });
 
@@ -193,11 +220,13 @@ describe("building one pulled usage record", () => {
       const first = buildPulledUsageRecord({
         event: withHour("60000"),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const corrected = buildPulledUsageRecord({
         event: withHour("3600000"),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: new Date("2026-08-07T09:00:00.000Z"),
       });
 
@@ -208,6 +237,7 @@ describe("building one pulled usage record", () => {
       const base = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const otherWorkspace = buildPulledUsageRecord({
@@ -221,6 +251,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const otherPeriod = buildPulledUsageRecord({
@@ -228,6 +259,7 @@ describe("building one pulled usage record", () => {
           overrides: { event_timestamp: "2026-08-02T00:00:00.000Z" },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -239,11 +271,13 @@ describe("building one pulled usage record", () => {
       const a = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const b = buildPulledUsageRecord({
         event: usageEvent(),
         source: { ...SOURCE, ingestionSourceId: "src_2" },
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -258,6 +292,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const b = buildPulledUsageRecord({
@@ -267,6 +302,7 @@ describe("building one pulled usage record", () => {
           },
         }),
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -283,6 +319,7 @@ describe("building one pulled usage record", () => {
         buildPulledUsageRecord({
           event: auditOnly,
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
       ).toBeNull();
@@ -296,6 +333,7 @@ describe("building one pulled usage record", () => {
         buildPulledUsageRecord({
           event: auditOnly,
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
       ).toBeNull();
@@ -308,6 +346,7 @@ describe("building one pulled usage record", () => {
         buildPulledUsageRecord({
           event: usageEvent({ overrides: { event_timestamp: "not-a-date" } }),
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
       ).toThrow(/timestamp/i);
@@ -318,6 +357,7 @@ describe("building one pulled usage record", () => {
         buildPulledUsageRecord({
           event: usageEvent({ hint: { dimensions: {} } }),
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
       ).toThrow();
@@ -331,6 +371,7 @@ describe("building one pulled usage record", () => {
             hint: { costBasis: "provider_reported" },
           }),
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
       ).toThrow();

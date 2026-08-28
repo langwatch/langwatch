@@ -143,7 +143,10 @@ export async function getDataPrivacySnapshot(
         orderBy: { name: "asc" },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, name: true, teamId: true },
         orderBy: { name: "asc" },
       }),

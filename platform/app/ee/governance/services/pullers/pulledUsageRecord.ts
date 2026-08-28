@@ -141,10 +141,17 @@ function restatementKeyFor({
 export function buildPulledUsageRecord({
   event,
   source,
+  governanceProjectId,
   observedAt,
 }: {
   event: NormalizedPullEvent;
   source: PulledUsageSourceAttribution;
+  /**
+   * The org's hidden governance project — where the row is STORED, not who
+   * the money belongs to. Separate from `source` because attribution is what
+   * the source knows and the home is what the org has.
+   */
+  governanceProjectId: string;
   observedAt: Date;
 }): PulledUsageObservedEventData | null {
   const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
@@ -195,11 +202,14 @@ export function buildPulledUsageRecord({
     ingestionSourceId: source.ingestionSourceId,
     organizationId: source.organizationId,
     teamId: source.teamId,
-    // Deferred: `IngestionSource` carries no project yet (ADR-088 Decision 4).
-    // Null says unattributed. The hidden governance project every other pull
-    // writer uses is not an option here — it is invisible to the customer, so
-    // filing their money there would be worse than saying we do not know.
-    projectId: null,
+    // The row's home: the org's hidden governance project, the same partition
+    // the OCSF audit rows and the ledger's TenantId already use. Nothing
+    // pulled arrives homeless. This says where the row is STORED and not who
+    // owns the money — that stays on organizationId/teamId above, which
+    // `pulledUsageScopeId` reads to pick the ledger's Scope. Members never see
+    // the home: every listing surface excludes kind="internal_governance".
+    // Decision: ADR-128.
+    projectId: governanceProjectId,
     model,
     ...quantities,
     costNanoUsd: priced.costNanoUsd,
