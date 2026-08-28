@@ -254,6 +254,25 @@ type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
 /**
+ * What installing a check into the chain actually requires: the declaration
+ * brand, and nothing else.
+ *
+ * The chain builder below reads the descriptor off the check and hands the
+ * function to `.use()`; it never calls it, so the context and validated-input
+ * types the check is written against are the CALLER's business, checked on the
+ * public `.use()` above against that procedure's own generics. Naming them
+ * again here only asserted that two unrelated type parameters — the process's
+ * custom-check context and the context its declared checks read — were the
+ * same type, which they are not: `TrpcDeclaredCheck<TDeclaredContext>` and
+ * `TrpcCheckMiddleware<TCheckContext, TInputOut>` are both installed here.
+ *
+ * The brand is the invariant that matters and it survives: only
+ * `declareAuthzMiddleware(...)` produces it, so an undeclared function is
+ * still a compile error rather than a sweep finding.
+ */
+type InstallableCheck = DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>;
+
+/**
  * Builds one process's declaring procedure builder.
  *
  * `TCheckContext` is the request context a hand-written custom check receives
@@ -327,9 +346,7 @@ export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext
      * behaviour — the check must sit inside the error/tracing middlewares and
      * before `enforceCheck`, which is what proves a check ran at all.
      */
-    const withPermissionCheck = (
-      check: DeclaredAuthzMiddleware<TrpcCheckMiddleware<TCheckContext, TInputOut>>,
-    ): Declared =>
+    const withPermissionCheck = (check: InstallableCheck): Declared =>
       (procedure as unknown as ChainableProcedure)
         .use(middlewares.tracer)
         .use(middlewares.logger)

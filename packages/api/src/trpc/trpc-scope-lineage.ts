@@ -4,7 +4,7 @@ import {
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
-import type { TrpcAuthorizationPort } from "./trpc-policy-ports.js";
+import type { TrpcAuthorizationPort, TrpcMiddlewareContext } from "./trpc-policy-ports.js";
 
 /**
  * The middleware's own parameters, annotated rather than inferred.
@@ -21,7 +21,7 @@ import type { TrpcAuthorizationPort } from "./trpc-policy-ports.js";
  * this is the same move for the same reason.
  */
 type ScopeLineageParams<TContext> = {
-  ctx: TContext;
+  ctx: TrpcMiddlewareContext<TContext>;
   input: unknown;
   next: () => any;
 };

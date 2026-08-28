@@ -41,6 +41,7 @@ import type {
   TrpcActorPort,
   TrpcAuthorizationDenialPort,
   TrpcAuthorizationPort,
+  TrpcMiddlewareContext,
 } from "./trpc-policy-ports.js";
 
 const logger = createLogger("langwatch:authz");
@@ -77,7 +78,7 @@ export interface TrpcDeclaredAuthzContext {
 type DeclaredCheckNext = () => any;
 
 export type TrpcDeclaredCheckParams<TContext> = {
-  ctx: TContext;
+  ctx: TrpcMiddlewareContext<TContext>;
   input: ScopeInput;
   next: DeclaredCheckNext;
 };

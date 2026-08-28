@@ -18,6 +18,38 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
+import type { Overwrite, Simplify } from "@trpc/server/unstable-core-do-not-import";
+
+/**
+ * The request context as tRPC actually hands it to a middleware.
+ *
+ * tRPC never gives a middleware the bare context type: it gives that type with
+ * its index signatures stripped (`Overwrite<TContext, object>`, flattened by
+ * `Simplify`). At runtime the two are the same object, but for a `TContext`
+ * that is still a type parameter the compiler cannot prove the mapped form
+ * assignable back to it, so a port declared `(ctx: TContext)` cannot be called
+ * with what the middleware was given.
+ *
+ * Every port below is therefore declared against what it is actually handed.
+ * A process fills these ports with a concrete context, where the mapping
+ * reduces away and its implementations read exactly the fields they always
+ * did.
+ */
+export type TrpcMiddlewareContext<TContext> = Simplify<Overwrite<TContext, object>>;
+
+/**
+ * The same context, as a middleware installed AFTER the authenticating one
+ * receives it: `TContext` with the authenticated shape written over it.
+ *
+ * The audit middleware sits behind the authentication middleware and still
+ * reads the caller, so `actor` is handed this rather than the plain context.
+ * Runtime-identical again — the object is the one the process built, with a
+ * narrowed session on it — but the compiler treats the two mappings as
+ * unrelated, so the port has to name both.
+ */
+export type TrpcAuthenticatedMiddlewareContext<TContext, TAuthenticatedContext> = Simplify<
+  Overwrite<TContext, Overwrite<object, TAuthenticatedContext>>
+>;
 
 /**
  * The request as the spine reads it: headers for the caller's trace context,
@@ -51,7 +83,7 @@ export type TrpcActor = Readonly<{ id: string; impersonatorId?: string }>;
 
 /** Reads the actor off a request context. */
 export interface TrpcActorPort<TContext> {
-  actor(ctx: TContext): TrpcActor | undefined;
+  actor(ctx: TrpcMiddlewareContext<TContext>): TrpcActor | undefined;
 }
 
 /**
@@ -66,7 +98,18 @@ export interface TrpcIdentityPort<
   TContext,
   TAuthenticatedContext extends object,
 > extends TrpcActorPort<TContext> {
-  authenticate(ctx: TContext): TAuthenticatedContext;
+  authenticate(ctx: TrpcMiddlewareContext<TContext>): TAuthenticatedContext;
+  /**
+   * Widened from `TrpcActorPort`: the audit middleware reads the caller from
+   * behind the authentication middleware, where the context carries the
+   * authenticated shape. Both spellings are the same object, and the fields
+   * `actor` reads are the ones `TContext` already had.
+   */
+  actor(
+    ctx:
+      | TrpcMiddlewareContext<TContext>
+      | TrpcAuthenticatedMiddlewareContext<TContext, TAuthenticatedContext>,
+  ): TrpcActor | undefined;
 }
 
 /** One audit row, as the spine describes it. */
@@ -133,7 +176,7 @@ export interface TrpcAuthorizationDecisions {
  * process-wide one.
  */
 export interface TrpcAuthorizationPort<TContext> {
-  forRequest(ctx: TContext): TrpcAuthorizationDecisions;
+  forRequest(ctx: TrpcMiddlewareContext<TContext>): TrpcAuthorizationDecisions;
 }
 
 /**

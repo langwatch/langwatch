@@ -23,6 +23,11 @@ import {
   SpanStatusCode,
 } from "@opentelemetry/api";
 import { TRPCError } from "@trpc/server";
+import type {
+  GetRawInputFn,
+  MiddlewareResult,
+  ProcedureType,
+} from "@trpc/server/unstable-core-do-not-import";
 import { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.js";
 import { redactAuditArgs } from "./trpc-audit-redaction.js";
 import { isSilencedCall, recordTrpcCall } from "./trpc-call-logging.js";
@@ -33,7 +38,9 @@ import type {
   TrpcAuditPort,
   TrpcCauseTranslationPort,
   TrpcErrorReportingPort,
+  TrpcAuthenticatedMiddlewareContext,
   TrpcIdentityPort,
+  TrpcMiddlewareContext,
 } from "./trpc-policy-ports.js";
 import type { TrpcRoot } from "./trpc-root.js";
 
@@ -141,13 +148,44 @@ export function createTrpcRuntimePolicy<
   TAuthenticatedContext extends object,
 >(root: TrpcRoot<TContext>, ports: TrpcRuntimePolicyPorts<TContext, TAuthenticatedContext>) {
   /**
-   * Reusable middleware that enforces users are logged in before running the
-   * procedure. The narrowed context is the process's own — it decides what a
-   * signed-in caller looks like downstream, not this package.
+   * The two middlewares the authenticated procedure is built from are written
+   * as plain functions and only then wrapped with `root.middleware(...)`.
+   *
+   * `root.middleware(fn)` answers a builder whose `_middlewares` is `[fn]`, and
+   * `procedure.use(fn)` appends `fn` itself, so a procedure built from either
+   * carries the SAME function instance: the chain, its order, and the identity
+   * `createIsPublicProcedure` compares against are unchanged. What the function
+   * form buys is that `procedure.use(...)` type-checks it against
+   * `MiddlewareFunction`, which names the context as `TContext`, rather than
+   * against `MiddlewareBuilder`, which names it as `Overwrite<TContext, …>` and
+   * is not provably the same type while `TContext` is a type parameter.
+   *
+   * The parameters are annotated rather than inferred, and annotated with only
+   * the fields each middleware reads. This is the move
+   * `trpc-declared-authz.ts` and `trpc-scope-lineage.ts` already make; here it
+   * is what lets `ctx` be spelled `TrpcMiddlewareContext<TContext>` — the type
+   * the ports are declared against — instead of a shape only tRPC can name.
    */
-  const enforceUserIsAuthed = root.middleware(({ ctx, next }) =>
-    next({ ctx: ports.identity.authenticate(ctx) }),
-  );
+  type AuthenticateParams = {
+    ctx: TrpcMiddlewareContext<TContext>;
+    next: <$ContextOverride>(opts: {
+      ctx: $ContextOverride;
+    }) => Promise<MiddlewareResult<$ContextOverride>>;
+  };
+
+  /**
+   * Enforces users are logged in before running the procedure. The narrowed
+   * context is the process's own — it decides what a signed-in caller looks
+   * like downstream, not this package.
+   */
+  const authenticate = ({
+    ctx,
+    next,
+  }: AuthenticateParams): Promise<MiddlewareResult<TAuthenticatedContext>> =>
+    next({ ctx: ports.identity.authenticate(ctx) });
+
+  /** The same middleware, as the reusable builder other mounts install. */
+  const enforceUserIsAuthed = root.middleware(authenticate);
 
   const enforcePermissionCheck = root.middleware(({ ctx, next }) => {
     if (!ctx.permissionChecked) {
@@ -159,43 +197,55 @@ export function createTrpcRuntimePolicy<
     return next();
   });
 
-  const auditLogTRPCErrors = root.middleware(
-    async ({ ctx, next, path, type, input, getRawInput }) => {
-      const result = await next();
-      const actor = ports.identity.actor(ctx);
-      if (
-        (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
-        !result.ok &&
-        result.error instanceof TRPCError &&
-        result.error.code !== "INTERNAL_SERVER_ERROR" &&
-        actor?.id
-      ) {
-        const auditedInput = input ?? (await getRawInput());
-        const scopeIds = auditScopeIds(auditedInput);
-        await ports.audit.record({
-          userId: actor.id,
-          organizationId: scopeIds.organizationId,
-          projectId: scopeIds.projectId,
-          action: path,
-          // Through the same redaction as the success path. This middleware sits
-          // ahead of the input parser, so tRPC hands it no parsed `input`;
-          // reading the raw input is what puts the arguments, project and
-          // organization on a failed call's row instead of leaving them blank.
-          args: redactAuditArgs({ input: auditedInput, action: path }),
-          error: result.error,
-          req: ctx.req,
-          // When an admin is impersonating, the actor id reflects the
-          // impersonated user (correct for RBAC attribution). We stamp the
-          // real admin's identity in metadata so security forensics can
-          // filter on `metadata.impersonatorId` to find actions that were
-          // actually performed by an admin.
-          metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
-        });
-      }
+  type AuditErrorsParams = {
+    ctx:
+      | TrpcMiddlewareContext<TContext>
+      | TrpcAuthenticatedMiddlewareContext<TContext, TAuthenticatedContext>;
+    path: string;
+    type: ProcedureType;
+    input: unknown;
+    getRawInput: GetRawInputFn;
+    next: () => Promise<MiddlewareResult<object>>;
+  };
 
-      return result;
-    },
-  );
+  const auditErrors = async ({ ctx, next, path, type, input, getRawInput }: AuditErrorsParams) => {
+    const result = await next();
+    const actor = ports.identity.actor(ctx);
+    if (
+      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
+      !result.ok &&
+      result.error instanceof TRPCError &&
+      result.error.code !== "INTERNAL_SERVER_ERROR" &&
+      actor?.id
+    ) {
+      const auditedInput = input ?? (await getRawInput());
+      const scopeIds = auditScopeIds(auditedInput);
+      await ports.audit.record({
+        userId: actor.id,
+        organizationId: scopeIds.organizationId,
+        projectId: scopeIds.projectId,
+        action: path,
+        // Through the same redaction as the success path. This middleware sits
+        // ahead of the input parser, so tRPC hands it no parsed `input`;
+        // reading the raw input is what puts the arguments, project and
+        // organization on a failed call's row instead of leaving them blank.
+        args: redactAuditArgs({ input: auditedInput, action: path }),
+        error: result.error,
+        req: ctx.req,
+        // When an admin is impersonating, the actor id reflects the
+        // impersonated user (correct for RBAC attribution). We stamp the
+        // real admin's identity in metadata so security forensics can
+        // filter on `metadata.impersonatorId` to find actions that were
+        // actually performed by an admin.
+        metadata: actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : undefined,
+      });
+    }
+
+    return result;
+  };
+
+  /** The same middleware, as the reusable builder other mounts install. */
+  const auditLogTRPCErrors = root.middleware(auditErrors);
 
   const auditLogMutations = root.middleware(
     async ({ ctx, next, type, path, input, getRawInput }) => {
@@ -364,7 +414,7 @@ export function createTrpcRuntimePolicy<
    *
    * @see https://trpc.io/docs/procedures
    */
-  const authProtectedProcedure = root.procedure.use(enforceUserIsAuthed).use(auditLogTRPCErrors);
+  const authProtectedProcedure = root.procedure.use(authenticate).use(auditErrors);
 
   return {
     authProtectedProcedure,

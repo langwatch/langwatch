@@ -63,7 +63,10 @@ export function handleTrpcCallLogging({
   statusCode,
   log,
   capture,
-  slowCallBudgetMs = resolveSlowCallBudgetMs(),
+  // The package's own constant, never an environment read. A composition root
+  // that wants the operator override resolves it with
+  // `resolveSlowCallBudgetMs(process.env)` and passes the number in.
+  slowCallBudgetMs = DEFAULT_SLOW_CALL_MS,
   now = Date.now(),
 }: {
   result: { ok: boolean; error?: unknown };
