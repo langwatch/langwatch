@@ -428,6 +428,33 @@ describe("getProjectLambdaArn", () => {
         NLP_LAMBDA_MEMORY_SIZE_MB,
       );
       expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
+
+    /** @scenario A pre-existing Lambda carrying a short Timeout is reconciled */
+    it("updates drifted Timeout", async () => {
+      const drifted = {
+        ...mockLambdaConfig,
+        Timeout: 300, // Short timeout, needs update to 900
+      };
+
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        // checkLambdaExists
+        .mockResolvedValueOnce({ Configuration: drifted })
+        // GetFunction for image/config details
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: currentImageUri },
+        })
+        .mockResolvedValueOnce(mockLambdaConfig)
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-timeout");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+      const updates = configUpdateCalls(send);
+      expect(updates).toHaveLength(1);
+      expect(updates[0][0].input.Timeout).toBe(900);
+    });
     });
 
     /** @scenario A pre-existing Lambda carrying a short Timeout is reconciled */
@@ -589,6 +616,61 @@ describe("getProjectLambdaArn", () => {
 
       const arn = await getProjectLambdaArn("reconcile-conflict");
       expect(arn).toBe(mockLambdaConfig.FunctionArn);
+    });
+  });
+
+  describe("error discrimination", () => {
+    /** @scenario AWS errors are matched by exception name, not message text */
+    it("recognizes ResourceConflictException by name", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce({
+          name: "ResourceConflictException",
+          message: "An update is in progress",
+        });
+
+      const arn = await getProjectLambdaArn("error-by-name");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+    });
+
+    /** @scenario AWS errors fall back to message matching for older SDK versions */
+    it("recognizes update-in-progress by message as fallback", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce(
+          new Error("An update is in progress"),
+        );
+
+      const arn = await getProjectLambdaArn("error-by-message");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+    });
+
+    /** @scenario Unrelated errors are not swallowed */
+    it("throws unrelated errors", async () => {
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        .mockResolvedValueOnce({ Configuration: mockLambdaConfig })
+        .mockResolvedValueOnce({
+          Configuration: mockLambdaConfig,
+          Code: { ImageUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest" },
+        })
+        .mockRejectedValueOnce(
+          new Error("Access Denied"),
+        );
+
+      await expect(getProjectLambdaArn("error-unrelated")).rejects.toThrow(
+        "Access Denied",
+      );
     });
   });
 });
