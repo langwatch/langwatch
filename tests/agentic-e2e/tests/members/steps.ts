@@ -99,14 +99,15 @@ export async function whenICloseInviteLinkDialog(page: Page) {
  * Assert that an email appears in the "Invites" list with an invited badge.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+  const invitesList = page.getByTestId("invites-list");
+  await expect(invitesList).toBeVisible({ timeout: 10000 });
 
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
+  const row = invitesList.getByTestId("invite-row").filter({ hasText: email });
 
   await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
+  await expect(row.getByTestId("invite-status")).toHaveText("Invited", {
+    timeout: 5000,
+  });
 }
 
 /**
