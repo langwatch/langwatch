@@ -190,16 +190,16 @@
       "subjects": ["project"]
     },
     {
-      "id": "role",
-      "root": "packages/features/role",
-      "classification": "core",
-      "subjects": ["role", "custom-role"]
-    },
-    {
       "id": "prompt",
       "root": "packages/features/prompt",
       "classification": "core",
       "subjects": ["prompt", "prompt-tag", "prompt-version"]
+    },
+    {
+      "id": "role",
+      "root": "packages/features/role",
+      "classification": "core",
+      "subjects": ["custom-role", "role"]
     },
     {
       "id": "scenario",

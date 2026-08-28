@@ -135,6 +135,76 @@ behaviour. The app supplies routing, data hooks and small named render ports for
 media, terminal and anchored-comment UI. Browser code does not authorize,
 compose services or reshape Trace responses.
 
+## Public surfaces and transports
+
+The contract publishes the read, ingress and processing vocabulary: trace and
+span values, the query language, the commands and events the pipeline exchanges,
+the ingestion age limit and the errors. The server package publishes the
+ClickHouse-backed services and the processing installer. The web package
+publishes reusable, transport-neutral presentation. Trace mounts no route: the
+`/api/traces` REST application, the trace export application and the `tracesV2`
+tRPC router are host transports, and the standalone API application takes the
+topic assignment port from the contract rather than a second implementation.
+
+## Dependencies
+
+The contract depends on the shared handled-error package, a query parser, a
+pattern-matching helper and Zod. The server depends on that contract, on the
+Model Provider contract for cost lookup, on the Prompt contract for the metadata
+carried on spans, on the Dataset and Coding Agent contracts for the effects it
+hands off, on the Eventing package for its commands, projections and stores, on
+the OpenTelemetry interfaces and the OTLP transformer for ingress traversal, on
+the shared identifier generator, on the shared observability logger, and on the
+LangWatch tracer for its own instrumentation. It depends on no application
+module.
+
+## Persistence
+
+Every durable read and write is a ClickHouse call through repositories private
+to the server package, carrying a tenant identifier. `trace_summaries`,
+`stored_spans`, `trace_analytics` and the timeseries rollup are four distinct
+projections that are never substituted for one another. "Persistence and query
+parity" above states the rules that govern them, including anchor handling,
+claim-check payload recall and cost redaction ordering.
+
+## Runtime and registration
+
+Composition roots build one trace service, ingestion service, canonicalisation
+service and processing graph per process, injecting ClickHouse resolution,
+deduplication, spool and blob access, privacy preparation, tokenization,
+pricing, media extraction and projection storage through named ports. The
+package-owned processing installer is the only registration boundary: the
+application's pipeline registry mounts it, and the definitions it registers are
+the same in every process while only worker-capable roles consume the resulting
+jobs. Cross-feature effects subscribe to that graph rather than registering a
+second one.
+
+## Environment and configuration
+
+Trace packages read no environment value. Retention defaults, read caps,
+ClickHouse resolution and every port arrive at composition. The one shared
+setting the feature reads is the identifier environment prefix, which the
+process sets once at boot on the shared identifier generator; Trace reads that
+configured value, never an environment variable.
+
+## Errors
+
+A missing trace throws a concrete not-found error that each transport maps to
+its own successful-empty or not-found response, because those responses already
+differ per route and unifying them would be a behaviour change. A query the
+parser rejects throws `filter_parse_error`, and a query naming an unknown field
+throws `filter_field_unknown`; both are handled errors carrying the offending
+detail, so a caller can correct the query rather than retry it. Persistence
+failures stay unhandled and keep their existing transport mapping.
+
+## Contracts and validation
+
+Zod 4 schemas define the read responses, the ingress payloads, the commands and
+events, and the projection data, preserving the existing transport fields and
+their nullability. Cost redaction happens after persistence and before response
+validation, so a redacted value is still a valid response rather than a hole in
+one. ClickHouse row shapes stay inside the server package.
+
 ## Consequences
 
 Displaced app command, projection, schema and store modules are deleted once

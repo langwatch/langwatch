@@ -2,6 +2,14 @@
 
 **Status:** Accepted
 
+## Context
+
+Project secrets had a lifecycle spread across the transports that used them:
+name rules, the reserved-name list, the per-project ceiling and encryption were
+each re-stated where they were needed. Secrets are also the one resource where a
+leak is unrecoverable, so a second implementation is a second place for a value
+to escape.
+
 ## Decision
 
 The Secret feature owns project-secret metadata, name and value validation,
@@ -42,6 +50,66 @@ the service's 50-secrets-per-project invariant; no additional quota is
 invented by this migration. These actor-sensitive operations do not enable
 caching. A reviewed per-operation rate/resource policy remains a follow-up
 rather than an implied protection.
+
+## Public surfaces and transports
+
+The contract publishes the secret values, the permission vocabulary its queries
+require, the errors and the abstract service. Unlike most features, Secret also
+publishes its own transports: a REST installer and a tRPC router live in the
+server package, so every host mounts the same routes rather than restating them.
+The application mounts the REST installer three times, at `/api/v1/secret`,
+`/api/v1/secrets` and `/api/secret`, and mounts the deployed `/api/secrets`
+family alongside as a compatibility transport. The tRPC router is composed both
+by the platform application's internal router and by the standalone API
+application.
+
+## Dependencies
+
+The contract depends on the authorization contract for the permission a query
+declares, on the shared handled-error package and on Zod. The server depends on
+that contract, on the shared REST service type its installer targets, on the
+shared tRPC types its router builds against, and on the generated Prisma
+client. Secret depends on no other feature, and the encryption
+implementation is a port the host fills rather than a dependency.
+
+## Persistence
+
+One private Prisma repository owns the `ProjectSecret` table. It stores the
+encrypted value and the metadata a caller may read; the plain value exists only
+inside a service call. Every operation carries the target project identifier, so
+a credential valid for several projects still reaches only the one the transport
+authorised for that request.
+
+## Runtime and registration
+
+Process composition builds one service from the Prisma client, the host's
+encryption port and the reserved-name list, and exposes it on the application
+context; the REST and tRPC surfaces are installed from the same package at
+router assembly. The feature owns no worker job, subscriber or event pipeline,
+so one instance serves every process role and both applications.
+
+## Environment and configuration
+
+Secret packages read no environment value. Encryption keys never enter the
+feature: the host implements the encryption port with its own configured
+cipher, and the reserved names are passed in, so a deployment changes either
+without touching this boundary.
+
+## Errors
+
+A missing secret, a reserved name, the per-project ceiling and a duplicate name
+throw handled errors carrying the codes `secret_not_found`,
+`secret_name_reserved`, `secret_limit_reached` and `secret_already_exists`. Each
+is a customer fault with the status its transports already returned, and none of
+their messages carries a secret value.
+
+## Contracts and validation
+
+Zod 4 schemas define the REST inputs and outputs and the service inputs. Output
+schemas are metadata-only by construction, so no encrypted or plain value can
+reach a response even if a future repository read selects one. Transports own
+wire validation and the framework input-size ceiling; the service owns the
+domain invariants behind them.
 
 ## Consequences
 
