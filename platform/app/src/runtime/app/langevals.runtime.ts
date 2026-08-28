@@ -1,41 +1,71 @@
 import { createLogger } from "@langwatch/observability";
-import type {
-  BatchEvaluationResult,
-  SingleEvaluationResult,
+import {
+  batchEvaluationResultSchema,
+  type BatchEvaluationResult,
+  type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import type { LangevalsRuntimeConfig } from "~/runtime/langevals.config";
 import { evaluationDurationHistogram, getEvaluationStatusCounter } from "~/server/metrics";
 import { tryAndConvertTo } from "~/server/tracer/tracesMapping";
-import { EvaluatorExecutionError, EvaluatorInputTooLargeError } from "../../evaluations/errors";
-import type { LangEvalsClient, LangEvalsEvaluateParams } from "./langevals.client";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "~/server/app-layer/evaluations/errors";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
-const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes
+export type LangevalsEvaluateParams = Readonly<{
+  evaluatorType: string;
+  data: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  env: Record<string, string>;
+  idempotencyKey?: string;
+}>;
 
-export class LangEvalsHttpClient implements LangEvalsClient {
-  constructor(
-    private readonly endpoint: string,
-    private readonly maxRetries: number = 1,
-    private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  ) {}
+export interface LangevalsEvaluatorClient {
+  evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult>;
+}
 
-  async evaluate(params: LangEvalsEvaluateParams): Promise<SingleEvaluationResult> {
-    return this.evaluateWithRetry(params, this.maxRetries);
+/** Null object used by self-hosted deployments without a Langevals endpoint. */
+export class NullLangevalsEvaluatorClient implements LangevalsEvaluatorClient {
+  async evaluate(): Promise<SingleEvaluationResult> {
+    return { status: "skipped", details: "Langevals client not available" };
+  }
+}
+
+/**
+ * Process-owned HTTP evaluator transport. It owns no durable connection or
+ * socket: each request uses the platform fetch implementation and its abort
+ * controller is released before the request settles.
+ */
+export class AppLangevalsRuntime implements LangevalsEvaluatorClient {
+  static create(
+    config: LangevalsRuntimeConfig,
+  ): AppLangevalsRuntime | NullLangevalsEvaluatorClient {
+    if (!config.endpoint) {
+      return new NullLangevalsEvaluatorClient();
+    }
+
+    return new AppLangevalsRuntime(config);
+  }
+
+  private constructor(private readonly config: LangevalsRuntimeConfig) {}
+
+  async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
+    return await this.evaluateWithRetry(params, this.config.maxRetries);
   }
 
   private async evaluateWithRetry(
-    params: LangEvalsEvaluateParams,
+    params: LangevalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
     const { evaluatorType, data, settings, env, idempotencyKey } = params;
-    const url = `${this.endpoint}/${evaluatorType}/evaluate`;
-
+    const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
     const startTime = performance.now();
-    let response: Response;
-
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
+    let response: Response;
     try {
       response = await fetch(url, {
         method: "POST",
@@ -61,17 +91,19 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        logger.warn({ url, timeoutMs: this.timeoutMs }, "Evaluator request timed out");
-        throw new EvaluatorExecutionError(`Evaluator timed out after ${this.timeoutMs}ms`, {
-          meta: { evaluatorType, url, timeoutMs: this.timeoutMs },
+        logger.warn({ url, timeoutMs: this.config.timeoutMs }, "Evaluator request timed out");
+        throw new EvaluatorExecutionError(`Evaluator timed out after ${this.config.timeoutMs}ms`, {
+          meta: { evaluatorType, url, timeoutMs: this.config.timeoutMs },
         });
       }
+
       if (error instanceof Error && error.message.includes("fetch failed")) {
         logger.warn({ error, url }, "Evaluator cannot be reached");
         throw new EvaluatorExecutionError("Evaluator cannot be reached", {
           meta: { evaluatorType, url },
         });
       }
+
       throw error;
     } finally {
       clearTimeout(timeout);
@@ -80,7 +112,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     if (!response.ok) {
       if (response.status >= 500 && retriesLeft > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        return this.evaluateWithRetry(params, retriesLeft - 1);
+        return await this.evaluateWithRetry(params, retriesLeft - 1);
       }
 
       const duration = performance.now() - startTime;
@@ -89,13 +121,9 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
       } catch {
-        /* safe json parse fallback */
+        // The status text remains the meaningful response summary.
       }
-      // 413 is the customer's payload being too big, not our backend failing.
-      // Raised as its own customer-fault error so it reports as an actionable
-      // skip instead of an opaque `413 {"message":"Request Too Long"}`. The
-      // counter is labelled to match the status the command ultimately emits,
-      // so oversized inputs don't read as platform error-rate on dashboards.
+
       if (response.status === 413) {
         getEvaluationStatusCounter(evaluatorType, "skipped").inc();
         throw new EvaluatorInputTooLargeError({
@@ -111,8 +139,18 @@ export class LangEvalsHttpClient implements LangEvalsClient {
 
     const duration = performance.now() - startTime;
     evaluationDurationHistogram.labels(evaluatorType).observe(duration);
+    let results: BatchEvaluationResult;
+    try {
+      results = batchEvaluationResultSchema.parse(await response.json());
+    } catch (error) {
+      getEvaluationStatusCounter(evaluatorType, "error").inc();
+      throw new EvaluatorExecutionError("Unexpected response: invalid results", {
+        meta: { evaluatorType },
+        ...(error instanceof Error ? { reasons: [error] } : {}),
+      });
+    }
 
-    const result = ((await response.json()) as BatchEvaluationResult)[0];
+    const result = results[0];
     if (!result) {
       getEvaluationStatusCounter(evaluatorType, "error").inc();
       throw new EvaluatorExecutionError("Unexpected response: empty results", {

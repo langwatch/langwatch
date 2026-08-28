@@ -11,6 +11,7 @@ import {
 } from "../config";
 import { resolveEvaluationExecutionConfig } from "~/runtime/evaluation-execution.config";
 import { resolveScenarioChildParentEnvironment } from "~/runtime/worker/scenario-child-parent.config";
+import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
 
 describe("Gateway virtual-key process configuration", () => {
   beforeEach(() => {
@@ -82,6 +83,26 @@ describe("Evaluation execution process configuration", () => {
       }
     },
   );
+});
+
+describe("Langevals process configuration", () => {
+  it("keeps the configured internal endpoint and transport defaults together", () => {
+    expect(
+      resolveLangevalsRuntimeConfig({ LANGEVALS_ENDPOINT: "http://langevals.internal:8000" }),
+    ).toEqual({
+      endpoint: "http://langevals.internal:8000",
+      maxRetries: 1,
+      timeoutMs: 120_000,
+    });
+  });
+
+  it("leaves the transport unavailable when the endpoint is absent", () => {
+    expect(resolveLangevalsRuntimeConfig({}).endpoint).toBeUndefined();
+  });
+
+  it("keeps an explicitly empty endpoint unavailable", () => {
+    expect(resolveLangevalsRuntimeConfig({ LANGEVALS_ENDPOINT: "" }).endpoint).toBe("");
+  });
 });
 
 describe("Scenario child parent environment", () => {

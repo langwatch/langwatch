@@ -260,6 +260,8 @@ import {
   closeAwsClientConfiguration,
   configureAwsClientConfiguration,
 } from "~/runtime/app/aws-client.composition";
+import { AppLangevalsRuntime } from "~/runtime/app/langevals.runtime";
+import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
 import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
@@ -327,8 +329,6 @@ import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "
 import { demoProjectId } from "./authz/demo-project";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
-import { NullLangevalsClient } from "./clients/langevals/langevals.client";
-import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { OtlpSpanPiiRedactionService } from "./traces/span-pii-redaction.service";
@@ -857,7 +857,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     execution: createAppTopicClusteringExecutionDependencies({
       resolveClickHouseClient,
       modelProviders,
-      langevalsEndpoint: config.langevalsEndpoint ?? null,
+      langevalsEndpoint: config.langevals.endpoint ?? null,
     }),
     metrics: new AppTopicClusteringMetricsAdapter(),
   });
@@ -1112,9 +1112,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       modelProviders,
       managedProviders,
       modelEnvResolver: createDefaultModelEnvResolver(modelProviders, managedProviders),
-      langevalsClient: config.langevalsEndpoint
-        ? new LangEvalsHttpClient(config.langevalsEndpoint)
-        : new NullLangevalsClient(),
+      langevalsClient: AppLangevalsRuntime.create(config.langevals),
       workflows,
       evaluators,
       workflowExecutor: AppWorkflowEvaluationAdapter.create(workflows),
@@ -2581,6 +2579,7 @@ export function createTestApp(
       payloadCodec: "json",
     },
     outboundProxy: {},
+    langevals: resolveLangevalsRuntimeConfig({}),
     nlpLambda: resolveNlpLambdaRuntimeConfig({}),
     featureFlags: resolveFeatureFlagConfig({}),
     scenarioExecution: {

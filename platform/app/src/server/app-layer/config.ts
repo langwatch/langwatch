@@ -10,6 +10,10 @@ import {
   type EvaluationExecutionConfig,
 } from "~/runtime/evaluation-execution.config";
 import {
+  resolveLangevalsRuntimeConfig,
+  type LangevalsRuntimeConfig,
+} from "~/runtime/langevals.config";
+import {
   resolveScenarioChildParentEnvironment,
   type ScenarioChildParentEnvironment,
 } from "~/runtime/worker/scenario-child-parent.config";
@@ -151,7 +155,8 @@ export interface AppConfig {
   outboundProxy: OutboundProxyConfig;
 
   // Services
-  langevalsEndpoint?: string;
+  /** Typed configuration for the process-owned Langevals evaluator transport. */
+  langevals: LangevalsRuntimeConfig;
   langyWorker?: LangyWorkerHttpConfig;
   scenarioExecution: {
     langwatchEndpoint: string;
@@ -256,7 +261,7 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisDbIndex: env.REDIS_DB_INDEX,
     groupQueue,
     outboundProxy: parseOutboundProxyConfig(process.env),
-    langevalsEndpoint: env.LANGEVALS_ENDPOINT,
+    langevals: resolveLangevalsRuntimeConfig(env),
     scenarioExecution: {
       langwatchEndpoint: env.LANGWATCH_ENDPOINT,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,

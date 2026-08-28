@@ -38,7 +38,7 @@ import type { TraceService } from "~/server/traces/trace.service";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { LangEvalsClient } from "../clients/langevals/langevals.client";
+import type { LangevalsEvaluatorClient as LangEvalsClient } from "~/runtime/app/langevals.runtime";
 import { EvaluatorConfigError, EvaluatorNotFoundError, TraceNotEvaluatableError } from "./errors";
 import type { EvaluationExecutionResult } from "./evaluation-execution.types";
 

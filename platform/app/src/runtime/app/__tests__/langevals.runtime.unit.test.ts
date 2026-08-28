@@ -1,16 +1,18 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for LangEvalsHttpClient.
+ * Unit tests for AppLangevalsRuntime.
  *
  * Strategy: mock global.fetch for network I/O, vi.mock only for
  * metrics/logging (infrastructure concerns, not business logic).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EvaluatorExecutionError, EvaluatorInputTooLargeError } from "../../../evaluations/errors";
-import type { LangEvalsEvaluateParams } from "../langevals.client";
-import { LangEvalsHttpClient } from "../langevals.http.client";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "~/server/app-layer/evaluations/errors";
+import { AppLangevalsRuntime, type LangevalsEvaluateParams } from "../langevals.runtime";
 
 const { getEvaluationStatusCounter } = vi.hoisted(() => ({
   getEvaluationStatusCounter: vi.fn(() => ({ inc: vi.fn() })),
@@ -36,7 +38,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function buildParams(overrides?: Partial<LangEvalsEvaluateParams>): LangEvalsEvaluateParams {
+function buildParams(overrides?: Partial<LangevalsEvaluateParams>): LangevalsEvaluateParams {
   return {
     evaluatorType: "test/evaluator",
     data: { input: "hello", output: "world" },
@@ -53,7 +55,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-describe("LangEvalsHttpClient", () => {
+function createClient(endpoint: string, maxRetries = 1, timeoutMs = 120_000) {
+  return AppLangevalsRuntime.create({ endpoint, maxRetries, timeoutMs });
+}
+
+describe("AppLangevalsRuntime", () => {
   const endpoint = "http://langevals:8000";
 
   beforeEach(() => {
@@ -66,6 +72,15 @@ describe("LangEvalsHttpClient", () => {
     vi.useRealTimers();
   });
 
+  it("uses the null transport when an empty endpoint is configured", async () => {
+    const client = createClient("");
+
+    await expect(client.evaluate(buildParams())).resolves.toEqual({
+      status: "skipped",
+      details: "Langevals client not available",
+    });
+  });
+
   describe("evaluate()", () => {
     describe("when langevals returns a successful result", () => {
       it("returns the first result from the batch response", async () => {
@@ -76,7 +91,7 @@ describe("LangEvalsHttpClient", () => {
         };
         vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([expected]));
 
-        const client = new LangEvalsHttpClient(endpoint);
+        const client = createClient(endpoint);
         const result = await client.evaluate(buildParams());
 
         expect(result).toEqual(expected);
@@ -87,7 +102,7 @@ describe("LangEvalsHttpClient", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(jsonResponse([{ status: "processed", score: 1 }]));
 
-        const client = new LangEvalsHttpClient(endpoint);
+        const client = createClient(endpoint);
         await client.evaluate(buildParams({ evaluatorType: "openai/moderation" }));
 
         expect(fetchSpy).toHaveBeenCalledWith(
@@ -104,7 +119,7 @@ describe("LangEvalsHttpClient", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(jsonResponse([{ status: "processed", score: 1 }]));
 
-        const client = new LangEvalsHttpClient(endpoint);
+        const client = createClient(endpoint);
         await client.evaluate(buildParams({ idempotencyKey: "evaluation:retry-safe" }));
 
         expect(fetchSpy).toHaveBeenCalledWith(
@@ -123,7 +138,7 @@ describe("LangEvalsHttpClient", () => {
       it("throws EvaluatorExecutionError", async () => {
         vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
-        const client = new LangEvalsHttpClient(endpoint);
+        const client = createClient(endpoint);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         await expect(client.evaluate(buildParams())).rejects.toThrow("Evaluator cannot be reached");
@@ -138,7 +153,7 @@ describe("LangEvalsHttpClient", () => {
           .mockResolvedValueOnce(jsonResponse({ error: "internal" }, 500))
           .mockResolvedValueOnce(jsonResponse([expected]));
 
-        const client = new LangEvalsHttpClient(endpoint, 1);
+        const client = createClient(endpoint, 1);
 
         const resultPromise = client.evaluate(buildParams());
         // Advance past the 100ms retry delay
@@ -156,7 +171,7 @@ describe("LangEvalsHttpClient", () => {
           jsonResponse({ error: "internal server error" }, 500),
         );
 
-        const client = new LangEvalsHttpClient(endpoint, 0);
+        const client = createClient(endpoint, 0);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
       });
@@ -168,7 +183,7 @@ describe("LangEvalsHttpClient", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(jsonResponse({ error: "bad request" }, 400));
 
-        const client = new LangEvalsHttpClient(endpoint, 2);
+        const client = createClient(endpoint, 2);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         // Should NOT retry on 4xx
@@ -182,7 +197,7 @@ describe("LangEvalsHttpClient", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(jsonResponse({ message: "Request Too Long" }, 413));
 
-        const client = new LangEvalsHttpClient(endpoint, 2);
+        const client = createClient(endpoint, 2);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorInputTooLargeError);
         expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -193,7 +208,7 @@ describe("LangEvalsHttpClient", () => {
           jsonResponse({ message: "Request Too Long" }, 413),
         );
 
-        const client = new LangEvalsHttpClient(endpoint, 0);
+        const client = createClient(endpoint, 0);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorInputTooLargeError);
         // An oversized input is the customer's payload, not a platform fault:
@@ -210,7 +225,7 @@ describe("LangEvalsHttpClient", () => {
           jsonResponse({ error: "bad request" }, 400),
         );
 
-        const client = new LangEvalsHttpClient(endpoint, 0);
+        const client = createClient(endpoint, 0);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         expect(getEvaluationStatusCounter).toHaveBeenCalledWith("test/evaluator", "error");
@@ -221,11 +236,22 @@ describe("LangEvalsHttpClient", () => {
       it("throws EvaluatorExecutionError", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
 
-        const client = new LangEvalsHttpClient(endpoint);
+        const client = createClient(endpoint);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(
           "Unexpected response: empty results",
         );
+      });
+    });
+
+    describe("when langevals returns a malformed batch response", () => {
+      it("maps the contract failure to an evaluator execution error", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "processed" }));
+
+        await expect(createClient(endpoint).evaluate(buildParams())).rejects.toThrow(
+          EvaluatorExecutionError,
+        );
+        expect(getEvaluationStatusCounter).toHaveBeenCalledWith("test/evaluator", "error");
       });
     });
 
@@ -235,7 +261,7 @@ describe("LangEvalsHttpClient", () => {
           .spyOn(globalThis, "fetch")
           .mockResolvedValue(jsonResponse({ error: "fail" }, 500));
 
-        const client = new LangEvalsHttpClient(endpoint, 0);
+        const client = createClient(endpoint, 0);
 
         await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         expect(fetchSpy).toHaveBeenCalledTimes(1);
