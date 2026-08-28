@@ -18,8 +18,11 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/docs/scripts"
 cp "$SCRIPTS_DIR/check-docs-prose.sh" "$WORK/docs/scripts/check-docs-prose.sh"
 
-# A banned word, a percent sign and a carriage return, on one line.
-printf 'Nothing 100%% here\r and more\n' > "$WORK/docs/page.mdx"
+# A banned word, a percent sign and a carriage return, on one line. The page
+# name carries a colon and a comma, which is what separates the annotation
+# properties from each other and from the message.
+PAGE_NAME='page,one:two.mdx'
+printf 'Nothing 100%% here\r and more\n' > "$WORK/docs/$PAGE_NAME"
 
 OUTPUT="$(bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
 STATUS=$?
@@ -45,10 +48,10 @@ fi
 
 ANNOTATION="$(printf '%s\n' "$OUTPUT" | grep '^::error' | head -1)"
 
-if [[ "$ANNOTATION" == *"page.mdx"* ]]; then
-  check "the annotation names the page" yes
+if [[ "$ANNOTATION" == *"page%2Cone%3Atwo.mdx"* ]]; then
+  check "the page name reads with its colon and comma encoded" yes
 else
-  check "the annotation names the page" no
+  check "the page name reads with its colon and comma encoded" no
 fi
 
 if [[ "$ANNOTATION" == *$'\r'* ]]; then
