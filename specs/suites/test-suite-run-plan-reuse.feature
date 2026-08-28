@@ -118,18 +118,18 @@ Feature: Running a test suite reuses the run plan path
   # --- The product UI never treats a test suite as a run plan ---
 
   @unit
-  Scenario: The Agent Testing UI runs only through the run plan procedure
-    Given the Agent Testing feature source
-    When every run it can start is read
-    Then it reaches the run plan procedure
-    And it reaches neither the suite run procedure nor the run all procedure
+  Scenario: A run started from the Agent Testing UI always carries a run plan
+    Given the Agent Testing surface
+    When a person starts any run it offers
+    Then the run carries its configuration on a run plan
+    And no run is addressed to a test suite by its id
 
   @unit
-  Scenario: The Agent Testing UI writes no execution settings onto a suite row
-    Given the Agent Testing feature source
-    When every suite it writes is read
-    Then it calls neither the suite create procedure nor the suite update procedure
-    And so it cannot put targets, a repeat count or a model on a test suite
+  Scenario: A test suite row never gains execution settings from the product UI
+    Given the Agent Testing surface
+    When a person creates or edits anything it offers
+    Then no targets, repeat count or model is written onto a test suite row
+    And a test suite keeps only the name and the scenarios that belong to it
 
   # --- Run plans still exist ---
 

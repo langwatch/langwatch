@@ -47,7 +47,7 @@ function filesMatching(pattern: RegExp): string[] {
 
 describe("given the Agent Testing UI", () => {
   describe("when it starts a run", () => {
-    /** @scenario "The Agent Testing UI runs only through the run plan procedure" */
+    /** @scenario "A run started from the Agent Testing UI always carries a run plan" */
     it("reaches suites.runPlan and never the id-based run procedures", () => {
       // `suites.run` is a prefix of both `runPlan` and `runAll`, so the dot
       // is what makes each pattern name one procedure.
@@ -56,7 +56,7 @@ describe("given the Agent Testing UI", () => {
       expect(filesMatching(/api\.suites\.runPlan\b/)).not.toEqual([]);
     });
 
-    /** @scenario "The Agent Testing UI writes no execution settings onto a suite row" */
+    /** @scenario "A test suite row never gains execution settings from the product UI" */
     it("never calls the suite procedures that accept execution settings", () => {
       expect(filesMatching(/api\.suites\.create\b/)).toEqual([]);
       expect(filesMatching(/api\.suites\.update\b/)).toEqual([]);
