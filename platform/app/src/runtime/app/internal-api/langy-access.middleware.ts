@@ -11,7 +11,7 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
  * permission check alone would expose it there; the server never runs Langy on
  * the demo project, so the refusal is explicit. One definition, chained by
  * every customer-facing Langy procedure (`langy`, `langyEgress`) between the
- * permission check and `enforceLangyAccess`, so the three routers cannot drift.
+ * permission check and `enforceLangyAccess`, so the two surfaces cannot drift.
  */
 export const refuseDemoProject: PermissionMiddleware<{
   projectId: string;

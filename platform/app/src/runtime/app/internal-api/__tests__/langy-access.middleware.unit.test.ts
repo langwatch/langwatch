@@ -13,7 +13,7 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
 }));
 
 import { LangyNotEnabledError } from "@langwatch/langy-contract";
-import { enforceLangyAccess } from "../langyAccessMiddleware";
+import { enforceLangyAccess } from "../langy-access.middleware";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 const featureFlags = { isEnabled: vi.fn() };

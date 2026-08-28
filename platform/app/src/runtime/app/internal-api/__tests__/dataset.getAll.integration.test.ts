@@ -5,21 +5,23 @@
  * list page, the "Add to Dataset" picker, the command bar and the automations
  * pages — running end to end against the real Postgres.
  *
- * This pins the wiring the helper tests cannot see: that the router returns the
- * `_count.datasetRecords` shape its consumers render, with the right number for
- * each storage layout, and that another project's entries never contribute.
+ * This pins the wiring the package's own transport test cannot see: that the
+ * composed process router returns the `_count.datasetRecords` shape its
+ * consumers render, with the right number for each storage layout, and that
+ * another project's entries never contribute.
  *
  * Spec: specs/datasets/datasets-list-page.feature
  */
+
+import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { getTestUser } from "../../../../utils/testUtils";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
+import { getTestUser } from "~/utils/testUtils";
 
 wireDefaultTestApp();
 
@@ -154,9 +156,7 @@ describe("dataset.getAll", () => {
 
         // The neighbouring project's dataset is not in my list at all, and its
         // 25 entries have not inflated any row here.
-        expect(listed.some((dataset) => dataset.name === "neighbour dataset")).toBe(
-          false,
-        );
+        expect(listed.some((dataset) => dataset.name === "neighbour dataset")).toBe(false);
       });
 
       /** @scenario "Listing never counts another project's entries" */

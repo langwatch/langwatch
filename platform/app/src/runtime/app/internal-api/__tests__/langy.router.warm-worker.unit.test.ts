@@ -17,6 +17,7 @@ const {
   warmConversationWorker,
   auditLog,
   getDecision,
+  checkScopeLineage,
 } = vi.hoisted(() => ({
   checkLangyMessageRateLimit: vi.fn(),
   checkLangyWarmRateLimit: vi.fn(),
@@ -29,6 +30,9 @@ const {
     permitted: true,
     organizationRole: null,
   })),
+  // The scope-lineage guard runs ahead of the check on every declared
+  // procedure; a single-project input is always consistent.
+  checkScopeLineage: vi.fn(async () => ({ kind: "consistent" as const })),
 }));
 
 vi.mock("~/server/middleware/rate-limit-langy", () => ({
@@ -41,8 +45,10 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
-    langy: { turns: { startConversationTurn, warmConversationWorker } },
-    permissions: { getDecision },
+    langy: { startConversationTurn, warmConversationWorker },
+    permissions: { getDecision, checkScopeLineage },
+    // No Redis: the live edge is not what this suite is about.
+    redis: null,
   }),
 }));
 
@@ -50,16 +56,26 @@ vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog }));
 
 vi.mock("~/server/posthog", () => ({ trackServerEvent: vi.fn() }));
 
+// The UI-action channel is a different Langy surface with its own tests; stub
+// it so this suite does not drag the page-action manifests into a unit test of
+// the turn path.
+vi.mock("~/server/app-layer/langy/ui-actions/ui-action.service", () => ({
+  LangyUiActionService: class {
+    claim = vi.fn();
+    complete = vi.fn();
+  },
+}));
+
 // The rollout gate and the demo refusal have their own tests
-// (langyAccessMiddleware.unit.test.ts); here they must simply not stand in the
-// way of the mutation under test.
-vi.mock("../langyAccessMiddleware", () => ({
+// (langy-access.middleware.unit.test.ts); here they must simply not stand in
+// the way of the mutation under test.
+vi.mock("../langy-access.middleware", () => ({
   enforceLangyAccess: ({ next }: any) => next(),
   refuseDemoProject: ({ next }: any) => next(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
+vi.mock("~/server/api/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   const passthrough = async ({ ctx, next }: any) => {
     ctx.permissionChecked = true;
     return next();
@@ -67,8 +83,8 @@ vi.mock("../../rbac", async (importOriginal) => {
   return { ...actual, checkProjectPermission: () => passthrough };
 });
 
-import { createInnerTRPCContext } from "../../trpc";
-import { langyRouter } from "../langy";
+import { createInnerTRPCContext } from "~/server/api/trpc";
+import { langyRouter } from "../langy.router";
 
 const caller = () =>
   langyRouter.createCaller(

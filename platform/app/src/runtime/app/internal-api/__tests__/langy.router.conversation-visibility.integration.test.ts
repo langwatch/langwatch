@@ -12,7 +12,7 @@
  * `LangyConversationService`, the real Prisma conversation repository and the
  * real Postgres row whose `(UserId = caller OR IsShared)` clause IS the
  * visibility rule. Only three boundaries are stubbed: the project-permission /
- * rollout middlewares (covered by langyAccessMiddleware.unit.test.ts), the
+ * rollout middlewares (covered by langy-access.middleware.unit.test.ts), the
  * composition root, and the ClickHouse event-log reader.
  *
  * Spec: specs/langy/langy-event-sourced-frontend.feature
@@ -38,13 +38,23 @@ vi.mock("~/server/app-layer/app", () => ({
 
 // The rollout gate and the demo refusal are transport concerns with their own
 // unit tests; this file is about who may READ a conversation.
-vi.mock("../langyAccessMiddleware", () => ({
+vi.mock("../langy-access.middleware", () => ({
   enforceLangyAccess: ({ next }: { next: () => unknown }) => next(),
   refuseDemoProject: ({ next }: { next: () => unknown }) => next(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
+// The UI-action channel is a different Langy surface with its own tests; stub
+// it so this suite does not drag the page-action manifests into a unit test of
+// the turn path.
+vi.mock("~/server/app-layer/langy/ui-actions/ui-action.service", () => ({
+  LangyUiActionService: class {
+    claim = vi.fn();
+    complete = vi.fn();
+  },
+}));
+
+vi.mock("~/server/api/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
     resolveProjectPermission: vi
@@ -60,8 +70,8 @@ import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/lan
 import { prisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
-import { createInnerTRPCContext } from "../../trpc";
-import { langyRouter } from "../langy";
+import { createInnerTRPCContext } from "~/server/api/trpc";
+import { langyRouter } from "../langy.router";
 
 const ns = nanoid(8);
 const PROJECT_ID = `p-langy-vis-${ns}`;
@@ -237,7 +247,11 @@ describe("Langy conversation updates reach exactly the members who may read", ()
     );
     appHolder.current = {
       broadcast,
-      langy: { conversations },
+      // The conversation service IS the Langy capability these two
+      // procedures reach; the transport calls it through `ctx.app.langy`.
+      langy: conversations,
+      // No Redis: neither procedure under test touches the live edge.
+      redis: null,
       // `.permission()` procedures decide through getApp().permissions
       // (ADR-092); this file's rbac mock still stubs the resolvers underneath.
       permissions: appPermissionsService(prisma),

@@ -38,9 +38,24 @@ Callers do not repeat repository absence checks at the service boundary.
 
 The contract package exports provider, default-model, cost, translation values,
 errors, schemas, and the single abstract service. The server root exports the
-Postgres composition adapter and construction ports only. Existing model
-provider, model-cost, default-model, and translate REST/tRPC surfaces remain
-compatibility adapters.
+Postgres composition adapter, construction ports, and the two app-tRPC API
+classes below. Existing model provider, model-cost, default-model, and
+translate REST surfaces remain compatibility adapters.
+
+The internal tRPC transports are package-owned. `ModelProviderTrpcApi`
+(`modelProvider.*`) and `LlmModelCostTrpcApi` (`llmModelCost.*`) live in
+`server/src/api/app-trpc/` and own the procedure names, input and output
+shapes, and delegation to the service. The process mounts them from
+`platform/app/src/runtime/app/internal-api/model-provider.router.ts`, which
+supplies the tRPC root, the authenticated procedure, the authorization policy
+chain, and the ports the transports cannot own themselves: the outbound
+credential probes, the Codex device flow, the audit trail, the regex-safety
+predicate, the model-limit lookup, and the span-preview reader.
+
+The policy is applied by the feature AFTER its own `.input()`, never composed
+ahead of it: tRPC appends its parser as a middleware at the point `.input()`
+is called, so a check installed earlier reads `input === undefined` and every
+declaration that resolves a scope id from the input would pass on nothing.
 
 ### Dependencies
 

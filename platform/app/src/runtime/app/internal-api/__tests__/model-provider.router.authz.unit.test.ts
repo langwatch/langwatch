@@ -1,11 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 import type { App } from "~/server/app-layer/app";
-import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
-import { createInnerTRPCContext } from "../../trpc";
-import { modelProviderRouter } from "../modelProviders";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
+import { modelProviderRouter } from "../model-provider.router";
 
 // ---------------------------------------------------------------------------
 // This suite runs the REAL rbac middleware (no rbac mock): tenancy denial
@@ -14,11 +15,15 @@ import { modelProviderRouter } from "../modelProviders";
 // in-memory fixture filtered the same way the real where-clauses select.
 // ---------------------------------------------------------------------------
 
-const { mockFindAllAccessibleForProject } = vi.hoisted(() => ({
-  mockFindAllAccessibleForProject: vi.fn(),
-}));
+/**
+ * The composed service, stubbed at the one method this route calls. The
+ * masking of stored credentials is the service's own job and is covered by
+ * the sibling masking suite; what this suite proves is who reaches the
+ * service at all.
+ */
+const { mockGetForProject } = vi.hoisted(() => ({ mockGetForProject: vi.fn() }));
 
-// Keep the module-level prisma (imported by modelProviders.utils) from
+// Keep the module-level prisma the mount pulls in transitively from
 // instantiating a real client; this route resolves through ctx.prisma.
 vi.mock("~/server/db", () => ({
   prisma: { auditLog: { create: vi.fn() } },
@@ -140,30 +145,46 @@ function callerForUser(userId: string) {
       permissions: appPermissionsService(database),
       authzGrants: {} as never,
       governance: {} as never,
+      modelProviders: { getForProject: mockGetForProject } as never,
     } as unknown as App,
   });
   ctx.prisma = database;
   return modelProviderRouter.createCaller(ctx);
 }
 
+const auditRows: unknown[] = [];
+
 describe("modelProviders.getAllForProject authz", () => {
+  // A refused call is audited, and the audit sink is a process singleton the
+  // composition root installs. Collect the rows rather than reach a database:
+  // without a sink the refusal itself throws and every denial below reads as
+  // an internal error instead of the FORBIDDEN it is.
+  beforeAll(() => {
+    AppAuditLogRuntime.install({
+      prisma: { auditLog: { create: async (row: unknown) => auditRows.push(row) } },
+    });
+  });
+  afterAll(() => {
+    AppAuditLogRuntime.clear();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    auditRows.length = 0;
 
-    mockFindAllAccessibleForProject.mockResolvedValue([
-      {
+    mockGetForProject.mockResolvedValue({
+      openai: {
         id: "mp_openai",
-        name: "OpenAI",
         provider: "openai",
         enabled: true,
-        customKeys: { OPENAI_API_KEY: "sk-plaintext-secret-123" },
-        customModels: null,
-        customEmbeddingsModels: null,
-        deploymentMapping: null,
-        extraHeaders: null,
-        scopes: [{ scopeType: "PROJECT", scopeId: "project_a" }],
+        // Already masked: this is what the service hands back on a read.
+        customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
+        customModels: [],
+        customEmbeddingsModels: [],
+        models: null,
+        embeddingsModels: null,
       },
-    ]);
+    });
   });
 
   describe("when the user has no access to the project at all", () => {
@@ -171,17 +192,17 @@ describe("modelProviders.getAllForProject authz", () => {
     it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_with_nothing");
 
-      await expect(
-        caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.getAllForProject({ projectId: "project_a" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
 
     it("throws TRPCError (not a generic error) for denied access", async () => {
       const caller = callerForUser("user_with_nothing");
 
-      await expect(
-        caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toBeInstanceOf(TRPCError);
+      await expect(caller.getAllForProject({ projectId: "project_a" })).rejects.toBeInstanceOf(
+        TRPCError,
+      );
     });
   });
 
@@ -190,9 +211,9 @@ describe("modelProviders.getAllForProject authz", () => {
     it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_other_project_admin");
 
-      await expect(
-        caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.getAllForProject({ projectId: "project_a" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
   });
 
@@ -201,9 +222,9 @@ describe("modelProviders.getAllForProject authz", () => {
     it("rejects with FORBIDDEN", async () => {
       const caller = callerForUser("user_other_org_admin");
 
-      await expect(
-        caller.getAllForProject({ projectId: "project_a" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.getAllForProject({ projectId: "project_a" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
   });
 
@@ -214,10 +235,7 @@ describe("modelProviders.getAllForProject authz", () => {
       const result = await caller.getAllForProject({ projectId: "project_a" });
 
       expect(result.openai).toBeDefined();
-      // And even for this authorized user, the key comes back masked.
-      expect(result.openai?.customKeys).toMatchObject({
-        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-      });
+      expect(mockGetForProject).toHaveBeenCalledWith({ projectId: "project_a" });
     });
   });
 });
