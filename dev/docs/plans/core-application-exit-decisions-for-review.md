@@ -215,6 +215,78 @@ package test suites, both authorization guard suites, and the architecture lint.
 
 ---
 
+## 10. The enterprise four mount from `packages/enterprise/composition/api`, not `apps/api` — `LANDED`
+
+**Decided.** `license`, `licenseEnforcement`, `scimToken`, `ssoConnections` and
+`subscription` are composed by `EnterpriseTrpcComposition` in
+`packages/enterprise/composition/api`, and `root.ts` consumes that directly.
+They do **not** get an `apps/api` mount the way every core vertical does.
+
+**Why.** The exit plan's own rule (line 103) is that core never imports
+enterprise implementations, and that role-specific enterprise composition stays
+under `packages/enterprise/composition/**`. `apps/api` is core, and mounting
+these needs the enterprise *server* packages rather than their contracts. The
+precedent is `apps/worker`, which reaches enterprise only through
+`@langwatch/enterprise-worker`.
+
+**Alternative not taken.** An `apps/api` mount that forwards to
+`@langwatch/enterprise-api`. It would make all verticals look uniform, at the
+cost of a file with nothing in it.
+
+**Review this if** you would rather have the uniform shape — it is a small,
+mechanical change to add, and the argument for it is legibility rather than
+correctness.
+
+---
+
+## 11. `apps/api/src/internal-api/` was collapsed into `app-trpc/` — `LANDED`
+
+**Decided.** The ops composition moved to `apps/api/src/features/ops/` and the
+policy kit to `apps/api/src/app-trpc/`. The `internal-api` directory is gone, so
+`@langwatch/platform-api/app-trpc` is the single specifier for every tRPC mount.
+
+**Why.** Two entry points doing the same job invite two conventions.
+
+**Reversibility.** Trivial; nothing outside `apps/api` imported the old paths.
+
+---
+
+## 12. The second `AdminSurfaceHiddenError` was deleted — `LANDED`
+
+**Decided.** `platform/app/src/server/ops/adminSurfaceHidden.ts` is deleted. The
+class lives in `@langwatch/ops-contract`, and both remaining callers already
+import it from there.
+
+**Why it is worth a line here rather than a silent cleanup.** This error exists
+to make a hidden operator surface indistinguishable from a missing one. Two
+definitions is the drift risk that matters: if either ever gained a
+distinguishing detail, a prober could tell the two apart, which is the exact
+thing the error prevents.
+
+**Verified before deleting:** zero importers of the deleted path.
+
+---
+
+## 13. The destructive-ops guard now refuses a missing session — `LANDED`
+
+**Decided.** `requireDestructiveOpsAuth` in
+`packages/features/ops/server/src/api/app-trpc/ops.api.ts` read
+`ctx.session?.user.impersonator`, so a null session skipped the impersonation
+refusal and fell through to the confirmation check alone. It now refuses an
+absent session outright.
+
+**Why.** The guard's strictest branch was the one a missing session bypassed,
+and it stands in front of blob deletion and authorization-path rollback. The
+authenticated procedure it mounts behind makes the null case unreachable today —
+so this changes no reachable behaviour — but a guard that is fail-open in shape
+only stays safe while the thing in front of it does.
+
+**Review this if** you would rather the package API not assume its own mount
+point is authenticated. The alternative is to make the session non-nullable in
+`OpsTrpcContext`, which is stricter and a larger change.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the
