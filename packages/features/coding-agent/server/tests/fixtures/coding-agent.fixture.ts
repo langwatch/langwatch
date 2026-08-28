@@ -499,6 +499,14 @@ export class TestGithubService extends GithubService {
     throw new Error("not used by Coding Agent tests");
   }
 
+  async getConnectionStatus(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
+  async disconnect(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
   async recordInstallation(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
