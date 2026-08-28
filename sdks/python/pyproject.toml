@@ -78,7 +78,7 @@ markers = [
 dev = ["black>=26.5.1"]
 examples = [
     "anthropic>=0.36.0,<0.122.0",
-    "chainlit>=2.11.1,<3",
+    "chainlit>=2.12.0,<3",
     "cloudpickle>=3.1.2",
     "dspy-ai>=3.3.0,<4",
     "faiss-cpu>=1.15.0,<2.0.0",
@@ -121,6 +121,14 @@ tests = [
 
 [tool.uv]
 exclude-newer = "7 days"
+
+# chainlit is exempted from the age gate above. 2.12.0 is the first release
+# above a CRITICAL and a HIGH advisory that cover everything from 2.4.0rc0 to
+# 2.11.1, so waiting out the seven days would mean sitting on a known critical
+# for the sake of a policy that exists to catch supply-chain surprises. The
+# exemption is pinned to the exact version rather than opened for the package,
+# and it comes out once 2.12.0 ages past the gate on its own.
+exclude-newer-package = { chainlit = "2026-08-26T00:00:00Z" }
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
