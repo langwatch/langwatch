@@ -26,7 +26,7 @@ import {
   mergeConfigs,
 } from "@chakra-ui/react";
 import { describe, expect, it } from "vitest";
-import { langyThemeConfig } from "../langyTheme";
+import { langyThemeConfig } from "@langwatch/ui/langy-theme";
 
 const appConfig = defineConfig({
   theme: {

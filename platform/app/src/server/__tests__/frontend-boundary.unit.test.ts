@@ -227,14 +227,41 @@ const manifestTarget = (manifest: string, subpath: string): string | null => {
  * ignoring workspace packages entirely — as this guard first did — let a real
  * one through.
  */
+/**
+ * The `apps/*` process compositions, keyed by the package name they declare.
+ *
+ * Unlike `packages/*`, an application's directory is not its package name
+ * (`apps/ui` is `@langwatch/ui`, `apps/api` is `@langwatch/platform-api`), so
+ * the map has to be read rather than derived. Leaving them out is the same gap
+ * that once hid `@langwatch/react-rum`: server code already imports
+ * `@langwatch/ui/public-config`, and nothing was walking what that reaches.
+ */
+const applicationDirectories = (): Map<string, string> => {
+  const map = new Map<string, string>();
+  const appsRoot = path.join(REPO_ROOT, "apps");
+  if (!fs.existsSync(appsRoot)) return map;
+  for (const entry of fs.readdirSync(appsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(appsRoot, entry.name);
+    const manifest = path.join(dir, "package.json");
+    if (!fs.existsSync(manifest)) continue;
+    const { name } = JSON.parse(read(manifest)) as { name?: string };
+    if (name) map.set(name, dir);
+  }
+  return map;
+};
+
+const APPLICATION_DIRECTORIES = applicationDirectories();
+
 const resolveWorkspacePackage = (spec: string): string | null => {
   if (!spec.startsWith("@langwatch/")) return null;
-  const [, name, ...rest] = spec.split("/");
+  const [scope, name, ...rest] = spec.split("/");
   if (!name) return null;
   const subpath = rest.length > 0 ? `./${rest.join("/")}` : ".";
 
-  for (const root of [APP_ROOT, REPO_ROOT]) {
-    const pkgDir = path.join(root, "packages", name);
+  const applicationDir = APPLICATION_DIRECTORIES.get(`${scope}/${name}`);
+  const packageDirs = [APP_ROOT, REPO_ROOT].map((root) => path.join(root, "packages", name));
+  for (const pkgDir of applicationDir ? [applicationDir, ...packageDirs] : packageDirs) {
     const manifest = path.join(pkgDir, "package.json");
     if (!fs.existsSync(manifest)) continue;
 

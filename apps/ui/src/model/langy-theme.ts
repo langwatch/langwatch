@@ -169,7 +169,8 @@ export const langyThemeConfig = defineConfig({
           barTrack: langy("#e2e2e2", white(0.1)),
           barFill: langy("rgba(245, 107, 26, 0.75)", brand300(0.7)),
 
-          // The signal grid's line colour (dark only — see langyTheme.css).
+          // The signal grid's line colour (dark only — see
+          // platform/app/src/features/langy/langyTheme.css).
           grid: langy("transparent", white(0.035)),
 
           // Langy's answer text: a step dimmer than `fg`, so a glance separates

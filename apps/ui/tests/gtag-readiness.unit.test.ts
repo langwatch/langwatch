@@ -4,7 +4,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useIsGtagReady } from "../useIsGtagReady";
+import { useIsGtagReady } from "../src/behavior/gtag-readiness";
 
 describe("useIsGtagReady", () => {
   beforeEach(() => {

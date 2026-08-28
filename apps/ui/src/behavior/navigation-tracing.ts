@@ -23,7 +23,6 @@
 import { type NavigationSpanHandle, startNavigationSpan } from "@langwatch/react-rum";
 import { useEffect, useRef } from "react";
 import { useLocation, useMatches, useNavigation } from "react-router";
-import { usePublicEnv } from "./usePublicEnv";
 
 /**
  * Backstop for the settle timer. `requestAnimationFrame` does not fire in a
@@ -36,10 +35,7 @@ const SETTLE_DEADLINE_MS = 5_000;
 /** React Router's key for the location a visit started on, which we do not trace. */
 const INITIAL_LOCATION_KEY = "default";
 
-export function useNavigationTracing(): void {
-  const publicEnv = usePublicEnv();
-  const enabled = !!publicEnv.data?.RUM_ENABLED;
-
+export function useNavigationTracing({ enabled }: { enabled: boolean }): void {
   const navigation = useNavigation();
   const location = useLocation();
   // `useMatches` rather than `useParams`: this hook runs in the root layout,

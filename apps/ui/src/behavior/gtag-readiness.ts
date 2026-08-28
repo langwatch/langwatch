@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { pollForGlobal } from "~/utils/pollForGlobal";
+import { pollForGlobal } from "./poll-for-global";
 
 // gtag is defined by GTM's container once it loads — which is now
 // idle-deferred — so it may not exist yet on the render that first builds

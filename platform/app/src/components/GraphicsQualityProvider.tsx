@@ -3,7 +3,8 @@
  * the device can't sustain a smooth rate, flips the app into
  * reduced-graphics mode: decorative blur/backdrop effects switch to a plain
  * background instead (see the `--lw-backdrop-blur` CSS variable wired into
- * the theme recipes in src/pages/_app.tsx, and RunRow/GroupRow's sticky
+ * the theme recipes in packages/design-system/src/system/config.ts, and
+ * RunRow/GroupRow's sticky
  * headers).
  *
  * rAF only runs during the ~SAMPLE_WINDOW_MS window itself; the

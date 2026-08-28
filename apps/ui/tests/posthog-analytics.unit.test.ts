@@ -18,17 +18,16 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
-let publicEnvData: Record<string, unknown> | undefined = {
+import {
+  type PostHogPublicConfig,
+  usePostHog,
+} from "../src/behavior/posthog-analytics";
+
+let publicEnvData: PostHogPublicConfig | undefined = {
   POSTHOG_KEY: "test-key",
   POSTHOG_HOST: "https://eu.i.posthog.com",
   NODE_ENV: "test",
 };
-
-vi.mock("../usePublicEnv", () => ({
-  usePublicEnv: () => ({ data: publicEnvData }),
-}));
-
-import { usePostHog } from "../usePostHog";
 
 function fireLoadedCallback() {
   const { loaded } = mockInit.mock.calls[0]![1] as {
@@ -58,7 +57,7 @@ describe("usePostHog", () => {
     it("does not call posthog.init", () => {
       publicEnvData = undefined;
 
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).not.toHaveBeenCalled();
     });
@@ -66,7 +65,7 @@ describe("usePostHog", () => {
     it("returns undefined", () => {
       publicEnvData = undefined;
 
-      const { result } = renderHook(() => usePostHog());
+      const { result } = renderHook(() => usePostHog(publicEnvData));
 
       expect(result.current).toBeUndefined();
     });
@@ -74,17 +73,17 @@ describe("usePostHog", () => {
 
   describe("when publicEnv has loaded but there is no POSTHOG_KEY", () => {
     it("does not call posthog.init", () => {
-      publicEnvData = { POSTHOG_KEY: undefined, NODE_ENV: "test" };
+      publicEnvData = { POSTHOG_KEY: undefined, POSTHOG_HOST: undefined, NODE_ENV: "test" };
 
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).not.toHaveBeenCalled();
     });
 
     it("returns undefined", () => {
-      publicEnvData = { POSTHOG_KEY: undefined, NODE_ENV: "test" };
+      publicEnvData = { POSTHOG_KEY: undefined, POSTHOG_HOST: undefined, NODE_ENV: "test" };
 
-      const { result } = renderHook(() => usePostHog());
+      const { result } = renderHook(() => usePostHog(publicEnvData));
 
       expect(result.current).toBeUndefined();
     });
@@ -92,19 +91,19 @@ describe("usePostHog", () => {
 
   describe("when a POSTHOG_KEY is present", () => {
     it("calls posthog.init with the key", () => {
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).toHaveBeenCalledWith("test-key", expect.any(Object));
     });
 
     it("returns the posthog client", () => {
-      const { result } = renderHook(() => usePostHog());
+      const { result } = renderHook(() => usePostHog(publicEnvData));
 
       expect(result.current).toBeDefined();
     });
 
     it("initializes with recording disabled at init time", () => {
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).toHaveBeenCalledWith(
         "test-key",
@@ -116,7 +115,7 @@ describe("usePostHog", () => {
     });
 
     it("keeps core capture options eager and unchanged", () => {
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).toHaveBeenCalledWith(
         "test-key",
@@ -130,7 +129,7 @@ describe("usePostHog", () => {
     });
 
     it("does not start session recording before init's loaded callback fires", () => {
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockStartSessionRecording).not.toHaveBeenCalled();
     });
@@ -144,7 +143,7 @@ describe("usePostHog", () => {
         NODE_ENV: "test",
       };
 
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).toHaveBeenCalledWith(
         "test-key",
@@ -157,9 +156,9 @@ describe("usePostHog", () => {
 
   describe("given no POSTHOG_HOST is provided", () => {
     it("defaults api_host to the EU PostHog endpoint", () => {
-      publicEnvData = { POSTHOG_KEY: "test-key", NODE_ENV: "test" };
+      publicEnvData = { POSTHOG_KEY: "test-key", POSTHOG_HOST: undefined, NODE_ENV: "test" };
 
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       expect(mockInit).toHaveBeenCalledWith(
         "test-key",
@@ -172,7 +171,7 @@ describe("usePostHog", () => {
 
   describe("when init's loaded callback fires", () => {
     it("exposes the client on window.posthog", () => {
-      renderHook(() => usePostHog());
+      renderHook(() => usePostHog(publicEnvData));
 
       fireLoadedCallback();
 
@@ -183,10 +182,11 @@ describe("usePostHog", () => {
       it("enables posthog debug logging", () => {
         publicEnvData = {
           POSTHOG_KEY: "test-key",
+          POSTHOG_HOST: undefined,
           NODE_ENV: "development",
         };
 
-        renderHook(() => usePostHog());
+        renderHook(() => usePostHog(publicEnvData));
         fireLoadedCallback();
 
         expect(mockDebug).toHaveBeenCalledTimes(1);
@@ -195,9 +195,13 @@ describe("usePostHog", () => {
 
     describe("given NODE_ENV is not development", () => {
       it("does not enable posthog debug logging", () => {
-        publicEnvData = { POSTHOG_KEY: "test-key", NODE_ENV: "production" };
+        publicEnvData = {
+          POSTHOG_KEY: "test-key",
+          POSTHOG_HOST: undefined,
+          NODE_ENV: "production",
+        };
 
-        renderHook(() => usePostHog());
+        renderHook(() => usePostHog(publicEnvData));
         fireLoadedCallback();
 
         expect(mockDebug).not.toHaveBeenCalled();
@@ -215,7 +219,7 @@ describe("usePostHog", () => {
           }),
         );
 
-        renderHook(() => usePostHog());
+        renderHook(() => usePostHog(publicEnvData));
         fireLoadedCallback();
 
         expect(mockStartSessionRecording).not.toHaveBeenCalled();
@@ -229,7 +233,7 @@ describe("usePostHog", () => {
         const requestIdleCallback = vi.fn(() => 1);
         vi.stubGlobal("requestIdleCallback", requestIdleCallback);
 
-        renderHook(() => usePostHog());
+        renderHook(() => usePostHog(publicEnvData));
         fireLoadedCallback();
 
         expect(requestIdleCallback).toHaveBeenCalledWith(
@@ -251,7 +255,7 @@ describe("usePostHog", () => {
           );
           vi.stubGlobal("cancelIdleCallback", cancelIdleCallback);
 
-          const { unmount } = renderHook(() => usePostHog());
+          const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           unmount();
@@ -276,7 +280,7 @@ describe("usePostHog", () => {
           );
           vi.stubGlobal("cancelIdleCallback", undefined);
 
-          const { unmount } = renderHook(() => usePostHog());
+          const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           expect(() => unmount()).not.toThrow();
@@ -295,7 +299,7 @@ describe("usePostHog", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
           vi.useFakeTimers();
 
-          renderHook(() => usePostHog());
+          renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           expect(mockStartSessionRecording).not.toHaveBeenCalled();
@@ -310,7 +314,7 @@ describe("usePostHog", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
           vi.useFakeTimers();
 
-          const { unmount } = renderHook(() => usePostHog());
+          const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           unmount();
@@ -326,7 +330,7 @@ describe("usePostHog", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
           vi.useFakeTimers();
 
-          renderHook(() => usePostHog());
+          renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           expect(mockStartSessionRecording).not.toHaveBeenCalled();
@@ -342,7 +346,7 @@ describe("usePostHog", () => {
           vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
           vi.useFakeTimers();
 
-          const { unmount } = renderHook(() => usePostHog());
+          const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
           unmount();

@@ -17,6 +17,38 @@
     "./public-config": {
       "types": "./src/behavior/public-config.ts",
       "default": "./src/behavior/public-config.ts"
+    },
+    "./design-system": {
+      "types": "./src/behavior/design-system.ts",
+      "default": "./src/behavior/design-system.ts"
+    },
+    "./langy-theme": {
+      "types": "./src/model/langy-theme.ts",
+      "default": "./src/model/langy-theme.ts"
+    },
+    "./analytics-client": {
+      "types": "./src/behavior/analytics-client.ts",
+      "default": "./src/behavior/analytics-client.ts"
+    },
+    "./posthog-analytics": {
+      "types": "./src/behavior/posthog-analytics.ts",
+      "default": "./src/behavior/posthog-analytics.ts"
+    },
+    "./gtag-readiness": {
+      "types": "./src/behavior/gtag-readiness.ts",
+      "default": "./src/behavior/gtag-readiness.ts"
+    },
+    "./browser-tracing": {
+      "types": "./src/behavior/browser-tracing.ts",
+      "default": "./src/behavior/browser-tracing.ts"
+    },
+    "./navigation-tracing": {
+      "types": "./src/behavior/navigation-tracing.ts",
+      "default": "./src/behavior/navigation-tracing.ts"
+    },
+    "./poll-for-global": {
+      "types": "./src/behavior/poll-for-global.ts",
+      "default": "./src/behavior/poll-for-global.ts"
     }
   },
   "scripts": {
@@ -25,17 +57,24 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
+    "posthog-js": "^1.396.9",
     "react": "^19.2.7",
+    "react-contextual-analytics": "^1.1.2",
     "react-dom": "^19.2.7",
     "react-router": "^8.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@chakra-ui/react": "^3.36.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",

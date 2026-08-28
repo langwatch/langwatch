@@ -4,8 +4,8 @@ import {
   DesignSystemProvider,
   type DesignSystemProviderProps,
 } from "@langwatch/design-system/provider";
-import { system } from "~/theme";
+import { uiDesignSystem } from "@langwatch/ui/design-system";
 
 export function Provider(props: Omit<DesignSystemProviderProps, "system">) {
-  return <DesignSystemProvider system={system} {...props} />;
+  return <DesignSystemProvider system={uiDesignSystem} {...props} />;
 }

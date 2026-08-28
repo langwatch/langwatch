@@ -133,7 +133,8 @@ function StatusIcon({ status }: { status: ToastStatus }) {
  *
  * Light mode wears Chakra's filled toast, dark mode a panel with one hairline
  * in the status tone. That split, and the material itself — surface, radius,
- * padding and type — is the `toast` slot recipe in `pages/_app.tsx`; what
+ * padding and type — is the `toast` slot recipe in
+ * `packages/design-system/src/system/config.ts`; what
  * changes with it here is the colour of the icon and of the action, which have
  * a fill to sit on in one mode and not the other.
  */

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pollForGlobal } from "../pollForGlobal";
+import { pollForGlobal } from "../src/behavior/poll-for-global";
 
 describe("pollForGlobal", () => {
   beforeEach(() => {

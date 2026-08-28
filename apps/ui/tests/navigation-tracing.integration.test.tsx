@@ -10,8 +10,8 @@
  * navigation genuinely passes through `loading` before it commits, which is
  * the transition the hook keys off. The OpenTelemetry provider is real too,
  * exporting in memory: what is asserted is the trace that came out, not the
- * calls that were made. Only `usePublicEnv` is mocked, because it is the flag
- * boundary and reaching it would need a tRPC client.
+ * calls that were made. Nothing is mocked: the enabled flag is an argument the
+ * composing application supplies, so a scenario simply passes it.
  */
 
 import { NavigationContextManager } from "@langwatch/react-rum";
@@ -30,13 +30,14 @@ import {
   type RouteObject,
   RouterProvider,
 } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useNavigationTracing } from "../useNavigationTracing";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { useNavigationTracing } from "../src/behavior/navigation-tracing";
 
-const publicEnv = { RUM_ENABLED: true };
-vi.mock("~/hooks/usePublicEnv", () => ({
-  usePublicEnv: () => ({ data: publicEnv }),
-}));
+/**
+ * The flag the composing application resolves and passes in. Held in a
+ * mutable cell so a scenario can turn telemetry off before it renders.
+ */
+const telemetry = { enabled: true };
 
 const exporter = new InMemorySpanExporter();
 const provider = new BasicTracerProvider({
@@ -56,7 +57,7 @@ const navigationSpans = (): ReadableSpan[] =>
   exporter.getFinishedSpans().filter((s) => s.name.startsWith("navigation "));
 
 function Layout() {
-  useNavigationTracing();
+  useNavigationTracing({ enabled: telemetry.enabled });
   return <Outlet />;
 }
 
@@ -99,7 +100,7 @@ const settle = () =>
 beforeEach(() => {
   exporter.reset();
   releaseLazyRoute = null;
-  publicEnv.RUM_ENABLED = true;
+  telemetry.enabled = true;
   contextManager.enable();
   context.setGlobalContextManager(contextManager);
   trace.setGlobalTracerProvider(provider);
@@ -210,7 +211,7 @@ describe("useNavigationTracing", () => {
     describe("when the user navigates", () => {
       /** scenario "Telemetry is silent when disabled" */
       it("reports nothing", async () => {
-        publicEnv.RUM_ENABLED = false;
+        telemetry.enabled = false;
         const router = renderAt("/acme/home");
 
         await act(async () => {

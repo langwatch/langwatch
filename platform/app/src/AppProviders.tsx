@@ -1,10 +1,15 @@
 import { UiDesignSystemShell } from "@langwatch/ui";
+import { createUiAnalyticsClient } from "@langwatch/ui/analytics-client";
+import { useBrowserTracing } from "@langwatch/ui/browser-tracing";
+import { uiDesignSystem } from "@langwatch/ui/design-system";
+import { useIsGtagReady } from "@langwatch/ui/gtag-readiness";
+import { useNavigationTracing } from "@langwatch/ui/navigation-tracing";
+import { usePostHog } from "@langwatch/ui/posthog-analytics";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ReactNode } from "react";
 import { AnalyticsProvider } from "react-contextual-analytics";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { EnterpriseSaasFooter } from "./components/enterprise/EnterpriseSaasFooter";
 import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
@@ -12,11 +17,6 @@ import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useNavigationV2Tracking } from "./features/navigation/useNavigationV2Tracking";
 import { useAttributionCapture } from "./hooks/useAttributionCapture";
-import { useBrowserTracing } from "./hooks/useBrowserTracing";
-import { useIsGtagReady } from "./hooks/useIsGtagReady";
-import { useNavigationTracing } from "./hooks/useNavigationTracing";
-import { usePostHog } from "./hooks/usePostHog";
-import { system } from "./theme";
 import { TRPCProvider } from "./utils/api";
 
 /**
@@ -32,7 +32,7 @@ export function OuterProviders({ children }: { children: ReactNode }) {
   return (
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>
-        <UiDesignSystemShell system={system}>
+        <UiDesignSystemShell system={uiDesignSystem}>
           <GraphicsQualityProvider>{children}</GraphicsQualityProvider>
         </UiDesignSystemShell>
       </TRPCProvider>
@@ -45,13 +45,21 @@ export function OuterProviders({ children }: { children: ReactNode }) {
  * These are rendered inside <RouterProvider> via the RootLayout route.
  */
 export function InnerProviders({ children }: { children: ReactNode }) {
-  const postHog = usePostHog();
+  // The browser instrumentation behaviours live in `@langwatch/ui` and read
+  // nothing from the environment themselves; this is the one place that
+  // resolves the public configuration and hands it to each of them, in the
+  // order they have always run in.
   const publicEnv = usePublicEnv();
+  const postHog = usePostHog(publicEnv.data);
   const isGtagReady = useIsGtagReady();
-  useBrowserTracing();
+  useBrowserTracing({
+    enabled: publicEnv.data?.RUM_ENABLED,
+    environment: publicEnv.data?.NODE_ENV,
+    sampleRatio: publicEnv.data?.RUM_SAMPLE_RATIO,
+  });
   // Router context is available here — InnerProviders renders inside
   // RouterProvider — which is what a navigation span needs.
-  useNavigationTracing();
+  useNavigationTracing({ enabled: !!publicEnv.data?.RUM_ENABLED });
   // Navigation-v2 write points (product memory + settings return capture).
   // Inert in legacy mode.
   useNavigationV2Tracking();
@@ -60,10 +68,11 @@ export function InnerProviders({ children }: { children: ReactNode }) {
     <>
       <CommandBarProvider>
         <AnalyticsProvider
-          client={createAppAnalyticsClient({
+          client={createUiAnalyticsClient({
             isSaaS: Boolean(publicEnv.data?.IS_SAAS),
             posthogClient: postHog,
             isGtagReady,
+            isDevelopment: process.env.NODE_ENV !== "production",
           })}
         >
           {/* Always wrap in PostHogProvider with the module singleton —

@@ -1,4 +1,4 @@
-import { pollForGlobal } from "./pollForGlobal";
+import { pollForGlobal } from "@langwatch/ui/poll-for-global";
 
 /**
  * Polling for gtag runs for up to ten seconds, long enough for the page to be

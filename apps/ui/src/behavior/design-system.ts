@@ -1,5 +1,5 @@
 import { createDesignSystem } from "@langwatch/design-system/system";
-import { langyThemeConfig } from "~/features/langy/langyTheme";
+import { langyThemeConfig } from "../model/langy-theme";
 
 /** The application-composed system: shared foundations plus installed features. */
-export const system = createDesignSystem(langyThemeConfig);
+export const uiDesignSystem = createDesignSystem(langyThemeConfig);

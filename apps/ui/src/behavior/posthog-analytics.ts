@@ -1,6 +1,17 @@
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
-import { usePublicEnv } from "./usePublicEnv";
+import type { PublicEnvironment } from "../model/public-environment";
+
+/**
+ * The public configuration PostHog needs. The composing application resolves
+ * it — this behaviour never reads it from the environment itself — and passes
+ * the same object it holds, so the initialisation effect keeps reacting to the
+ * arrival of configuration exactly as it did before the move.
+ */
+export type PostHogPublicConfig = Pick<
+  PublicEnvironment,
+  "POSTHOG_KEY" | "POSTHOG_HOST" | "NODE_ENV"
+>;
 
 // Returns a cancel function so callers can drop pending work if the effect
 // tears down (or re-runs) before the idle/load callback fires — otherwise a
@@ -38,15 +49,14 @@ function startSessionRecordingWhenIdle(): () => void {
   };
 }
 
-export function usePostHog() {
-  const publicEnv = usePublicEnv();
+export function usePostHog(config: PostHogPublicConfig | undefined) {
   const cancelStartSessionRecordingRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (!publicEnv.data) return;
+    if (!config) return;
 
-    const posthogKey = publicEnv.data?.POSTHOG_KEY;
-    const posthogHost = publicEnv.data?.POSTHOG_HOST;
+    const posthogKey = config.POSTHOG_KEY;
+    const posthogHost = config.POSTHOG_HOST;
 
     if (posthogKey) {
       // capture_pageview: "history_change" tells posthog-js to capture
@@ -91,7 +101,7 @@ export function usePostHog() {
           if (typeof window !== "undefined") {
             (window as unknown as { posthog: typeof posthog }).posthog = posthog;
           }
-          if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
+          if (config.NODE_ENV === "development") posthog.debug();
           cancelStartSessionRecordingRef.current = startSessionRecordingWhenIdle();
         },
       });
@@ -101,7 +111,7 @@ export function usePostHog() {
       cancelStartSessionRecordingRef.current?.();
       cancelStartSessionRecordingRef.current = null;
     };
-  }, [publicEnv.data]);
+  }, [config]);
 
-  return publicEnv.data?.POSTHOG_KEY ? posthog : undefined;
+  return config?.POSTHOG_KEY ? posthog : undefined;
 }
