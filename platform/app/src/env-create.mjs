@@ -154,6 +154,7 @@ export function createEnvConfig(source) {
     server: {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
+      CLICKHOUSE_OPS_URL: z.string().url().optional(),
       NODE_ENV: z.enum(["development", "test", "production"]),
       ENVIRONMENT: z
         .string()
@@ -598,6 +599,7 @@ export function createEnvConfig(source) {
     runtimeEnv: {
       DATABASE_URL: source.DATABASE_URL,
       CLICKHOUSE_URL: source.CLICKHOUSE_URL,
+      CLICKHOUSE_OPS_URL: source.CLICKHOUSE_OPS_URL,
       NODE_ENV: source.NODE_ENV,
       ENVIRONMENT: source.ENVIRONMENT,
       BASE_HOST: source.BASE_HOST,

@@ -17,7 +17,7 @@ const logger = createLogger("langwatch:clickhouse:connection-pool");
  *
  * This is the socket ceiling, not the working limit. A process has one
  * construction site against a given server (`./managedClient.ts`), and what
- * actually bounds the statements it runs is the limiter in `./statementLimit.ts`,
+ * actually bounds the statements it runs is the package-managed limiter,
  * sized from this number so the two agree.
  */
 export function getClickHouseMaxOpenConnections(): number {

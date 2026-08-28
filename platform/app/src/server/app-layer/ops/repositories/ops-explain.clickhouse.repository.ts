@@ -1,5 +1,4 @@
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
-import { getOpsClickHouseClient } from "~/server/ops/explain-core";
 
 export interface OpsExplainClientResolution {
   client: ClickHouseClient;
@@ -7,6 +6,11 @@ export interface OpsExplainClientResolution {
    *  configured on this instance and the call fell back to the
    *  default-user shared client. */
   usingFallback: boolean;
+}
+
+/** Complete composition port for selecting the dedicated or shared client. */
+export abstract class OpsExplainClientResolver {
+  abstract resolve(): OpsExplainClientResolution | null;
 }
 
 /**
@@ -19,13 +23,7 @@ export interface OpsExplainClientResolution {
  * every other repository follows.
  */
 export class OpsExplainClickHouseRepository {
-  constructor(
-    private readonly deps: {
-      /** The composition root's shared client, the one door this repository
-       *  has to it - EXPLAIN is fleet work, not tenant work. */
-      fallbackClient: () => ClickHouseClient | null;
-    },
-  ) {}
+  constructor(private readonly resolver: OpsExplainClientResolver) {}
 
   /**
    * The dedicated `langwatch_ops` readonly user when `CLICKHOUSE_OPS_URL`
@@ -33,10 +31,7 @@ export class OpsExplainClickHouseRepository {
    * Null when neither is configured on this instance.
    */
   resolveClient(): OpsExplainClientResolution | null {
-    const opsClient = getOpsClickHouseClient();
-    if (opsClient) return { client: opsClient, usingFallback: false };
-    const sharedClient = this.deps.fallbackClient();
-    return sharedClient ? { client: sharedClient, usingFallback: true } : null;
+    return this.resolver.resolve();
   }
 
   /**

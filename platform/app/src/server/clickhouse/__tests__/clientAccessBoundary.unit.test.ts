@@ -22,7 +22,7 @@
  * the list is a ratchet: a file not on it fails, and a file on it that no longer
  * needs to be fails too, so the list can only shrink. Nothing new gets in.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -66,13 +66,18 @@ const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
 
 const CLIENT_MODULE_VALUE_EXPORTS = new Set([
   "getClickHouseClientForTenant",
+  "configureClickHouseRuntime",
   "getClickHouseClientForOrganization",
   "getAllClickHouseInstances",
   "isClickHouseEnabled",
+  "shutdownClickHouseConnections",
+  "shutdownComposedClickHouseRuntime",
   "clearCustomClientCache",
   "getCustomClientCacheSize",
   "clearTenantOrgCache",
   "getPrivateClickHouseUrls",
+  "_getSharedClickHouseClient",
+  "AppClickHouseRuntime",
 ]);
 
 /**
@@ -88,11 +93,7 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
  * one reformatting away from missing one.
  */
 function valueExportsOf(source: string): string[] {
-  return [
-    ...unnamedExportsOf(source),
-    ...declarationExportsOf(source),
-    ...braceExportsOf(source),
-  ];
+  return [...unnamedExportsOf(source), ...declarationExportsOf(source), ...braceExportsOf(source)];
 }
 
 /** `export default x` and `export * from "..."` - neither carries a name. */
@@ -206,13 +207,7 @@ function mayResolveByLocation(path: string): boolean {
  */
 const RESOLVES_DIRECTLY_BACKLOG = new Set<string>([]);
 
-const SKIPPED_DIRECTORIES = new Set([
-  "node_modules",
-  "__tests__",
-  "__mocks__",
-  ".next",
-  "dist",
-]);
+const SKIPPED_DIRECTORIES = new Set(["node_modules", "__tests__", "__mocks__", ".next", "dist"]);
 
 function isScanned(fileName: string): boolean {
   if (!/\.tsx?$/.test(fileName)) return false;
@@ -247,6 +242,7 @@ function scan(): ScanResult {
   const files: ScannedFile[] = [];
   let walked = 0;
   for (const root of ROOTS) {
+    if (!existsSync(join(PACKAGE_ROOT, root))) continue;
     for (const absolute of walk(join(PACKAGE_ROOT, root))) {
       walked += 1;
       const source = readFileSync(absolute, "utf8");
@@ -386,9 +382,7 @@ describe("the ClickHouse client access boundary", () => {
     });
 
     it("keeps the backlog shrinking, never growing", () => {
-      const resolvers = new Set(
-        scanned.filter((file) => file.resolves).map((file) => file.path),
-      );
+      const resolvers = new Set(scanned.filter((file) => file.resolves).map((file) => file.path));
       const stale = [...RESOLVES_DIRECTLY_BACKLOG].filter((path) => !resolvers.has(path));
 
       expect(
@@ -417,9 +411,7 @@ describe("the ClickHouse client access boundary", () => {
     });
 
     it("keeps that allowance shrinking too", () => {
-      const users = new Set(
-        scanned.filter((file) => file.resolvesViaApp).map((file) => file.path),
-      );
+      const users = new Set(scanned.filter((file) => file.resolvesViaApp).map((file) => file.path));
       const stale = [...MAY_RESOLVE_VIA_APP].filter((path) => !users.has(path));
 
       expect(

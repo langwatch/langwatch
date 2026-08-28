@@ -12,7 +12,7 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import {
   privateRouteOrgId,
@@ -121,13 +121,6 @@ const createdProjectIds: string[] = [];
 const createdTeamIds: string[] = [];
 const createdOrgIds: string[] = [];
 
-/**
- * Mock the shared client to return our shared test container client.
- */
-vi.mock("../client", () => ({
-  _getSharedClickHouseClient: () => sharedClient,
-}));
-
 describe("ClickHouse routing via env vars", () => {
   beforeAll(async () => {
     const [shared, private_] = await startTestClickHouseEndpoints({
@@ -138,10 +131,42 @@ describe("ClickHouse routing via env vars", () => {
     const sharedUrl = shared!.url;
     const privateUrl = private_!.url;
 
+    process.env.CLICKHOUSE_URL = sharedUrl;
     // Set the private CH env var BEFORE importing clickhouseClient
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
-    process.env[`CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`] =
-      privateUrl;
+    process.env[`CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`] = privateUrl;
+
+    const { AppClickHouseRuntime, configureClickHouseRuntime } =
+      await import("../clickhouseClient");
+    configureClickHouseRuntime(
+      AppClickHouseRuntime.create({
+        sharedUrl,
+        privateRoutes: [
+          { organizationId: PRIVATE_ORG_ID, url: privateUrl, cluster: "testcustomer" },
+          {
+            organizationId: PRIVATE_ORG_ID_WITHOUT_PROJECTS,
+            url: privateUrl,
+            cluster: "grantsledger",
+          },
+        ],
+        poolSizing: {},
+        directory: {
+          async organizationForTenant(tenantId: string): Promise<string | null> {
+            const project = await prisma.project.findUnique({
+              where: { id: tenantId },
+              select: { team: { select: { organizationId: true } } },
+            });
+            if (project?.team.organizationId !== undefined) return project.team.organizationId;
+            const organization = await prisma.organization.findUnique({
+              where: { id: tenantId },
+              select: { id: true },
+            });
+            return organization?.id ?? null;
+          },
+        },
+        buildTime: false,
+      }),
+    );
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -157,10 +182,10 @@ describe("ClickHouse routing via env vars", () => {
   }, 300_000);
 
   afterAll(async () => {
-    const { clearCustomClientCache, clearTenantOrgCache } =
+    const { clearTenantOrgCache, shutdownClickHouseConnections } =
       await import("../clickhouseClient");
-    await clearCustomClientCache();
     clearTenantOrgCache();
+    await shutdownClickHouseConnections();
 
     if (createdProjectIds.length > 0) {
       await prisma.project.deleteMany({
@@ -180,9 +205,8 @@ describe("ClickHouse routing via env vars", () => {
 
     // Clean up env var
     delete process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`];
-    delete process.env[
-      `CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`
-    ];
+    delete process.env[`CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`];
+    delete process.env.CLICKHOUSE_URL;
   }, 60_000);
 
   describe("when org has no private ClickHouse env var", () => {
@@ -202,7 +226,7 @@ describe("ClickHouse routing via env vars", () => {
       createdOrgIds.push(organizationId);
 
       const client = await getClickHouseClientForTenant(projectId);
-      expect(client).toBe(sharedClient);
+      expect(client).not.toBeNull();
 
       const rowId = `shared-${nanoid(8)}`;
       await insertTestRow(client!, {
@@ -341,9 +365,7 @@ describe("ClickHouse routing via env vars", () => {
       await clearCustomClientCache();
 
       const first = await getClickHouseClientForOrganization(PRIVATE_ORG_ID);
-      const second = await getClickHouseClientForOrganization(
-        PRIVATE_ORG_ID_WITHOUT_PROJECTS,
-      );
+      const second = await getClickHouseClientForOrganization(PRIVATE_ORG_ID_WITHOUT_PROJECTS);
 
       expect(second).toBe(first);
       expect(getCustomClientCacheSize()).toBe(1);

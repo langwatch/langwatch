@@ -15,7 +15,9 @@ import {
 } from "@langwatch/evaluation-server";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { z } from "zod";
+import { poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { GroupQueuePolicy } from "@langwatch/group-queue";
+import { PRIVATE_CH_ENV_PREFIX, parseRouteKey } from "../clickhouse/privateRouteKey";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -113,6 +115,7 @@ export function resolveGroupQueueProcessConfig(source: {
 
 export interface AppConfig {
   nodeEnv: string;
+  buildTime: boolean;
 
   /** Typed configuration for the process-owned NLP Lambda capability. */
   nlpLambda: NlpLambdaRuntimeConfig;
@@ -122,10 +125,15 @@ export interface AppConfig {
 
   // Infrastructure
   databaseUrl: string;
-  clickhouseUrl?: string;
-  redisUrl?: string;
   /** Process-composed HMAC pepper for the Gateway virtual-key control plane. */
   virtualKeyPepper?: string;
+  clickhouseUrl?: string;
+  /** Dedicated read-only endpoint for the operator EXPLAIN capability. */
+  clickhouseOpsUrl?: string;
+  /** Parsed once at process composition; never re-read by ClickHouse clients. */
+  clickhousePoolSizing: PoolSizingInput;
+  clickhousePrivateRoutes: readonly { organizationId: string; url: string; cluster: string }[];
+  redisUrl?: string;
   redisClusterEndpoints?: string;
   /** Raw `REDIS_DB_INDEX`; `@langwatch/redis-client` validates and applies it. */
   redisDbIndex?: string;
@@ -233,11 +241,15 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
 
   return {
     nodeEnv: env.NODE_ENV,
+    buildTime: process.env.BUILD_TIME !== undefined,
     nlpLambda: resolveNlpLambdaRuntimeConfig(env),
     featureFlags: resolveFeatureFlagConfig(process.env),
     databaseUrl: env.DATABASE_URL,
     virtualKeyPepper: env.LW_VIRTUAL_KEY_PEPPER,
     clickhouseUrl: env.CLICKHOUSE_URL,
+    clickhouseOpsUrl: env.CLICKHOUSE_OPS_URL,
+    clickhousePoolSizing: poolSizingFromEnv(process.env),
+    clickhousePrivateRoutes: resolvePrivateClickHouseRoutes(process.env),
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     redisDbIndex: env.REDIS_DB_INDEX,
@@ -296,6 +308,25 @@ function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undef
 function nonNegativeSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
   const parsed = Number(raw);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function resolvePrivateClickHouseRoutes(source: Record<string, string | undefined>): ReadonlyArray<{
+  organizationId: string;
+  url: string;
+  cluster: string;
+}> {
+  const routes: Array<{ organizationId: string; url: string; cluster: string }> = [];
+  const seen = new Set<string>();
+  for (const [key, url] of Object.entries(source)) {
+    if (!key.startsWith(PRIVATE_CH_ENV_PREFIX) || url === undefined || url.trim() === "") continue;
+    const route = parseRouteKey({ key, prefix: PRIVATE_CH_ENV_PREFIX });
+    if (route === null) continue;
+    if (seen.has(route.orgId))
+      throw new Error(`Duplicate private ClickHouse config for ${route.orgId}.`);
+    seen.add(route.orgId);
+    routes.push({ organizationId: route.orgId, url, cluster: route.cluster });
+  }
+  return routes;
 }
 
 function readEvaluationByteEnv(raw: string | undefined, fallback: number): number {

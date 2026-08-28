@@ -137,7 +137,7 @@ export const setClickHouseActiveConnections = (count: number) =>
 // ============================================================================
 
 // How many statements a process is running and how many are waiting for a slot
-// (see ~/server/clickhouse/statementLimit.ts). These are the numbers nobody
+// (see @langwatch/clickhouse-client managed client policy). These are the numbers nobody
 // could see during the 2026-07-31 overload: the server's own counters show
 // what it admitted, never what a client was holding back. Sized from the
 // limiter itself at scrape time rather than tracked by hand, so the gauges
@@ -151,10 +151,7 @@ const limiterProbes = new Map<string, LimiterStatsProbe>();
  * replaces the probe, which is what a client rebuild (tests, a private instance
  * re-resolved) should do - two probes for one label would double-count.
  */
-export const registerClickHouseLimiter = (
-  instance: string,
-  probe: LimiterStatsProbe,
-): void => {
+export const registerClickHouseLimiter = (instance: string, probe: LimiterStatsProbe): void => {
   limiterProbes.set(instance, probe);
 };
 
@@ -389,9 +386,7 @@ const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
  *
  * See specs/ops/clickhouse-backup-metrics.feature.
  */
-export function shouldCollectBackupMetrics(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function shouldCollectBackupMetrics(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
   if (typeof raw !== "string") return true;
   const normalized = raw.trim().toLowerCase();
@@ -579,10 +574,7 @@ let storageStatsInterval: ReturnType<typeof setInterval> | null = null;
  * Starts periodic collection of ClickHouse storage statistics.
  * Collects stats every 15 seconds by default.
  */
-export function startStorageStatsCollection(
-  client: ClickHouseClient,
-  intervalMs = 15000,
-): void {
+export function startStorageStatsCollection(client: ClickHouseClient, intervalMs = 15000): void {
   if (storageStatsInterval) {
     return; // Already running
   }
@@ -612,9 +604,7 @@ export function stopStorageStatsCollection(): void {
  * module is the one place allowed to reach for a client directly. Returns
  * `false` without starting anything when ClickHouse isn't configured.
  */
-export function startStorageStatsCollectionFromSharedClient(
-  intervalMs?: number,
-): boolean {
+export function startStorageStatsCollectionFromSharedClient(intervalMs?: number): boolean {
   const client = _getSharedClickHouseClient();
   if (!client) return false;
   startStorageStatsCollection(client, intervalMs);

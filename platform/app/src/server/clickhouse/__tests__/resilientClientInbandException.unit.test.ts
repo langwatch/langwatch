@@ -8,17 +8,15 @@ vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/clickhouse/metrics")>();
   return {
     ...actual,
-    observeClickHouseQueryDuration: (...args: unknown[]) =>
-      mockObserveQueryDuration(...args),
-    incrementClickHouseQueryCount: (...args: unknown[]) =>
-      mockIncrementQueryCount(...args),
+    observeClickHouseQueryDuration: (...args: unknown[]) => mockObserveQueryDuration(...args),
+    incrementClickHouseQueryCount: (...args: unknown[]) => mockIncrementQueryCount(...args),
   };
 });
 
 // Vitest hoists vi.mock above static imports, so this import receives the
 // mocked metrics module regardless of ordering; kept below the factory for
 // readability only.
-import { createResilientClickHouseClient } from "../managedClient";
+import { createResilientClickHouseClientForTest as createResilientClickHouseClient } from "../managedClient";
 
 /**
  * ClickHouse streams over HTTP: an error after the first flushed row cannot
@@ -65,9 +63,7 @@ describe("createResilientClickHouseClient()", () => {
 
     it("throws a plain error carrying the ClickHouse text for untranslated codes", async () => {
       const wrapper = createResilientClickHouseClient({
-        client: clientAnswering([
-          { exception: "Code: 999. DB::Exception: some future failure" },
-        ]),
+        client: clientAnswering([{ exception: "Code: 999. DB::Exception: some future failure" }]),
       });
 
       const result = await wrapper.query({ query: "SELECT 1" } as never);
@@ -83,8 +79,7 @@ describe("createResilientClickHouseClient()", () => {
       const wrapper = createResilientClickHouseClient({
         client: clientAnswering([
           {
-            exception:
-              "Code: 210. DB::NetException: Connection reset by peer. (NETWORK_ERROR)",
+            exception: "Code: 210. DB::NetException: Connection reset by peer. (NETWORK_ERROR)",
           },
         ]),
       });

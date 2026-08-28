@@ -21,7 +21,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) => (name.includes("query") ? mockQueryLogger : mockLogger),
 }));
 
-import { createResilientClickHouseClient } from "../managedClient";
+import {
+  createResilientClickHouseClientForTest,
+  createResilientClickHouseClientForTest as createResilientClickHouseClient,
+} from "../managedClient";
 
 function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   return {
@@ -35,7 +38,7 @@ function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   } as unknown as ClickHouseClient;
 }
 
-describe("createResilientClickHouseClient()", () => {
+describe("createResilientClickHouseClientForTest()", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockQueryLogger.debug.mockReset();
@@ -60,7 +63,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         insert: vi.fn().mockRejectedValue(transientError),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
         baseDelayMs: 1,
@@ -76,7 +79,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         insert: vi.fn().mockRejectedValue(new Error("MEMORY_LIMIT_EXCEEDED")),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
         baseDelayMs: 1,
@@ -100,7 +103,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         insert: vi.fn().mockRejectedValue(schemaError),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
         baseDelayMs: 1,
@@ -119,7 +122,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(transientError),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 2,
         baseDelayMs: 1,
@@ -136,7 +139,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockResolvedValue(queryResult),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
@@ -152,7 +155,7 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockResolvedValue(queryResult),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
@@ -176,14 +179,12 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
@@ -193,14 +194,12 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
 
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -219,14 +218,12 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(new Error("Syntax error in query")),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
 
       expect(mockQueryLogger.error).not.toHaveBeenCalled();
     });
@@ -236,14 +233,12 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
 
       const loggedObj = mockQueryLogger.warn.mock.calls[0]![0] as Record<string, unknown>;
       expect(loggedObj[QUERY_CAUSE_FIELD]).toBe(err);
@@ -256,14 +251,12 @@ describe("createResilientClickHouseClient()", () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(new Error("Syntax error in query")),
       });
-      const client = createResilientClickHouseClient({
+      const client = createResilientClickHouseClientForTest({
         client: mock,
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
 
       expect(mockQueryLogger.warn.mock.calls[0]![0]).not.toHaveProperty("error");
     });
@@ -348,9 +341,7 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
-        "Syntax error in query",
-      );
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow("Syntax error in query");
     });
   });
 
@@ -359,10 +350,7 @@ describe("createResilientClickHouseClient()", () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const queryResult = { data: [] };
       const mock = makeMockClient({
-        query: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(queryResult),
+        query: vi.fn().mockRejectedValueOnce(transientError).mockResolvedValueOnce(queryResult),
       });
       mockLogger.warn.mockImplementation(() => {
         throw new Error("pino transport crashed");

@@ -1,8 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const clickHouseMocks = vi.hoisted(() => ({
+  close: vi.fn(async () => undefined),
+  createClient: vi.fn(),
+}));
+
+vi.mock("@clickhouse/client", () => ({
+  createClient: clickHouseMocks.createClient,
+}));
 import {
-  _resetOpsClickHouseClientForTesting,
   buildExplainQuery,
-  getOpsClickHouseClient,
+  OpsClickHouseRuntime,
   parseOpsConnection,
   redactQueryForAudit,
   stripCommentsAndStrings,
@@ -132,16 +140,12 @@ describe("buildExplainQuery", () => {
     });
 
     it("does not treat `;` inside a string as multi-statement", () => {
-      expect(
-        buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).ok,
-      ).toBe(true);
+      expect(buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).ok).toBe(true);
     });
 
     it("treats a quoted block-comment marker as data", () => {
       expect(
-        buildExplainQuery(
-          `SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`,
-        ).ok,
+        buildExplainQuery(`SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`).ok,
       ).toBe(true);
     });
   });
@@ -152,19 +156,13 @@ describe("stripCommentsAndStrings", () => {
     expect(stripCommentsAndStrings("SELECT /* x */ 1")).toMatch(/SELECT\s+\s+1/);
   });
   it("drops line comments", () => {
-    expect(stripCommentsAndStrings("SELECT 1 -- trailing\nFROM x")).not.toMatch(
-      /trailing/,
-    );
+    expect(stripCommentsAndStrings("SELECT 1 -- trailing\nFROM x")).not.toMatch(/trailing/);
   });
   it("collapses string literals", () => {
-    expect(stripCommentsAndStrings("SELECT 'abc', \"def\" FROM x")).toMatch(
-      /SELECT '', "" FROM x/,
-    );
+    expect(stripCommentsAndStrings("SELECT 'abc', \"def\" FROM x")).toMatch(/SELECT '', "" FROM x/);
   });
   it("handles nested block comments", () => {
-    const out = stripCommentsAndStrings(
-      "WHERE 1=1 /* outer /* inner */ TenantId = 'p_fake' */",
-    );
+    const out = stripCommentsAndStrings("WHERE 1=1 /* outer /* inner */ TenantId = 'p_fake' */");
     expect(out).not.toMatch(/TenantId/i);
     expect(out).not.toMatch(/p_fake/);
   });
@@ -243,28 +241,38 @@ describe("parseOpsConnection", () => {
   });
 });
 
-describe("getOpsClickHouseClient", () => {
-  const saved = process.env.CLICKHOUSE_OPS_URL;
+describe("OpsClickHouseRuntime", () => {
   beforeEach(() => {
-    _resetOpsClickHouseClientForTesting();
-  });
-  afterEach(() => {
-    if (saved === undefined) delete process.env.CLICKHOUSE_OPS_URL;
-    else process.env.CLICKHOUSE_OPS_URL = saved;
-    _resetOpsClickHouseClientForTesting();
+    clickHouseMocks.close.mockReset();
+    clickHouseMocks.createClient.mockReset();
+    clickHouseMocks.createClient.mockReturnValue({ close: clickHouseMocks.close });
   });
 
-  it("returns null when CLICKHOUSE_OPS_URL is unset", () => {
-    delete process.env.CLICKHOUSE_OPS_URL;
-    expect(getOpsClickHouseClient()).toBeNull();
+  it("returns null when no typed ops endpoint was composed", () => {
+    const runtime = OpsClickHouseRuntime.create({ buildTime: false });
+    expect(runtime.resolveClient()).toBeNull();
   });
 
-  it("builds and caches a client when set", () => {
-    process.env.CLICKHOUSE_OPS_URL =
-      "http://langwatch_ops:secret@ch.example:8123/langwatch";
-    const a = getOpsClickHouseClient();
-    const b = getOpsClickHouseClient();
+  it("lazily builds, caches, and closes a typed endpoint client", async () => {
+    const runtime = OpsClickHouseRuntime.create({
+      url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
+      buildTime: false,
+    });
+    const a = runtime.resolveClient();
+    const b = runtime.resolveClient();
     expect(a).not.toBeNull();
     expect(b).toBe(a);
+    await runtime.close();
+    expect(clickHouseMocks.close).toHaveBeenCalledOnce();
+    expect(runtime.resolveClient()).toBeNull();
+  });
+
+  it("does not materialize a client during BUILD_TIME", async () => {
+    const runtime = OpsClickHouseRuntime.create({
+      url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
+      buildTime: true,
+    });
+    expect(runtime.resolveClient()).toBeNull();
+    await runtime.close();
   });
 });

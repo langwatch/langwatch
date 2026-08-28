@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClickHouseConfigService } from "../config";
 import {
   ClickHouseClientFactory,
+  ClickHouseConnectionClosedError,
   ClickHouseConnectionService,
   ClickHouseNotConfiguredError,
   type ClickHouseClientCreationInput,
@@ -114,5 +115,78 @@ describe("explicit ClickHouse connection lifecycle", () => {
     );
     expect(first.close).toHaveBeenCalledOnce();
     expect(second.close).toHaveBeenCalledOnce();
+  });
+
+  it("uses stable shared and private aliases for one endpoint", async () => {
+    const factory = new RecordingClientFactory();
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant: async () => "org-2" },
+      clientFactory: factory,
+    }).connect(
+      ClickHouseConfigService.create().resolve({
+        shared: { url: "http://same:8123", cluster: "shared" },
+        privateRoutes: [
+          { organizationId: "org-2", url: "http://private:8123", cluster: "later" },
+          { organizationId: "org-1", url: "http://private:8123", cluster: "first" },
+          { organizationId: "org-3", url: "http://same:8123", cluster: "private-shared" },
+        ],
+        poolSizing: { override: 4 },
+      }),
+    );
+
+    const privateClient = await connection.resolve("project-2");
+    const sharedClient = connection.resolveOrganization("org-3");
+    const instances = connection.instances();
+
+    expect(privateClient.input).toMatchObject({ instance: "org-1", cluster: "first" });
+    expect(sharedClient.input).toMatchObject({ instance: "shared", cluster: "shared" });
+    expect(instances.map(({ target }) => target)).toEqual(["shared", "org-1"]);
+  });
+
+  it("refuses resolves and instance enumeration once closing starts", async () => {
+    const factory = new RecordingClientFactory();
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant: async () => "org-1" },
+      clientFactory: factory,
+    }).connect(configuration());
+    const client = await connection.resolve("project-1");
+    let releaseClose: (() => void) | undefined;
+    vi.mocked(client.close).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseClose = resolve;
+        }),
+    );
+
+    const closing = connection.closeOnce();
+
+    await expect(connection.resolve("project-1")).rejects.toBeInstanceOf(
+      ClickHouseConnectionClosedError,
+    );
+    expect(() => connection.instances()).toThrow(ClickHouseConnectionClosedError);
+
+    releaseClose?.();
+    await closing;
+  });
+
+  it("clears only private clients and allows their later recreation", async () => {
+    const factory = new RecordingClientFactory();
+    const connection = ClickHouseConnectionService.create({
+      directory: { organizationForTenant: async () => "org-1" },
+      clientFactory: factory,
+    }).connect(configuration());
+    const shared = connection.shared();
+    const privateClient = connection.resolveOrganization("org-1");
+
+    expect(connection.privateClientCount()).toBe(1);
+    await connection.clearPrivateClients();
+
+    expect(shared.close).not.toHaveBeenCalled();
+    expect(privateClient.close).toHaveBeenCalledOnce();
+    expect(connection.privateClientCount()).toBe(0);
+
+    const recreated = connection.resolveOrganization("org-1");
+    expect(recreated).not.toBe(privateClient);
+    expect(connection.privateClientCount()).toBe(1);
   });
 });

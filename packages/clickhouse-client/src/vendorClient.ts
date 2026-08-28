@@ -77,15 +77,33 @@ export interface VendorClientResilienceOptions {
    * callers are queue jobs that classify the raw error themselves. Omit to
    * raise errors untranslated.
    */
-  translateQueryError?:
-    | ((input: { error: unknown; durationMs: number }) => unknown)
-    | undefined;
+  translateQueryError?: ((input: { error: unknown; durationMs: number }) => unknown) | undefined;
   /**
    * Names the time-partitioned table a SELECT scans without a prunable time
    * predicate, or null. The table list is host schema knowledge, so the
    * detector is injected rather than owned here. Omit to never warn.
    */
   detectColdScan?: ((rawQuery: string) => string | null) | undefined;
+}
+
+/** Complete retry/reporting policy supplied to a managed vendor client. */
+export abstract class VendorClientPolicy {
+  abstract wrap<Client extends VendorStatementClient>(client: Client, cluster: string): Client;
+}
+
+/** The standard vendor retry and reporting policy, configured once per process. */
+export class VendorClientResiliencePolicy extends VendorClientPolicy {
+  private constructor(private readonly options: VendorClientResilienceOptions) {
+    super();
+  }
+
+  static create(options: VendorClientResilienceOptions = {}): VendorClientResiliencePolicy {
+    return new VendorClientResiliencePolicy(options);
+  }
+
+  wrap<Client extends VendorStatementClient>(client: Client, cluster: string): Client {
+    return new VendorClientResilience({ ...this.options, cluster }).wrap(client);
+  }
 }
 
 /**
@@ -121,10 +139,7 @@ export class VendorClientResilience {
   private readonly maxDelayMs: number;
   private readonly transientMessageFragments: readonly string[];
   private readonly report: StatementReporter;
-  private readonly translateQueryError: (input: {
-    error: unknown;
-    durationMs: number;
-  }) => unknown;
+  private readonly translateQueryError: (input: { error: unknown; durationMs: number }) => unknown;
 
   constructor({
     cluster = "shared",
@@ -154,67 +169,51 @@ export class VendorClientResilience {
 
   /** Build one resilient client over the vendor's, preserving its type. */
   wrap<T extends VendorStatementClient>(client: T): T {
-    const wrapper = Object.create(client) as T;
+    return new Proxy(client, {
+      get: (target, property) => {
+        if (property === "query") return (params: unknown) => this.query(target, params);
+        if (property === "insert") return (params: unknown) => this.insert(target, params);
+        return Reflect.get(target, property, target);
+      },
+    });
+  }
 
-    wrapper.query = (async (params: unknown) => {
-      const queryType = extractQueryType(params);
-      const table = extractTableName(params);
-      const start = now();
-      try {
-        const result = (await this.withTransientRetry({
-          run: () => client.query(params),
-          operation: "query",
-        })) as { json?: (...args: never[]) => unknown };
-        const durationMs = now() - start;
-        this.report.success({ operation: "query", durationMs, params });
-        this.report.outcome({
-          queryType,
-          table,
-          durationMs,
-          outcome: "success",
-        });
-        return this.guardInbandException({ result, startMs: start, params });
-      } catch (error) {
-        const durationMs = now() - start;
-        this.report.failure({ operation: "query", error, durationMs, params });
-        this.report.outcome({ queryType, table, durationMs, outcome: "error" });
-        // Retries are exhausted at this point: hand the failure to the host's
-        // translator so callers get whatever typed, actionable shape the host
-        // defines for known ClickHouse failures.
-        throw this.translateQueryError({ error, durationMs });
-      }
-    }) as T["query"];
+  private async query(client: VendorStatementClient, params: unknown): Promise<unknown> {
+    const queryType = extractQueryType(params);
+    const table = extractTableName(params);
+    const start = now();
+    try {
+      const result = await this.withTransientRetry({
+        run: () => client.query(params),
+        operation: "query",
+      });
+      const durationMs = now() - start;
+      this.report.success({ operation: "query", durationMs, params });
+      this.report.outcome({ queryType, table, durationMs, outcome: "success" });
+      return this.guardInbandException({ result, startMs: start, params });
+    } catch (error) {
+      const durationMs = now() - start;
+      this.report.failure({ operation: "query", error, durationMs, params });
+      this.report.outcome({ queryType, table, durationMs, outcome: "error" });
+      throw this.translateQueryError({ error, durationMs });
+    }
+  }
 
-    wrapper.insert = (async (params: unknown) => {
-      const table =
-        ((params as Record<string, unknown> | null)?.table as string) ?? "unknown";
-      const start = now();
-      try {
-        // Deliberately NOT retried here. See the note on this class.
-        const result = await client.insert(params);
-        const durationMs = now() - start;
-        this.report.success({ operation: "insert", durationMs, params });
-        this.report.outcome({
-          queryType: "INSERT",
-          table,
-          durationMs,
-          outcome: "success",
-        });
-        return result;
-      } catch (error) {
-        const durationMs = now() - start;
-        this.report.failure({ operation: "insert", error, durationMs, params });
-        this.report.outcome({
-          queryType: "INSERT",
-          table,
-          durationMs,
-          outcome: "error",
-        });
-        throw error;
-      }
-    }) as T["insert"];
-
-    return wrapper;
+  private async insert(client: VendorStatementClient, params: unknown): Promise<unknown> {
+    const table = tableOf(params);
+    const start = now();
+    try {
+      const result = await client.insert(params);
+      const durationMs = now() - start;
+      this.report.success({ operation: "insert", durationMs, params });
+      this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "success" });
+      return result;
+    } catch (error) {
+      const durationMs = now() - start;
+      this.report.failure({ operation: "insert", error, durationMs, params });
+      this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "error" });
+      throw error;
+    }
   }
 
   /**
@@ -249,7 +248,7 @@ export class VendorClientResilience {
   }): unknown {
     const error = new Error(message);
     const code = /Code:\s*(\d+)/.exec(message)?.[1];
-    if (code) (error as { code?: string }).code = code;
+    if (code) Object.assign(error, { code });
     return this.translateQueryError({ error, durationMs });
   }
 
@@ -279,20 +278,20 @@ export class VendorClientResilience {
    * timeout) are not transient. Callers that need a retry get it from their
    * own layer — the job queue re-runs the whole unit of work.
    */
-  private guardInbandException<R extends { json?: (...args: never[]) => unknown }>({
+  private guardInbandException({
     result,
     startMs,
     params,
   }: {
-    result: R;
+    result: unknown;
     startMs: number;
     params: unknown;
-  }): R {
-    if (typeof result?.json !== "function") return result;
+  }): unknown {
+    if (!isJsonResult(result)) return result;
     const queryType = extractQueryType(params);
     const originalJson = result.json.bind(result);
-    result.json = (async (...args: never[]) => {
-      const rows = (await originalJson(...args)) as unknown;
+    result.json = async (...args: never[]) => {
+      const rows = await originalJson(...args);
       for (const row of Array.isArray(rows) ? rows : [rows]) {
         const exception = inbandExceptionOf(row);
         if (exception !== undefined) {
@@ -312,7 +311,23 @@ export class VendorClientResilience {
         }
       }
       return rows;
-    }) as R["json"];
+    };
     return result;
   }
+}
+
+type JsonResult = { json(...args: never[]): unknown };
+
+function isJsonResult(value: unknown): value is JsonResult {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "json" in value &&
+    typeof value.json === "function"
+  );
+}
+
+function tableOf(params: unknown): string {
+  if (params === null || typeof params !== "object" || !("table" in params)) return "unknown";
+  return typeof params.table === "string" ? params.table : "unknown";
 }

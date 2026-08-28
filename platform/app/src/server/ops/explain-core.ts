@@ -6,13 +6,7 @@ import { z } from "zod";
 /// itself lives in src/server/routes/ops.ts (Hono); these functions stay
 /// pure so they can be unit-tested in isolation.
 
-export const ALLOWED_EXPLAIN_TYPES = [
-  "PLAN",
-  "SYNTAX",
-  "PIPELINE",
-  "AST",
-  "INDEXES",
-] as const;
+export const ALLOWED_EXPLAIN_TYPES = ["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"] as const;
 export type ExplainType = (typeof ALLOWED_EXPLAIN_TYPES)[number];
 
 /// `ANALYZE` would execute the inner query — never allow it. The other
@@ -154,10 +148,7 @@ export function stripCommentsAndStrings(query: string): string {
   return out;
 }
 
-export function buildExplainQuery(
-  query: string,
-  type: ExplainType = "PLAN",
-): ParseResult {
+export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): ParseResult {
   const trimmed = query.trim();
   if (!trimmed) return { ok: false, reason: "query is empty" };
   if (/^\s*EXPLAIN\b/i.test(trimmed)) {
@@ -196,8 +187,7 @@ export function buildExplainQuery(
   // `EXPLAIN INDEXES <query>` raises a parser error and the endpoint
   // 502s. Expand it to the canonical form so callers can pass `INDEXES`
   // as a logical type without needing to know that wrinkle.
-  const prefix =
-    type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
+  const prefix = type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
   return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 
@@ -214,9 +204,6 @@ export function redactQueryForAudit(query: string): {
   const sha256 = createHash("sha256").update(query).digest("hex").slice(0, 16);
   return { shape: shape.slice(0, 300), sha256 };
 }
-
-let opsClickHouseClient: ClickHouseClient | null = null;
-let warnedAboutMissingOpsUrl = false;
 
 /**
  * Parse CLICKHOUSE_OPS_URL into the pieces @clickhouse/client wants as
@@ -250,37 +237,46 @@ export function parseOpsConnection(raw: string): {
   }
 }
 
-export function getOpsClickHouseClient(): ClickHouseClient | null {
-  if (opsClickHouseClient) return opsClickHouseClient;
-  const url = process.env.CLICKHOUSE_OPS_URL;
-  if (!url || url.trim() === "") return null;
-  const parsed = parseOpsConnection(url);
-  // No client-side `clickhouse_settings` here: the langwatch_ops user runs
-  // under the `readonly_safe` profile (readonly=1) which forbids modifying
-  // any session setting client-side, so the previous default of
-  // date_time_input_format=best_effort made every request fail with
-  // "Cannot modify ... in readonly mode". EXPLAIN never parses input
-  // values anyway, so dropping the setting is also functionally correct.
-  // The execution/result/memory caps that USED to live here are enforced
-  // server-side by the profile.
-  opsClickHouseClient = createClient({
-    url: parsed?.url ?? url,
-    username: parsed?.username || undefined,
-    password: parsed?.password || undefined,
-    database: parsed?.database,
-    max_open_connections: 5,
-    keep_alive: { enabled: true, idle_socket_ttl: 1500 },
-  });
-  return opsClickHouseClient;
-}
+/** Process-owned lazy client for the dedicated read-only ops account. */
+export class OpsClickHouseRuntime {
+  static create(options: { url?: string; buildTime: boolean }): OpsClickHouseRuntime {
+    return new OpsClickHouseRuntime(options.url, options.buildTime);
+  }
 
-export function consumeMissingOpsUrlWarning(): boolean {
-  if (warnedAboutMissingOpsUrl) return false;
-  warnedAboutMissingOpsUrl = true;
-  return true;
-}
+  private client: ClickHouseClient | undefined;
+  private closeOperation: Promise<void> | undefined;
+  private closed = false;
 
-export function _resetOpsClickHouseClientForTesting(): void {
-  opsClickHouseClient = null;
-  warnedAboutMissingOpsUrl = false;
+  private constructor(
+    private readonly url: string | undefined,
+    private readonly buildTime: boolean,
+  ) {}
+
+  resolveClient(): ClickHouseClient | null {
+    if (this.closed || this.buildTime || this.url?.trim() === "" || this.url === undefined) {
+      return null;
+    }
+    if (this.client !== undefined) return this.client;
+
+    const parsed = parseOpsConnection(this.url);
+    // No client-side `clickhouse_settings` here: the readonly profile forbids
+    // session-setting changes; its server-side profile enforces the limits.
+    this.client = createClient({
+      url: parsed?.url ?? this.url,
+      username: parsed?.username || undefined,
+      password: parsed?.password || undefined,
+      database: parsed?.database,
+      max_open_connections: 5,
+      keep_alive: { enabled: true, idle_socket_ttl: 1500 },
+    });
+    return this.client;
+  }
+
+  close(): Promise<void> {
+    if (this.closeOperation !== undefined) return this.closeOperation;
+    this.closed = true;
+    const client = this.client;
+    this.closeOperation = client === undefined ? Promise.resolve() : client.close();
+    return this.closeOperation;
+  }
 }

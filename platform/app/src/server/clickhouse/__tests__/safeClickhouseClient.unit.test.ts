@@ -5,7 +5,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "../queryDefaults";
-import { wrapWithDefaultSettings } from "../safeClickhouseClient";
+import { withClickHouseDefaultQuerySettings } from "@langwatch/clickhouse-client";
 
 function createMockClient(
   queryResult?: unknown,
@@ -23,12 +23,12 @@ function createMockClient(
   return client;
 }
 
-describe("wrapWithDefaultSettings", () => {
+describe("withClickHouseDefaultQuerySettings", () => {
   describe("when calling query without clickhouse_settings", () => {
     /** @scenario Analytics queries include a memory spill-to-disk safety setting */
     it("injects DEFAULT_CLICKHOUSE_SETTINGS", async () => {
       const mock = createMockClient();
-      const wrapped = wrapWithDefaultSettings(mock);
+      const wrapped = withClickHouseDefaultQuerySettings(mock, DEFAULT_CLICKHOUSE_SETTINGS);
 
       await wrapped.query({
         query: "SELECT 1",
@@ -47,7 +47,7 @@ describe("wrapWithDefaultSettings", () => {
     /** @scenario Memory safety setting does not override explicit per-query settings */
     it("merges defaults with caller overrides taking precedence", async () => {
       const mock = createMockClient();
-      const wrapped = wrapWithDefaultSettings(mock);
+      const wrapped = withClickHouseDefaultQuerySettings(mock, DEFAULT_CLICKHOUSE_SETTINGS);
 
       await wrapped.query({
         query: "SELECT 1",
@@ -71,7 +71,7 @@ describe("wrapWithDefaultSettings", () => {
   describe("when calling query with extra caller settings", () => {
     it("preserves both defaults and extra settings", async () => {
       const mock = createMockClient();
-      const wrapped = wrapWithDefaultSettings(mock);
+      const wrapped = withClickHouseDefaultQuerySettings(mock, DEFAULT_CLICKHOUSE_SETTINGS);
 
       await wrapped.query({
         query: "SELECT 1",
@@ -95,7 +95,7 @@ describe("wrapWithDefaultSettings", () => {
   describe("when calling non-query methods", () => {
     it("passes through insert without modification", async () => {
       const mock = createMockClient();
-      const wrapped = wrapWithDefaultSettings(mock);
+      const wrapped = withClickHouseDefaultQuerySettings(mock, DEFAULT_CLICKHOUSE_SETTINGS);
 
       await wrapped.insert({
         table: "test",
@@ -112,7 +112,7 @@ describe("wrapWithDefaultSettings", () => {
 
     it("delegates close without modification", async () => {
       const mock = createMockClient();
-      const wrapped = wrapWithDefaultSettings(mock);
+      const wrapped = withClickHouseDefaultQuerySettings(mock, DEFAULT_CLICKHOUSE_SETTINGS);
 
       await wrapped.close();
 

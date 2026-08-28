@@ -2,7 +2,13 @@ import {
   createEnterpriseWebhookEndpointService,
   installEnterpriseWebhookAccess,
 } from "~/server/webhooks/enterpriseWebhookEndpointService";
-import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
+import {
+  SettingsMap,
+  TupleParam,
+  type ClickHouseClient,
+  type ClickHouseSettings,
+  type DataFormat,
+} from "@clickhouse/client";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   REPORT_SCHEDULER_TARGET_TYPE,
@@ -175,16 +181,22 @@ import { createAppLangyCredentialComposition } from "~/runtime/app/features/lang
 import { AppLangySessionKeyMetricsAdapter } from "~/runtime/app/features/langy-session-key-metrics.adapter";
 import { resolveLangyHarness } from "~/runtime/app/features/langy-harness.adapter";
 import { renderLangyTurnContext } from "~/runtime/app/features/langy-turn-context.adapter";
-import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
+import {
+  OpsExplainClickHouseRepository,
+  OpsExplainClientResolver,
+  type OpsExplainClientResolution,
+} from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import {
   type ClickHouseClientResolver,
-  clearCustomClientCache,
+  AppClickHouseRuntime,
+  configureClickHouseRuntime,
   getAllClickHouseInstances,
   getClickHouseClientForOrganization,
   getClickHouseClientForTenant,
   isClickHouseEnabled,
+  _getSharedClickHouseClient,
+  shutdownComposedClickHouseRuntime,
 } from "~/server/clickhouse/clickhouseClient";
-import { _getSharedClickHouseClient, closeClickHouseClient } from "~/server/clickhouse/client";
 import { createProcessPrismaConnection } from "~/runtime/app/prisma-process.composition";
 import {
   adoptPrismaConnection,
@@ -219,8 +231,8 @@ import {
 } from "@langwatch/gateway-server";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { createProcessVirtualKeyCrypto } from "~/runtime/app/features/gateway-virtual-key-crypto.composition";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
@@ -232,6 +244,7 @@ import {
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
+import { OpsClickHouseRuntime } from "~/server/ops/explain-core";
 import { getPostHogInstance } from "~/server/posthog";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
@@ -432,6 +445,203 @@ import { UsageService } from "./usage/usage.service";
 /** Keeps the connection's lifecycle lines under the name they had before ADR-093. */
 const redisLogger = createLogger("langwatch:redis");
 
+class PrismaClickHouseTenantDirectory {
+  static create(prisma: typeof globalPrisma): PrismaClickHouseTenantDirectory {
+    return new PrismaClickHouseTenantDirectory(prisma);
+  }
+
+  private constructor(private readonly prisma: typeof globalPrisma) {}
+
+  async organizationForTenant(tenantId: string): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: tenantId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    if (project?.team.organizationId !== undefined) return project.team.organizationId;
+
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    return organization?.id ?? null;
+  }
+}
+
+class AppOpsExplainClientResolver extends OpsExplainClientResolver {
+  static create({
+    opsRuntime,
+    clickhouseRuntime,
+  }: {
+    opsRuntime: OpsClickHouseRuntime;
+    clickhouseRuntime: AppClickHouseRuntime;
+  }): AppOpsExplainClientResolver {
+    return new AppOpsExplainClientResolver(opsRuntime, clickhouseRuntime);
+  }
+
+  private constructor(
+    private readonly opsRuntime: OpsClickHouseRuntime,
+    private readonly clickhouseRuntime: AppClickHouseRuntime,
+  ) {
+    super();
+  }
+
+  resolve(): OpsExplainClientResolution | null {
+    const opsClient = this.opsRuntime.resolveClient();
+    if (opsClient !== null) return { client: opsClient, usingFallback: false };
+
+    const sharedClient = this.clickhouseRuntime.sharedClient();
+    return sharedClient === null ? null : { client: sharedClient, usingFallback: true };
+  }
+}
+
+class UnavailableOpsExplainClientResolver extends OpsExplainClientResolver {
+  static create(): UnavailableOpsExplainClientResolver {
+    return new UnavailableOpsExplainClientResolver();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  resolve(): null {
+    return null;
+  }
+}
+
+class AppClickHouseRowsResult {
+  static create(result: { json(): Promise<unknown> }): AppClickHouseRowsResult {
+    return new AppClickHouseRowsResult(result);
+  }
+
+  private constructor(private readonly result: { json(): Promise<unknown> }) {}
+
+  async json<Result = unknown>(): Promise<Result[]> {
+    const value = await this.result.json();
+    if (!Array.isArray(value)) throw new Error("Expected ClickHouse JSONEachRow result.");
+    return value;
+  }
+}
+
+class AppLogMetricClickHouseClient {
+  static create(client: ClickHouseClient): AppLogMetricClickHouseClient {
+    return new AppLogMetricClickHouseClient(client);
+  }
+
+  private constructor(private readonly client: ClickHouseClient) {}
+
+  insert(params: {
+    table: string;
+    values: unknown[];
+    format?: DataFormat;
+    clickhouse_settings?: ClickHouseSettings;
+  }): Promise<unknown> {
+    return this.client.insert(params);
+  }
+
+  async query(params: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format?: DataFormat;
+    clickhouse_settings?: ClickHouseSettings;
+  }): Promise<AppClickHouseRowsResult> {
+    return AppClickHouseRowsResult.create(await this.client.query(params));
+  }
+}
+
+class AppLogMetricClickHouseResolver {
+  static create(resolveClient: ClickHouseClientResolver): AppLogMetricClickHouseResolver {
+    return new AppLogMetricClickHouseResolver(resolveClient);
+  }
+
+  private constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  resolve = async (tenantId: string): Promise<AppLogMetricClickHouseClient> => {
+    return AppLogMetricClickHouseClient.create(await this.resolveClient(tenantId));
+  };
+}
+
+class AppGatewayClickHouseSettings {
+  static from(
+    input:
+      | Record<
+          string,
+          string | number | boolean | Record<string, string | number | boolean> | undefined
+        >
+      | undefined,
+  ): ClickHouseSettings | undefined {
+    if (input === undefined) return undefined;
+    const settings: ClickHouseSettings = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value === undefined || typeof value !== "object") settings[key] = value;
+      else {
+        const entries = Object.entries(value).map(([nestedKey, nestedValue]) => [
+          nestedKey,
+          String(nestedValue),
+        ]);
+        settings[key] = SettingsMap.from(Object.fromEntries(entries));
+      }
+    }
+    return settings;
+  }
+}
+
+class AppGatewayClickHouseClient {
+  static create(client: ClickHouseClient): AppGatewayClickHouseClient {
+    return new AppGatewayClickHouseClient(client);
+  }
+
+  private constructor(private readonly client: ClickHouseClient) {}
+
+  async query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<
+      string,
+      string | number | boolean | Record<string, string | number | boolean> | undefined
+    >;
+  }): Promise<AppClickHouseRowsResult> {
+    const settings = AppGatewayClickHouseSettings.from(input.clickhouse_settings);
+    const result = await this.client.query({
+      query: input.query,
+      query_params: input.query_params,
+      format: input.format,
+      ...(settings === undefined ? {} : { clickhouse_settings: settings }),
+    });
+    return AppClickHouseRowsResult.create(result);
+  }
+
+  async insert(input: {
+    table: string;
+    values: Record<string, unknown>[];
+    format?: "JSONEachRow";
+    clickhouse_settings?: Record<
+      string,
+      string | number | boolean | Record<string, string | number | boolean> | undefined
+    >;
+  }): Promise<void> {
+    const settings = AppGatewayClickHouseSettings.from(input.clickhouse_settings);
+    await this.client.insert({
+      table: input.table,
+      values: input.values,
+      format: input.format,
+      ...(settings === undefined ? {} : { clickhouse_settings: settings }),
+    });
+  }
+}
+
+class AppGatewayClickHouseResolver {
+  static create(resolveClient: ClickHouseClientResolver): AppGatewayClickHouseResolver {
+    return new AppGatewayClickHouseResolver(resolveClient);
+  }
+
+  private constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  resolve = async (tenantId: string): Promise<AppGatewayClickHouseClient> => {
+    return AppGatewayClickHouseClient.create(await this.resolveClient(tenantId));
+  };
+}
+
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
 }
@@ -473,9 +683,21 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   }
   const prisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma });
+  const clickhouseRuntime = AppClickHouseRuntime.create({
+    sharedUrl: config.clickhouseUrl,
+    privateRoutes: config.clickhousePrivateRoutes,
+    poolSizing: config.clickhousePoolSizing,
+    directory: PrismaClickHouseTenantDirectory.create(prisma),
+    buildTime: config.buildTime,
+  });
+  const opsClickHouseRuntime = OpsClickHouseRuntime.create({
+    url: config.clickhouseOpsUrl,
+    buildTime: config.buildTime,
+  });
+  configureClickHouseRuntime(clickhouseRuntime);
   configureProcessOutboundProxy(config.outboundProxy);
   configureAwsClientConfiguration(config.outboundProxy);
-  const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
+  const clickhouseEnabled = !config.buildTime && isClickHouseEnabled();
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
@@ -484,6 +706,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     if (!client) throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+  const logMetricClickHouseResolver =
+    AppLogMetricClickHouseResolver.create(resolveClickHouseClient);
+  const gatewayClickHouseResolver = AppGatewayClickHouseResolver.create(resolveClickHouseClient);
 
   const processStore = new PrismaProcessStore(prisma);
 
@@ -513,7 +738,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const traceCanonicalisation = TraceCanonicalisationService.create();
   const logRuntime = clickhouseEnabled
     ? LogRuntimeAdapter.create({
-        resolveClient: resolveClickHouseClient,
+        resolveClient: logMetricClickHouseResolver.resolve,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         defaultReadLimit: TRACE_LOG_READ_CAP,
         logCommandShardCount: resolveLogCommandShardCount(process.env.LOG_PROCESSING_SHARDS),
@@ -526,8 +751,8 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
       });
   const metricRuntime = clickhouseEnabled
     ? MetricRuntimeAdapter.create({
-        resolveClient: resolveClickHouseClient,
-        resolveOrganizationClient: getClickHouseClientForOrganization,
+        resolveClient: logMetricClickHouseResolver.resolve,
+        resolveOrganizationClient: logMetricClickHouseResolver.resolve,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         metricCommandShardCount: resolveMetricCommandShardCount(
           process.env.METRIC_PROCESSING_SHARDS,
@@ -1249,7 +1474,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   // counter is the failure mode this table exists to replace).
   const gatewaySpend = clickhouseEnabled
     ? {
-        port: GatewaySpendEventsClickHouseAdapter.create(resolveClickHouseClient),
+        port: GatewaySpendEventsClickHouseAdapter.create(gatewayClickHouseResolver.resolve),
       }
     : undefined;
 
@@ -1277,7 +1502,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   // serve stale PG spend for the same budgets the UI showed live (#6248), and
   // how the CLI route ended up with a second copy of the same constructor.
   const gatewayBudgetRepository = clickhouseEnabled
-    ? GatewayBudgetLedgerAdapter.create(resolveClickHouseClient)
+    ? GatewayBudgetLedgerAdapter.create(gatewayClickHouseResolver.resolve)
     : undefined;
   const gatewayBudgetDecisions = PrismaGatewayAdapter.create({
     database: prisma,
@@ -1286,7 +1511,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   }).build();
   const gatewayChanges = createGatewayChangeEventsPort(prisma);
   const gatewayVirtualKeySpend = clickhouseEnabled
-    ? GatewayVirtualKeySpendAdapter.create(resolveClickHouseClient)
+    ? GatewayVirtualKeySpendAdapter.create(gatewayClickHouseResolver.resolve)
     : undefined;
   const gatewayWebhookEventsRepository = clickhouseEnabled
     ? WebhookEventsClickHouseRepository.create(resolveClickHouseClient)
@@ -2025,12 +2250,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   const shutdownResources = new AppShutdownResources();
   shutdownResources.register("subscriber", "dataset-s3-clients", () => datasetRuntime.close());
   shutdownResources.register("clickhouse", "langwatchql", () => langWatchQL.close());
-  if (clickhouseEnabled) {
-    shutdownResources.register("clickhouse", "clickhouse", async () => {
-      await clearCustomClientCache();
-      await closeClickHouseClient();
-    });
-  }
+  shutdownResources.register("clickhouse", "ops-explain", () => opsClickHouseRuntime.close());
+  shutdownResources.register("clickhouse", "clickhouse", () =>
+    shutdownComposedClickHouseRuntime(clickhouseRuntime),
+  );
   // BEFORE the Redis closeable, deliberately: stopping the writer hands the
   // snapshot lease back, and a released lease is the difference between the
   // fleet electing a new writer immediately and going without one for the
@@ -2193,9 +2416,12 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     ),
     opsExplain: {
       service: new OpsExplainService(
-        new OpsExplainClickHouseRepository({
-          fallbackClient: _getSharedClickHouseClient,
-        }),
+        new OpsExplainClickHouseRepository(
+          AppOpsExplainClientResolver.create({
+            opsRuntime: opsClickHouseRuntime,
+            clickhouseRuntime,
+          }),
+        ),
       ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
@@ -2315,7 +2541,10 @@ export function createTestApp(
   setDiscoverBroadcaster(null);
   const config: AppConfig = {
     nodeEnv: testPrismaConfiguration.nodeEnv,
+    buildTime: false,
     databaseUrl: testPrismaConfiguration.databaseUrl,
+    clickhousePoolSizing: {},
+    clickhousePrivateRoutes: [],
     groupQueue: {
       compression: "gzip",
       payloadCodec: "json",
@@ -2844,7 +3073,7 @@ export function createTestApp(
     ),
     opsExplain: {
       service: new OpsExplainService(
-        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+        new OpsExplainClickHouseRepository(UnavailableOpsExplainClientResolver.create()),
       ),
     },
     langy: PostgresLangyAdapter.create({ database: testPrisma }).build({

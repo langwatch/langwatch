@@ -11,7 +11,7 @@
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { prisma } from "~/server/db";
 import type { EventRecord } from "@langwatch/eventing";
@@ -30,13 +30,6 @@ const SHARED_ORG_ID = privateRouteOrgId("test-iso-shared-org");
 // Set the private CH env var BEFORE importing clickhouseClient module
 // so parsePrivateClickHouseEnvVars() picks it up at module load.
 // The URL will be set in beforeAll once the container is started.
-
-/**
- * Mock the shared client module to return our shared test container client.
- */
-vi.mock("../client", () => ({
-  _getSharedClickHouseClient: () => sharedClient,
-}));
 
 // Both DDLs below stay unqualified: each endpoint's client carries its own
 // database in the connection URL, and that separation is what these tests
@@ -262,6 +255,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
     // Set the private CH env var so the clickhouseClient module resolves it
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
+    process.env.CLICKHOUSE_URL = sharedUrl;
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -294,8 +288,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
   afterAll(async () => {
     // Clean up clickhouseClient caches
-    const { clearCustomClientCache, clearTenantOrgCache } =
-      await import("../clickhouseClient");
+    const { clearCustomClientCache, clearTenantOrgCache } = await import("../clickhouseClient");
     await clearCustomClientCache();
     clearTenantOrgCache();
 
@@ -319,6 +312,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
 
     delete process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`];
+    delete process.env.CLICKHOUSE_URL;
   }, 60_000);
 
   /**
@@ -425,9 +419,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
         expect(privateSpanRow).toBeDefined();
 
         const privateInShared = await queryStoredSpans(sharedClient, privateProjectId);
-        const leakedPrivate = privateInShared.find(
-          (r) => r.SpanId === privateSpan.spanId,
-        );
+        const leakedPrivate = privateInShared.find((r) => r.SpanId === privateSpan.spanId);
         expect(leakedPrivate).toBeUndefined();
 
         // Shared span lands in shared container only

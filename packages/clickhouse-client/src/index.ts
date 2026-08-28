@@ -25,6 +25,7 @@ export type {
 export {
   ClickHouseClientFactory,
   ClickHouseConnection,
+  ClickHouseConnectionClosedError,
   ClickHouseConnectionService,
   ClickHouseNotConfiguredError,
 } from "./connection";
@@ -35,6 +36,29 @@ export type {
   ClickHouseInstance,
 } from "./connection";
 export { ClickHouseShutdownService } from "./shutdown";
+export {
+  ClickHouseManagedClientService,
+  ClickHouseManagedClientLogger,
+  ClickHouseManagedClientTelemetry,
+  ClickHouseOverloadErrorFactory,
+  ClickHouseVendorClientFactory,
+  createVendorClientResiliencePolicy,
+  createResilientVendorClient,
+  withClickHouseDefaultQuerySettings,
+  withClickHouseStatementLimit,
+  DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS,
+  DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
+  DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+  DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT,
+  DEFAULT_STATEMENT_WAIT_TIMEOUT_MS,
+} from "./managed-client";
+export type {
+  ClickHouseManagedClientOptions,
+  ClickHouseStatementLimitOptions,
+  ClickHouseStatementOperation,
+  ClickHouseVendorClient,
+  ClickHouseVendorClientOptions,
+} from "./managed-client";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
@@ -80,7 +104,11 @@ export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
 export type { StatementLogSink, StatementMetrics, StatementOutcome } from "./statementReporting";
 export type { VendorQueryType } from "./statementShape";
 export type { VendorClientResilienceOptions, VendorStatementClient } from "./vendorClient";
-export { VendorClientResilience } from "./vendorClient";
+export {
+  VendorClientPolicy,
+  VendorClientResilience,
+  VendorClientResiliencePolicy,
+} from "./vendorClient";
 export { checkTenantScope, TenantGuard, TenantScopeError } from "./tenantGuard";
 export type {
   QueryErrorDescriptor,

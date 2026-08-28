@@ -1,13 +1,42 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AcquireAbortedError } from "@langwatch/clickhouse-client";
+import {
+  AcquireAbortedError,
+  DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+  DEFAULT_STATEMENT_WAIT_TIMEOUT_MS,
+  withClickHouseStatementLimit,
+} from "@langwatch/clickhouse-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import { CLICKHOUSE_REQUEST_TIMEOUT_MS } from "../managedClient";
 import {
-  MIN_QUEUE_DEPTH,
-  STATEMENT_WAIT_TIMEOUT_MS,
-  withStatementLimit,
-} from "../statementLimit";
+  PlatformManagedClientLogger,
+  PlatformManagedClientTelemetry,
+  PlatformOverloadErrorFactory,
+} from "../managedClient";
+
+const MIN_QUEUE_DEPTH = DEFAULT_MIN_STATEMENT_QUEUE_DEPTH;
+const STATEMENT_WAIT_TIMEOUT_MS = DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
+
+function withStatementLimit<T extends ClickHouseClient>({
+  client,
+  maxConcurrent,
+  instance,
+  waitTimeoutMs = STATEMENT_WAIT_TIMEOUT_MS,
+}: {
+  client: T;
+  maxConcurrent: number;
+  instance: string;
+  waitTimeoutMs?: number;
+}): T {
+  return withClickHouseStatementLimit({
+    client,
+    input: { url: "", instance, cluster: instance, maxOpenConnections: maxConcurrent },
+    telemetry: new PlatformManagedClientTelemetry(),
+    overloadErrorFactory: new PlatformOverloadErrorFactory(),
+    logger: new PlatformManagedClientLogger(),
+    statementWaitTimeoutMs: waitTimeoutMs,
+  });
+}
 
 /**
  * A stand-in for the driver that lets a test decide when each statement

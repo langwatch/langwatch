@@ -15,7 +15,7 @@ vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
 });
 
 // Must import after mock setup
-import { createResilientClickHouseClient } from "../managedClient";
+import { createResilientClickHouseClientForTest as createResilientClickHouseClient } from "../managedClient";
 
 describe("createResilientClickHouseClient()", () => {
   let mockClient: ClickHouseClient;
@@ -64,11 +64,7 @@ describe("createResilientClickHouseClient()", () => {
         table: "traces",
       } as any);
 
-      expect(mockObserveQueryDuration).toHaveBeenCalledWith(
-        "SELECT",
-        "traces",
-        expect.any(Number),
-      );
+      expect(mockObserveQueryDuration).toHaveBeenCalledWith("SELECT", "traces", expect.any(Number));
     });
   });
 
@@ -82,9 +78,9 @@ describe("createResilientClickHouseClient()", () => {
 
     it("records error metrics for failed queries", async () => {
       const wrapper = createResilientClickHouseClient({ client: mockClient });
-      await expect(
-        wrapper.query({ query: "SELECT * FROM traces" } as any),
-      ).rejects.toThrow("Query failed");
+      await expect(wrapper.query({ query: "SELECT * FROM traces" } as any)).rejects.toThrow(
+        "Query failed",
+      );
 
       expect(mockObserveQueryDuration).toHaveBeenCalledWith(
         "SELECT",
@@ -107,11 +103,7 @@ describe("createResilientClickHouseClient()", () => {
       const wrapper = createResilientClickHouseClient({ client: mockClient });
       await wrapper.insert({ table: "events", values: [] } as any);
 
-      expect(mockObserveQueryDuration).toHaveBeenCalledWith(
-        "INSERT",
-        "events",
-        expect.any(Number),
-      );
+      expect(mockObserveQueryDuration).toHaveBeenCalledWith("INSERT", "events", expect.any(Number));
       expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "success");
     });
   });
@@ -129,15 +121,11 @@ describe("createResilientClickHouseClient()", () => {
         client: mockClient,
         maxRetries: 0,
       });
-      await expect(
-        wrapper.insert({ table: "events", values: [] } as any),
-      ).rejects.toThrow("Permanent failure");
-
-      expect(mockObserveQueryDuration).toHaveBeenCalledWith(
-        "INSERT",
-        "events",
-        expect.any(Number),
+      await expect(wrapper.insert({ table: "events", values: [] } as any)).rejects.toThrow(
+        "Permanent failure",
       );
+
+      expect(mockObserveQueryDuration).toHaveBeenCalledWith("INSERT", "events", expect.any(Number));
       expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "error");
     });
   });
@@ -164,13 +152,11 @@ describe("createResilientClickHouseClient()", () => {
       },
       {
         label: "KEEPER_EXCEPTION Session expired",
-        message:
-          "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
+        message: "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
       },
       {
         label: "KEEPER_EXCEPTION Connection loss",
-        message:
-          "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
+        message: "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
       },
     ] as const;
 
@@ -207,9 +193,7 @@ describe("createResilientClickHouseClient()", () => {
         // raised after the server buffered the batch can duplicate rows.
         const insert = vi
           .fn()
-          .mockRejectedValue(
-            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
-          );
+          .mockRejectedValue(new Error("Code: 202. DB::Exception: Too many simultaneous queries."));
         const client = {
           query: vi.fn(),
           insert,
@@ -222,9 +206,9 @@ describe("createResilientClickHouseClient()", () => {
           maxDelayMs: 1,
         });
 
-        await expect(
-          wrapper.insert({ table: "events", values: [] } as any),
-        ).rejects.toThrow(/Too many simultaneous queries/);
+        await expect(wrapper.insert({ table: "events", values: [] } as any)).rejects.toThrow(
+          /Too many simultaneous queries/,
+        );
 
         expect(insert).toHaveBeenCalledTimes(1);
         expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "error");

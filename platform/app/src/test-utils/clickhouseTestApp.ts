@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import { SettingsMap, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
 import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
 import { AppGovernanceRuntime } from "@langwatch/enterprise-api/governance/runtime";
 import { AppGovernanceEventingAdapter } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
@@ -20,7 +20,6 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { modelProviders as modelProviderRegistry } from "@langwatch/model-provider-contract";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -33,6 +32,71 @@ import {
   GatewaySpendEventsService,
 } from "@langwatch/gateway-server";
 import { GatewayVirtualKeySpendAdapter } from "@langwatch/gateway-server";
+import type { GatewayClickHouseClient, GatewayClickHouseResolver } from "@langwatch/gateway-server";
+
+type GatewaySettingsInput = Record<
+  string,
+  string | number | boolean | Record<string, string | number | boolean> | undefined
+>;
+
+class TestGatewayClickHouseClient implements GatewayClickHouseClient {
+  static create(client: ClickHouseClient): TestGatewayClickHouseClient {
+    return new TestGatewayClickHouseClient(client);
+  }
+
+  private constructor(private readonly client: ClickHouseClient) {}
+
+  async query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: GatewaySettingsInput;
+  }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
+    const settings = testGatewaySettings(input.clickhouse_settings);
+    const result = await this.client.query({
+      query: input.query,
+      query_params: input.query_params,
+      format: input.format,
+      ...(settings === undefined ? {} : { clickhouse_settings: settings }),
+    });
+    return {
+      json: async <Result = unknown>(): Promise<Result[]> => result.json<Result>(),
+    };
+  }
+
+  async insert(input: {
+    table: string;
+    values: Record<string, unknown>[];
+    format?: "JSONEachRow";
+    clickhouse_settings?: GatewaySettingsInput;
+  }): Promise<void> {
+    const settings = testGatewaySettings(input.clickhouse_settings);
+    await this.client.insert({
+      table: input.table,
+      values: input.values,
+      format: input.format,
+      ...(settings === undefined ? {} : { clickhouse_settings: settings }),
+    });
+  }
+}
+
+function testGatewaySettings(
+  input: GatewaySettingsInput | undefined,
+): ClickHouseSettings | undefined {
+  if (input === undefined) return undefined;
+  const settings: ClickHouseSettings = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || typeof value !== "object") settings[key] = value;
+    else {
+      const entries = Object.entries(value).map(([nestedKey, nestedValue]) => [
+        nestedKey,
+        String(nestedValue),
+      ]);
+      settings[key] = SettingsMap.from(Object.fromEntries(entries));
+    }
+  }
+  return settings;
+}
 
 /**
  * Installs an App singleton whose ClickHouse-backed repositories are real and
@@ -95,12 +159,15 @@ export function installClickHouseTestApp({
     }
     return client;
   };
+  const requiredGateway: GatewayClickHouseResolver = async (tenantId) => {
+    return TestGatewayClickHouseClient.create(await required(tenantId));
+  };
 
   const governanceTraceActivity = new AppGovernanceTraceActivityAdapter(required);
   const governanceOcsfEvents = new AppGovernanceOcsfEventsAdapter(required);
   const personalUsage = new AppPersonalUsageReadAdapter(required);
   const baseApp = createTestApp();
-  const governanceVirtualKeys = VirtualKeyService.create(prisma, baseApp.projects);
+  const governanceVirtualKeys = baseApp.gateway.virtualKeys;
   const governanceOptions = {
     organizations: baseApp.organizations,
     projects: baseApp.projects,
@@ -182,10 +249,10 @@ export function installClickHouseTestApp({
     redis: redis ?? null,
     gateway: {
       ...baseApp.gateway,
-      budgets: GatewayBudgetLedgerAdapter.create(required),
-      virtualKeySpend: GatewayVirtualKeySpendAdapter.create(required),
+      budgets: GatewayBudgetLedgerAdapter.create(requiredGateway),
+      virtualKeySpend: GatewayVirtualKeySpendAdapter.create(requiredGateway),
       spendEvents: GatewaySpendEventsService.create(
-        GatewaySpendEventsClickHouseAdapter.create(required),
+        GatewaySpendEventsClickHouseAdapter.create(requiredGateway),
       ),
       webhookEvents: WebhookEventsClickHouseRepository.create(required),
     },

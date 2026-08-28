@@ -20,8 +20,8 @@ export const DEFAULT_CLICKHOUSE_SETTINGS: Record<string, number> = {
 /**
  * Write settings for the ADR-066 read-back folds' `INSERT` path.
  *
- * NOTE these are NOT applied automatically: `wrapWithDefaultSettings` proxies
- * only `.query`, so `insert` never receives {@link DEFAULT_CLICKHOUSE_SETTINGS}
+ * NOTE these are NOT applied automatically: the managed client applies them
+ * only to `.query`, so `insert` never receives {@link DEFAULT_CLICKHOUSE_SETTINGS}
  * or anything else. Every insert that needs a setting must pass it explicitly,
  * which is why this constant is shared rather than repeated per repository.
  *

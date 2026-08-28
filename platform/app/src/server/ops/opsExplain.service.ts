@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
-import { CLICKHOUSE_GUARDRAILS, consumeMissingOpsUrlWarning } from "./explain-core";
+import { CLICKHOUSE_GUARDRAILS } from "./explain-core";
 
 const logger = createLogger("langwatch:ops:clickhouse:explain");
 
@@ -21,6 +21,8 @@ export type OpsExplainOutcome =
  * and how the query reaches ClickHouse.
  */
 export class OpsExplainService {
+  private warnedAboutMissingOpsUrl = false;
+
   constructor(private readonly repository: OpsExplainClickHouseRepository) {}
 
   async explain({
@@ -48,7 +50,8 @@ export class OpsExplainService {
         );
         return { status: "not_configured_in_production" };
       }
-      if (consumeMissingOpsUrlWarning()) {
+      if (!this.warnedAboutMissingOpsUrl) {
+        this.warnedAboutMissingOpsUrl = true;
         logger.warn(
           "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +
             "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +

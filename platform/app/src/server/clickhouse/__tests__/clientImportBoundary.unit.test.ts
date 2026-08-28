@@ -8,7 +8,7 @@
  * The allowlist is the whole policy. Adding a file to it is a design
  * decision, not a fix.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -66,6 +66,7 @@ describe("given the two-door ClickHouse access policy", () => {
     it("finds them only in the composition root and the sanctioned boot paths", () => {
       const offenders: string[] = [];
       for (const root of SCAN_ROOTS) {
+        if (!existsSync(root)) continue;
         for (const file of walk(root)) {
           const appRelative = relative(APP_ROOT, file);
           if (appRelative.startsWith(join("src", "server", "clickhouse"))) continue;
