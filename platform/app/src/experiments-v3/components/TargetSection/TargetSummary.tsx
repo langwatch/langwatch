@@ -7,6 +7,8 @@ import {
   PassRateCircle,
 } from "@langwatch/design-system/pass-rate-indicator";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { PassRateCoverageChip } from "~/components/shared/PassRateCoverageChip";
+import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { useEvaluatorNames } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
@@ -54,9 +56,7 @@ export const TargetSummary = memo(function TargetSummary({
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
-    aggregates.completedRows > 0 ||
-    aggregates.errorRows > 0 ||
-    aggregates.totalCost !== null;
+    aggregates.completedRows > 0 || aggregates.errorRows > 0 || aggregates.totalCost !== null;
 
   const coverage = passRateCoverage({
     completedRows: aggregates.completedRows,
@@ -124,9 +124,7 @@ export const TargetSummary = memo(function TargetSummary({
               <Text color="fg.muted">Avg Latency</Text>
               <HStack gap={1}>
                 <Icon as={LuClock} color="fg.muted" boxSize={3} />
-                <Text fontWeight="medium">
-                  {formatLatency(aggregates.averageLatency)}
-                </Text>
+                <Text fontWeight="medium">{formatLatency(aggregates.averageLatency)}</Text>
                 <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
@@ -188,10 +186,7 @@ export const TargetSummary = memo(function TargetSummary({
                   {evaluator.passRate !== null && (
                     <HStack gap={1}>
                       <PassRateCircle passRate={evaluator.passRate} size="8px" />
-                      <Text
-                        fontSize="11px"
-                        color={getPassRateGradientColor(evaluator.passRate)}
-                      >
+                      <Text fontSize="11px" color={getPassRateGradientColor(evaluator.passRate)}>
                         {formatPassRate(evaluator.passRate)}
                       </Text>
                     </HStack>
@@ -272,17 +267,15 @@ export const TargetSummary = memo(function TargetSummary({
           />
         )}
 
-        {(aggregates.overallPassRate !== null ||
-          aggregates.overallAverageScore !== null) && <Text fontWeight="600">Score</Text>}
+        {(aggregates.overallPassRate !== null || aggregates.overallAverageScore !== null) && (
+          <Text fontWeight="600">Score</Text>
+        )}
 
         {/* Pass rate */}
         {aggregates.overallPassRate !== null && (
           <HStack gap={1}>
             <PassRateCircle passRate={aggregates.overallPassRate} />
-            <Text
-              color={getPassRateGradientColor(aggregates.overallPassRate)}
-              fontWeight="medium"
-            >
+            <Text color={getPassRateGradientColor(aggregates.overallPassRate)} fontWeight="medium">
               {formatPassRate(aggregates.overallPassRate)}
             </Text>
           </HStack>
