@@ -3,28 +3,110 @@ import { describe, expect, it } from "vitest";
 import {
   EnvironmentManagedProviderConfigurationAdapter,
   ManagedProviderCredentialsPort,
-  ManagedProviderProjectRepository,
   ManagedProviderService,
   type ManagedProviderCredentials,
   ManagedProviderConfigurationReporter,
 } from "../src";
+import { ProjectService } from "@langwatch/project-contract";
 
 class SilentReporter extends ManagedProviderConfigurationReporter {
   info(): void {}
   warn(): void {}
 }
 
-class ProjectRepository extends ManagedProviderProjectRepository {
+class Projects extends ProjectService {
+  tryFindInternal(): never {
+    throw new Error("Not used by this test");
+  }
+
+  ensureInternal(): never {
+    throw new Error("Not used by this test");
+  }
+
+  isPresenceEnabled(): never {
+    throw new Error("Not used by this test");
+  }
+
+  getById(): never {
+    throw new Error("Not used by this test");
+  }
+
+  getOrganizationId(): never {
+    throw new Error("Not used by this test");
+  }
+
   async tryGetOrganizationId(): Promise<string> {
     return "org_1";
+  }
+
+  tryGetById(): never {
+    throw new Error("Not used by this test");
+  }
+  tryGetSummaryById(): never {
+    throw new Error("Not used by this test");
+  }
+  getWithTeam(): never {
+    throw new Error("Not used by this test");
+  }
+  tryGetWithTeam(): never {
+    throw new Error("Not used by this test");
+  }
+  create(): never {
+    throw new Error("Not used by this test");
+  }
+  update(): never {
+    throw new Error("Not used by this test");
+  }
+  archive(): never {
+    throw new Error("Not used by this test");
+  }
+  listByOrganization(): never {
+    throw new Error("Not used by this test");
+  }
+  listByTeam(): never {
+    throw new Error("Not used by this test");
+  }
+  listNamesByIds(): never {
+    throw new Error("Not used by this test");
+  }
+  listIdsByOrganization(): never {
+    throw new Error("Not used by this test");
+  }
+  listActiveByScopes(): never {
+    throw new Error("Not used by this test");
+  }
+  updateMetadata(): never {
+    throw new Error("Not used by this test");
+  }
+  touchCodingAgentSessionSeen(): never {
+    throw new Error("Not used by this test");
+  }
+  touchCodingAgentPullRequestSeen(): never {
+    throw new Error("Not used by this test");
+  }
+  searchByQuery(): never {
+    throw new Error("Not used by this test");
+  }
+  tryGetTraceSharingConfig(): never {
+    throw new Error("Not used by this test");
+  }
+  resolveOrgAdmin(): never {
+    throw new Error("Not used by this test");
+  }
+  resolveTraceDestination(): never {
+    throw new Error("Not used by this test");
+  }
+  tryGetTraceDestination(): never {
+    throw new Error("Not used by this test");
+  }
+  listTraceDestinations(): never {
+    throw new Error("Not used by this test");
   }
 }
 
 class CredentialAdapter extends ManagedProviderCredentialsPort {
   configs: ManagedBedrockConfig[] = [];
-  async assumeCustomerRole(
-    config: ManagedBedrockConfig,
-  ): Promise<ManagedProviderCredentials> {
+  async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
     this.configs.push(config);
     return {
       accessKeyId: "temporary-key",
@@ -51,7 +133,7 @@ describe("ManagedProviderService", () => {
     });
     const service = ManagedProviderService.create({
       configuration,
-      projects: new ProjectRepository(),
+      projects: new Projects(),
       credentials: new CredentialAdapter(),
     });
     const result = await service.buildLitellmParameters({

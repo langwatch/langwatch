@@ -25,7 +25,7 @@
     "@aws-sdk/client-sts": "^3.1080.0",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*"
+    "@langwatch/project-contract": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

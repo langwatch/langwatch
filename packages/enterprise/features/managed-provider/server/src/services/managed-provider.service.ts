@@ -2,16 +2,16 @@ import {
   type BuildManagedProviderParametersInput,
   ManagedProviderService as ManagedProviderServiceContract,
 } from "@langwatch/enterprise-managed-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port";
 import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port";
-import type { ManagedProviderProjectRepository } from "../ports/managed-provider-project.port";
 
 export class ManagedProviderService extends ManagedProviderServiceContract {
   private readonly projectOrganizations = new Map<string, string>();
 
   private constructor(
     private readonly configuration: ManagedProviderConfigurationPort,
-    private readonly projects: ManagedProviderProjectRepository,
+    private readonly projects: ProjectService,
     private readonly credentials: ManagedProviderCredentialsPort,
   ) {
     super();
@@ -19,32 +19,34 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
 
   static create(options: {
     configuration: ManagedProviderConfigurationPort;
-    projects: ManagedProviderProjectRepository;
+    projects: ProjectService;
     credentials: ManagedProviderCredentialsPort;
   }): ManagedProviderService {
-    return new ManagedProviderService(
-      options.configuration,
-      options.projects,
-      options.credentials,
-    );
+    return new ManagedProviderService(options.configuration, options.projects, options.credentials);
   }
 
   isManagedProvider(organizationId: string, provider: string): boolean {
-    return (
-      provider === "bedrock" &&
-      this.configuration.tryForOrganization(organizationId) !== null
-    );
+    return provider === "bedrock" && this.configuration.tryForOrganization(organizationId) !== null;
   }
 
   async buildLitellmParameters(
     input: BuildManagedProviderParametersInput,
   ): Promise<Record<string, string>> {
-    if (input.modelProvider.provider !== "bedrock") return input.params;
+    if (input.modelProvider.provider !== "bedrock") {
+      return input.params;
+    }
 
     const organizationId = await this.tryOrganizationForProject(input.projectId);
-    if (!organizationId) return input.params;
+
+    if (!organizationId) {
+      return input.params;
+    }
+
     const config = this.configuration.tryForOrganization(organizationId);
-    if (!config) return input.params;
+
+    if (!config) {
+      return input.params;
+    }
 
     const credentials = await this.credentials.assumeCustomerRole(config);
     input.params.aws_access_key_id = credentials.accessKeyId;
@@ -57,6 +59,7 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
         ? config.bedrockProxyEndpoint
         : `http://${config.bedrockProxyEndpoint}`;
     delete input.params.api_key;
+
     return input.params;
   }
 
@@ -64,11 +67,19 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
     this.projectOrganizations.clear();
   }
 
-  private async tryOrganizationForProject(projectId: string): Promise<string | null> {
+  private async tryOrganizationForProject(projectId: string): Promise<string | undefined> {
     const cached = this.projectOrganizations.get(projectId);
-    if (cached) return cached;
+
+    if (cached) {
+      return cached;
+    }
+
     const organizationId = await this.projects.tryGetOrganizationId(projectId);
-    if (organizationId) this.projectOrganizations.set(projectId, organizationId);
+
+    if (organizationId) {
+      this.projectOrganizations.set(projectId, organizationId);
+    }
+
     return organizationId;
   }
 }

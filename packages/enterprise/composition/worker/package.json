@@ -29,7 +29,8 @@
     "@langwatch/enterprise-governance-server": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-server": "workspace:*",
-    "@langwatch/observability": "workspace:*"
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

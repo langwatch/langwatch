@@ -55,17 +55,15 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
       const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
       // VirtualKey is ORG-scoped post-collapse (no projectId column); the
       // ids come from this project's own tenant-filtered spend rows, and
-      // the org fence keeps a foreign id from resolving to a name.
-      const project = await ctx.prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { team: { select: { organizationId: true } } },
-      });
+      // the Project service resolves the owning-org fence without exposing
+      // Project persistence to this transport.
+      const organizationId = await ctx.app.projects.tryGetOrganizationId(input.projectId);
       const vks =
-        vkIds.length && project?.team
+        vkIds.length && organizationId
           ? await ctx.prisma.virtualKey.findMany({
               where: {
                 id: { in: vkIds },
-                organizationId: project.team.organizationId,
+                organizationId,
               },
               select: { id: true, name: true },
             })

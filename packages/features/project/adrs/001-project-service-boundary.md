@@ -17,7 +17,8 @@ Project behaviour is exposed through one portable `ProjectService` contract
 and one process-owned implementation. Features receive that service through
 composition. They do not define project repositories, create project services,
 or query project persistence themselves. The service owns project creation,
-settings changes, archive policy, project-key rotation, metadata activity,
+project-to-organization target resolution, settings changes, archive policy,
+project-key rotation, metadata activity,
 presence and trace-sharing reads, including the personal-workspace invariants.
 
 ### Public surfaces and transports
@@ -70,5 +71,8 @@ identity model, with project kind making internal lifecycle operations explicit.
 ## Consequences
 
 Project lifecycle policy has one implementation and one repository owner.
-Governance consumes `ProjectService` rather than owning a Governance project
-stack, while compatibility routes retain their current URLs during migration.
+Governance and Managed Provider consume `ProjectService` rather than owning
+project stacks, while compatibility routes retain their current URLs during
+migration. Role and binding lifecycle remain owned by their existing feature
+boundaries; Project does not absorb them because this slice requires no role
+or binding mutation.

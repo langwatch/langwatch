@@ -36,6 +36,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",

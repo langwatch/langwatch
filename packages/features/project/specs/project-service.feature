@@ -18,6 +18,21 @@ Feature: Shared project service
     Then it receives the process-owned project service
     And it does not construct a project repository or service
 
+  Scenario: A feature resolves a project's organization
+    When Managed Provider needs a project's organization
+    Then it asks the process-owned project service
+    And it does not query Project persistence directly
+
+  Scenario: A compatibility transport resolves a project's organization
+    When the Gateway spend-event transport needs to scope virtual-key names
+    Then it asks the process-owned project service for the organization
+    And unknown or orphaned projects resolve no virtual-key names
+
+  Scenario: A compatibility caller resolves a project tenant target
+    When it asks for a project's owning organization
+    Then the project service returns the tenant for an active or archived project
+    And it returns absence for a missing or orphaned project
+
   Scenario: A project is created in an existing shared team
     When the project service creates a project for that team and organization
     Then it verifies the team is active and belongs to the organization

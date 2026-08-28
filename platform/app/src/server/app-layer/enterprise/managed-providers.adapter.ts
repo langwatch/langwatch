@@ -3,11 +3,10 @@ import {
   ManagedProviderConfigurationReporter,
   EnvironmentManagedProviderConfigurationAdapter,
   PostgresManagedProviderAdapter,
-  PrismaManagedProviderProjectRepository,
 } from "~/runtime/app/features/managed-providers";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const logger = createLogger("langwatch:managed-providers:bedrock");
 
@@ -33,12 +32,12 @@ export class ManagedProvidersAppAdapter {
   private constructor(readonly service: ManagedProviderService) {}
 
   static create(options: {
-    prisma: PrismaClient;
+    projects: ProjectService;
     environment: Readonly<Record<string, string | undefined>>;
   }): ManagedProvidersAppAdapter {
     return new ManagedProvidersAppAdapter(
       PostgresManagedProviderAdapter.create({
-        projects: PrismaManagedProviderProjectRepository.create(options.prisma),
+        projects: options.projects,
         configuration: EnvironmentManagedProviderConfigurationAdapter.create({
           source: options.environment,
           reporter: AppManagedProviderConfigurationReporter.create(),

@@ -314,6 +314,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
@@ -774,6 +777,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../features/project/contract
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -1083,9 +1089,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../observability
-      '@langwatch/prisma-client':
+      '@langwatch/project-contract':
         specifier: workspace:*
-        version: link:../../../../prisma-client
+        version: link:../../../../features/project/contract
     devDependencies:
       '@types/node':
         specifier: ^24.0.0

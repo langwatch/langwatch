@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectDatabase } from "../src/ports/project.port";
-import { PrismaProjectRepository } from "../src/repositories/prisma/prisma-project.repository";
+import { PrismaProjectRepository } from "../src/repositories/prisma/prisma.project.repository";
 
 const destination = {
   id: "project_destination",
@@ -45,9 +45,9 @@ describe("PrismaProjectRepository trace destinations", () => {
   it("finds the oldest live governance project deterministically", async () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 
-    await expect(
-      repository.tryFindOldestGovernanceTraceDestination("org_1"),
-    ).resolves.toEqual(destination);
+    await expect(repository.tryFindOldestGovernanceTraceDestination("org_1")).resolves.toEqual(
+      destination,
+    );
     expect(project.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
     );
@@ -121,6 +121,23 @@ describe("PrismaProjectRepository coding-agent activity", () => {
         OR: [{ [field]: null }, { [field]: { lte: staleBefore } }],
       },
       data: { [field]: at },
+    });
+  });
+});
+
+describe("PrismaProjectRepository.tryGetOrganizationId", () => {
+  it("preserves optional tenant resolution for archived and missing projects", async () => {
+    const findUnique = vi
+      .fn()
+      .mockResolvedValueOnce({ team: { organizationId: "org_1" } })
+      .mockResolvedValueOnce(null);
+    const repository = PrismaProjectRepository.create({ project: { findUnique }, team: {} });
+
+    await expect(repository.tryGetOrganizationId("project_archived")).resolves.toBe("org_1");
+    await expect(repository.tryGetOrganizationId("project_missing")).resolves.toBe(undefined);
+    expect(findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: "project_archived" },
+      select: { team: { select: { organizationId: true } } },
     });
   });
 });

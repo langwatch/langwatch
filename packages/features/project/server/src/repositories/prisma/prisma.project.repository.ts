@@ -40,9 +40,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     return new PrismaProjectRepository(database as PrismaClient);
   }
 
-  async tryFindInternalByOrganization(
-    organizationId: string,
-  ): Promise<InternalProject | null> {
+  async tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({
         where: {
@@ -78,10 +76,7 @@ export class PrismaProjectRepository extends ProjectRepository {
         }),
       );
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         const winner = await this.prisma.project.findUnique({
           where: { slug: input.slug },
         });
@@ -105,6 +100,14 @@ export class PrismaProjectRepository extends ProjectRepository {
 
   async tryGetById(id: string): Promise<Project | null> {
     return this.mapProject(await this.prisma.project.findUnique({ where: { id } }));
+  }
+
+  async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team?.organizationId;
   }
 
   async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
@@ -138,9 +141,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     });
   }
 
-  async touchCodingAgentPullRequestSeen(
-    input: TouchCodingAgentActivityInput,
-  ): Promise<void> {
+  async touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void> {
     await this.prisma.project.updateMany({
       where: {
         id: input.projectId,
@@ -283,10 +284,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     };
   }
 
-  async findAllByTeam(input: {
-    organizationId: string;
-    teamId: string;
-  }): Promise<Project[]> {
+  async findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({
       where: {
         teamId: input.teamId,
@@ -342,9 +340,7 @@ export class PrismaProjectRepository extends ProjectRepository {
           ? {}
           : {
               OR: [
-                ...(input.projectIds.length > 0
-                  ? [{ id: { in: input.projectIds } }]
-                  : []),
+                ...(input.projectIds.length > 0 ? [{ id: { in: input.projectIds } }] : []),
                 ...(input.teamIds.length > 0 ? [{ teamId: { in: input.teamIds } }] : []),
               ],
             }),
@@ -355,10 +351,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     return rows.map((row) => this.mapProjectRequired(row));
   }
 
-  async tryFindBySlugInTeam(input: {
-    slug: string;
-    teamId: string;
-  }): Promise<Project | null> {
+  async tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
     return this.mapProject(await this.prisma.project.findFirst({ where: input }));
   }
 
@@ -414,9 +407,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     });
   }
 
-  async tryGetTraceDestination(
-    projectId: string,
-  ): Promise<TraceDestinationProject | null> {
+  async tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     const row = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
@@ -430,9 +421,7 @@ export class PrismaProjectRepository extends ProjectRepository {
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
     });
-    const byId = new Map(
-      rows.map((row) => [row.id, traceDestinationProjectSchema.parse(row)]),
-    );
+    const byId = new Map(rows.map((row) => [row.id, traceDestinationProjectSchema.parse(row)]));
     return projectIds.flatMap((projectId) => {
       const project = byId.get(projectId);
       return project ? [project] : [];

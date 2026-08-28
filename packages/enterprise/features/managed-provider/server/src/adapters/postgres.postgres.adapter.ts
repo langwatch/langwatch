@@ -1,21 +1,21 @@
 import type { ManagedProviderService as ManagedProviderServiceContract } from "@langwatch/enterprise-managed-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port";
 import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port";
-import type { ManagedProviderProjectRepository } from "../ports/managed-provider-project.port";
 import { ManagedProviderService } from "../services/managed-provider.service";
 
-/** Composes the managed-provider capability around its private project read port. */
+/** Composes managed providers around the process-owned Project service. */
 export class PostgresManagedProviderAdapter {
   private constructor(
     private readonly options: {
-      projects: ManagedProviderProjectRepository;
+      projects: ProjectService;
       configuration: ManagedProviderConfigurationPort;
       credentials: ManagedProviderCredentialsPort;
     },
   ) {}
 
   static create(options: {
-    projects: ManagedProviderProjectRepository;
+    projects: ProjectService;
     configuration: ManagedProviderConfigurationPort;
     credentials: ManagedProviderCredentialsPort;
   }): PostgresManagedProviderAdapter {

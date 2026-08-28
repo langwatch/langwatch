@@ -84,6 +84,7 @@ function mintProjectSlug(name: string, projectId: string): string {
   if (reserved.has(slug)) {
     throw new Error(`Minted project slug "${slug}" equals a reserved top-level route`);
   }
+
   return slug;
 }
 
@@ -119,12 +120,11 @@ export class ProjectService extends ProjectServiceContract {
 
   tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
+
     return this.repository.tryFindInternalByOrganization(parsed.organizationId);
   }
 
-  async resolveTraceDestination(
-    input: TraceDestinationInput,
-  ): Promise<TraceDestinationDecision> {
+  async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
     const parsed = traceDestinationInputSchema.parse(input);
     if (parsed.traceProjectId) {
       const project = await this.repository.tryFindLiveTraceDestination({
@@ -170,29 +170,30 @@ export class ProjectService extends ProjectServiceContract {
   }
 
   tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
-    return this.repository.tryGetTraceDestination(
-      traceDestinationProjectIdSchema.parse(projectId),
-    );
+    return this.repository.tryGetTraceDestination(traceDestinationProjectIdSchema.parse(projectId));
   }
 
   listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
     const parsed = traceDestinationProjectIdsSchema.parse(projectIds);
+
     return this.repository.listTraceDestinations([...new Set(parsed)]);
   }
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
     const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.tryFindInternalByOrganization(
-      parsed.organizationId,
-    );
-    if (existing) return existing;
+    const existing = await this.repository.tryFindInternalByOrganization(parsed.organizationId);
+    if (existing) {
+      return existing;
+    }
 
     const teamId = await this.organizations.getOldestTeamId({
       organizationId: parsed.organizationId,
     });
     const slug = `governance-${parsed.organizationId}`;
     const bySlug = await this.repository.tryFindInternalBySlug(slug);
-    if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) return bySlug;
+    if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+      return bySlug;
+    }
 
     return this.repository.createInternalOrFindWinner({
       id: this.credentials.generateProjectId(),
@@ -205,34 +206,45 @@ export class ProjectService extends ProjectServiceContract {
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {
     const parsed = projectPresenceInputSchema.parse(input);
+
     return this.repository.isPresenceEnabled(parsed.projectId);
   }
 
   async getById(id: string): Promise<Project> {
     const project = await this.repository.tryGetById(id);
-    if (!project) throw new ProjectNotFoundError("Project not found");
+    if (!project) {
+      throw new ProjectNotFoundError("Project not found");
+    }
+
     return project;
   }
 
   async getOrganizationId(projectId: string): Promise<string> {
     const project = await this.getWithTeam(projectId);
+
     return project.team.organizationId;
+  }
+
+  tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+    return this.repository.tryGetOrganizationId(projectId);
   }
 
   tryGetById(projectId: string): Promise<Project | null> {
     return this.repository.tryGetById(projectId);
   }
 
-  async tryGetSummaryById(
-    projectId: string,
-  ): Promise<{ name: string; slug: string } | null> {
+  async tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> {
     const project = await this.repository.tryGetById(projectId);
+
     return project ? { name: project.name, slug: project.slug } : null;
   }
 
   async getWithTeam(id: string): Promise<ProjectWithTeam> {
     const project = await this.repository.tryGetWithTeam(id);
-    if (!project) throw new ProjectNotFoundError("Project not found");
+    if (!project) {
+      throw new ProjectNotFoundError("Project not found");
+    }
+
     return project;
   }
 
@@ -248,8 +260,11 @@ export class ProjectService extends ProjectServiceContract {
     if (!destinationTeam) {
       throw new TeamNotInOrganizationError("Team does not belong to this organization");
     }
+
     const violation = personalWorkspaceCreateViolation(destinationTeam.isPersonal);
-    if (violation) throw new PersonalWorkspaceBoundaryError(violation);
+    if (violation) {
+      throw new PersonalWorkspaceBoundaryError(violation);
+    }
   }
 
   async create(input: {
@@ -286,6 +301,7 @@ export class ProjectService extends ProjectServiceContract {
           actor: { type: "user", id: input.userId },
         });
       }
+
       teamId = team.id;
     }
 
@@ -321,6 +337,7 @@ export class ProjectService extends ProjectServiceContract {
         "project key-map sync failed; backfill will retry",
       );
     }
+
     return project;
   }
 
@@ -340,6 +357,7 @@ export class ProjectService extends ProjectServiceContract {
           "Destination team not found, is archived, or belongs to a different organization",
         );
       }
+
       const current = await this.repository.tryGetWithTeam(input.id);
       if (
         current &&
@@ -350,14 +368,18 @@ export class ProjectService extends ProjectServiceContract {
           isProjectPersonal: current.isPersonal,
           isDestinationTeamPersonal: team.isPersonal,
         });
-        if (violation) throw new PersonalWorkspaceBoundaryError(violation);
+        if (violation) {
+          throw new PersonalWorkspaceBoundaryError(violation);
+        }
       }
     }
+
     const project = await this.repository.update({
       id: input.id,
       organizationId: input.organizationId,
       data,
     });
+
     return project;
   }
 
@@ -367,7 +389,9 @@ export class ProjectService extends ProjectServiceContract {
       existing && existing.team.organizationId === input.organizationId
         ? personalWorkspaceArchiveViolation(existing.isPersonal)
         : null;
-    if (violation) throw new PersonalProjectProtectedError(violation);
+    if (violation) {
+      throw new PersonalProjectProtectedError(violation);
+    }
 
     try {
       await this.storedObjects?.deleteOwnedBy({ projectId: input.id });
@@ -377,7 +401,9 @@ export class ProjectService extends ProjectServiceContract {
         "stored-object cleanup failed during project archive; continuing",
       );
     }
+
     const project = await this.repository.archive(input);
+
     return project;
   }
 
@@ -396,26 +422,24 @@ export class ProjectService extends ProjectServiceContract {
 
   listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]> {
     const parsed = projectNamesByIdsInputSchema.parse(input);
+
     return this.repository.findNamesByIds([...new Set(parsed.projectIds)]);
   }
 
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
     const parsed = projectIdsByOrganizationInputSchema.parse(input);
+
     return this.repository.findIdsByOrganization(parsed.organizationId);
   }
 
-  async listActiveByScopes(
-    input: ActiveProjectsByScopesInput,
-  ): Promise<ActiveProjectsByScopes> {
+  async listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {
     const parsed = activeProjectsByScopesInputSchema.parse(input);
-    if (
-      !parsed.organizationWide &&
-      parsed.teamIds.length === 0 &&
-      parsed.projectIds.length === 0
-    ) {
+    if (!parsed.organizationWide && parsed.teamIds.length === 0 && parsed.projectIds.length === 0) {
       return { data: [], hasMore: false };
     }
+
     const rows = await this.repository.findActiveByScopes(parsed);
+
     return {
       data: rows.slice(0, parsed.limit),
       hasMore: rows.length > parsed.limit,
@@ -461,6 +485,7 @@ export class ProjectService extends ProjectServiceContract {
       if (!result) {
         return { userId: null, organizationId: null, firstMessage: false };
       }
+
       return {
         userId: result.adminUserId,
         organizationId: result.organizationId,
@@ -476,6 +501,7 @@ export class ProjectService extends ProjectServiceContract {
         "Failed to resolve org admin — returning null resolution",
       );
       this.diagnostics?.capture(new Error("Failed to resolve org admin"), resolution);
+
       return { userId: null, organizationId: null, firstMessage: false };
     }
   }

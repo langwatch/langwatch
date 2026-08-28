@@ -39,6 +39,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 const getSpendEventsPage = vi.hoisted(() => vi.fn());
+const tryGetOrganizationId = vi.hoisted(() => vi.fn());
 
 // The router takes the spend-events repository from the App, so standing
 // in for the store means standing in for `getApp()`. `current` toggles
@@ -55,6 +56,7 @@ vi.mock("~/server/app-layer/app", async () => {
     getApp: () => ({
       permissions: appPermissionsService(),
       gateway: { spendEvents: spendEventsService.current },
+      projects: { tryGetOrganizationId },
     }),
   };
 });
@@ -99,9 +101,6 @@ function buildCaller() {
     publiclyShared: false,
   });
   ctx.prisma = {
-    project: {
-      findUnique: vi.fn().mockResolvedValue({ team: { organizationId: "org_1" } }),
-    },
     virtualKey: {
       findMany: vi.fn().mockResolvedValue([{ id: "vk_1", name: "Customer A key" }]),
     },
@@ -125,6 +124,7 @@ describe("gatewaySpendEventsRouter", () => {
       rows: [SPEND_ROW],
       nextCursor: null,
     });
+    tryGetOrganizationId.mockResolvedValue("org_1");
   });
 
   /** @scenario Ledger filters and cursor pass through to the repository page read */
@@ -170,6 +170,17 @@ describe("gatewaySpendEventsRouter", () => {
     expect(result.rows).toHaveLength(1);
     expect(result.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
     expect(result.clickHouseDisabled).toBe(false);
+    expect(tryGetOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
+  });
+
+  /** @scenario Unknown project tenants do not resolve virtual-key names */
+  it("keeps virtual-key names empty when the project has no organization", async () => {
+    tryGetOrganizationId.mockResolvedValue(undefined);
+
+    const caller = buildCaller();
+    const result = await caller.list(BASE_INPUT);
+
+    expect(result.virtualKeyNames).toEqual({});
   });
 
   /** @scenario The ledger degrades to an empty page without ClickHouse */

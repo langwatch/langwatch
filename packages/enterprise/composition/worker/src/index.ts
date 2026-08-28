@@ -3,13 +3,13 @@ import type { ManagedProviderService } from "@langwatch/enterprise-managed-provi
 import type {
   ManagedProviderConfigurationPort,
   ManagedProviderCredentialsPort,
-  ManagedProviderProjectRepository,
 } from "@langwatch/enterprise-managed-provider-server";
 import { PostgresManagedProviderAdapter } from "@langwatch/enterprise-managed-provider-server";
+import type { ProjectService } from "@langwatch/project-contract";
 
 export type EnterpriseWorkerCompositionOptions = {
   managedProvider: {
-    projects: ManagedProviderProjectRepository;
+    projects: ProjectService;
     configuration: ManagedProviderConfigurationPort;
     credentials: ManagedProviderCredentialsPort;
   };

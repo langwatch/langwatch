@@ -778,10 +778,6 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     demoProjectId,
   });
 
-  const managedProviders = ManagedProvidersAppAdapter.create({
-    prisma,
-    environment: process.env,
-  }).service;
   const roles = AppRoleRuntime.create({
     database: prisma,
     grants: authzFeature.grants,
@@ -825,6 +821,10 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
     }).build(),
     "ProjectService",
   );
+  const managedProviders = ManagedProvidersAppAdapter.create({
+    projects,
+    environment: process.env,
+  }).service;
   const dataPrivacy = PrismaDataPrivacyAdapter.create({
     prisma,
     projects,
@@ -2596,10 +2596,6 @@ export function createTestApp(
     canonical: userAvatarStoredObjects,
     historical: storedObjectsService,
   });
-  const managedProviders = ManagedProvidersAppAdapter.create({
-    prisma: testPrisma,
-    environment: {},
-  }).service;
   const testRoles = AppRoleRuntime.create({
     database: testPrisma,
     grants: testAuthz.grants,
@@ -2694,6 +2690,10 @@ export function createTestApp(
     }).build(),
     "ProjectService",
   );
+  const managedProviders = ManagedProvidersAppAdapter.create({
+    projects: testProjects,
+    environment: {},
+  }).service;
   const testDataPrivacy = PrismaDataPrivacyAdapter.create({
     prisma: testPrisma,
     projects: testProjects,
