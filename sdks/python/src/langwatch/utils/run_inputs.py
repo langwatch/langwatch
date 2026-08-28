@@ -8,7 +8,7 @@ shadows the lazy facade of the same name.
 
 from typing import Any, Dict, Optional, Sequence
 
-SCOPE_MODES = ("all", "folders", "labels", "cases")
+SCOPE_MODES = ("all", "test_suites", "labels", "scenarios")
 """The scope modes the platform has. Mirrors `suiteScopeSchema` in
 platform/app/src/server/suites/scope.ts."""
 
@@ -16,7 +16,7 @@ platform/app/src/server/suites/scope.ts."""
 def build_scope(
     mode: str,
     *,
-    folder_ids: Optional[Sequence[str]] = None,
+    test_suite_ids: Optional[Sequence[str]] = None,
     labels: Optional[Sequence[str]] = None,
     scenario_ids: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
@@ -24,28 +24,30 @@ def build_scope(
 
     Every mode but ``all`` reads a list, and a mode whose list is missing is a
     mistake the caller can fix without a round trip, so it raises here rather
-    than travelling to the platform to be refused. ``cases`` is the exception
-    in shape only: its list is sent as the configuration's ``scenarioIds``, so
-    the scope object itself carries the mode alone.
+    than travelling to the platform to be refused. ``scenarios`` is the
+    exception in shape only: its list is sent as the configuration's
+    ``scenarioIds``, so the scope object itself carries the mode alone.
     """
     if mode == "all":
         return {"mode": "all"}
-    if mode == "folders":
-        if not folder_ids:
+    if mode == "test_suites":
+        if not test_suite_ids:
             raise ValueError(
-                'scope="folders" needs folder_ids: name the test suites to run'
+                'scope="test_suites" needs test_suite_ids: name the test suites to run'
             )
-        return {"mode": "folders", "folderIds": list(folder_ids)}
+        return {"mode": "test_suites", "testSuiteIds": list(test_suite_ids)}
     if mode == "labels":
         if not labels:
             raise ValueError(
-                'scope="labels" needs labels: name the labels the cases carry'
+                'scope="labels" needs labels: name the labels the scenarios carry'
             )
         return {"mode": "labels", "labels": list(labels)}
-    if mode == "cases":
+    if mode == "scenarios":
         if not scenario_ids:
-            raise ValueError('scope="cases" needs scenario_ids: name the cases to run')
-        return {"mode": "cases"}
+            raise ValueError(
+                'scope="scenarios" needs scenario_ids: name the scenarios to run'
+            )
+        return {"mode": "scenarios"}
     raise ValueError(f"unknown scope {mode!r}: one of {', '.join(SCOPE_MODES)}")
 
 
