@@ -50,6 +50,11 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
 
 vi.mock("@langwatch/presence-web", () => ({
   TracePresenceAvatars: () => null,
+  // `ModeSwitch` and `VizPlaceholder` read the peer store to decide whose
+  // cursors to show. The header renders both, so the mock has to answer for
+  // the store as well or the module throws before anything is asserted.
+  usePresenceStore: () => [],
+  selectPeersMatching: () => () => [],
 }));
 
 vi.mock("../../../../hooks/useTraceResources", () => ({
