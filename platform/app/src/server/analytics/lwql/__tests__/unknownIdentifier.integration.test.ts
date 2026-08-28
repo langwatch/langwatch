@@ -90,6 +90,7 @@ describe("given SQL that names a column no dataset has", () => {
   });
 
   describe("when the query names a column that does not exist", () => {
+    /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("refuses it as a member-actionable error rather than an unknown", async () => {
       const failure = await failureOf(
         `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
@@ -100,6 +101,7 @@ describe("given SQL that names a column no dataset has", () => {
       );
     });
 
+    /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("blames the member rather than the platform", async () => {
       const failure = await failureOf(
         `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
@@ -117,6 +119,8 @@ describe("given SQL that names a column no dataset has", () => {
      * pass if the extractor read nothing out of the server's sentence, because
      * the identifier is optional by design. This is what says the wording the
      * unit fixtures assume is the wording ClickHouse actually writes.
+     *
+     * @scenario "A query naming a column that does not exist is refused with the column named"
      */
     it("names the offending column, read from what the server actually said", async () => {
       const failure = await failureOf(
@@ -129,6 +133,7 @@ describe("given SQL that names a column no dataset has", () => {
       expect(serialised.meta).toMatchObject({ identifier: MISSING_COLUMN });
     });
 
+    /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("relays no part of the server's message, which echoes the query", async () => {
       const failure = await failureOf(
         `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
