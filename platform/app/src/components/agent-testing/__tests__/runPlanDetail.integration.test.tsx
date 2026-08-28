@@ -21,7 +21,9 @@ import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { RunPlanDetail } from "../results/RunPlanDetail";
 import { RUN_AGAIN_LABEL } from "../results/RunPlanDetailHeader";
 import { PROJECT_DEFAULT_MODEL } from "../results/RunSettingsBlock";
+import { RunsSidebarEntry } from "../results/RunsSidebarEntry";
 import type { RunPlan } from "../results/run-plans";
+import { passRateColor } from "../shared/pass-rate-color";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
@@ -1366,5 +1368,57 @@ describe("<RunPlanDetail/>", () => {
     expect(
       screen.queryByTestId("runs-sidebar-pending"),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("<RunsSidebarEntry/>", () => {
+  afterEach(cleanup);
+
+  /** @scenario "The runs sidebar reads a pass rate on the same scale as the tables" */
+  it("reads a pass rate on the colour scale the whole surface shares", () => {
+    render(
+      <>
+        <RunsSidebarEntry
+          title="Run #2"
+          note={null}
+          timeAgo="now"
+          passRate={90}
+          passedCount={null}
+          isSelected={false}
+          testId="entry-90"
+        />
+        <RunsSidebarEntry
+          title="Run #1"
+          note={null}
+          timeAgo="now"
+          passRate={60}
+          passedCount={null}
+          isSelected={false}
+          testId="entry-60"
+        />
+      </>,
+      { wrapper: Wrapper },
+    );
+
+    const colorOf = (element: Element) =>
+      window.getComputedStyle(element).color;
+    const backgroundOf = (element: Element) =>
+      window.getComputedStyle(element).backgroundColor;
+
+    const ninety = screen.getByTestId("entry-90-result");
+    const sixty = screen.getByTestId("entry-60-result");
+    const ninetyText = within(ninety).getByTestId("pass-rate-text");
+    const sixtyText = within(sixty).getByTestId("pass-rate-text");
+
+    // Both rates sit in the same band of the surface's scale, so the raw
+    // gradient of a rate would give them two colours and the scale gives
+    // them one.
+    expect(colorOf(ninetyText)).toBe(passRateColor(90));
+    expect(colorOf(sixtyText)).toBe(passRateColor(60));
+    expect(colorOf(ninetyText)).toBe(colorOf(sixtyText));
+
+    expect(backgroundOf(screen.getByTestId("entry-90-result-dot"))).toBe(
+      colorOf(ninetyText),
+    );
   });
 });
