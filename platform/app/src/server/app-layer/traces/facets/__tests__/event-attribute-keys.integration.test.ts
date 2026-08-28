@@ -152,7 +152,7 @@ describe("event-attribute-keys facet integration", () => {
         expect(new Set(keys).size).toBe(keys.length); // GROUP BY => no dupes
         expect(keys).toContain("event_key_0");
         expect(keys).toContain(`event_key_${KEYS_PER_EVENT - 1}`);
-        expect(keys).not.toContain(""); // empty keys filtered out
+        expect(keys).not.toContain("");
         expect(rows).toHaveLength(EXPECTED_DISTINCT_KEYS);
         expect(Number(rows[0]?.total_distinct)).toBe(EXPECTED_DISTINCT_KEYS);
       });
