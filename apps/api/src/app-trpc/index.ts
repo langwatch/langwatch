@@ -47,9 +47,10 @@ export {
   createTracesTrpcRouter,
 } from "../features/trace/trace-trpc.mount";
 export {
-  declaredCheckFrom,
-  type AppAuthzMiddlewareBuilders,
-} from "./app-trpc.declared-check";
+  createSharedTraceTrpcRouter,
+  createTracesV2TrpcRouter,
+} from "../features/trace/traces-v2-trpc.mount";
+export { declaredCheckFrom, type AppAuthzMiddlewareBuilders } from "./app-trpc.declared-check";
 export { createFrontDoorTrpcRouter } from "../features/auth/auth-trpc.mount";
 export {
   createGroupTrpcRouter,
@@ -57,10 +58,7 @@ export {
   createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
-export {
-  createIdentityTrpcRouter,
-  createUserTrpcRouter,
-} from "../features/user/user-trpc.mount";
+export { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 export {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,

@@ -25,10 +25,6 @@
       "platform/app/src/server/api/routers/organization.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/publicEnv.ts": ["../../../env.mjs"],
       "platform/app/src/server/api/routers/subscription.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/tracesV2.ts": [
-        "~/features/traces-v2/utils/costAttribution",
-        "~/shared/traces/media-refs"
-      ],
       "platform/app/src/server/api/routers/user.ts": ["../../../env.mjs"],
       "platform/app/src/server/app-layer/bug-reports/bug-report-slack.ts": ["~/env.mjs"],
       "platform/app/src/server/app-layer/config.ts": ["../../env-create.mjs"],
@@ -750,23 +746,8 @@
         "~/server/scenarios/internal-set-id",
         "~/server/scenarios/scenario-event.types"
       ],
-      "platform/app/src/features/traces-v2/components/ai/AiPromptInput.tsx": [
-        "~/server/app-layer/traces/ai-query"
-      ],
-      "platform/app/src/features/traces-v2/components/ai/useAiTraceAction.ts": [
-        "~/server/app-layer/traces/ai-query"
-      ],
       "platform/app/src/features/traces-v2/components/ExportConfigDialog.tsx": [
         "~/server/export/types"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/ErrorBannerDetail.tsx": [
-        "~/server/app-layer/traces/ai-query"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/FloatingAiErrorRow.tsx": [
-        "~/server/app-layer/traces/ai-query"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/SearchBar.tsx": [
-        "~/server/app-layer/traces/ai-query"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/anchoredComments/TraceCommentList.tsx": [
         "~/server/annotations/annotationAnchorLabel"
@@ -865,9 +846,6 @@
       "platform/app/src/features/traces-v2/components/TraceDrawer/terminalView/toolSpans.ts": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/logSummary.ts": [
-        "~/server/api/routers/tracesV2"
-      ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/SpanAccordions.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],
@@ -945,7 +923,6 @@
       "platform/app/src/features/traces-v2/hooks/useSpanLangwatchSignals.ts": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/hooks/useSpanLogs.ts": ["~/server/api/routers/tracesV2"],
       "platform/app/src/features/traces-v2/hooks/useSpansFull.ts": [
         "~/server/api/routers/tracesV2.schemas",
         "~/server/traces/edit-overlay/applyTraceEditOverlay",
@@ -980,9 +957,6 @@
       ],
       "platform/app/src/features/traces-v2/stores/annotationDraftStore.ts": [
         "~/server/annotations/annotationAnchor"
-      ],
-      "platform/app/src/features/traces-v2/stores/filterStore.ts": [
-        "~/server/app-layer/traces/ai-query"
       ],
       "platform/app/src/features/traces-v2/stores/traceEditStore.ts": [
         "~/server/tracer/spanIOStringify"

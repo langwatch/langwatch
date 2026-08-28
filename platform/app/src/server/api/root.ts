@@ -31,12 +31,14 @@ import {
   createPromptTrpcRouter,
   createSavedViewTrpcRouter,
   createScenarioTrpcRouter,
+  createSharedTraceTrpcRouter,
   createShareTrpcRouter,
   createSpansTrpcRouter,
   createStoredObjectTrpcRouter,
   createSuiteTrpcRouter,
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
+  createTracesV2TrpcRouter,
   createTranslateTrpcRouter,
   declaredCheckFrom,
   type AppTrpcPolicyKit,
@@ -185,6 +187,7 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import type { SlackActionParams } from "@langwatch/automation-contract";
 import { PostgresSavedViewAdapter } from "@langwatch/dashboard-server";
+import { createSharedTraceTrpcPorts, createTracesV2TrpcPorts } from "~/runtime/app/features/trace";
 import { canReadCapturedContent } from "@langwatch/trace-server";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -237,10 +240,8 @@ import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.route
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
-import { sharedTraceRouter } from "./routers/sharedTrace";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
-import { tracesV2Router } from "./routers/tracesV2";
 import { userRouter } from "./routers/user";
 import { optimizationRouter, workflowRouter } from "./routers/workflows";
 
@@ -675,6 +676,24 @@ const tracesRouter = createTracesTrpcRouter({
     buildPreconditionTraceData: buildPreconditionTraceDataFromTrace,
     evaluatePreconditions,
   },
+});
+
+const tracesV2Router = createTracesV2TrpcRouter({
+  ...appTrpcMount,
+  ports: createTracesV2TrpcPorts(),
+});
+
+/**
+ * ADR-057: the one anonymous trace read. It takes the process's PUBLIC
+ * procedure — the same one `publicProcedure` is built from, so
+ * `isPublicProcedure` still recognises it — and a `noPermission` declaration
+ * rather than a permission: the share token in the input is the whole
+ * authorization.
+ */
+const sharedTraceRouter = createSharedTraceTrpcRouter({
+  ...appTrpcMount,
+  publicProcedure: appTrpcRoot.procedure,
+  ports: createSharedTraceTrpcPorts(),
 });
 
 const promptsRouter = createPromptTrpcRouter({
