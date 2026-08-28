@@ -20,21 +20,25 @@ import {
   readIdempotencyKey,
   withIdempotency,
 } from "~/server/api/idempotency";
-import { createOrgApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createOrgApp } from "~/server/api/security";
+import {
+  apiErrorSchema,
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { prisma } from "~/server/db";
 import { toStoredEnum, toWireEnum } from "@langwatch/gateway-server";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
-import { canonicalBaseResponses, canonicalConflictResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   idempotencyKeyParameter,
   idempotentJson,
   idempotentReplayHeaders,
 } from "../../shared/idempotent-response";
-import { apiErrorSchema } from "../../shared/schemas";
 import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();

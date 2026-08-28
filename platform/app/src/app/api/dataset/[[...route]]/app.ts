@@ -10,14 +10,19 @@ import {
 } from "@langwatch/dataset-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createProjectApp, handlerManagedAuth, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
+import { createProjectApp } from "~/server/api/security";
+import {
+  baseResponses,
+  errorSchema,
+  handlerManagedAuth,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
 } from "../../middleware/dataset-service";
-import { baseResponses } from "../../shared/base-responses";
 import {
   BadRequestError,
   InternalServerError,
@@ -25,7 +30,6 @@ import {
   UnprocessableEntityError,
 } from "../../shared/errors";
 import { platformUrl } from "../../shared/platform-url";
-import { errorSchema } from "../../shared/schemas";
 import { MAX_LIMIT_MB } from "./constants";
 import { authorizeDirectUpload } from "./direct-upload-auth";
 import { handleDatasetError } from "./error-handler";

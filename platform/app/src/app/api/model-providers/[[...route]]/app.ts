@@ -1,5 +1,5 @@
 import { createProjectApp } from "~/server/api/security";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { patchZodOpenapi } from "@langwatch/platform-api/app-rest";
 import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
 import { registerModelProviderRoutes } from "./app.v1";
 

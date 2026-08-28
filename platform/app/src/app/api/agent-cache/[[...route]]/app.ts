@@ -1,10 +1,13 @@
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
-import { apiErrorSchema } from "../../shared/schemas";
+import { createProjectApp } from "~/server/api/security";
+import {
+  apiErrorSchema,
+  canonicalBaseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import {
   AgentCacheService,
   CACHE_ENTRY_NAME_REGEX,

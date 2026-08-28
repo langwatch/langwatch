@@ -14,10 +14,13 @@ import {
 import { describeRoute, resolver } from "hono-openapi";
 import { type Context, type MiddlewareHandler } from "hono";
 import { handleError } from "~/app/api/middleware/error-handler";
-import { baseResponses } from "~/app/api/shared/base-responses";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import { createProjectApp, requires } from "~/server/api/security";
-import { hiddenValidator } from "~/server/api/validation";
+import {
+  badRequestSchema,
+  baseResponses,
+  hiddenValidator,
+  requires,
+} from "@langwatch/platform-api/app-rest";
+import { createProjectApp } from "~/server/api/security";
 
 const logger = createLogger("langwatch:api:secrets");
 const LEGACY_SECRET_API_NOTICE =

@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
 import { app as copilotkitApp } from "~/app/api/copilotkit/[[...route]]/app";
 import { app as experimentsApp } from "~/app/api/experiments/[[...route]]/app";
-import { app as modelDefaultsApp } from "~/app/api/model-defaults/[[...route]]/app";
+import { createModelDefaultsRestApp } from "@langwatch/platform-api";
 import { app as modelProvidersApp } from "~/app/api/model-providers/[[...route]]/app";
 import {
   type Organization,
@@ -30,11 +30,17 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { appRestSecurity } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 wireDefaultTestApp();
+
+const { hono: modelDefaultsApp } = createModelDefaultsRestApp({
+  security: appRestSecurity,
+  modelProviders: () => getApp().modelProviders,
+});
 
 const ns = `secured-rbac-${nanoid(8)}`;
 

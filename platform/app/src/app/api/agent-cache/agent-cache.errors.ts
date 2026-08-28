@@ -1,6 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
  * The project holds no live entry under the requested name.

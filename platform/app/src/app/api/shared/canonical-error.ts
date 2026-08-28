@@ -13,7 +13,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { HttpError } from "./errors";
-import { type ApiErrorBody, apiErrorBody } from "./schemas";
+import { type ApiErrorBody, apiErrorBody } from "@langwatch/platform-api/app-rest";
 
 const INVALID_SPAN_ID = "0".repeat(16);
 

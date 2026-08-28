@@ -3,11 +3,18 @@ import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
-import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import {
+  badRequestSchema,
+  baseResponses,
+  conflictResponses,
+  patchZodOpenapi,
+  requires,
+  type SecuredApp,
+  successSchema,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { prisma } from "~/server/db";
 import { commitMessageSchema, versionSchema } from "@langwatch/prompt-contract";
-import { requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
 import { parsePromptShorthand, ShorthandParseError } from "@langwatch/prompt-contract";
 import {
   PromptTagConflictError,
@@ -16,13 +23,11 @@ import {
   PromptTagValidationError,
 } from "@langwatch/prompt-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
 } from "../../middleware";
-import { baseResponses, conflictResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import {
   type ApiResponsePrompt,

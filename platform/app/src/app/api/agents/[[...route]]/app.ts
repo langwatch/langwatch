@@ -10,9 +10,12 @@ import {
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
+import { createProjectApp } from "~/server/api/security";
+import {
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import {
   type AgentServiceMiddlewareVariables,
   agentServiceMiddleware,

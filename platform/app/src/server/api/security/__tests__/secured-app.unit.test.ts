@@ -9,10 +9,10 @@ import { describe, expect, it } from "vitest";
 import {
   apiKeyPermission,
   describeAccessPolicy,
+  getRoutePolicy,
   internalSecret,
   publicEndpoint,
 } from "@langwatch/api";
-import { getRoutePolicy } from "@langwatch/api";
 import { createProjectApp, createServiceApp } from "../index";
 
 const noopSecret: MiddlewareHandler = async (_c, next) => next();

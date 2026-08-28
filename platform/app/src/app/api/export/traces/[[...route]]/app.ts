@@ -12,9 +12,9 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { handlerManagedAuth, validator as zValidator } from "@langwatch/platform-api/app-rest";
 import { getUserProtectionsForProject } from "~/server/api/utils";
-import { validator as zValidator } from "~/server/api/validation";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -72,7 +72,7 @@ secured
 
     // Derive RBAC protections from the user's session and project role
     const protections = await getUserProtectionsForProject(
-      { prisma, session },
+      { prisma, session, app: c.app },
       { projectId: request.projectId },
     );
 

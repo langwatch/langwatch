@@ -15,9 +15,7 @@ class TestApplication extends ApiApplicationPort<{ name: string }> {
 }
 
 class TestLifecycle extends ApiLifecyclePort<{ composed: true }> {
-  readonly compose = vi.fn(
-    async (_resources: ResourceScope) => ({ composed: true }) as const,
-  );
+  readonly compose = vi.fn(async (_resources: ResourceScope) => ({ composed: true }) as const);
 }
 
 describe("ApiRuntime", () => {

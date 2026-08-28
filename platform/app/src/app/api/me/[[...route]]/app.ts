@@ -1,10 +1,14 @@
 import { describeRoute, resolver } from "hono-openapi";
-import { createProjectApp, requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createProjectApp } from "~/server/api/security";
+import {
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
-import { baseResponses } from "../../shared/base-responses";
 import { resolvePersonalCaller } from "../../shared/personal-project-caller";
 import {
   meProjectResponseSchema,

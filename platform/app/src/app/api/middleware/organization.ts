@@ -1,13 +1,11 @@
 import type { MiddlewareHandler } from "hono";
-import type { Organization } from "~/generated/prisma/client";
-
-import { prisma } from "~/server/db";
+import { TeamNotFoundError } from "@langwatch/organization-contract";
 
 /**
  * Variables set by the organization middleware
  */
 export type OrganizationMiddlewareVariables = {
-  organization: Organization;
+  organization: Readonly<{ id: string }>;
 };
 
 export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
@@ -23,13 +21,11 @@ export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
     );
   }
 
-  const team = await prisma.team.findUnique({
-    where: { id: project.teamId },
-    include: { organization: true },
-  });
-
-  const organization = team?.organization;
-  if (!organization) {
+  try {
+    const team = await c.app.organizations.getTeamById({ teamId: project.teamId });
+    c.set("organization", { id: team.organizationId });
+  } catch (error) {
+    if (!(error instanceof TeamNotFoundError)) throw error;
     return c.json(
       {
         error: "Internal Server Error",
@@ -38,8 +34,6 @@ export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
       500,
     );
   }
-
-  c.set("organization", organization);
 
   await next();
 };

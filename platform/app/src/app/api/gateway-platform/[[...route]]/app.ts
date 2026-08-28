@@ -28,19 +28,26 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
-import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
+import type { Project } from "~/generated/prisma/client";
+import type { GatewayCacheRuleCursor, GatewayCacheRuleResource } from "@langwatch/gateway-contract";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
   withIdempotency,
 } from "~/server/api/idempotency";
-import { apiKeyPermission, createProjectApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createProjectApp } from "~/server/api/security";
+import {
+  apiErrorBody,
+  apiErrorSchema,
+  apiKeyPermission,
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+  patchZodOpenapi,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { prisma } from "~/server/db";
 import { toBudgetDto } from "@langwatch/gateway-server";
 import type { BudgetScope } from "@langwatch/gateway-server";
-import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
-import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
@@ -85,15 +92,12 @@ import {
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "@langwatch/gateway-server";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses, canonicalConflictResponses } from "../../shared/base-responses";
 import { requestTraceIds } from "../../shared/canonical-error";
 import {
   idempotencyKeyParameter,
   idempotentJson,
   idempotentReplayHeaders,
 } from "../../shared/idempotent-response";
-import { apiErrorBody, apiErrorSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -394,7 +398,7 @@ function createdAtIdCursor(
 }
 
 /** The (priority, createdAt, id) sort key a cache-rule cursor names. */
-function cacheRuleCursor(encoded: string | undefined): CacheRuleCursor | null | undefined {
+function cacheRuleCursor(encoded: string | undefined): GatewayCacheRuleCursor | null | undefined {
   if (encoded === undefined) return undefined;
   const parts = decodePageCursor(encoded, 3);
   if (!parts) return null;
@@ -1566,7 +1570,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       scopeTypes = new Set(parsed.data);
     }
     const organizationId = await orgIdForProject(project.id);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     const {
       budgets: rows,
       spendAvailable,
@@ -1633,7 +1637,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     const found = await service.getWithHealth(id, organizationId);
     if (!found) {
       return errorResponse(c, {
@@ -1694,7 +1698,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
     const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     try {
       const outcome = await withIdempotency({
         prisma,
@@ -1768,7 +1772,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
     const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     try {
       const row = await service.update({
         id,
@@ -1819,7 +1823,7 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     try {
       const row = await service.archive({
         id,
@@ -1886,7 +1890,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
     if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = c.app.gateway.budgetDecisions;
+    const service = c.app.gateway.service;
     try {
       const row = await service.reset({
         id,
@@ -1996,8 +2000,8 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
     if (cursor === null) return invalidCursor(c);
 
     const organizationId = await orgIdForProject(project.id);
-    const service = GatewayCacheRuleService.create(prisma);
-    const rows = await service.listPage({
+    const service = c.var.langwatchApp.gateway.service;
+    const rows = await service.cacheRuleListPage({
       organizationId,
       limit: page.data.limit,
       cursor: cursor ?? null,
@@ -2036,8 +2040,8 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const service = GatewayCacheRuleService.create(prisma);
-    const row = await service.get(id, organizationId);
+    const service = c.var.langwatchApp.gateway.service;
+    const row = await service.tryCacheRuleGet(id, organizationId);
     if (!row) {
       return errorResponse(c, {
         status: 404,
@@ -2084,7 +2088,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
     const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayCacheRuleService.create(prisma);
+    const service = c.var.langwatchApp.gateway.service;
     try {
       const outcome = await withIdempotency({
         prisma,
@@ -2093,7 +2097,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
         key: idempotencyKey,
         validatedBody: body.data,
         handler: async () => {
-          const row = await service.create({
+          const row = await service.cacheRuleCreate({
             organizationId,
             name: body.data.name,
             description: body.data.description ?? null,
@@ -2139,9 +2143,9 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
     const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayCacheRuleService.create(prisma);
+    const service = c.var.langwatchApp.gateway.service;
     try {
-      const row = await service.update({
+      const row = await service.cacheRuleUpdate({
         id,
         organizationId,
         name: body.data.name,
@@ -2183,9 +2187,9 @@ secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayCacheRuleService.create(prisma);
+    const service = c.var.langwatchApp.gateway.service;
     try {
-      const row = await service.archive({
+      const row = await service.cacheRuleArchive({
         id,
         organizationId,
         actorUserId,
@@ -2197,7 +2201,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
   },
 );
 
-function toCacheRuleDto(r: GatewayCacheRule) {
+function toCacheRuleDto(r: GatewayCacheRuleResource) {
   return {
     id: r.id,
     organization_id: r.organizationId,
@@ -2205,13 +2209,9 @@ function toCacheRuleDto(r: GatewayCacheRule) {
     description: r.description,
     priority: r.priority,
     enabled: r.enabled,
-    matchers: r.matchers as Record<string, unknown>,
-    action: r.action as {
-      mode: "respect" | "force" | "disable";
-      ttl?: number;
-      salt?: string;
-    },
-    mode_enum: toWireEnum(r.modeEnum),
+    matchers: r.matchers,
+    action: r.action,
+    mode_enum: toWireEnum(r.mode),
     archived_at: r.archivedAt?.toISOString() ?? null,
     created_at: r.createdAt.toISOString(),
     updated_at: r.updatedAt.toISOString(),

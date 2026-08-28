@@ -62,3 +62,46 @@ export {
   type VersionStatus,
 } from "./types.js";
 export { type RegistrationEvent, type ResolvedEndpoint, resolveVersions } from "./versioning.js";
+
+// ---------------------------------------------------------------------------
+// Route security — the access-policy vocabulary, the route-policy registry and
+// the secured-app builder every LangWatch REST family mounts on.
+// ---------------------------------------------------------------------------
+
+export {
+  type AccessPolicy,
+  anyAuthenticated,
+  apiKeyPermission,
+  type CredentialClass,
+  credentialClassFor,
+  describeAccessPolicy,
+  type HandlerCredential,
+  handlerManagedAuth,
+  internalSecret,
+  isApiKeyReachable,
+  policyPermissions,
+  publicEndpoint,
+  requires,
+  requiresOnProject,
+} from "./security/access-policy.js";
+export {
+  documentedPathOf,
+  isHttpMethod,
+  type SecurityRequirement,
+  securityForCredentialClass,
+} from "./security/openapi-security.js";
+export {
+  allRegisteredRoutes,
+  getRoutePolicy,
+  type RegisteredRoute,
+  registerRoutePolicy,
+} from "./security/route-registry.js";
+export {
+  type ApiErrorEnvelope,
+  createSecuritySpine,
+  familyFromBasePath,
+  SecuredApp,
+  type SecuredAppPorts,
+  type SecuredVerbs,
+  type SecuritySpine,
+} from "./security/secured-app.js";

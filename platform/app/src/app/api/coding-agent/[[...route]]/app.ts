@@ -7,12 +7,11 @@ import {
 } from "@langwatch/coding-agent-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
+import { createProjectApp } from "~/server/api/security";
+import { baseResponses, patchZodOpenapi, requires } from "@langwatch/platform-api/app-rest";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
-import { baseResponses } from "../../shared/base-responses";
 import { resolvePersonalCaller } from "../../shared/personal-project-caller";
 
 patchZodOpenapi();

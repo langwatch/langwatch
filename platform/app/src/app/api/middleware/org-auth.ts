@@ -1,11 +1,10 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context, MiddlewareHandler } from "hono";
 import { type ApiErrorEnvelope, authRefusalBody } from "~/app/api/shared/canonical-error";
 import type { Organization } from "~/generated/prisma/client";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
-import { remediation } from "~/server/app-layer/error-remediation";
 import { prisma } from "~/server/db";
 import { appFromContext } from "./app-context";
 

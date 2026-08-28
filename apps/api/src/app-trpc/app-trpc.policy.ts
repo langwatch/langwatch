@@ -119,3 +119,21 @@ export function appTrpcNoPermissionPolicy(middlewares: AppTrpcPolicyMiddlewares)
       allow: declaration.allow ? { ...declaration.allow } : undefined,
     });
 }
+
+/**
+ * The `serviceAuthorized({ reason, permissions })` shape: the scope is data the
+ * handler or resolver loads at runtime, so it performs the real authorization
+ * and the declaration records why plus which permissions it enforces.
+ *
+ * This only moves WHERE the check happens, never whether one does — the
+ * process's fail-closed backstop still refuses a procedure no check ran on.
+ */
+export function appTrpcServiceAuthorizedPolicy(middlewares: AppTrpcPolicyMiddlewares) {
+  const policy = declaredPolicy(middlewares);
+  return (declaration: { reason: string; permissions: readonly AuthzPermission[] }) =>
+    policy({
+      kind: "service-authorized",
+      reason: declaration.reason,
+      permissions: declaration.permissions,
+    });
+}

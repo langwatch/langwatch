@@ -4,16 +4,23 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
-import { requires, type SecuredApp } from "~/server/api/security";
+import {
+  baseResponses,
+  coerceToEpoch,
+  flexibleDateSchema,
+  RequestValidationError,
+  requires,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { RequestValidationError, validator as zValidator } from "~/server/api/validation";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
 } from "~/server/app-layer/traces/trace-metadata.service";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import {
   type CompiledProjection,
@@ -28,9 +35,7 @@ import {
   generateAsciiTree,
 } from "~/server/traces/trace-formatting";
 import type { AuthMiddlewareVariables } from "../../middleware";
-import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:traces");
 

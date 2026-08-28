@@ -28,7 +28,7 @@
 import { PostgresIngestionTemplateAdapter } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { app as governanceApp } from "~/app/api/governance/[[...route]]/app";
+import { createGovernanceRestApp } from "@langwatch/platform-api";
 import {
   type Organization,
   OrganizationUserRole,
@@ -41,6 +41,7 @@ import {
 import type { App } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { appRestSecurity } from "~/server/api/security";
 
 const SHARED_INPUT = {
   sourceType: "internal_uniform",
@@ -56,6 +57,12 @@ describe("Audit uniformity: identical payload shape across all governance surfac
   let testUser: User;
   let patToken: string;
   let app: App;
+
+  const { hono: governanceApp } = createGovernanceRestApp({
+    security: appRestSecurity,
+    governance: () => app.governance,
+    projects: () => app.projects,
+  });
 
   const orgIds: string[] = [];
   const userIds: string[] = [];

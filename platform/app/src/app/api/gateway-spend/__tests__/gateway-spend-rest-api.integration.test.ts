@@ -26,7 +26,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
 import {
   GatewaySpendEventsRepository,
   GatewaySpendEventsService,
@@ -65,7 +65,7 @@ vi.mock("~/server/app-layer/app", async () => {
         }),
       },
       gateway: {
-        budgets: new GatewayBudgetClickHouseRepository(resolveTestClickHouseClient),
+        budgets: GatewayBudgetLedgerAdapter.create(resolveTestClickHouseClient),
         virtualKeySpend: undefined,
         spendEvents: GatewaySpendEventsService.create(
           new GatewaySpendEventsRepository(resolveTestClickHouseClient),
@@ -962,7 +962,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         createdById: userId,
       },
     });
-    const budgetCH = new GatewayBudgetClickHouseRepository(async () => chClient);
+    const budgetCH = GatewayBudgetLedgerAdapter.create(async () => chClient);
     await budgetCH.insertDebitsForBudgets([
       {
         tenantId: project.id,

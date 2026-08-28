@@ -3,8 +3,12 @@ import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
-import { createOrgApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createOrgApp } from "~/server/api/security";
+import {
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import type { ApiKeyDetail, ApiKeyService } from "@langwatch/api-key-contract";
 import { ApiKeyNotFoundError, ApiKeyNotOwnedError } from "@langwatch/api-key-contract";
 import {
@@ -12,7 +16,6 @@ import {
   apiKeyPermissionFormatSchema as permissionFormatSchema,
   refineRestrictedPermissions,
 } from "@langwatch/api-key-contract";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import { appFromContext } from "../../middleware/app-context";

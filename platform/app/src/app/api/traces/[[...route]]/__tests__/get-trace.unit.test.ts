@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 import { getApp } from "~/server/app-layer/app";
 

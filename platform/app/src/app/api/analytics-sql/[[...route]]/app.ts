@@ -15,7 +15,7 @@
  */
 
 import { createProjectApp } from "~/server/api/security";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { patchZodOpenapi } from "@langwatch/platform-api/app-rest";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
 import { registerLangWatchQLRoutes } from "./app.v1";
 

@@ -9,11 +9,14 @@ import {
 } from "@langwatch/scenario-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import { requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import {
+  badRequestSchema,
+  baseResponses,
+  requires,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import type { AuthMiddlewareVariables } from "../../middleware";
-import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");

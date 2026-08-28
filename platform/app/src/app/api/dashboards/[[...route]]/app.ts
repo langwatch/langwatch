@@ -1,9 +1,12 @@
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import type { DashboardSummary } from "@langwatch/dashboard-contract";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
+import { createProjectApp } from "~/server/api/security";
+import {
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import {
   type DashboardServiceMiddlewareVariables,
   dashboardServiceMiddleware,
@@ -59,7 +62,10 @@ secured.access(requires("analytics:view")).get(
     const project = c.get("project");
     const service = c.get("dashboardService");
 
-    const dashboards = await service.getAll({ projectId: project.id });
+    const dashboards = await service.getAll({
+      projectId: project.id,
+      graphCountScope: "builder",
+    });
 
     return c.json({
       data: dashboards.map((d: DashboardSummary) => ({

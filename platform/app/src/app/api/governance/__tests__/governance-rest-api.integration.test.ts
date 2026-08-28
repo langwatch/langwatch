@@ -32,7 +32,8 @@ import {
 import { prisma } from "~/server/db";
 
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { app } from "../[[...route]]/app";
+import { createGovernanceRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
 
 interface ApiHelpers {
   get: (path: string) => Response | Promise<Response>;
@@ -65,6 +66,12 @@ describe("Feature: Governance REST API", () => {
     Authorization: `Bearer ${patToken}`,
     "X-Project-Id": testProject.id,
     "Content-Type": "application/json",
+  });
+
+  const { hono: app } = createGovernanceRestApp({
+    security: appRestSecurity,
+    governance: () => testApp.governance,
+    projects: () => testApp.projects,
   });
 
   const request = (path: string, init?: RequestInit) =>

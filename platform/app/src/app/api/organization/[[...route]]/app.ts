@@ -62,7 +62,8 @@ const { service, guard } = createManagementService({
 export const app = service
   .provide({
     organizations: (_base, context) => appFromContext(context).organizations,
-    invites: () => InviteService.create(prisma),
+    invites: (_base, context) =>
+      InviteService.create(prisma, { baseHost: appFromContext(context).config.baseHost }),
     authz: (_base, context) => appFromContext(context).permissions,
   })
   // ── profile ────────────────────────────────────────────────────────────────

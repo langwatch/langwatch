@@ -30,7 +30,6 @@
  *
  * @see specs/analytics/lwql-saved-charts.feature
  * @see specs/analytics/lwql-langy-authoring.feature — the placement routes
- * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
 import { nanoid } from "nanoid";
@@ -38,7 +37,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import {
-  type Dashboard,
   type Organization,
   type Project,
   RoleBindingScopeType,
@@ -650,6 +648,12 @@ describe("given the saved workbench chart REST endpoints", () => {
       });
       expect(never.error.code).toBe("saved_workbench_chart_not_found");
 
+      const oversized = await refused({
+        path: chartPath(otherProject, "x".repeat(65)),
+        auth: asProject(otherProject),
+      });
+      expect(oversized.error.code).toBe("saved_workbench_chart_not_found");
+
       expect(await listedIds(otherProject)).toEqual([]);
 
       const after = await succeeds({
@@ -891,9 +895,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: { dashboardId: foreignDashboard.id },
       });
-      expect(refusal.error.code).toBe(
-        "saved_workbench_chart_dashboard_not_found",
-      );
+      expect(refusal.error.code).toBe("saved_workbench_chart_dashboard_not_found");
 
       expect(await placementOf(openProject, chart.id)).toEqual(before);
     });
@@ -951,9 +953,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           auth: asProject(openProject),
         }),
       ]);
-      expect(refusals.map((body) => body.error.code)).toEqual(
-        Array(2).fill("lwql_not_enabled"),
-      );
+      expect(refusals.map((body) => body.error.code)).toEqual(Array(2).fill("lwql_not_enabled"));
 
       expect(await placementOf(openProject, chart.id)).toEqual(before);
     });
@@ -1045,19 +1045,15 @@ describe("given the saved workbench chart REST endpoints", () => {
           body: cliCreateBody("Langy's twin"),
         });
 
-        // The application's own save path: the service the tRPC router calls,
+        // The application's composed Dashboard service uses the same policy,
         // with the member's protections resolved the same way.
-        const viaApplication = await SavedWorkbenchChartService.create(
-          prisma,
-        ).createChart({
+        const viaApplication = await getApp().dashboard.createSavedWorkbenchChart({
           projectId: openProject.id,
           protections: await getProtectionsForProject(prisma, {
             projectId: openProject.id,
           }),
-          input: {
-            name: "Member's twin",
-            definition: cliCreateBody("unused").definition,
-          },
+          name: "Member's twin",
+          definition: cliCreateBody("unused").definition,
         });
 
         const rows = await prisma.customGraph.findMany({
@@ -1100,15 +1096,13 @@ describe("given the saved workbench chart REST endpoints", () => {
         // The application's own save path.
         let viaApplication: string | undefined;
         try {
-          await SavedWorkbenchChartService.create(prisma).createChart({
+          await getApp().dashboard.createSavedWorkbenchChart({
             projectId: gatedProject.id,
             protections: await getProtectionsForProject(prisma, {
               projectId: gatedProject.id,
             }),
-            input: {
-              name: "Withheld, via application",
-              definition: { ...DEFINITION, sql: GATED_SQL },
-            },
+            name: "Withheld, via application",
+            definition: { ...DEFINITION, sql: GATED_SQL },
           });
         } catch (error) {
           viaApplication = (error as { code?: string }).code;
@@ -1134,9 +1128,7 @@ describe("given the saved workbench chart REST endpoints", () => {
             definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC },
           },
         });
-        expect(refusal.error.code).toBe(
-          "saved_workbench_chart_specification_refused",
-        );
+        expect(refusal.error.code).toBe("saved_workbench_chart_specification_refused");
 
         expect(await listedIds(openProject)).toEqual(before);
       });

@@ -7,6 +7,13 @@ export {
   setTraceUrlProvider,
 } from "./handled-error";
 export {
+  REMEDIATION_CODES,
+  REMEDIATION_DOC_PATHS,
+  type RemediationCode,
+  remediation,
+  remediationFor,
+} from "./remediation";
+export {
   handledErrorFaultSchema,
   serializedHandledErrorSchema,
   serializedReasonSchema,

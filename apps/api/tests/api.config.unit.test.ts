@@ -23,6 +23,7 @@ describe("API process configuration", () => {
       host: "127.0.0.1",
       port: 6560,
       httpDrainGraceMs: 9000,
+      shutdown: { processDeadlineMs: 24_000 },
       logger: {
         format: undefined,
         level: undefined,
@@ -45,6 +46,22 @@ describe("API process configuration", () => {
         },
       },
     });
+  });
+
+  it("gives the whole shutdown sequence more budget than the listener drain alone", () => {
+    expect(resolveApiConfig({ API_HTTP_DRAIN_GRACE_MS: "9000" }).shutdown.processDeadlineMs).toBe(
+      24_000,
+    );
+    expect(
+      resolveApiConfig({ API_HTTP_DRAIN_GRACE_MS: "9000", API_SHUTDOWN_DEADLINE_MS: "12000" })
+        .shutdown.processDeadlineMs,
+    ).toBe(12_000);
+  });
+
+  it("rejects a shutdown deadline that would abort every drain immediately", () => {
+    expect(() => resolveApiConfig({ API_SHUTDOWN_DEADLINE_MS: "0" })).toThrow(
+      "Invalid api configuration",
+    );
   });
 
   it("rejects invalid executable ports before a listener is constructed", () => {

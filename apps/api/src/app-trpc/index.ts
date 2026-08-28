@@ -10,6 +10,7 @@ export {
   appTrpcNoPermissionPolicy,
   appTrpcPolicy,
   appTrpcPolicyAny,
+  appTrpcServiceAuthorizedPolicy,
   type AppTrpcPolicy,
   type AppTrpcPolicyMiddlewares,
 } from "./app-trpc.policy";
@@ -30,6 +31,11 @@ export {
 } from "../features/share/share-trpc.mount";
 export { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount";
 export { createSuiteTrpcRouter } from "../features/suite/suite-trpc.mount";
+export {
+  createSpansTrpcRouter,
+  createTraceEditOverlayTrpcRouter,
+  createTracesTrpcRouter,
+} from "../features/trace/trace-trpc.mount";
 export {
   declaredCheckFrom,
   type AppAuthzMiddlewareBuilders,
@@ -66,3 +72,8 @@ export {
   type AppTrpcPolicyKit,
 } from "./app-trpc.policy-kit";
 export { createOpsTrpcRouter, type OpsTrpcContext } from "../features/ops/ops-trpc.mount";
+export {
+  createGatewayTrpcRouters,
+  type GatewayTrpcContext,
+  type GatewayTrpcPorts,
+} from "../features/gateway/gateway-trpc.mount";

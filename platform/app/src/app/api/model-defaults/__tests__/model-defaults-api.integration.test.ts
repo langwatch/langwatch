@@ -13,9 +13,15 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { app } from "../[[...route]]/app";
+import { createModelDefaultsRestApp } from "@langwatch/platform-api";
+import { appRestSecurity } from "~/server/api/security";
 
 wireDefaultTestApp();
+
+const { hono: app } = createModelDefaultsRestApp({
+  security: appRestSecurity,
+  modelProviders: () => getApp().modelProviders,
+});
 
 describe("Feature: Model Defaults REST API", () => {
   const ns = `model-defaults-api-${nanoid(8)}`;

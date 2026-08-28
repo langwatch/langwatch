@@ -3,7 +3,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { anyAuthenticated } from "@langwatch/platform-api/app-rest";
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { rateLimit } from "~/server/rateLimit";
 import {

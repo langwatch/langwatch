@@ -10,7 +10,7 @@ import {
   NotFoundError,
   UnprocessableEntityError,
 } from "../../shared/errors";
-import { errorSchema } from "../../shared/schemas";
+import { errorSchema } from "@langwatch/platform-api/app-rest";
 
 const logger = createLogger("langwatch:api:agents:errors");
 

@@ -23,36 +23,32 @@
  * The handlers check the request's *envelope* — a name, and a definition that
  * was supplied — and nothing about what a definition means. The versioned
  * definition schema, the LangWatchQL validator and the Vega-Lite policy all
- * live behind `SavedWorkbenchChartService`, which is the single write path.
+ * live behind the composed Dashboard service, which is the single write path.
  * Re-declaring any of them here would fork the contract and hand this surface
  * the power to admit a chart the workbench would refuse, which is the one thing
  * slice 1 exists to prevent.
  *
- * @see ~/server/analytics/saved-workbench-charts — the service and its schema
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import {
-  LWQL_VEGA_LIMITS,
-  measureSpecBytes,
-} from "@langwatch/analytics-web/visualization";
+import { LWQL_VEGA_LIMITS, measureSpecBytes } from "@langwatch/analytics-web/visualization";
 import type { Project } from "~/generated/prisma/client";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
-import { type createProjectApp, requires } from "~/server/api/security";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { validator as zValidator } from "~/server/api/validation";
 import {
-  mapDashboardSavedWorkbenchChartError,
-  validateSavedWorkbenchChartDefinition,
-} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+  apiErrorSchema,
+  canonicalBaseResponses,
+  requires,
+  type RouteResponse,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
+import { type createProjectApp } from "~/server/api/security";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { mapDashboardSavedWorkbenchChartError } from "~/runtime/app/features/dashboard-saved-workbench-chart-policy.adapter";
 import { prisma } from "~/server/db";
 
-import { canonicalBaseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { apiErrorSchema } from "../../shared/schemas";
-import type { RouteResponse } from "../../shared/types";
 import { lwqlProject } from "./routeGuards";
 
 /** Request shape only — a length, not a meaning. Matches the tRPC surface. */
@@ -306,17 +302,13 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const validatedDefinition = validateSavedWorkbenchChartDefinition({
-        projectId: project.id,
-        protections: await getProtectionsForProject(prisma, { projectId: project.id }),
-        definition,
-        lwql: c.app.langWatchQL,
-      });
+      const protections = await getProtectionsForProject(prisma, { projectId: project.id });
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.createSavedWorkbenchChart({
           projectId: project.id,
+          protections,
           name,
-          definition: validatedDefinition,
+          definition,
         }),
       );
       return c.json(chartResource({ chart, project }), 201);
@@ -385,25 +377,16 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const validatedDefinition =
+      const protections =
         definition === undefined
           ? undefined
-          : validateSavedWorkbenchChartDefinition({
-              projectId: project.id,
-              protections: await getProtectionsForProject(prisma, {
-                projectId: project.id,
-              }),
-              definition,
-              lwql: c.app.langWatchQL,
-            });
+          : await getProtectionsForProject(prisma, { projectId: project.id });
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.updateSavedWorkbenchChart({
           chartId: chartIdOf(c.req.param("chartId")),
           projectId: project.id,
           ...(name === undefined ? {} : { name }),
-          ...(validatedDefinition === undefined
-            ? {}
-            : { definition: validatedDefinition }),
+          ...(definition === undefined ? {} : { definitionUpdate: { definition, protections } }),
         }),
       );
       return c.json(chartResource({ chart, project }));
@@ -463,14 +446,18 @@ function registerPlace(secured: ReturnType<typeof createProjectApp>): void {
     zValidator("json", placeChartSchema),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
-      const chart = await chartService().placeChart({
-        id: chartIdOf(c.req.param("chartId")),
-        projectId: project.id,
-        input: c.req.valid("json"),
-      });
+      const chart = await dashboardSavedChartCall(() =>
+        c.app.dashboard.placeSavedWorkbenchChart({
+          projectId: project.id,
+          chartId: chartIdOf(c.req.param("chartId")),
+          ...c.req.valid("json"),
+        }),
+      );
       return c.json(chartResource({ chart, project }));
     },
   );
@@ -492,13 +479,17 @@ function registerUnplace(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
-      await chartService().unplaceChart({
-        id: chartIdOf(c.req.param("chartId")),
-        projectId: project.id,
-      });
+      await dashboardSavedChartCall(() =>
+        c.app.dashboard.unplaceSavedWorkbenchChart({
+          chartId: chartIdOf(c.req.param("chartId")),
+          projectId: project.id,
+        }),
+      );
       return c.body(null, 204);
     },
   );

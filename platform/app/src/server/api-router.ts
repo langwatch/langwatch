@@ -7,7 +7,8 @@ import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { app as webhooksApp } from "~/server/enterprise/scim/webhooks";
 import { LEGACY_CALLBACK_PROVIDER_IDS } from "~/runtime/app/features/sso";
 import { type Context, Hono } from "hono";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { appRestSecurity, createServiceApp } from "~/server/api/security";
+import { createAppRestFeatures, publicEndpoint } from "@langwatch/platform-api/app-rest";
 import { app as adminApp } from "~/server/routes/ops/admin";
 import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
@@ -26,11 +27,8 @@ import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/ap
 import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
-import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
-import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
-import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
@@ -156,11 +154,24 @@ export function createApiRouter(app: App) {
   api.route("/", apiDiscoveryApp); // /api/openapi.json, /api/rpc.discover
   api.route("/", rootDiscoveryApp); // /.well-known/openapi, /llms.txt
   api.route("/", gatewayPlatformApp);
-  api.route("/", governanceApp);
-  api.route("/", graphsApp);
+  // Governance, graphs and model defaults live in `@langwatch/platform-api` and
+  // are mounted by factory rather than by import. `createAppRestFeatures` is
+  // their single enumeration — the same one the route-registry audits build
+  // from — so a family cannot be served while being invisible to the
+  // authorization audit.
+  for (const packagedRestApp of createAppRestFeatures({
+    security: appRestSecurity,
+    services: {
+      dashboard: () => app.dashboard,
+      governance: () => app.governance,
+      modelProviders: () => app.modelProviders,
+      projects: () => app.projects,
+    },
+  })) {
+    api.route("/", packagedRestApp);
+  }
   api.route("/", groupsApp);
   api.route("/", meApp); // /api/me/usage — personal spend/usage
-  api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
   api.route("/", apiKeysApp);

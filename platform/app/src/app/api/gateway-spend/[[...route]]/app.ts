@@ -15,8 +15,13 @@ import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
-import { createOrgApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createOrgApp } from "~/server/api/security";
+import {
+  canonicalBaseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { getApp } from "~/server/app-layer/app";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
@@ -44,8 +49,6 @@ import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import { FixedGatewaySettlementPolicy } from "@langwatch/gateway-server";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-server";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   END_USER_SPEND_DESCRIPTION,

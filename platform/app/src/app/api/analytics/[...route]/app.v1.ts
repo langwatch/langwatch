@@ -5,10 +5,14 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { type createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { baseResponses } from "../../shared/base-responses";
-import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
+import { type createProjectApp } from "~/server/api/security";
+import {
+  baseResponses,
+  coerceToEpoch,
+  flexibleDateSchema,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 
 const logger = createLogger("langwatch:api:analytics");
 

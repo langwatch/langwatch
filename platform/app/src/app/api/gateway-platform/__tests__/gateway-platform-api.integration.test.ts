@@ -34,11 +34,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 
-import {
-  readStoredBody,
-  serializeResponseBody,
-  withIdempotency,
-} from "~/server/api/idempotency";
+import { readStoredBody, serializeResponseBody, withIdempotency } from "~/server/api/idempotency";
 import { getApp } from "~/server/app-layer/app";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
@@ -46,13 +42,10 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
+import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
 import { currentPeriodStart } from "@langwatch/gateway-server";
 import { nextAnchoredResetAt } from "@langwatch/gateway-server";
-import {
-  clearClickHouseTestApp,
-  installClickHouseTestApp,
-} from "~/test-utils/clickhouseTestApp";
+import { clearClickHouseTestApp, installClickHouseTestApp } from "~/test-utils/clickhouseTestApp";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
@@ -116,10 +109,7 @@ function legacyAuth(key: string = LEGACY_KEY): Record<string, string> {
   return { "X-Auth-Token": key, ...jsonHeaders };
 }
 
-function apiKeyAuth(
-  token: string,
-  projectId: string = PROJECT_ID,
-): Record<string, string> {
+function apiKeyAuth(token: string, projectId: string = PROJECT_ID): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
     "X-Project-Id": projectId,
@@ -586,10 +576,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(list.status).toBe(200);
 
-      const create = await createVk(
-        { name: `viewer-denied-${suffix}` },
-        apiKeyAuth(viewerToken),
-      );
+      const create = await createVk({ name: `viewer-denied-${suffix}` }, apiKeyAuth(viewerToken));
       expect(create.status).toBe(403);
     });
   });
@@ -603,9 +590,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(status).toBe(201);
       expect(body.secret).toMatch(/^vk-lw-/);
       expect(body.virtual_key.name).toBe(`sdk-min-${suffix}`);
-      expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "project", scope_id: PROJECT_ID },
-      ]);
+      expect(body.virtual_key.scopes).toEqual([{ scope_type: "project", scope_id: PROJECT_ID }]);
       expect(body.virtual_key.routing_mode).toBe("none");
       expect(body.virtual_key.purpose).toBe("user");
       expect(body.virtual_key.status).toBe("active");
@@ -613,10 +598,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // gone from the wire in both directions.
       expect(body.virtual_key).not.toHaveProperty("provider_credential_ids");
 
-      const get = await app.request(
-        `/api/gateway/v1/virtual-keys/${body.virtual_key.id}`,
-        { headers: legacyAuth() },
-      );
+      const get = await app.request(`/api/gateway/v1/virtual-keys/${body.virtual_key.id}`, {
+        headers: legacyAuth(),
+      });
       expect(get.status).toBe(200);
       const fetched = await get.json();
       expect(fetched.virtual_key.id).toBe(body.virtual_key.id);
@@ -673,9 +657,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         apiKeyAuth(adminToken),
       );
       expect(status).toBe(201);
-      expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "organization", scope_id: ORG_ID },
-      ]);
+      expect(body.virtual_key.scopes).toEqual([{ scope_type: "organization", scope_id: ORG_ID }]);
     });
 
     /** @scenario A member API key passes the route gate but not per-scope manage */
@@ -840,10 +822,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
     /** @scenario A sibling team's keys are invisible to the project credential */
     it("does not list or serve another team's project-scoped keys", async () => {
-      const sibling = await createVk(
-        { name: `sibling-${suffix}` },
-        legacyAuth(SIBLING_LEGACY_KEY),
-      );
+      const sibling = await createVk({ name: `sibling-${suffix}` }, legacyAuth(SIBLING_LEGACY_KEY));
       expect(sibling.status).toBe(201);
 
       const list = await app.request("/api/gateway/v1/virtual-keys", {
@@ -852,10 +831,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { data } = await list.json();
       expect(data.some((vk: any) => vk.id === sibling.body.virtual_key.id)).toBe(false);
 
-      const get = await app.request(
-        `/api/gateway/v1/virtual-keys/${sibling.body.virtual_key.id}`,
-        { headers: legacyAuth() },
-      );
+      const get = await app.request(`/api/gateway/v1/virtual-keys/${sibling.body.virtual_key.id}`, {
+        headers: legacyAuth(),
+      });
       expect(get.status).toBe(404);
     });
 
@@ -920,19 +898,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         budget: { limit_usd: "5", window: "month" },
       });
       const id = created.body.virtual_key.id;
-      const first = await post(
-        `/api/gateway/v1/virtual-keys/${id}/revoke`,
-        {},
-        legacyAuth(),
-      );
+      const first = await post(`/api/gateway/v1/virtual-keys/${id}/revoke`, {}, legacyAuth());
       expect(first.status).toBe(200);
       expect((await first.json()).virtual_key.status).toBe("revoked");
 
-      const second = await post(
-        `/api/gateway/v1/virtual-keys/${id}/revoke`,
-        {},
-        legacyAuth(),
-      );
+      const second = await post(`/api/gateway/v1/virtual-keys/${id}/revoke`, {}, legacyAuth());
       expect(second.status).toBe(200);
       expect((await second.json()).virtual_key.status).toBe("revoked");
 
@@ -1022,24 +992,18 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(scopeTypes.has("virtual_key")).toBe(true);
       expect(scopeTypes.has("principal")).toBe(true);
 
-      const filtered = await app.request(
-        "/api/gateway/v1/budgets?scope_type=virtual_key",
-        { headers: legacyAuth() },
-      );
+      const filtered = await app.request("/api/gateway/v1/budgets?scope_type=virtual_key", {
+        headers: legacyAuth(),
+      });
       const filteredBody = await filtered.json();
       expect(filteredBody.data.length).toBeGreaterThan(0);
-      expect(filteredBody.data.every((b: any) => b.scope_type === "virtual_key")).toBe(
-        true,
-      );
+      expect(filteredBody.data.every((b: any) => b.scope_type === "virtual_key")).toBe(true);
 
-      const excluded = await app.request(
-        "/api/gateway/v1/budgets?scope_type=organization,team",
-        { headers: legacyAuth() },
-      );
+      const excluded = await app.request("/api/gateway/v1/budgets?scope_type=organization,team", {
+        headers: legacyAuth(),
+      });
       const excludedBody = await excluded.json();
-      expect(excludedBody.data.some((b: any) => b.scope_type === "virtual_key")).toBe(
-        false,
-      );
+      expect(excludedBody.data.some((b: any) => b.scope_type === "virtual_key")).toBe(false);
     });
 
     /** @scenario One budget can be read on its own */
@@ -1114,9 +1078,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           now: new Date(),
         }).toISOString(),
       );
-      expect(budget.resets_at).not.toBe(
-        currentPeriodStart("MONTH", new Date()).toISOString(),
-      );
+      expect(budget.resets_at).not.toBe(currentPeriodStart("MONTH", new Date()).toISOString());
 
       // Reading it back agrees, so a caller polling the budget sees the
       // same cycle the create call promised.
@@ -1341,7 +1303,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // Two people on the anchor, one of them at the cap. The per-user
       // buckets are the only place this spend exists; the template's own
       // scope id never accrues a row.
-      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
+      const chRepo = GatewayBudgetLedgerAdapter.create(async () => ch());
       for (const { endUserId, amountNanoUsd } of [
         { endUserId: "seat-over", amountNanoUsd: 1_500_000_000 },
         { endUserId: "seat-under", amountNanoUsd: 250_000_000 },
@@ -1367,10 +1329,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         ]);
       }
 
-      const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=attributed_user",
-        { headers: legacyAuth() },
-      );
+      const list = await app.request("/api/gateway/v1/budgets?scope_type=attributed_user", {
+        headers: legacyAuth(),
+      });
       const listBody = await list.json();
       const row = listBody.data.find((b: any) => b.id === budgetId);
       expect(row).toBeDefined();
@@ -1473,7 +1434,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       const budgetId = (await createRes.json()).budget.id;
 
-      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
+      const chRepo = GatewayBudgetLedgerAdapter.create(async () => ch());
       await chRepo.insertDebit([
         {
           tenantId: PROJECT_ID,
@@ -1549,6 +1510,47 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   // ── Pagination ────────────────────────────────────────────────────────
 
   describe("cursor pagination on the unbounded lists", () => {
+    it("persists a cache-rule mutation with its configuration change event and audit trail", async () => {
+      const body = {
+        name: `audited-rule-${suffix}`,
+        matchers: { model: "gpt-5-mini" },
+        action: { mode: "force", ttl: 60 },
+      };
+      const eventsBefore = await prisma.gatewayChangeEvent.count({
+        where: { organizationId: ORG_ID, kind: "CACHE_RULE_CREATED" },
+      });
+      const auditsBefore = await prisma.auditLog.count({
+        where: { organizationId: ORG_ID, action: "gateway.cache_rule.created" },
+      });
+
+      const created = await post("/api/gateway/v1/cache-rules", body, legacyAuth());
+      expect(created.status).toBe(201);
+      const createdBody = await created.json();
+
+      await expect(
+        prisma.gatewayCacheRule.findUnique({ where: { id: createdBody.cache_rule.id } }),
+      ).resolves.toMatchObject({ modeEnum: "FORCE", action: body.action });
+      await expect(
+        prisma.gatewayChangeEvent.count({
+          where: { organizationId: ORG_ID, kind: "CACHE_RULE_CREATED" },
+        }),
+      ).resolves.toBe(eventsBefore + 1);
+      await expect(
+        prisma.auditLog.count({
+          where: { organizationId: ORG_ID, action: "gateway.cache_rule.created" },
+        }),
+      ).resolves.toBe(auditsBefore + 1);
+
+      const archived = await app.request(
+        `/api/gateway/v1/cache-rules/${createdBody.cache_rule.id}`,
+        { method: "DELETE", headers: legacyAuth() },
+      );
+      expect(archived.status).toBe(200);
+      await expect(
+        prisma.gatewayCacheRule.findUnique({ where: { id: createdBody.cache_rule.id } }),
+      ).resolves.toMatchObject({ archivedAt: expect.any(Date) });
+    });
+
     /** @scenario An unbounded list is walked by cursor without loss or repeats */
     it("pages budgets without skipping or repeating a row", async () => {
       for (let i = 0; i < 5; i++) {
@@ -1597,10 +1599,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       expect(created.status).toBe(201);
 
-      for (const path of [
-        "/api/gateway/v1/virtual-keys",
-        "/api/gateway/v1/cache-rules",
-      ]) {
+      for (const path of ["/api/gateway/v1/virtual-keys", "/api/gateway/v1/cache-rules"]) {
         const walked = await walkAll(path, 2);
         expect(new Set(walked).size).toBe(walked.length);
         const oneShot = await app.request(`${path}?limit=200`, {
@@ -1750,10 +1749,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
     /** @scenario Spend for an unknown key is a 404, not a zero */
     it("404s for an unknown key id", async () => {
-      const res = await app.request(
-        `/api/gateway/v1/virtual-keys/vk_does_not_exist/spend`,
-        { headers: legacyAuth() },
-      );
+      const res = await app.request(`/api/gateway/v1/virtual-keys/vk_does_not_exist/spend`, {
+        headers: legacyAuth(),
+      });
       expect(res.status).toBe(404);
     });
   });
@@ -1775,10 +1773,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
 
       // Both fields must survive every read shape, not just the create echo.
-      const get = await app.request(
-        `/api/gateway/v1/virtual-keys/${body.virtual_key.id}`,
-        { headers: legacyAuth() },
-      );
+      const get = await app.request(`/api/gateway/v1/virtual-keys/${body.virtual_key.id}`, {
+        headers: legacyAuth(),
+      });
       const fetched = await get.json();
       expect(fetched.virtual_key.external_id).toBe(externalId);
       expect(fetched.virtual_key.metadata).toEqual({
@@ -1786,10 +1783,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         cost_center: "cc-42",
       });
 
-      const list = await app.request(
-        `/api/gateway/v1/virtual-keys?external_id=${externalId}`,
-        { headers: legacyAuth() },
-      );
+      const list = await app.request(`/api/gateway/v1/virtual-keys?external_id=${externalId}`, {
+        headers: legacyAuth(),
+      });
       expect(list.status).toBe(200);
       const listed = await list.json();
       expect(listed.data).toHaveLength(1);
@@ -1888,10 +1884,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect((await byId.json()).budget.external_id).toBe(externalId);
 
-      const filtered = await app.request(
-        `/api/gateway/v1/budgets?external_id=${externalId}`,
-        { headers: legacyAuth() },
-      );
+      const filtered = await app.request(`/api/gateway/v1/budgets?external_id=${externalId}`, {
+        headers: legacyAuth(),
+      });
       expect(filtered.status).toBe(200);
       const filteredBody = await filtered.json();
       expect(filteredBody.data).toHaveLength(1);
@@ -1924,9 +1919,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
       const tooMany = await createVk({
         name: `ext-cap-keys-${suffix}`,
-        metadata: Object.fromEntries(
-          Array.from({ length: 41 }, (_, i) => [`k${i}`, "v"]),
-        ),
+        metadata: Object.fromEntries(Array.from({ length: 41 }, (_, i) => [`k${i}`, "v"])),
       });
       expect(tooMany.status).toBe(400);
       expect(tooMany.body.error.code).toBe("validation_error");
@@ -2074,11 +2067,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
       expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
-      const mutated = await post(
-        "/api/gateway/v1/budgets",
-        { ...body, limit_usd: 6 },
-        keyed(key),
-      );
+      const mutated = await post("/api/gateway/v1/budgets", { ...body, limit_usd: 6 }, keyed(key));
       const error = await expectCanonicalError(mutated, {
         status: 409,
         code: "idempotency_error",
@@ -2262,9 +2251,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // The key answers for the request that owns it, not for the one that was
       // replaced. Without the fence this row now replays a response whose
       // resource the replacement never made.
-      expect(readStoredBody(settled!)).toBe(
-        serializeResponseBody({ id: "from-the-replacement" }),
-      );
+      expect(readStoredBody(settled!)).toBe(serializeResponseBody({ id: "from-the-replacement" }));
 
       await prisma.idempotencyReceipt.deleteMany({ where: { id: claimed.id } });
     });

@@ -2,13 +2,14 @@ import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
+import { createOrgApp } from "~/server/api/security";
 import {
   anyAuthenticated,
-  createOrgApp,
+  patchZodOpenapi,
   requires,
   requiresOnProject,
-} from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
 import {
@@ -20,7 +21,6 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
 } from "@langwatch/project-contract";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";

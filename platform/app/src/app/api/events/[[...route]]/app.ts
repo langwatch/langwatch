@@ -1,8 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import { createProjectApp, requires } from "~/server/api/security";
+import {
+  badRequestSchema,
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+} from "@langwatch/platform-api/app-rest";
+import { createProjectApp } from "~/server/api/security";
 import {
   predefinedEventsSchemas,
   predefinedEventTypes,
@@ -14,12 +19,10 @@ import {
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
-} from "~/server/tracer/types";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+} from "@langwatch/trace-contract";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { zodErrorMessage } from "~/utils/zodErrorMessage";
 
-import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 

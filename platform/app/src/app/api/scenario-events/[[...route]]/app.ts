@@ -1,8 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createProjectApp } from "~/server/api/security";
+import {
+  baseResponses,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import type { App } from "~/server/app-layer/app";
 import { bodyLimit } from "~/server/routes/_lib/body-limit";
 import {
@@ -16,7 +20,6 @@ import { responseSchemas, scenarioEventSchema } from "@langwatch/scenario-contra
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { encodeContent, encodeEnd, encodeStart } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
-import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:scenario-events");
 

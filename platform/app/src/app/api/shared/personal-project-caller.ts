@@ -17,9 +17,8 @@
  * so its holder is the owner by construction and the ownership guard has
  * nothing to compare.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
  * The calling key belongs to a workspace that is not one person's.

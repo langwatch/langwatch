@@ -2,13 +2,16 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import {
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  type SecuredApp,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { organizationMiddleware } from "../../middleware";
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
-import { baseResponses } from "../../shared/base-responses";
 import {
   apiResponseModelProvidersSchema,
   updateModelProviderInputSchema,

@@ -2,18 +2,22 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import { anyAuthenticated, requires, type SecuredApp } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-
-import type { AuthMiddlewareVariables } from "../../middleware/auth";
-import { baseResponses } from "../../shared/base-responses";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  anyAuthenticated,
+  type AppRestProjectVariables,
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  type SecuredApp,
+  validator as zValidator,
+} from "../../app-rest";
 import {
   apiResponseConfigCreatedSchema,
   apiResponseModelDefaultsSchema,
   createModelDefaultConfigInputSchema,
   updateModelDefaultConfigInputSchema,
-} from "./schemas";
+} from "./model-defaults-rest.schemas";
 
 const logger = createLogger("langwatch:api:model-defaults");
 
@@ -36,7 +40,8 @@ function rethrowModelDefaultsWriteError(err: unknown): never {
 }
 
 export function registerModelDefaultsRoutes(
-  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+  secured: SecuredApp<{ Variables: AppRestProjectVariables }>,
+  modelProviders: () => ModelProviderService,
 ): void {
   // GET /api/model-defaults — snapshot for the current project (read scope).
   secured.access(requires("project:view")).get(
@@ -59,7 +64,7 @@ export function registerModelDefaultsRoutes(
     async (c) => {
       const project = c.get("project");
       const userId = c.get("apiKeyUserId");
-      const snapshot = await c.var.langwatchApp.modelProviders.getDefaultSnapshot({
+      const snapshot = await modelProviders().getDefaultSnapshot({
         projectId: project.id,
         actorId: userId,
       });
@@ -122,7 +127,7 @@ export function registerModelDefaultsRoutes(
           throw new HTTPException(401, {
             message: "A user-bound credential is required for default-model writes",
           });
-        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({
+        const saved = await modelProviders().saveDefaultConfig({
           config: body.config,
           scopes: body.scopes,
           authorId: userId ?? null,
@@ -164,7 +169,7 @@ export function registerModelDefaultsRoutes(
           throw new HTTPException(401, {
             message: "A user-bound credential is required for default-model writes",
           });
-        const saved = await c.var.langwatchApp.modelProviders.saveDefaultConfig({
+        const saved = await modelProviders().saveDefaultConfig({
           id,
           config: body.config,
           scopes: body.scopes,
@@ -203,7 +208,7 @@ export function registerModelDefaultsRoutes(
           throw new HTTPException(401, {
             message: "A user-bound credential is required for default-model writes",
           });
-        await c.var.langwatchApp.modelProviders.deleteDefaultConfig({
+        await modelProviders().deleteDefaultConfig({
           id,
           actorId: userId,
         });

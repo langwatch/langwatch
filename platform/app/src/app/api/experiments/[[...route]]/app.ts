@@ -26,8 +26,13 @@ import { createLogger } from "@langwatch/observability";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createProjectApp } from "~/server/api/security";
+import {
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { createBlankWorkbenchState } from "~/server/experiments-v3/blank-workbench-state";
 import {
   createExperimentBodySchema,
@@ -35,8 +40,6 @@ import {
   handledErrorEnvelopeSchema,
 } from "~/server/routes/experiments-v3.schemas";
 import { workbenchActorFrom } from "~/server/experiments-v3/workbench-actor";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 

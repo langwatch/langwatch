@@ -27,11 +27,20 @@ import {
 import { allRegisteredRoutes } from "@langwatch/api";
 
 /**
- * The registry is populated as a side effect of the app modules loading, so
- * anything asserting over it must import the composed router first.
+ * The registry is populated as a side effect of the router being COMPOSED, so
+ * anything asserting over it must compose the router first.
+ *
+ * Importing the module is no longer enough: the families that live in
+ * `@langwatch/platform-api` are mounted by factory, and a factory registers its
+ * routes when it runs. Composing covers both — the families that register at
+ * module-load time do so on the import, the packaged ones when the router
+ * builds them. `registerRoutePolicy` is keyed on method + path, so composing
+ * more than once per suite records the same entries rather than duplicating.
  */
 const loadRouter = async (): Promise<void> => {
-  await import("~/server/api-router");
+  const { createApiRouter } = await import("~/server/api-router");
+  const { createTestApp } = await import("~/server/app-layer/presets");
+  createApiRouter(createTestApp());
 };
 
 /**
@@ -97,7 +106,8 @@ describe("API router endpoint authorization guarantee", () => {
 
   describe("when a route is registered through SecuredApp", () => {
     /** @scenario "A public or internal route declares a documented reason" */
-    it("declares a non-empty reason for every public, internal, or handler-managed policy", () => {
+    it("declares a non-empty reason for every public, internal, or handler-managed policy", async () => {
+      await loadRouter();
       const offenders = allRegisteredRoutes().filter((r) => {
         if (
           r.policy.kind === "public" ||
@@ -119,7 +129,8 @@ describe("API router endpoint authorization guarantee", () => {
   // the internet. Pin the policies separately so a future edit can't quietly
   // re-merge them.
   describe("when the GitHub connection endpoints are registered", () => {
-    it("treats /github/install as handler-managed and /github/setup as public", () => {
+    it("treats /github/install as handler-managed and /github/setup as public", async () => {
+      await loadRouter();
       const byPath = new Map(
         allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
       );

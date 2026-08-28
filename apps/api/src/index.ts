@@ -89,6 +89,9 @@ export {
   AuthzApiAuthorizationAdapter,
 } from "./api-request.policy";
 export { TopicApiFeature } from "./features/topic/topic-api.feature";
+export { createGovernanceRestApp } from "./features/governance/governance-rest";
+export { createGraphsRestApp } from "./features/graphs/graphs-rest";
+export { createModelDefaultsRestApp } from "./features/model-defaults/model-defaults-rest";
 export {
   apiConfigDefinition,
   apiObservabilityConfiguration,

@@ -11,13 +11,16 @@ import {
 } from "@langwatch/suite-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import {
+  badRequestSchema,
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
+import { createProjectApp } from "~/server/api/security";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { ScenarioFolderNotFoundError, type ScenarioFolder } from "@langwatch/scenario-contract";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 patchZodOpenapi();

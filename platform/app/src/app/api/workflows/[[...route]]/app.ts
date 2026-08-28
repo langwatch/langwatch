@@ -2,9 +2,14 @@ import { createLogger } from "@langwatch/observability";
 import { WorkflowNotFoundError, type Workflow } from "@langwatch/workflow-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { badRequestSchema } from "~/app/api/shared/schemas";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import {
+  badRequestSchema,
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
+import { createProjectApp } from "~/server/api/security";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import {
@@ -13,8 +18,6 @@ import {
   WorkflowEvaluationService,
 } from "~/server/workflows/workflowEvaluation.service";
 import { prisma } from "~/server/db";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 patchZodOpenapi();

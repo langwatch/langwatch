@@ -1,7 +1,7 @@
 import { resolver } from "hono-openapi";
 import type { ZodSchema } from "zod";
 
-import type { RouteResponse } from "../../../shared/types";
+import type { RouteResponse } from "@langwatch/platform-api/app-rest";
 
 /**
  * Builds a standard success response object for OpenAPI route definitions.

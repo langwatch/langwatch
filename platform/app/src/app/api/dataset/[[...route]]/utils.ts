@@ -1,5 +1,5 @@
 import { resolver } from "hono-openapi";
-import type { RouteResponse } from "../../shared/types";
+import type { RouteResponse } from "@langwatch/platform-api/app-rest";
 
 export const buildStandardSuccessResponse = (zodSchema: any): RouteResponse => {
   return {

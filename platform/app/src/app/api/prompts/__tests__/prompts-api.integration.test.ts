@@ -1,16 +1,8 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildVersionCreateInput,
-  llmPromptConfigFactory,
-} from "~/factories/llm-config.factory";
+import { buildVersionCreateInput, llmPromptConfigFactory } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
-import type {
-  LlmPromptConfig,
-  Organization,
-  Project,
-  Team,
-} from "~/generated/prisma/client";
+import type { LlmPromptConfig, Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -52,9 +44,7 @@ describe("Prompts API", () => {
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
-        getActivePlan: vi
-          .fn()
-          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+        getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
       }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -116,8 +106,7 @@ describe("Prompts API", () => {
 
     helpers = {
       api: {
-        get: (path: string) =>
-          app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        get: (path: string) => app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
         post: (path: string, body: any) =>
           app.request(path, {
             method: "POST",
@@ -206,9 +195,7 @@ describe("Prompts API", () => {
 
       afterEach(async () => {
         // Clean up configs
-        await cleanupTestRows(prisma, [
-          ["llmPromptConfig", { projectId: testProjectId }],
-        ]);
+        await cleanupTestRows(prisma, [["llmPromptConfig", { projectId: testProjectId }]]);
       });
 
       it("gets all prompts for a project", async () => {
@@ -302,7 +289,7 @@ describe("Prompts API", () => {
 
         expect(res.status).toBe(404);
         const body = await res.json();
-        expect(body).toHaveProperty("error");
+        expect(body).toMatchObject({ error: "prompt_not_found" });
       });
 
       describe("Prompt Versions - Schema Version 1.0", () => {
@@ -310,10 +297,7 @@ describe("Prompts API", () => {
           afterEach(async () => {
             // Clean up versions
             await cleanupTestRows(prisma, [
-              [
-                "llmPromptConfigVersion",
-                { configId: config.id, projectId: testProjectId },
-              ],
+              ["llmPromptConfigVersion", { configId: config.id, projectId: testProjectId }],
             ]);
           });
 
@@ -336,10 +320,7 @@ describe("Prompts API", () => {
           beforeEach(async () => {
             // Delete all versions for the config
             await cleanupTestRows(prisma, [
-              [
-                "llmPromptConfigVersion",
-                { configId: config.id, projectId: testProjectId },
-              ],
+              ["llmPromptConfigVersion", { configId: config.id, projectId: testProjectId }],
             ]);
           });
 
@@ -624,9 +605,7 @@ describe("Prompts API", () => {
         expect(updatedPrompt.scope).toBe("ORGANIZATION");
         expect(updatedPrompt.prompt).toBe("Updated prompt text with {{new_variable}}");
         expect(updatedPrompt.messages).toHaveLength(3);
-        expect(updatedPrompt.messages[0].content).toBe(
-          "Updated prompt text with {{new_variable}}",
-        );
+        expect(updatedPrompt.messages[0].content).toBe("Updated prompt text with {{new_variable}}");
         expect(updatedPrompt.inputs).toHaveLength(3);
         expect(updatedPrompt.inputs[2].identifier).toBe("additional_param");
         expect(updatedPrompt.outputs).toHaveLength(2);
@@ -804,6 +783,42 @@ describe("Prompts API", () => {
   });
 
   // Validation/unhappy path tests
+  describe("Prompt persistence transaction", () => {
+    it("rolls metadata back when the immutable version write is rejected", async () => {
+      const promptService = globalForApp.__langwatch_app!.prompts;
+      const created = await promptService.createPrompt({
+        projectId: testProjectId,
+        handle: `rollback-${nanoid(8)}`,
+        prompt: "before rollback",
+        model: "openai/gpt-5-mini",
+      });
+
+      await expect(
+        promptService.updatePrompt({
+          idOrHandle: created.id,
+          projectId: testProjectId,
+          data: {
+            authorId: `missing_author_${nanoid(8)}`,
+            handle: `should-not-persist-${nanoid(8)}`,
+            prompt: "after rollback",
+          },
+        }),
+      ).rejects.toMatchObject({ code: "P2003" });
+
+      const afterFailure = await promptService.tryGetPromptByIdOrHandle({
+        idOrHandle: created.id,
+        projectId: testProjectId,
+      });
+
+      expect(afterFailure).toMatchObject({
+        id: created.id,
+        handle: created.handle,
+        prompt: "before rollback",
+        version: 1,
+      });
+    });
+  });
+
   describe("Validation tests", () => {
     it("validates input when creating a prompt", async () => {
       const invalidData = {
@@ -938,9 +953,7 @@ describe("Prompts API", () => {
         expect(initialBody.action).toBe("created");
 
         // 2) Delete it.
-        const deleteRes = await helpers.api.delete(
-          `/api/prompts/${initialBody.prompt.id}`,
-        );
+        const deleteRes = await helpers.api.delete(`/api/prompts/${initialBody.prompt.id}`);
         expect(deleteRes.status).toBe(200);
 
         // 3) Sync again with the same handle — should create a new prompt.

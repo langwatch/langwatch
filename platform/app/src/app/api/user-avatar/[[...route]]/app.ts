@@ -23,7 +23,8 @@ import {
 } from "@langwatch/user-contract";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { anyAuthenticated, createServiceApp } from "~/server/api/security";
+import { createServiceApp } from "~/server/api/security";
+import { anyAuthenticated } from "@langwatch/platform-api/app-rest";
 import { rateLimit } from "~/server/rateLimit";
 import {
   jsonResponse,

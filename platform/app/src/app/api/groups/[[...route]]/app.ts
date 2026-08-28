@@ -2,9 +2,12 @@ import { describeRoute } from "hono-openapi";
 import { organizationGroupBindingInputSchema } from "@langwatch/organization-contract";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import { createOrgApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createOrgApp } from "~/server/api/security";
+import {
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { requireEnterprisePlanRest } from "../../middleware/enterprise-gate";
 import { handleGroupError } from "./error-handler";
 

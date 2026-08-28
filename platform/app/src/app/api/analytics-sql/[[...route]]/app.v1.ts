@@ -39,14 +39,15 @@ import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
 } from "~/server/analytics/lwql/timeWindowSchema";
-import { type createProjectApp, requires } from "~/server/api/security";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { validator as zValidator } from "~/server/api/validation";
-import { prisma } from "~/server/db";
+import { type createProjectApp } from "~/server/api/security";
 import {
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
-} from "../../shared/base-responses";
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { prisma } from "~/server/db";
 import { lwqlProject } from "./routeGuards";
 
 const logger = createLogger("langwatch:api:analytics-sql");

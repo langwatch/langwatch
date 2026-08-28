@@ -8,7 +8,9 @@
 
 import type { z } from "zod";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { emitManagementAudit } from "~/server/api/management/audit";
+import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "~/server/api/routers/organization-settings.effects";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { buildInviteAcceptUrl } from "~/server/invites/invite-link";
 import {
@@ -35,10 +37,16 @@ export const updateOrganizationHandler = async (
   input: z.infer<typeof updateOrganizationSchema>,
 ) => {
   const organization = organizationOf(c);
-  await c.get("organizations").updateSettings({
+  const result = await c.get("organizations").updateSettings({
     organizationId: organization.id,
     ...input,
   });
+  await revokeTraceSharesAfterOrganizationSettingsUpdate(
+    appFromContext(c).share,
+    appFromContext(c).projects,
+    organization.id,
+    result,
+  );
   emitManagementAudit({
     c,
     organizationId: organization.id,
@@ -278,7 +286,10 @@ export const createInvitesHandler = async (
       invites: result.invites.map((entry) => ({
         ...inviteWire({
           ...entry.invite,
-          inviteUrl: buildInviteAcceptUrl(entry.invite.inviteCode),
+          inviteUrl: buildInviteAcceptUrl(
+            entry.invite.inviteCode,
+            appFromContext(c).config.baseHost,
+          ),
         }),
         emailNotSent: entry.emailNotSent,
       })),

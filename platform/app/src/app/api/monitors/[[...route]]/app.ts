@@ -2,13 +2,16 @@ import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { monitorSettingsSchema } from "@langwatch/monitor-contract";
-import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
+import { createProjectApp } from "~/server/api/security";
+import {
+  badRequestSchema,
+  baseResponses,
+  patchZodOpenapi,
+  requires,
+  validator as zValidator,
+} from "@langwatch/platform-api/app-rest";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { badRequestSchema } from "../../shared/schemas";
 
 patchZodOpenapi();
 
@@ -208,7 +211,7 @@ secured.access(requires("evaluations:view")).get(
 );
 
 // ── Create Monitor ──────────────────────────────────────────
-// `:create`, matching the tRPC twin at `server/api/routers/monitors.ts` that the
+// `:create`, matching the tRPC twin in `@langwatch/monitor-server` that the
 // UI's own "create monitor" button calls. That path already writes `enabled:
 // true` with the caller's `executionMode` while asking only for `:create`, so
 // demanding `:manage` here made the identical action cost more over REST than it
@@ -320,9 +323,7 @@ secured.access(requires("evaluations:update")).patch(
       evaluatorId: body.evaluatorId,
       level: body.level ?? (existing.level as "trace" | "thread"),
       threadIdleTimeout:
-        body.threadIdleTimeout !== undefined
-          ? body.threadIdleTimeout
-          : existing.threadIdleTimeout,
+        body.threadIdleTimeout !== undefined ? body.threadIdleTimeout : existing.threadIdleTimeout,
     });
 
     return c.json({
