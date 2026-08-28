@@ -6,12 +6,12 @@ import {
 } from "@aws-sdk/client-lambda";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../../env.mjs";
+import { NLP_LAMBDA_MEMORY_SIZE_MB } from "../../../../server/nlpgo/timeouts";
 import {
   clearLambdaArnCache,
   createLambdaClient,
   getProjectLambdaArn,
   LAMBDA_ARN_CACHE_TTL_MS,
-  LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
 } from "../index";
 
 const setConfig = (imageUri: string) => {
@@ -369,9 +369,9 @@ describe("getProjectLambdaArn", () => {
       const updates = configUpdateCalls(send);
       expect(updates).toHaveLength(1);
       expect(updates[0][0].input.MemorySize).toBe(
-        LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
+        NLP_LAMBDA_MEMORY_SIZE_MB,
       );
-      expect(LANGWATCH_NLP_LAMBDA_MEMORY_SIZE).toBe(2048);
+      expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
     });
 
     /** @scenario No drift means no AWS write at all — the common path */

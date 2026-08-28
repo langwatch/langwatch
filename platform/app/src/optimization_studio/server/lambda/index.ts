@@ -249,12 +249,6 @@ export const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): numb
 };
 
 /**
- * @deprecated Use {@link NLP_LAMBDA_MEMORY_SIZE_MB} from `server/nlpgo/timeouts`
- *             instead. Kept as a re-export for backward compatibility.
- */
-export { NLP_LAMBDA_MEMORY_SIZE_MB as LANGWATCH_NLP_LAMBDA_MEMORY_SIZE } from "../../../server/nlpgo/timeouts";
-
-/**
  * The single source of truth for the environment variables every per-project
  * langwatch_nlp Lambda must carry. Used both when creating a function and when
  * reconciling an existing one, so the two can never drift apart.
