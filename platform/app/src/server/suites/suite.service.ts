@@ -48,6 +48,7 @@ import {
 } from "./errors";
 import { normalizePlanScope, sortSuiteTargets } from "./plan-config";
 import { derivePlanName } from "./plan-name";
+import { withPlanNameLock } from "./plan-name-lock";
 import { isDynamicScope, parseSuiteScope, type SuiteScope } from "./scope";
 import { readScopeMembership, readScopeScenarioIds } from "./scope-membership";
 import { pickFreeSlug } from "./slug";
@@ -1458,6 +1459,11 @@ export class SuiteService {
    * itself holds up. The caller passes the normalised scope, the sorted
    * targets and the scenarios the run resolved, so nothing here can refuse the
    * run and nothing is resolved twice.
+   *
+   * The match and the write it decides are one step, under
+   * {@link withPlanNameLock}. Runs of a name no plan holds yet arrive
+   * together, so without it two of them both read "nothing here" and both
+   * insert, and one name ends up naming two plans.
    */
   private async resolvePlanByName(params: {
     projectId: string;
@@ -1479,39 +1485,63 @@ export class SuiteService {
       scenarioIds: params.scenarioIds,
     };
 
-    const existing = await this.repository.findPlanByName({
-      projectId: params.projectId,
-      name: params.name,
-    });
-    if (existing) {
-      const suite = await this.repository.update({
-        id: existing.id,
-        projectId: params.projectId,
-        data: storedConfig,
-      });
-      return { suite, created: false };
-    }
-
     const baseSlug = slugify(params.name) || "run-plan";
-    const initialSlug = await this.generateUniqueSlug({
-      baseSlug,
-      projectId: params.projectId,
-    });
-    const suite = await this.saveWithSlugRetry({
-      initialSlug,
-      execute: (slug) =>
-        this.repository.create({
+
+    const resolveUnderLock = () =>
+      withPlanNameLock(
+        {
+          prisma: this.prisma,
           projectId: params.projectId,
           name: params.name,
-          slug,
-          kind: "custom",
-          labels: [],
-          ...storedConfig,
-        }),
-      regenerateSlug: () =>
-        this.generateUniqueSlug({ baseSlug, projectId: params.projectId }),
-    });
-    return { suite, created: true };
+        },
+        async (tx) => {
+          const existing = await this.repository.findPlanByName({
+            projectId: params.projectId,
+            name: params.name,
+            tx,
+          });
+          if (existing) {
+            const suite = await this.repository.update({
+              id: existing.id,
+              projectId: params.projectId,
+              data: storedConfig,
+              tx,
+            });
+            return { suite, created: false };
+          }
+
+          const slug = await this.generateUniqueSlug({
+            baseSlug,
+            projectId: params.projectId,
+            tx,
+          });
+          const suite = await this.repository.create(
+            {
+              projectId: params.projectId,
+              name: params.name,
+              slug,
+              kind: "custom",
+              labels: [],
+              ...storedConfig,
+            },
+            { tx },
+          );
+          return { suite, created: true };
+        },
+      );
+
+    try {
+      return await resolveUnderLock();
+    } catch (error) {
+      // The name lock holds two runs of ONE name apart, so a slug taken here
+      // was taken by a plan of another name that slugifies the same way. A
+      // failed statement aborts its transaction, so the retry is the whole
+      // locked block, which picks a free slug on its second read.
+      if (isUniqueConstraintError(error)) {
+        return await resolveUnderLock();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -1628,12 +1658,14 @@ export class SuiteService {
   private async generateUniqueSlug(params: {
     baseSlug: string;
     projectId: string;
+    tx?: Prisma.TransactionClient;
   }): Promise<string> {
     return pickFreeSlug({
       baseSlug: params.baseSlug,
       takenSlugs: await this.repository.findSlugsByPrefix({
         projectId: params.projectId,
         slugPrefix: params.baseSlug,
+        tx: params.tx,
       }),
     });
   }

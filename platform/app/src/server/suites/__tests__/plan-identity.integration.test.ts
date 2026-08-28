@@ -15,11 +15,15 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { getTestUser } from "../../../utils/testUtils";
+import { AgentRepository } from "../../agents/agent.repository";
 import { prisma } from "../../db";
+import { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
+import { ScenarioRepository } from "../../scenarios/scenario.repository";
 import { ScenarioService } from "../../scenarios/scenario.service";
 import { CLI_EPHEMERAL_LABEL } from "../constants";
 import { sortSuiteTargets } from "../plan-config";
 import type { SuiteScope } from "../scope";
+import { SuiteRepository } from "../suite.repository";
 import { SuiteService } from "../suite.service";
 import type { SuiteTarget } from "../types";
 
@@ -694,5 +698,82 @@ describe("resolving a run plan by name", () => {
       expect(plans[0]!.scenarioIds).toEqual([secretCase.id]);
       expect(startedRuns()).toHaveLength(1);
     });
+  });
+});
+
+/**
+ * A service whose name lookup is slow, so every run of a name no plan holds
+ * yet reads "nothing here" before any of them writes. Real concurrency alone
+ * does not reproduce that reliably: the lookup answers in under a millisecond,
+ * so runs started together still tend to fall into line. The delay sits
+ * between the read and the write the read decides, which is the window the
+ * name lock closes.
+ */
+function serviceWithSlowNameLookup(delayMs: number): SuiteService {
+  const repository = new SuiteRepository(prisma);
+  const slowRepository = new Proxy(repository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      const method = value.bind(target);
+      if (property !== "findPlanByName") return method;
+      return async (...args: unknown[]) => {
+        const found = await (method as (...a: unknown[]) => Promise<unknown>)(
+          ...args,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return found;
+      };
+    },
+  });
+
+  return new SuiteService(
+    slowRepository,
+    new ScenarioRepository(prisma),
+    new AgentRepository(prisma),
+    new LlmConfigRepository(prisma),
+    SuiteRunService.create({
+      resolveClickHouseClient: null,
+      startSuiteRun,
+      queueSimulationRun,
+    }),
+    prisma,
+  );
+}
+
+describe("when runs of one name start together", () => {
+  /**
+   * The name is the plan contract, so it has to hold under concurrency too.
+   * A CI job that starts the REST API, the CLI and the MCP server on one
+   * derived name has every caller read "no plan of this name" at the same
+   * moment, and each of them would then insert its own.
+   */
+  /** @scenario "Concurrent first runs of one name create one plan" */
+  it("creates the plan once and files every run under it", async () => {
+    const testCase = await createCase("Angry refund request");
+    const agent = await createHttpAgent();
+    const name = "Refunds prod-agent";
+    suiteService = serviceWithSlowNameLookup(150);
+
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        runUnderName({
+          name,
+          scope: { mode: "cases" },
+          scenarioIds: [testCase.id],
+          targets: [{ type: "http", referenceId: agent.id }],
+        }),
+      ),
+    );
+
+    const plans = await plansNamed(name);
+    expect(plans).toHaveLength(1);
+
+    // One run created the plan, the rest joined the one it created.
+    expect(results.filter((result) => result.created)).toHaveLength(1);
+    expect(new Set(results.map((result) => result.suiteId))).toEqual(
+      new Set([plans[0]!.id]),
+    );
+    expect(startedRuns()).toHaveLength(4);
   });
 });

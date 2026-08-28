@@ -24,6 +24,12 @@ Feature: A run plan is identified by its name
     dialog suggests, so a run started from the command line and one started
     from the dialog land on one plan.
 
+    Matching a name and answering it are one step. Runs of a name no plan
+    holds yet arrive together, because the REST API, the CLI, the MCP server
+    and the run dialog derive the same name for the same scope and targets.
+    They are serialized per project and name, so the first of them creates the
+    plan and the rest join it.
+
     Two rules follow, and both were bugs in the prototype:
 
       - replacing the config must never rename the plan, or a plan whose name
@@ -45,6 +51,14 @@ Feature: A run plan is identified by its name
     Then a run plan named "Refunds prod-agent" is created
     And it carries the scope and targets the run was started with
     And the run belongs to that plan
+
+  @integration
+  Scenario: Concurrent first runs of one name create one plan
+    Given a project with no run plan named "Refunds prod-agent"
+    When four runs are started together under the name "Refunds prod-agent"
+    Then exactly one run plan named "Refunds prod-agent" exists
+    And one of the runs reports that it created the plan
+    And every one of the four runs belongs to that plan
 
   @integration
   Scenario: A run whose name matches a plan joins it and replaces its config

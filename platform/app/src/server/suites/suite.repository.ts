@@ -37,7 +37,10 @@ export type UpdateSuiteInput = Partial<Omit<CreateSuiteInput, "projectId">>;
 export class SuiteRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(input: CreateSuiteInput): Promise<SimulationSuite> {
+  async create(
+    input: CreateSuiteInput,
+    options?: { tx?: SuiteWriteClient },
+  ): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.create",
       {
@@ -54,7 +57,9 @@ export class SuiteRepository {
           { projectId: input.projectId, operation: "INSERT" },
           "Inserting suite",
         );
-        const result = await this.prisma.simulationSuite.create({
+        const result = await (
+          options?.tx ?? this.prisma
+        ).simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             ...input,
@@ -196,8 +201,9 @@ export class SuiteRepository {
   async findSlugsByPrefix(params: {
     projectId: string;
     slugPrefix: string;
+    tx?: SuiteWriteClient;
   }): Promise<string[]> {
-    const rows = await this.prisma.simulationSuite.findMany({
+    const rows = await (params.tx ?? this.prisma).simulationSuite.findMany({
       where: {
         projectId: params.projectId,
         slug: { startsWith: params.slugPrefix },
@@ -226,8 +232,9 @@ export class SuiteRepository {
   async findPlanByName(params: {
     projectId: string;
     name: string;
+    tx?: SuiteWriteClient;
   }): Promise<SimulationSuite | null> {
-    return this.prisma.simulationSuite.findFirst({
+    return (params.tx ?? this.prisma).simulationSuite.findFirst({
       where: {
         projectId: params.projectId,
         kind: "custom",

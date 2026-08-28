@@ -38,3 +38,14 @@ export function derivePlanName({
     targets.length === 0 ? scopeLabel : `${scopeLabel} ${targets.join(" vs ")}`;
   return name.trim().slice(0, MAX_PLAN_NAME_LENGTH);
 }
+
+/**
+ * The key two names are the same under: trimmed, without case.
+ *
+ * One definition, so the lookup that matches a plan by name and the lock that
+ * keeps two runs from creating that plan twice agree on what "the same name"
+ * means.
+ */
+export function planNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
