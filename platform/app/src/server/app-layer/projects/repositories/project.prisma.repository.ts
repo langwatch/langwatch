@@ -238,6 +238,7 @@ export class PrismaProjectRepository implements ProjectRepository {
     const where = {
       archivedAt: null,
       team: { organizationId },
+      kind: { not: "internal_governance" },
       ...(projectIds ? { id: { in: projectIds } } : {}),
     };
     const [data, total] = await Promise.all([

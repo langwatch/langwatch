@@ -46,9 +46,14 @@ export const pulledUsageObservedEventDataSchema = z.object({
   /** Null when the source names no team: unattributed, said out loud. */
   teamId: z.string().nullable(),
   /**
-   * Null until `IngestionSource` can carry a project (ADR-088 Decision 4).
-   * Null means unattributed. It must never be filled with the hidden
-   * governance project, which is invisible to the customer.
+   * The row's storage home: the org's hidden governance project (ADR-128).
+   * Not attribution — who the money belongs to is organizationId/teamId
+   * above. Members never see the home; every listing surface excludes
+   * kind="internal_governance".
+   *
+   * Stays nullable for the events already on the durable log, which were
+   * written before there was a home to name. Nothing minted since carries
+   * null.
    */
   projectId: z.string().nullable(),
 
