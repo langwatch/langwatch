@@ -9,6 +9,7 @@ import type {
   GithubPullRequestRef,
   GithubTurnToken,
 } from "./github";
+import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection";
 
 /** The cross-feature GitHub capabilities used by Coding Agent and Langy. */
 export abstract class GithubService {
@@ -19,10 +20,7 @@ export abstract class GithubService {
   abstract canMapRepositoryHost(repositoryHost: string): boolean;
   abstract getAppInstallUrl(): string;
   abstract getInstallStateTtlMs(): number;
-  abstract registerInstallNonce(input: {
-    nonce: string;
-    ttlSec: number;
-  }): Promise<boolean>;
+  abstract registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean>;
   abstract tryConsumeInstallNonce(nonce: string): Promise<boolean | null>;
   abstract signInstallState(payload: GithubInstallStatePayload): string;
   abstract tryVerifyInstallState(
@@ -31,16 +29,29 @@ export abstract class GithubService {
   abstract popupResponseHtml(login: string): string;
   abstract popupErrorHtml(message: string): string;
   abstract tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
-  abstract getAllForOrganization(
-    organizationId: string,
-  ): Promise<readonly GithubInstallation[]>;
-  abstract tryGetByInstallationId(
-    installationId: string,
-  ): Promise<GithubInstallation | null>;
+  abstract getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
+  abstract tryGetByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   abstract isOrganizationMember(input: {
     userId: string;
     organizationId: string;
   }): Promise<boolean>;
+  /**
+   * What the organization's settings surface renders: the installations,
+   * whether the App is configured on this instance, and where an install
+   * starts. The uninstall deep links are built here so no caller needs to know
+   * the host this instance is bound to.
+   */
+  abstract getConnectionStatus(input: { organizationId: string }): Promise<GithubConnectionStatus>;
+  /**
+   * Hands back the deep link that uninstalls the App on GitHub. Throws
+   * `GithubNotConnectedError` when the organization has no such installation —
+   * one owned by another organization answers identically, so an installation
+   * id cannot be probed.
+   */
+  abstract disconnect(input: {
+    organizationId: string;
+    installationId: string;
+  }): Promise<GithubDisconnectResult>;
   abstract recordInstallation(input: {
     installationId: string;
     organizationId: string;

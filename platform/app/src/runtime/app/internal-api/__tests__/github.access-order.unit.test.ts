@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInnerTRPCContext } from "../../trpc";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 
-// The github procedures chain checkOrganizationPermission -> membership. This
+// The github procedures chain the declared organization permission -> membership. This
 // suite locks BOTH the permission each one demands and that order: reading the
 // connection asks for `organization:view`, which every member holds, so a
 // surface that needs GitHub can name who to ask; changing it asks for
@@ -9,8 +9,8 @@ import { createInnerTRPCContext } from "../../trpc";
 // the whole organization. Membership runs second so a permitted caller still
 // cannot reach another tenant's connection.
 //
-// The permission middleware is stubbed to a controllable gate — whether the
-// role matrix grants a permission is pinned separately in the rbac suites; what
+// The authorization service is stubbed to a controllable gate — whether the
+// role matrix grants a permission is pinned separately in the authz suites; what
 // matters here is which permission is demanded, and in what order.
 const {
   isOrganizationMember,
@@ -43,26 +43,31 @@ const { githubHost } = vi.hoisted(() => ({
   githubHost: { webBase: "https://github.com" },
 }));
 
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
-        permissionsAsked.push(permission);
-        return hasOrgPermission();
-      },
-    ),
-  };
-});
-
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
-  const base = appPermissionsMock();
+  const { GithubConnectionService } = await import("@langwatch/github-server");
+  // The real connection service over stubbed persistence: what the transport
+  // hands back is the feature's own answer, not a second copy of it here.
+  const connection = GithubConnectionService.create({
+    installations: {
+      getAllForOrganization,
+      tryGetByInstallationId: getByInstallationId,
+    },
+    getAppConfig: () => appConfig,
+    getWebBase: () => githubHost.webBase,
+  });
+  const permissions = {
+    getDecision: async ({ permission }: { permission: string }) => {
+      permissionsAsked.push(permission);
+      return { permitted: hasOrgPermission(), organizationRole: null };
+    },
+    // Every declared check runs behind the lineage guard; a single-tenant
+    // input is what these procedures take, so it is always consistent here.
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+  };
   return {
-    ...base,
+    tryGetApp: () => null,
     getApp: () => ({
-      ...base.getApp(),
+      permissions,
       github: {
         getAppConfig: () => appConfig,
         getWebBase: () => githubHost.webBase,
@@ -70,13 +75,23 @@ vi.mock("~/server/app-layer/app", async () => {
         getAllForOrganization,
         tryGetByInstallationId: getByInstallationId,
         listRepositoriesForOrganization,
+        getConnectionStatus: (input: { organizationId: string }) =>
+          connection.getConnectionStatus(input),
+        disconnect: (input: { organizationId: string; installationId: string }) =>
+          connection.disconnect(input),
       },
     }),
   };
 });
 vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
+// Not exercised here — the connection procedures are organization-scoped — and
+// mocked to keep this suite off the Prisma module graph, which deadlocks
+// against the two mock factories above.
+vi.mock("~/server/organizations/resolveOrganizationId", () => ({
+  resolveOrganizationId: vi.fn(async () => "org-1"),
+}));
 
-import { githubRouter } from "../github";
+import { githubRouter } from "../github.router";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 

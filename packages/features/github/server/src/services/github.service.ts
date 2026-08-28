@@ -1,5 +1,7 @@
 import { GithubService as GithubServiceContract } from "@langwatch/github-contract";
 import type {
+  GithubConnectionStatus,
+  GithubDisconnectResult,
   GithubInstallation,
   GithubRepositoryRef,
   GithubPullRequestLiveStatus,
@@ -15,6 +17,7 @@ import type { GithubInstallResponsePort } from "../ports/github-install-response
 import type { GithubInstallStatePort } from "../ports/github-install-state.port";
 import type { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port";
 
+import { GithubConnectionService } from "./github-connection.service";
 import { GithubInstallationsService } from "./github-installations.service";
 import {
   type BranchMappingRequest,
@@ -42,6 +45,8 @@ type GithubServiceDependencies = {
  * depend on this facade rather than constructing repositories or sub-services.
  */
 export class GithubFeatureService extends GithubServiceContract {
+  private readonly connection: GithubConnectionService;
+
   static create(dependencies: GithubServiceDependencies): GithubFeatureService {
     return new GithubFeatureService(
       dependencies.installations,
@@ -66,6 +71,22 @@ export class GithubFeatureService extends GithubServiceContract {
     private readonly pullRequestEvents: GithubPullRequestEventPort,
   ) {
     super();
+    this.connection = GithubConnectionService.create({
+      installations,
+      getAppConfig: () => this.getAppConfig(),
+      getWebBase: () => this.getWebBase(),
+    });
+  }
+
+  getConnectionStatus(input: { organizationId: string }): Promise<GithubConnectionStatus> {
+    return this.connection.getConnectionStatus(input);
+  }
+
+  disconnect(input: {
+    organizationId: string;
+    installationId: string;
+  }): Promise<GithubDisconnectResult> {
+    return this.connection.disconnect(input);
   }
 
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
@@ -80,10 +101,7 @@ export class GithubFeatureService extends GithubServiceContract {
     return this.installations.tryGetByInstallationId(installationId);
   }
 
-  isOrganizationMember(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.installations.isOrganizationMember(input);
   }
 
@@ -103,9 +121,7 @@ export class GithubFeatureService extends GithubServiceContract {
     return this.installations.handleWebhookEvent(input);
   }
 
-  listRepositoriesForOrganization(
-    organizationId: string,
-  ): Promise<readonly GithubRepositoryRef[]> {
+  listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
 
@@ -163,9 +179,7 @@ export class GithubFeatureService extends GithubServiceContract {
     return this.installState.sign(payload);
   }
 
-  tryVerifyInstallState(
-    token: string | null | undefined,
-  ): GithubInstallStatePayload | null {
+  tryVerifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
     return this.installState.tryVerify(token);
   }
 

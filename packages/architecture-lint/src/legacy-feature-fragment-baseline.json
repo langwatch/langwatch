@@ -1263,11 +1263,6 @@
     },
     {
       "feature": "github",
-      "file": "platform/app/src/server/api/routers/github.ts",
-      "kind": "transport"
-    },
-    {
-      "feature": "github",
       "file": "platform/app/src/server/routes/github.ts",
       "kind": "transport"
     },

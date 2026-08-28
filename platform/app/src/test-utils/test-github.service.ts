@@ -1,6 +1,8 @@
 import {
   GithubService,
   type GithubAppConfig,
+  type GithubConnectionStatus,
+  type GithubDisconnectResult,
   type GithubInstallation,
   type GithubInstallStatePayload,
   type GithubPullRequest,
@@ -93,6 +95,14 @@ export class TestGithubService extends GithubService {
 
   async isOrganizationMember(): Promise<boolean> {
     return false;
+  }
+
+  async getConnectionStatus(): Promise<GithubConnectionStatus> {
+    return { configured: true, connected: false, installations: [], installUrl: null };
+  }
+
+  async disconnect(): Promise<GithubDisconnectResult> {
+    return { uninstallUrl: `${this.getWebBase()}/settings/installations/test` };
   }
 
   async recordInstallation(): Promise<{ accountLogin: string }> {

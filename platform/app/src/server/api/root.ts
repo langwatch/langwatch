@@ -38,7 +38,7 @@ import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
 import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
-import { githubRouter } from "./routers/github";
+import { githubRouter } from "~/runtime/app/internal-api/github.router";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";

@@ -4,7 +4,9 @@
 #   packages/features/github/server/src/services/github-installations.service.ts (record/list/mint, webhook handling)
 #   packages/features/github/server/src/adapters/github-app-token.adapter.ts     (app JWT, installation tokens, GitHub API client)
 #   platform/app/src/server/routes/github.ts                                 (install / setup / webhook routes + legacy aliases)
-#   platform/app/src/server/api/routers/github.ts                            (connection status, repos, disconnect, live PR status)
+#   packages/features/github/server/src/services/github-connection.service.ts    (connection status, uninstall + install links, disconnect)
+#   packages/features/github/server/src/api/app-trpc/github.api.ts              (connection status, repos, disconnect, live PR status)
+#   platform/app/src/runtime/app/internal-api/github.router.ts                  (process transport mount)
 #   platform/app/src/pages/settings/integrations.tsx                         (the settings surface)
 #
 # Related specs:
