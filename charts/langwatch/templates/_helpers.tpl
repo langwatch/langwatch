@@ -733,6 +733,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 
+# Engine code-block timeout (seconds), propagated to all processes that invoke nlpgo
+- name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+  value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
+
 # PostgreSQL connection string
 {{- if .Values.postgresql.chartManaged }}
 - name: PGUSER
