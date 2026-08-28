@@ -34,6 +34,7 @@ import type { Prisma } from "~/generated/prisma/client";
 import type { App } from "~/server/app-layer/app";
 import { AppGovernanceIngestionPullHost } from "~/server/app-layer/governance-ingestion-pull.host";
 import { prisma } from "~/server/db";
+import { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
@@ -88,6 +89,7 @@ let ch: ClickHouseClient;
 let chRepo: GatewayBudgetClickHouseRepository;
 let testApp: App;
 let worker: IngestionPullWorkerService;
+let governanceAws: AppAwsClientConfiguration | undefined;
 
 /**
  * One pull, driven exactly as production drives it.
@@ -291,18 +293,30 @@ beforeAll(() => {
   ch = client;
   testApp = installClickHouseTestApp({ resolveClient: async () => ch });
   chRepo = new GatewayBudgetClickHouseRepository(async () => ch);
+  governanceAws = AppAwsClientConfiguration.create({});
   const featureFlags = MemoryFeatureFlagService.create();
   featureFlags.setFlag("release_pulled_usage_cost_enabled", true);
   worker = AppIngestionPullWorkerAdapter.create({
     sources: PostgresIngestionPullSourceAdapter.create(prisma),
-    host: AppGovernanceIngestionPullHost.create(featureFlags),
+    host: AppGovernanceIngestionPullHost.create(featureFlags, governanceAws),
     projects: testApp.projects,
     events: new AppGovernanceOcsfEventsAdapter(async () => ch),
   }).build();
 });
 
 afterAll(async () => {
-  await clearClickHouseTestApp();
+  let firstFailure: unknown;
+  try {
+    await clearClickHouseTestApp();
+  } catch (error) {
+    firstFailure = error;
+  }
+  try {
+    await governanceAws?.close();
+  } catch (error) {
+    firstFailure ??= error;
+  }
+  if (firstFailure) throw firstFailure;
 });
 
 // ---------------------------------------------------------------------------

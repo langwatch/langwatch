@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+  type S3ClientConfig,
+} from "@aws-sdk/client-s3";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   BuiltInPullerRegistryService,
@@ -42,6 +47,15 @@ import {
 const MAX_S3_FILES = 100;
 const MAX_S3_PAGES = 50;
 
+type GovernanceAwsClientConfigInput = {
+  region?: string;
+  targetHost: string;
+  endpoint?: string;
+  staticCredentials?: GovernanceObjectStorageCredentials;
+};
+
+type GovernanceAwsClientConfig = S3ClientConfig;
+
 export type GovernanceHttpRequest = {
   method?: string;
   headers?: Record<string, string>;
@@ -54,6 +68,7 @@ type GovernanceObjectStorageListInput = {
   bucket: string;
   prefix: string;
   region: string;
+  endpoint?: string;
   startAfter?: string;
   credentials: GovernanceObjectStorageCredentials;
   signal?: AbortSignal;
@@ -64,6 +79,7 @@ type GovernanceObjectStorageReadTextInput = {
   bucket: string;
   key: string;
   region: string;
+  endpoint?: string;
   credentials: GovernanceObjectStorageCredentials;
   signal?: AbortSignal;
   maxBytes: number;
@@ -78,6 +94,7 @@ export abstract class GovernanceIngestionPullHost {
   };
   abstract isPulledUsageCostEnabled(organizationId: string): Promise<boolean>;
   abstract capture(error: Error, context: Record<string, unknown>): void;
+  abstract buildAwsClientConfig(input: GovernanceAwsClientConfigInput): GovernanceAwsClientConfig;
   abstract readonly encryption: GovernanceEncryption;
 }
 
@@ -95,78 +112,109 @@ class AppGovernanceHttpPort extends GovernanceHttpPort {
   }
 }
 
-class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
+export class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {
+    super();
+  }
+
+  static create(host: GovernanceIngestionPullHost): AppGovernanceObjectStoragePort {
+    return new AppGovernanceObjectStoragePort(host);
+  }
+
   async list(input: GovernanceObjectStorageListInput): Promise<string[]> {
-    const client = this.client(input);
-    const keys: string[] = [];
-    let continuationToken: string | undefined;
-    let pages = 0;
-    do {
-      pages += 1;
-      const response = await client.send(
-        new ListObjectsV2Command({
-          Bucket: input.bucket,
-          Prefix: input.prefix,
-          StartAfter: continuationToken ? undefined : input.startAfter,
-          ContinuationToken: continuationToken,
-          MaxKeys: 1_000,
-        }),
-        { abortSignal: input.signal },
-      );
-      for (const object of response.Contents ?? []) {
-        if (object.Key) keys.push(object.Key);
-        if (keys.length >= Math.min(input.limit, MAX_S3_FILES)) {
-          return keys;
+    return this.withClient(input, async (client) => {
+      const keys: string[] = [];
+      let continuationToken: string | undefined;
+      let pages = 0;
+      do {
+        pages += 1;
+        const response = await client.send(
+          new ListObjectsV2Command({
+            Bucket: input.bucket,
+            Prefix: input.prefix,
+            StartAfter: continuationToken ? undefined : input.startAfter,
+            ContinuationToken: continuationToken,
+            MaxKeys: 1_000,
+          }),
+          { abortSignal: input.signal },
+        );
+        for (const object of response.Contents ?? []) {
+          if (object.Key) keys.push(object.Key);
+          if (keys.length >= Math.min(input.limit, MAX_S3_FILES)) {
+            return keys;
+          }
         }
-      }
-      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-    } while (continuationToken && pages < MAX_S3_PAGES);
-    return keys;
+        continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+      } while (continuationToken && pages < MAX_S3_PAGES);
+      return keys;
+    });
   }
 
   async readText(input: GovernanceObjectStorageReadTextInput): Promise<string> {
-    const response = await this.client(input).send(
-      new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
-      { abortSignal: input.signal },
-    );
-    if (!response.Body) {
-      throw new Error(`empty body for s3://${input.bucket}/${input.key}`);
-    }
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    if (!(Symbol.asyncIterator in response.Body)) {
-      throw new Error(`streaming body unavailable for s3://${input.bucket}/${input.key}`);
-    }
-    for await (const chunk of response.Body) {
-      if (input.signal?.aborted) {
-        throw new Error(`aborted while reading s3://${input.bucket}/${input.key}`);
+    return this.withClient(input, async (client) => {
+      const response = await client.send(
+        new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+        { abortSignal: input.signal },
+      );
+      if (!response.Body) {
+        throw new Error(`empty body for s3://${input.bucket}/${input.key}`);
       }
-      totalBytes += chunk.byteLength;
-      if (totalBytes > input.maxBytes) {
-        throw new Error(`file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`);
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+      if (!(Symbol.asyncIterator in response.Body)) {
+        throw new Error(`streaming body unavailable for s3://${input.bucket}/${input.key}`);
       }
-      chunks.push(chunk);
-    }
-    const bytes = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(bytes);
-  }
-
-  private client(input: {
-    region: string;
-    credentials: GovernanceObjectStorageCredentials;
-  }): S3Client {
-    const { accessKeyId, secretAccessKey, sessionToken } = input.credentials;
-    return new S3Client({
-      region: input.region,
-      credentials:
-        accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey, sessionToken } : undefined,
+      for await (const chunk of response.Body) {
+        if (input.signal?.aborted) {
+          throw new Error(`aborted while reading s3://${input.bucket}/${input.key}`);
+        }
+        totalBytes += chunk.byteLength;
+        if (totalBytes > input.maxBytes) {
+          throw new Error(
+            `file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`,
+          );
+        }
+        chunks.push(chunk);
+      }
+      const bytes = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return new TextDecoder().decode(bytes);
     });
   }
+
+  private async withClient<T>(
+    input: {
+      region: string;
+      endpoint?: string;
+      credentials: GovernanceObjectStorageCredentials;
+    },
+    operation: (client: S3Client) => Promise<T>,
+  ): Promise<T> {
+    const { accessKeyId, secretAccessKey, sessionToken } = input.credentials;
+    const client = new S3Client({
+      ...this.host.buildAwsClientConfig({
+        region: input.region,
+        endpoint: input.endpoint,
+        targetHost: input.endpoint ?? defaultS3Host(input.region),
+        staticCredentials: { accessKeyId, secretAccessKey, sessionToken },
+      }),
+      forcePathStyle: input.endpoint !== undefined,
+    });
+    try {
+      return await operation(client);
+    } finally {
+      client.destroy();
+    }
+  }
+}
+
+function defaultS3Host(region: string): string {
+  const suffix = region.startsWith("cn-") ? ".amazonaws.com.cn" : ".amazonaws.com";
+  return `s3.${region}${suffix}`;
 }
 
 class AppGovernanceOcsfEventSinkPort extends GovernanceOcsfEventSinkPort {
@@ -271,7 +319,7 @@ export class AppIngestionPullWorkerAdapter {
   build(): IngestionPullWorkerService {
     const diagnostics = AppIngestionPullDiagnosticsPort.create(this.host);
     const http = AppGovernanceHttpPort.create(this.host);
-    const objects = new AppGovernanceObjectStoragePort();
+    const objects = AppGovernanceObjectStoragePort.create(this.host);
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));

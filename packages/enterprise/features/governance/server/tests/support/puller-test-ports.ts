@@ -65,6 +65,7 @@ export class TestObjectStoragePort extends GovernanceObjectStoragePort {
         bucket: string;
         prefix: string;
         region: string;
+        endpoint?: string;
         startAfter?: string;
       }
     | undefined;
@@ -73,6 +74,7 @@ export class TestObjectStoragePort extends GovernanceObjectStoragePort {
     bucket: string;
     prefix: string;
     region: string;
+    endpoint?: string;
     startAfter?: string;
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
@@ -93,6 +95,7 @@ export class TestObjectStoragePort extends GovernanceObjectStoragePort {
     bucket: string;
     key: string;
     region: string;
+    endpoint?: string;
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
     maxBytes: number;
@@ -114,9 +117,7 @@ class TestSourcePort extends IngestionPullSourcePort {
 }
 
 class TestSinkPort extends GovernanceOcsfEventSinkPort {
-  constructor(
-    private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>,
-  ) {
+  constructor(private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>) {
     super();
   }
 
@@ -138,8 +139,7 @@ class TestEntitlementPort extends PulledUsageEntitlementPort {
 class TestRatePort {
   rate(input: PulledUsageRateInput) {
     return {
-      costNanoUsd:
-        input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
+      costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
       rateVersion: "test",
     };
   }
@@ -157,9 +157,7 @@ export type WorkerTestDoubles = {
   ensureProject: () => Promise<{ id: string }>;
 };
 
-export function createWorkerService(
-  doubles: WorkerTestDoubles,
-): IngestionPullWorkerService {
+export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWorkerService {
   const registry = PullerRegistryService.create();
   registry.register(doubles.adapter);
   const pricing = PulledUsagePricingService.create(new TestRatePort());

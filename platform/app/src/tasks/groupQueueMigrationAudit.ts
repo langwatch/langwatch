@@ -17,7 +17,13 @@ export interface QueueAuditRedis {
   zcard(key: string): Promise<number>;
   zcount(key: string, min: number | string, max: number | string): Promise<number>;
   scard(key: string): Promise<number>;
-  scan(cursor: string, ...args: Array<string | number>): Promise<[string, string[]]>;
+  scan(
+    cursor: string,
+    matchToken: "MATCH",
+    pattern: string,
+    countToken: "COUNT",
+    count: number,
+  ): Promise<[string, string[]]>;
   hvals(key: string): Promise<string[]>;
 }
 

@@ -26,6 +26,7 @@ import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmai
 import { decrypt, encrypt } from "~/utils/encryption";
 import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import type { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
 
 class AppGovernanceEncryption implements GovernanceEncryption {
   encrypt(value: string): string {
@@ -39,12 +40,18 @@ class AppGovernanceEncryption implements GovernanceEncryption {
 
 /** API-process infrastructure for the canonical ingestion-pull worker. */
 export class AppGovernanceIngestionPullHost extends GovernanceIngestionPullHost {
-  private constructor(private readonly featureFlags: FeatureFlagService) {
+  private constructor(
+    private readonly featureFlags: FeatureFlagService,
+    private readonly aws: AppAwsClientConfiguration,
+  ) {
     super();
   }
 
-  static create(featureFlags: FeatureFlagService): AppGovernanceIngestionPullHost {
-    return new AppGovernanceIngestionPullHost(featureFlags);
+  static create(
+    featureFlags: FeatureFlagService,
+    aws: AppAwsClientConfiguration,
+  ): AppGovernanceIngestionPullHost {
+    return new AppGovernanceIngestionPullHost(featureFlags, aws);
   }
 
   readonly encryption = new AppGovernanceEncryption();
@@ -83,6 +90,19 @@ export class AppGovernanceIngestionPullHost extends GovernanceIngestionPullHost 
       }
       captureException(toError(error));
     });
+  }
+
+  buildAwsClientConfig(input: {
+    region?: string;
+    targetHost: string;
+    endpoint?: string;
+    staticCredentials?: {
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      sessionToken?: string;
+    };
+  }) {
+    return this.aws.build(input);
   }
 }
 

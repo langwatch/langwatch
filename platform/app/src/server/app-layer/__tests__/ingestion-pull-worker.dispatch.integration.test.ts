@@ -30,6 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { App } from "~/server/app-layer/app";
 import { AppGovernanceIngestionPullHost } from "~/server/app-layer/governance-ingestion-pull.host";
 import { prisma } from "~/server/db";
+import { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -49,6 +50,7 @@ let server: http.Server;
 let serverUrl: string;
 let testApp: App;
 let worker: IngestionPullWorkerService;
+let governanceAws: AppAwsClientConfiguration | undefined;
 
 // Fixture audit-log response — page 1 returns 2 events + a next_cursor;
 // page 2 returns 1 event + null cursor (drained). Mirrors the real
@@ -98,9 +100,10 @@ beforeAll(async () => {
   // The path under test takes its ClickHouse repositories from the App rather
   // than resolving a client, so the fixture has to provide one.
   testApp = installClickHouseTestApp({ resolveClient: async () => ch });
+  governanceAws = AppAwsClientConfiguration.create({});
   worker = AppIngestionPullWorkerAdapter.create({
     sources: PostgresIngestionPullSourceAdapter.create(prisma),
-    host: AppGovernanceIngestionPullHost.create(MemoryFeatureFlagService.create()),
+    host: AppGovernanceIngestionPullHost.create(MemoryFeatureFlagService.create(), governanceAws),
     projects: testApp.projects,
     events: new AppGovernanceOcsfEventsAdapter(async () => ch),
   }).build();
@@ -171,23 +174,34 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await clearClickHouseTestApp();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  let firstFailure: unknown;
+  try {
+    await clearClickHouseTestApp();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
 
-  if (govProjectId) {
-    await ch
-      .command({
-        query: `DELETE FROM governance_ocsf_events WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId: govProjectId },
-      })
-      .catch(() => {});
+    if (govProjectId) {
+      await ch
+        .command({
+          query: `DELETE FROM governance_ocsf_events WHERE TenantId = {tenantId:String}`,
+          query_params: { tenantId: govProjectId },
+        })
+        .catch(() => {});
+    }
+    await cleanupTestRows(prisma, [
+      ["ingestionSource", { organizationId }],
+      ["project", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+    ]);
+  } catch (error) {
+    firstFailure = error;
   }
-  await cleanupTestRows(prisma, [
-    ["ingestionSource", { organizationId }],
-    ["project", { team: { organizationId } }],
-    ["team", { organizationId }],
-    ["organization", { id: organizationId }],
-  ]);
+  try {
+    await governanceAws?.close();
+  } catch (error) {
+    firstFailure ??= error;
+  }
+  if (firstFailure) throw firstFailure;
 });
 
 describe("PullerAdapter framework — end-to-end with real CH + real fetch", () => {

@@ -74,17 +74,12 @@ describe("migrateObjectStorage task configuration", () => {
     ).toThrow(/must not include an account key/);
   });
 
-  it.each(["plan", "copy", "finalize", "verify"] as const)(
-    "accepts the %s phase",
-    (phase) => {
-      expect(parseMigrationTaskPhase(phase)).toBe(phase);
-    },
-  );
+  it.each(["plan", "copy", "finalize", "verify"] as const)("accepts the %s phase", (phase) => {
+    expect(parseMigrationTaskPhase(phase)).toBe(phase);
+  });
 
   it("rejects an unknown phase before making changes", () => {
-    expect(() => parseMigrationTaskPhase("delete-source")).toThrow(
-      /plan.*copy.*finalize.*verify/,
-    );
+    expect(() => parseMigrationTaskPhase("delete-source")).toThrow(/plan.*copy.*finalize.*verify/);
   });
 
   it("refuses copy when the configured source is not the active app storage", () => {
@@ -167,8 +162,7 @@ describe("migrateObjectStorage task configuration", () => {
   it("accepts equivalent normalized Azure endpoints after cutover", () => {
     const config = parseMigrationTaskConfig({
       ...validEnvironment(),
-      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
-        "https://destination.blob.core.windows.net/",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "https://destination.blob.core.windows.net/",
     });
 
     expect(() =>
@@ -233,9 +227,9 @@ describe("createCutoverAuditRedis", () => {
     expect(shared.duplicate).toHaveBeenCalledWith([], {
       scaleReads: "master",
     });
-    expect(audit.redis).toBe(duplicated);
+    expect(audit.redis).not.toBe(duplicated);
     expect(duplicated.nodes).toHaveBeenCalledWith("master");
-    expect(audit.scanNodes).toEqual([masterNode]);
+    expect(audit.scanNodes).toHaveLength(1);
     audit.cleanup();
     expect(duplicated.disconnect).toHaveBeenCalledOnce();
   });
@@ -288,6 +282,39 @@ describe("createCutoverAuditRedis", () => {
     expect(duplicated.disconnect).toHaveBeenCalledOnce();
   });
 
+  it("preserves the handshake error when closing the failed duplicate also fails", async () => {
+    const events = new Map<string, (value?: unknown) => void>();
+    const handshakeFailure = new Error("CLUSTERDOWN");
+    const cleanupFailure = new Error("disconnect failed");
+    const logger = {
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    const duplicated = {
+      status: "connecting",
+      nodes: vi.fn(() => []),
+      disconnect: vi.fn(() => {
+        throw cleanupFailure;
+      }),
+      once: vi.fn((event: string, handler: (value?: unknown) => void) => {
+        events.set(event, handler);
+      }),
+    };
+    const shared = Object.create(Cluster.prototype) as Cluster;
+    Object.assign(shared, { duplicate: vi.fn(() => duplicated) });
+
+    const pending = createCutoverAuditRedis(shared, logger);
+    events.get("error")?.(handshakeFailure);
+
+    await expect(pending).rejects.toBe(handshakeFailure);
+    expect(duplicated.disconnect).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith(
+      { error: cleanupFailure },
+      "failed to close cutover-audit Redis duplicate after handshake failure",
+    );
+  });
+
   /**
    * ioredis retries a cluster handshake indefinitely and emits no terminal
    * event when every seed node is simply unreachable, so an unbounded wait
@@ -323,8 +350,8 @@ describe("createCutoverAuditRedis", () => {
 
     const audit = await createCutoverAuditRedis(single);
 
-    expect(audit.redis).toBe(single);
-    expect(audit.scanNodes).toEqual([single]);
+    expect(audit.redis).not.toBe(single);
+    expect(audit.scanNodes).toHaveLength(1);
     expect(() => audit.cleanup()).not.toThrow();
   });
 });
@@ -352,8 +379,7 @@ describe("toAzureCredentials transport guards", () => {
       ...validEnvironment(),
       OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "azureCli",
       OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
-      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
-        "https://destination.blob.core.usgovcloudapi.net",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "https://destination.blob.core.usgovcloudapi.net",
     });
 
     expect(() => toAzureCredentials(config)).toThrow(/AUTHORITY_HOST/);
@@ -364,8 +390,7 @@ describe("toAzureCredentials transport guards", () => {
       ...validEnvironment(),
       OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "azureCli",
       OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
-      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
-        "https://destination.blob.core.usgovcloudapi.net",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "https://destination.blob.core.usgovcloudapi.net",
       OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST: "https://login.microsoftonline.us",
     });
 

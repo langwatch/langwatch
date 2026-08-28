@@ -257,6 +257,7 @@ import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { resetSqsClientCache } from "~/server/webhooks/destinations/sqsWebhookDestination";
 import {
+  AppAwsClientConfiguration,
   closeAwsClientConfiguration,
   configureAwsClientConfiguration,
 } from "~/runtime/app/aws-client.composition";
@@ -1588,7 +1589,7 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   // `ctx.app`; the worker uses the same project service directly.
   const gatewayVirtualKeyCrypto = createProcessVirtualKeyCrypto(config);
   const governanceVirtualKeys = VirtualKeyService.create(prisma, projects, gatewayVirtualKeyCrypto);
-  const governanceIngestionPullHost = AppGovernanceIngestionPullHost.create(featureFlags);
+  const governanceIngestionPullHost = AppGovernanceIngestionPullHost.create(featureFlags, aws);
   const governanceOptions = {
     organizations,
     projects,
@@ -2598,6 +2599,7 @@ export function createTestApp(
     },
     ...overrides?.config,
   };
+  const testAws = AppAwsClientConfiguration.create(config.outboundProxy);
   const evaluationInputsOffloadConfig = config.evaluationInputsOffload;
   const testFeatureFlags =
     overrides?.featureFlags ??
@@ -2699,7 +2701,10 @@ export function createTestApp(
     projects: testProjects,
   }).build();
   const testGatewayChanges = createGatewayChangeEventsPort(testPrisma);
-  const testGovernanceIngestionPullHost = AppGovernanceIngestionPullHost.create(testFeatureFlags);
+  const testGovernanceIngestionPullHost = AppGovernanceIngestionPullHost.create(
+    testFeatureFlags,
+    testAws,
+  );
   const testPlanProvider =
     overrides?.planProvider ??
     PlanProviderService.create({
@@ -2919,6 +2924,7 @@ export function createTestApp(
     }),
   });
   const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("subscriber", "governance-s3-aws", () => testAws.close());
   shutdownResources.register("database", "prisma", closePrismaConnection);
 
   return new App({

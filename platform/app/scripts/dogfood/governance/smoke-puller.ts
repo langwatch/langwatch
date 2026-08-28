@@ -28,8 +28,11 @@ import { PostgresIngestionPullSourceAdapter } from "@langwatch/enterprise-govern
 import { randomBytes } from "crypto";
 import http from "http";
 import type { AddressInfo } from "net";
+import type { App } from "~/server/app-layer/app";
 import { AppGovernanceIngestionPullHost } from "~/server/app-layer/governance-ingestion-pull.host";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
+import { AppAwsClientConfiguration } from "~/runtime/app/aws-client.composition";
+import { parseOutboundProxyConfig } from "~/server/outboundProxy";
 import { prisma } from "../../../src/server/db";
 
 const CLICKHOUSE_URL =
@@ -93,6 +96,32 @@ async function startFixtureServer(): Promise<{
   };
 }
 
+async function runGovernancePull(input: {
+  app: App;
+  sourceId: string;
+}): Promise<{ nextCursor: string | null; eventCount: number }> {
+  const aws = AppAwsClientConfiguration.create(parseOutboundProxyConfig(process.env));
+  let executionFailed = false;
+  try {
+    const worker = AppIngestionPullWorkerAdapter.create({
+      sources: PostgresIngestionPullSourceAdapter.create(prisma),
+      host: AppGovernanceIngestionPullHost.create(input.app.featureFlags, aws),
+      projects: input.app.projects,
+      events: new AppGovernanceOcsfEventsAdapter(input.app.clickhouse.resolveClient),
+    }).build();
+    return await worker.run({ sourceId: input.sourceId, cursor: null });
+  } catch (error) {
+    executionFailed = true;
+    throw error;
+  } finally {
+    try {
+      await aws.close();
+    } catch (error) {
+      if (!executionFailed) throw error;
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const slug = `puller-smoke-${Date.now()}`;
   console.log(`[smoke-puller] starting; namespace=${slug}`);
@@ -146,13 +175,7 @@ async function main(): Promise<void> {
   console.log(`[smoke-puller] IngestionSource minted: id=${source.id}`);
 
   const app = initializeDefaultApp({ processRole: "web" });
-  const worker = AppIngestionPullWorkerAdapter.create({
-    sources: PostgresIngestionPullSourceAdapter.create(prisma),
-    host: AppGovernanceIngestionPullHost.create(app.featureFlags),
-    projects: app.projects,
-    events: new AppGovernanceOcsfEventsAdapter(app.clickhouse.resolveClient),
-  }).build();
-  const outcome = await worker.run({ sourceId: source.id, cursor: null });
+  const outcome = await runGovernancePull({ app, sourceId: source.id });
   console.log(`[smoke-puller] runIngestionPull completed`);
 
   const govProject = await app.projects.ensureInternal({

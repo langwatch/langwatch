@@ -9,6 +9,7 @@ export abstract class GovernanceObjectStoragePort {
     bucket: string;
     prefix: string;
     region: string;
+    endpoint?: string;
     startAfter?: string;
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
@@ -19,6 +20,7 @@ export abstract class GovernanceObjectStoragePort {
     bucket: string;
     key: string;
     region: string;
+    endpoint?: string;
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
     maxBytes: number;

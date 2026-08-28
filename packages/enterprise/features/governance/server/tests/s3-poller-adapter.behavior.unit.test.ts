@@ -74,9 +74,31 @@ describe("S3PollingPullerAdapter", () => {
       const parsed = adapter.validateConfig(withoutPrefix);
       expect(parsed.prefix).toBe("");
     });
+
+    it("accepts an explicit custom S3 endpoint", () => {
+      const adapter = makeAdapter();
+      const parsed = adapter.validateConfig({
+        ...VALID_CONFIG,
+        endpoint: "https://objects.internal.example.test",
+      });
+
+      expect(parsed.endpoint).toBe("https://objects.internal.example.test");
+    });
   });
 
   describe("runOnce — ndjson parser", () => {
+    it("passes the custom endpoint through to object storage", async () => {
+      const adapter = makeAdapter();
+      const config = adapter.validateConfig({
+        ...VALID_CONFIG,
+        endpoint: "https://objects.internal.example.test",
+      });
+
+      await adapter.runOnce({ cursor: null }, config);
+
+      expect(storage.lastList?.endpoint).toBe("https://objects.internal.example.test");
+    });
+
     it("happy-path drain: reads all keys lexicographically + advances cursor to last key", async () => {
       const adapter = makeAdapter();
       storage.objects = [
