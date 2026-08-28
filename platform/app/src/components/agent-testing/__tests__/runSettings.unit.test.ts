@@ -17,7 +17,7 @@ function run(langwatch: Record<string, unknown>): ScenarioRunData {
     scenarioId: "scenario_refund",
     batchRunId: "batch_1",
     scenarioRunId: "run_a",
-    status: ScenarioRunStatus.COMPLETED,
+    status: ScenarioRunStatus.SUCCESS,
     messages: [],
     timestamp: 0,
     durationInMs: 0,
