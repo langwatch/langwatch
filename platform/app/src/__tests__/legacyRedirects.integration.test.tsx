@@ -10,10 +10,10 @@
  * Spec: specs/navigation/gateway-url-move.feature
  */
 
+import { UiPrefixRedirect } from "@langwatch/ui";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
-import { LegacyPrefixRedirect } from "../components/LegacyPrefixRedirect";
 import { legacyRedirectRoutes } from "../legacyRedirects";
 
 // The global test-setup.ts stubs ~/utils/compat/next-router with an inert
@@ -55,7 +55,7 @@ function renderRouterAt(initialEntries: string[]) {
       // departments rename never adds a hop.
       path: "/governance/cost-centers",
       element: (
-        <LegacyPrefixRedirect
+        <UiPrefixRedirect
           from="/governance/cost-centers"
           to="/governance/people"
         />

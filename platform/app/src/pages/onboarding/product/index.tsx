@@ -1,11 +1,12 @@
+import { UiDesignSystemShell } from "@langwatch/ui";
+import { uiDesignSystem } from "@langwatch/ui/design-system";
 import type React from "react";
-import { Provider } from "~/components/ui/provider";
 import ProductScreen from "~/features/onboarding/screens/ProductScreen";
 
 const OnboardingProduct: React.FC = () => (
-  <Provider>
+  <UiDesignSystemShell system={uiDesignSystem}>
     <ProductScreen />
-  </Provider>
+  </UiDesignSystemShell>
 );
 
 export default OnboardingProduct;

@@ -9,6 +9,7 @@ export {
   UiDesignSystemShell,
   type UiDesignSystemShellProps,
 } from "./ui/sections/ui-design-system-shell";
+export { UiPrefixRedirect } from "./ui/elements/ui-prefix-redirect";
 export {
   forceReloadOnce,
   isChunkLoadError,
@@ -17,6 +18,7 @@ export {
   RELOAD_AT_KEY,
   warmChunk,
 } from "./behavior/chunk-reload";
+export { lazyRoute, type LazyRouteModule } from "./behavior/lazy-route";
 export { RpcClientPort } from "./features/agent/behavior/rpc-client.port";
 export { TrpcAgentBrowserAdapter } from "./features/agent/behavior/trpc-agent-browser.adapter";
 export {

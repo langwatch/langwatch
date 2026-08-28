@@ -287,6 +287,151 @@ point is authenticated. The alternative is to make the session non-nullable in
 
 ---
 
+## 14. The route lazy-loader moves to `@langwatch/ui`, and `routes.tsx` imports it under its old local name — `IN FLIGHT`
+
+**Decided.** The `page()` helper that wrapped every `import()` in
+`platform/app/src/routes.tsx` is now `lazyRoute` in
+`apps/ui/src/behavior/lazy-route.ts`, exported from the `@langwatch/ui` root
+entry. `routes.tsx` consumes it as `import { lazyRoute as page } from
+"@langwatch/ui"`, so all ~130 route stanzas are untouched.
+
+**Why.** ADR-002 says stale-chunk recovery is owned by `apps/ui/src/behavior`
+and that the legacy route table consumes that one implementation. The route half
+of that recovery was still a private closure in `routes.tsx`, so the ADR
+described a state the code did not have. `routes.tsx` is centrally owned and
+several agents are working around it, so the change is two lines plus the
+deletion of the helper — a rename of every call site would have been a
+130-line diff in a file that is a merge hotspot.
+
+**Alternative not taken.** Rewrite each `...page(() => import(...))` to
+`...lazyRoute(...)`. That is more honest about where the function comes from and
+removes the alias, at the cost of a large diff in the most contended file on the
+branch. `src/__tests__/navigationDestinationsAreRouted.unit.test.ts` parses
+`routes.tsx` as text, but only for `path: "..."` literals, so either shape is
+safe for it.
+
+**Cost of the alias.** A reader of `routes.tsx` sees `page(...)` and has to
+follow the import to learn it is package code. That is a real legibility loss.
+
+**Reversibility.** Trivial: the alias is one line.
+
+**Watch this one.** `reloadOnChunkError` is no longer imported by `routes.tsx`.
+If a future edit reintroduces a bare `import()` in the route table without going
+through `page`, a stale chunk after a deploy will reach the error boundary
+instead of reloading, and nothing will fail.
+
+---
+
+## 15. `LegacyPrefixRedirect` moves to `apps/ui` as `UiPrefixRedirect`, and the move restores a prop a merge dropped — `IN FLIGHT`
+
+**Decided.** `platform/app/src/components/LegacyPrefixRedirect.tsx` is deleted.
+The component is `UiPrefixRedirect` in
+`apps/ui/src/ui/elements/ui-prefix-redirect.tsx`, exported from the
+`@langwatch/ui` root entry. `routes.tsx`, `legacyRedirects.tsx` and
+`src/__tests__/legacyRedirects.integration.test.tsx` import it from there.
+
+**Why the rename.** In `apps/ui` the "Legacy" prefix would be wrong: ADR-002
+reserves that word for deliberate temporary composition and explicit deletion
+targets (`LegacyUiShellAdapter`). A prefix redirect is a permanent routing
+primitive, and the thing that is legacy is the URL, not the element.
+
+**Why it moved at all.** It depends on `react-router` and nothing else, which is
+rare in the shell closure. The redirect *table* (`legacyRedirects.tsx`) is
+application route data and stays in `platform/app`; ADR-001's model is exactly
+that — a global `ui/` primitive, composed by app-owned data.
+
+**This move carries a fix, which is the part to review.** On this branch the
+component was broken: merge `5770224e31` dropped `pinParams` from the
+destructured signature while keeping the body that reads it. `pinParams` was
+therefore an undeclared free identifier — a `pnpm typecheck` error, and a
+`ReferenceError` on every `/governance/ingestion-sources`, `/governance/catalog`
+and `/governance/cost-centers` hit at runtime. The moved file restores
+`origin/main`'s signature verbatim.
+
+**Alternative not taken.** Fix in place and leave the move for later, so the
+repair is a one-file diff that rebases cleanly on its own. Rejected because the
+programme's rule is that a slice leaves `platform/app` smaller, and the move is
+otherwise free. The cost is that reverting the move also reverts the fix.
+
+**Reversibility.** High — four files.
+
+**Watch this one.** `src/__tests__/legacyRedirects.integration.test.tsx` asserts
+`?tab=sources` in four places; those assertions are the `pinParams` path and
+could not have been passing on this branch. Run it first.
+
+---
+
+## 16. The second design-system provider in `platform/app` is deleted, not moved — `IN FLIGHT`
+
+**Decided.** `platform/app/src/components/ui/provider.tsx` — a `Provider`
+wrapper that bound `uiDesignSystem` to `DesignSystemProvider` — is deleted. Its
+two callers (`pages/onboarding/welcome.tsx`, `pages/onboarding/product/index.tsx`)
+now render `UiDesignSystemShell system={uiDesignSystem}` directly, which is what
+`AppProviders.tsx` already does.
+
+**Why.** ADR-004 says `apps/ui` does not own a second provider, and by extension
+the application should not own a third. Two wrappers over the same provider are
+the drift risk: one of them gains a prop and half the app gets it.
+
+**Alternative not taken.** Move the bound wrapper into `apps/ui` as, say,
+`UiDesignSystem`. That would save two callers from naming the system, at the
+cost of a second door onto the same provider in the package that ADR-004 says
+should have one.
+
+**Cost.** Two call sites now repeat `system={uiDesignSystem}`.
+
+**Reversibility.** Trivial.
+
+**Watch this one.** Both onboarding pages mount a design-system provider
+*inside* an application that already mounts one in `OuterProviders`. That
+nesting is pre-existing and was preserved exactly; it is worth a separate look,
+because a nested Chakra provider is usually a mistake rather than an intent.
+
+---
+
+## 17. Most of the shell stays in `platform/app`, because `apps/ui` cannot declare its dependencies in this pass — `IN FLIGHT`
+
+**Decided.** `OuterProviders`, `InnerProviders`, `RootLayout`,
+`PageErrorFallback`, `NotFoundOrErrorPage`, `GraphicsQualityProvider` and
+`useAttributionCapture` were all read and all left where they are.
+
+**Why.** Two different walls, and only one of them is architectural.
+
+The architectural wall is real and should not be worked around: `TRPCProvider`
+and `usePublicEnv` bind to the application's `AppRouter` type through
+`~/utils/api`; `CommandBarProvider`, `EnterpriseSaasFooter` and
+`useNavigationV2Tracking` reach `useOrganizationTeamProject` and therefore the
+same client. Those are pinned until the transport is packaged.
+
+The second wall is mechanical, and it is the one to review. `apps/ui`
+declares twelve runtime dependencies. `GraphicsQualityProvider` needs `zustand`,
+`PageErrorFallback` and `NotFoundOrErrorPage` need `lucide-react`, and
+`RootLayout` needs `nprogress` and `react-error-boundary`. None of the four is
+present in `apps/ui/node_modules` **or** in the root `node_modules`, so a move
+would not resolve from `apps/ui/src` under either Node or Vite resolution.
+Declaring them in `apps/ui/package.json` is the correct end state, but it takes
+effect only after a `pnpm install`, which this pass was not allowed to run.
+
+**Alternative not taken.** Declare the dependencies anyway and move the code,
+leaving the branch unbuildable until someone installs. Rejected: several agents
+are working in this tree at once and an unverifiable broken module graph is a
+poor thing to hand any of them. The cost is that the single largest remaining
+browser-only vertical — graphics quality, four source files and three tests with
+only two importers — did not move when it was ready to.
+
+**Reversibility.** Not applicable; nothing was changed. This entry exists so the
+next pass starts by adding `zustand`, `lucide-react`, `nprogress` and
+`react-error-boundary` to `apps/ui/package.json`, installing, and then moving
+those verticals.
+
+**Watch this one.** `platform/app/src/main.tsx` is the browser process entry and
+belongs in `apps/ui` under ADR-111, but it imports
+`./runtime/ui/legacy-ui-shell.adapter` and `./styles/globals.scss`. Moving it
+would make `apps/ui` import `platform/app`, which ADR-001 forbids. It is pinned
+by direction, not by dependencies, and no install will unpin it.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the

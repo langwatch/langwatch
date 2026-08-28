@@ -1,5 +1,5 @@
+import { UiPrefixRedirect } from "@langwatch/ui";
 import type { RouteObject } from "react-router";
-import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
 
 /**
  * Prefixes that moved to a new top-level home. Old links, bookmarks, emails
@@ -23,7 +23,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/governance/ingestion-sources/*",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/ingestion-sources"
         to="/governance/inventory"
       />
@@ -32,7 +32,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/governance/ingestion-sources",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/ingestion-sources"
         to="/governance/inventory"
         pinParams={{ tab: "sources" }}
@@ -42,7 +42,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/governance/catalog/*",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/catalog"
         to="/governance/inventory"
       />
@@ -51,7 +51,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/governance/catalog",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/catalog"
         to="/governance/inventory"
         pinParams={{ tab: "sources" }}
@@ -64,7 +64,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
     // for viewers — the pane they can actually read.
     path: "/governance/tool-catalog",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/tool-catalog"
         to="/governance/inventory"
       />
@@ -73,7 +73,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/governance/departments",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/governance/departments"
         to="/governance/people"
       />
@@ -81,24 +81,24 @@ export const legacyRedirectRoutes: RouteObject[] = [
   },
   {
     path: "/settings/gateway/*",
-    element: <LegacyPrefixRedirect from="/settings/gateway" to="/gateway" />,
+    element: <UiPrefixRedirect from="/settings/gateway" to="/gateway" />,
   },
   {
     path: "/settings/gateway",
-    element: <LegacyPrefixRedirect from="/settings/gateway" to="/gateway" />,
+    element: <UiPrefixRedirect from="/settings/gateway" to="/gateway" />,
   },
   {
     path: "/settings/governance/*",
-    element: <LegacyPrefixRedirect from="/settings/governance" to="/governance" />,
+    element: <UiPrefixRedirect from="/settings/governance" to="/governance" />,
   },
   {
     path: "/settings/governance",
-    element: <LegacyPrefixRedirect from="/settings/governance" to="/governance" />,
+    element: <UiPrefixRedirect from="/settings/governance" to="/governance" />,
   },
   {
     path: "/settings/routing-policies/*",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/settings/routing-policies"
         to="/gateway/routing-policies"
       />
@@ -107,7 +107,7 @@ export const legacyRedirectRoutes: RouteObject[] = [
   {
     path: "/settings/routing-policies",
     element: (
-      <LegacyPrefixRedirect
+      <UiPrefixRedirect
         from="/settings/routing-policies"
         to="/gateway/routing-policies"
       />

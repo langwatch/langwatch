@@ -7,7 +7,7 @@
  * references them. The next lazy `import()` of such a chunk 404s with
  * "Failed to fetch dynamically imported module".
  *
- * Route chunks are guarded by the `page()` helper in `routes.tsx`; the global
+ * Route chunks are guarded by `lazyRoute` in `./lazy-route`; the global
  * `vite:preloadError` listener (registered by the shell adapter) covers every
  * other lazy import by reloading once so the browser fetches fresh hashes.
  */

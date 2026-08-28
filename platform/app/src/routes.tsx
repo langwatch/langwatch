@@ -1,5 +1,5 @@
 import NProgress from "nprogress";
-import { reloadOnChunkError } from "@langwatch/ui";
+import { lazyRoute as page, UiPrefixRedirect } from "@langwatch/ui";
 import { Suspense, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -9,7 +9,6 @@ import {
   useLocation,
   useNavigation,
 } from "react-router";
-import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import { legacyRedirectRoutes } from "./legacyRedirects";
@@ -46,23 +45,6 @@ function RootLayout() {
     </InnerProviders>
   );
 }
-
-/**
- * Helper: wraps a dynamic import() into the shape React Router's `lazy` expects.
- * React Router's lazy keeps the OLD route visible while the new module loads,
- * eliminating the gray flash that React.lazy + Suspense causes.
- */
-const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
-  lazy: () =>
-    importFn()
-      .then((m) => ({ Component: m.default }))
-      .catch((err: unknown) => {
-        // Stale route chunk after a deploy → reload once to pick up the new
-        // hashes. Non-chunk errors fall through to the error boundary.
-        reloadOnChunkError(err);
-        throw err;
-      }),
-});
 
 const routes: RouteObject[] = [
   // Auth (public)
@@ -248,7 +230,7 @@ const routes: RouteObject[] = [
         // /settings/governance/cost-centers address chains through here,
         // and /governance/departments redirects via legacyRedirectRoutes).
         path: "/governance/cost-centers",
-        element: <LegacyPrefixRedirect from="/governance/cost-centers" to="/governance/people" />,
+        element: <UiPrefixRedirect from="/governance/cost-centers" to="/governance/people" />,
       },
       {
         // View-all teams listing - bird's-eye `View all teams →` lands here.

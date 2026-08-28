@@ -1,11 +1,12 @@
-import { Provider } from "~/components/ui/provider";
+import { UiDesignSystemShell } from "@langwatch/ui";
+import { uiDesignSystem } from "@langwatch/ui/design-system";
 import { WelcomeScreen } from "~/features/onboarding/screens/WelcomeScreen";
 
 const OnboardingWelcome: React.FC = () => {
   return (
-    <Provider>
+    <UiDesignSystemShell system={uiDesignSystem}>
       <WelcomeScreen />
-    </Provider>
+    </UiDesignSystemShell>
   );
 };
 
