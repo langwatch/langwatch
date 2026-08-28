@@ -4,7 +4,7 @@
  * down to the middleware built here.
  *
  * ONE seam, decision-neutral, properly layered: this middleware is the tRPC
- * boundary, it resolves `getApp().permissions` — the App-composed
+ * boundary, it resolves `ctx.app.permissions` — the App-composed
  * `PermissionsService`, which takes the
  * `ForkAwarePermissionDecisionRepository`, which owns the client and
  * delegates to the same fork-aware resolvers the legacy
@@ -43,11 +43,8 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
-import { type App, getApp } from "../app";
-import {
-  LiteMemberRestrictedError,
-  MembershipDisabledError,
-} from "../permissions/errors";
+import type { App } from "../app";
+import { LiteMemberRestrictedError, MembershipDisabledError } from "../permissions/errors";
 
 const logger = createLogger("langwatch:authz");
 
@@ -56,8 +53,8 @@ type ScopeInput = Partial<Record<ScopeTierField, unknown>>;
 type MiddlewareParams = {
   ctx: {
     session: Session | null;
-    /** The composed App the context factory injected (see `trpc.ts`). */
-    app?: App;
+    /** The composed App the tRPC context factory injected. */
+    app: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
   };
@@ -65,17 +62,7 @@ type MiddlewareParams = {
   next: () => any;
 };
 
-/**
- * The App this request decides through: the one its context factory injected,
- * or the process singleton for contexts built without one (SSG helpers,
- * embedded callers). Both are the same instance in production — the ctx slot
- * exists so a test can hand in a fake without mocking the App module.
- */
-const appOf = (ctx: MiddlewareParams["ctx"]): App => ctx.app ?? getApp();
-
-type DeclaredMiddleware = DeclaredAuthzMiddleware<
-  (params: MiddlewareParams) => Promise<any>
->;
+type DeclaredMiddleware = DeclaredAuthzMiddleware<(params: MiddlewareParams) => Promise<any>>;
 
 /**
  * `.permission(p)` / `.permission(p, { via })`. The type layer
@@ -101,7 +88,7 @@ export const checkDeclaredPermission = ({
       }
 
       const scope = requireDeclaredScope({ permission, input, via });
-      const { permitted, organizationRole } = await appOf(ctx).permissions.getDecision({
+      const { permitted, organizationRole } = await ctx.app.permissions.getDecision({
         userId: ctx.session.user.id,
         permission,
         scope,
@@ -111,7 +98,6 @@ export const checkDeclaredPermission = ({
           permission,
           scope,
           organizationRole,
-          denialReason,
         });
       }
       // Legacy parity: the organization tier never carried a role onto the
@@ -149,9 +135,7 @@ export const checkDeclaredPermissionAny = (
         input,
         via: "projectId",
       });
-      const { permitted, organizationRole, denialReason } = await appOf(
-        ctx,
-      ).permissions.getProjectAnyDecision({
+      const { permitted, organizationRole } = await ctx.app.permissions.getProjectAnyDecision({
         userId: ctx.session.user.id,
         projectId,
         permissions,
@@ -161,7 +145,6 @@ export const checkDeclaredPermissionAny = (
           permission: permissions[0],
           scope: { tier: "project", id: projectId },
           organizationRole,
-          denialReason,
         });
       }
       ctx.organizationRole = organizationRole;
@@ -271,10 +254,7 @@ function wiringBug({
   permission: AuthzPermission;
   via?: ScopeTierField;
 }): TRPCError {
-  logger.error(
-    { permission, via },
-    "declared permission's input carries no usable scope id",
-  );
+  logger.error({ permission, via }, "declared permission's input carries no usable scope id");
   return new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: "Something went wrong. Please try again.",

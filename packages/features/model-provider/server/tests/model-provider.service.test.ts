@@ -166,6 +166,10 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
+  checkScopeLineage(): Promise<never> {
+    return this.notUsed();
+  }
+
   explainDecision(): Promise<never> {
     return this.notUsed();
   }

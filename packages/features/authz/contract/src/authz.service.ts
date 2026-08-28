@@ -1,4 +1,5 @@
 import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz";
+import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage";
 import type { PermissionScopeArg, TierOfScopeArg } from "./declaration";
 import type { AuthzPermission } from "./registry";
 import type { BindingScopeTier } from "./vocabulary";
@@ -98,6 +99,9 @@ export abstract class AuthzService {
   abstract canBatchByIds(args: AuthzCanBatchByIdsInput): Promise<AuthzCanBatchByIdsOutput>;
 
   abstract tryResolveScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
+
+  /** Refuses mixed scope ids that do not resolve to one organization. */
+  abstract checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
 
   abstract explainDecision(args: AuthzExplainDecisionInput): Promise<AuthzExplainDecisionOutput>;
 

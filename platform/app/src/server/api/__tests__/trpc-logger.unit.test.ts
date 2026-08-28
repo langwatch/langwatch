@@ -1,7 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { handleTrpcCallLogging, recordTrpcCall, resetSlowCallThrottle } from "../trpc";
+import {
+  handleTrpcCallLogging,
+  recordTrpcCall,
+  resetSlowCallThrottle,
+} from "../trpc.runtime-policy";
 
 function createMockLog() {
   return {

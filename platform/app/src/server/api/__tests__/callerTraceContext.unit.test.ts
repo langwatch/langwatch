@@ -14,7 +14,7 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { callerTraceContext } from "../trpc";
+import { callerTraceContext } from "../trpc.runtime-policy";
 
 const REMOTE_TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 const REMOTE_SPAN_ID = "b7ad6b7169203331";
@@ -105,9 +105,7 @@ describe("callerTraceContext", () => {
     });
 
     it("survives a req with no headers", () => {
-      expect(
-        spanContextOf(callerTraceContext({ req: {}, type: "query" })),
-      ).toBeUndefined();
+      expect(spanContextOf(callerTraceContext({ req: {}, type: "query" }))).toBeUndefined();
     });
   });
 

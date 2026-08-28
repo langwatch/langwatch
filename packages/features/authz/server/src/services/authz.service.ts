@@ -53,6 +53,8 @@ import {
   type AuthzLegacyAccessNoticeInput,
   type AuthzRequireProjectPermissionInput,
   type AuthzScopeRef,
+  type AuthzScopeLineageInput,
+  type AuthzScopeLineageResult,
   type AuthzTeamMemberBinding,
   type Authorized,
   type BindingScopeTier,
@@ -70,6 +72,7 @@ import type { AuthzReadRepository } from "../repositories/authz-read.repository"
 import { AuthzBindingReaderService } from "./authz-binding-reader.service";
 import { AuthzCollectorService } from "./authz-collector.service";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service";
+import { AuthzScopeLineageService } from "./authz-scope-lineage.service";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -119,6 +122,7 @@ export class AuthzService extends AuthzServiceContract {
         listing: options.listing,
       }),
       AuthzGrantSnapshotService.create(collector, options),
+      AuthzScopeLineageService.create({ repository: options.repository }),
       options,
     );
   }
@@ -129,6 +133,7 @@ export class AuthzService extends AuthzServiceContract {
     private readonly collector: AuthzCollectorService,
     private readonly bindingReader: AuthzBindingReaderService,
     private readonly snapshots: AuthzGrantSnapshotService,
+    private readonly scopeLineage: AuthzScopeLineageService,
     private readonly options: AuthzServiceOptions,
   ) {
     super();
@@ -472,6 +477,10 @@ export class AuthzService extends AuthzServiceContract {
     }
 
     return null;
+  }
+
+  async checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {
+    return this.scopeLineage.check(args);
   }
 
   async getDecision({

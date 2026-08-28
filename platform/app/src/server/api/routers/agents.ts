@@ -1,5 +1,2 @@
-/**
- * Compatibility entry point for the app router. Agents transport composition
- * lives under runtime/app; feature-server imports are forbidden here.
- */
+/** The universal tRPC root mounts the process-composed Agent transport here. */
 export { agentsRouter } from "~/runtime/app/internal-api/agents.router";

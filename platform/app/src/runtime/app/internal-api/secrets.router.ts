@@ -1,6 +1,5 @@
-import { AgentTrpcApi } from "@langwatch/agent-server";
+import { SecretTrpcApi } from "@langwatch/secret-server";
 import { appTrpcRoot } from "~/server/api/trpc.root";
-import { scopeLineageGuard } from "~/server/api/trpc.scope-lineage-middleware";
 import {
   auditLogMutations,
   handledErrorMiddleware,
@@ -12,10 +11,9 @@ const featureProcedure = appTrpcRoot.procedure
   .use(tracerMiddleware)
   .use(loggerMiddleware)
   .use(handledErrorMiddleware)
-  .use(scopeLineageGuard({ kind: "permission", permission: "evaluations:manage" }))
   .use(auditLogMutations);
 
 /** Process transport mount for mixed tRPC batches; feature behaviour is package-owned. */
-export const agentsRouter = AgentTrpcApi.create(appTrpcRoot, {
+export const secretsRouter = SecretTrpcApi.create(appTrpcRoot, {
   protected: featureProcedure,
 });

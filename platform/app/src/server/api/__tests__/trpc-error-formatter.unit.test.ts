@@ -7,7 +7,7 @@ import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { errorFormatter } from "../trpc";
+import { errorFormatter } from "../trpc.error-formatter";
 
 function format(error: TRPCError) {
   return errorFormatter({
@@ -108,9 +108,7 @@ describe("tRPC error response boundary", () => {
         const formatted = format(error);
 
         expect(formatted.message).toBe("langy_conversation_not_found");
-        expect(JSON.stringify(formatted)).not.toContain(
-          "Conversation not found: conversation-1",
-        );
+        expect(JSON.stringify(formatted)).not.toContain("Conversation not found: conversation-1");
         expect(formatted.data.error).toMatchObject({
           code: "langy_conversation_not_found",
           httpStatus: 404,

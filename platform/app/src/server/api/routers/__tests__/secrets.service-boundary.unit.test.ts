@@ -32,13 +32,14 @@ const secret: Secret = {
 };
 
 function caller() {
+  const actor = () => ({ id: "user-1" });
+  const getDecision = vi.fn().mockResolvedValue({ permitted: true, organizationRole: "MEMBER" });
+
   return secretsRouter.createCaller({
     session: { user: { id: "user-1" }, expires: "1" },
     app: {
       permissions: {
-        getDecision: vi
-          .fn()
-          .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+        getDecision,
       },
       secrets: {
         list,
@@ -47,6 +48,16 @@ function caller() {
         delete: deleteSecret,
       },
     },
+    actor,
+    authorize: async (permission: string, target: { projectId: string }) => {
+      const decision = await getDecision({
+        userId: actor().id,
+        permission,
+        scope: { tier: "project", id: target.projectId },
+      });
+      if (!decision.permitted) throw new Error("permission denied");
+    },
+    can: async () => true,
     permissionChecked: true,
   } as never);
 }

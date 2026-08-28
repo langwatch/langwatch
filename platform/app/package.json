@@ -222,6 +222,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/trpc": "workspace:*",
     "@langwatch/ui": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-server": "workspace:*",

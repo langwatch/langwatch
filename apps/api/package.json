@@ -25,7 +25,19 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-server": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/secret-server": "workspace:*",
+    "@langwatch/trpc": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
+    "@trpc/server": "^11.18.0",
+    "hono": "^4.10.7",
+    "superjson": "^2.2.6"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

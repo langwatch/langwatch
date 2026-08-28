@@ -260,9 +260,7 @@ through a policy:
 
 ```ts
 app.access(requires("traces:view")).get("/traces/:id", handler);
-app
-  .access(publicEndpoint("health probe; no data in the response"))
-  .get("/health", handler);
+app.access(publicEndpoint("health probe; no data in the response")).get("/health", handler);
 ```
 
 Policy vocabulary is typed against the registry. Reasons on `publicEndpoint`,
@@ -312,8 +310,9 @@ Spec: `specs/rbac/credential-arbitration.feature`.
 Whatever the declaration kind — declared, custom, or opted out — a runtime
 guard in front of it refuses any request whose input carries scope ids that
 do not all resolve to one organization
-(`platform/app/src/server/app-layer/authz/scope-lineage-guard.ts`, wired in
-`withPermissionCheck`). The declaration sweep closes tier-shadowing
+(`AuthzService.checkScopeLineage`, adapted by
+`platform/app/src/server/api/trpc.scope-lineage-middleware.ts`). The
+declaration sweep closes tier-shadowing
 statically, but only for declarations it can see through; this guard removes
 the exploit's precondition everywhere instead — a check passing on your own
 narrow id can never aim a handler at someone else's wider one, because the
@@ -334,7 +333,8 @@ carrying at most one scope id costs nothing.
   receives witnesses through `authorize`, it never mints them.
 - `platform/app/src/server/app-layer/permissions/imperative.ts` — `require*`
   and `probe*`.
-- `platform/app/src/server/api/trpc.ts` — the pending builder.
+- `platform/app/src/server/api/trpc.permission-builder.ts` — the app's
+  declaration policy builder; `@langwatch/trpc` owns generic root creation.
 - `packages/api` — the service framework and its boot checks.
 - `specs/rbac/typed-permission-declarations.feature` — the behavioural
   contract; every guarantee above is a bound scenario.

@@ -20,7 +20,8 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 
 import { auditLog } from "~/runtime/app/features/audit-log";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter } from "../trpc";
+import { protectedProcedure } from "../trpc.permission-builder";
 
 const mockAuditLog = vi.mocked(auditLog);
 
@@ -30,8 +31,7 @@ const runInput = z.object({
 });
 
 /** Marks the permission check as done, the way a real check middleware does. */
-const grantPermission = ({ ctx, next }: any) =>
-  next({ ctx: { ...ctx, permissionChecked: true } });
+const grantPermission = ({ ctx, next }: any) => next({ ctx: { ...ctx, permissionChecked: true } });
 
 const testRouter = createTRPCRouter({
   // Nested so the action path the middlewares see is the real one: the rules
@@ -58,6 +58,11 @@ const testRouter = createTRPCRouter({
 function caller() {
   return testRouter.createCaller({
     session: { user: { id: "user-1" } },
+    app: {
+      permissions: {
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      },
+    },
     permissionChecked: false,
     req: undefined,
   } as any);
@@ -96,9 +101,7 @@ describe("audit middlewares", () => {
       // is the assertion that says so at the path the rules cover.
       /** @scenario "Audit log entries never record a secret value" */
       it("records no parameter value on the error path either", async () => {
-        await expect(
-          caller().scenarios.run({ projectId: "proj-1", parameters }),
-        ).rejects.toThrow();
+        await expect(caller().scenarios.run({ projectId: "proj-1", parameters })).rejects.toThrow();
 
         expect(mockAuditLog).toHaveBeenCalledTimes(1);
         const call = mockAuditLog.mock.calls[0]?.[0];

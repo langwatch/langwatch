@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInnerTRPCContext } from "~/server/api/trpc";
+import { createInnerTRPCContext } from "~/server/api/trpc.context";
 import type { RequestAppServices } from "../requestApp";
 
 describe("request application context", () => {

@@ -135,9 +135,7 @@ function scopeFieldsOf(parser: unknown): ScopeFieldSets | null {
   if (!shape || typeof shape !== "object") return null;
 
   return {
-    required: SCOPE_FIELDS.filter(
-      (field) => field in shape && !isAbsentable(shape[field]),
-    ),
+    required: SCOPE_FIELDS.filter((field) => field in shape && !isAbsentable(shape[field])),
     accepted: SCOPE_FIELDS.filter((field) => field in shape),
   };
 }
@@ -178,7 +176,7 @@ function coveredScopeFields({
     if (!tier) return [];
     // When the checked tier is the organization, every narrower id the input
     // carries is anchored to that SAME organization at runtime: the scope
-    // lineage guard (scope-lineage-guard.ts) runs ahead of every check and
+    // lineage guard (trpc.scope-lineage-middleware.ts) runs ahead of every check and
     // refuses any request whose scope ids resolve to different organizations
     // (or to none). An org-wide grant authorizes the org's teams and
     // projects, so those ids are covered — by the guard, not by trust.
@@ -194,9 +192,7 @@ function coveredScopeFields({
     case "permission":
       return forPermission(declaration.permission, accepted, declaration.via);
     case "permission-any":
-      return declaration.permissions.flatMap((permission) =>
-        forPermission(permission, accepted),
-      );
+      return declaration.permissions.flatMap((permission) => forPermission(permission, accepted));
     // A custom or service-authorized middleware runs its OWN enforcement,
     // opaque to the sweep, so its declared permissions are trusted against the
     // fields that always arrive rather than resolved positionally. Fields the
@@ -206,9 +202,7 @@ function coveredScopeFields({
     case "service-authorized":
     case "custom":
       return [
-        ...declaration.permissions.flatMap((permission) =>
-          forPermission(permission, required),
-        ),
+        ...declaration.permissions.flatMap((permission) => forPermission(permission, required)),
         ...(Object.keys(declaration.enforces ?? {}) as ScopeTierField[]),
       ];
     case "no-permission":
@@ -217,9 +211,8 @@ function coveredScopeFields({
 }
 
 function collectProcedures(): Procedure[] {
-  const procedures = (
-    appRouter as unknown as { _def: { procedures: Record<string, unknown> } }
-  )._def.procedures;
+  const procedures = (appRouter as unknown as { _def: { procedures: Record<string, unknown> } })
+    ._def.procedures;
 
   return Object.entries(procedures).map(([path, procedure]) => {
     const def = (procedure as { _def?: Record<string, any> })._def ?? {};

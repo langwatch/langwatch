@@ -10,6 +10,7 @@ export * from "./authz-grant.events";
 export * from "./authz-grants.service";
 export * from "./authz.queries";
 export * from "./authz.service";
+export * from "./authz-scope-lineage";
 export * from "./bitset";
 export * from "./credential-claims";
 export * from "./declaration";

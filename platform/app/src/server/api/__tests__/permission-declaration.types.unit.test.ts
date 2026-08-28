@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { requires } from "../security";
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "../trpc.permission-builder";
 
 const projectInput = z.object({ projectId: z.string() });
 const teamInput = z.object({ teamId: z.string() });
@@ -36,12 +36,7 @@ const organizationScoped = protectedProcedure
 
 /** @scenario "An input modelled as a union is checked per member" */
 const eitherScoped = protectedProcedure
-  .input(
-    z.union([
-      z.object({ projectId: z.string() }),
-      z.object({ organizationId: z.string() }),
-    ]),
-  )
+  .input(z.union([z.object({ projectId: z.string() }), z.object({ organizationId: z.string() })]))
   .permission("project:update");
 
 /** @scenario "A scope derivation is written at the call site, never inferred" */
@@ -50,9 +45,7 @@ const derived = protectedProcedure
   .permission("organization:manage", { via: "teamId" });
 
 /** @scenario "Any one of several declared permissions is enough" */
-const anyOf = protectedProcedure
-  .input(projectInput)
-  .permissionAny("traces:view", "scenarios:view");
+const anyOf = protectedProcedure.input(projectInput).permissionAny("traces:view", "scenarios:view");
 
 /** @scenario "Opting out of permission checks requires a written reason" */
 const optedOut = protectedProcedure
@@ -160,12 +153,6 @@ describe("typed permission declarations", () => {
       // leaves it empty — is a different answer entirely, and lives with the
       // middleware that gives it.
       expect(projectScoped).toBeDefined();
-    });
-
-    /** @scenario "A platform-tier permission is refused by the scoped declaration surface" */
-    it("refuses ops permissions on the scoped surface", () => {
-      // The assertion is the `@ts-expect-error` on the ops:view declaration.
-      expect(true).toBe(true);
     });
 
     /** @scenario "An input modelled as a union is checked per member" */

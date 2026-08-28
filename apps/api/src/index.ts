@@ -1,3 +1,5 @@
+export { ApiApplication } from "./api.application";
+export { ApiProcess } from "./api.process";
 export {
   ApiApplicationPort,
   ApiLifecyclePort,

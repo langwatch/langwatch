@@ -48,12 +48,11 @@ vi.mock("~/server/api/rbac", () => ({
   resolveProjectPermission: (...args: unknown[]) => resolveProjectPermission(...args),
   resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),
   hasOrganizationPermission: (...args: unknown[]) => hasOrganizationPermission(...args),
-  resolveProjectPermissionAny: (...args: unknown[]) =>
-    resolveProjectPermissionAny(...args),
+  resolveProjectPermissionAny: (...args: unknown[]) => resolveProjectPermissionAny(...args),
 }));
 
-// The seam resolves its service from the App; this fake App runs the REAL
-// service + repository over the rbac stubs above.
+// The context owns the exact App the middleware uses. This mocked App keeps
+// the real compatibility service over the resolver stubs above.
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
@@ -66,8 +65,10 @@ const {
   declaredServiceAuthorization,
 } = await import("../trpc-middleware");
 const { authzDeclarationOf } = await import("@langwatch/authz-contract");
+const { getApp } = await import("~/server/app-layer/app");
 
 const session = { user: { id: "alice" } };
+const app = getApp();
 
 const paramsFor = (
   input: Record<string, string | undefined>,
@@ -75,6 +76,7 @@ const paramsFor = (
 ) => ({
   ctx: {
     session: (authed ? session : null) as any,
+    app,
     permissionChecked: false,
     organizationRole: undefined as any,
   },
@@ -222,9 +224,7 @@ describe("checkDeclaredPermission", () => {
     /** @scenario "A scope id the caller left blank is answered as invalid input" */
     it("answers invalid input, naming the field, without deciding anything", async () => {
       const error = await rejection(() =>
-        checkDeclaredPermission({ permission: "traces:view" })(
-          paramsFor({ projectId: "" }) as any,
-        ),
+        checkDeclaredPermission({ permission: "traces:view" })(paramsFor({ projectId: "" }) as any),
       );
 
       expect(error.code).toBe("BAD_REQUEST");
@@ -247,9 +247,7 @@ describe("checkDeclaredPermission", () => {
      */
     it("does not report the caller's blank id as an internal error", async () => {
       await rejection(() =>
-        checkDeclaredPermission({ permission: "traces:view" })(
-          paramsFor({ projectId: "" }) as any,
-        ),
+        checkDeclaredPermission({ permission: "traces:view" })(paramsFor({ projectId: "" }) as any),
       );
       expect(loggedError).not.toHaveBeenCalled();
     });
