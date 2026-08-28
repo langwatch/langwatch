@@ -10,11 +10,13 @@ import {
   dashboardSchema,
   savedWorkbenchChartSchema,
   savedWorkbenchChartDefinitionSchema,
+  SavedWorkbenchChartAlreadyExistsError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
 import {
   DashboardRepository,
+  type DashboardGraphKind,
   type SavedWorkbenchChartRecord,
   type DashboardRecord,
   type DashboardSummaryRecord,
@@ -45,11 +47,18 @@ export class PrismaDashboardRepository extends DashboardRepository {
 
   async findAllDashboards(input: {
     projectId: string;
+    graphKinds: readonly DashboardGraphKind[];
   }): Promise<DashboardSummaryRecord[]> {
     const rows = await this.prisma.dashboard.findMany({
       where: { projectId: input.projectId },
       orderBy: { order: "asc" },
-      include: { _count: { select: { graphs: true } } },
+      include: {
+        _count: {
+          select: {
+            graphs: { where: { kind: { in: [...input.graphKinds] } } },
+          },
+        },
+      },
     });
     return rows.map((row) => ({ ...toDashboard(row), graphCount: row._count.graphs }));
   }
@@ -74,9 +83,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     };
   }
 
-  async tryFindFirstDashboard(input: {
-    projectId: string;
-  }): Promise<DashboardRecord | null> {
+  async tryFindFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
     const row = await this.prisma.dashboard.findFirst({
       where: { projectId: input.projectId },
       orderBy: { order: "asc" },
@@ -84,9 +91,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? toDashboard(row) : null;
   }
 
-  async tryFindLastDashboard(input: {
-    projectId: string;
-  }): Promise<DashboardRecord | null> {
+  async tryFindLastDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
     const row = await this.prisma.dashboard.findFirst({
       where: { projectId: input.projectId },
       orderBy: { order: "desc" },
@@ -94,10 +99,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? toDashboard(row) : null;
   }
 
-  async findDashboardIds(input: {
-    projectId: string;
-    dashboardIds: string[];
-  }): Promise<string[]> {
+  async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
     const rows = await this.prisma.dashboard.findMany({
       where: { id: { in: input.dashboardIds }, projectId: input.projectId },
       select: { id: true },
@@ -138,10 +140,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     );
   }
 
-  async updateDashboardOrder(input: {
-    projectId: string;
-    dashboardIds: string[];
-  }): Promise<void> {
+  async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {
     await this.prisma.$transaction(
       input.dashboardIds.map((dashboardId, order) =>
         this.prisma.dashboard.update({
@@ -152,10 +151,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     );
   }
 
-  async findAllGraphs(input: {
-    projectId: string;
-    dashboardId?: string;
-  }): Promise<GraphRecord[]> {
+  async findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
       where: {
         projectId: input.projectId,
@@ -169,10 +165,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return rows.map((row) => this.toGraph(row));
   }
 
-  async tryFindGraph(input: {
-    projectId: string;
-    graphId: string;
-  }): Promise<GraphRecord | null> {
+  async tryFindGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | null> {
     const row = await this.prisma.customGraph.findFirst({
       where: {
         id: input.graphId,
@@ -237,12 +230,8 @@ export class PrismaDashboardRepository extends DashboardRepository {
       },
       data: {
         ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.graph === undefined
-          ? {}
-          : { graph: input.graph as Prisma.InputJsonValue }),
-        ...(input.filters === undefined
-          ? {}
-          : { filters: input.filters as Prisma.InputJsonValue }),
+        ...(input.graph === undefined ? {} : { graph: input.graph as Prisma.InputJsonValue }),
+        ...(input.filters === undefined ? {} : { filters: input.filters as Prisma.InputJsonValue }),
       },
     });
     return this.toGraph(row);
@@ -326,16 +315,20 @@ export class PrismaDashboardRepository extends DashboardRepository {
     name: string;
     definition: SavedWorkbenchChartDefinition;
   }): Promise<SavedWorkbenchChartRecord> {
-    const row = await this.prisma.customGraph.create({
-      data: {
-        id: input.id,
-        projectId: input.projectId,
-        name: input.name,
-        graph: input.definition as Prisma.InputJsonValue,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
-    });
-    return this.toSavedWorkbenchChart(row);
+    try {
+      const row = await this.prisma.customGraph.create({
+        data: {
+          id: input.id,
+          projectId: input.projectId,
+          name: input.name,
+          graph: input.definition as Prisma.InputJsonValue,
+          kind: WORKBENCH_SQL_CHART_KIND,
+        },
+      });
+      return this.toSavedWorkbenchChart(row);
+    } catch (error) {
+      return mapSavedWorkbenchChartCreateError(error);
+    }
   }
 
   async tryUpdateSavedWorkbenchChart(input: {
@@ -361,10 +354,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     return row ? this.toSavedWorkbenchChart(row) : null;
   }
 
-  async deleteSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<number> {
+  async deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<number> {
     const result = await this.prisma.customGraph.deleteMany({
       where: {
         id: input.chartId,
@@ -373,6 +363,55 @@ export class PrismaDashboardRepository extends DashboardRepository {
       },
     });
     return result.count;
+  }
+
+  async tryPlaceSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    dashboardId: string;
+    gridColumn: number;
+    gridRow: number;
+    colSpan: number;
+    rowSpan: number;
+  }): Promise<SavedWorkbenchChartRecord | null> {
+    const rows = await this.prisma.customGraph.updateManyAndReturn({
+      where: {
+        id: input.chartId,
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+      },
+      data: {
+        dashboardId: input.dashboardId,
+        gridColumn: input.gridColumn,
+        gridRow: input.gridRow,
+        colSpan: input.colSpan,
+        rowSpan: input.rowSpan,
+      },
+    });
+    const row = rows[0];
+    return row ? this.toSavedWorkbenchChart(row) : null;
+  }
+
+  async tryUnplaceSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<SavedWorkbenchChartRecord | null> {
+    const rows = await this.prisma.customGraph.updateManyAndReturn({
+      where: {
+        id: input.chartId,
+        projectId: input.projectId,
+        kind: WORKBENCH_SQL_CHART_KIND,
+      },
+      data: {
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+      },
+    });
+    const row = rows[0];
+    return row ? this.toSavedWorkbenchChart(row) : null;
   }
 
   private toGraph(row: {
@@ -410,6 +449,11 @@ export class PrismaDashboardRepository extends DashboardRepository {
     projectId: string;
     name: string;
     graph: unknown;
+    dashboardId: string | null;
+    gridColumn: number;
+    gridRow: number;
+    colSpan: number;
+    rowSpan: number;
     createdAt: Date;
     updatedAt: Date;
   }): SavedWorkbenchChartRecord {
@@ -418,8 +462,26 @@ export class PrismaDashboardRepository extends DashboardRepository {
       projectId: row.projectId,
       name: row.name,
       definition: savedWorkbenchChartDefinitionSchema.parse(row.graph),
+      dashboardId: row.dashboardId,
+      gridColumn: row.gridColumn,
+      gridRow: row.gridRow,
+      colSpan: row.colSpan,
+      rowSpan: row.rowSpan,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     });
   }
+}
+
+function prismaErrorCode(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  const code = error.code;
+  return typeof code === "string" ? code : null;
+}
+
+function mapSavedWorkbenchChartCreateError(error: unknown): never {
+  if (prismaErrorCode(error) === "P2002") {
+    throw new SavedWorkbenchChartAlreadyExistsError();
+  }
+  throw error;
 }

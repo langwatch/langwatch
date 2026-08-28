@@ -19,8 +19,16 @@ persistence boundary, LangWatchQL browser behaviour, and Vega-Lite policy. The
 application owns routes, tRPC transport, saved-chart persistence, and browser
 theme/lazy-render ports.
 
-Server-side LangWatchQL execution remains a recorded migration residual under
-`platform/app/src/server/analytics/lwql`; it does not define another owner.
+`LangWatchQLService` is the one deliberate additional public Analytics service:
+its restricted database identity, tenant capability, query/result ceilings, and
+one close lifecycle are a distinct trust boundary from ordinary Analytics
+reads. Dashboard and other consumers use its portable contract, never an
+Analytics repository or executor.
+
+The concrete server executor remains a recorded migration residual under
+`platform/app/src/server/analytics/lwql` until its typed configuration and
+restricted client move into the Analytics server package. The portable contract
+is canonical; the residual implementation does not define another owner.
 
 ## Public surfaces and transports
 

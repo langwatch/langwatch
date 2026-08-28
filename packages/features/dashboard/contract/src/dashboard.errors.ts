@@ -1,3 +1,13 @@
+import { ValidationError } from "@langwatch/handled-error";
+
+type DashboardValidationErrorSource = Readonly<{
+  message: string;
+  flatten(): {
+    formErrors: string[];
+    fieldErrors: Record<string, string[] | undefined> | string;
+  };
+}>;
+
 export class DashboardNotFoundError extends Error {
   constructor() {
     super("Dashboard not found");
@@ -23,6 +33,45 @@ export class SavedWorkbenchChartNotFoundError extends Error {
   constructor() {
     super("Saved chart not found");
     this.name = "SavedWorkbenchChartNotFoundError";
+  }
+}
+
+export class SavedWorkbenchChartDashboardNotFoundError extends Error {
+  constructor() {
+    super("Dashboard not found");
+    this.name = "SavedWorkbenchChartDashboardNotFoundError";
+  }
+}
+
+export class SavedWorkbenchChartAlreadyExistsError extends Error {
+  constructor() {
+    super("A saved chart with this id already exists");
+    this.name = "SavedWorkbenchChartAlreadyExistsError";
+  }
+}
+
+export class SavedWorkbenchChartDefinitionUpdateProtectionsRequiredError extends Error {
+  constructor() {
+    super("Saved workbench chart definition updates require caller protections");
+    this.name = "SavedWorkbenchChartDefinitionUpdateProtectionsRequiredError";
+  }
+}
+
+/** Preserves the shared 422 validation envelope at the Dashboard boundary. */
+export class SavedWorkbenchChartValidationError extends ValidationError {
+  constructor(error: DashboardValidationErrorSource) {
+    const flattened = error.flatten();
+    const fieldErrors =
+      typeof flattened.fieldErrors === "string"
+        ? { form: [flattened.fieldErrors] }
+        : flattened.fieldErrors;
+    super(error.message, {
+      meta: {
+        fieldErrors,
+        formErrors: flattened.formErrors,
+      },
+    });
+    this.name = "SavedWorkbenchChartValidationError";
   }
 }
 

@@ -1,8 +1,11 @@
+import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type {
   Graph,
   GraphLayout,
   SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
+
+export type DashboardGraphKind = "builder" | "workbench_sql";
 
 export type DashboardRecord = {
   id: string;
@@ -21,6 +24,11 @@ export type SavedWorkbenchChartRecord = {
   projectId: string;
   name: string;
   definition: unknown;
+  dashboardId: string | null;
+  gridColumn: number;
+  gridRow: number;
+  colSpan: number;
+  rowSpan: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -29,17 +37,14 @@ export type SavedWorkbenchChartRecord = {
 export abstract class DashboardRepository {
   abstract findAllDashboards(input: {
     projectId: string;
+    graphKinds: readonly DashboardGraphKind[];
   }): Promise<DashboardSummaryRecord[]>;
   abstract tryFindDashboard(input: {
     projectId: string;
     dashboardId: string;
   }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | null>;
-  abstract tryFindFirstDashboard(input: {
-    projectId: string;
-  }): Promise<DashboardRecord | null>;
-  abstract tryFindLastDashboard(input: {
-    projectId: string;
-  }): Promise<DashboardRecord | null>;
+  abstract tryFindFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | null>;
+  abstract tryFindLastDashboard(input: { projectId: string }): Promise<DashboardRecord | null>;
   abstract findDashboardIds(input: {
     projectId: string;
     dashboardIds: string[];
@@ -68,10 +73,7 @@ export abstract class DashboardRepository {
     projectId: string;
     dashboardId?: string;
   }): Promise<GraphRecord[]>;
-  abstract tryFindGraph(input: {
-    projectId: string;
-    graphId: string;
-  }): Promise<GraphRecord | null>;
+  abstract tryFindGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | null>;
   abstract tryFindLastGraphGridRow(input: {
     projectId: string;
     dashboardId: string;
@@ -92,10 +94,7 @@ export abstract class DashboardRepository {
     graph?: Record<string, unknown>;
     filters?: Record<string, unknown>;
   }): Promise<GraphRecord>;
-  abstract deleteGraph(input: {
-    projectId: string;
-    graphId: string;
-  }): Promise<GraphRecord>;
+  abstract deleteGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord>;
   abstract updateGraphLayout(input: {
     projectId: string;
     graphId: string;
@@ -129,14 +128,33 @@ export abstract class DashboardRepository {
     projectId: string;
     chartId: string;
   }): Promise<number>;
+  abstract tryPlaceSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    dashboardId: string;
+    gridColumn: number;
+    gridRow: number;
+    colSpan: number;
+    rowSpan: number;
+  }): Promise<SavedWorkbenchChartRecord | null>;
+  abstract tryUnplaceSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+  }): Promise<SavedWorkbenchChartRecord | null>;
 }
 
 /** Application-owned validation for LWQL and Vega-Lite definitions. */
 export abstract class SavedWorkbenchChartPolicy {
   abstract validate(input: {
     projectId: string;
+    protections: LangWatchQLProtections;
     definition: SavedWorkbenchChartDefinition;
   }): void | Promise<void>;
+}
+
+/** Controls which graph kinds a project may count as visible dashboard cards. */
+export abstract class DashboardGraphVisibilityPolicyPort {
+  abstract placeableKinds(input: { projectId: string }): Promise<readonly DashboardGraphKind[]>;
 }
 
 export abstract class DashboardIdGenerator {

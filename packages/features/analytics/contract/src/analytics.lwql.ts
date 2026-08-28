@@ -145,3 +145,62 @@ export const lwqlTimeWindowSchema = z
   })
   .strict();
 export type LangWatchQLTimeWindow = z.infer<typeof lwqlTimeWindowSchema>;
+
+/** The tenant identity a restricted LangWatchQL execution runs as. */
+export type LangWatchQLCaller = Readonly<{
+  /** Project id is used for audit logging; the database enforces tenant isolation. */
+  id: string;
+  /** Project-scoped secret hashed into the restricted tenant capability. */
+  lwqlKey: string;
+}>;
+
+/** The caller-specific content gates the LangWatchQL catalog understands. */
+export type LangWatchQLProtections = Readonly<{
+  canSeeCosts?: boolean | null;
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+}>;
+
+/** How a surface handles a saved chart whose requested period exceeds its bucket budget. */
+export type LangWatchQLBudgetOverflowMode = "refuse" | "coarsen";
+
+/** The requesting surface's trusted context for running a restricted query. */
+export type LangWatchQLRunContext = Readonly<{
+  project: LangWatchQLCaller;
+  protections: LangWatchQLProtections;
+  timeWindow?: LangWatchQLTimeWindow;
+  granularitySeconds?: number;
+  onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+}>;
+
+/** Input shared by every restricted LangWatchQL execution surface. */
+export type LangWatchQLExecuteInput = LangWatchQLRunContext &
+  Readonly<{
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+  }>;
+
+/** Input used to admit a statement before it is stored as a reusable artifact. */
+export type LangWatchQLValidationInput = Readonly<{
+  projectId: string;
+  protections: LangWatchQLProtections;
+  sql: string;
+  parameters?: Readonly<Record<string, unknown>>;
+  timeWindow?: LangWatchQLTimeWindow;
+}>;
+
+/**
+ * Analytics' separate restricted-query lifecycle and trust boundary.
+ *
+ * Ordinary Analytics reads use AnalyticsService. LangWatchQL owns a distinct
+ * tenant capability, restricted database identity, query ceilings, and one
+ * process-owned close lifecycle, so consumers such as Dashboard depend only on
+ * this contract and never on an Analytics server implementation.
+ */
+export abstract class LangWatchQLService {
+  abstract get available(): boolean;
+  abstract close(): Promise<void>;
+  abstract describeSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
+  abstract validate(input: LangWatchQLValidationInput): unknown;
+  abstract execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+}
