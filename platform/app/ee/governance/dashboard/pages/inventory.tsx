@@ -40,13 +40,11 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "@ee/governance/dashboard/logic/pullCadence";
+import { sourceBadge } from "@ee/governance/dashboard/logic/sourceHealthDisplay";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {
   ChevronRight,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
   Copy,
   KeyRound,
   Pencil,
@@ -100,19 +98,6 @@ type SecretDetails = {
   sourceName: string;
   sourceType: SourceType;
 };
-const STATUS_META: Record<
-  string,
-  { icon: typeof CircleCheck; label: string; color: string }
-> = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
-  awaiting_first_event: {
-    icon: CircleDashed,
-    label: "Awaiting first event",
-    color: "amber.500",
-  },
-  disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
-};
-
 export interface ComposerState {
   sourceType: SourceType;
   name: string;
@@ -922,8 +907,10 @@ function SourceRow({
   onArchive: () => void;
   canManage: boolean;
 }) {
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const status = sourceBadge({
+    status: source.status,
+    errorCount: source.errorCount,
+  });
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
