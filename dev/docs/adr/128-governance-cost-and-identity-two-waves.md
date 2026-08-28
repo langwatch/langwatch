@@ -118,7 +118,9 @@ before the relying code ships:
 
 ## Decision
 
-Numbered; each states why and what it rejects. §1–§8 are wave 1 (money),
+Numbered; each states why and what it rejects. §1–§8 are the money
+design — wave 1 ships the lanes **independent**; §2's interconnection
+and §7's mapping ship in **wave 2** (ruled by Sergio 2026-08-29) —
 §9–§17 identity and wave 2, §18–§20 cross-cutting.
 
 ### §1. One ADR, two waves, cost before identity
@@ -127,14 +129,29 @@ Wave 1 answers WHERE the money goes (company → application/source → agent �
 model); wave 2 answers WHO spent it (business area → user → conversation).
 Agent sits in wave 1 because its id arrives free on provider rows (Genie
 space, Copilot bot, OpenAI project); business area sits in wave 2 because it
-only exists by walking cost → person → dated department link. Rejects: two
-separate documents (the waves share every schema decision, and wave-1 tables
-must carry wave-2 columns from day one — §4).
+only exists by walking cost → person → dated department link.
 
-### §2. The bill is the total; gateway detail splits it
+**In wave 1 the money lanes are independent.** Billed, gateway and seat
+numbers appear side by side, each labeled, and are **never summed into
+one figure** — summing a billed lane and its own gateway metering would
+count the same dollars twice. Connecting the two lanes (which gateway
+traffic a bill pays for, the split, the variance line) is **wave 2**,
+because it needs the §7 key-to-bill mapping and its schema. §2 below is
+the already-ruled design for that connection, stamped wave 2 so nothing
+gets re-litigated when it ships.
 
-Where a pulled bill covers traffic (same provider account, per provider/day
-— the bill's finest grain):
+Rejects: two separate documents (the waves share every schema decision,
+and wave-1 tables must carry wave-2 columns from day one — §4).
+
+### §2. The bill is the total; gateway detail splits it (interconnection — ships wave 2)
+
+**Wave 1**: the billed lane shows the bill, the gateway lane shows
+metering, separately labeled, no combined figure (§1). Everything below
+is the ruled design for the **wave-2** connected view.
+
+Where a pulled bill covers traffic (per provider/day — the bill's finest
+grain; *which* gateway traffic a bill covers is the admin's key mapping,
+§7):
 
 - **Total shown = the bill.** The screen's number can be held against the
   invoice.
@@ -148,6 +165,14 @@ Where a pulled bill covers traffic (same provider account, per provider/day
   negative (bill composition, below), and that renders as-is.
 - Both numbers are always stored and comparable; the wave-2
   estimated-vs-billed report is this variance line given its own screen.
+- **Days the bill hasn't reached yet are marked "estimated."** Gateway
+  rows arrive instantly; the bill lands days later. Until a provider/day
+  has a bill row, the screen shows the gateway number with an
+  *estimated* tag; when the bill lands, the number flips to the bill and
+  the tag disappears. Computed at read (does the bill row exist yet?),
+  nothing stored — the same pattern AWS, Azure and GCP cost pages use,
+  so Tuesday's $4.20 becoming Thursday's $6.00 never looks like a
+  silent change.
 
 Where no bill covers the traffic, gateway rows stand alone, labeled
 *metered*. The overlap rule runs at **query time, never insert time**:
@@ -295,8 +320,10 @@ production. Wave 1 ships with, not after:
 - **Puller health surfaced, not just logged**: the thin service joins
   `IngestionSource` status so a day with no rows renders "no data since
   [last successful pull]" — distinct from a genuine $0 day.
-  Prerequisite named in §20, and it is *two* fixes, not one: the puller
-  worker today never flips source status on repeated failure
+  **Unhealthy = 3 consecutive failed runs** (ruled by Sergio
+  2026-08-29); a single flake never flips status, a third strike always
+  does. Prerequisite named in §20, and it is *two* fixes, not one: the
+  puller worker today never flips source status on repeated failure
   (`pullerWorker.ts` `assertRunMadeProgress` raises and stops), the
   model's error counter has **no production writer**, and no
   last-successful-pull timestamp exists at all (`lastEventAt` records
@@ -305,6 +332,13 @@ production. Wave 1 ships with, not after:
 
 The variance line (§2) already gives bill-vs-metering drift a first-class
 UI; these three give the pipeline itself the same honesty.
+
+**Alerts are automations, and automations are out of wave 1.** Wave 1
+surfaces every signal on screen (variance line, projection lag, source
+health); it sends nothing. All three signals live in queryable
+tables/columns, so a future automations layer can attach notifications
+without this design changing — the signals are the API, the alerting is
+a consumer.
 
 ### §5. One `cost_source` column carries channel and provider
 
@@ -323,7 +357,12 @@ and "show combined" are the same table.
 Each day the roster puller writes an event: *"provider reported N seats of
 type X."* Money is the multiplication, done at read: count-event × dated
 price list (which **we maintain** — no API publishes seat prices, proven
-for Copilot). A wrong price never poisons storage; fix the list and every
+for Copilot). The price list follows the llmcost pattern already in the
+repo — a JSON source of truth loaded into a registry, org-level
+overrides on top (`modelProviders/llmModels.json` →
+`loadModelCatalog.ts` → `registry.ts`, overrides via the existing
+drawer/router shape): manually seeded now, an automated sync task later
+(ruled by Sergio 2026-08-29). A wrong price never poisons storage; fix the list and every
 screen heals, because the stored event only ever claimed a count, which
 stays true. Roster history is frozen: January's count lives in January's
 events after people leave in March.
@@ -337,14 +376,38 @@ Rejects: storing seat dollars (bakes price-list mistakes into history);
 pure compute-at-read with no events (loses roster history — the count on
 a past date becomes unknowable).
 
-### §7. Every dollar has one home; the exclusion filter ships before the rollup goes live
+### §7. Every dollar has one home; the exclusion filter and key-to-bill mapping ship in wave 2
 
 Gateway, provider-bill, and seat channels are separately labeled and never
-double-count. The designed-but-unbuilt exclusion filter becomes real: its
-job under §2 is marking which gateway traffic corresponds to a pulled bill
-so the combined view counts each dollar once. The evidence pack ranks the
-missing filter as risk #1; it is a **blocking prerequisite** of turning
-the rollup projection on, not a fast-follow.
+double-count. **In wave 1 this invariant is structural**: the lanes are
+never summed into one figure (§1), so there is nothing to exclude and
+the rollup projection is **not blocked** on any filter — the evidence
+pack ranked the missing filter as risk #1 *for a combined view*, and
+wave 1 doesn't build one. (Deferral ruled by Sergio 2026-08-29; it
+removes the filter from the wave-1 critical path.)
+
+**Wave 2 — coverage is an explicit admin mapping, not an assumption.**
+When an admin connects a provider bill (an `IngestionSource`), they say
+which gateway keys that bill pays for (a schema addition on the source
+config — the reason this waits for wave 2). The rule then reads:
+
+- A gateway row whose key is **mapped** to a source: the bill replaces
+  its number in the combined total; the row still splits the bill (§2).
+- A gateway row whose key is **unmapped**: it stands alone as *metered*
+  — its dollars are real and no bill claims them.
+- Mapped keys' gateway sum **exceeding** the bill is §2's variance line:
+  total stays the bill, the overrun is shown, never subtracted.
+
+The mapping lives with the source config (small admin list, audited,
+read at query time like every overlap rule). The exclusion filter stays
+a **blocking prerequisite of the wave-2 combined view** — the first
+screen that merges lanes cannot ship before it. Rejected: provider-wide
+coverage — one connected bill silently claiming *all* that provider's
+gateway traffic. Zero-config, and correct for a single-account org, but
+an org with a second, unconnected account of the same provider would
+have that account's gateway dollars silently swallowed by the wrong
+bill; the explicit mapping keeps them visible as metered. (Ruled by
+Sergio 2026-08-29.)
 
 ### §8. Pulled money's home is the governance project; the spender fields stay empty (revises ADR-088 Decision 4)
 
@@ -542,7 +605,9 @@ deferred as before.
 Cost and identity screens are governance-centralized and gated by new
 permission verbs in the ADR-092 registry (e.g. `governance_cost:view`,
 `governance_identity:manage`), granted via role bindings on the existing
-org → team → project scope tree to users or groups. What a viewer *sees*
+org → team → project scope tree to users or groups. Pulled-money
+visibility is **org-scoped**: wave 1 grants `governance_cost:view` at
+org scope (ruled by Sergio 2026-08-29). What a viewer *sees*
 narrows with scope (a team-scoped viewer sees their team's slice). The
 identity tables are **data on those screens, never inputs to the
 permission decision** (hard constraint 3). Discovered people do not get
@@ -572,7 +637,9 @@ then.
   silently); also record the privilege level the Databricks puller
   actually needs (docs indicate CAN MANAGE per Genie space and
   account-admin grants for system tables — some security teams will
-  refuse).
+  refuse). Each probe's answer is **recorded in the Assumptions table**
+  when it lands — the table row flips from "unprobed" to the measured
+  result, so the ADR stays the single place the truth lives.
 - **Audit single-copy** — the 9 adapters' direct-insert audit path
   becomes journal-backed on a separate infra track; not an ADR
   risk.
@@ -604,12 +671,12 @@ then.
 
 | Invariant | Meaning | Satisfied by / test anchor |
 |---|---|---|
-| Bill = total | per provider/day with a bill: displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days |
+| Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
 | Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
 | Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
-| One dollar, one home | a dollar appears in exactly one channel of the combined view | §7 exclusion filter, blocking prerequisite; test: gateway row covered by a pulled bill is excluded from the combined total once |
+| One dollar, one home | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
 | Pulled rows never enforce | no budget resolver ever reaches `Scope="pulled"` rows | structural, ADR-088 Decision 3 (unchanged) |
 | Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
 | Identity grants nothing | no authz code path reads `DiscoveredPerson`/`DiscoveredAgent`/`IdentityMatch` | hard constraint 3; test: authz engine module has no import of identity tables |
@@ -633,8 +700,8 @@ then.
 |---|---|---|---|
 | ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
 | Prisma migration adding the three identity tables + seat price list | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration) |
-| Rollup fold projection | yes (replayable) | large | automated: replay-equality test + both feature flags off until §7 filter merged |
-| Exclusion filter | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the projection |
+| Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
+| Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
 | Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); no fuzzy path exists in code |
 | GDPR erasure blanking person references | no | large | human review, always; erasure blanks person fields, money amounts stay |
 | Screens behind flags | yes | small | none — ship it |
@@ -772,10 +839,13 @@ row; a provider restating history updates screens with an explainable
 marker; the closed PR stack is replaced by a document, not by memory.
 
 **Negative.** Two sources of truth per overlap (bill + metering) must be
-explained in the UI forever — the variance line is a permanent tenant.
-Mixed-currency orgs see two totals until a biller-converted column or a
-rate table exists. The exclusion filter is a hard blocker on the rollup
-going live — schedule risk sits there. Seat money computed at read means
+explained in the UI forever — from wave 2, the variance line is a
+permanent tenant; in wave 1 the two lanes simply sit side by side,
+unreconciled, and users must be told not to add them. Mixed-currency
+orgs see two totals until a biller-converted column or a rate table
+exists. The exclusion filter and key-to-bill mapping are a hard blocker
+on the wave-2 combined view — schedule risk moved there, off the wave-1
+rollup. Seat money computed at read means
 exports must run the same multiplication (one shared code path, or
 numbers drift). Read-time identity resolution makes per-person queries
 join-heavy; acceptable at current volume, revisit if drill-downs slow.
@@ -796,9 +866,33 @@ money tables, only the identity tables and read paths.
 | Copilot prepaid-credit visibility — revisit if a consumption API ever ships | watch provider changelog |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
+| Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
 
+- **v3.2 (2026-08-29, captain: Sergio Esteban).** Eight pre-implementation
+  rulings folded, one restructure:
+  - **Lane interconnection moved to wave 2** (the restructure): wave 1
+    ships billed, gateway and seat lanes independent and never summed
+    (§1); §2's bill-splits/variance design and §7's exclusion filter +
+    key-to-bill mapping are stamped wave 2. The filter drops off the
+    wave-1 critical path — schedule risk moves to the wave-2 combined
+    view.
+  - **Coverage rule** (§7): explicit admin key-to-bill mapping;
+    provider-wide coverage rejected (second unconnected account's
+    dollars would be silently swallowed). Overrun on mapped keys =
+    show the bill + the §2 variance line, never subtract.
+  - **Estimated tag** (§2, wave 2): not-yet-billed days show the
+    gateway number tagged *estimated*, computed at read; flips to the
+    bill when it lands.
+  - **Pulled-money visibility** (§18): org-scoped
+    `governance_cost:view`.
+  - **Puller unhealthy = 3 consecutive failed runs** (§4a).
+  - **Seat price list = llmcost pattern** (§6): JSON source of truth →
+    registry → prices; manual seed now, sync task later.
+  - **Alerts are automations, out of wave 1** (§4a): signals stay
+    queryable so a future automations layer attaches without redesign.
+  - **Probe answers land in the Assumptions table** (§20).
 - **v3 (2026-08-29, captain: Sergio Esteban).** Truth audit before lock:
   three independent auditors re-verified every claim against (1) the
   script kits' actual output artifacts, (2) the code in this repo, (3)
