@@ -83,3 +83,46 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     When getProjectLambdaArn("projectA") and getProjectLambdaArn("projectB") both resolve
     Then the cache holds two independent entries
     And neither project's resolution shortcuts the other's
+
+  # Config reconcile — after resolveProjectLambdaArn finds an existing Lambda,
+  # it compares the desired env vars / MemorySize (the same source
+  # createProjectLambda uses) against the live FunctionConfiguration and
+  # pushes only what has drifted, via UpdateFunctionConfigurationCommand.
+  # This is what brings pre-existing (already-created) Lambdas up to date
+  # with config the create path has since gained — the same "MemorySize
+  # migration" gap that used to only be gestured at in a comment.
+
+  @integration @unit
+  Scenario: A pre-existing Lambda carrying a stale env var is reconciled without clobbering unmanaged vars
+    Given a Lambda function exists whose CACHE_BUCKET env var is stale
+    And the function also carries an env var this code does not manage
+    When getProjectLambdaArn resolves that project
+    Then exactly one UpdateFunctionConfiguration call is issued
+    And the call's env vars match the desired set
+    And the unmanaged env var is preserved unchanged
+
+  @integration @unit
+  Scenario: A Lambda still on the old 1024 MB default is raised to 2048
+    Given a Lambda function exists with MemorySize 1024
+    When getProjectLambdaArn resolves that project
+    Then an UpdateFunctionConfiguration call sets MemorySize to 2048
+
+  @integration @unit
+  Scenario: No drift means no AWS write at all — the common path
+    Given a Lambda function exists whose env vars and MemorySize already match the desired config
+    When getProjectLambdaArn resolves that project
+    Then no UpdateFunctionConfiguration call is issued
+
+  @integration @unit
+  Scenario: The code update lands and is polled to completion before the config update is sent
+    Given a Lambda function exists with a stale image URI and a drifted MemorySize
+    When getProjectLambdaArn resolves that project
+    Then UpdateFunctionCode is called and polled to completion
+    And only then is UpdateFunctionConfiguration called
+
+  @integration @unit
+  Scenario: A concurrent update makes AWS reject the reconcile but resolution still succeeds
+    Given a Lambda function exists with a drifted MemorySize
+    And AWS rejects the UpdateFunctionConfiguration call with "An update is in progress"
+    When getProjectLambdaArn resolves that project
+    Then the resolution still succeeds and returns a valid ARN
