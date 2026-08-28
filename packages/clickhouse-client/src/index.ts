@@ -8,15 +8,33 @@ export type {
   VendorLogSink,
 } from "./logging";
 export { decideVendorLog, emitVendorLog, VENDOR_CAUSE_FIELD } from "./logging";
-export type {
-  AbortSignalLike,
-  QueryDriver,
-  QueryKind,
-  QueryRequest,
-  QueryResult,
-} from "./query";
+export type { AbortSignalLike, QueryDriver, QueryKind, QueryRequest, QueryResult } from "./query";
 export type { ClickHouseQueryClientOptions } from "./client";
 export { ClickHouseQueryClient } from "./client";
+export {
+  ClickHouseConfigService,
+  DuplicatePrivateClickHouseRouteError,
+  InvalidClickHouseConfigurationError,
+} from "./config";
+export type {
+  ClickHouseConfiguration,
+  ClickHouseConfigurationInput,
+  ClickHousePrivateRouteConfiguration,
+  ClickHouseSharedConfiguration,
+} from "./config";
+export {
+  ClickHouseClientFactory,
+  ClickHouseConnection,
+  ClickHouseConnectionService,
+  ClickHouseNotConfiguredError,
+} from "./connection";
+export type {
+  ClickHouseClientCreationInput,
+  ClickHouseCloseableClient,
+  ClickHouseConnectionServiceOptions,
+  ClickHouseInstance,
+} from "./connection";
+export { ClickHouseShutdownService } from "./shutdown";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
@@ -42,12 +60,7 @@ export {
   TRANSIENT_HTTP_STATUSES,
   TRANSIENT_NETWORK_CODES,
 } from "./resilience";
-export type {
-  RetryAttemptNotice,
-  RetryNotice,
-  RetryOptions,
-  RunWithRetryOptions,
-} from "./retry";
+export type { RetryAttemptNotice, RetryNotice, RetryOptions, RunWithRetryOptions } from "./retry";
 export { RetryPolicy, runWithRetry } from "./retry";
 export type {
   RoutingTable,
@@ -64,16 +77,9 @@ export {
   UnknownTenantError,
 } from "./tenancy";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
-export type {
-  StatementLogSink,
-  StatementMetrics,
-  StatementOutcome,
-} from "./statementReporting";
+export type { StatementLogSink, StatementMetrics, StatementOutcome } from "./statementReporting";
 export type { VendorQueryType } from "./statementShape";
-export type {
-  VendorClientResilienceOptions,
-  VendorStatementClient,
-} from "./vendorClient";
+export type { VendorClientResilienceOptions, VendorStatementClient } from "./vendorClient";
 export { VendorClientResilience } from "./vendorClient";
 export { checkTenantScope, TenantGuard, TenantScopeError } from "./tenantGuard";
 export type {
