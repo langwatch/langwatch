@@ -25,6 +25,11 @@ export type AgentTestingTabLayoutProps = {
   rail?: React.ReactNode;
   /** The centred content column of the tab. */
   children: React.ReactNode;
+  /**
+   * Whether an empty rail slot still takes a rail's width. A surface that has
+   * no rail of its own sets this false and centres on the whole page.
+   */
+  reserveRailSpace?: boolean;
   "data-testid"?: string;
 };
 
@@ -39,6 +44,7 @@ export type AgentTestingTabLayoutProps = {
 export function AgentTestingTabLayout({
   rail,
   children,
+  reserveRailSpace = true,
   ...rest
 }: AgentTestingTabLayoutProps) {
   return (
@@ -49,14 +55,15 @@ export function AgentTestingTabLayout({
       alignItems="stretch"
       data-testid={rest["data-testid"]}
     >
-      {rail ?? (
-        <Box
-          width={`${AGENT_TESTING_RAIL_WIDTH}px`}
-          minWidth={`${AGENT_TESTING_RAIL_WIDTH}px`}
-          aria-hidden
-          data-testid="agent-testing-rail-spacer"
-        />
-      )}
+      {rail ??
+        (reserveRailSpace ? (
+          <Box
+            width={`${AGENT_TESTING_RAIL_WIDTH}px`}
+            minWidth={`${AGENT_TESTING_RAIL_WIDTH}px`}
+            aria-hidden
+            data-testid="agent-testing-rail-spacer"
+          />
+        ) : null)}
       {children}
     </HStack>
   );

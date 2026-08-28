@@ -102,19 +102,21 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const handleBack = useCallback(() => selectPlan(null), [selectPlan]);
 
   if (!isReady) {
-    // Wrap in AgentTestingTabLayout so the skeleton reserves the same rail
-    // width the ready list uses; otherwise it starts one rail-width farther
-    // left and shifts when `isReady` flips true.
+    // The skeleton stands in for the plans list, which has no rail, so it
+    // reserves none either and does not shift when `isReady` flips true.
     return (
-      <AgentTestingTabLayout data-testid="agent-testing-results-tab">
+      <AgentTestingTabLayout
+        reserveRailSpace={false}
+        data-testid="agent-testing-results-tab"
+      >
         <TabSkeleton flex={1} />
       </AgentTestingTabLayout>
     );
   }
 
-  // The plan detail already has a rail (RunsSidebar) baked in. The list view
-  // has none, so it takes an invisible rail spacer of the same width so the
-  // content column lines up with the Scenarios table.
+  // The plan detail has a rail (RunsSidebar) baked in. The list view has
+  // none, and reserves none: it is the widest table of the page and reads
+  // centred on the whole page.
   if (planSlug && selectedPlan) {
     return (
       <RunPlanDetail
@@ -183,7 +185,10 @@ function ResultsListView({
   );
 
   return (
-    <AgentTestingTabLayout data-testid="agent-testing-results-tab">
+    <AgentTestingTabLayout
+      reserveRailSpace={false}
+      data-testid="agent-testing-results-tab"
+    >
       {isResolvingPlan ? (
         <TabSkeleton
           rows={3}

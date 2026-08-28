@@ -88,6 +88,14 @@ Feature: The Results tab
     And a plan that covers every scenario reads "All scenarios"
 
   @integration
+  Scenario: The Scope cell carries a mark for the kind of scope it is
+    Given a run plan scoped to a test suite
+    When its row is read
+    Then a mark for a suite sits beside the scope words
+    And a plan scoped to a label, to hand-picked scenarios, to every scenario
+      or run from code each carries its own mark
+
+  @integration
   Scenario: The Targets column names the agents the plan runs against
     Given a run plan that runs against "dev-agent" and "prod-agent"
     When its row is read
@@ -239,6 +247,13 @@ Feature: The Results tab
   # --- Colour ---
 
   @unit
+  Scenario: A pass rate reads in the product's own pass rate colours
+    Given a pass rate
+    When its colour is read
+    Then the colour is the one the product uses for a pass rate everywhere else
+    And the bands of this surface still decide which of them applies
+
+  @unit
   Scenario: One helper maps a pass rate to a colour for text and for bars
     Given a pass rate
     When its colour is read for the text and for the bar of the same row
@@ -263,6 +278,20 @@ Feature: The Results tab
     Given a run plan whose runs reached no verdict
     When its pass rate colour is read
     Then it is grey
+
+  @integration
+  Scenario: The runs sidebar reads a pass rate on the same scale as the tables
+    Given a run that passed 60 percent and a run that passed 90 percent
+    When their entries in the runs sidebar are read
+    Then both percentages read the same colour
+    And the dot of an entry reads the colour of its percentage
+
+  @unit
+  Scenario: A run that is still going does not read as a failure
+    Given a run that is still going
+    When the colour of its status is read
+    Then it is the colour of a queued run
+    And it is not the colour of a failed run
 
   # --- The runs sidebar ---
 

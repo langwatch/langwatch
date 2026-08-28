@@ -104,6 +104,12 @@ Feature: The Agent Testing page
     And "Results" carries the number of run plans
 
   @integration
+  Scenario: The selected tab is underlined on the header's own border
+    Given the Agent Testing page is open
+    Then the tabs run the full height of the header
+    And the underline of the selected tab sits on the header's bottom border
+
+  @integration
   Scenario: The header carries no action on either tab
     Given the Agent Testing page is open on the Scenarios tab
     Then the header offers no action
@@ -119,6 +125,13 @@ Feature: The Agent Testing page
     Then the content of each is held to one readable column
     And the column is centred on the whole page, not on the space beside the rail
     And the column does not move when the tab changes
+
+  @integration
+  Scenario: A surface with no rail takes the width the rail would have used
+    Given the Agent Testing page is open on the Results tab
+    Then the list of run plans reserves no space for a rail
+    And it is centred on the whole page
+    And it is held to a wider column than a surface that has a rail beside it
 
   # --- Addresses ---
 

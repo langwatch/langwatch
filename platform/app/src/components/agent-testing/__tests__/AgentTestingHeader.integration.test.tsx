@@ -30,6 +30,27 @@ const comesBefore = (first: Element, second: Element) =>
     first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
   );
 
+/** The CSS the emitted classes of an element carry, as one string. */
+const rulesFor = (element: Element): string => {
+  const classes = Array.from(element.classList);
+  const texts: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let cssRules: CSSRuleList;
+    try {
+      cssRules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of Array.from(cssRules)) texts.push(rule.cssText);
+  }
+  for (const style of Array.from(document.querySelectorAll("style"))) {
+    texts.push(style.textContent ?? "");
+  }
+  return texts
+    .filter((text) => classes.some((className) => text.includes(className)))
+    .join("\n");
+};
+
 describe("<AgentTestingHeader/>", () => {
   afterEach(cleanup);
 
@@ -42,6 +63,24 @@ describe("<AgentTestingHeader/>", () => {
       const tabs = screen.getByRole("tablist");
 
       expect(comesBefore(title, tabs)).toBe(true);
+    });
+
+    /** @scenario "The selected tab is underlined on the header's own border" */
+    it("runs the tabs the full height of the header", () => {
+      renderHeader({ tab: "results" });
+
+      // The underline is drawn at the foot of the trigger, so a trigger that
+      // fills the header puts it on the header's own bottom border. The height
+      // is a rule on the emitted class rather than an inline style, so the
+      // rules of that class are what the assertion reads.
+      const list = screen.getByRole("tablist");
+      const tabs = screen.getAllByRole("tab");
+
+      for (const element of [list, ...tabs]) {
+        expect(rulesFor(element)).toMatch(
+          /height:\s*(100%|var\(--chakra-sizes-full\))/,
+        );
+      }
     });
 
     /** @scenario "Each tab name carries how many rows it holds" */

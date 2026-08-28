@@ -63,6 +63,7 @@ export function AgentTestingHeader({
           PageLayout.Header rule. */}
       <Grid
         width="full"
+        height="full"
         templateColumns="1fr auto 1fr"
         alignItems="center"
         gap={4}
@@ -85,14 +86,23 @@ export function AgentTestingHeader({
           </HStack>
         </GridItem>
 
-        <GridItem>
+        {/* The tabs run the full height of the header, so the underline of
+            the selected one lands on the header's bottom border rather than
+            floating above it. */}
+        <GridItem alignSelf="stretch">
           <Tabs.Root
             value={tab}
             onValueChange={({ value }) => onTabChange(value as AgentTestingTab)}
             variant="line"
             size="sm"
+            height="full"
           >
-            <Tabs.List borderBottomWidth={0} gap={1}>
+            <Tabs.List
+              borderBottomWidth={0}
+              gap={1}
+              height="full"
+              alignItems="stretch"
+            >
               <AgentTestingTabTrigger
                 value="cases"
                 label="Scenarios"
@@ -125,6 +135,7 @@ function AgentTestingTabTrigger({
   return (
     <Tabs.Trigger
       value={value}
+      height="full"
       paddingX={3}
       gap={1.5}
       fontSize="13px"

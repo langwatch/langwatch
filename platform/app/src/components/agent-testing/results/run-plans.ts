@@ -37,6 +37,17 @@ export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
 export type RunPlanKind = "suite" | "external";
 
+/**
+ * What a plan covers, as one word. The Scope column draws a mark for it, so a
+ * plan that runs a suite is told from one that runs a label at a glance.
+ */
+export type RunPlanScopeKind =
+  | "all"
+  | "folders"
+  | "labels"
+  | "cases"
+  | "external";
+
 /** How the last run of a plan went, in the shape every source can supply. */
 export type RunPlanLastRun = {
   passedCount: number;
@@ -64,6 +75,8 @@ export type RunPlan = {
    * only be read as names while the whole suite list is in hand.
    */
   scopeLabel: string;
+  /** What kind of scope that is, which is the mark drawn beside the label. */
+  scopeKind: RunPlanScopeKind;
 };
 
 /**
@@ -124,6 +137,11 @@ export function suiteScopeLabel({
       return count === 1 ? "1 scenario" : `${count} scenarios`;
     }
   }
+}
+
+/** Which kind of scope a stored plan holds. */
+export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
+  return parseSuiteScope(suite.scope).mode;
 }
 
 /** The address segment an external set is opened by. */
@@ -216,6 +234,7 @@ export function buildRunPlans({
         caseCount: suite.scenarioIds.length,
         lastRun: summary ? toLastRun(summary) : null,
         scopeLabel: suiteScopeLabel({ suite, suiteNames }),
+        scopeKind: suiteScopeKind(suite),
       };
     });
 
@@ -228,6 +247,7 @@ export function buildRunPlans({
     caseCount: null,
     lastRun: toLastRun(set),
     scopeLabel: "Whatever the code ran",
+    scopeKind: "external" as const,
   }));
 
   return [...suitePlans, ...externalPlans].sort(byLastRunDesc);
@@ -258,6 +278,7 @@ export function resolveRunPlan({
       caseCount: null,
       lastRun: null,
       scopeLabel: "Whatever the code ran",
+      scopeKind: "external",
     };
   }
 

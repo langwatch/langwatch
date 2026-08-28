@@ -46,6 +46,9 @@ export function GroupByTabs({ grouping, onGroupingChange }: GroupByTabsProps) {
       </Text>
       <SegmentedControl
         size="sm"
+        // The size recipe sets the label size on the item, so the toolbar's
+        // 12.5px is set on the part rather than inherited from the enclosure.
+        css={{ "& [data-part='item-text']": { fontSize: "12.5px" } }}
         value={grouping}
         items={items}
         aria-label="Group results by"

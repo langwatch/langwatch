@@ -15,8 +15,16 @@
  * - red below 40 percent.
  * - grey when nothing settled, so there is no rate to colour.
  *
+ * The colours are the product's own. `PassRateIndicator` already owns what a
+ * pass rate looks like, and Evaluations reads it through that, so a rate here
+ * takes the same red, amber and green rather than a darker set of its own. The
+ * bands stay, so the colour still answers this surface's rule: a plan is green
+ * only when every scenario passed.
+ *
  * @see specs/features/agent-testing/results-tabs.feature
  */
+
+import { getPassRateGradientColor } from "~/components/shared/PassRateIndicator";
 
 /** Where amber starts. Under this a pass rate reads red. */
 export const PASS_RATE_AMBER_FLOOR = 40;
@@ -35,9 +43,9 @@ export const PASS_RATE_GREEN_FLOOR = 99.5;
 export type PassRateBand = "green" | "amber" | "red" | "none";
 
 const BAND_COLORS: Record<PassRateBand, string> = {
-  green: "green.fg",
-  amber: "orange.fg",
-  red: "red.fg",
+  green: getPassRateGradientColor(100),
+  amber: getPassRateGradientColor(50),
+  red: getPassRateGradientColor(0),
   none: "fg.subtle",
 };
 

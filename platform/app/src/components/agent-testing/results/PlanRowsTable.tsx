@@ -11,7 +11,15 @@
  */
 
 import { Badge, Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { Archive, MoreVertical } from "lucide-react";
+import {
+  Archive,
+  Crosshair,
+  Folder,
+  FolderCode,
+  Layers,
+  MoreVertical,
+  Tag,
+} from "lucide-react";
 import { useState } from "react";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { Menu } from "~/components/ui/menu";
@@ -29,7 +37,38 @@ import {
   ResultsTableRow,
 } from "./ResultsTableChrome";
 import { targetsLabel } from "./result-atoms";
-import type { RunPlan } from "./run-plans";
+import type { RunPlan, RunPlanScopeKind } from "./run-plans";
+
+/**
+ * The mark beside what a plan covers. A scope is a rule rather than a list, so
+ * the mark says which rule it is: every scenario, a suite, a label, or a
+ * hand-picked few. It reads next to words that name the same thing, so it
+ * carries no label of its own.
+ */
+const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
+  all: Layers,
+  folders: Folder,
+  labels: Tag,
+  cases: Crosshair,
+  external: FolderCode,
+};
+
+function ScopeCell({ plan }: { plan: RunPlan }) {
+  return (
+    <HStack gap={1.5} minWidth={0} data-testid="plan-scope">
+      <Icon
+        as={SCOPE_ICONS[plan.scopeKind]}
+        boxSize="13px"
+        color={FG_MUTED}
+        flexShrink={0}
+        aria-hidden
+      />
+      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+        {plan.scopeLabel}
+      </Text>
+    </HStack>
+  );
+}
 
 /**
  * The columns of the plan table.
@@ -250,9 +289,7 @@ export function PlanRowsTable({
 
             <LastRunCell group={group} days={days} now={now} />
 
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
-              {plan.scopeLabel}
-            </Text>
+            <ScopeCell plan={plan} />
 
             <Text fontSize="11.5px" color={FG_MUTED} truncate>
               {targetsLabel(

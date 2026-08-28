@@ -326,6 +326,48 @@ describe("the Test Runs list", () => {
     ).toBeInTheDocument();
   });
 
+  /** @scenario "The Scope cell carries a mark for the kind of scope it is" */
+  it("draws a mark of its own for every kind of scope", () => {
+    const plans = plansOf({
+      plans: [
+        makeSuite({ scope: { mode: "all" } }),
+        makeSuite({
+          id: "suite_2",
+          name: "Nightly",
+          slug: "nightly",
+          scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        }),
+        makeSuite({
+          id: "suite_3",
+          name: "Labelled",
+          slug: "labelled",
+          scope: { mode: "labels", labels: ["smoke"] },
+        }),
+        makeSuite({
+          id: "suite_4",
+          name: "Picked",
+          slug: "picked",
+          scope: { mode: "cases" },
+        }),
+      ],
+      folders: [{ id: "folder_refunds", name: "Refunds" }],
+    });
+
+    renderRows(planRowsOf(plans));
+
+    // The mark says which rule the scope is, so the four rules cannot be told
+    // apart by the words alone.
+    const marks = ["checkout", "nightly", "labelled", "picked"].map((slug) => {
+      const cell = within(
+        screen.getByTestId(`run-plan-row-${slug}`),
+      ).getByTestId("plan-scope");
+      return cell.querySelector("svg")?.innerHTML ?? "";
+    });
+
+    for (const mark of marks) expect(mark).not.toBe("");
+    expect(new Set(marks).size).toBe(marks.length);
+  });
+
   /** @scenario "The Targets column names the agents the plan runs against" */
   it("names both agents in the Targets cell", () => {
     const plans = plansOf({

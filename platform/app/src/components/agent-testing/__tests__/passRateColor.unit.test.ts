@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { getPassRateGradientColor } from "~/components/shared/PassRateIndicator";
 import {
   formatPassRate,
   PASS_RATE_AMBER_FLOOR,
@@ -28,6 +29,23 @@ describe("the colour of a pass rate", () => {
         const bar = passRateColor(rate);
         expect(bar).toBe(text);
       }
+    });
+  });
+
+  describe("when the colour itself is read", () => {
+    /** @scenario "A pass rate reads in the product's own pass rate colours" */
+    it("answers the colour the product uses for a pass rate everywhere else", () => {
+      expect(passRateColor(100)).toBe(getPassRateGradientColor(100));
+      expect(passRateColor(60)).toBe(getPassRateGradientColor(50));
+      expect(passRateColor(0)).toBe(getPassRateGradientColor(0));
+    });
+
+    /** @scenario "A pass rate reads in the product's own pass rate colours" */
+    it("keeps this surface's bands deciding which colour applies", () => {
+      // The product's scale is a gradient, so 60 percent would be a colour of
+      // its own. Here it is amber, because a plan is green only at one hundred.
+      expect(passRateColor(60)).toBe(passRateColor(41));
+      expect(passRateColor(99)).not.toBe(passRateColor(100));
     });
   });
 

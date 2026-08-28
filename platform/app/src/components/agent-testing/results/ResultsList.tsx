@@ -27,11 +27,13 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { CONTENT_COLUMN_GUTTER, ContentColumn } from "../shared/ContentColumn";
+import {
+  CONTENT_COLUMN_WIDE_MAX_WIDTH,
+  ContentColumn,
+} from "../shared/ContentColumn";
 import { FG_MUTED } from "../shared/design";
 import { periodDays } from "../shared/PeriodPicker";
 import { SmallButton } from "../shared/SmallButton";
-import { AGENT_TESTING_RAIL_WIDTH } from "../shared/TabLayout";
 import type { AgentTestingRoutingState } from "../useAgentTestingRouting";
 import { FlatRowsTable, GroupedRowsTable } from "./GroupedRowsTable";
 import { PlanRowsTable } from "./PlanRowsTable";
@@ -53,12 +55,18 @@ function ResultsHeader({
 }) {
   return (
     <HStack gap={2} height="32px">
-      <Text fontSize="14px" fontWeight="semibold" color="fg">
-        Test Runs
-      </Text>
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
-      </Text>
+      {/* The count sits on the title's baseline. Centred, a smaller line beside
+          a larger one reads as lifted off it. */}
+      <HStack gap={2} alignItems="baseline" minWidth={0}>
+        <Text fontSize="14px" fontWeight="semibold" color="fg">
+          Test Runs
+        </Text>
+        <Text fontSize="11.5px" color={FG_MUTED}>
+          {executionCount === 1
+            ? "1 execution"
+            : `${executionCount} executions`}
+        </Text>
+      </HStack>
       <Box flex={1} />
       <SmallButton onClick={onNewRunPlan}>
         <Plus size={13} />
@@ -270,7 +278,7 @@ export function ResultsList({
 
   return (
     <ContentColumn
-      railWidth={AGENT_TESTING_RAIL_WIDTH + CONTENT_COLUMN_GUTTER}
+      columnMaxWidth={CONTENT_COLUMN_WIDE_MAX_WIDTH}
       data-testid="agent-testing-run-plans"
     >
       <ResultsHeader
