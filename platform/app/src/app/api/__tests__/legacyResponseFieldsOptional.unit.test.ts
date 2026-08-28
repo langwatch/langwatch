@@ -175,7 +175,12 @@ describe("given the generated OpenAPI document", () => {
   describe("when the scenario model and turn fields are read", () => {
     /** @scenario "The scenario answers read the model and turn fields as optional" */
     it("lists simulatorModel, judgeModel, maxTurns and minTurns as optional on every success answer", () => {
-      for (const field of ["simulatorModel", "judgeModel", "maxTurns", "minTurns"]) {
+      for (const field of [
+        "simulatorModel",
+        "judgeModel",
+        "maxTurns",
+        "minTurns",
+      ]) {
         // The version snapshot was published with these fields from its
         // first day, so it may read them as required.
         const reading = readingOf({
