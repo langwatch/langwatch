@@ -262,6 +262,16 @@ const createProjectLambda = async (
         STUDIO_RUNTIME: "async",
         AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
         CACHE_BUCKET: config.cache_bucket,
+        // nlpgo's own compiled default for a Python code block was 60s,
+        // which killed legitimate long-running studio code blocks (raised
+        // to 600s on the nlpgo side in #7640). Override it here too so
+        // freshly-created per-project Lambdas don't fall back to the old
+        // 60s default. 600 stays under this Lambda's own 900s Timeout
+        // above. Operator-overridable via env, matching the raw
+        // process.env reads already used in this file (e.g.
+        // LANGWATCH_NLP_LAMBDA_CONFIG, LANGWATCH_NLP_SERVICE).
+        NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS:
+          process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS ?? "600",
       },
     },
     Tags: {
