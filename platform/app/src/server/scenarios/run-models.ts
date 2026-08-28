@@ -14,7 +14,10 @@
  *
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  * @see specs/scenarios/run-configuration-on-runs.feature
+ * @see specs/scenarios/simulation-run-model-resolution.feature
  */
+
+import { expandLatestAlias } from "../modelProviders/latestAliases";
 
 /** The project-default feature key each simulation role resolves against. */
 export const SIMULATOR_MODEL_FEATURE_KEY = "scenarios.user_simulator";
@@ -36,6 +39,15 @@ export type ResolvedRunModels = {
  * The model each simulation role runs on: the run plan's choice, else the
  * case's own choice, else the project default for that role.
  *
+ * A run plan and a scenario store their model choice verbatim, so a virtual
+ * alias such as `openai/latest` arrives here unexpanded. Providers only
+ * understand concrete model ids, so both answers pass through
+ * `expandLatestAlias`: the run executes on a concrete model, and the resolved
+ * model stamped on the run names the same concrete model. Storage keeps the
+ * alias, so the pick keeps tracking upstream releases. A concrete id passes
+ * through unchanged, and the project-default path already expands its own
+ * answer, so a second pass over it changes nothing.
+ *
  * @param plan - What the run plan names, empty when it names nothing.
  * @param scenario - What the case names, empty when it names nothing.
  * @param resolveFeatureModel - Reads the project default for a feature key.
@@ -52,14 +64,16 @@ export async function resolveRunModels({
   scenario: RunModelChoice;
   resolveFeatureModel: (featureKey: string) => Promise<string>;
 }): Promise<ResolvedRunModels> {
-  const simulatorModel =
+  const simulatorModel = expandLatestAlias(
     plan.simulatorModel ??
-    scenario.simulatorModel ??
-    (await resolveFeatureModel(SIMULATOR_MODEL_FEATURE_KEY));
-  const judgeModel =
+      scenario.simulatorModel ??
+      (await resolveFeatureModel(SIMULATOR_MODEL_FEATURE_KEY)),
+  );
+  const judgeModel = expandLatestAlias(
     plan.judgeModel ??
-    scenario.judgeModel ??
-    (await resolveFeatureModel(JUDGE_MODEL_FEATURE_KEY));
+      scenario.judgeModel ??
+      (await resolveFeatureModel(JUDGE_MODEL_FEATURE_KEY)),
+  );
   return { simulatorModel, judgeModel };
 }
 

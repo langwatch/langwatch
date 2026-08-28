@@ -156,9 +156,19 @@ Feature: Simulation run model resolution per target type
 
   # A scenario or run plan can store a virtual alias like "openai/latest" or
   # "anthropic/latest-mini" as its simulator or judge model. Providers do not
-  # understand these aliases, so the prefetcher must expand them to the
-  # concrete registry flagship before preparing litellm params. Storage keeps
-  # the alias verbatim so the pick keeps tracking upstream releases.
+  # understand these aliases, so the chain that resolves the run models expands
+  # every answer to the concrete registry flagship. One expansion serves both
+  # readers of that chain: the prefetch prepares litellm params with a concrete
+  # model, and the queue path stamps the same concrete model on the run.
+  # Storage keeps the alias verbatim so the pick keeps tracking upstream
+  # releases.
+
+  @unit
+  Scenario: A latest alias expands where the run models resolve
+    Given a run plan whose simulator model is "openai/latest"
+    When the models of the run are resolved
+    Then the simulator model is the concrete model the alias resolves to
+    And it is never the literal alias
 
   @unit
   Scenario: A latest alias on the scenario simulator model expands to a concrete model at run time

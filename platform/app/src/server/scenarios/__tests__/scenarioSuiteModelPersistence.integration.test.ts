@@ -109,8 +109,10 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
           criteria: ["Agent helps"],
           labels: [],
         });
-        await service.update(scenario.id, projectId, {
-          simulatorModel: "openai/latest",
+        await service.update({
+          id: scenario.id,
+          projectId,
+          data: { simulatorModel: "openai/latest" },
         });
 
         const repo = new SuiteRepository(prisma);
