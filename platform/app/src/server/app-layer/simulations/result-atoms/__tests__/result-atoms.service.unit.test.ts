@@ -460,6 +460,8 @@ describe("the shape of an atom", () => {
               BatchRunId: "batch-1",
               ScenarioRunId: "run-1",
               ScenarioId: "scen-1",
+              ScenarioKey: "scen-1",
+              ScenarioName: "",
               Status: "SUCCESS",
               Outcome: "passed",
               RunAt: String(now),
