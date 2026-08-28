@@ -213,6 +213,51 @@ const LWQL_REQUEST_TIMEOUT_MS =
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
 /**
+ * What a failed governed run is reported as.
+ *
+ * Three answers, and which one applies is decided by what the server refused
+ * rather than by anything the caller sent:
+ *
+ *  - **The deployment is incomplete.** An unknown table or database, or an
+ *    access refusal, cannot be the caller's SQL: the validator only lets
+ *    catalog-approved names reach here. So it is the same "not provisioned
+ *    here" condition as having no executor at all, and gets the same answer.
+ *  - **The caller named a column that is not there.** This one IS their SQL,
+ *    and is the only refusal on this path they fix themselves. The validator
+ *    approves table names, not columns, and column existence is not knowable
+ *    when a chart is saved, so run time is the only place it can be named.
+ *  - **Anything else** goes through the read path's own translation, so the
+ *    resource ceilings a caller can act on arrive as the platform's existing
+ *    codes rather than as a second vocabulary for the same failures. What that
+ *    does not recognise stays unhandled and degrades to "unknown", which is
+ *    correct: a driver diagnostic is not something a caller can act on, and is
+ *    exactly the kind of text this API must not relay.
+ *
+ * In every case the raw error rides in `reasons` for the operator's logs and
+ * never in the response. Lifted out of the `execute` body rather than inlined
+ * so the decision has a name, and so `execute` stays within the complexity
+ * budget the house rules enforce on changed lines.
+ */
+function refusalFor({
+  error,
+  durationMs,
+}: {
+  error: unknown;
+  durationMs: number;
+}): unknown {
+  if (isClickHouseObjectUnavailableError(error)) {
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+  if (isClickHouseUnknownIdentifierError(error)) {
+    return new LangWatchQLUnknownIdentifierError(
+      unknownIdentifierFromError(error),
+      { reasons: [toError(error)] },
+    );
+  }
+  return translateClickHouseQueryError(error, durationMs);
+}
+
+/**
  * An executor that runs LangWatchQL as the restricted identity.
  *
  * The client is built here rather than taken as an argument so that the two
@@ -261,34 +306,7 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        // An unknown table/database or an access refusal cannot be the
-        // caller's SQL: the validator only lets catalog-approved names reach
-        // this point. It is a deployment whose LangWatchQL objects or grants
-        // are missing — the same "not provisioned here" condition as a null
-        // executor, and it gets the same answer. The raw error rides in
-        // `reasons` for the operator's logs and never in the response.
-        if (isClickHouseObjectUnavailableError(error)) {
-          throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
-        }
-        // A name that resolves to no column IS the caller's SQL, and is the
-        // one refusal on this path they fix themselves. The validator approves
-        // table names, not columns, and column existence is not knowable when a
-        // chart is saved, so run time is the only place this can be named. The
-        // identifier is lifted from the server's message by an extractor that
-        // fails closed; the message itself never leaves here.
-        if (isClickHouseUnknownIdentifierError(error)) {
-          throw new LangWatchQLUnknownIdentifierError(
-            unknownIdentifierFromError(error),
-            { reasons: [toError(error)] },
-          );
-        }
-        // Reuses the read path's translation, so the two resource ceilings a
-        // caller can act on arrive as the platform's existing codes rather than
-        // as a second vocabulary for the same two failures. Anything it does
-        // not recognise stays unhandled and degrades to "unknown" — correct,
-        // because a driver diagnostic is not something a caller can act on and
-        // is exactly the kind of text this API must not relay.
-        throw translateClickHouseQueryError(error, Date.now() - startedAt);
+        throw refusalFor({ error, durationMs: Date.now() - startedAt });
       }
     },
 
