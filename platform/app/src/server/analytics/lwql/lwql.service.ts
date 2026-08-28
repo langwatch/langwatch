@@ -29,7 +29,10 @@ import {
   type LangWatchQLResultLimits,
   lwqlConnectionFromEnv,
 } from "./executor";
-import { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
+import {
+  assertLangWatchQLGranularityDeclaration,
+  resolveLangWatchQLTimeWindow,
+} from "./resolveTimeWindow";
 import { describeLangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
