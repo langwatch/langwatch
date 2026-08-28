@@ -380,6 +380,47 @@ Resolved during Wave 1 queue composition: `F-QUEUE-01` is closed by
 the sole live platform Group Queue factory. This does not enable the partial
 Worker consumer; that gate remains under `F-WORKER-01`.
 
+New findings recorded during the Wave 3 to 5 fan-out:
+
+`F-CI-02` — **package suites are invisible to CI, and the gap is now larger
+than when `F-CI-01` was written.** `langwatch-app-ci.yml` names packages one by
+one, and no line names `@langwatch/dataset-server`, `@langwatch/monitor-server`,
+`@langwatch/evaluator-server`, `@langwatch/github-server` or
+`@langwatch/secret-server`. Every transport test written during this wave —
+26 for Dataset, 16 for Monitor, 44 for Evaluator, and more arriving — is
+local-only until a workflow line is added. Add the lines with the wave, not
+after it.
+
+`F-TRPC-01` — **a moved vertical needs `@trpc/server` in its own manifest.**
+`packages/features/model-provider/server` could not resolve it, which produces
+around forty `TS7031 implicitly any` errors downstream rather than one honest
+module-not-found. Check the manifest first when a moved API file types as `any`.
+
+`F-DATASET-02` — **`DatasetConflictError` exists twice**, once in
+`dataset-contract` and once in `server/src/services/errors.ts`, and only the
+second carries `reason`. Today's translation is duck-typed on `error.name` so
+both work and the two paths happen to line up: the record mappings use contract
+classes and the service throws contract classes, while the adapters throw the
+`services/errors` family. An `instanceof` against the wrong one fails silently.
+
+`F-EVAL-01` — **one deleted test was already red at baseline.**
+`evaluators.tenant-workflow.unit.test.ts` failed 3/3 before the move, building a
+context whose `app.evaluators` is undefined because the behaviour it asserted
+had moved into `EvaluatorService`. Its intent is restored as two cases in
+`evaluator.service.test.ts` pinning `workflows.assertInProject`. Deleting a red
+test is only defensible when its intent lands somewhere green; record which.
+
+`F-TRPC-02` — **two client-facing types widened during the Monitor move**, and
+the reason is a real TypeScript limit rather than a shortcut. `monitors.create`
+and `update` now type `preconditions` as `MonitorCreateInput["preconditions"]`
+rather than the literal-union `CheckPrecondition[]`, and
+`evaluators.cascadeArchive` types `archivedWorkflow` as `{ id: string }`.
+Runtime validation is byte-identical — the same schema is injected — but the
+compile-time hint on `field`/`rule` is looser. A generic parameter would have
+preserved it exactly, and cannot: property access on a `z.object()` mapped type
+containing an unresolved type parameter does not resolve, producing 24
+`TS2339`s. Revisit if the compiler stops being the obstacle.
+
 Resolved during Wave 2 access composition: `F-AUTHZ-01` and `F-AUTHZ-02` are
 closed by `480e9f73ec`. The canonical decision path preserves denial reasons,
 membership-disabled and lite-member errors retain their specialised envelopes,
