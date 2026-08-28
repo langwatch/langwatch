@@ -99,7 +99,7 @@ async function handleAvatarRead(
 
   let result;
   try {
-    result = await c.app.storedObjects.getById({
+    result = await c.app.userAvatarObjects.getById({
       projectId,
       id,
     });
@@ -112,18 +112,21 @@ async function handleAvatarRead(
   // readable route from serving trace/scenario media (see file header).
   if (
     !result ||
-    result.row.purpose !== USER_AVATAR_PURPOSE ||
-    result.row.owner_kind !== USER_AVATAR_OWNER_KIND
+    result.metadata.purpose !== USER_AVATAR_PURPOSE ||
+    result.metadata.ownerKind !== USER_AVATAR_OWNER_KIND
   ) {
     return jsonResponse({ status: "not_found" }, 404);
   }
 
-  if (!("stream" in result)) {
+  if (result.status === "missing") {
     return jsonResponse({ status: "missing" }, 404);
   }
 
   return streamAvatarResponse({
-    row: result.row,
+    row: {
+      size_bytes: result.metadata.byteLength,
+      media_type: result.metadata.mediaType,
+    },
     stream: result.stream,
     method: options.method,
   });

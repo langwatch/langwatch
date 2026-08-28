@@ -8,10 +8,7 @@
  */
 import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
-import {
-  AzureBackendMisconfiguredError,
-  resolveAzureCredentials,
-} from "./azure-credentials";
+import { AzureBackendMisconfiguredError, resolveAzureCredentials } from "./azure-credentials";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
 import { StorageRegistry } from "./storage-registry";
@@ -58,10 +55,7 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
     // in this deployment` — a message that flatly contradicts their config and
     // buries the webhook/label/annotation guidance the original error carries.
     // Let it through there; keep the quiet path for the migration case.
-    if (
-      error instanceof AzureBackendMisconfiguredError &&
-      env.STORED_OBJECTS_BACKEND !== "azure"
-    ) {
+    if (error instanceof AzureBackendMisconfiguredError && env.STORED_OBJECTS_BACKEND !== "azure") {
       return undefined;
     }
     throw error;
@@ -75,11 +69,7 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
  * URI is dispatched: a globally selected but incomplete Azure configuration
  * must not block a BYOC project whose active destination is S3.
  */
-export function createStorageRegistry({
-  projectId,
-}: {
-  projectId: string;
-}): StorageRegistry {
+export function createStorageRegistry({ projectId }: { projectId: string }): StorageRegistry {
   return new StorageRegistry({
     s3: new S3Driver(projectId),
     file: new LocalFilesystemDriver(),

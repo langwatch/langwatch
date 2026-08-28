@@ -230,7 +230,11 @@ import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
-import { AppUserRuntime } from "~/runtime/app/features/user";
+import { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
+import { AppUserAvatarStorageInfrastructureAdapter } from "~/runtime/app/features/user-avatar-storage-infrastructure.adapter";
+import { createProcessUserAvatarStoredObjectService } from "~/runtime/app/features/user-avatar-stored-object-service.composition";
+import { AppUserAvatarStoredObjectStorageAdapter } from "~/runtime/app/features/user-avatar-stored-object-storage.adapter";
+import { AppUserRuntimeAdapter } from "~/runtime/app/features/user-runtime.adapter";
 import { AppSecretRuntime } from "~/runtime/app/features/secret";
 import {
   createStorageRegistry,
@@ -538,6 +542,17 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const licenseEnforcement = createLicenseEnforcementService(prisma);
   const broadcast = new BroadcastService(redis);
   const storedObjectsService = createProcessStoredObjectsService();
+  const userAvatarInfrastructure = AppUserAvatarStorageInfrastructureAdapter.create();
+  const userAvatarStorage =
+    AppUserAvatarStoredObjectStorageAdapter.create(userAvatarInfrastructure);
+  const userAvatarStoredObjects = createProcessUserAvatarStoredObjectService({
+    database: prisma,
+    storage: userAvatarStorage,
+  });
+  const userAvatarObjects = AppUserAvatarReadCompatibilityAdapter.create({
+    canonical: userAvatarStoredObjects,
+    historical: storedObjectsService,
+  });
   const evaluationInputsOffloadConfig = config.evaluationInputsOffload;
   const projects = traced(
     AppProjectRuntime.create({
@@ -1739,12 +1754,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ingestionSecretPepper: ingestionSources.secretPepper(),
     ingestionDiagnostics: ingestionSources.diagnostics(),
   });
-  const users = AppUserRuntime.create({
+  const users = AppUserRuntimeAdapter.create({
     database: prisma,
     redis,
     organizations,
     governance,
-    storedObjects: storedObjectsService,
+    storedObjects: userAvatarStoredObjects,
   });
   const scim = PostgresScimAdapter.create({
     database: prisma,
@@ -2141,6 +2156,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     codingAgents,
     github: githubService,
     storedObjects: storedObjectsService,
+    userAvatarObjects,
     storedObjectOwners: StoredObjectOwnerLookupService.create(
       new StoredObjectOwnerClickHouseRepository(getAllClickHouseInstances),
     ),
@@ -2221,6 +2237,17 @@ export function createTestApp(
     demoProjectId: () => undefined,
   });
   const storedObjectsService = createProcessStoredObjectsService();
+  const userAvatarInfrastructure = AppUserAvatarStorageInfrastructureAdapter.create();
+  const userAvatarStorage =
+    AppUserAvatarStoredObjectStorageAdapter.create(userAvatarInfrastructure);
+  const userAvatarStoredObjects = createProcessUserAvatarStoredObjectService({
+    database: testPrisma,
+    storage: userAvatarStorage,
+  });
+  const userAvatarObjects = AppUserAvatarReadCompatibilityAdapter.create({
+    canonical: userAvatarStoredObjects,
+    historical: storedObjectsService,
+  });
   const managedProviders = ManagedProvidersAppAdapter.create({
     prisma: testPrisma,
     environment: {},
@@ -2411,12 +2438,12 @@ export function createTestApp(
     ingestionSecretPepper: testIngestionSources.secretPepper(),
     ingestionDiagnostics: testIngestionSources.diagnostics(),
   });
-  const testUsers = AppUserRuntime.create({
+  const testUsers = AppUserRuntimeAdapter.create({
     database: testPrisma,
     redis: null,
     organizations: nullOrganizations,
     governance: testGovernance,
-    storedObjects: storedObjectsService,
+    storedObjects: userAvatarStoredObjects,
   });
   const testBroadcast = new BroadcastService(null);
   // Pull-request linkage against an unconfigured App and null stores: every
@@ -2764,6 +2791,7 @@ export function createTestApp(
     codingAgents: testCodingAgents,
     github: testGithub,
     storedObjects: storedObjectsService,
+    userAvatarObjects,
     storedObjectOwners: StoredObjectOwnerLookupService.create(
       new StoredObjectOwnerClickHouseRepository(async () => []),
     ),

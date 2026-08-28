@@ -141,6 +141,7 @@ export class App {
   readonly billingQueries: AppDependencies["billingQueries"];
   readonly commands: AppCommands;
   readonly storedObjects: AppDependencies["storedObjects"];
+  readonly userAvatarObjects: AppDependencies["userAvatarObjects"];
   readonly storedObjectOwners: AppDependencies["storedObjectOwners"];
   readonly opsExplain: AppDependencies["opsExplain"];
   readonly github: AppDependencies["github"];
@@ -252,6 +253,7 @@ export class App {
     this.billingQueries = deps.billingQueries;
     this.commands = deps.commands;
     this.storedObjects = deps.storedObjects;
+    this.userAvatarObjects = deps.userAvatarObjects;
     this.storedObjectOwners = deps.storedObjectOwners;
     this.opsExplain = deps.opsExplain;
     this.github = deps.github;

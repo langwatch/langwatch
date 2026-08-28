@@ -1,6 +1,7 @@
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { StoredObjectService } from "@langwatch/stored-object-contract";
 import {
   USER_AVATAR_OWNER_KIND,
   USER_AVATAR_PURPOSE,
@@ -15,21 +16,20 @@ import {
 } from "@langwatch/user-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { revokeAllSessionsForUser } from "~/server/better-auth/revokeSessions";
-import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 
-class AppUserSessionRevocationPort extends UserSessionRevocationPort {
+class AppUserSessionRevocationAdapter extends UserSessionRevocationPort {
+  static create(
+    database: PrismaClient,
+    redis: RedisConnection | null,
+  ): AppUserSessionRevocationAdapter {
+    return new AppUserSessionRevocationAdapter(database, redis);
+  }
+
   private constructor(
     private readonly database: PrismaClient,
     private readonly redis: RedisConnection | null,
   ) {
     super();
-  }
-
-  static create(
-    database: PrismaClient,
-    redis: RedisConnection | null,
-  ): AppUserSessionRevocationPort {
-    return new AppUserSessionRevocationPort(database, redis);
   }
 
   revokeForUser(input: { userId: string }): Promise<void> {
@@ -41,13 +41,13 @@ class AppUserSessionRevocationPort extends UserSessionRevocationPort {
   }
 }
 
-class AppUserCliTokenRevocationPort extends UserCliTokenRevocationPort {
-  private constructor(private readonly governance: GovernanceService) {
-    super();
+class AppUserCliTokenRevocationAdapter extends UserCliTokenRevocationPort {
+  static create(governance: GovernanceService): AppUserCliTokenRevocationAdapter {
+    return new AppUserCliTokenRevocationAdapter(governance);
   }
 
-  static create(governance: GovernanceService): AppUserCliTokenRevocationPort {
-    return new AppUserCliTokenRevocationPort(governance);
+  private constructor(private readonly governance: GovernanceService) {
+    super();
   }
 
   async revokeForUser(input: { userId: string }): Promise<void> {
@@ -55,8 +55,12 @@ class AppUserCliTokenRevocationPort extends UserCliTokenRevocationPort {
   }
 }
 
-class AppUserAvatarStoragePort extends UserAvatarStoragePort {
-  constructor(private readonly storedObjects: StoredObjectsService) {
+class AppUserAvatarStorageAdapter extends UserAvatarStoragePort {
+  static create(storedObjects: StoredObjectService): AppUserAvatarStorageAdapter {
+    return new AppUserAvatarStorageAdapter(storedObjects);
+  }
+
+  private constructor(private readonly storedObjects: StoredObjectService) {
     super();
   }
 
@@ -71,14 +75,17 @@ class AppUserAvatarStoragePort extends UserAvatarStoragePort {
       purpose: USER_AVATAR_PURPOSE,
       ownerKind: USER_AVATAR_OWNER_KIND,
       ownerId: input.userId,
+      filename: "avatar",
       mediaType: input.mediaType,
-      bytes: Buffer.from(input.bytes),
+      audience: "project:view",
+      bytes: input.bytes,
     });
-    return { id: stored.id };
+    return { id: stored.reference.id };
   }
 }
 
-export class AppUserRuntime {
+/** Process composition for the User feature's canonical service. */
+export class AppUserRuntimeAdapter {
   private constructor() {}
 
   static create(options: {
@@ -86,14 +93,14 @@ export class AppUserRuntime {
     redis: RedisConnection | null;
     organizations: OrganizationService;
     governance: GovernanceService;
-    storedObjects: StoredObjectsService;
+    storedObjects: StoredObjectService;
   }): UserService {
     return PostgresUserAdapter.create({
       database: options.database,
-      sessions: AppUserSessionRevocationPort.create(options.database, options.redis),
-      cliTokens: AppUserCliTokenRevocationPort.create(options.governance),
+      sessions: AppUserSessionRevocationAdapter.create(options.database, options.redis),
+      cliTokens: AppUserCliTokenRevocationAdapter.create(options.governance),
       organizations: options.organizations,
-      avatarStorage: new AppUserAvatarStoragePort(options.storedObjects),
+      avatarStorage: AppUserAvatarStorageAdapter.create(options.storedObjects),
     }).build();
   }
 }

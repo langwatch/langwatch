@@ -4468,11 +4468,6 @@
     },
     {
       "feature": "user",
-      "file": "platform/app/src/runtime/app/features/user.ts",
-      "kind": "composition"
-    },
-    {
-      "feature": "user",
       "file": "platform/app/src/server/api/routers/user.ts",
       "kind": "transport"
     },

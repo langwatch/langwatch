@@ -214,6 +214,7 @@
     "@langwatch/share-web": "workspace:*",
     "@langwatch/ssrf": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/suite-web": "workspace:*",

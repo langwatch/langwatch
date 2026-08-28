@@ -35,6 +35,7 @@ import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
 import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import type { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
+import type { AppUserAvatarReadCompatibilityAdapter } from "~/runtime/app/features/user-avatar-read.compatibility.adapter";
 import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
@@ -267,6 +268,8 @@ export interface AppDependencies {
    */
   github: GithubService;
   storedObjects: StoredObjectsService;
+  /** Canonical-first User avatar reads with a bounded historical fallback. */
+  userAvatarObjects: AppUserAvatarReadCompatibilityAdapter;
   /** The cross-tenant first step for historical file URLs without a project id. */
   storedObjectOwners: StoredObjectOwnerLookupService;
   /** The operator-only `/api/ops/clickhouse/explain` endpoint's service —

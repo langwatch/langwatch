@@ -5240,6 +5240,9 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../packages/features/stored-object/contract
+      '@langwatch/stored-object-server':
+        specifier: workspace:*
+        version: link:../../packages/features/stored-object/server
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../packages/features/suite/contract
