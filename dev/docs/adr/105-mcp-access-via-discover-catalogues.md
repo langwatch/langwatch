@@ -2,12 +2,14 @@
 
 **Date:** 2026-08-21
 
-**Status:** Proposed
+**Status:** Superseded — never accepted, and withdrawn without ever having
+worked. See "Why this was withdrawn" at the end.
 
 **Related:** [RPC-first fluent registration](../../../packages/api/adrs/001-rpc-first-fluent-registration.md),
 [explicit version namespaces](../../../packages/api/adrs/002-explicit-version-namespaces.md),
-[the API discovery contract](../../../packages/api/specs/api-discovery.feature),
-and the behavioural contract [rpc-tools-from-catalogues.feature](../../../specs/mcp-server/rpc-tools-from-catalogues.feature).
+[the API discovery contract](../../../packages/api/specs/api-discovery.feature).
+Its behavioural contract, `specs/mcp-server/rpc-tools-from-catalogues.feature`,
+was removed with the implementation — it bound only to the deleted unit test.
 
 ## Context
 
@@ -100,3 +102,45 @@ that already has an SDK capable of owning the translation.
 - The JSON Schema → zod conversion in the adapter is the one lossy seam; it
   is bounded, tested against the constructs the catalogues actually emit, and
   never authoritative.
+
+## Why this was withdrawn
+
+This proposal was implemented and shipped, and it never registered a single
+tool. The catalogue builder recognised an RPC as **a POST at a dotted name** —
+`things.create` — and every service in the platform registers undotted REST
+paths (`/`, `/:id`). The only dotted names in the repository were the API
+package's own test fixtures. So `buildServiceCatalogue` returned an empty
+operation list for every real service, every catalogue answered
+`{"operations": []}`, and the MCP server advertised exactly the static tools it
+would have advertised without any of this.
+
+That is also why the failure stayed invisible for so long. The startup guard
+this ADR describes — "a catalogue that cannot be fetched fails here, the server
+does not start with a silently empty tool list" — was protecting an invariant
+that was **already violated**: the catalogue was always empty, but it was empty
+*successfully*, so the guard never fired. A fail-closed check only helps when
+the thing it distrusts is the thing that goes wrong.
+
+When the RPC registration style was removed from `@langwatch/api`, the endpoint
+began returning 404 and the guard finally fired — at module scope, before any
+transport starts, so the MCP server could not boot at all. The fix is not to
+soften the guard. It is to delete a 241-line client of a capability that
+produced nothing:
+
+- `mcp/typescript/src/tools/rpc-discovered.ts`
+- `mcp/typescript/src/langwatch-api-discover.ts`
+- `mcp/typescript/src/utils/json-schema-to-zod.ts` (the "one lossy seam" above,
+  orphaned with its only caller)
+- the unit test, which carried all eight `@scenario` bindings for
+  `specs/mcp-server/rpc-tools-from-catalogues.feature`, removed with it
+
+No MCP capability is lost, because none was ever delivered. The static tools
+are untouched.
+
+The idea this ADR describes — services publishing a machine-readable operation
+catalogue that MCP turns into tools with no per-service work — is still a good
+one. Anything reviving it should start by making the catalogue actually
+non-empty for one real service, and prove it with a test that asserts a tool
+count greater than zero. Every test this proposal shipped asserted behaviour
+against a hand-built fixture catalogue, so all of them passed while the
+production path returned nothing.

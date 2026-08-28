@@ -9,10 +9,6 @@ import {
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
 import { handleExperimentResults } from "./tools/get-experiment-results.js";
-import {
-  getDiscoveredRpcTools,
-  registerDiscoveredRpcTools,
-} from "./tools/rpc-discovered.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
@@ -35,8 +31,6 @@ export function createMcpServer(): McpServer {
   });
 
   registerTools(server);
-  // The rpc.discover-driven tools, discovered once at startup (ADR-105).
-  registerDiscoveredRpcTools(server, getDiscoveredRpcTools());
 
   return server;
 }

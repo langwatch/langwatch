@@ -397,7 +397,7 @@ export function createApiRouter(app: App) {
   // reads files declaring an `/api` basePath — see api-discovery.ts. The
   // root-level pair only arrives here at all because start.ts consults
   // `isRootDiscoveryPath`; without that they meet the SPA fallback.
-  api.route("/", apiDiscoveryApp); // /api/openapi.json, /api/rpc.discover
+  api.route("/", apiDiscoveryApp); // /api/openapi.json
   api.route("/", rootDiscoveryApp); // /.well-known/openapi, /llms.txt
   // Most REST families now live in `@langwatch/platform-api` and are mounted by
   // factory rather than by import. `createAppRestFeatures` is their single

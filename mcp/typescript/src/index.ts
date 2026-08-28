@@ -48,12 +48,6 @@ initConfig({
   projectId: argv.projectId,
 });
 
-// Discover the rpc.discover-driven tools once, before any transport starts
-// (ADR-105). A catalogue that cannot be fetched fails here — the server does
-// not start with a silently empty tool list.
-const { discoverAndStoreRpcTools } = await import("./tools/rpc-discovered.js");
-await discoverAndStoreRpcTools();
-
 if (argv.http) {
   const { startHttpServer } = await import("./http-server.js");
   const { isLoopbackHost, parseAllowedOrigins } = await import("./http-security.js");
