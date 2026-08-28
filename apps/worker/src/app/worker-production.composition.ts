@@ -15,6 +15,10 @@ import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feat
 import type { WorkerConfig } from "../platform/config/worker.config";
 import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime";
 import {
+  WorkerInfrastructureAdapter,
+  type WorkerInfrastructureAdapterOptions,
+} from "../platform/infrastructure/worker-foundation.adapter";
+import {
   WorkerLifecyclePort,
   WorkerTransportPort,
 } from "../platform/lifecycle/worker-runtime.port";
@@ -34,18 +38,36 @@ export type WorkerTraceCompositionOptions = {
   installer: TraceProcessingInstallerPort;
 };
 
-/** All process boundaries are supplied explicitly by the executable's boot root. */
-export type WorkerProductionCompositionOptions = {
+/** Resolved technical inputs for the Worker-owned transport foundation. */
+export type WorkerInfrastructureCompositionOptions = Omit<
+  WorkerInfrastructureAdapterOptions,
+  "resources"
+>;
+
+type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
-  eventing: EventingServerRuntimeOptions;
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
   trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
-  resources?: ResourceScope;
 };
+
+/** All process boundaries are supplied explicitly by the executable's boot root. */
+export type WorkerProductionCompositionOptions =
+  | (WorkerProductionCompositionBaseOptions & {
+      /** Constructs the process-owned Redis/AWS/storage foundation. */
+      eventing: Omit<EventingServerRuntimeOptions, "groupQueue">;
+      infrastructure: WorkerInfrastructureCompositionOptions;
+      resources: ResourceScope;
+    })
+  | (WorkerProductionCompositionBaseOptions & {
+      /** Compatibility path for already-composed technical test ports. */
+      eventing: EventingServerRuntimeOptions;
+      infrastructure?: undefined;
+      resources?: ResourceScope;
+    });
 
 /**
  * Fully composed background-worker graph for extractable worker surfaces.
@@ -57,8 +79,16 @@ export type WorkerProductionCompositionOptions = {
  */
 export class WorkerProductionComposition {
   static create(options: WorkerProductionCompositionOptions): WorkerProductionComposition {
+    const infrastructure = options.infrastructure
+      ? WorkerInfrastructureAdapter.create({
+          ...options.infrastructure,
+          resources: options.resources,
+        })
+      : undefined;
+    const eventingOptions = createEventingPersistence(options, infrastructure);
+
     const eventing = WorkerEventingRuntime.createProduction({
-      persistence: options.eventing,
+      persistence: eventingOptions,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
     });
     const trace = TraceWorkerFeatureInstaller.create({
@@ -68,7 +98,7 @@ export class WorkerProductionComposition {
     const topicServer = TopicServerInstaller.create({
       database: options.topic.database,
       processStore: eventing.processStore,
-      redis: options.topic.redis,
+      redis: infrastructure?.redis ?? options.topic.redis,
       execution: options.topic.execution,
       metrics: options.topic.metrics,
     });
@@ -91,6 +121,7 @@ export class WorkerProductionComposition {
       enterprise,
       observability: options.observability,
       resources: options.resources,
+      infrastructure,
     });
   }
 
@@ -108,6 +139,7 @@ export class WorkerProductionComposition {
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
     resources?: ResourceScope;
+    infrastructure?: WorkerInfrastructureAdapter;
   }): WorkerProductionComposition {
     const lifecycle = WorkerProductionLifecycle.create(options.lifecycle);
     const runtime = WorkerRuntime.create({
@@ -142,6 +174,7 @@ export class WorkerProductionComposition {
       options.topic,
       options.trace,
       enterprise,
+      options.infrastructure,
     );
   }
 
@@ -151,6 +184,7 @@ export class WorkerProductionComposition {
     readonly topic: TopicWorkerFeatureInstaller,
     readonly trace: TraceWorkerFeatureInstaller,
     readonly enterprise: EnterpriseWorkerComposition | undefined,
+    readonly infrastructure: WorkerInfrastructureAdapter | undefined,
   ) {}
 }
 
@@ -166,4 +200,18 @@ class WorkerProductionLifecycle extends WorkerLifecyclePort {
   async close(): Promise<void> {
     await this.lifecycle.close();
   }
+}
+
+function createEventingPersistence(
+  options: WorkerProductionCompositionOptions,
+  infrastructure: WorkerInfrastructureAdapter | undefined,
+): EventingServerRuntimeOptions {
+  if (!options.infrastructure) return options.eventing;
+  if (!infrastructure) {
+    throw new Error("Worker infrastructure was not constructed for the production graph.");
+  }
+  return {
+    ...options.eventing,
+    groupQueue: infrastructure.queueDependencies,
+  };
 }

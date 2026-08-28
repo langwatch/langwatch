@@ -29,10 +29,13 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/aws-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-worker": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

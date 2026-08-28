@@ -1,8 +1,4 @@
-export {
-  GroupQueueConsumer,
-  GroupQueueProducer,
-  RunningGroupQueueConsumer,
-} from "./capabilities";
+export { GroupQueueConsumer, GroupQueueProducer, RunningGroupQueueConsumer } from "./capabilities";
 export type {
   DeduplicationConfig,
   GroupQueueActivityPort,
@@ -18,6 +14,12 @@ export type {
   QueueSendOptions,
 } from "./contracts";
 export { defineGroupQueue } from "./definition";
+export {
+  GroupQueueDependenciesAdapter,
+  type GroupQueueDependenciesAdapterOptions,
+  type GroupQueueRedis,
+  type GroupQueueStoragePort,
+} from "./dependencies-adapter";
 export {
   GroupQueueConfigurationError,
   GroupQueueError,

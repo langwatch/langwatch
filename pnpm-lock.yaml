@@ -284,6 +284,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../packages/aws-client
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -293,9 +296,15 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../packages/group-queue
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../packages/redis-client
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition

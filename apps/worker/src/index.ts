@@ -1,10 +1,17 @@
 export { WorkerApplication } from "./app/worker.application";
 export {
   WorkerProductionComposition,
+  type WorkerInfrastructureCompositionOptions,
   type WorkerProductionCompositionOptions,
   type WorkerTraceCompositionOptions,
   type WorkerTopicCompositionOptions,
 } from "./app/worker-production.composition";
+export {
+  WorkerInfrastructureAdapter,
+  WorkerStorageFactoryPort,
+  type WorkerInfrastructureAdapterOptions,
+  type WorkerStorageLease,
+} from "./platform/infrastructure/worker-foundation.adapter";
 export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer";
 export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer";
 export {

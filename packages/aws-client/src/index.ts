@@ -1,3 +1,4 @@
+export { AwsClientProcessRuntime } from "./process-runtime";
 export {
   AwsClientConfiguration,
   OutboundProxyResolverPort,
