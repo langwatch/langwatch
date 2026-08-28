@@ -15,7 +15,7 @@ Feature: One cost screen, three honest lanes
   Background:
     Given an organization with billed and gateway cost available
 
-  @integration
+  @integration @unimplemented
   Scenario: Each lane renders its own labeled total
     Given billed and gateway totals that differ from each other
     When a permitted viewer opens the cost screen
@@ -29,7 +29,7 @@ Feature: One cost screen, three honest lanes
     # "Matches its own source" end to end is a datastore-lane concern
     # covered by the rollup spec, not this component test.
 
-  @integration
+  @integration @unimplemented
   Scenario: The seat lane is an honest hole until seat data ships
     # Seat ingestion and pricing arrive in a separate PR. The lane still
     # renders so the screen's shape is complete, but it must say it has
@@ -54,7 +54,7 @@ Feature: One cost screen, three honest lanes
     # the lane's copy must stay digit-free — no "(0 sources)", no dates,
     # no "wave 2" — or the test breaks, and that break is the point.
 
-  @integration
+  @integration @unimplemented
   Scenario: Viewing requires the organization-scoped governance cost permission
     Given a member without the governance cost permission on this organization
     # The permission is ORG-scoped (registry key governanceCost:view —
@@ -65,7 +65,7 @@ Feature: One cost screen, three honest lanes
     When they request the cost data
     Then the request is denied
 
-  @integration
+  @integration @unimplemented
   Scenario: A grant on another organization does not open this organization's costs
     # Client-side hooks resolve permissions against the active org only,
     # so this cross-org denial is a SERVER-side test on the cost query,
@@ -79,7 +79,7 @@ Feature: One cost screen, three honest lanes
     When they query this organization's cost data
     Then the query is refused
 
-  @integration
+  @integration @unimplemented
   Scenario: The screen stays behind its release flag
     # ADR-128 names two flags: pulled-cost recording and the cost screen.
     # This scenario covers the screen flag; recording may be on while the
@@ -95,7 +95,7 @@ Feature: One cost screen, three honest lanes
     When they open the place the screen would live
     Then the not-found screen is shown in its place
 
-  @integration
+  @integration @unimplemented
   Scenario: A failed cost read never renders as zero
     # The exact failure the feature forbids: a `?? 0` on a failed or null
     # read fabricates a zero where there is no data. An error is honest;
@@ -106,7 +106,7 @@ Feature: One cost screen, three honest lanes
     Then an error state is shown
     And no lane displays a zero amount
 
-  @integration
+  @integration @unimplemented
   Scenario: A deployment without a cost store shows unavailable, not zero
     # The house degrade pattern (optional repository, empty-shape return —
     # see personalUsage.service.ts emptySummary) returns ZEROS when the
@@ -119,7 +119,7 @@ Feature: One cost screen, three honest lanes
     Then the screen states cost data is unavailable
     And no lane displays a zero amount
 
-  @integration
+  @integration @unimplemented
   Scenario: A refund-heavy billed day renders negative as reported
     # Render-only in wave 1: the screen shows what the bill says, without
     # interpretation. (Deeper negative-day semantics are stamped wave 2 in
