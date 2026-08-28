@@ -15,8 +15,8 @@ export const runPlanScopeSchema = z.discriminatedUnion("mode", [
     .describe("Every non-archived scenario of the project"),
   z
     .object({
-      mode: z.literal("folders"),
-      folderIds: z
+      mode: z.literal("test_suites"),
+      testSuiteIds: z
         .array(z.string())
         .describe("The test suite IDs whose scenarios to run"),
     })
@@ -30,7 +30,7 @@ export const runPlanScopeSchema = z.discriminatedUnion("mode", [
       "The non-archived scenarios carrying at least one of the given labels",
     ),
   z
-    .object({ mode: z.literal("cases") })
+    .object({ mode: z.literal("scenarios") })
     .describe("The scenarios named in scenarioIds, picked by hand"),
 ]);
 

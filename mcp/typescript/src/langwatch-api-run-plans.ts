@@ -25,7 +25,7 @@ import type {
 /** What a run plan covers. Mirrors `suiteScopeSchema` on the platform. */
 export type RunPlanScope = z.infer<typeof runPlanScopeSchema>;
 
-/** One thing a plan runs its cases against. */
+/** One thing a plan runs its scenarios against. */
 export type RunPlanTarget = z.infer<typeof runPlanTargetSchema>;
 
 /** The values a run supplies for the parameters its scenarios declare. */

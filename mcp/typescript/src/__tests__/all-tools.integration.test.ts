@@ -314,7 +314,7 @@ const CANNED_RUN_PLAN_RUN = {
 const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
 
 const CANNED_TEST_SUITE = {
-  id: "folder_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/test-suites/folder_abc",
+  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc",
 };
 
 const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];
@@ -325,7 +325,7 @@ const CANNED_TEST_SUITE_DETAIL = {
 };
 
 const CANNED_TEST_SUITE_CREATED = {
-  ...CANNED_TEST_SUITE, id: "folder_new", name: "New Suite", slug: "new-suite", scenarioIds: [], scenarioCount: 0,
+  ...CANNED_TEST_SUITE, id: "suite_new", name: "New Suite", slug: "new-suite", scenarioIds: [], scenarioCount: 0,
 };
 
 const CANNED_TEST_SUITE_RENAMED = { ...CANNED_TEST_SUITE, name: "Checkout v2", slug: "checkout-v2" };
@@ -557,7 +557,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_TEST_SUITE_RENAMED));
       } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: "folder_abc", archived: true }));
+        res.end(JSON.stringify({ id: "suite_abc", archived: true }));
       }
       // --- Simulation Run endpoints ---
       else if (url?.match(/^\/api\/simulation-runs\/[^/]+$/) && method === "GET") {
@@ -1560,7 +1560,7 @@ describe("All MCP tools integration", () => {
 
       expect(result).toContain("created");
       expect(result).toContain("New Suite");
-      expect(result).toContain("folder_new");
+      expect(result).toContain("suite_new");
     });
   });
 
@@ -1569,7 +1569,7 @@ describe("All MCP tools integration", () => {
       const { handleGetTestSuite } = await import(
         "../tools/get-test-suite.js"
       );
-      const result = await handleGetTestSuite({ id: "folder_abc" });
+      const result = await handleGetTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("Checkout");
       expect(result).toContain("Login Flow Happy Path");
@@ -1582,7 +1582,7 @@ describe("All MCP tools integration", () => {
         "../tools/rename-test-suite.js"
       );
       const result = await handleRenameTestSuite({
-        id: "folder_abc",
+        id: "suite_abc",
         name: "Checkout v2",
       });
 
@@ -1595,7 +1595,7 @@ describe("All MCP tools integration", () => {
       const { handleArchiveTestSuite } = await import(
         "../tools/archive-test-suite.js"
       );
-      const result = await handleArchiveTestSuite({ id: "folder_abc" });
+      const result = await handleArchiveTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("archived");
       expect(result).toContain("scenarios filed in it");
@@ -1608,7 +1608,7 @@ describe("All MCP tools integration", () => {
         "../tools/run-test-suite.js"
       );
       const result = await handleRunTestSuite({
-        id: "folder_abc",
+        id: "suite_abc",
         targets: [{ type: "http", referenceId: "agent_abc" }],
       });
 

@@ -15,6 +15,6 @@ export async function handleCreateTestSuite(params: {
     `**Slug**: ${suite.slug}`,
     `**View**: ${suite.platformUrl}`,
     "",
-    `> File scenarios in it with \`platform_create_scenario\` or \`platform_update_scenario\`, passing folderId \`${suite.id}\`.`,
+    `> File scenarios in it with \`platform_create_scenario\` or \`platform_update_scenario\`, passing testSuiteId \`${suite.id}\`.`,
   ].join("\n");
 }

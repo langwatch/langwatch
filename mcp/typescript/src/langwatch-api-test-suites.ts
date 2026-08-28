@@ -8,7 +8,7 @@ import type {
 /**
  * Client for `/api/v1/test-suites`.
  *
- * A test suite is a folder of scenarios: a name and the cases filed in it.
+ * A test suite groups scenarios: a name and the scenarios filed in it.
  * Running one is sugar over a run plan, so the run returns the same result a
  * run plan does.
  */

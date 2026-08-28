@@ -1,6 +1,7 @@
 /**
- * Digests of the test suite tools, and the folder fields the scenario tools
- * carry so an agent can file a case in a suite and read a suite back.
+ * Digests of the test suite tools, and the test suite fields the scenario
+ * tools carry so an agent can file a scenario in a suite and read a suite
+ * back.
  *
  * @see specs/mcp-server/test-suite-tools.feature
  */
@@ -59,7 +60,7 @@ const mockCreateScenario = vi.mocked(createScenario);
 const mockUpdateScenario = vi.mocked(updateScenario);
 
 const sampleSuite: TestSuite = {
-  id: "folder_abc123",
+  id: "suite_abc123",
   name: "Checkout",
   slug: "checkout",
   scenarioIds: ["scen_abc123", "scen_def456"],
@@ -68,7 +69,7 @@ const sampleSuite: TestSuite = {
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
   platformUrl:
-    "https://app.langwatch.ai/proj/simulations/test-suites/folder_abc123",
+    "https://app.langwatch.ai/proj/simulations/test-suites/suite_abc123",
 };
 
 const sampleScenario: ScenarioSummary = {
@@ -77,7 +78,7 @@ const sampleScenario: ScenarioSummary = {
   situation: "The card issuer declines the payment",
   criteria: ["Offers another payment method"],
   labels: ["checkout"],
-  folderId: "folder_abc123",
+  testSuiteId: "suite_abc123",
 };
 
 beforeEach(() => {
@@ -101,7 +102,7 @@ describe("handleListTestSuites()", () => {
     });
 
     it("includes the suite id", () => {
-      expect(result).toContain("**ID**: folder_abc123");
+      expect(result).toContain("**ID**: suite_abc123");
     });
   });
 
@@ -150,11 +151,11 @@ describe("handleCreateTestSuite()", () => {
     /** @scenario "Agent creates a test suite" */
     it("confirms the suite was created and names its id", () => {
       expect(result).toContain('Test suite "Checkout" created.');
-      expect(result).toContain("**ID**: folder_abc123");
+      expect(result).toContain("**ID**: suite_abc123");
     });
 
-    it("says to file scenarios in it with folderId", () => {
-      expect(result).toContain("folderId `folder_abc123`");
+    it("says to file scenarios in it with testSuiteId", () => {
+      expect(result).toContain("testSuiteId `suite_abc123`");
     });
   });
 });
@@ -171,7 +172,7 @@ describe("handleGetTestSuite()", () => {
         ],
       });
 
-      const result = await handleGetTestSuite({ id: "folder_abc123" });
+      const result = await handleGetTestSuite({ id: "suite_abc123" });
 
       expect(result).toContain("- Card declined (scen_abc123)");
       expect(result).toContain("- Coupon expired (scen_def456)");
@@ -188,7 +189,7 @@ describe("handleGetTestSuite()", () => {
         scenarios: [],
       });
 
-      const result = await handleGetTestSuite({ id: "folder_abc123" });
+      const result = await handleGetTestSuite({ id: "suite_abc123" });
 
       expect(result).toContain("None filed yet.");
     });
@@ -200,7 +201,7 @@ describe("handleGetTestSuite()", () => {
       mockGetTestSuite.mockResolvedValue(detail);
 
       const result = await handleGetTestSuite({
-        id: "folder_abc123",
+        id: "suite_abc123",
         format: "json",
       });
 
@@ -220,12 +221,12 @@ describe("handleRenameTestSuite()", () => {
       });
 
       const result = await handleRenameTestSuite({
-        id: "folder_abc123",
+        id: "suite_abc123",
         name: "Checkout v2",
       });
 
       expect(result).toContain(
-        'Test suite folder_abc123 is now named "Checkout v2".',
+        'Test suite suite_abc123 is now named "Checkout v2".',
       );
     });
   });
@@ -237,15 +238,15 @@ describe("handleArchiveTestSuite()", () => {
 
     beforeEach(async () => {
       mockArchiveTestSuite.mockResolvedValue({
-        id: "folder_abc123",
+        id: "suite_abc123",
         archived: true,
       });
-      result = await handleArchiveTestSuite({ id: "folder_abc123" });
+      result = await handleArchiveTestSuite({ id: "suite_abc123" });
     });
 
     /** @scenario "Agent archives a test suite" */
     it("confirms the suite is archived", () => {
-      expect(result).toContain("Test suite folder_abc123 is archived");
+      expect(result).toContain("Test suite suite_abc123 is archived");
     });
 
     it("says the scenarios filed in it are archived with it", () => {
@@ -277,7 +278,7 @@ describe("handleRunTestSuite()", () => {
     beforeEach(async () => {
       mockRunTestSuite.mockResolvedValue(run);
       result = await handleRunTestSuite({
-        id: "folder_abc123",
+        id: "suite_abc123",
         targets: [{ type: "http", referenceId: "agent_abc" }],
       });
     });
@@ -295,14 +296,14 @@ describe("handleRunTestSuite()", () => {
     });
 
     it("sends the suite id apart from the run body", () => {
-      expect(mockRunTestSuite).toHaveBeenCalledWith("folder_abc123", {
+      expect(mockRunTestSuite).toHaveBeenCalledWith("suite_abc123", {
         targets: [{ type: "http", referenceId: "agent_abc" }],
       });
     });
   });
 });
 
-describe("handleCreateScenario() with a folderId", () => {
+describe("handleCreateScenario() with a testSuiteId", () => {
   describe("when the scenario is filed in a test suite", () => {
     /** @scenario "Agent files a new scenario in a test suite" */
     it("says which test suite the scenario is filed in", async () => {
@@ -311,18 +312,18 @@ describe("handleCreateScenario() with a folderId", () => {
       const result = await handleCreateScenario({
         name: "Card declined",
         situation: "The card issuer declines the payment",
-        folderId: "folder_abc123",
+        testSuiteId: "suite_abc123",
       });
 
-      expect(result).toContain("**Test suite**: folder_abc123");
+      expect(result).toContain("**Test suite**: suite_abc123");
       expect(mockCreateScenario).toHaveBeenCalledWith(
-        expect.objectContaining({ folderId: "folder_abc123" }),
+        expect.objectContaining({ testSuiteId: "suite_abc123" }),
       );
     });
   });
 });
 
-describe("handleUpdateScenario() with a folderId", () => {
+describe("handleUpdateScenario() with a testSuiteId", () => {
   describe("when an unfiled scenario is filed in a test suite", () => {
     /** @scenario "Agent files an existing scenario in a test suite" */
     it("says which test suite the scenario is filed in", async () => {
@@ -330,24 +331,24 @@ describe("handleUpdateScenario() with a folderId", () => {
 
       const result = await handleUpdateScenario({
         scenarioId: "scen_abc123",
-        folderId: "folder_abc123",
+        testSuiteId: "suite_abc123",
       });
 
-      expect(result).toContain("**Test suite**: folder_abc123");
+      expect(result).toContain("**Test suite**: suite_abc123");
       expect(mockUpdateScenario).toHaveBeenCalledWith({
         id: "scen_abc123",
-        folderId: "folder_abc123",
+        testSuiteId: "suite_abc123",
       });
     });
   });
 });
 
-describe("handleListScenarios() with a folderId", () => {
+describe("handleListScenarios() with a testSuiteId", () => {
   const otherScenario: ScenarioSummary = {
     ...sampleScenario,
     id: "scen_zzz999",
     name: "Login timeout",
-    folderId: "folder_other",
+    testSuiteId: "suite_other",
   };
 
   describe("when the project has scenarios in two test suites", () => {
@@ -355,7 +356,7 @@ describe("handleListScenarios() with a folderId", () => {
     it("returns only the scenarios filed in that test suite", async () => {
       mockListScenarios.mockResolvedValue([sampleScenario, otherScenario]);
 
-      const result = await handleListScenarios({ folderId: "folder_abc123" });
+      const result = await handleListScenarios({ testSuiteId: "suite_abc123" });
 
       expect(result).toContain("Card declined");
       expect(result).not.toContain("Login timeout");
@@ -368,15 +369,15 @@ describe("handleListScenarios() with a folderId", () => {
     it("says no scenarios are filed in that test suite", async () => {
       mockListScenarios.mockResolvedValue([otherScenario]);
 
-      const result = await handleListScenarios({ folderId: "folder_abc123" });
+      const result = await handleListScenarios({ testSuiteId: "suite_abc123" });
 
       expect(result).toContain(
-        "No scenarios found in test suite folder_abc123.",
+        "No scenarios found in test suite suite_abc123.",
       );
     });
   });
 
-  describe("when no folderId is given", () => {
+  describe("when no testSuiteId is given", () => {
     it("lists every scenario of the project", async () => {
       mockListScenarios.mockResolvedValue([sampleScenario, otherScenario]);
 

@@ -533,7 +533,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Tags for organizing and filtering scenarios"),
-      folderId: z
+      testSuiteId: z
         .string()
         .nullish()
         .describe(
@@ -557,7 +557,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "platform_list_scenarios",
     "List all scenarios on the LangWatch platform. Returns AI-readable digest by default.",
     {
-      folderId: z
+      testSuiteId: z
         .string()
         .optional()
         .describe("Only the scenarios filed in this test suite"),
@@ -617,7 +617,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Updated labels"),
-      folderId: z
+      testSuiteId: z
         .string()
         .nullish()
         .describe(
@@ -659,7 +659,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   // --- Platform Run Plan Tools (require API key) ---
   // A run plan is what you run, and its NAME identifies it: running a name
   // that exists replaces that plan's configuration, running a new name
-  // creates the plan. Test suites are folders of scenarios; running one is
+  // creates the plan. A test suite groups scenarios; running one is
   // sugar that creates or joins the plan "<suite name> <target name>".
 
   server.tool(
@@ -673,22 +673,24 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "The run plan to run. An existing name is replaced with this configuration, a new name creates the plan. Omit to let the server name it after the suite and the target.",
         ),
       scope: runPlanScopeSchema.describe(
-        "What the plan covers: every case in the project, the cases filed in given test suites, the cases carrying given labels, or the hand-picked list in scenarioIds.",
+        "What the plan covers: every scenario in the project, the scenarios filed in given test suites, the scenarios carrying given labels, or the hand-picked list in scenarioIds.",
       ),
       scenarioIds: z
         .array(z.string())
         .optional()
-        .describe("The cases to run. Read only when scope.mode is 'cases'."),
+        .describe(
+          "The scenarios to run. Read only when scope.mode is 'scenarios'.",
+        ),
       targets: z
         .array(runPlanTargetSchema)
-        .describe("What to run the cases against."),
+        .describe("What to run the scenarios against."),
       repeatCount: z
         .number()
         .int()
         .min(1)
         .max(5)
         .optional()
-        .describe("How many times to run each case against each target (1 to 5, default 1)"),
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
       simulatorModel: z
         .string()
         .optional()
@@ -801,11 +803,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   // --- Platform Test Suite Tools (require API key) ---
-  // A test suite is a folder of scenarios: a name and the cases filed in it.
+  // A test suite groups scenarios: a name and the scenarios filed in it.
 
   server.tool(
     "platform_list_test_suites",
-    "List the test suites of the project. A test suite is a folder of scenarios.",
+    "List the test suites of the project. A test suite groups scenarios.",
     {
       format: z
         .enum(["digest", "json"])
@@ -825,7 +827,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_test_suite",
-    "Create a test suite, the folder scenarios are filed in. File a scenario in it by passing the suite ID as folderId on platform_create_scenario or platform_update_scenario.",
+    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario.",
     {
       name: z.string().describe("Test suite name"),
     },
@@ -914,7 +916,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .min(1)
         .max(5)
         .optional()
-        .describe("How many times to run each case against each target (1 to 5, default 1)"),
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
       simulatorModel: z
         .string()
         .optional()
