@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./public-config": {
+      "types": "./src/behavior/public-config.ts",
+      "default": "./src/behavior/public-config.ts"
     }
   },
   "scripts": {

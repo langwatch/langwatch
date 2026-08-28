@@ -12,7 +12,7 @@ import { createEnvConfig } from "./src/env-create.mjs";
 import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,
-} from "./src/runtime/public-config";
+} from "@langwatch/ui/public-config";
 import { PublicAppConfigService } from "./src/runtime/public-config.server";
 
 // Load `.env` into the Vite config's process environment. Vite normally

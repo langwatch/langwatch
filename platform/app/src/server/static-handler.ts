@@ -3,7 +3,7 @@ import type { ServerResponse } from "http";
 import path from "path";
 
 import { getAssetBase, injectAssetBaseIntoHtml } from "./asset-base";
-import { injectPublicAppConfigIntoHtml, type PublicAppConfig } from "../runtime/public-config";
+import { injectPublicAppConfigIntoHtml, type PublicAppConfig } from "@langwatch/ui/public-config";
 
 const MIME_TYPES: Record<string, string> = {
   ".js": "application/javascript",

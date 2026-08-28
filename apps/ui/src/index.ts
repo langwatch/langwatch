@@ -19,3 +19,11 @@ export {
 } from "./behavior/chunk-reload";
 export { RpcClientPort } from "./features/agent/behavior/rpc-client.port";
 export { TrpcAgentBrowserAdapter } from "./features/agent/behavior/trpc-agent-browser.adapter";
+export {
+  createPublicAppConfigMetaTag,
+  injectPublicAppConfigIntoHtml,
+  PUBLIC_APP_CONFIG_META_NAME,
+  publicAppConfigSchema,
+  readPublicAppConfig,
+  type PublicAppConfig,
+} from "./behavior/public-config";

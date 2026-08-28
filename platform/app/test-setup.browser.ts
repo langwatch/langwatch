@@ -3,7 +3,7 @@ import { initializeEnvironmentConfig } from "./src/env.mjs";
 import {
   createPublicAppConfigMetaTag,
   PUBLIC_APP_CONFIG_META_NAME,
-} from "./src/runtime/public-config";
+} from "@langwatch/ui/public-config";
 
 // Browser bundles transitively touch `process.env` through `env-create.mjs`
 // (and other Node-shaped modules). Vitest's browser provider doesn't expose

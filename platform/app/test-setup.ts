@@ -9,7 +9,7 @@ import { initializeEnvironmentConfig } from "./src/env.mjs";
 import {
   createPublicAppConfigMetaTag,
   PUBLIC_APP_CONFIG_META_NAME,
-} from "./src/runtime/public-config";
+} from "@langwatch/ui/public-config";
 
 dotenv.config({ path: ["../../.env", ".env"] });
 

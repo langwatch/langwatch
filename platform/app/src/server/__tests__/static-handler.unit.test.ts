@@ -6,8 +6,8 @@ import { join } from "path";
 import { Readable } from "stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { readPublicAppConfig, type PublicAppConfig } from "@langwatch/ui/public-config";
 import { serveStaticOrFallback } from "../static-handler";
-import { readPublicAppConfig, type PublicAppConfig } from "../../runtime/public-config";
 
 const publicConfig: PublicAppConfig = {
   appBaseUrl: "https://app.example.com",

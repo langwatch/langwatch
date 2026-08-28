@@ -1,6 +1,6 @@
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
-import type { PublicAppConfig } from "./public-config";
-import { publicAppConfigSchema } from "./public-config";
+import type { PublicAppConfig } from "@langwatch/ui/public-config";
+import { publicAppConfigSchema } from "@langwatch/ui/public-config";
 
 export type PublicAppConfigSource = Readonly<{
   BASE_HOST?: string;

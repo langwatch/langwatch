@@ -1,5 +1,5 @@
+import { readPublicAppConfig } from "@langwatch/ui/public-config";
 import { api, type RouterOutputs } from "../utils/api";
-import { readPublicAppConfig } from "../runtime/public-config";
 
 export type PublicEnvironment = {
   BASE_HOST: string;

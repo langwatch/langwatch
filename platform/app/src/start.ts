@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from "f
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import type { PublicAppConfig } from "@langwatch/ui/public-config";
 import type { AppBootConfig } from "./runtime/config";
-import type { PublicAppConfig } from "./runtime/public-config";
 import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
