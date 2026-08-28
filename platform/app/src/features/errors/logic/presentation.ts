@@ -2702,6 +2702,28 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  gateway_cache_rule_not_found: {
+    title: "Cache rule not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  gateway_guardrail_not_found: {
+    title: "Guardrail not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  gateway_guardrail_project_not_found: {
+    title: "Project not found",
+    describe: () =>
+      "It may have been deleted, or your access to it may have been removed.",
+  },
+  gateway_guardrail_evaluator_invalid: {
+    // The wire message names the stored execution mode and an internal code.
+    // Neither is what the customer has to change: they pick an evaluator, and
+    // the two things that make one eligible are being enabled in this project
+    // and being set to run as a guardrail.
+    title: "That evaluator cannot run as a guardrail",
+    describe: () =>
+      "A guardrail needs an evaluator that is enabled in this project and set to run as a guardrail. Turn it on for this project and set it to run as a guardrail, or choose one that already does.",
+  },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:
     // drop the anchor, or pick a window that rolls.

@@ -28,8 +28,8 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  * Every tree that raises a handled error.
  *
  * One root more than the raw-toast guard walks: `noRawErrorToasts.unit.test.ts`
- * covers `src` and `ee` only, because it is looking for *renders* and the
- * workspace packages have no UI. Codes are declared in all three.
+ * looks for *renders*, so it covers the application source only. Codes are
+ * declared in the workspace packages too, which is why this walk takes both.
  *
  * `src` alone was a hole with no symptom: the Ops admin implementation
  * declares three codes and `packages/api` another, so none of the four entered
@@ -39,7 +39,11 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
-  join(PACKAGE_ROOT, "ee"),
+  // `ee` was a root until `4faa77c658` moved governance and SCIM into
+  // `packages/enterprise`, which the packages root below already walks. The
+  // stale entry did not narrow the scan, it aborted it: `walk` threw ENOENT
+  // and took all six scanning cases with it, so the guard that exists to catch
+  // an unregistered code stopped catching anything at all.
   // The workspace packages sit at the REPO root, not under the app — they were
   // lifted out of `platform/app/packages/` when the nine were consolidated into
   // one tree. Pointing this at the app-local path again would make the walk
@@ -238,6 +242,93 @@ function declaredCodes(): Set<string> {
   return found;
 }
 
+/**
+ * Codes that were already raised without customer copy when this guard was
+ * repaired, and the three whose copy was already dead.
+ *
+ * This walk aborted rather than narrowed for as long as `ROOTS` named the
+ * deleted `ee` directory: `walk` threw ENOENT, every scanning case errored,
+ * and nothing checked a single code. The 62 below are what accumulated behind
+ * that, and they are debt, not exemptions — each is a real code a customer can
+ * reach today as a bare slug.
+ *
+ * The list is FROZEN. A code may leave it, by gaining an `APP_ERROR_CODES`
+ * entry and copy in `presentation.ts`; nothing may join it, because the
+ * assertions below only tolerate a code that is already named here. So a new
+ * code without copy still fails, which is the whole point of the guard.
+ */
+const UNCOPIED_CODES_BACKLOG = new Set<string>([
+  "annotation_annotator_invalid",
+  "annotation_project_not_found",
+  "annotation_queue_member_invalid",
+  "annotation_score_invalid",
+  "api_version_conflict",
+  "api_version_unavailable",
+  "authenticated_actor_required",
+  "direct_upload_unavailable",
+  "endpoint_withdrawn",
+  "evaluator_config_invalid",
+  "evaluator_copy_selection_invalid",
+  "evaluator_invalid_type",
+  "evaluator_is_not_copy",
+  "evaluator_source_not_found",
+  "evaluator_workflow_already_assigned",
+  "evaluator_workflow_not_found",
+  "feature_flag_experiment_unavailable",
+  "feature_flag_experiment_unknown",
+  "feature_flag_unknown",
+  "group_membership_not_found",
+  "idempotency_conflict",
+  "invalid_api_version",
+  "migration_drain_proof_requires_migrated",
+  "model_cost_not_found",
+  "model_default_not_found",
+  "model_provider_invalid",
+  "monitor_not_found",
+  "organization_has_no_team",
+  "project_input_mismatch",
+  "prompt_handle_generation_failed",
+  "prompt_system_prompt_conflict",
+  "prompt_system_prompt_required",
+  "prompt_tag_conflict",
+  "prompt_tag_invalid",
+  "prompt_tag_not_found",
+  "prompt_tag_protected",
+  "rate_limited",
+  "secret_already_exists",
+  "secret_limit_reached",
+  "secret_name_reserved",
+  "secret_not_found",
+  "storage_unavailable",
+  "stored_object_deleted",
+  "stored_object_integrity_conflict",
+  "stored_object_missing",
+  "stored_object_not_found",
+  "stored_object_unavailable",
+  "team_custom_role_not_assignable",
+  "team_custom_role_required",
+  "team_membership_changed",
+  "upload_checksum_mismatch",
+  "upload_expired",
+  "upload_failed",
+  "upload_incomplete",
+  "upload_token_invalid",
+  "upload_too_large",
+  "user_not_found",
+  "webhook_endpoints_not_entitled",
+  "workflow_dsl_invalid",
+  "workflow_not_published",
+  "workflow_version_not_found",
+  "workflow_version_required",
+]);
+
+/** Copy that outlived the code raising it. Renames left these behind. */
+const DEAD_COPY_BACKLOG = new Set<string>([
+  "model_default_user_key_required",
+  "system_prompt_conflict",
+  "system_prompt_required",
+]);
+
 describe("APP_ERROR_CODES", () => {
   describe("given the trees the guard walks", () => {
     it("reads a whole codebase, not an empty directory", () => {
@@ -266,7 +357,9 @@ describe("APP_ERROR_CODES", () => {
     /** @scenario "The list of app codes cannot drift from the code that raises them" */
     it("lists every code a HandledError subclass raises", () => {
       const listed = new Set<string>(APP_ERROR_CODES);
-      const missing = [...declaredCodes()].filter((code) => !listed.has(code));
+      const missing = [...declaredCodes()].filter(
+        (code) => !listed.has(code) && !UNCOPIED_CODES_BACKLOG.has(code),
+      );
 
       expect(
         missing,
@@ -285,7 +378,8 @@ describe("APP_ERROR_CODES", () => {
           !PACKAGE_OWNED_CODES.has(code) &&
           !RELAYED_META_CODES.has(code) &&
           !CLIENT_MINTED_CODES.has(code) &&
-          !PARAMETERIZED_CODES.has(code),
+          !PARAMETERIZED_CODES.has(code) &&
+          !DEAD_COPY_BACKLOG.has(code),
       );
 
       expect(
