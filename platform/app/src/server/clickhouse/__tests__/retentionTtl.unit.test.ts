@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 import {
@@ -170,9 +172,7 @@ describe("governance_cost_rollup_1d retention exemption", () => {
     ).toBeUndefined();
   });
 
-  it("declares its fixed 13-month delete in the migration itself", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+  it("declares its fixed 13-month delete in the migration itself", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
