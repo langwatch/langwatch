@@ -249,10 +249,10 @@ function refusalFor({
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
   if (isClickHouseUnknownIdentifierError(error)) {
-    return new LangWatchQLUnknownIdentifierError(
-      unknownIdentifierFromError(error),
-      { reasons: [toError(error)] },
-    );
+    return new LangWatchQLUnknownIdentifierError({
+      identifier: unknownIdentifierFromError(error),
+      reasons: [toError(error)],
+    });
   }
   return translateClickHouseQueryError(error, durationMs);
 }

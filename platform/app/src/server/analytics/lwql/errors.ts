@@ -114,11 +114,14 @@ export class LangWatchQLUnavailableError extends HandledError {
 export class LangWatchQLUnknownIdentifierError extends HandledError {
   declare readonly code: "lwql_unknown_identifier";
 
-  constructor(
+  constructor({
+    identifier,
+    ...options
+  }: {
     /** The unresolvable name, when it could be read from the server's refusal. */
-    identifier: string | undefined,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+    identifier: string | undefined;
+    reasons?: readonly Error[];
+  }) {
     super(
       "lwql_unknown_identifier",
       identifier === undefined
