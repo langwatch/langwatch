@@ -61699,7 +61699,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 - `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
-This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
 Create the namespace and the Secrets:
 
@@ -61737,7 +61737,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.16.0
+    targetRevision: 3.17.0
     helm:
       releaseName: langwatch
       values: |
@@ -61786,7 +61786,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.16.0
+      targetRevision: 3.17.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62133,7 +62133,7 @@ graph LR
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `x.y.z` | A specific release, recommended for production — pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
+| `x.y.z` | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
 | `local` | Built locally via `make images` (development only) |
 
 <Tip>
@@ -62147,7 +62147,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.16.0
+VERSION=3.17.0
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62163,13 +62163,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.16.0"
+    tag: "3.17.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.16.0"
+    tag: "3.17.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.16.0"
+    tag: "3.17.0"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -65836,7 +65836,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -66168,7 +66168,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml
 ```
 
