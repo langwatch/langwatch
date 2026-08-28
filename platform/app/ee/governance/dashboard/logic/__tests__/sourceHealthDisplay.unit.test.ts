@@ -68,7 +68,13 @@ describe("noDataSinceNotice", () => {
   const lastSuccessAt = new Date("2026-08-01T10:00:00.000Z");
 
   it("names the last success once the source is unhealthy", () => {
-    expect(noDataSinceNotice({ errorCount: FAILING, lastSuccessAt })).toEqual({
+    expect(
+      noDataSinceNotice({
+        status: "active",
+        errorCount: FAILING,
+        lastSuccessAt,
+      }),
+    ).toEqual({
       lastSuccessIso: "2026-08-01T10:00:00.000Z",
     });
   });
@@ -76,6 +82,7 @@ describe("noDataSinceNotice", () => {
   it("accepts the timestamp as a string, the shape the API returns", () => {
     expect(
       noDataSinceNotice({
+        status: "active",
         errorCount: FAILING,
         lastSuccessAt: "2026-08-01T10:00:00.000Z",
       }),
@@ -83,14 +90,33 @@ describe("noDataSinceNotice", () => {
   });
 
   it("stays silent while the source is healthy", () => {
-    expect(noDataSinceNotice({ errorCount: 0, lastSuccessAt })).toBeNull();
+    expect(
+      noDataSinceNotice({ status: "active", errorCount: 0, lastSuccessAt }),
+    ).toBeNull();
   });
 
   it("stays silent when the source has never pulled successfully", () => {
     // There is no "since" to name, and the awaiting-first-event badge already
     // covers this case.
     expect(
-      noDataSinceNotice({ errorCount: FAILING, lastSuccessAt: null }),
+      noDataSinceNotice({
+        status: "active",
+        errorCount: FAILING,
+        lastSuccessAt: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("stays silent for a disabled source that is also failing", () => {
+    // Both facts are true and only one line can be shown. A source nobody
+    // asked to run has not "stopped pulling", and the badge already says
+    // Disabled — an outage notice under it sends the reader to fix nothing.
+    expect(
+      noDataSinceNotice({
+        status: "disabled",
+        errorCount: FAILING,
+        lastSuccessAt,
+      }),
     ).toBeNull();
   });
 });

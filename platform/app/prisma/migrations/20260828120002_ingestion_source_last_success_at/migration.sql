@@ -8,3 +8,9 @@ ALTER TABLE "IngestionSource" ADD COLUMN     "lastSuccessAt" TIMESTAMP(3);
 
 -- AlterTable
 ALTER TABLE "IngestionPullRunProjection" ADD COLUMN     "lastSuccessAt" DOUBLE PRECISION;
+
+-- Down: (reversible — uncomment and run manually to roll back)
+-- Both columns are nullable and derived: the projection replay rebuilds them
+-- from the event log, so dropping them loses nothing that cannot be replayed.
+-- ALTER TABLE "IngestionSource" DROP COLUMN "lastSuccessAt";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastSuccessAt";

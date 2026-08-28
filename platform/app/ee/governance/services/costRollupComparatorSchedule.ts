@@ -26,7 +26,10 @@
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
-import type { ScheduledJobRepository } from "~/server/app-layer/scheduler/scheduler.types";
+import type {
+  ScheduledJobRecord,
+  ScheduledJobRepository,
+} from "~/server/app-layer/scheduler/scheduler.types";
 
 import {
   GOVERNANCE_COST_SOURCE,
@@ -96,6 +99,43 @@ export function costSourceFromTargetId(
 }
 
 /**
+ * One tenant's existing entries, or null when the read itself failed.
+ *
+ * The read is the other half of the per-tenant boundary. Both callers below
+ * catch their writes, but an unguarded read throws straight out of the pass
+ * and every tenant after this one goes unscheduled until the next boot — the
+ * exact failure the write-level catches exist to prevent.
+ */
+async function findEntriesForTenant({
+  scheduledJobs,
+  targetType,
+  tenantId,
+  logger,
+}: {
+  scheduledJobs: ScheduledJobRepository;
+  targetType: string;
+  tenantId: string;
+  logger: { warn: (context: unknown, message: string) => void };
+}): Promise<ScheduledJobRecord[] | null> {
+  try {
+    // One query per tenant, so a tenant already scheduled costs no writes.
+    return await scheduledJobs.findAllForProject({
+      projectId: tenantId,
+      targetType,
+    });
+  } catch (error) {
+    logger.warn(
+      {
+        tenantId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Reading the cost rollup comparator entries for this tenant failed; the next boot retries it",
+    );
+    return null;
+  }
+}
+
+/**
  * One tenant's missing entries, created.
  *
  * Create-if-missing, like the report reconciler: an entry that already exists
@@ -118,11 +158,14 @@ async function ensureEntriesForTenant({
   tenantId: string;
   logger: { warn: (context: unknown, message: string) => void };
 }): Promise<{ created: number; failed: number }> {
-  // One query per tenant, so a tenant already scheduled costs no writes.
-  const existing = await scheduledJobs.findAllForProject({
-    projectId: tenantId,
+  const existing = await findEntriesForTenant({
+    scheduledJobs,
     targetType,
+    tenantId,
+    logger,
   });
+  // One unreadable tenant, counted and stepped over.
+  if (existing === null) return { created: 0, failed: 1 };
   const existingTargetIds = new Set(existing.map((job) => job.targetId));
 
   const missing = COMPARED_COST_SOURCES.filter(
@@ -171,29 +214,53 @@ async function ensureEntriesForTenant({
  *
  * Only what is actually there and still active, so the count reports work done
  * rather than no-op writes against tenants that never had an entry.
+ *
+ * Failures are logged and counted, never thrown, for the same reason as the
+ * creation path: an archived tenant whose rows will not switch off must not
+ * cost the live tenants behind it their schedule.
  */
 async function deactivateEntriesForTenant({
   scheduledJobs,
   targetType,
   tenantId,
+  logger,
 }: {
   scheduledJobs: ScheduledJobRepository;
   targetType: string;
   tenantId: string;
-}): Promise<number> {
-  const existing = await scheduledJobs.findAllForProject({
-    projectId: tenantId,
+  logger: { warn: (context: unknown, message: string) => void };
+}): Promise<{ deactivated: number; failed: number }> {
+  const existing = await findEntriesForTenant({
+    scheduledJobs,
     targetType,
+    tenantId,
+    logger,
   });
-  const live = existing.filter((row) => row.active);
-  for (const job of live) {
-    await scheduledJobs.deactivateForTarget({
-      projectId: tenantId,
-      targetType,
-      targetId: job.targetId,
-    });
+  if (existing === null) return { deactivated: 0, failed: 1 };
+
+  let deactivated = 0;
+  let failed = 0;
+  for (const job of existing.filter((row) => row.active)) {
+    try {
+      await scheduledJobs.deactivateForTarget({
+        projectId: tenantId,
+        targetType,
+        targetId: job.targetId,
+      });
+      deactivated += 1;
+    } catch (error) {
+      failed += 1;
+      logger.warn(
+        {
+          tenantId,
+          targetId: job.targetId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Switching off the cost rollup comparator for this archived tenant failed; the next boot retries it",
+      );
+    }
   }
-  return live.length;
+  return { deactivated, failed };
 }
 
 /**
@@ -242,11 +309,14 @@ export async function reconcileCostRollupComparatorSchedules({
   }
 
   for (const project of archived) {
-    deactivated += await deactivateEntriesForTenant({
+    const result = await deactivateEntriesForTenant({
       scheduledJobs,
       targetType,
       tenantId: project.id,
+      logger,
     });
+    deactivated += result.deactivated;
+    failed += result.failed;
   }
 
   return { created, deactivated, failed };
