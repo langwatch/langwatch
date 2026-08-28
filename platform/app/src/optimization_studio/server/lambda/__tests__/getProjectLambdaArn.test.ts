@@ -352,6 +352,7 @@ describe("getProjectLambdaArn", () => {
     });
 
     describe("when discriminating errors", () => {
+      /** @scenario AWS errors are matched by exception name, not message text */
       it("recognizes ResourceConflictException by name", async () => {
         const drifted = { ...mockLambdaConfig, Timeout: 300 };
         const _send = vi
@@ -364,7 +365,11 @@ describe("getProjectLambdaArn", () => {
                 "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
             },
           })
-          .mockRejectedValueOnce(Object.assign(new Error("An update is in progress"), { name: "ResourceConflictException" }))
+          .mockRejectedValueOnce(
+            Object.assign(new Error("An update is in progress"), {
+              name: "ResourceConflictException",
+            }),
+          )
           .mockResolvedValue({ Configuration: mockLambdaConfig });
 
         const arn = await getProjectLambdaArn("error-by-name");
