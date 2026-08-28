@@ -433,7 +433,6 @@ describe("how many identity providers an organization may register", () => {
       credentials: new InMemoryCredentials(),
       discovery: reachable,
       baseUrl: BASE_URL,
-      providerConfig: plaintextProviderConfigCipher,
       // Not what this refusal reads, so each one answers its quietest.
       testSignIns: { findLatestForConnection: async () => null },
       breakGlass: { history: async () => [] },
@@ -752,7 +751,6 @@ describe("what LangWatch is, to an identity provider", () => {
   it("answers every address before a connection exists", () => {
     const details = serviceProviderDetailsFor({
       baseUrl: BASE_URL,
-      providerConfig: plaintextProviderConfigCipher,
       connectionId: null,
     });
 
@@ -764,7 +762,6 @@ describe("what LangWatch is, to an identity provider", () => {
   it("keys the per-connection addresses on the connection once there is one", () => {
     const details = serviceProviderDetailsFor({
       baseUrl: BASE_URL,
-      providerConfig: plaintextProviderConfigCipher,
       connectionId: CONNECTION,
     });
 

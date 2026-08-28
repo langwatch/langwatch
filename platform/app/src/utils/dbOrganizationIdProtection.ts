@@ -310,6 +310,26 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "connectionId") === "string",
   },
+  // One row per domain an SSO connection has proved (D04), carrying the
+  // owning `organizationId`. This is the "who already verified this domain"
+  // fact lifted out of `SsoConnection.verifiedDomains` and given its own
+  // table, so that first-verifier-owns is a uniqueness constraint rather than
+  // an array the fold has to police.
+  //
+  // `SsoConnection` itself is EXEMPT because that ownership read is
+  // cross-organization by design. Here it does not have to be: the read names
+  // the domains it is asking about, and `domain` is the primary key, so a
+  // clause naming them reaches exactly those rows however many organizations
+  // they span — which is the answer the ownership rule wants. The fold's
+  // other two writes name `connectionId`, a parent key belonging to exactly
+  // one organization. So both bounds hold and the model stays guarded, which
+  // leaves a bare `findMany()` over every tenant's domain ownership — the one
+  // shape neither call site needs — with no admitted form.
+  SsoVerifiedDomain: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      idPredicate(clauseField(clause, "domain")),
+  },
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.

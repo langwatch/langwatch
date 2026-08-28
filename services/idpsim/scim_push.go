@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+// ProvisioningTarget is the SCIM service provider the simulator provisions
+// against — the app's /Users and /Groups endpoints, say — together with the
+// bearer token that provider issued. It names one target for both directions:
+// a push writes to it, a read-back asks it what it ended up holding.
+type ProvisioningTarget struct {
+	// BaseURL is the SCIM base URL (…/scim/v2 style — Users/Groups appended).
+	BaseURL string `json:"target"`
+	// Token is the bearer token the target requires.
+	Token string `json:"token"`
+}
+
 // scimPushResult reports what landed.
 type scimPushResult struct {
 	UsersCreated  int      `json:"usersCreated"`

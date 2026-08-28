@@ -13,7 +13,6 @@ import {
   HandledErrorAlert,
   readHandledError,
 } from "~/features/errors";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authFailureMessage } from "~/pages/auth/authFailureMessage";
 import { api } from "~/utils/api";
 import { signIn } from "~/utils/auth-client";
@@ -159,10 +158,6 @@ export function SignUpCredentialForm({
   // derived from focus, so the confirmation does not vanish the moment
   // somebody tabs into it.
   const [isChoosingPassword, setIsChoosingPassword] = useState(false);
-  // Only where this deployment mounted the plugin. Offering to create a
-  // passkey against an endpoint that was never registered is an offer we
-  // cannot honour.
-  const publicEnv = usePublicEnv();
   // Not on the step a spent link lands on. That step is reached with a
   // single-use proof that only `user.register` can spend, and a passkey does
   // not go through it — the ceremony creates the account itself, which would

@@ -32,7 +32,6 @@ import {
   usePasskeyCeremony,
 } from "~/features/auth/logic/passkeyCeremony";
 import { showErrorToast } from "~/features/errors";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
 import { passkeyLabel as labelFor } from "./passkeyAuthenticators";
 import { useLastWayInWarning } from "./useLastWayInWarning";
@@ -357,7 +356,6 @@ function LastWayInNotice() {
  * somebody already uses — and offers to make one.
  */
 export function PasskeysSection() {
-  const publicEnv = usePublicEnv();
   const passkeys = authClient.useListPasskeys();
   const [isCreating, setIsCreating] = useState(false);
   // Which passkey a dialog is open for, or null. Held as the row rather than
@@ -365,15 +363,10 @@ export function PasskeysSection() {
   // identical-looking cards is not a question anybody can answer.
   const [renaming, setRenaming] = useState<HeldPasskey | null>(null);
   const [removing, setRemoving] = useState<HeldPasskey | null>(null);
-  // The ceremony this page started, if it is the one in flight. Read before
-  // any early return: a hook cannot be called conditionally, and the flag
-  // check below is a return.
+  // The ceremony this page started, if it is the one in flight.
   const ceremony = usePasskeyCeremony();
   const registering = ceremony?.purpose === "register" ? ceremony : null;
   const abandoned = useRef<{ abandoned: boolean } | null>(null);
-
-  // A deployment that never mounted the plugin has no endpoint behind any of
-  // this. Rendering the hero there would be an offer we cannot honour.
 
   const held = passkeys.data ?? [];
 

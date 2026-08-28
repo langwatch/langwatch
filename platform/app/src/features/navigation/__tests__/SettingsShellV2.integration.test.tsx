@@ -125,10 +125,6 @@ vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div data-testid="loading-screen" />,
 }));
 
-// Legacy mode renders through DashboardLayout, which mounts the nudge. This
-// suite asserts on settings navigation, not on the nudge's own contract.
-vi.mock("~/components/me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
-
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({
     data: {

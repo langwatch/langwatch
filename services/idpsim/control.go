@@ -140,8 +140,8 @@ func (s *Server) handleControlSCIMPush(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	var req scimPushRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Target == "" {
+	var req ProvisioningTarget
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BaseURL == "" {
 		http.Error(w, "a push needs a target SCIM base URL", http.StatusBadRequest)
 		return
 	}
