@@ -1,7 +1,4 @@
-import {
-  EventingServerRuntime,
-  type EventingServerRuntimeOptions,
-} from "@langwatch/eventing/server";
+import type { EventingServerRuntimeOptions } from "@langwatch/eventing/server";
 import {
   EnterpriseWorkerComposition,
   type EnterpriseWorkerCompositionOptions,
@@ -13,7 +10,6 @@ import {
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
-import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
 import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
@@ -31,7 +27,6 @@ export type WorkerTopicCompositionOptions = {
   redis: TopicServerInstallerDependencies["redis"];
   execution: TopicServerInstallerDependencies["execution"];
   metrics: TopicServerInstallerDependencies["metrics"];
-  traceAssignments: TraceTopicAssignmentPort;
 };
 
 /** Trace's package-owned processing registration, mounted before Topic. */
@@ -45,7 +40,7 @@ export type WorkerProductionCompositionOptions = {
   eventing: EventingServerRuntimeOptions;
   lifecycle: WorkerLifecyclePort;
   transport: WorkerTransportPort;
-  trace?: WorkerTraceCompositionOptions;
+  trace: WorkerTraceCompositionOptions;
   topic: WorkerTopicCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
@@ -62,33 +57,25 @@ export type WorkerProductionCompositionOptions = {
  */
 export class WorkerProductionComposition {
   static create(options: WorkerProductionCompositionOptions): WorkerProductionComposition {
-    const eventingServer = EventingServerRuntime.create({
-      ...options.eventing,
-      consumersEnabled: false,
-    });
-    const eventing = WorkerEventingRuntime.create({
-      ...eventingServer.dependencies(),
-      executionTarget: "worker",
-      consumersEnabled: false,
+    const eventing = WorkerEventingRuntime.createProduction({
+      persistence: options.eventing,
       warnWhenProjectionsRunInline: options.config.nodeEnvironment === "production",
+    });
+    const trace = TraceWorkerFeatureInstaller.create({
+      installer: options.trace.installer,
+      eventing,
     });
     const topicServer = TopicServerInstaller.create({
       database: options.topic.database,
-      processStore: eventingServer.processStore,
+      processStore: eventing.processStore,
       redis: options.topic.redis,
       execution: options.topic.execution,
       metrics: options.topic.metrics,
     });
-    const trace = options.trace
-      ? TraceWorkerFeatureInstaller.create({
-          installer: options.trace.installer,
-          eventing,
-        })
-      : undefined;
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,
-      traceAssignments: trace?.traceAssignments ?? options.topic.traceAssignments,
+      traceAssignments: trace.traceAssignments,
     });
     const enterprise = options.enterprise
       ? EnterpriseWorkerComposition.create(options.enterprise)
@@ -117,7 +104,7 @@ export class WorkerProductionComposition {
     lifecycle: WorkerLifecyclePort;
     transport: WorkerTransportPort;
     topic: TopicWorkerFeatureInstaller;
-    trace?: TraceWorkerFeatureInstaller;
+    trace: TraceWorkerFeatureInstaller;
     enterprise?: EnterpriseWorkerComposition | EnterpriseWorkerCompositionOptions;
     observability?: ProcessObservability;
     resources?: ResourceScope;
@@ -131,13 +118,13 @@ export class WorkerProductionComposition {
     const application = WorkerApplication.create({
       runtime,
       eventing: options.eventing,
-      featureInstallers: options.trace ? [options.trace, options.topic] : [options.topic],
+      featureInstallers: [options.trace, options.topic],
     });
 
     options.observability?.logger.info(
       {
         environment: options.config.environment,
-        features: options.trace ? [options.trace.name, options.topic.name] : [options.topic.name],
+        features: [options.trace.name, options.topic.name],
       },
       "worker production graph composed",
     );
@@ -162,7 +149,7 @@ export class WorkerProductionComposition {
     readonly application: WorkerApplication,
     readonly eventing: WorkerEventingRuntime,
     readonly topic: TopicWorkerFeatureInstaller,
-    readonly trace: TraceWorkerFeatureInstaller | undefined,
+    readonly trace: TraceWorkerFeatureInstaller,
     readonly enterprise: EnterpriseWorkerComposition | undefined,
   ) {}
 }

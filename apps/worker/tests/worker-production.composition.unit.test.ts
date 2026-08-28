@@ -4,6 +4,12 @@ import {
   type EventSourcing,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventStore,
+  EventingServerRuntime,
+  PrismaProcessStore,
+} from "@langwatch/eventing/server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -75,6 +81,31 @@ class TraceInstaller {
   constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {}
 }
 
+function createProcessPersistenceDatabase() {
+  return {
+    $executeRaw: async () => 0,
+    $queryRaw: async () => [],
+    $transaction: async <Result>(callback: (transaction: object) => Promise<Result>) =>
+      callback({}),
+    processManagerInbox: {},
+    processManagerInstance: {},
+    processManagerOutbox: {},
+    processManagerOutboxAttempt: {},
+  };
+}
+
+function createTraceFeature(eventing: WorkerEventingRuntime): {
+  trace: TraceWorkerFeatureInstaller;
+  installer: TraceInstaller;
+} {
+  const assignments = new TraceAssignments();
+  const installer = new TraceInstaller(assignments);
+  return {
+    trace: TraceWorkerFeatureInstaller.create({ installer, eventing }),
+    installer,
+  };
+}
+
 class Projects {
   async tryGetOrganizationId(projectId: string): Promise<string | null> {
     return projectId === "project-1" ? "org-1" : null;
@@ -106,6 +137,44 @@ class Credentials {
 }
 
 describe("WorkerProductionComposition", () => {
+  it("composes one canonical durable Eventing graph with consumers disabled", () => {
+    const assignments = new TraceAssignments();
+    const createServer = EventingServerRuntime.create.bind(EventingServerRuntime);
+    const create = vi
+      .spyOn(EventingServerRuntime, "create")
+      .mockImplementation((options) => createServer(options));
+
+    try {
+      const composition = WorkerProductionComposition.create({
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        eventing: {
+          database: createProcessPersistenceDatabase(),
+          resolveClickHouseClient: async () => ({
+            insert: async () => undefined,
+            query: async () => ({ json: async () => [] }),
+          }),
+          groupQueue: { redis: {} as never },
+          retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+        },
+        lifecycle: new Lifecycle(),
+        transport: new Transport(),
+        trace: { installer: new TraceInstaller(assignments) },
+        topic: {
+          database: {} as never,
+          redis: null,
+          execution: {} as never,
+          metrics: {} as never,
+        },
+      });
+
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ consumersEnabled: false }));
+      expect(composition.eventing.eventStore).toBeInstanceOf(EventingClickHouseEventStore);
+      expect(composition.eventing.processStore).toBeInstanceOf(PrismaProcessStore);
+    } finally {
+      create.mockRestore();
+    }
+  });
+
   it("installs Topic's producer graph and boot seeds without claiming the shared Eventing queue", async () => {
     const queue = new Queue();
     const eventing = WorkerEventingRuntime.create({
@@ -116,11 +185,12 @@ describe("WorkerProductionComposition", () => {
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
+    const traceFeature = createTraceFeature(eventing);
     const capability = new TopicCapability();
     const topic = TopicWorkerFeatureInstaller.create({
       installer: capability,
       eventing,
-      traceAssignments: { assignTopic: async () => undefined },
+      traceAssignments: traceFeature.trace.traceAssignments,
     });
     const transport = new Transport();
     const lifecycle = new Lifecycle();
@@ -129,6 +199,7 @@ describe("WorkerProductionComposition", () => {
       eventing,
       lifecycle,
       transport,
+      trace: traceFeature.trace,
       topic,
       enterprise: {
         managedProvider: {
@@ -146,6 +217,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: expect.any(Object),
     });
     expect(capability.startBootSeeds).toHaveBeenCalledOnce();
+    expect(traceFeature.installer.install).toHaveBeenCalledBefore(capability.install);
     expect(capability.install).toHaveBeenCalledBefore(queue.waitUntilReady);
     expect(capability.startBootSeeds).toHaveBeenCalledBefore(queue.waitUntilReady);
     expect(queue.waitUntilReady).toHaveBeenCalledOnce();
@@ -187,35 +259,30 @@ describe("WorkerProductionComposition", () => {
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
-    const traceAssignments = new TraceAssignments();
-    const traceInstaller = new TraceInstaller(traceAssignments);
-    const trace = TraceWorkerFeatureInstaller.create({
-      installer: traceInstaller,
-      eventing,
-    });
+    const traceFeature = createTraceFeature(eventing);
     const capability = new TopicCapability();
     const topic = TopicWorkerFeatureInstaller.create({
       installer: capability,
       eventing,
-      traceAssignments: trace.traceAssignments,
+      traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
-      trace,
+      trace: traceFeature.trace,
       topic,
     });
 
     await composition.application.start();
 
-    expect(traceInstaller.install).toHaveBeenCalledWith(eventing.eventSourcing);
+    expect(traceFeature.installer.install).toHaveBeenCalledWith(eventing.eventSourcing);
     expect(capability.install).toHaveBeenCalledWith({
       eventSourcing: eventing.eventSourcing,
-      traceAssignments: trace.traceAssignments,
+      traceAssignments: traceFeature.trace.traceAssignments,
     });
-    expect(traceInstaller.install.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(traceFeature.installer.install.mock.invocationCallOrder[0]).toBeLessThan(
       capability.install.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
@@ -230,17 +297,19 @@ describe("WorkerProductionComposition", () => {
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
+    const traceFeature = createTraceFeature(eventing);
     const capability = new EventingTopicCapability();
     const topic = TopicWorkerFeatureInstaller.create({
       installer: capability,
       eventing,
-      traceAssignments: { assignTopic: async () => undefined },
+      traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
+      trace: traceFeature.trace,
       topic,
     });
 
@@ -266,6 +335,7 @@ describe("WorkerProductionComposition", () => {
       warnWhenProjectionsRunInline: false,
       consumersEnabled: false,
     });
+    const traceFeature = createTraceFeature(eventing);
     const resources = new ResourceScope();
     const closeResource = vi.fn();
     resources.own("parent", closeResource);
@@ -273,13 +343,14 @@ describe("WorkerProductionComposition", () => {
     const topic = TopicWorkerFeatureInstaller.create({
       installer: capability,
       eventing,
-      traceAssignments: { assignTopic: async () => undefined },
+      traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
+      trace: traceFeature.trace,
       topic,
       resources,
     });

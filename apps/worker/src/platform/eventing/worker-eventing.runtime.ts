@@ -7,6 +7,10 @@ import {
   type ProcessStore,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
+import {
+  EventingServerRuntime,
+  type EventingServerRuntimeOptions,
+} from "@langwatch/eventing/server";
 
 export interface WorkerEventingDependencies {
   eventStore: EventStore;
@@ -25,6 +29,13 @@ export interface WorkerEventingDependencies {
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
+/** Durable Eventing ports supplied by the Worker process composition root. */
+export interface WorkerEventingProductionOptions {
+  persistence: EventingServerRuntimeOptions;
+  /** Production-only diagnostic for projections without a shared queue. */
+  warnWhenProjectionsRunInline: boolean;
+}
+
 /**
  * The worker's one Eventing runtime. Feature installers receive this shared
  * instance to register command queues, projections, deterministic processes,
@@ -35,20 +46,43 @@ export class WorkerEventingRuntime {
     return new WorkerEventingRuntime(dependencies);
   }
 
+  /**
+   * Builds the Worker’s one durable Eventing graph from the sealed server
+   * adapters. The process root supplies Prisma, ClickHouse, retention, and
+   * Group Queue ports; this boundary keeps consumers disabled until the full
+   * legacy registry has moved.
+   */
+  static createProduction(options: WorkerEventingProductionOptions): WorkerEventingRuntime {
+    const server = EventingServerRuntime.create({
+      ...options.persistence,
+      consumersEnabled: false,
+    });
+    return WorkerEventingRuntime.create({
+      ...server.dependencies(),
+      executionTarget: "worker",
+      consumersEnabled: false,
+      warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,
+    });
+  }
+
   readonly eventSourcing: EventSourcing;
+  readonly eventStore: EventStore;
+  readonly processStore: ProcessStore;
   private registrationsComplete = false;
   private started = false;
   private startPromise: Promise<void> | undefined;
   private closed = false;
 
   private constructor(dependencies: WorkerEventingDependencies) {
+    this.eventStore = dependencies.eventStore;
+    this.processStore = dependencies.processStore;
     this.eventSourcing = new EventSourcing({
       enabled: true,
-      eventStore: dependencies.eventStore,
+      eventStore: this.eventStore,
       queueFactory: dependencies.queueFactory,
       consumersEnabled: false,
       executionTarget: dependencies.executionTarget,
-      processStore: dependencies.processStore,
+      processStore: this.processStore,
       retentionPolicyResolver: dependencies.retentionPolicyResolver,
       warnWhenProjectionsRunInline: dependencies.warnWhenProjectionsRunInline,
     });

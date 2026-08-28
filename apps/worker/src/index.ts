@@ -19,6 +19,7 @@ export {
 export {
   WorkerEventingRuntime,
   type WorkerEventingDependencies,
+  type WorkerEventingProductionOptions,
 } from "./platform/eventing/worker-eventing.runtime";
 export {
   WorkerHandlePort,
