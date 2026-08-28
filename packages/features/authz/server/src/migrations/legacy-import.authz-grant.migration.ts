@@ -188,20 +188,13 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       inventory,
     });
 
-    // The projection, read ONCE per pass (the spec's own words) — before
-    // anything is stated, so nothing here waits on a fold. Reconcile and the
-    // check both walk this read: what this pass states is invisible to it by
-    // construction, lands as `outstanding`, and the NEXT pass sees it folded
-    // and finalizes. Holding a first pass to finalize a later one is the
-    // design, not a shortcut.
-    const heads = await this.readHeads(organizationId);
-
-    await this.state({ organizationId, expected, signal });
-    await this.reconcileStale({ organizationId, expected, heads, signal });
-    await this.repairDrift({ organizationId, expected, heads, signal });
-    // The budget handover rides every pass, monotonically upward: legacy
-    // keeps counting views while the organization is held, and the proof
-    // compares counts exactly, so re-seeding is what lets it heal.
+    // The budget handover rides every pass, monotonically upward, and it
+    // PRECEDES the projection read: legacy keeps counting views while the
+    // organization is held, and this write raises the usage row the read
+    // below returns. Seeded after that read, the proof compared a count the
+    // same pass had already superseded, so a link viewed between passes was
+    // reported outstanding forever and a frequently viewed one held its
+    // organization indefinitely.
     await this.deps.store.seedResourceGrantUsage({
       organizationId,
       seeds: expected.shareLinks.map((link) => ({
@@ -210,6 +203,18 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
         viewCount: link.row.viewCount,
       })),
     });
+
+    // The projection, read ONCE per pass (the spec's own words) — before
+    // anything is stated, so nothing here waits on a fold. Staging, reconcile
+    // and the check all walk this read: what this pass states is invisible to
+    // it by construction, lands as `outstanding`, and the NEXT pass sees it
+    // folded and finalizes. Holding a first pass to finalize a later one is
+    // the design, not a shortcut.
+    const heads = await this.readHeads(organizationId);
+
+    await this.state({ organizationId, expected, heads, signal });
+    await this.reconcileStale({ organizationId, expected, heads, signal });
+    await this.repairDrift({ organizationId, expected, heads, signal });
 
     const { outstanding, diffs } = this.check({
       organizationId,
@@ -285,18 +290,33 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     return { grantRows, roleHeads, resourceRows };
   }
 
-  /** Roles before grants: a custom binding's roleKey names its role. */
+  /**
+   * Roles before grants: a custom binding's roleKey names its role.
+   *
+   * Only what the heads do not already carry is staged. A restated fact
+   * dedupes at the event store, but the queue has already paid to carry it,
+   * and a grant is its own aggregate — a held organization with a large
+   * share-link population restaged one group per grant on every pass and
+   * converged on nothing while it repeated them.
+   */
   private async state({
     organizationId,
     expected,
+    heads,
     signal,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
+    heads: HeadState;
     signal?: AbortSignal;
   }): Promise<void> {
+    const { roles, grants } = AuthzMigrationProofMapper.unstated({
+      organizationId,
+      expected,
+      heads,
+    });
     await this.each({
-      items: expected.roles,
+      items: roles,
       signal,
       send: (role) =>
         this.deps.ledger.defineRole({
@@ -310,13 +330,6 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
           actor: ACTOR,
         }),
     });
-    const grants = [
-      ...expected.bindingFacts,
-      ...expected.teamFacts,
-      ...expected.organizationFacts,
-      ...expected.credentialFacts,
-      ...expected.shareLinks.map((link) => link.fact),
-    ];
     await this.each({
       items: grants,
       signal,
@@ -408,8 +421,10 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       // Every kind: the migration only runs before an organization
       // finalizes, and until then every role head — `system_api_key`
       // included — mirrors a legacy CustomRole row, so a head with no such
-      // row is stale whatever its kind.
-      .filter((head) => !expectedRoleIds.has(head.id))
+      // row is stale whatever its kind. A head already buried is not: the
+      // tombstone is permanent, and the deny key carries the pass's business
+      // time, so re-deleting it would append an event on every pass forever.
+      .filter((head) => !head.deleted && !expectedRoleIds.has(head.id))
       .map((head) => head.id)
       .sort();
     await this.each({
@@ -1011,7 +1026,7 @@ export class AuthzExpectedFactsMapper {
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
  *  has not caught up with what this pass stated or revoked. */
 export type AuthzEngineDiff = {
-  kind: "grant_revoked" | "grant_changed" | "role_changed" | "resource_changed";
+  kind: "grant_revoked" | "grant_changed" | "role_deleted" | "role_changed" | "resource_changed";
   id: string;
   field?: string;
   expected?: string | null;
@@ -1085,10 +1100,22 @@ export class AuthzMigrationProofMapper {
         outstanding.push(role.roleId);
         continue;
       }
+      // A buried head whose legacy row exists again. The projection keeps
+      // the role tombstoned — `role.upsert` leaves `deletedAt` alone — so
+      // comparing only the ordinary fields called it converged and finalized
+      // an organization whose role the engine still refuses. Named, never
+      // restored: repair is the operator's.
+      if (head.deleted) {
+        diffs.push({ kind: "role_deleted", id: role.roleId });
+        continue;
+      }
       diffs.push(...this.roleDiffs({ role, head }));
     }
     for (const head of heads.roleHeads) {
-      if (!expectedRoleIds.has(head.id)) {
+      // A buried head with no legacy row is a deletion this migration
+      // already made, folded. Counting it outstanding held the organization
+      // on a condition no later pass could clear.
+      if (!head.deleted && !expectedRoleIds.has(head.id)) {
         outstanding.push(head.id);
       }
     }
@@ -1127,6 +1154,48 @@ export class AuthzMigrationProofMapper {
       }
     }
     return { outstanding, diffs };
+  }
+
+  /**
+   * What a pass has to state: the facts the heads do not already carry.
+   * Every skip is the check's own predicate read backwards — a fact the
+   * check would call converged is one the ledger already holds — so what a
+   * pass skips can never change what it reports. An organization whose heads
+   * are empty, its first pass, still states everything.
+   *
+   * A share link whose head only LAGS on views is carried: the budget rides
+   * `seedResourceGrantUsage`, and no restated attach could carry it.
+   */
+  static unstated({
+    organizationId,
+    expected,
+    heads,
+  }: {
+    organizationId: string;
+    expected: ExpectedFacts;
+    heads: HeadState;
+  }): { roles: RoleFact[]; grants: GrantFact[] } {
+    const roleHeadById = new Map(heads.roleHeads.map((head) => [head.id, head]));
+    const roles = expected.roles.filter((role) => {
+      const head = roleHeadById.get(role.roleId);
+      return !head || this.roleDrifted({ role, head });
+    });
+
+    const grantHeadById = new Map(heads.grantRows.map((row) => [row.id, row]));
+    const grants = expected.nonResourceFacts.filter((fact) => {
+      const head = grantHeadById.get(fact.grantId);
+      if (!head) return true;
+      return head.revoked || this.grantDiffs({ fact, head }).length > 0;
+    });
+
+    const resourceHeadById = new Map(heads.resourceRows.map((row) => [row.grantId, row]));
+    const shareLinks = expected.shareLinks.filter((link) => {
+      const head = resourceHeadById.get(link.row.id);
+      if (!head) return true;
+      return this.resourceDiffs({ organizationId, link, head }).diffs.length > 0;
+    });
+
+    return { roles, grants: [...grants, ...shareLinks.map((link) => link.fact)] };
   }
 
   static roleDrifted({ role, head }: { role: RoleFact; head: RoleHeadRow }): boolean {
