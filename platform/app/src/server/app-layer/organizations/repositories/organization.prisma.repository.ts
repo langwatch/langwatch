@@ -441,7 +441,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     organizationId: string,
   ): Promise<Array<{ id: string; name: string }>> {
     return this.prisma.project.findMany({
-      where: { team: { organizationId } },
+      // Named projects reach a customer — the plan-limit alert email lists
+      // them per project. The governance project's usage stays in the
+      // org-level total rather than becoming a line that reveals it.
+      where: { team: { organizationId }, kind: { not: "internal_governance" } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
