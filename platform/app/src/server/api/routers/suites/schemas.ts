@@ -14,7 +14,7 @@ export const projectSchema = z.object({
 });
 
 /**
- * A run plan is created with the rule it covers, the cases it names, or both.
+ * A run plan is created with the rule it covers, the scenarios it names, or both.
  *
  * `scenarioIds` is required only for a plan that runs a hand-picked list,
  * which is what a plan with no scope also means. A dynamic scope resolves its
@@ -39,7 +39,7 @@ export const createSuiteSchema = projectSchema
     judgeModel: z.string().nullish(),
   })
   .superRefine((input, ctx) => {
-    const picksCases = !input.scope || input.scope.mode === "cases";
+    const picksCases = !input.scope || input.scope.mode === "scenarios";
     if (picksCases && input.scenarioIds.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -19,13 +19,13 @@ import { suiteScopeSchema } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import { SUITE_KINDS } from "~/server/suites/types";
-import { folderRouter } from "./folder.router";
 import {
   createSuiteSchema,
   projectSchema,
   suiteTargetSchema,
   updateSuiteSchema,
 } from "./schemas";
+import { testSuiteRouter } from "./test-suite.router";
 
 function createSuiteService(prisma: PrismaClient) {
   return SuiteService.create({
@@ -35,7 +35,7 @@ function createSuiteService(prisma: PrismaClient) {
 }
 
 export const suiteRouter = createTRPCRouter({
-  folders: folderRouter,
+  testSuites: testSuiteRouter,
 
   create: protectedProcedure
     .input(createSuiteSchema)
@@ -45,8 +45,8 @@ export const suiteRouter = createTRPCRouter({
       return service.create(input);
     }),
 
-  // The kinds default is "custom" inside the service: v1 callers name no
-  // kind and must never receive folder rows. v2 callers name what they want.
+  // The kinds default is "run_plan" inside the service: v1 callers name no
+  // kind and must never receive test suite rows. v2 callers name what they want.
   getAll: protectedProcedure
     .input(
       projectSchema.extend({
@@ -210,7 +210,7 @@ export const suiteRouter = createTRPCRouter({
    *
    * Separate from `run` on purpose. `run` takes a plan id and is what the CLI,
    * the REST surface and v1 reach; this one is the v2 run dialog's single
-   * entry point for all four of its cases.
+   * entry point for all four of its scenarios.
    *
    * @see specs/suites/run-plan-identity-by-name.feature
    */

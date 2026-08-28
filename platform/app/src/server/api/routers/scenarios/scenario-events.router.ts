@@ -153,7 +153,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     }),
 
   // The latest run result per scenario inside the window, for the
-  // last-result cells of the cases table. Separate from the case list read on
+  // last-result cells of the scenarios table. Separate from the scenario list read on
   // purpose: the list renders instantly and these cells stream in.
   getLastResultSummaries: protectedProcedure
     .input(

@@ -217,9 +217,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * Turns a label or a folder filter into the scenario ids it names.
+   * Turns a label or a test suite filter into the scenario ids it names.
    *
-   * Labels and folder membership live in Postgres and the run row carries
+   * Labels and test suite membership live in Postgres and the run row carries
    * neither, so this is the only place the two stores meet. The result
    * INTERSECTS with an explicit scenario filter rather than replacing it: two
    * filters both narrow, and a union would widen the page when a person added
@@ -233,15 +233,15 @@ export class ResultAtomsService {
     filter: ResultsFilter,
   ): Promise<ResultsFilter> {
     const hasLabels = (filter.labels?.length ?? 0) > 0;
-    const hasFolders = (filter.folderIds?.length ?? 0) > 0;
-    if (!hasLabels && !hasFolders) return filter;
+    const hasTestSuites = (filter.testSuiteIds?.length ?? 0) > 0;
+    if (!hasLabels && !hasTestSuites) return filter;
 
     const matched = await this.prisma.scenario.findMany({
       where: {
         projectId: filter.projectId,
         archivedAt: null,
         ...(hasLabels ? { labels: { hasSome: filter.labels } } : {}),
-        ...(hasFolders ? { folderId: { in: filter.folderIds } } : {}),
+        ...(hasTestSuites ? { testSuiteId: { in: filter.testSuiteIds } } : {}),
       },
       select: { id: true },
     });
@@ -255,7 +255,7 @@ export class ResultAtomsService {
       ...filter,
       scenarioIds: ids,
       labels: undefined,
-      folderIds: undefined,
+      testSuiteIds: undefined,
     };
   }
 

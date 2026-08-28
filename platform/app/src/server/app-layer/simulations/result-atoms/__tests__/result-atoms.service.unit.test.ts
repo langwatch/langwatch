@@ -524,7 +524,7 @@ describe("bucketSecondsFor", () => {
 
 describe("the shape of an atom", () => {
   describe("given a scenario that sits in a suite and carries labels", () => {
-    /** @scenario "An atom names its scenario and leaves the folder and the labels out" */
+    /** @scenario "An atom names its scenario and leaves the test suite and the labels out" */
     it("names the scenario and carries neither the folder nor the labels", async () => {
       const service = new ResultAtomsService(
         makeRepo({
@@ -562,7 +562,7 @@ describe("the shape of an atom", () => {
       const atom = page.atoms[0]!;
 
       expect(atom.scenarioId).toBe("scen-1");
-      expect(atom).not.toHaveProperty("folderId");
+      expect(atom).not.toHaveProperty("testSuiteId");
       expect(atom).not.toHaveProperty("labels");
     });
   });

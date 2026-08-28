@@ -165,8 +165,9 @@ export interface ResultsOverview {
  * What is in scope. Both reads take the same filter so the overview and the
  * atom list can never disagree about what the page is showing.
  *
- * `scenarioIds` carries the resolution of a label or a folder filter: labels
- * and folders live in Postgres, so the caller turns them into scenario ids
+ * `scenarioIds` carries the resolution of a label or a test suite filter:
+ * labels and test suites live in Postgres, so the caller turns them into
+ * scenario ids
  * before the query runs.
  */
 export interface ResultsFilter {
@@ -188,8 +189,8 @@ export interface ResultsFilter {
    * labels live in Postgres and the run row carries none.
    */
   labels?: string[];
-  /** Suites to keep, by folder id. Resolved to scenario ids the same way. */
-  folderIds?: string[];
+  /** Suites to keep, by test suite id. Resolved to scenario ids the same way. */
+  testSuiteIds?: string[];
   scenarioSetIds?: string[];
   targetKeys?: string[];
   /** `passed` and `failed` fold several statuses each, see categorizeRunStatus. */

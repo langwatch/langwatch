@@ -169,7 +169,7 @@ describe("the scope of a run plan over tRPC", () => {
           projectId,
           name: `Empty ${nanoid(6)}`,
           scenarioIds: [],
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           targets: [],
           repeatCount: 1,
           labels: [],
@@ -209,10 +209,10 @@ describe("the scope of a run plan over tRPC", () => {
     });
   });
 
-  describe("when the suite is a test suite folder", () => {
+  describe("when the suite is a test suite", () => {
     /** @scenario "A test suite refuses a scope" */
     it("refuses the scope and keeps none", async () => {
-      const folder = await caller.suites.folders.create({
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: `Refunds ${nanoid(4)}`,
       });
@@ -220,13 +220,13 @@ describe("the scope of a run plan over tRPC", () => {
       await expect(
         caller.suites.update({
           projectId,
-          id: folder.id,
+          id: testSuite.id,
           scope: { mode: "all" },
         }),
       ).rejects.toMatchObject({ cause: { code: "suite_scope_not_allowed" } });
 
       const stored = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(stored.scope).toBeNull();
     });

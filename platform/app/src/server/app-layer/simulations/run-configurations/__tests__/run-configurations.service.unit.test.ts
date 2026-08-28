@@ -63,8 +63,8 @@ describe("Feature: reading a configuration back off the runs", () => {
       const plan = {
         id: "suite-1",
         name: "Refunds",
-        kind: "custom",
-        scope: { mode: "cases" },
+        kind: "run_plan",
+        scope: { mode: "scenarios" },
         scenarioIds: ["scenario-b", "scenario-a"],
         targets,
       };
@@ -73,7 +73,7 @@ describe("Feature: reading a configuration back off the runs", () => {
       // replaces built it: the sorted-first target carries the overrides.
       const fromPlanRow = configurationKeyOf({
         configuration: {
-          scope: { mode: "cases", caseIds: plan.scenarioIds },
+          scope: { mode: "scenarios", scenarioIds: plan.scenarioIds },
           targets: sortTargets(targets),
           repeatCount: 2,
           simulatorModel: "openai/gpt-5-mini",
@@ -115,7 +115,7 @@ describe("Feature: reading a configuration back off the runs", () => {
         plan: {
           id: "suite-1",
           name: "Refunds",
-          kind: "custom",
+          kind: "run_plan",
           scope: { mode: "all" },
           scenarioIds: [],
           targets: [stored],
@@ -177,7 +177,7 @@ describe("Feature: reading a configuration back off the runs", () => {
       const plan = {
         id: "suite-1",
         name: "Refunds",
-        kind: "custom",
+        kind: "run_plan",
         scope: { mode: "all" },
         scenarioIds: [],
         targets: [],
@@ -199,14 +199,14 @@ describe("Feature: reading a configuration back off the runs", () => {
     });
   });
 
-  describe("given a folder plan", () => {
-    it("scopes the configuration to the folder itself", () => {
+  describe("given a test suite plan", () => {
+    it("scopes the configuration to the test suite itself", () => {
       const entry = toEntry({
         row: row({}),
         plan: {
-          id: "folder-1",
+          id: "test-suite-1",
           name: "Refunds",
-          kind: "folder",
+          kind: "test_suite",
           scope: null,
           scenarioIds: [],
           targets: [],
@@ -214,8 +214,8 @@ describe("Feature: reading a configuration back off the runs", () => {
       });
 
       expect(entry.configuration.scope).toEqual({
-        mode: "folders",
-        folderIds: ["folder-1"],
+        mode: "test_suites",
+        testSuiteIds: ["test-suite-1"],
       });
     });
   });

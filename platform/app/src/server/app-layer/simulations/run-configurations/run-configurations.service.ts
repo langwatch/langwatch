@@ -129,27 +129,28 @@ export class RunConfigurationsService {
 /**
  * What a plan covers, with the hand-picked list inside the rule.
  *
- * A folder is only a grouping, so its scope is itself. Every other plan
+ * A test suite is only a grouping, so its scope is itself. Every other plan
  * carries its rule, and a hand-picked one carries its stored list.
  */
 function scopeOf(plan: PlanRow): RunConfigurationScope {
-  if (plan.kind === "folder") return { mode: "folders", folderIds: [plan.id] };
+  if (plan.kind === "test_suite")
+    return { mode: "test_suites", testSuiteIds: [plan.id] };
   const stored = parseSuiteScope(plan.scope);
-  if (stored.mode === "cases") {
-    return { mode: "cases", caseIds: [...plan.scenarioIds] };
+  if (stored.mode === "scenarios") {
+    return { mode: "scenarios", scenarioIds: [...plan.scenarioIds] };
   }
   return stored;
 }
 
 /** The scope as the key recipe takes it: the rule, without the picked list. */
 function toSuiteScope(scope: RunConfigurationScope): SuiteScope {
-  if (scope.mode === "cases") return { mode: "cases" };
+  if (scope.mode === "scenarios") return { mode: "scenarios" };
   return scope;
 }
 
 /** The scenarios a rule names inside itself, which only a hand-picked one does. */
 function caseIdsOf(scope: RunConfigurationScope): string[] | undefined {
-  return scope.mode === "cases" ? scope.caseIds : undefined;
+  return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
 /** The targets a plan row holds, dropping anything that no longer parses. */

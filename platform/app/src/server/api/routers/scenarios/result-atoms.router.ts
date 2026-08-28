@@ -19,7 +19,7 @@ const resultsFilterSchema = z.object({
   endDate: z.number().int().nonnegative().optional(),
   scenarioIds: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  folderIds: z.array(z.string()).optional(),
+  testSuiteIds: z.array(z.string()).optional(),
   scenarioSetIds: z.array(z.string()).optional(),
   targetKeys: z.array(z.string()).optional(),
   outcome: z.enum(["passed", "failed", "pending"]).optional(),
