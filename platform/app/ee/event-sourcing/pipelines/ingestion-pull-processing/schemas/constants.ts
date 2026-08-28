@@ -40,9 +40,15 @@ export const INGESTION_PULL_EVENT_VERSIONS = {
   RUN_FAILED: "2026-07-17",
 } as const;
 
-/** Projection schema versions using calendar versioning (YYYY-MM-DD). */
+/**
+ * Projection schema versions using calendar versioning (YYYY-MM-DD).
+ *
+ * RUN_STATUS moved to 2026-08-28 with `LastSuccessAt` (ADR-128): the column
+ * is derivable from the existing event log, so replay backfills it and no
+ * source has to fail three more times before its health is knowable.
+ */
 export const INGESTION_PULL_PROJECTION_VERSIONS = {
-  RUN_STATUS: "2026-07-17",
+  RUN_STATUS: "2026-08-28",
 } as const;
 
 export const INGESTION_PULL_RUN_OUTCOME = {

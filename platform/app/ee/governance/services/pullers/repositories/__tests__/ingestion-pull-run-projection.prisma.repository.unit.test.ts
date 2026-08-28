@@ -37,6 +37,7 @@ function storedProjection(): StoredProjection<IngestionPullRunStatusData> {
       LastRunError: null,
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
+      LastSuccessAt: 2_000,
       LastRunScheduledFor: 1_500,
       CreatedAt: 1_000,
       UpdatedAt: 2_000,
@@ -46,7 +47,7 @@ function storedProjection(): StoredProjection<IngestionPullRunStatusData> {
     occurredAt: 2_000,
     createdAt: 1_000,
     updatedAt: 2_000,
-    version: "2026-07-17",
+    version: "2026-08-28",
   };
 }
 

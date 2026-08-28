@@ -1,3 +1,5 @@
+import { buildIngestionSourceMirror } from "@ee/governance/services/pullers/repositories/ingestionSourceMirror";
+import { deriveSourceHealth } from "@ee/governance/services/pullers/sourceHealth";
 import { describe, expect, it } from "vitest";
 
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
@@ -292,6 +294,159 @@ describe("IngestionPullRunStatusFoldProjection", () => {
         );
 
         expect(configured.Cursor).toBe("cursor-seed");
+      });
+    });
+  });
+
+  describe("given a connected source whose runs report outcomes", () => {
+    const configured = projection.apply(
+      projection.init(),
+      event("lw.obs.ingestion_pull.configured", {
+        sourceId: "source-1",
+        cron: "*/15 * * * *",
+        configVersion: "v1",
+        cursor: "cursor-A",
+      }),
+    );
+
+    const succeed = ({
+      state,
+      scheduledFor,
+      occurredAt,
+      eventCount = 3,
+    }: {
+      state: IngestionPullRunStatusData;
+      scheduledFor: number;
+      occurredAt: number;
+      eventCount?: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.run_completed",
+          {
+            sourceId: "source-1",
+            runId: String(scheduledFor),
+            scheduledFor,
+            nextCursor: `cursor-${scheduledFor}`,
+            eventCount,
+          },
+          occurredAt,
+        ),
+      );
+
+    const fail = ({
+      state,
+      scheduledFor,
+      occurredAt,
+    }: {
+      state: IngestionPullRunStatusData;
+      scheduledFor: number;
+      occurredAt: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.run_failed",
+          {
+            sourceId: "source-1",
+            runId: String(scheduledFor),
+            scheduledFor,
+            error: "provider unavailable",
+            errorCode: "provider_error",
+          },
+          occurredAt,
+        ),
+      );
+
+    describe("when one run fails after a success", () => {
+      /** @scenario "A single failed run does not mark the source unhealthy" */
+      it("still reads as healthy", () => {
+        const succeeded = succeed({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+        });
+        const failed = fail({
+          state: succeeded,
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+        });
+
+        expect(failed.ConsecutiveErrors).toBe(1);
+        expect(
+          deriveSourceHealth({ consecutiveFailures: failed.ConsecutiveErrors }),
+        ).toBe("healthy");
+      });
+    });
+
+    describe("when three runs in a row fail", () => {
+      /** @scenario "Three consecutive failed runs mark the source unhealthy" */
+      it("reads as unhealthy", () => {
+        let state = configured;
+        for (const scheduledFor of [1_000, 2_000, 3_000]) {
+          state = fail({ state, scheduledFor, occurredAt: scheduledFor + 100 });
+        }
+
+        expect(state.ConsecutiveErrors).toBe(3);
+        expect(
+          deriveSourceHealth({ consecutiveFailures: state.ConsecutiveErrors }),
+        ).toBe("unhealthy");
+      });
+    });
+
+    describe("when a run succeeds after two failures", () => {
+      /** @scenario "A successful run records its time and resets the failure count" */
+      it("stamps the success time and clears the count", () => {
+        const failedTwice = fail({
+          state: fail({
+            state: configured,
+            scheduledFor: 1_000,
+            occurredAt: 1_100,
+          }),
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+        });
+        expect(failedTwice.LastSuccessAt).toBeNull();
+
+        const recovered = succeed({
+          state: failedTwice,
+          scheduledFor: 3_000,
+          occurredAt: 3_100,
+        });
+
+        // A NEW field, not lastEventAt: that one moves whenever data arrives,
+        // including on a run that arrived and then failed, so it can never
+        // answer "when did we last successfully reach the provider".
+        expect(recovered.LastSuccessAt).toBe(3_100);
+        expect(recovered.ConsecutiveErrors).toBe(0);
+        expect(
+          deriveSourceHealth({
+            consecutiveFailures: recovered.ConsecutiveErrors,
+          }),
+        ).toBe("healthy");
+      });
+    });
+
+    describe("when a run completes with no new usage for the period", () => {
+      /** @scenario "A run that finds nothing new still counts as a success" */
+      it("counts as a success and leaves the last-event time alone", () => {
+        const empty = succeed({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+          eventCount: 0,
+        });
+
+        expect(empty.LastRunOutcome).toBe("completed");
+        expect(empty.ConsecutiveErrors).toBe(0);
+        expect(empty.LastSuccessAt).toBe(1_100);
+
+        const mirror = buildIngestionSourceMirror({ state: empty });
+        expect(mirror.lastSuccessAt).toEqual(new Date(1_100));
+        // undefined leaves the column as it was -- an empty run is not data
+        // arriving, so nothing about the last event changed.
+        expect(mirror.lastEventAt).toBeUndefined();
       });
     });
   });
