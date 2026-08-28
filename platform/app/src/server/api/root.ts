@@ -13,9 +13,19 @@ import {
   appTrpcNoPermissionPolicy,
   appTrpcPolicy,
   appTrpcServiceAuthorizedPolicy,
+  createAuthzTrpcRouter,
+  createAutomationTrpcRouter,
+  createCodingAgentTrpcRouter,
+  createEmailSuppressionTrpcRouter,
   createGatewayTrpcRouters,
+  createHomeTrpcRouter,
+  createHttpProxyTrpcRouter,
+  createLimitsTrpcRouter,
   createOpsTrpcRouter,
+  createOrganizationTrpcRouter,
+  createPersonalWorkspaceFeaturesTrpcRouter,
   createPinnedTraceTrpcRouter,
+  createPlanTrpcRouter,
   createPromptTagTrpcRouter,
   createPromptTrpcRouter,
   createScenarioTrpcRouter,
@@ -25,6 +35,8 @@ import {
   createSuiteTrpcRouter,
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
+  createTranslateTrpcRouter,
+  createWorkflowOptimizationTrpcRouter,
   declaredCheckFrom,
   type AppTrpcPolicyKit,
   type AppTrpcPolicyMiddlewares,
@@ -100,7 +112,11 @@ import { env } from "~/env.mjs";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
 import { getLicenseCryptography, getLicenseHandler } from "~/runtime/app/licensing";
-import { ssoConnections } from "~/server/app-layer/identity/runtime";
+import {
+  identityEmail,
+  joinRequestsService,
+  ssoConnections,
+} from "~/server/app-layer/identity/runtime";
 import { SsoConnectionBackofficeService } from "~/server/app-layer/identity/sso-connection-backoffice.service";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import { resolveHotDays, TABLE_TTL_CONFIG } from "~/server/clickhouse/ttlReconciler";
@@ -110,18 +126,84 @@ import {
 } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
-import { assertEnterprisePlanType, ENTERPRISE_FEATURE_ERRORS } from "./enterprise";
-import { checkOpsPermission } from "./rbac";
+import {
+  assertEnterprisePlan,
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "./enterprise";
+import {
+  batchScopePermissions,
+  checkOpsPermission,
+  checkOrganizationPermission,
+  checkProjectPermission,
+  type PermissionMiddlewareParams,
+} from "./rbac";
+import { declareAuthzMiddleware } from "@langwatch/authz-contract";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
+import { fireTeamMemberInvitedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
+import { fireInviteAcceptedNurturingCalls } from "~/server/app-layer/billing/nurturing/inviteAcceptance";
+import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
+import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
+import { buildInviteAcceptUrl } from "~/server/invites/invite-link";
+import { assertInviteSendAllowed } from "~/server/invites/invite-send-throttle";
+import {
+  INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
+  InviteExpiredError,
+  InviteNotFoundError,
+  InviteWrongAccountError,
+  OrganizationNotFoundError,
+} from "~/server/invites/errors";
+import {
+  InviteService,
+  maskInvitedAddress,
+  matchInviteToAcceptor,
+  resolveInviteDisplayStatus,
+} from "~/server/invites/invite.service";
+import type { LimitType } from "@langwatch/enterprise-billing-contract";
+import { LimitExceededError } from "~/server/license-enforcement/errors";
+import {
+  assertExternalTeamRoleChangeWithinSeatLimits,
+  LICENSE_LIMIT_ERRORS,
+} from "~/server/license-enforcement/license-limit-guard";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { decrypt } from "~/utils/encryption";
+import {
+  isTeamRoleAllowedForOrganizationRole,
+  type TeamRoleValue,
+} from "~/utils/memberRoleConstraints";
+import { toError } from "~/utils/posthogErrorCapture";
 import { agentsRouter } from "~/runtime/app/internal-api/agents.router";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
-import { authzRouter } from "./routers/authz";
-import { automationRouter } from "./routers/automations";
+import type { SlackActionParams } from "@langwatch/automation-contract";
+import { canReadCapturedContent } from "@langwatch/trace-server";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import { listSlackChannels } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
+import {
+  actionParamsSchemaFor,
+  automationWebhookProvider,
+  persistActionParamsFor,
+  redactActionParamsFor,
+} from "~/runtime/app/features/automation-adapters/providers/registry";
+import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
+import { RecentItemsService } from "~/server/home/recent-items.service";
+import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
+import { wrapAiCall } from "~/server/modelProviders/aiCallFailedError";
+import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { rateLimit } from "~/server/rateLimit";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import { getClientIp } from "~/utils/getClientIp";
 import { batchRecordRouter } from "~/runtime/app/internal-api/batch-record.router";
 import { bugReportsRouter } from "./routers/bugReports";
-import { codingAgentsRouter } from "./routers/coding-agent";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -129,7 +211,6 @@ import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "~/runtime/app/internal-api/data-retention.router";
 import { datasetRouter } from "~/runtime/app/internal-api/dataset.router";
 import { datasetRecordRouter } from "~/runtime/app/internal-api/dataset-record.router";
-import { emailSuppressionRouter } from "./routers/emailSuppression";
 import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "~/runtime/app/internal-api/evaluator.router";
 import { experimentsRouter } from "./routers/experiments";
@@ -139,22 +220,15 @@ import { frontDoorRouter } from "./routers/frontDoor";
 import { githubRouter } from "~/runtime/app/internal-api/github.router";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
-import { homeRouter } from "./routers/home";
-import { httpProxyRouter } from "./routers/httpProxy";
 import { identityRouter } from "./routers/identity";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "~/runtime/app/internal-api/langy.router";
 import { langyEgressRouter } from "~/runtime/app/internal-api/langy.router";
-import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { modelProviderRouter } from "~/runtime/app/internal-api/model-provider.router";
 import { monitorsRouter } from "~/runtime/app/internal-api/monitor.router";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
-import { optimizationRouter } from "./routers/optimization";
-import { organizationRouter } from "./routers/organization";
-import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
-import { planRouter } from "./routers/plan";
 import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "~/runtime/app/internal-api/project.router";
 import { publicEnvRouter } from "./routers/publicEnv";
@@ -167,7 +241,6 @@ import { sharedTraceRouter } from "./routers/sharedTrace";
 import { teamRouter } from "~/runtime/app/internal-api/team.router";
 import { topicsRouter } from "~/runtime/app/internal-api/topic.router";
 import { tracesV2Router } from "./routers/tracesV2";
-import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 
@@ -199,6 +272,432 @@ const pinnedTraceRouter = createPinnedTraceTrpcRouter(appTrpcMount);
 const suiteRouter = createSuiteTrpcRouter(appTrpcMount);
 const storedObjectsRouter = createStoredObjectTrpcRouter(appTrpcMount);
 const promptTagsRouter = createPromptTagTrpcRouter(appTrpcMount);
+const planRouter = createPlanTrpcRouter(appTrpcMount);
+const authzRouter = createAuthzTrpcRouter(appTrpcMount);
+const personalWorkspaceFeaturesRouter = createPersonalWorkspaceFeaturesTrpcRouter(appTrpcMount);
+const translateRouter = createTranslateTrpcRouter({ ...appTrpcMount, ports: { wrapAiCall } });
+
+const recentItems = new RecentItemsService();
+
+const homeRouter = createHomeTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    getRecentItems: (_ctx, input) => recentItems.getRecentItems(input),
+  },
+});
+
+const limitsRouter = createLimitsTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    getUsageStats: (_ctx, input) =>
+      UsageStatsService.create(prisma).getUsageStats(input.organizationId, input.user),
+    checkAndSendWarning: (ctx, input) =>
+      (ctx as TRPCContext).app.usageLimits.checkAndSendWarning(input),
+  },
+});
+
+/**
+ * The provider registry, the shared counter and the Slack listing: the three
+ * capabilities the automation transport reaches that automation does not own.
+ * Each needs this deployment's encryption key, its Redis, or its SSRF policy.
+ * The provider entries are lambdas because `automationWebhookProvider` is a
+ * class instance and an unbound method would lose its `this`.
+ */
+const automationRouter = createAutomationTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    rateLimit,
+    listSlackChannels,
+    providers: {
+      actionParamsSchemaFor,
+      persistActionParamsFor: (action, args) => persistActionParamsFor(action, args),
+      redactActionParamsFor,
+      decryptSlackBotToken: (actionParams) =>
+        decryptSlackBotToken((actionParams ?? {}) as SlackActionParams),
+      decryptWebhookHeaders: (stored) => automationWebhookProvider.decryptHeaders(stored),
+      decryptWebhookSigningSecrets: (stored) =>
+        automationWebhookProvider.decryptSigningSecrets(stored),
+    },
+  },
+});
+
+/**
+ * The unsubscribe pair arrives from a mail client, so it needs the process's
+ * unauthenticated procedure — the same one `publicProcedure` is built from,
+ * which is what keeps `isPublicProcedure` recognising it.
+ */
+const emailSuppressionRouter = createEmailSuppressionTrpcRouter({
+  ...appTrpcMount,
+  publicProcedure: appTrpcRoot.procedure,
+  ports: {
+    clientIp: (ctx) => getClientIp((ctx as TRPCContext).req),
+    rateLimit,
+    recordAudit: (entry) => auditLog(entry),
+  },
+});
+
+/**
+ * What one viewer may see of one project, resolved from the project's
+ * protections by the functions that own each rule: content visibility by
+ * `canReadCapturedContent`, spend by the `cost:view` cut the protections
+ * already carry. It THROWS when the policy cannot be resolved, which the
+ * coding-agent package reads as "not visible" — do not give it a default.
+ */
+const codingAgentViewerVisibility = async (
+  request: unknown,
+  { projectId }: { projectId: string },
+) => {
+  const protections = await getUserProtectionsForProject(request as TRPCContext, { projectId });
+  return {
+    canReadCapturedContent: canReadCapturedContent(protections),
+    canSeeCosts: protections.canSeeCosts === true,
+  };
+};
+
+const codingAgentsRouter = createCodingAgentTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    tryResolveOrganizationForProject: resolveOrganizationId,
+    resolveCallerProjectScope: ({ userId, organizationId }) =>
+      resolveCallerProjectScope({ userId, organizationId }),
+    readViewerVisibility: codingAgentViewerVisibility,
+  },
+});
+
+const httpProxyRouter = createHttpProxyTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    postStudioEvent: async (request, { projectId, event, onEvent }) => {
+      const ctx = request as TRPCContext;
+      await studioBackendPostEvent({
+        projectId,
+        nlpLambda: ctx.app.nlpLambda,
+        modelProviders: ctx.app.modelProviders,
+        message: await ctx.app.workflows.enrichStudioEvent({ event, projectId }),
+        onEvent,
+      });
+    },
+    // The span is the agent feature's; the OTLP conversion and the collector
+    // are this process's, so the write is split at exactly that seam.
+    recordAgentTestTrace: async (request, { projectId, trace }) => {
+      const ctx = request as TRPCContext;
+      await ctx.app.traces.recordSpan({
+        tenantId: projectId,
+        span: CollectorSpanUtils.convertSpanToOtlp(trace.span),
+        resource: CollectorSpanUtils.buildResource({
+          reservedTraceMetadata: { user_id: trace.userId },
+          customMetadata: trace.customMetadata,
+          expectedOutput: null,
+        }),
+        instrumentationScope: { name: "langwatch.agent_test" },
+        // Resolved downstream in the recordSpan pipeline from the scoped
+        // data-privacy policy; ingestion passes the essential default
+        // (#4729 removed Project.piiRedactionLevel).
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+        occurredAt: trace.occurredAt,
+      });
+    },
+  },
+});
+
+/**
+ * The audit-log read authorizes at the ORGANIZATION tier, always.
+ *
+ * A bare `.permission("auditLog:view")` cannot express this: `auditLog` is
+ * grantable at project/team/organization, and the declared check resolves to
+ * the narrowest tier whose id the input carries. Because `projectId` is an
+ * optional filter here, supplying it would move the whole check to the
+ * project tier and leave `input.organizationId` — the id the query is
+ * anchored on — unauthorized. A caller holding `auditLog:view` on any one
+ * project could then read a different organization's org-scoped audit trail.
+ *
+ * So the org id is checked unconditionally, and when a project filter is
+ * present it is additionally checked at the project tier, so a project-scoped
+ * grant cannot widen a read to rows outside that project either.
+ */
+function checkAuditLogPermission() {
+  const organizationCheck = checkOrganizationPermission("auditLog:view");
+  const projectCheck = checkProjectPermission("auditLog:view");
+  return declareAuthzMiddleware(
+    {
+      kind: "custom",
+      reason:
+        "the audit-log read is authorized at the organization tier the query is anchored on, never the optional project filter",
+      permissions: ["auditLog:view"],
+    },
+    async (
+      params: PermissionMiddlewareParams<{
+        organizationId: string;
+        projectId?: string;
+      }>,
+    ) => {
+      const { projectId } = params.input;
+      if (!projectId) return organizationCheck(params);
+      return organizationCheck({
+        ...params,
+        next: () => projectCheck({ ...params, input: { projectId } }),
+      });
+    },
+  );
+}
+
+/** The request app, as the organization ports read it off the tRPC context. */
+const organizationCtx = (ctx: unknown) => ctx as TRPCContext;
+
+/** The invitation service, built per call against the request's Prisma. */
+const invitesFor = (ctx: unknown) => {
+  const app = organizationCtx(ctx);
+  return InviteService.create(app.prisma, { mailer: app.app.mailer });
+};
+
+const organizationRouter = createOrganizationTrpcRouter({
+  ...appTrpcMount,
+  auditLogCheck: checkAuditLogPermission(),
+  ports: {
+    signUpDataSchema,
+
+    probeOrganizationPermission: (ctx, organizationId, permission) =>
+      probeOrganizationPermission(organizationCtx(ctx), organizationId, permission),
+    batchProjectPermissions: async (ctx, input) =>
+      (
+        await batchScopePermissions(organizationCtx(ctx), {
+          organizationId: input.organizationId,
+          teamIds: [],
+          projectIds: input.projectIds,
+          projectTeamId: input.projectTeamId,
+          permission: input.permission,
+        })
+      ).projects,
+    listBindingsForSynthesis: (ctx, input) =>
+      organizationCtx(ctx).app.permissions.listBindingsForSynthesis(input),
+    enrichTeamWithRoleBindings,
+
+    demoProject: () => ({
+      userId: env.DEMO_PROJECT_USER_ID ?? "",
+      projectId: env.DEMO_PROJECT_ID ?? "",
+    }),
+    decryptStoredSecret: decrypt,
+
+    assertCustomRolesAllowed: async (ctx, { organizationId }) => {
+      const app = organizationCtx(ctx);
+      await assertEnterprisePlan({
+        planProvider: app.app.planProvider,
+        organizationId,
+        user: app.session?.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+    },
+    assertAuditLogsAllowed: async (ctx, { organizationId }) => {
+      const app = organizationCtx(ctx);
+      await assertEnterprisePlan({
+        planProvider: app.app.planProvider,
+        organizationId,
+        user: app.session?.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
+      });
+    },
+    isCustomRole,
+
+    fullMemberLimitMessage: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+    liteMemberViewerOnlyMessage: LITE_MEMBER_VIEWER_ONLY_ERROR,
+    asMemberSeatLimitReached: (error) =>
+      error instanceof MemberSeatLimitReachedError
+        ? {
+            limitType: error.meta.limitType,
+            current: error.meta.current,
+            max: error.meta.max,
+          }
+        : null,
+    asResourceLimitExceeded: (error) =>
+      error instanceof LimitExceededError
+        ? {
+            limitType: error.limitType,
+            current: error.current,
+            max: error.max,
+            message: error.message,
+          }
+        : null,
+    isOrganizationNotFound: (error) => error instanceof OrganizationNotFoundError,
+    // `limitType` round-trips: it came off the same refusal a moment earlier
+    // and is handed straight back to the notifier that raised it.
+    notifyResourceLimitReached: (ctx, input) =>
+      organizationCtx(ctx).app.usageLimits.notifyResourceLimitReached({
+        ...input,
+        limitType: input.limitType as LimitType,
+      }),
+    isTeamRoleAllowedForOrganizationRole: ({ organizationRole, teamRole }) =>
+      isTeamRoleAllowedForOrganizationRole({
+        organizationRole,
+        teamRole: teamRole as TeamRoleValue,
+      }),
+    assertTeamRoleChangeWithinSeatLimits: async (ctx, input) => {
+      const app = organizationCtx(ctx);
+      await assertExternalTeamRoleChangeWithinSeatLimits({
+        prisma: app.prisma,
+        roles: app.app.roles,
+        planProvider: app.app.planProvider,
+        organizationId: input.organizationId,
+        teamId: input.teamId,
+        userId: input.userId,
+        actingUser: app.session?.user,
+      });
+    },
+    assertNoPersonalTeamScope: async (ctx, { teamId }) => {
+      await assertNoPersonalTeamScope({
+        client: organizationCtx(ctx).prisma,
+        scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
+      });
+    },
+    tryGetTeamOrganizationId: async (ctx, { teamId }) => {
+      const team = await organizationCtx(ctx).prisma.team.findUnique({
+        where: { id: teamId },
+        select: { organizationId: true },
+      });
+      return team?.organizationId ?? null;
+    },
+    tryGetOrganizationMemberRole: async (ctx, { organizationId, userId }) => {
+      const membership = await organizationCtx(ctx).prisma.organizationUser.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+      });
+      return membership?.role ?? null;
+    },
+
+    createInvites: (ctx, input) =>
+      invitesFor(ctx).createInvites({
+        organizationId: input.organizationId,
+        invites: input.invites,
+        user: organizationCtx(ctx).session?.user,
+        // Lenient validation keeps this procedure's historical form
+        // behavior: invalid teams and custom roles drop the assignment or
+        // the invite quietly instead of refusing the batch.
+        validation: "lenient",
+      }),
+    revokeInvite: async (ctx, input) => {
+      await invitesFor(ctx).revokeInvite(input);
+    },
+    assertInviteSendAllowed: (_ctx, input) => assertInviteSendAllowed(input),
+    resendInvite: (ctx, input) => invitesFor(ctx).resendInvite(input),
+    buildInviteAcceptUrl,
+    listInvites: (ctx, input) => invitesFor(ctx).listInvites(input),
+    tryGetInviteByCode: (ctx, { inviteCode }) =>
+      organizationCtx(ctx).prisma.organizationInvite.findUnique({
+        where: { inviteCode },
+        include: { organization: true },
+      }),
+    resolveInviteDisplayStatus,
+    matchInviteToAcceptor: async (_ctx, { inviteEmail, sessionEmail, userId }) =>
+      matchInviteToAcceptor({
+        inviteEmail,
+        sessionEmail,
+        matchable: await identityEmail().verifiedEmailsOf({ userId }),
+      }),
+    maskInvitedAddress,
+    applyInvite: (ctx, { userId, invite, viaIdentifierId }) =>
+      invitesFor(ctx).applyInvite({ userId, invite, viaIdentifierId }),
+    findLandingProjectSlug: (ctx, { invite }) => invitesFor(ctx).findLandingProjectSlug(invite),
+    inviteNotFoundError: () => new InviteNotFoundError("Invitation not found"),
+    inviteExpiredError: () => new InviteExpiredError(),
+    inviteWrongAccountError: (maskedEmail) => new InviteWrongAccountError(maskedEmail),
+    inviteAlreadyAcceptedMessage: INVITE_ALREADY_ACCEPTED_MESSAGE,
+    inviteNotReadyMessage: INVITE_NOT_READY_MESSAGE,
+
+    resolveJoinRequestByInvitation: async (ctx, input) => {
+      const app = organizationCtx(ctx);
+      await joinRequestsService({
+        authzGrants: app.app.authzGrants,
+        featureFlags: app.app.featureFlags,
+        mailer: app.app.mailer,
+      }).resolveByInvitation(input);
+    },
+    withdrawJoinRequestOnInvitationAccepted: async (ctx, input) => {
+      const app = organizationCtx(ctx);
+      await joinRequestsService({
+        authzGrants: app.app.authzGrants,
+        featureFlags: app.app.featureFlags,
+        mailer: app.app.mailer,
+      }).withdrawOnInvitationAccepted(input);
+    },
+    tryFindUserIdByEmail: async (ctx, { email }) => {
+      const user = await organizationCtx(ctx).prisma.user.findFirst({
+        where: { email },
+        select: { id: true },
+      });
+      return user?.id ?? null;
+    },
+
+    trackServerEvent,
+    fireTeamMemberInvitedNurturing,
+    fireInviteAcceptedNurturing: fireInviteAcceptedNurturingCalls,
+    sendSlackSignupEvent: (ctx, input) =>
+      organizationCtx(ctx).app.notifications.sendSlackSignupEvent(input),
+    reportError: (error, context) => captureException(toError(error), context),
+  },
+});
+
+const optimizationRouter = createWorkflowOptimizationTrpcRouter({
+  ...appTrpcMount,
+  ports: {
+    // The studio's chat panel runs the workflow over the same public run
+    // endpoint an external caller uses, authenticated as the project.
+    runPublishedWorkflow: async (ctx, input) => {
+      const project = await (ctx as TRPCContext).prisma.project.findFirst({
+        where: { id: input.projectId },
+      });
+
+      const apiKey = project?.apiKey;
+
+      const response = await fetch(
+        `${process.env.BASE_HOST}/api/workflows/${input.workflowId}/run`,
+        {
+          method: "POST",
+          body: JSON.stringify(input.body),
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey && { "x-auth-token": apiKey }),
+          },
+        },
+      );
+
+      return await response.json();
+    },
+    tryGetWorkflow: async (ctx, input) =>
+      await (ctx as TRPCContext).prisma.workflow.findFirst({
+        where: { id: input.workflowId, projectId: input.projectId },
+      }),
+    tryGetWorkflowVersion: async (ctx, input) =>
+      await (ctx as TRPCContext).prisma.workflowVersion.findFirst({
+        where: { id: input.versionId, projectId: input.projectId },
+      }),
+    setWorkflowFlags: async (ctx, input) => {
+      await (ctx as TRPCContext).prisma.workflow.update({
+        where: { id: input.workflowId, projectId: input.projectId },
+        data: {
+          ...(input.isComponent === undefined ? {} : { isComponent: input.isComponent }),
+          ...(input.isEvaluator === undefined ? {} : { isEvaluator: input.isEvaluator }),
+        },
+      });
+    },
+    listPublishedComponents: async (ctx, input) => {
+      const workflows = await (ctx as TRPCContext).prisma.workflow.findMany({
+        where: {
+          projectId: input.projectId,
+          OR: [{ isComponent: true }, { isEvaluator: true }],
+        },
+        include: { versions: true },
+      });
+
+      // Each component carries only the version it publishes; the studio picks
+      // a component by its published shape, never by a draft.
+      workflows.forEach((workflow) => {
+        workflow.versions = workflow.versions.filter(
+          (version) => version.id === workflow.publishedId,
+        );
+      });
+
+      return workflows;
+    },
+  },
+});
 
 /**
  * The caller's read-time redactions, resolved per request. Every trace
@@ -524,7 +1023,6 @@ const enterpriseGatewayRouters = EnterpriseGatewayTrpcComposition.create({
 });
 
 const coreRouters = {
-
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
