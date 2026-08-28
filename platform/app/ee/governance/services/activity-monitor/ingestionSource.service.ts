@@ -57,6 +57,7 @@ export type SourceType =
   | "copilot_studio"
   | "copilot_studio_dataverse"
   | "openai_compliance"
+  | "openai_admin"
   | "claude_compliance"
   | "anthropic_admin"
   | "databricks_genie"
@@ -71,12 +72,29 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "copilot_studio",
   "copilot_studio_dataverse",
   "openai_compliance",
+  "openai_admin",
   "claude_compliance",
   "anthropic_admin",
   "databricks_genie",
   "s3_custom",
   "http_custom",
 ] as const;
+
+const PUSH_SOURCE_TYPES: ReadonlySet<SourceType> = new Set([
+  "otel_generic",
+  "claude_code",
+  "claude_cowork",
+  "workato",
+  "s3_custom", // webhook callback path authenticated by ingest secret
+]);
+
+export function isPushSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  return PUSH_SOURCE_TYPES.has(sourceType);
+}
 
 export interface CreateIngestionSourceInput {
   organizationId: string;
@@ -118,8 +136,8 @@ export interface UpdateIngestionSourceInput {
 
 export interface CreatedIngestionSource {
   source: IngestionSource;
-  /** Raw ingestSecret — exposed exactly once at creation and never persisted. */
-  ingestSecret: string;
+  /** Raw ingestSecret — exposed exactly once at creation and never persisted. Null for non-push sources. */
+  ingestSecret: string | null;
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -573,8 +591,9 @@ export class IngestionSourceService {
     // lazy-create logic anywhere else (master_orchestrator constraint).
     await ensureHiddenGovernanceProject(this.prisma, input.organizationId);
 
-    const ingestSecret = generateIngestSecret();
-    const ingestSecretHash = hashIngestSecret(ingestSecret);
+    const isPush = isPushSourceType({ sourceType: input.sourceType });
+    const ingestSecret = isPush ? generateIngestSecret() : null;
+    const ingestSecretHash = ingestSecret ? hashIngestSecret(ingestSecret) : "";
 
     // Phase 10 carryover — the schema has `parserConfig` but no
     // `pullConfig` column; the puller worker actually reads
@@ -600,6 +619,15 @@ export class IngestionSourceService {
     const mergedParserConfig = encryptParserConfigCredentials(
       requestedParserConfig,
     )!;
+
+    // The @@unique([organizationId, name]) constraint spans all rows
+    // including archived ones. If an archived source holds the name,
+    // rename it so the new source can take it.
+    await this.freeArchivedName({
+      organizationId: input.organizationId,
+      name: input.name,
+    });
+
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -633,7 +661,13 @@ export class IngestionSourceService {
     // lives out here because the guard only runs on the parserConfig path
     // while the write is shared by every path.
     let cursorMustNotMove = false;
-    if (input.name !== undefined) data.name = input.name;
+    if (input.name !== undefined && input.name !== existing.name) {
+      await this.freeArchivedName({
+        organizationId: input.organizationId,
+        name: input.name,
+      });
+      data.name = input.name;
+    }
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
       // A client never handles the stored secret, in either direction. It is
@@ -799,6 +833,18 @@ export class IngestionSourceService {
     organizationId: string,
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.requireById(id, organizationId);
+    if (!isPushSourceType({ sourceType: existing.sourceType as SourceType })) {
+      throw new ValidationError(
+        "Only push-mode sources have an ingest secret to rotate.",
+        {
+          meta: {
+            formErrors: [
+              "Only push-mode sources have an ingest secret to rotate.",
+            ],
+          },
+        },
+      );
+    }
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
     const priorParser =
@@ -830,6 +876,35 @@ export class IngestionSourceService {
       await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return source;
+  }
+
+  // ---- name-collision helpers -------------------------------------------
+
+  /**
+   * If an archived source in this org holds `name`, rename it to
+   * `"name (archived <id-suffix>)"` so the unique constraint allows
+   * a new source to take the name. No-op when no collision exists or
+   * the colliding source is still active.
+   */
+  private async freeArchivedName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<void> {
+    const collider = await this.prisma.ingestionSource.findUnique({
+      where: {
+        organizationId_name: { organizationId, name },
+      },
+      select: { id: true, archivedAt: true },
+    });
+    if (!collider?.archivedAt) return;
+
+    await this.prisma.ingestionSource.update({
+      where: { id: collider.id },
+      data: { name: `${name} (archived ${collider.id})` },
+    });
   }
 
   /**

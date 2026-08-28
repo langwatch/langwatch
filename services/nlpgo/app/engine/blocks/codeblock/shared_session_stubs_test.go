@@ -24,6 +24,8 @@ import (
 
 const (
 	sharedSessionEntryName = "ACME_SESSION"
+	// The name one row takes to be the row that logs in.
+	sharedSessionClaimName = "ACME_SESSION_CLAIM"
 	// The credential the platform mints for one run. It is not the project
 	// key: the cache stub accepts this and nothing else.
 	sharedSessionSandboxKey = "sk-lw-test-sandbox-run-key"
@@ -91,6 +93,13 @@ type cacheWrite struct {
 	TTLSeconds int
 }
 
+// cacheClaim is one claim the example made, and whether it took the name.
+type cacheClaim struct {
+	Name       string
+	TTLSeconds int
+	Claimed    bool
+}
+
 // sharedSessionStubs is a stub login service, a stub protected API and a stub
 // agent cache. The login service mints a new session per login, and the
 // protected API accepts every session it has minted, so a row that presents an
@@ -100,16 +109,21 @@ type sharedSessionStubs struct {
 	apiServer   *httptest.Server
 	cacheServer *httptest.Server
 
-	mu             sync.Mutex
-	password       string
-	loginRequests  []loginRequest
-	mintedSessions []string
-	apiSessions    []string
-	cacheReads     []string
-	cacheWrites    []cacheWrite
-	rejectLogin    bool
-	rejectWrite    bool
-	failCache      bool
+	mu              sync.Mutex
+	password        string
+	loginRequests   []loginRequest
+	mintedSessions  []string
+	apiSessions     []string
+	cacheReads      []string
+	cacheWrites     []cacheWrite
+	cacheClaims     []cacheClaim
+	holdLoginClaims int
+	// How long the login service takes to answer. A real login is not
+	// instant, and the claim only earns its keep while one is in flight.
+	loginDelay  time.Duration
+	rejectLogin bool
+	rejectWrite bool
+	failCache   bool
 
 	// stored mirrors the agent cache: name -> entry, each with its own expiry.
 	stored map[string]cacheEntry
@@ -140,11 +154,18 @@ func newSharedSessionStubs(t *testing.T, password string) *sharedSessionStubs {
 		s.mu.Lock()
 		s.loginRequests = append(s.loginRequests, req)
 		reject := s.rejectLogin
+		delay := s.loginDelay
 		minted := fmt.Sprintf("session-%d", len(s.loginRequests))
 		if !reject && req.Password == s.password {
 			s.mintedSessions = append(s.mintedSessions, minted)
 		}
 		s.mu.Unlock()
+
+		// Outside the lock, so several logins in flight overlap the way they
+		// would against a real target.
+		if delay > 0 {
+			time.Sleep(delay)
+		}
 		if reject || req.Password != s.password {
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprint(w, `{"error":"invalid_credentials"}`)
@@ -200,7 +221,12 @@ func (s *sharedSessionStubs) serveCache(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	name := strings.TrimPrefix(r.URL.Path, "/api/agent-cache/")
+	claiming := strings.HasSuffix(name, "/claim")
+	name = strings.TrimSuffix(name, "/claim")
 
+	// One mutex for the whole call, so two claims that arrive together are
+	// resolved one after the other. That is what the platform's own claim
+	// does, and it is what makes the racing scenario a real assertion.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -212,6 +238,44 @@ func (s *sharedSessionStubs) serveCache(w http.ResponseWriter, r *http.Request) 
 	if s.rejectWrite && r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprint(w, `{"error":{"type":"permission_denied","code":"insufficient_permissions","message":"insufficient_permissions"}}`)
+		return
+	}
+
+	if claiming {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var body struct {
+			Value      string `json:"value"`
+			TTLSeconds *int   `json:"ttl_seconds"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		ttl := 15 * 60
+		if body.TTLSeconds != nil {
+			ttl = *body.TTLSeconds
+		}
+		entry, held := s.stored[name]
+		claimed := !held || !time.Now().Before(entry.expiresAt)
+		if s.holdLoginClaims > 0 && name == sharedSessionClaimName {
+			s.holdLoginClaims--
+			claimed = false
+		}
+		if claimed {
+			s.stored[name] = cacheEntry{
+				value:     body.Value,
+				expiresAt: time.Now().Add(time.Duration(ttl) * time.Second),
+			}
+		}
+		s.cacheClaims = append(s.cacheClaims, cacheClaim{
+			Name: name, TTLSeconds: ttl, Claimed: claimed,
+		})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"name": name, "claimed": claimed, "ttl_seconds": ttl,
+		})
 		return
 	}
 
@@ -283,6 +347,19 @@ func (s *sharedSessionStubs) seedSession(session string, ttl time.Duration) {
 	s.mintedSessions = append(s.mintedSessions, session)
 }
 
+// holdLoginFor answers the next `asks` claims on the login name as taken, then
+// leaves the name free. That is the sequence a row sees when another row holds
+// the claim and stores no session: the name reads as taken on each ask, then
+// as free once that claim's own lifetime passes. Counting the asks rather
+// than seeding a lifetime keeps
+// the scenario off the wall clock, which the interpreter's start-up time would
+// otherwise decide.
+func (s *sharedSessionStubs) holdLoginFor(asks int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.holdLoginClaims = asks
+}
+
 // seedForgottenSession puts a session in the cache that the protected API will
 // refuse, which is what an earlier row's session looks like after the target
 // system restarts, an operator closes the session, or the password changes.
@@ -331,4 +408,21 @@ func (s *sharedSessionStubs) writes() []cacheWrite {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]cacheWrite(nil), s.cacheWrites...)
+}
+
+func (s *sharedSessionStubs) claims() []cacheClaim {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]cacheClaim(nil), s.cacheClaims...)
+}
+
+// claimsTaken counts the claims that took the name.
+func (s *sharedSessionStubs) claimsTaken() int {
+	taken := 0
+	for _, claim := range s.claims() {
+		if claim.Claimed {
+			taken++
+		}
+	}
+	return taken
 }

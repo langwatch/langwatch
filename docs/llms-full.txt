@@ -16804,67 +16804,115 @@ You should see Cowork events landing as `tool.invocation` and `api.call`. If eve
 # FILE: ./ai-governance/ingestion-sources/copilot-studio.mdx
 
 ---
-title: Microsoft Copilot Studio (Purview)
-description: Setup contract only, Azure AD app registration is captured; the Purview Audit poller is pending.
+title: Microsoft Copilot Studio
+description: Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
 sidebarTitle: Microsoft Copilot Studio
 ---
 
-<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
+The source type is `copilot_studio_dataverse`. It connects to one Power
+Platform environment and queries the `conversationtranscripts` table on a
+15-minute cadence.
 
-`copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped, events do not flow yet.
+## What it reads
 
-The configuration contract below lets admins pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+The puller queries two Dataverse tables per run:
 
-## Currently implemented
+| Table | What it provides |
+|---|---|
+| `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
+| `bot` | Agent names, so conversations show which agent answered |
 
-- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
-- **Poller:** none.
-- **Normaliser:** none.
-- **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
+Each conversation produces one trace, with:
+- Each user question paired with the agent's answer as a turn
+- Tool calls the agent made, including unfinished ones
+- The person's directory account identifier on each question
+- A flag when the agent was edited after the conversation happened
+- A label when the conversation was a design-time test
 
-## What the admin configures upstream
+## What the admin sets up
 
-The composer collects:
+### In the Microsoft Entra admin centre
 
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| Azure AD tenant ID | yes | `IngestionSource.payloadConfig.tenantId` | (future poller) |
-| App registration client ID | yes | `payloadConfig.clientId` | (future poller) |
-| App registration client secret | yes | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+Done once for the whole organisation:
 
-In the Azure portal:
+1. **App registrations** → New registration. Give it a name (e.g. `langwatch-copilot-reader`), choose the single-tenant option.
+2. Copy the **Application (client) ID** and **Directory (tenant) ID** from the overview page.
+3. **Certificates & secrets** → New client secret. Copy the **Value** column immediately; Microsoft never shows it again.
+4. *(Optional)* **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
 
-1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
-2. **API permissions → Add → Microsoft Graph → Application permissions → `AuditLog.Read.All`**, then **Grant admin consent**.
-3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
-4. Optionally restrict the app to specific Azure subscriptions, regions per your security policy.
+### In the Power Platform admin centre
 
-There is no LangWatch-side URL or bearer secret to paste back into Microsoft. The future poller will hold the relationship: LangWatch calls Purview's `manage.office.com` Audit API on a schedule using the app registration above.
+Repeated for every environment that has agents:
 
-## What event shape we accept today
+5. **Environments** → pick the environment → Settings → Users + permissions → Application users → New app user.
+6. Paste the Application ID, choose a business unit, and assign the **Service Reader** role.
 
-None, no events flow until the poller ships. `langwatch ingest tail <sourceId>` prints:
+<Note>Service Reader is the tightest stock role that grants read access to both `bot` and `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer only reads records the account created itself, which for a service account is none. See the [security roles reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for details.</Note>
 
-```text
-No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
-secret, events will land here.
-```
+### In LangWatch
 
-(The hint mentions `/api/ingest/*` because that's the universal advice for push-mode sources; for `copilot_studio` specifically, no push endpoint exists. Once the poller lands, this empty-state hint will be replaced with poller-specific guidance.)
+Create a source of type **Microsoft Copilot Studio** and fill in:
 
-## What is still envelope-only, follow-up work
+| Field | Required | Description |
+|---|---|---|
+| Power Platform environment URL | yes | `https://org12345.crm.dynamics.com`, from the admin centre |
+| Microsoft Entra tenant ID | yes | The directory the app registration lives in |
+| App registration client ID | yes | From the app registration overview |
+| App registration client secret | yes | The secret value (shown once) |
 
-Everything below is the adapter slice that has not yet shipped:
+The environment URL must be an `https` address on a domain Microsoft serves
+Power Platform from (`.dynamics.com`, `.microsoftdynamics.us`,
+`.appsplatform.us`, `.dynamics.cn`). Environments on a custom domain need a
+support ticket.
 
-- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
-- **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor, Action, Target, `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
-- **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
-- **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.
+## How a run works
 
-When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.
+1. The puller exchanges the application credentials for a short-lived token scoped to the environment.
+2. It reads the agent table once (for names).
+3. It pages through the transcript table from where the last run left off.
+4. Multi-row conversations are stitched back together by their shared name and start time.
+5. Activities are paired into turns and emitted as OTLP spans.
+
+The cursor is a `(createdon, conversationtranscriptid)` pair so it never
+skips or re-reads a row. Default cadence is every 15 minutes.
+
+## Security boundaries
+
+- **Credentials stay in the environment.** Every request goes to the configured
+  Power Platform address. A next-page link pointing elsewhere stops the walk.
+  Redirects are never followed.
+- **The environment URL is checked at save time.** An address outside Microsoft's
+  known Power Platform domains is refused before it is stored.
+- **Directory access is optional.** When `Directory.Read.All` is granted, the
+  puller resolves the person's directory identifier to a name and department.
+  Without it, conversations still arrive with the raw `aadObjectId` only.
+
+## What shows up
+
+Each conversation trace includes these attributes:
+
+- `copilot_studio.agent_name`: the agent that answered
+- `copilot_studio.agent_changed_since`: `true` when the agent was edited after the conversation
+- `copilot_studio.design_mode`: `true` for conversations held while building the agent
+- `copilot_studio.transcript_batches`: which pieces this conversation was built from
+- `copilot_studio.conversation_incomplete`: `true` when a piece is missing from the middle
+- `langwatch.user.id`: the person's directory account on each user turn
+
+The model attribute is `microsoft/copilot-studio`, a product label, not a
+priced model. The agent record in the environment does not expose which model
+the agent uses.
+
+## Limitations
+
+- Microsoft deletes transcripts roughly 30 days out, so the first run's lookback
+  is capped at 30 days.
+- Dataverse caps a single transcript row at roughly 1 MB. Long conversations are
+  stored across multiple rows; the puller stitches them, but a missing piece
+  (a row that was already deleted) marks the conversation incomplete.
+- Agent names require the credential to read the `bot` table. If it cannot, conversations
+  still arrive but without an agent name, and the log says why.
+- The transcript has no token counts and no cost figures. Those come from Azure
+  cost reports, which require a separate billing-plan setup.
 
 ---
 
@@ -16876,7 +16924,7 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
+<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
 <Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
 
@@ -16891,12 +16939,16 @@ Each supported `sourceType` below states what is wired up today, what is still e
 | Source type | Delivery | OTLP shape | Storage | State |
 |---|---|---|---|---|
 | [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
+| `claude_code` | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
 | [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
 | [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
 | [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | Pull (Purview Audit API) | Logs | `log_records` | **Setup-contract-only**: Azure AD app config persisted, puller worker pending |
+| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
+| `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
+| `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
 | [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
 | [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
+| `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
 
@@ -16908,8 +16960,8 @@ Each supported `sourceType` below states what is wired up today, what is still e
 
 Different upstreams emit different event shapes:
 
-- **Span-shaped sources** (`otel_generic`, `claude_cowork`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
-- **Flat-event sources** (`workato`, `s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
+- **Span-shaped sources** (`otel_generic`, `claude_code`, `claude_cowork`, `copilot_studio_dataverse`, `databricks_genie`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
+- **Flat-event sources** (`workato`, `s3_custom`, `openai_compliance`, `claude_compliance`, `http_custom`, `anthropic_admin`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId`, `spanId`, duration that carry no information. They land naturally as OTLP `log_records` or OCSF events and drill into the log detail pane.
 
 **One internal pipeline either way**: both shapes pass through the same hardened OTLP parser (`parseOtlpBody.ts`) and the same trace pipeline downstream. Both are queryable from the same governance dashboard, both pull into the OCSF v1.1 read API, both honour the per-origin retention class.
 
@@ -16965,9 +17017,8 @@ The order in which deeper per-platform adapters land depends on customer pull. T
 
 1. **Cowork attribute extraction**: Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
 2. **Workato audit-shape parser**: Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor, Action, Target extraction is the follow-up.
-3. **Microsoft Copilot Studio (Purview Audit) puller**: needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
-4. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
-5. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
+3. **OpenAI, Anthropic Enterprise Compliance pullers**: S3 + Anthropic compliance API respectively; config persisted, pullers pending.
+4. **`s3_custom` DSL parser**, generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
 If you need an unwired adapter, file an issue tagged `governance/ingestion/adapter-roadmap` and we'll sequence accordingly.
 
@@ -35730,12 +35781,10 @@ This code is executed on every commit against the real runtime:
 ```python shared_session_code_agent.py
 # Log in once and share the session across the rows of a run.
 #
-# Rows are isolated, so each one starts cold and a login on every row is the
-# default result. This agent keeps one session in the project's agent cache and
-# reads it back at the start of every row, so only the rows that start at the
-# same moment log in. A row that finds the target no longer accepts the stored
-# session logs in again and stores the new one, so a session the target ends
-# early costs one login rather than the run.
+# Rows are isolated, so each one starts cold and logs in on its own. This agent
+# keeps the session in the project's agent cache. Of the rows that start
+# together, one takes the claim and logs in while the rest wait for what it
+# stores. A row the target refuses logs in again and stores the new session.
 #
 # The platform gives the sandbox its own LangWatch credential, so there is no
 # setup call to write and no LangWatch secret to create. The runner injects
@@ -35744,32 +35793,28 @@ This code is executed on every commit against the real runtime:
 # returned.
 
 import sys
+import time
 
 import langwatch
 import requests
 
-SESSION_ENTRY_NAME = "ACME_SESSION"  # the cache entry that holds the session
-SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
-REFRESH_MARGIN_SECONDS = 60  # store it for less, so it is never sent stale
-REFUSED = object()  # the target would not accept the session this row sent
+SESSION_NAME = "ACME_SESSION"  # the cache entry, and the claim that guards it
+SESSION_TTL_SECONDS = 14 * 60  # under what the target gives, so it is never stale
+LOGIN_SECONDS = 15  # over what a login takes: how long one row holds the claim
+REFUSED = object()
 
 
 class Code:
     def __call__(self, message: str):
         reply = self.ask(message, get_session())
         if reply is REFUSED:
-            # The stored session is no longer one the target accepts. A target
-            # ends a session whenever it likes: a restart, an operator closing
-            # it, a password change. The lifetime it promised is the most this
-            # agent can assume, never a guarantee. So log in again and send
-            # this row once more, which also stores the new session for the
-            # rows that follow.
+            # A target ends a session whenever it likes: a restart, an operator
+            # closing it, a password change. The lifetime it returned is the
+            # most this agent can assume, so a refusal costs one login.
             report("was refused", "this row logs in again")
             reply = self.ask(message, renew_session())
             if reply is REFUSED:
-                raise RuntimeError(
-                    "ACME refused a session this row obtained a moment ago."
-                )
+                raise RuntimeError("ACME refused a session obtained a moment ago.")
         return {"output": reply}
 
     def ask(self, message, session):
@@ -35788,20 +35833,46 @@ class Code:
 
 
 def get_session():
-    """Return a session token. This is the one line each row calls."""
-    try:
-        stored = langwatch.cache.get(SESSION_ENTRY_NAME)
-    except Exception:  # noqa: BLE001 - a cache that cannot answer is a miss
-        report("could not be read", "this row logs in")
-        stored = None
-    if stored:
-        return stored
+    """Return a session, stored by another row or obtained by this one.
 
-    return renew_session()
+    The loop always ends: either a session appears, or the claim comes free.
+    A row that takes the claim and then stops frees it after LOGIN_SECONDS,
+    and the next pass is where another row picks the work up.
+    """
+    while True:
+        stored = read_session()
+        if stored:
+            return stored
+        if take_the_login():
+            return renew_session()
+        time.sleep(1)
+
+
+def read_session():
+    """The stored session, or None. A cache that cannot answer is a miss."""
+    try:
+        return langwatch.cache.get(SESSION_NAME)
+    except Exception:  # noqa: BLE001 - the row must still answer
+        report("could not be read", "this row logs in")
+        return None
+
+
+def take_the_login():
+    """Whether this row is the one that logs in.
+
+    A cache that cannot answer means every row logs in, which is the result
+    with no claim at all, so the row goes on rather than stopping.
+    """
+    try:
+        return langwatch.cache.claim(
+            f"{SESSION_NAME}_CLAIM", "taken", ttl_seconds=LOGIN_SECONDS
+        )
+    except Exception:  # noqa: BLE001 - the row must still answer
+        return True
 
 
 def renew_session():
-    """Log in and store the session, for this row and the rows that follow."""
+    """Log in, and store the session for the rows that follow."""
     session = login()
     store_session(session)
     return session
@@ -35824,27 +35895,19 @@ def login():
 
 
 def store_session(session):
-    """Store the session for the rows that follow, for a little less than the
-    target system promises. A failure here does not fail the row: this row
-    holds a working session already, and the only cost is that the next row
-    logs in again."""
+    """Store it for the rows that follow. A failure here costs the next row a
+    login, never this row's answer."""
     try:
-        langwatch.cache.set(
-            SESSION_ENTRY_NAME,
-            session,
-            ttl_seconds=SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS,
-        )
+        langwatch.cache.set(SESSION_NAME, session, ttl_seconds=SESSION_TTL_SECONDS)
     except Exception:  # noqa: BLE001 - the row must still answer
         report("could not be stored", "the next row will log in again")
 
 
 def report(state, consequence):
-    """Say on stderr what the cache did, in this agent's own words.
-
-    Nothing from the exception reaches the output. An error message can quote
-    the credential that caused it, and a run shows stderr.
-    """
-    print(f"{SESSION_ENTRY_NAME} {state}, {consequence}", file=sys.stderr)
+    """Say on stderr what the cache did, in this agent's own fixed words. An
+    exception text can quote the credential that caused it, and a run shows
+    what it printed."""
+    print(f"{SESSION_NAME} {state}, {consequence}", file=sys.stderr)
 
 
 def secret(name):
@@ -35879,21 +35942,34 @@ The agent also treats a `401` as an expired session: it logs in again and retrie
 ### Behavior
 
 - Each run logs in only once. Every later row reads the stored session from the cache.
-- When rows start at the same time, each one can find the cache empty and log in. Both sessions are valid and the last write wins. Keep the login idempotent on the target, or lower the run's parallelism.
+- When rows start at the same time, one of them takes the claim and logs in. The rest wait and read the session it stores.
 - Entries belong to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
 - If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
 
 Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+
+### One login when rows start together
+
+The rows that start at the same moment all read an empty cache, so without a claim they all log in. The agent above takes a claim first. A claim writes only when the project does not hold that name yet, and answers `True` for the row that took it and `False` for the rows that did not, so one row logs in and the rest wait for the session it stores.
+
+`LOGIN_SECONDS` is the one number to set: how long a row holds the claim. Put it above the time your login takes.
+
+That single number also ends the wait. A row that takes the claim and then stops does not hold the others for good, because the claim expires and the next pass of a waiting row takes the name.
+
+Set it below your login time and the claim stops arbitrating: the name comes free while the first row is still logging in, so a second row takes it and logs in as well, and the last session written is the one the rows that follow read. Both sessions are valid, so the cost is extra logins, which is the result with no claim at all. The same applies when the cache itself cannot answer.
+
+The claim uses the entry's own name with `_CLAIM` after it, so there is no second name to pick. It has to be a separate entry: the claim is taken before the login, and the session can only be stored after it.
 
 ### Cache API
 
 ```python
 langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
 langwatch.cache.get("ACME_SESSION", default=None)
+langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)
 langwatch.cache.delete("ACME_SESSION")
 ```
 
-`get` returns the default on a miss, so no `try`/`except` is needed for that case. Other errors raise.
+`get` returns the default on a miss, so no `try`/`except` is needed for that case. `claim` returns `True` when it stored the value and `False` when the name was already held, and does not raise for a name it could not take. Other errors raise.
 
 Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
 
@@ -61623,7 +61699,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 - `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
-This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
 Create the namespace and the Secrets:
 
@@ -61661,7 +61737,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.16.0
+    targetRevision: 3.17.0
     helm:
       releaseName: langwatch
       values: |
@@ -61710,7 +61786,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.16.0
+      targetRevision: 3.17.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62057,7 +62133,7 @@ graph LR
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `x.y.z` | A specific release, recommended for production — pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
+| `x.y.z` | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
 | `local` | Built locally via `make images` (development only) |
 
 <Tip>
@@ -62071,7 +62147,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.16.0
+VERSION=3.17.0
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62087,13 +62163,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.16.0"
+    tag: "3.17.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.16.0"
+    tag: "3.17.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.16.0"
+    tag: "3.17.0"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -65760,7 +65836,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -66092,7 +66168,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml
 ```
 
@@ -66358,6 +66434,15 @@ The hybrid setup requires coordination with our team to configure the secure con
 
 ---
 
+# FILE: ./api-reference/agent-cache/claim-entry.mdx
+
+---
+title: "Claim a cache entry"
+openapi: "POST /api/agent-cache/{name}/claim"
+---
+
+---
+
 # FILE: ./api-reference/agent-cache/delete-entry.mdx
 
 ---
@@ -66394,6 +66479,10 @@ lifetime is between 5 seconds and 24 hours, and is 15 minutes when the request
 names none.
 
 There is no listing route: names come from the agent code that wrote them.
+
+A write replaces whatever the name held. To write only when the name is free,
+claim it instead: the claim route answers whether this caller is the one that
+took the name, which is how one row does work the rows beside it then reuse.
 
 Every route needs an API key that can manage the agent cache. A read returns the
 value, so a caller that can overwrite an entry can already choose what the next

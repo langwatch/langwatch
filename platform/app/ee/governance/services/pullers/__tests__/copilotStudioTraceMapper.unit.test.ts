@@ -21,7 +21,6 @@ import { describe, expect, it } from "vitest";
 import { spanSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   COPILOT_CONVERSATION_ACTION,
-  COPILOT_CONVERSATION_SPAN_NAME,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
   mapCopilotEventsToTraceRequest,
@@ -189,9 +188,17 @@ const CHAT = [
 describe("given a Copilot conversation stored in one row", () => {
   const spans = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
 
-  /** @scenario "A conversation becomes one trace carrying what was said" */
-  it("records one trace carrying the question and the answer", () => {
-    expect(new Set(spans.map((s) => s.traceId)).size).toBe(1);
+  /** @scenario "Each turn in a conversation becomes its own trace, all sharing a thread" */
+  it("records one trace per turn, all sharing the same thread", () => {
+    const turns = spans.filter(
+      (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
+    );
+    expect(turns.length).toBe(2);
+    expect(new Set(turns.map((s) => s.traceId)).size).toBe(2);
+    const threadIds = new Set(
+      turns.map((s) => attrsOf(s)["langwatch.thread.id"]),
+    );
+    expect(threadIds.size).toBe(1);
     for (const span of spans) {
       expect(spanSchema.safeParse(span).success).toBe(true);
     }
@@ -200,7 +207,7 @@ describe("given a Copilot conversation stored in one row", () => {
     expect(rendered).toContain("Hold the power button for ten seconds.");
   });
 
-  /** @scenario "A conversation becomes one trace carrying what was said" */
+  /** @scenario "Each turn in a conversation becomes its own trace, all sharing a thread" */
   it("opens with the agent's greeting rather than dropping it", () => {
     expect(JSON.stringify(spans)).toContain("Hello! How can I help?");
   });
@@ -282,9 +289,12 @@ describe("given a conversation Microsoft stored across several rows", () => {
   });
 
   /** @scenario "A conversation stored across several rows is still one conversation" */
-  it("records one trace, not two", () => {
+  it("groups batches into one thread with per-turn traces", () => {
     const spans = spansOf([copilotEvent(second), copilotEvent(first)]);
-    expect(new Set(spans.map((s) => s.traceId)).size).toBe(1);
+    const threadIds = new Set(
+      spans.map((s) => attrsOf(s)["langwatch.thread.id"]),
+    );
+    expect(threadIds.size).toBe(1);
     const rendered = JSON.stringify(spans);
     expect(rendered).toContain("How do I reset my laptop?");
     expect(rendered).toContain("Hold the power button for ten seconds.");
@@ -500,6 +510,114 @@ describe("given a conversation Microsoft stored across several rows", () => {
   });
 });
 
+/**
+ * Observed, not hand-built. One conversation with the agent, left idle past
+ * the session timeout and then picked up again, was stored as two rows: the
+ * same `name`, both numbered batch 0, and two different start times — 15
+ * messages under `2026-08-26T14:45:41Z` and 2 more under
+ * `2026-08-26T16:29:56Z`. Grouping on the start time as well as the name
+ * split it into two traces, and the trace list showed only the newer half.
+ *
+ * The rows below keep that shape — one name, one batch number, two start
+ * times — and carry a single exchange each. The message counts are not what
+ * splits the conversation; the second start time is, and one exchange per row
+ * is enough to show it.
+ */
+describe("given a conversation resumed after a break", () => {
+  const RESUMED_NAME = "98396e1f-0000-4000-8000-000000000002_14a3a0cf-bot";
+  const before = transcriptRow({
+    activities: [
+      userMessage({
+        id: "e1111111-1111-4111-8111-111111111111",
+        text: "what's the capital of berlin?",
+        ms: 1_787_755_541_000,
+      }),
+      agentMessage({
+        id: "e2222222-2222-4222-8222-222222222222",
+        text: "Berlin is a city, and it is the capital of Germany.",
+        ms: 1_787_755_545_000,
+      }),
+    ],
+    batchId: 0,
+    name: RESUMED_NAME,
+    start: "2026-08-26T14:45:41Z",
+    transcriptId: "row-before-break",
+  });
+  const after = transcriptRow({
+    activities: [
+      userMessage({
+        id: "e3333333-3333-4333-8333-333333333333",
+        text: "what about chile.",
+        ms: 1_787_761_796_000,
+      }),
+      agentMessage({
+        id: "e4444444-4444-4444-8444-444444444444",
+        text: "Santiago is the capital of Chile.",
+        ms: 1_787_761_800_000,
+      }),
+    ],
+    batchId: 0,
+    name: RESUMED_NAME,
+    start: "2026-08-26T16:29:56Z",
+    transcriptId: "row-after-break",
+  });
+
+  describe("when both halves reach the mapper in one pull", () => {
+    it("gives each turn its own trace, all sharing one thread", () => {
+      const spans = spansOf([copilotEvent(before), copilotEvent(after)]);
+      const turns = spans.filter(
+        (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
+      );
+      expect(turns.length).toBe(2);
+      expect(new Set(turns.map((s) => s.traceId)).size).toBe(2);
+      const threadIds = new Set(
+        turns.map((s) => attrsOf(s)["langwatch.thread.id"]),
+      );
+      expect(threadIds.size).toBe(1);
+      const rendered = JSON.stringify(spans);
+      expect(rendered).toContain("what's the capital of berlin?");
+      expect(rendered).toContain("Santiago is the capital of Chile.");
+    });
+
+    it("emits turn spans as roots, not children", () => {
+      const events = [copilotEvent(before), copilotEvent(after)];
+      const turns = turnSpansOf(events);
+      expect(turns.length).toBe(2);
+      for (const turn of turns) {
+        expect(turn.parentSpanId).toBeUndefined();
+      }
+    });
+
+    /**
+     * Both halves are numbered batch 0, which is two rows carrying the same
+     * number rather than a hole in the numbering. Nothing is missing here.
+     */
+    it("does not read the repeated batch number as a missing piece", () => {
+      const spans = spansOf([copilotEvent(before), copilotEvent(after)]);
+      expect(
+        attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"],
+      ).toBeUndefined();
+    });
+  });
+
+  /**
+   * The two halves land in different pull runs in practice, so the trace they
+   * join is decided by the identifiers alone, not by being mapped together.
+   */
+  describe("when each half is pulled on its own", () => {
+    it("gives each half a different trace but the same thread", () => {
+      const [firstRun, secondRun] = [
+        spansOf([copilotEvent(before)]),
+        spansOf([copilotEvent(after)]),
+      ];
+      expect(firstRun[0]!.traceId).not.toBe(secondRun[0]!.traceId);
+      expect(attrsOf(firstRun[0]!)["langwatch.thread.id"]).toBe(
+        attrsOf(secondRun[0]!)["langwatch.thread.id"],
+      );
+    });
+  });
+});
+
 describe("given a stored name that does not match the shape we observed", () => {
   /** @scenario "The conversation's stored label is used whole, never taken apart" */
   it("groups a name with no underscore and one with several", () => {
@@ -507,7 +625,10 @@ describe("given a stored name that does not match the shape we observed", () => 
       const turns = turnSpansOf([
         copilotEvent(transcriptRow({ activities: CHAT, name })),
       ]);
-      expect(new Set(turns.map((s) => s.traceId)).size).toBe(1);
+      const threadIds = new Set(
+        turns.map((s) => attrsOf(s)["langwatch.thread.id"]),
+      );
+      expect(threadIds.size).toBe(1);
       expect(turns.length).toBe(CHAT.length - 1);
     }
   });
@@ -524,7 +645,10 @@ describe("given a stored name that does not match the shape we observed", () => 
         }),
       ),
     ]);
-    expect(new Set(spans.map((s) => s.traceId)).size).toBe(2);
+    const threadIds = new Set(
+      spans.map((s) => attrsOf(s)["langwatch.thread.id"]),
+    );
+    expect(threadIds.size).toBe(2);
   });
 });
 
@@ -723,13 +847,10 @@ describe("given a tool call the agent ran", () => {
   });
 
   /**
-   * A call is attached to the turn it falls inside, and one that predates
-   * every turn attaches to the first rather than being dropped — so a tool
-   * span can begin before the earliest turn and end after the latest. The
-   * conversation span has to cover them: a parent that does not contain its
-   * children renders as a trace with spans hanging outside it.
+   * A call that predates every turn attaches to the first rather than being
+   * dropped. Its traceId matches the turn it hangs under.
    */
-  it("covers a tool call that starts before the first turn and ends after the last", () => {
+  it("assigns a tool call to the correct turn's trace even when it spans beyond the turn", () => {
     const firstTurnMs = 1_787_685_274_483;
     const lastTurnMs = 1_787_685_290_000;
     const spans = spansOf([
@@ -755,21 +876,15 @@ describe("given a tool call the agent ran", () => {
       ),
     ]);
 
-    const root = spans.find(
-      (s: { name: string }) => s.name === COPILOT_CONVERSATION_SPAN_NAME,
+    const tools = spans.filter(
+      (s) => attrsOf(s)["langwatch.span.type"] === "tool",
     );
-    expect(root).toBeDefined();
-
-    const children = spans.filter((s) => s.spanId !== root?.spanId);
-    expect(children.length).toBeGreaterThan(0);
-    for (const child of children) {
-      expect(Number(child.startTimeUnixNano)).toBeGreaterThanOrEqual(
-        Number(root!.startTimeUnixNano),
-      );
-      expect(Number(child.endTimeUnixNano)).toBeLessThanOrEqual(
-        Number(root!.endTimeUnixNano),
-      );
-    }
+    expect(tools).toHaveLength(1);
+    const tool = tools[0]!;
+    const parent = spans.find((s) => s.spanId === tool.parentSpanId);
+    expect(parent).toBeDefined();
+    expect(parent!.name).toBe(COPILOT_TURN_SPAN_NAME);
+    expect(tool.traceId).toBe(parent!.traceId);
   });
 });
 
@@ -889,30 +1004,39 @@ describe("given a multi-turn conversation", () => {
     copilotEvent(transcriptRow({ activities: MULTI_TURN_CHAT })),
   ]);
 
-  it("wraps all turns under a single root conversation span", () => {
-    const roots = spans.filter((s) => !s.parentSpanId);
-    expect(roots).toHaveLength(1);
-    expect(roots[0]?.name).toBe(COPILOT_CONVERSATION_SPAN_NAME);
-  });
-
-  it("makes every turn span a child of the conversation span", () => {
-    const root = spans.find((s) => !s.parentSpanId);
-    expect(root).toBeDefined();
+  it("makes every turn a root span with its own traceId", () => {
     const turns = spans.filter((s) => s.name === COPILOT_TURN_SPAN_NAME);
     expect(turns.length).toBe(3);
     for (const turn of turns) {
-      expect(turn.parentSpanId).toBe(root?.spanId);
+      expect(turn.parentSpanId).toBeUndefined();
     }
+    expect(new Set(turns.map((s) => s.traceId)).size).toBe(3);
   });
 
-  it("puts the first user message as conversation input and last bot reply as output", () => {
-    const root = spans.find((s) => !s.parentSpanId);
-    expect(root).toBeDefined();
-    const attrs = attrsOf(root!);
-    expect(attrs["langwatch.input"]).toContain("Tell me about France.");
-    expect(attrs["langwatch.output"]).toContain(
-      "Santiago is the capital of Chile.",
+  it("groups all turns under the same thread", () => {
+    const turns = spans.filter((s) => s.name === COPILOT_TURN_SPAN_NAME);
+    const threadIds = new Set(
+      turns.map((s) => attrsOf(s)["langwatch.thread.id"]),
     );
+    expect(threadIds.size).toBe(1);
+  });
+
+  it("carries each turn's own input and output", () => {
+    const turns = spans.filter((s) => s.name === COPILOT_TURN_SPAN_NAME);
+    const inputs = turns
+      .map((s) => attrsOf(s)["langwatch.input"] as string | undefined)
+      .filter((v): v is string => typeof v === "string");
+    expect(inputs.some((v) => v.includes("Tell me about France."))).toBe(true);
+    expect(inputs.some((v) => v.includes("What about Chile?"))).toBe(true);
+    const outputs = turns
+      .map((s) => attrsOf(s)["langwatch.output"] as string | undefined)
+      .filter((v): v is string => typeof v === "string");
+    expect(
+      outputs.some((v) => v.includes("France is a country in Western Europe.")),
+    ).toBe(true);
+    expect(
+      outputs.some((v) => v.includes("Santiago is the capital of Chile.")),
+    ).toBe(true);
   });
 });
 

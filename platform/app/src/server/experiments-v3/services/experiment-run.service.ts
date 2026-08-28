@@ -690,17 +690,23 @@ export class ExperimentRunService {
     }
 
     // Fetch cost/duration summary per run.
+    //
+    // `CarriedOver = 0` everywhere: a run holds a snapshot of the whole board,
+    // and the cells it copied in were paid for by the run that produced them.
+    // What the run reports it spent, and how long it took, is its own work
+    // only. The per-evaluator breakdown above deliberately keeps carried rows,
+    // because a pass rate describes the board the run stands for.
     const costResult = await clickHouseClient.query({
       query: `
         SELECT
           ExperimentId,
           RunId,
-          sumIf(TargetCost, ResultType = 'target') AS datasetCost,
-          sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
-          avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
-          avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-          avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
+          sumIf(TargetCost, ResultType = 'target' AND CarriedOver = 0) AS datasetCost,
+          sumIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0) AS evaluationsCost,
+          avgIf(TargetCost, ResultType = 'target' AND CarriedOver = 0 AND TargetCost IS NOT NULL) AS datasetAverageCost,
+          avgIf(TargetDurationMs, ResultType = 'target' AND CarriedOver = 0 AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
+          avgIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
+          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
         FROM experiment_run_items
         ${buildDedupedRunItemsWhere()}
         GROUP BY ExperimentId, RunId
