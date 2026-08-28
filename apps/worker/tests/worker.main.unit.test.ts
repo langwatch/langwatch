@@ -29,8 +29,8 @@ class Signals implements WorkerSignalSource {
 
 class WorkerStub implements WorkerMainProcessPort {
   readonly logger = { info: vi.fn(), error: vi.fn() };
-  readonly start = vi.fn(async () => undefined);
-  readonly close = vi.fn(async () => undefined);
+  readonly start = vi.fn<() => Promise<void>>(async () => void 0);
+  readonly close = vi.fn<() => Promise<void>>(async () => void 0);
 }
 
 function createMain(worker = new WorkerStub()) {
