@@ -4,9 +4,9 @@
 
 **Branch:** `feat/strict-feature-layout-v0`
 
-**Working checkpoint:** `de578b0f66`
+**Working checkpoint:** `8f7dc3ab0f`
 
-**Current execution wave:** Wave 1, process foundations
+**Current execution wave:** Wave 2, identity, tenancy and access
 
 Complete the current wave gate before starting work from a later wave. Parallel
 work is allowed only between independent items inside the current wave.
@@ -392,6 +392,20 @@ independent. Do not start a later wave until the current wave gate is complete.
 
 ### Wave 1: process foundations
 
+**Paused at user direction on 2026-08-28. Do not resume or expand Wave 1 while
+Wave 2 is active.** The following uncommitted lanes remain shared-worktree
+residuals rather than completed gates:
+
+- Analytics/Dashboard persistence and its app adapters/tests;
+- Gateway cache-rule, guardrail and budget persistence and tests;
+- Prompt persistence/service parity and its app adapters/tests;
+- Mailer/runtime/provider work and tests.
+
+Their exact modified and untracked paths remain visible in `git status`; they
+must not be staged with Wave 2 commits. Reassess them only when execution
+returns to Wave 1 or an explicit Wave 2 dependency requires a narrowly owned
+hunk.
+
 Current Wave 1 progress at `de578b0f66`:
 
 - [x] Enforce injected configuration in reusable production packages.
@@ -538,6 +552,10 @@ Gate: API and worker independently construct one explicit graph without global
 App, package env reads or request/job-time service construction.
 
 ### Wave 2: identity, tenancy and access
+
+**Active.** Start with the actor/tenant dependency graph, then migrate
+independent owners in parallel without sharing composition-root files. Root
+owns the integration hunks and commits each reviewed vertical separately.
 
 Move these owners before broad product transport cutover:
 
