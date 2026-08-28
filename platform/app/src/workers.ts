@@ -15,14 +15,16 @@ void (async () => {
   const { AppBoot } = await import("./runtime/app/boot");
   const { setEnvironment } = await import("@langwatch/ksuid");
   const { createLogger } = await import("@langwatch/observability");
-  const { installShutdownHandlers } =
-    await import("./server/shutdown/runGracefulShutdown");
+  const { installShutdownHandlers } = await import("./server/shutdown/runGracefulShutdown");
   const { SHUTDOWN_BUDGET } = await import("./server/shutdown/budget");
 
   setEnvironment(process.env.ENVIRONMENT ?? "local");
 
   // OTel instrumentation MUST load before any module that creates spans.
-  await import("./instrumentation.node");
+  const { resolveTelemetryConfiguration } = await import("./runtime/telemetry.config");
+  const telemetryConfig = resolveTelemetryConfiguration(process.env);
+  const { initializeInstrumentation } = await import("./instrumentation.node");
+  initializeInstrumentation(telemetryConfig);
   await import("./server/handled-error-wiring");
 
   const logger = createLogger("langwatch:workers");
@@ -47,8 +49,7 @@ void (async () => {
       // These imports are intentionally inside compose: config validation has
       // completed before the App composition or worker transport evaluate.
       const { WorkerRuntime } = await import("@langwatch/worker/runtime");
-      const { createLegacyWorkerPorts } =
-        await import("./runtime/worker/legacy-worker.adapter");
+      const { createLegacyWorkerPorts } = await import("./runtime/worker/legacy-worker.adapter");
       const { initializeWorkerApp } = await import("./server/app-layer/presets");
       const app = initializeWorkerApp();
       const ports = createLegacyWorkerPorts(app);

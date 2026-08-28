@@ -7,7 +7,10 @@ export async function register() {
     const { setEnvironment } = await import("@langwatch/ksuid");
     setEnvironment(process.env.ENVIRONMENT ?? "local");
 
-    await import("./instrumentation.node");
+    const { resolveTelemetryConfiguration } = await import("./runtime/telemetry.config");
+    const telemetryConfig = resolveTelemetryConfiguration(process.env);
+    const { initializeInstrumentation } = await import("./instrumentation.node");
+    initializeInstrumentation(telemetryConfig);
 
     const { initializeWebApp } = await import("./server/app-layer/presets");
     try {

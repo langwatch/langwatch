@@ -5334,6 +5334,9 @@ importers:
       '@opentelemetry/exporter-logs-otlp-proto':
         specifier: ^0.221.0
         version: 0.221.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/exporter-metrics-otlp-http':
+        specifier: 0.221.0
+        version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/exporter-metrics-otlp-proto':
         specifier: ^0.221.0
         version: 0.221.0(@opentelemetry/api@1.9.1)
@@ -5364,9 +5367,15 @@ importers:
       '@opentelemetry/instrumentation-runtime-node':
         specifier: ^0.34.0
         version: 0.34.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/otlp-exporter-base':
+        specifier: 0.221.0
+        version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-transformer':
         specifier: 0.55.0
         version: 0.55.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/otlp-transformer-telemetry':
+        specifier: npm:@opentelemetry/otlp-transformer@0.221.0
+        version: '@opentelemetry/otlp-transformer@0.221.0(@opentelemetry/api@1.9.1)'
       '@opentelemetry/otlp-transformer-next':
         specifier: npm:@opentelemetry/otlp-transformer@0.219.0
         version: '@opentelemetry/otlp-transformer@0.219.0(@opentelemetry/api@1.9.1)'

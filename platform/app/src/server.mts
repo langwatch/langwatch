@@ -35,18 +35,19 @@ void (async () => {
     };
     const original = mod._resolveFilename;
     mod._resolveFilename = (request, ...rest) =>
-      /\.(css|scss|sass)(\?.*)?$/.test(request)
-        ? noopCssPath
-        : original(request, ...rest);
+      /\.(css|scss|sass)(\?.*)?$/.test(request) ? noopCssPath : original(request, ...rest);
   }
 
   // Register the Grafana trace-link builder after the explicit environment
   // source has been selected.
   await import("./server/handled-error-wiring");
 
-  // OTel must register before the app graph evaluates. This remains a dynamic
-  // import so it observes the selected .env/.env.portless source.
-  await import("./instrumentation.node");
+  // OTel must register before the app graph evaluates. Resolve telemetry from
+  // the selected .env/.env.portless source before loading the SDK module.
+  const { resolveTelemetryConfiguration } = await import("./runtime/telemetry.config");
+  const telemetryConfig = resolveTelemetryConfiguration(process.env);
+  const { initializeInstrumentation } = await import("./instrumentation.node");
+  initializeInstrumentation(telemetryConfig);
 
   const appBoot = new AppBoot({
     compose: async (config, resources) => {
@@ -54,9 +55,7 @@ void (async () => {
       const { createLegacyAppRuntime } = await import("./runtime/app");
       const { initializeInProcessApp, initializeWebApp } =
         await import("./server/app-layer/presets");
-      const composeApp = config.workersInProcess
-        ? initializeInProcessApp
-        : initializeWebApp;
+      const composeApp = config.workersInProcess ? initializeInProcessApp : initializeWebApp;
       const appRuntime = await createLegacyAppRuntime({
         composeApp,
         resources,
