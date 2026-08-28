@@ -12,6 +12,7 @@ import {
   COST_VALUE_EXPR,
   groupKeyExpr,
   OUTCOME_EXPR,
+  SCENARIO_KEY_EXPR,
   TARGET_KEY_EXPR,
   TRIGGER_EXPR,
   trendKeyExpr,
@@ -35,6 +36,10 @@ export interface RawAtomRow {
   BatchRunId: string;
   ScenarioRunId: string;
   ScenarioId: string;
+  /** The key the scenario folds under, see `SCENARIO_KEY_EXPR`. */
+  ScenarioKey: string;
+  /** The name the run carries, or '' when it carries none. */
+  ScenarioName: string;
   Status: string;
   Outcome: string;
   RunAt: string;
@@ -58,6 +63,8 @@ export interface RunOrdinalRow {
 /** One group as ClickHouse folds it, before names are attached. */
 export interface RawGroupRow {
   GroupKey: string;
+  /** The name the newest run of the group carries, or '' when it carries none. */
+  Name: string;
   Atoms: string;
   Passed: string;
   Settled: string;
@@ -76,6 +83,12 @@ export interface RawTrendRow {
   RunAt: string;
   Passed: string;
   Settled: string;
+}
+
+/** One scenario that ran from code, as the filter lists it. */
+export interface RawCodeScenarioRow {
+  ScenarioKey: string;
+  Name: string;
 }
 
 /** One bucket of the pass-rate-over-time chart. */
@@ -109,6 +122,9 @@ interface AtomCursor {
  * one set at a time; this one reads the whole window flat so a filter can cut
  * it and a grouping can fold it. Nothing here changes what v1 reads.
  */
+/** How many scenarios that ran from code the filter lists at most. */
+export const MAX_CODE_SCENARIOS = 500;
+
 export class ResultAtomsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -170,6 +186,8 @@ export class ResultAtomsClickHouseRepository {
          BatchRunId,
          ScenarioRunId,
          ScenarioId,
+         ${SCENARIO_KEY_EXPR} AS ScenarioKey,
+         ifNull(Name, '') AS ScenarioName,
          Status,
          ${OUTCOME_EXPR} AS Outcome,
          toString(${ATOM_SORT_KEY}) AS RunAt,
@@ -281,6 +299,7 @@ export class ResultAtomsClickHouseRepository {
     return this.queryRows<RawGroupRow>(
       `SELECT
          GroupKey,
+         argMax(Name, RunAt)                     AS Name,
          toString(count())                       AS Atoms,
          toString(countIf(Outcome = 'passed'))   AS Passed,
          toString(countIf(Outcome != 'pending')) AS Settled,
@@ -293,6 +312,7 @@ export class ResultAtomsClickHouseRepository {
        FROM (
          SELECT
            ${groupKeyExpr(groupBy)} AS GroupKey,
+           ifNull(Name, '') AS Name,
            BatchRunId,
            ScenarioId,
            ${TARGET_KEY_EXPR} AS TargetKey,
@@ -304,6 +324,42 @@ export class ResultAtomsClickHouseRepository {
        )
        GROUP BY GroupKey`,
       { tenantId: filter.projectId, ...filters.params },
+    );
+  }
+
+  /**
+   * The scenarios that ran from code inside the window, one per key, each
+   * under the name its newest run carried.
+   *
+   * These have no row in Postgres, so the window is the only place they can
+   * be listed from. The caller sends a filter that names no scenario, so the
+   * list never hides the way back out of a scenario filter.
+   */
+  async findCodeScenarios(
+    filter: ResultsFilter,
+  ): Promise<RawCodeScenarioRow[]> {
+    if (isEmptyScope(filter)) return [];
+    const filters = buildAtomFilters(filter);
+    return this.queryRows<RawCodeScenarioRow>(
+      `SELECT
+         ScenarioKey,
+         argMax(Name, RunAt) AS Name
+       FROM (
+         SELECT
+           ${SCENARIO_KEY_EXPR} AS ScenarioKey,
+           ifNull(Name, '') AS Name,
+           ${ATOM_SORT_KEY} AS RunAt
+         ${atomScopeSql(filters)}
+           AND ${TRIGGER_EXPR} = 'code'
+       )
+       GROUP BY ScenarioKey
+       ORDER BY Name ASC, ScenarioKey ASC
+       LIMIT {atomCodeScenarios:UInt32}`,
+      {
+        tenantId: filter.projectId,
+        ...filters.params,
+        atomCodeScenarios: String(MAX_CODE_SCENARIOS),
+      },
     );
   }
 

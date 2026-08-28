@@ -39,6 +39,7 @@ function makeRow({
   note,
   archivedAt = null,
   durationMs = "1500",
+  name = "Refund Flow",
 }: {
   scenarioId?: string;
   scenarioRunId?: string;
@@ -55,6 +56,7 @@ function makeRow({
   note?: string;
   archivedAt?: Date | null;
   durationMs?: string | null;
+  name?: string | null;
 }) {
   const metadata: Record<string, unknown> = {};
   if (targetReferenceId) metadata.langwatch = { targetReferenceId };
@@ -69,7 +71,7 @@ function makeRow({
     ScenarioSetId: scenarioSetId,
     Version: "v1",
     Status: status,
-    Name: "Refund Flow",
+    Name: name,
     Description: null,
     Metadata:
       Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
@@ -168,6 +170,28 @@ describe("findAtoms", () => {
         Note: "stricter judge",
         Outcome: "passed",
       });
+    });
+  });
+
+  describe("given a run pushed from code that carries a name", () => {
+    /** @scenario "An atom carries the name its run was given" */
+    it("reads that name and folds under its set and that name", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List agents",
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.ScenarioName).toBe("List agents");
+      expect(atoms[0]?.ScenarioKey).toBe(`${setId}-list-agents`);
     });
   });
 
@@ -611,14 +635,24 @@ describe("filters", () => {
     it("keeps only that scenario", async () => {
       const setId = `set-${nanoid(6)}`;
       const wanted = `scen-${nanoid(6)}`;
+      // Runs started on the platform, so each is keyed by its scenario id.
       await insertRows([
         makeRow({
           scenarioId: wanted,
           batchRunId: `batch-${nanoid(6)}`,
           scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
         }),
-        makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId }),
-        makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+        }),
       ]);
 
       const { atoms } = await repo.findAtoms({
@@ -628,6 +662,43 @@ describe("filters", () => {
 
       expect(atoms).toHaveLength(1);
       expect(atoms[0]?.ScenarioId).toBe(wanted);
+    });
+  });
+
+  describe("when the filter names a scenario that ran from code by its key", () => {
+    /** @scenario "A filter on scenarios keeps a scenario that ran from code by its key" */
+    it("keeps only the runs of that name", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List agents",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List agents",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List prompts",
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({
+          scenarioSetIds: [setId],
+          scenarioIds: [`${setId}-list-agents`],
+        }),
+        limit: 10,
+      });
+
+      expect(atoms).toHaveLength(2);
+      expect(atoms.every((atom) => atom.ScenarioName === "List agents")).toBe(
+        true,
+      );
     });
   });
 
@@ -706,6 +777,47 @@ describe("filters", () => {
   });
 });
 
+describe("findCodeScenarios", () => {
+  describe("given runs from code and a run started on the platform", () => {
+    /** @scenario "The scenarios that ran from code are listed for the filter" */
+    it("lists the code scenarios under their keys and leaves the platform run out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List agents",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List agents",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: "List prompts",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          name: "Refund flow",
+        }),
+      ]);
+
+      const rows = await repo.findCodeScenarios(
+        baseFilter({ scenarioSetIds: [setId] }),
+      );
+
+      expect(rows).toEqual([
+        { ScenarioKey: `${setId}-list-agents`, Name: "List agents" },
+        { ScenarioKey: `${setId}-list-prompts`, Name: "List prompts" },
+      ]);
+    });
+  });
+});
+
 describe("findRunOrdinals", () => {
   describe("given a plan with three runs inside the period", () => {
     /** @scenario "The number of a run counts the runs of its plan, oldest first" */
@@ -741,6 +853,92 @@ describe("findRunOrdinals", () => {
 });
 
 describe("aggregateGroups", () => {
+  describe("when grouped by scenario over runs pushed from code", () => {
+    /** @scenario "A run pushed from code folds under its set and its name" */
+    it("folds runs of one name in one set together, and keeps sets apart", async () => {
+      const german = `german-${nanoid(6)}`;
+      const english = `english-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: german,
+          name: "List agents",
+          status: "SUCCESS",
+        }),
+        // An older run under a spelling that folds to the same key. The group
+        // reads the name its newest run carried.
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: german,
+          name: "list-agents",
+          status: "FAILED",
+          startedAt: new Date(now - 120_000),
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: english,
+          name: "List agents",
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [german, english] }),
+        groupBy: "scenario",
+      });
+
+      const byKey = new Map(groups.map((group) => [group.GroupKey, group]));
+      expect([...byKey.keys()].sort()).toEqual(
+        [`${german}-list-agents`, `${english}-list-agents`].sort(),
+      );
+      expect(Number(byKey.get(`${german}-list-agents`)?.Atoms)).toBe(2);
+      expect(Number(byKey.get(`${german}-list-agents`)?.Passed)).toBe(1);
+      expect(byKey.get(`${german}-list-agents`)?.Name).toBe("List agents");
+    });
+
+    /** @scenario "A run started on the platform folds under its scenario id" */
+    it("keeps a run started on the platform under its scenario id", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const scenarioId = `scen-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          scenarioId,
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          name: "List agents",
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "scenario",
+      });
+
+      expect(groups.map((group) => group.GroupKey)).toEqual([scenarioId]);
+    });
+
+    /** @scenario "A run pushed from code with no name keeps its id" */
+    it("keeps a run from code that carries no name under its own id", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const scenarioId = `scen-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          scenarioId,
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          name: null,
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "scenario",
+      });
+
+      expect(groups.map((group) => group.GroupKey)).toEqual([scenarioId]);
+    });
+  });
+
   describe("when grouped by target", () => {
     /** @scenario "The overview groups by target" */
     it("gives one group per target, each with its own pass rate", async () => {

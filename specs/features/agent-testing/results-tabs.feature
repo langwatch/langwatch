@@ -247,6 +247,27 @@ Feature: The Results tab
     And its Trend draws one bar per run
 
   @integration
+  Scenario: A scenario that ran from code reads its name and folds its runs
+    Given the runs of a set that runs from code, each carrying an id the SDK made up
+    When "Scenario" is chosen in Group by
+    Then one row reads the name the runs carried
+    And opening it lists every run of that name
+
+  @integration
+  Scenario: The Scenario filter lists the scenarios that ran from code
+    Given a scenario that ran from code inside the window
+    When the Scenario filter is opened
+    Then that scenario is offered under its name
+    And choosing it narrows the list by its key
+
+  @integration
+  Scenario: A run from code reads From code for its target and its scope
+    Given a set that runs from code
+    When its row and its runs are read
+    Then the scope reads "From code"
+    And the target reads "From code"
+
+  @integration
   Scenario: Choosing a run inside an opened row lands on its plan at that run
     Given a scenario row opened onto a run of the plan "Nightly"
     When that run is chosen

@@ -9,12 +9,12 @@ Feature: The wide run detail drawer
     sit side by side when the width allows. When it does not, the results stay
     stacked under the conversation, exactly as they are today.
 
-    The results read as a labelled "Status:" line at the top, followed by the
-    criteria split into a "Passed criteria" section over a "Failed criteria"
-    section. Each section is drawn only when it has rows. Within a section the
-    criteria keep the order the case declares them. Nothing there repeats the
-    chips at the top of the drawer: no success rate, no criteria count and no
-    duration.
+    The results read as the criteria split into a "Passed criteria" section
+    over a "Failed criteria" section, then a labelled "Verdict:" line under
+    them, then what the judge said. Each section is drawn only when it has
+    rows. Within a section the criteria keep the order the case declares them.
+    Nothing there repeats the chips at the top of the drawer: no success rate,
+    no criteria count and no duration.
 
     The messages carry no section heading of their own, and no line is drawn
     between them and the results. The results column is narrow, so the drawer
@@ -92,10 +92,11 @@ Feature: The wide run detail drawer
     And no line is drawn between the messages and the results
 
   @integration
-  Scenario: The results panel is headed with a Status line
+  Scenario: The verdict line reads under the criteria
     Given a finished run open in the drawer
     When the results panel is read
-    Then a "Status:" label is followed by "PASSED" in green or "FAILED" in red
+    Then a "Verdict:" label is followed by "PASSED" in green or "FAILED" in red
+    And it sits under the criteria and over the judge reasoning
     And it shows no success rate, no criteria count and no duration
     And there is no terminal log box
 
@@ -107,10 +108,10 @@ Feature: The wide run detail drawer
     And the passed criteria heading reads that same colour
 
   @integration
-  Scenario: A failed run reads FAILED in the Status line
+  Scenario: A failed run reads FAILED in the verdict line
     Given a failed run open in the drawer
     When the results panel is read
-    Then the status line reads "FAILED" in red
+    Then the verdict line reads "FAILED" in red
 
   @integration
   Scenario: What the judge said about the run as a whole reads last

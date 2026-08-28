@@ -31,7 +31,7 @@ import type {
   ResultsGroupBy,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { UNKNOWN_TARGET_KEY } from "~/server/app-layer/simulations/result-atoms/atom.types";
-import { type RunPlan, toExternalPlanSlug } from "./run-plans";
+import { CODE_RUN_LABEL, type RunPlan, toExternalPlanSlug } from "./run-plans";
 
 /** What the filter row asks of the list. */
 export type ResultFilters = {
@@ -101,6 +101,8 @@ export type ResultRow = {
   planSlug: string;
   planName: string;
   scenarioId: string;
+  /** What the scenario folds under, and what an opened scenario row is keyed by. */
+  scenarioKey: string;
   scenarioName: string;
   labels: string[];
   targetKey: string;
@@ -140,7 +142,10 @@ export function toResultRows({
       planSlug: plan?.slug ?? atom.planSlug,
       planName: plan?.name ?? atom.planSlug,
       scenarioId: atom.scenarioId,
-      scenarioName: facts?.name ?? atom.scenarioId,
+      scenarioKey: atom.scenarioKey,
+      // A stored scenario reads under its stored name; one that ran from code
+      // reads under the name its run carried.
+      scenarioName: facts?.name ?? atom.scenarioName ?? atom.scenarioId,
       labels: facts?.labels ?? [],
       targetKey: atom.targetKey,
       targetName: targetNameOf({ targetKey: atom.targetKey, targetNames }),
@@ -177,7 +182,9 @@ export function targetNameOf({
   targetKey: string;
   targetNames: Map<string, string>;
 }): string {
-  if (targetKey === UNKNOWN_TARGET_KEY) return "Unknown target";
+  // A run with no platform target was pointed at its agent by the code that
+  // pushed it, so it reads the way the scope of such a set reads.
+  if (targetKey === UNKNOWN_TARGET_KEY) return CODE_RUN_LABEL;
   return targetNames.get(targetKey) ?? targetKey;
 }
 

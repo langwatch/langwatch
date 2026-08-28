@@ -90,7 +90,7 @@ function EntryResult({
         boxSize="6px"
         borderRadius="full"
         flexShrink={0}
-        background={passRateColor(passRate)}
+        backgroundColor={passRateColor(passRate)}
         data-testid={`${testId}-result-dot`}
       />
       <PassRateText passRate={passRate} fontSize="10.5px" />

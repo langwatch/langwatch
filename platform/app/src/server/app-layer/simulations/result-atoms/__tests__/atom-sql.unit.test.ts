@@ -12,6 +12,7 @@ import {
   FAILED_STATUS_VALUES,
   groupKeyExpr,
   PASSED_STATUS_VALUES,
+  SCENARIO_KEY_EXPR,
   trendKeyExpr,
 } from "../atom-sql";
 
@@ -129,22 +130,38 @@ describe("buildAtomFilters", () => {
     });
   });
 
-  describe("when the filter names scenarios and sets", () => {
+  describe("when the filter names sets", () => {
     /**
-     * A run never moves between sets or scenarios, and ScenarioSetId is part
-     * of the dedup key already, so narrowing on them picks the same version
-     * either way. Keeping them in the subquery is what stops it grouping over
-     * the whole tenant.
+     * A run never moves between sets, and ScenarioSetId is part of the dedup
+     * key already, so narrowing on it picks the same version either way.
+     * Keeping it in the subquery is what stops it grouping over the whole
+     * tenant.
      */
     it("puts them where the dedup subquery can use them", () => {
       const filters = buildAtomFilters({
         ...base,
-        scenarioIds: ["s1"],
         scenarioSetIds: ["set-1"],
       });
 
-      expect(filters.stableClause).toContain("ScenarioId IN");
       expect(filters.stableClause).toContain("ScenarioSetId IN");
+    });
+  });
+
+  describe("when the filter names scenarios", () => {
+    /**
+     * A scenario is named by the key it folds under, and the name a run from
+     * code folds under can arrive with a later version of the run, so the
+     * key is read after dedup and never inside it.
+     */
+    it("reads the scenario key after dedup", () => {
+      const filters = buildAtomFilters({
+        ...base,
+        scenarioIds: ["s1"],
+      });
+
+      expect(filters.stableClause).not.toContain("ScenarioId IN");
+      expect(filters.volatileClause).toContain(SCENARIO_KEY_EXPR);
+      expect(filters.volatileClause).toContain("IN ({atomScenarioIds");
     });
   });
 

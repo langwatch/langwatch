@@ -1443,8 +1443,12 @@ describe("<RunsSidebarEntry/>", () => {
     // Both rates sit in the same band of the surface's scale, so the raw
     // gradient of a rate would give them two colours and the scale gives
     // them one.
-    expect(colorOf(ninetyText)).toBe(passRateColor(90));
-    expect(colorOf(sixtyText)).toBe(passRateColor(60));
+    // The scale answers a theme token; the element carries it as the
+    // variable the theme emits for it.
+    const tokenVar = (token: string) =>
+      `var(--chakra-colors-${token.replace(".", "-")})`;
+    expect(colorOf(ninetyText)).toBe(tokenVar(passRateColor(90)));
+    expect(colorOf(sixtyText)).toBe(tokenVar(passRateColor(60)));
     expect(colorOf(ninetyText)).toBe(colorOf(sixtyText));
 
     expect(backgroundOf(screen.getByTestId("entry-90-result-dot"))).toBe(

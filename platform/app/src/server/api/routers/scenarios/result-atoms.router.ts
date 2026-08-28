@@ -32,7 +32,30 @@ function toFilter(input: z.infer<typeof resultsFilterSchema>): ResultsFilter {
   };
 }
 
+/** The window alone: the scenario filter lists what the window holds. */
+const windowSchema = z.object({
+  projectId: z.string(),
+  startDate: z.number().int().nonnegative().optional(),
+  endDate: z.number().int().nonnegative().optional(),
+});
+
 export const resultAtomsRouter = createTRPCRouter({
+  /**
+   * The scenarios that ran from code inside the window, for the scenario
+   * filter. They have no row in Postgres, so the stored scenario list cannot
+   * name them.
+   */
+  getCodeScenarios: protectedProcedure
+    .input(windowSchema)
+    .permission("scenarios:view")
+    .query(async ({ input }) => {
+      return getApp().simulations.results.getCodeScenarios({
+        projectId: input.projectId,
+        startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+        endDate: input.endDate,
+      });
+    }),
+
   /**
    * The stat strip and the group rows for one grouping, aggregated in the
    * database.

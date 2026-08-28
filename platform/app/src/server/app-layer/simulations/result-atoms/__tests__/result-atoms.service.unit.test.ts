@@ -53,6 +53,7 @@ function makeRepo(data: FakeData) {
       .fn()
       .mockResolvedValue({ atoms: data.atoms ?? [], hasMore: false }),
     findRunOrdinals: vi.fn().mockResolvedValue([]),
+    findCodeScenarios: vi.fn().mockResolvedValue([]),
   } as unknown as ResultAtomsClickHouseRepository;
 }
 
@@ -71,6 +72,7 @@ function makePrisma({
 
 const group = (over: Partial<RawGroupRow> = {}): RawGroupRow => ({
   GroupKey: "key",
+  Name: "",
   Atoms: "2",
   Passed: "1",
   Settled: "2",
@@ -340,6 +342,29 @@ describe("getOverview", () => {
         subtitle: "checkout, beta",
       });
     });
+
+    /** @scenario "A group of runs pushed from code reads the name its runs carried" */
+    it("names a group the project holds no scenario for after the name its runs carried", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          groups: [
+            group({ GroupKey: "default-list-agents", Name: "List agents" }),
+          ],
+        }),
+        makePrisma({ scenarios: [] }),
+      );
+
+      const overview = await service.getOverview({
+        filter,
+        groupBy: "scenario",
+      });
+
+      expect(overview.groups[0]).toMatchObject({
+        key: "default-list-agents",
+        title: "List agents",
+        subtitle: null,
+      });
+    });
   });
 });
 
@@ -355,6 +380,8 @@ describe("getAtoms", () => {
         BatchRunId: "batch-1",
         ScenarioRunId: "run-1",
         ScenarioId: "scen-1",
+        ScenarioKey: "scen-1",
+        ScenarioName: "",
         Status: "SUCCESS",
         Outcome: "passed",
         RunAt: String(now),

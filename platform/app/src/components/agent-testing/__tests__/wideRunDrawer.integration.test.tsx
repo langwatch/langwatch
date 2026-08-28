@@ -296,7 +296,7 @@ describe("the wide run detail drawer", () => {
     const text = stacked.textContent ?? "";
     expect(text.indexOf("I want my money back")).toBeGreaterThanOrEqual(0);
     expect(text.indexOf("I want my money back")).toBeLessThan(
-      text.indexOf("Status:"),
+      text.indexOf("Verdict:"),
     );
   });
 
@@ -603,16 +603,28 @@ describe("the wide run detail drawer", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "The results panel is headed with a Status line" */
-  it("reads a Status line at the top and repeats nothing from the chip strip", () => {
+  /** @scenario "The verdict line reads under the criteria" */
+  it("reads a Verdict line under the criteria and repeats nothing from the chip strip", () => {
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
     const statusLine = within(panel).getByTestId("run-verdict-status-line");
-    expect(within(statusLine).getByText("Status:")).toBeInTheDocument();
+    expect(within(statusLine).getByText("Verdict:")).toBeInTheDocument();
     expect(
       within(statusLine).getByTestId("run-verdict-status-passed"),
     ).toHaveTextContent("PASSED");
+    // The verdict is what the criteria add up to, so it reads after them,
+    // and before the reasoning that explains it.
+    const text = panel.textContent ?? "";
+    expect(text.indexOf("Passed criteria")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Passed criteria")).toBeLessThan(
+      text.indexOf("Verdict:"),
+    );
+    if (text.includes("Judge reasoning")) {
+      expect(text.indexOf("Verdict:")).toBeLessThan(
+        text.indexOf("Judge reasoning"),
+      );
+    }
     expect(panel).not.toHaveTextContent(/LLM judge/i);
     expect(panel).not.toHaveTextContent(/success rate/i);
     expect(panel).not.toHaveTextContent("6.3s");
@@ -640,7 +652,7 @@ describe("the wide run detail drawer", () => {
     ).toHaveStyle({ color: passedColor });
   });
 
-  /** @scenario "A failed run reads FAILED in the Status line" */
+  /** @scenario "A failed run reads FAILED in the verdict line" */
   it("reads FAILED in red at the top of the panel on a failed run", () => {
     setRunState(
       makeRunState({

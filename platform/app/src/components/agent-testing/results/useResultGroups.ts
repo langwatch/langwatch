@@ -23,6 +23,7 @@ import type { Period, PeriodMode } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type {
+  CodeScenario,
   ResultAtom,
   ResultGroup,
   ResultTotals,
@@ -297,7 +298,7 @@ function groupRowsByKey({
   if (grouping !== "scenario" && grouping !== "target") return byKey;
 
   for (const row of rows) {
-    const key = grouping === "scenario" ? row.scenarioId : row.targetKey;
+    const key = grouping === "scenario" ? row.scenarioKey : row.targetKey;
     const held = byKey.get(key);
     if (held) held.push(row);
     else byKey.set(key, [row]);
@@ -351,17 +352,27 @@ function buildPlanRows({
  */
 function useResultFilterOptions({
   scenarios,
+  codeScenarios,
   targetNames,
 }: {
   scenarios: ScenarioSource[] | undefined;
+  /** The scenarios that ran from code inside the window, which the project holds no row for. */
+  codeScenarios: CodeScenario[] | undefined;
   targetNames: Map<string, string>;
 }) {
   const scenarioOptions = useMemo(
     () =>
-      (scenarios ?? [])
-        .map((scenario) => ({ value: scenario.id, label: scenario.name }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [scenarios],
+      [
+        ...(scenarios ?? []).map((scenario) => ({
+          value: scenario.id,
+          label: scenario.name,
+        })),
+        ...(codeScenarios ?? []).map((scenario) => ({
+          value: scenario.key,
+          label: scenario.name,
+        })),
+      ].sort((a, b) => a.label.localeCompare(b.label)),
+    [scenarios, codeScenarios],
   );
 
   const labelOptions = useMemo(() => {
@@ -418,8 +429,19 @@ export function useResultGroups({
     { enabled: !!project },
   );
 
+  // Read over the window alone, never through the filters: a scenario filter
+  // already in force must not hide the options that undo it.
+  const { data: codeScenarios } = api.scenarios.getCodeScenarios.useQuery(
+    { projectId, startDate: scope.startDate, endDate: scope.endDate },
+    { enabled: !!project },
+  );
+
   const targetNames = useTargetNameMap();
-  const options = useResultFilterOptions({ scenarios, targetNames });
+  const options = useResultFilterOptions({
+    scenarios,
+    codeScenarios,
+    targetNames,
+  });
 
   const rows = useNamedRows({
     atoms: atomPage.data?.atoms,

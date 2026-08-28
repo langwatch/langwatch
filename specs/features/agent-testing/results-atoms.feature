@@ -30,6 +30,45 @@ Feature: The results atom
     And it carries the id of the run and the number of that run
     And it carries the id and the name of the scenario
 
+  @integration
+  Scenario: A run pushed from code folds under its set and its name
+    Given two runs pushed from code named "List agents", each carrying an id the SDK made up
+    And both belong to the set "german"
+    When the atoms are read
+    Then both fold under the key "german-list-agents"
+    And the same name pushed in the set "english" folds under "english-list-agents"
+
+  @integration
+  Scenario: A run started on the platform folds under its scenario id
+    Given a run started on the platform against a stored scenario
+    When the atoms are read
+    Then it folds under that scenario's id, whatever its name
+
+  @integration
+  Scenario: A run pushed from code with no name keeps its id
+    Given a run pushed from code that carries no name
+    When the atoms are read
+    Then it folds under its own id
+
+  @integration
+  Scenario: An atom carries the name its run was given
+    Given a run pushed from code named "List agents"
+    When the atoms are read
+    Then the atom reads the name "List agents"
+
+  @integration
+  Scenario: A filter on scenarios keeps a scenario that ran from code by its key
+    Given runs pushed from code named "List agents" and "List prompts" in the set "default"
+    When the filter names "default-list-agents"
+    Then only the runs of "List agents" remain
+
+  @integration
+  Scenario: The scenarios that ran from code are listed for the filter
+    Given runs pushed from code named "List agents" and "List prompts", and a run started on the platform
+    When the scenarios that ran from code are read
+    Then "List agents" and "List prompts" are listed under their keys
+    And the platform run is not
+
   @unit
   Scenario: An atom names its scenario and leaves the folder and the labels out
     Given a run of a scenario that sits in a suite and carries two labels
@@ -189,6 +228,13 @@ Feature: The results atom
     Then one group is returned per plan
     And each group carries the name of its plan
     And each group carries its pass rate, its run count and its scenario count
+
+  @unit
+  Scenario: A group of runs pushed from code reads the name its runs carried
+    Given a group whose key names no stored scenario
+    And its runs carry the name "List agents"
+    When the overview is read
+    Then the group reads "List agents"
 
   @integration
   Scenario: The overview groups by scenario

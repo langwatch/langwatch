@@ -47,6 +47,9 @@ const mockPush = vi.hoisted(() =>
 );
 
 /** What the overview read answers, per grouping. */
+const codeScenarioState = vi.hoisted(() => ({
+  scenarios: [] as { key: string; name: string }[],
+}));
 const overviewState = vi.hoisted(() => ({
   byGroupBy: {} as Record<string, unknown>,
   lastInput: null as Record<string, unknown> | null,
@@ -95,6 +98,9 @@ vi.mock("~/utils/api", () => ({
             { id: "scen_2", name: "Track a parcel", labels: ["support"] },
           ],
         }),
+      },
+      getCodeScenarios: {
+        useQuery: () => ({ data: codeScenarioState.scenarios }),
       },
       getResultsOverview: {
         useQuery: (input: Record<string, unknown>) => {
@@ -217,6 +223,8 @@ function makeAtom(overrides: Record<string, unknown> = {}) {
     trigger: "app",
     note: null,
     scenarioId: "scen_1",
+    scenarioKey: "scen_1",
+    scenarioName: null,
     targetKey: "agent_dev",
     status: "SUCCESS",
     outcome: "passed",
@@ -313,6 +321,7 @@ describe("the toolbar of the Results tab", () => {
     atomState.lastInput = null;
     overviewState.lastInput = null;
     onSelectRun.mockClear();
+    codeScenarioState.scenarios = [];
   });
 
   afterEach(() => {
@@ -579,6 +588,118 @@ describe("the toolbar of the Results tab", () => {
         within(opened).getByTestId("results-run-line-exec_2"),
       ).toBeInTheDocument();
       expect(atomState.lastInput?.scenarioIds).toEqual(["scen_1"]);
+    });
+
+    /** @scenario "A scenario that ran from code reads its name and folds its runs" */
+    it("reads a scenario that ran from code under its name, with every run of that name behind it", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.scenario = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({ key: "default-list-agents", title: "list agents" }),
+        ],
+      };
+      // Two runs of one scenario, each under the id the SDK made up for it.
+      atomState.atoms = [
+        makeAtom({
+          executionId: "exec_a",
+          planSlug: "default",
+          scenarioId: "scenario_3I9HVcj",
+          scenarioKey: "default-list-agents",
+          scenarioName: "list agents",
+          targetKey: "unknown",
+        }),
+        makeAtom({
+          executionId: "exec_b",
+          planSlug: "default",
+          runId: "batch_2",
+          scenarioId: "scenario_3I9BXN1",
+          scenarioKey: "default-list-agents",
+          scenarioName: "list agents",
+          targetKey: "unknown",
+        }),
+      ];
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Scenario" }));
+
+      const row = await screen.findByTestId(
+        "results-group-row-default-list-agents",
+      );
+      expect(row).toHaveTextContent("list agents");
+      expect(row).not.toHaveTextContent("scenario_3I9");
+
+      await user.click(row);
+      const opened = await screen.findByTestId(
+        "results-group-expanded-default-list-agents",
+      );
+      expect(
+        within(opened).getByTestId("results-run-line-exec_a"),
+      ).toBeInTheDocument();
+      expect(
+        within(opened).getByTestId("results-run-line-exec_b"),
+      ).toBeInTheDocument();
+      expect(atomState.lastInput?.scenarioIds).toEqual(["default-list-agents"]);
+    });
+
+    /** @scenario "The Scenario filter lists the scenarios that ran from code" */
+    it("offers a scenario that ran from code in the Scenario filter, by its key", async () => {
+      const user = userEvent.setup();
+      codeScenarioState.scenarios = [
+        { key: "default-list-agents", name: "list agents" },
+      ];
+      renderList();
+
+      await user.click(screen.getByTestId("results-filter-scenario"));
+      await user.click(
+        await screen.findByRole("menuitemcheckbox", { name: /list agents/i }),
+      );
+
+      expect(overviewState.lastInput?.scenarioIds).toEqual([
+        "default-list-agents",
+      ]);
+    });
+
+    /** @scenario "A run from code reads From code for its target and its scope" */
+    it("reads From code as the scope and the target of a set that runs from code", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.plan = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({
+            key: "default",
+            targetKeys: ["unknown"],
+            lastRunAt: NOW,
+          }),
+        ],
+      };
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [makeGroup({ key: "unknown", title: "unknown" })],
+      };
+      renderList({
+        externalSets: [
+          {
+            scenarioSetId: "default",
+            passedCount: 1,
+            failedCount: 0,
+            totalCount: 1,
+            lastRunTimestamp: NOW,
+          },
+        ],
+      });
+
+      const row = screen.getByTestId("run-plan-row-external:default");
+      expect(within(row).getByTestId("plan-scope")).toHaveTextContent(
+        "From code",
+      );
+      expect(row).not.toHaveTextContent(/unknown/i);
+      expect(row).not.toHaveTextContent(/whatever/i);
+
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+      const target = await screen.findByTestId("results-group-row-unknown");
+      expect(target).toHaveTextContent("From code");
+      expect(target).not.toHaveTextContent(/unknown/i);
     });
 
     /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */

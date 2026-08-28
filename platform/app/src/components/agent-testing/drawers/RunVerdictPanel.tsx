@@ -58,7 +58,7 @@ const HEADING_LINE_HEIGHT = "14px";
  * space over its heading is the widest of the panel and the space under its
  * paragraph is narrower than that.
  */
-const SPACE_ABOVE_CRITERIA = 3.5;
+const SPACE_ABOVE_VERDICT = 5;
 const SPACE_BELOW_CRITERIA = 6;
 const SPACE_BELOW_REASONING = 3.5;
 
@@ -111,9 +111,11 @@ function PanelHeading({
 }
 
 /**
- * The labelled status line at the top of the panel. It reads the run status
- * as a single word: PASSED in green when the run met every criterion, FAILED
- * in red when the judge missed one.
+ * The labelled verdict line under the criteria. It reads the run status as a
+ * single word: PASSED in green when the run met every criterion, FAILED in
+ * red when the judge missed one. It sits under the criteria because it is
+ * what they add up to, and over the reasoning because that is what explains
+ * it.
  */
 function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
   const word =
@@ -125,9 +127,14 @@ function VerdictStatusLine({ status }: { status: ScenarioRunStatus }) {
   if (!word) return null;
   const color = word === "PASSED" ? PASSED_COLOR : FAILED_COLOR;
   return (
-    <HStack gap={2} alignItems="baseline" data-testid="run-verdict-status-line">
+    <HStack
+      gap={2}
+      alignItems="baseline"
+      marginTop={SPACE_ABOVE_VERDICT}
+      data-testid="run-verdict-status-line"
+    >
       <Text fontSize="12px" color={FG_MUTED}>
-        Status:
+        Verdict:
       </Text>
       <Text
         fontSize="13px"
@@ -303,12 +310,7 @@ export function RunVerdictPanel({
       paddingBottom={SPACE_BELOW_REASONING}
       data-testid="run-verdict-panel"
     >
-      <VerdictStatusLine status={status} />
-      <VStack
-        align="stretch"
-        gap={SPACE_BETWEEN_SECTIONS}
-        marginTop={SPACE_ABOVE_CRITERIA}
-      >
+      <VStack align="stretch" gap={SPACE_BETWEEN_SECTIONS}>
         {error ? (
           <Text
             fontSize="11.5px"
@@ -339,6 +341,7 @@ export function RunVerdictPanel({
           </Text>
         ) : null}
       </VStack>
+      <VerdictStatusLine status={status} />
       {reasoningError ? (
         <JudgeErrorPanel pretty={reasoningError.pretty} />
       ) : reasoning ? (

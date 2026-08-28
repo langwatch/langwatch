@@ -10,6 +10,7 @@ import type {
   AtomCost,
   AtomCostSource,
   AtomOutcome,
+  CodeScenario,
   ResultAtom,
   ResultGroup,
   ResultsFilter,
@@ -96,6 +97,31 @@ export class ResultAtomsService {
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
     };
+  }
+
+  /**
+   * The scenarios that ran from code inside the window, for the scenario
+   * filter. Read over the window alone: a scenario filter already in force
+   * must not hide the options that undo it.
+   */
+  async getCodeScenarios({
+    projectId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<CodeScenario[]> {
+    const rows = await this.repository.findCodeScenarios({
+      projectId,
+      startDate,
+      endDate,
+    });
+    return rows.map((row) => ({
+      key: row.ScenarioKey,
+      name: row.Name !== "" ? row.Name : row.ScenarioKey,
+    }));
   }
 
   /** The stat strip and the group rows, both cut by the same filter. */
@@ -327,6 +353,8 @@ function toAtom({
     trigger: row.Trigger === "app" ? "app" : "code",
     note: row.Note === "" ? null : row.Note,
     scenarioId: row.ScenarioId,
+    scenarioKey: row.ScenarioKey,
+    scenarioName: row.ScenarioName === "" ? null : row.ScenarioName,
     targetKey: row.TargetKey,
     status: mapStatus(row.Status),
     outcome: row.Outcome as AtomOutcome,
@@ -368,6 +396,15 @@ function toGroup({
   };
 }
 
+/**
+ * The name a group reads under when the project holds no scenario for it: a
+ * scenario that ran from code has no row to read, so it reads under the name
+ * its runs carried, and under its key when they carried none.
+ */
+function carriedName(row: RawGroupRow): string {
+  return row.Name !== "" ? row.Name : row.GroupKey;
+}
+
 function headline({
   row,
   groupBy,
@@ -381,7 +418,7 @@ function headline({
     const found = titles.byId.get(row.GroupKey);
     return {
       key: row.GroupKey,
-      title: found?.title ?? row.GroupKey,
+      title: found?.title ?? carriedName(row),
       subtitle: found?.subtitle === "" ? null : (found?.subtitle ?? null),
     };
   }

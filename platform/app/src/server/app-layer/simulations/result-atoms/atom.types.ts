@@ -60,6 +60,14 @@ export interface ResultAtom {
   /** The note of the run, or null. Never part of a plan's configuration. */
   note: string | null;
   scenarioId: string;
+  /**
+   * The key the scenario folds under: its id for a run started on the
+   * platform, its set and its name for a run pushed from code, whose id the
+   * SDK made up for that one run.
+   */
+  scenarioKey: string;
+  /** The name the run carries, or null when it carries none. */
+  scenarioName: string | null;
   /** The bare `targetReferenceId`, or {@link UNKNOWN_TARGET_KEY}. */
   targetKey: string;
   status: ScenarioRunStatus;
@@ -94,6 +102,13 @@ export interface SeriesBucket {
 }
 
 export type ResultsGroupBy = "plan" | "scenario" | "target" | "none";
+
+/** One scenario that ran from code, as the scenario filter lists it. */
+export interface CodeScenario {
+  /** The key its runs fold under, and what the scenario filter takes. */
+  key: string;
+  name: string;
+}
 
 export interface ResultGroup {
   /** planSlug, scenarioId, targetKey or executionId, following `groupBy`. */

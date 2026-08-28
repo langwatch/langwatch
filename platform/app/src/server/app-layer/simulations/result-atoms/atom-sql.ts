@@ -76,6 +76,34 @@ export const TARGET_KEY_EXPR = `if(${TARGET_REF_EXPR} = '', 'unknown', ${TARGET_
  */
 export const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
 
+/**
+ * The set a run belongs to, the empty id read as `default` the way every
+ * other read of a set that runs from code does.
+ */
+export const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
+
+/**
+ * A run's name as a key: lower case, every stretch of anything but a letter
+ * or a digit folded to one dash, no dash at either end. "List agents" and
+ * "list-agents" are one scenario.
+ */
+export const NAME_SLUG_EXPR = `trim(BOTH '-' FROM replaceRegexpAll(lowerUTF8(ifNull(Name, '')), '[^\\p{L}\\p{N}]+', '-'))`;
+
+/**
+ * The key a scenario folds under.
+ *
+ * A run started on the platform names a stored scenario, and that id is the
+ * key. A run pushed from code carries an id the SDK made up for that one run
+ * unless the code set one, so two runs of one scenario would never fold on it;
+ * its key is built from its set and its name instead, the id the SDK would
+ * have derived: `german-list-agents`. A code run with no name keeps its id,
+ * since there is nothing else to fold it on.
+ *
+ * The filter on scenarios reads this same key, so an opened row asks for the
+ * runs it shows and a stored scenario is still found by its id.
+ */
+export const SCENARIO_KEY_EXPR = `if(${TARGET_REF_EXPR} = '' AND ${NAME_SLUG_EXPR} != '', concat(${SET_KEY_EXPR}, '-', ${NAME_SLUG_EXPR}), ScenarioId)`;
+
 const TRACE_METRIC_KEYS = "JSONExtractKeys(TraceMetricsJson)";
 
 /**
@@ -128,7 +156,7 @@ export function groupKeyExpr(groupBy: ResultsGroupBy): string {
     case "plan":
       return "ScenarioSetId";
     case "scenario":
-      return "ScenarioId";
+      return SCENARIO_KEY_EXPR;
     case "target":
       return TARGET_KEY_EXPR;
     case "none":
@@ -171,9 +199,9 @@ export const DEDUP_WINDOW_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface AtomFilterSql {
   /**
-   * Predicates safe inside the dedup subquery: a run never moves between sets
-   * or scenarios, and `ScenarioSetId` is part of the dedup key already, so
-   * narrowing on them picks the same version either way.
+   * Predicates safe inside the dedup subquery: a run never moves between
+   * sets, and `ScenarioSetId` is part of the dedup key already, so narrowing
+   * on it picks the same version either way.
    */
   stableClause: string;
   /**
@@ -207,11 +235,6 @@ function stableFilterParts(filter: ResultsFilter): FilterParts {
     params.atomSetIds = filter.scenarioSetIds.flatMap((setId) =>
       expandSetIdFilter(setId),
     );
-  }
-
-  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
-    parts.push("ScenarioId IN ({atomScenarioIds:Array(String)})");
-    params.atomScenarioIds = filter.scenarioIds;
   }
 
   return { parts, params };
@@ -255,6 +278,13 @@ function volatileFilterParts(filter: ResultsFilter): FilterParts {
   if (filter.targetKeys && filter.targetKeys.length > 0) {
     parts.push(`${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`);
     params.atomTargetKeys = filter.targetKeys;
+  }
+
+  // A scenario is named by its key, and the name a code run folds under can
+  // arrive with a later version of the run, so the key is read after dedup.
+  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
+    parts.push(`${SCENARIO_KEY_EXPR} IN ({atomScenarioIds:Array(String)})`);
+    params.atomScenarioIds = filter.scenarioIds;
   }
 
   return { parts, params };

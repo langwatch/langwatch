@@ -145,12 +145,17 @@ function GroupSummaryRow({
   isScenario,
   isOpen,
   onToggleOpen,
+  resolveTargetName,
 }: {
   group: ResultGroup;
   isScenario: boolean;
   isOpen: boolean;
   onToggleOpen: (key: string) => void;
+  resolveTargetName: (targetKey: string) => string;
 }) {
+  // A target group is keyed by a reference id, and the read leaves naming it
+  // to the client, which holds the names of the agents and the prompts.
+  const title = isScenario ? group.title : resolveTargetName(group.key);
   return (
     <ResultsTableRow
       columns={GROUP_COLUMNS}
@@ -168,7 +173,7 @@ function GroupSummaryRow({
           </Box>
         ) : null}
         <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-          {group.title}
+          {title}
         </Text>
       </HStack>
 
@@ -298,6 +303,7 @@ export function GroupedRowsTable({
               isScenario={isScenario}
               isOpen={openedKeys.includes(group.key)}
               onToggleOpen={onToggleOpen}
+              resolveTargetName={resolveTargetName}
             />
 
             {openedKeys.includes(group.key) ? (

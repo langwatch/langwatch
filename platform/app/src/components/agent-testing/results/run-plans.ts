@@ -145,6 +145,12 @@ export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
 }
 
 /** The address segment an external set is opened by. */
+/**
+ * How a set that runs from code reads wherever a plan states its scope or its
+ * target. The code chose both, so both read the same way.
+ */
+export const CODE_RUN_LABEL = "From code";
+
 export function toExternalPlanSlug(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
 }
@@ -246,7 +252,7 @@ export function buildRunPlans({
     suiteId: null,
     caseCount: null,
     lastRun: toLastRun(set),
-    scopeLabel: "Whatever the code ran",
+    scopeLabel: CODE_RUN_LABEL,
     scopeKind: "external" as const,
   }));
 
@@ -277,7 +283,7 @@ export function resolveRunPlan({
       suiteId: null,
       caseCount: null,
       lastRun: null,
-      scopeLabel: "Whatever the code ran",
+      scopeLabel: CODE_RUN_LABEL,
       scopeKind: "external",
     };
   }
