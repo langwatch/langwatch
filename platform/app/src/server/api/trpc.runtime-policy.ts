@@ -1,3 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import {
   isSpanContextValid,
   context as otelContext,
@@ -9,17 +13,13 @@ import {
 } from "@opentelemetry/api";
 import { TRPCError } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import { HandledError } from "@langwatch/handled-error";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { createLogger } from "@langwatch/observability";
-import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
-import { appTrpcRoot } from "./trpc.root";
 import { trpcFailureTraceIds } from "./trpc.failure-trace";
+import { appTrpcRoot } from "./trpc.root";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -61,41 +61,44 @@ export const enforcePermissionCheck = appTrpcRoot.middleware(({ ctx, next }) => 
   return next();
 });
 
-const auditLogTRPCErrors = appTrpcRoot.middleware(async ({ ctx, next, path, type, input }) => {
-  const result = await next();
-  if (
-    (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
-    !result.ok &&
-    result.error instanceof TRPCError &&
-    result.error.code !== "INTERNAL_SERVER_ERROR" &&
-    ctx.session?.user.id
-  ) {
-    const scopeIds = auditScopeIds(input);
-    await auditLog({
-      userId: ctx.session.user.id,
-      organizationId: scopeIds.organizationId,
-      projectId: scopeIds.projectId,
-      action: path,
-      // Through the same redaction as the success path. This middleware
-      // sits before the input parser, so `input` is unset here today; the
-      // call is what keeps a chain that changes from storing in clear what
-      // the other middleware takes out.
-      args: redactAuditArgs({ input, action: path }),
-      error: result.error,
-      req: ctx.req,
-      // When an admin is impersonating, `session.user.id` reflects the
-      // impersonated user (correct for RBAC attribution). We stamp the
-      // real admin's identity in metadata so security forensics can
-      // filter on `metadata.impersonatorId` to find actions that were
-      // actually performed by an admin.
-      metadata: ctx.session.user.impersonator
-        ? { impersonatorId: ctx.session.user.impersonator.id }
-        : undefined,
-    });
-  }
+const auditLogTRPCErrors = appTrpcRoot.middleware(
+  async ({ ctx, next, path, type, input, getRawInput }) => {
+    const result = await next();
+    if (
+      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
+      !result.ok &&
+      result.error instanceof TRPCError &&
+      result.error.code !== "INTERNAL_SERVER_ERROR" &&
+      ctx.session?.user.id
+    ) {
+      const auditedInput = input ?? (await getRawInput());
+      const scopeIds = auditScopeIds(auditedInput);
+      await auditLog({
+        userId: ctx.session.user.id,
+        organizationId: scopeIds.organizationId,
+        projectId: scopeIds.projectId,
+        action: path,
+        // Through the same redaction as the success path. This middleware sits
+        // ahead of the input parser, so tRPC hands it no parsed `input`;
+        // reading the raw input is what puts the arguments, project and
+        // organization on a failed call's row instead of leaving them blank.
+        args: redactAuditArgs({ input: auditedInput, action: path }),
+        error: result.error,
+        req: ctx.req,
+        // When an admin is impersonating, `session.user.id` reflects the
+        // impersonated user (correct for RBAC attribution). We stamp the
+        // real admin's identity in metadata so security forensics can
+        // filter on `metadata.impersonatorId` to find actions that were
+        // actually performed by an admin.
+        metadata: ctx.session.user.impersonator
+          ? { impersonatorId: ctx.session.user.impersonator.id }
+          : undefined,
+      });
+    }
 
-  return result;
-});
+    return result;
+  },
+);
 
 /**
  * Pull the resource ID + kind from a tRPC mutation result so the audit
@@ -239,6 +242,17 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "httpProxy.execute": ["templateVariables"],
 };
 
+/**
+ * Action paths whose input holds a credential directly in a field, rather than
+ * inside an object. `redactObjectField` deliberately ignores a plain string, so
+ * these would otherwise be stored as typed. `value` is an ordinary word other
+ * mutations use for harmless things, so the rule is bound to the action.
+ */
+const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "secrets.create": ["value"],
+  "secrets.update": ["value"],
+};
+
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(Object.keys(source).map((name) => [name, "[redacted]"]));
@@ -311,6 +325,10 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
     if (value !== undefined) replace(field, value);
   }
 
+  for (const field of (action ? REDACTED_SCALAR_FIELDS_BY_ACTION[action] : undefined) ?? []) {
+    if (record[field] !== undefined) replace(field, "[redacted]");
+  }
+
   if (Array.isArray(record.extraHeaders)) {
     replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
@@ -319,22 +337,29 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
 }
 
 export const auditLogMutations = appTrpcRoot.middleware(
-  async ({ ctx, next, type, path, input }) => {
+  async ({ ctx, next, type, path, input, getRawInput }) => {
     if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
       return next();
     }
 
     const result = await next();
 
+    // Package-owned routers mount this on the procedure the process hands
+    // them, so it sits ahead of their own `.input()`, and tRPC threads a
+    // parsed `input` forward only from a parser that already ran. Without the
+    // fallback every such mutation audits with no arguments, no project and
+    // no organization. Platform routers parse first and never reach it.
+    const auditedInput = input ?? (await getRawInput());
+
     const target = result.ok ? deriveAuditTarget(path, result.data) : {};
-    const scopeIds = auditScopeIds(input);
+    const scopeIds = auditScopeIds(auditedInput);
 
     await auditLog({
       userId: ctx.session.user.id,
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,
       action: path,
-      args: redactAuditArgs({ input, action: path }),
+      args: redactAuditArgs({ input: auditedInput, action: path }),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,

@@ -22,6 +22,8 @@ import { auditLog } from "~/runtime/app/features/audit-log";
 
 import { createTRPCRouter } from "../trpc";
 import { protectedProcedure } from "../trpc.permission-builder";
+import { appTrpcRoot } from "../trpc.root";
+import { auditLogMutations } from "../trpc.runtime-policy";
 
 const mockAuditLog = vi.mocked(auditLog);
 
@@ -41,6 +43,19 @@ const testRouter = createTRPCRouter({
       .input(runInput)
       .use(grantPermission as any)
       .mutation(async () => ({ scheduled: true })),
+  }),
+  // The shape a package-owned router mounts: the process hands the feature a
+  // procedure already carrying the audit middleware, and the feature adds its
+  // own `.input()` afterwards. `protectedProcedure` is the other way round —
+  // its builder installs the middleware after the parser — so this is the only
+  // arrangement that exercises the pre-parse case. Secret is a real mount of
+  // this shape, and the one whose input holds a credential in a bare field.
+  secrets: createTRPCRouter({
+    create: appTrpcRoot.procedure
+      .use(grantPermission as any)
+      .use(auditLogMutations)
+      .input(z.object({ projectId: z.string(), name: z.string(), value: z.string() }))
+      .mutation(async () => ({ id: "secret-1" })),
   }),
   scenarios: createTRPCRouter({
     // A query at a path the rules cover, so the error middleware is the one
@@ -91,6 +106,37 @@ describe("audit middlewares", () => {
           parameters: { api_token: "[redacted]", region: "[redacted]" },
         });
         expect(JSON.stringify(recordedArgs())).not.toContain("tok-live-1");
+      });
+    });
+
+    describe("when the mutation is mounted the way a feature package mounts it", () => {
+      // The audit middleware sits ahead of the package's own `.input()`, so it
+      // is handed no parsed input and has to read the raw one. Without that,
+      // every package-mounted mutation audits with no arguments and no scope.
+      it("records the arguments and the project it acted on", async () => {
+        await caller().secrets.create({
+          projectId: "proj-1",
+          name: "OPENAI_API_KEY",
+          value: "sk-live-1",
+        });
+
+        expect(mockAuditLog).toHaveBeenCalledTimes(1);
+        expect(mockAuditLog.mock.calls[0]?.[0]?.projectId).toBe("proj-1");
+        expect(recordedArgs()).toMatchObject({ projectId: "proj-1", name: "OPENAI_API_KEY" });
+      });
+
+      // Recovering the arguments is only safe if the credential in them is
+      // dropped. The name is kept — "which secret was set" is the point of the
+      // row — and the value never reaches the table.
+      it("keeps the secret's name and never its value", async () => {
+        await caller().secrets.create({
+          projectId: "proj-1",
+          name: "OPENAI_API_KEY",
+          value: "sk-live-1",
+        });
+
+        expect(recordedArgs()).toMatchObject({ value: "[redacted]" });
+        expect(JSON.stringify(recordedArgs())).not.toContain("sk-live-1");
       });
     });
 
