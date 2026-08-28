@@ -12,6 +12,18 @@ import {
 import { resolveEvaluationExecutionConfig } from "~/runtime/evaluation-execution.config";
 import { resolveScenarioChildParentEnvironment } from "~/runtime/worker/scenario-child-parent.config";
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
+import { resolveStripeRuntimeConfig } from "~/runtime/app/stripe.runtime";
+
+describe("Stripe process configuration", () => {
+  it("keeps the established SDK policy with the validated secret key", () => {
+    expect(resolveStripeRuntimeConfig({ STRIPE_SECRET_KEY: "sk_test_process" })).toEqual({
+      secretKey: "sk_test_process",
+      apiVersion: "2024-04-10",
+      maxNetworkRetries: 1,
+      telemetry: true,
+    });
+  });
+});
 
 describe("Gateway virtual-key process configuration", () => {
   beforeEach(() => {
@@ -37,6 +49,40 @@ describe("Gateway virtual-key process configuration", () => {
       "configured-virtual-key-pepper-32-bytes",
     );
   });
+});
+
+describe("Mailer private process configuration", () => {
+  beforeEach(() => {
+    resetEnvironmentConfigForTests();
+  });
+
+  afterEach(() => {
+    resetEnvironmentConfigForTests();
+    initializeEnvironmentConfig(process.env);
+  });
+
+  it.each(["web", "worker", "all"] as const)(
+    "projects one immutable mail gateway for the %s process role",
+    (processRole) => {
+      initializeEnvironmentConfig({
+        NODE_ENV: "test",
+        BUILD_TIME: "1",
+        SKIP_ENV_VALIDATION: "1",
+        BASE_HOST: "https://tenant.example.test",
+        EMAIL_PROVIDER: "resend",
+        RESEND_API_KEY: "re_test",
+      });
+
+      expect(createAppConfigFromEnv({ processRole })).toMatchObject({
+        processRole,
+        mailer: {
+          defaultFrom: "LangWatch <mailer@tenant.example.test>",
+          provider: "resend",
+          resend: { apiKey: "re_test" },
+        },
+      });
+    },
+  );
 });
 
 describe("Evaluation execution process configuration", () => {

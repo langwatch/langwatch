@@ -1,4 +1,3 @@
-export { StripeClientAdapter } from "./adapters/stripe.stripe.adapter";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter";
 export {
   ClickHouseBillingAdapter,

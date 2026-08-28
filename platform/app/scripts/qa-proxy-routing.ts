@@ -18,7 +18,7 @@ import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
 import { AppAwsClientConfiguration } from "../src/runtime/app/aws-client.composition";
 import { AppMailerRuntime } from "../src/runtime/app/mailer.runtime";
-import { resolveMailerConfiguration } from "../src/server/mailer/mailer.config";
+import { resolveAppMailerConfiguration } from "../src/runtime/app/mailer.private-config";
 import { EmailProviderConfigurationError } from "../src/server/mailer/providers/types";
 import { isProxyBypassed, parseOutboundProxyConfig } from "../src/server/outboundProxy";
 
@@ -27,21 +27,9 @@ const PROXY_PORT = 8888;
 const outboundProxy = parseOutboundProxyConfig(process.env);
 const aws = AppAwsClientConfiguration.create(outboundProxy);
 const mailer = AppMailerRuntime.create({
-  configuration: resolveMailerConfiguration({
-    baseHost: process.env.BASE_HOST ?? "http://localhost",
-    emailDefaultFrom: process.env.EMAIL_DEFAULT_FROM,
-    emailProvider: process.env.EMAIL_PROVIDER,
-    useAwsSes: process.env.USE_AWS_SES,
-    awsRegion: process.env.AWS_REGION,
-    awsSesEndpoint: process.env.AWS_SES_ENDPOINT,
-    sendgridApiKey: process.env.SENDGRID_API_KEY,
-    smtpUrl: process.env.SMTP_URL,
-    smtpHost: process.env.SMTP_HOST,
-    smtpPort: process.env.SMTP_PORT,
-    smtpUser: process.env.SMTP_USER,
-    smtpPassword: process.env.SMTP_PASSWORD,
-    smtpSecure: process.env.SMTP_SECURE,
-    resendApiKey: process.env.RESEND_API_KEY,
+  configuration: resolveAppMailerConfiguration({
+    ...process.env,
+    BASE_HOST: process.env.BASE_HOST ?? "http://localhost",
   }),
   aws,
   outboundProxy,

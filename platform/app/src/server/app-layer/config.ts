@@ -34,7 +34,8 @@ import { z } from "zod";
 import { poolSizingFromEnv, type PoolSizingInput } from "@langwatch/clickhouse-client";
 import type { GroupQueuePolicy } from "@langwatch/group-queue";
 import { PRIVATE_CH_ENV_PREFIX, parseRouteKey } from "../clickhouse/privateRouteKey";
-import { resolveMailerConfiguration } from "../mailer/mailer.config";
+import { resolveAppMailerConfiguration } from "~/runtime/app/mailer.private-config";
+import { resolveStripeRuntimeConfig, type StripeRuntimeConfig } from "~/runtime/app/stripe.runtime";
 import type { MailerConfiguration } from "../mailer/providers/types";
 import { createLogger } from "@langwatch/observability";
 
@@ -162,6 +163,8 @@ export interface AppConfig {
   outboundProxy: OutboundProxyConfig;
   /** Private, immutable configuration for the process-owned outbound mailer. */
   mailer: MailerConfiguration;
+  /** SDK policy for the process-owned Stripe client, composed only in SaaS mode. */
+  stripe: StripeRuntimeConfig;
 
   // Services
   /** Typed configuration for the process-owned Langevals evaluator transport. */
@@ -272,22 +275,8 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     redisDbIndex: env.REDIS_DB_INDEX,
     groupQueue,
     outboundProxy: parseOutboundProxyConfig(process.env),
-    mailer: resolveMailerConfiguration({
-      baseHost,
-      emailDefaultFrom: env.EMAIL_DEFAULT_FROM,
-      emailProvider: env.EMAIL_PROVIDER,
-      useAwsSes: env.USE_AWS_SES,
-      awsRegion: env.AWS_REGION,
-      awsSesEndpoint: env.AWS_SES_ENDPOINT,
-      sendgridApiKey: env.SENDGRID_API_KEY,
-      smtpUrl: env.SMTP_URL,
-      smtpHost: env.SMTP_HOST,
-      smtpPort: env.SMTP_PORT,
-      smtpUser: env.SMTP_USER,
-      smtpPassword: env.SMTP_PASSWORD,
-      smtpSecure: env.SMTP_SECURE,
-      resendApiKey: env.RESEND_API_KEY,
-    }),
+    mailer: resolveAppMailerConfiguration(env),
+    stripe: resolveStripeRuntimeConfig({ STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY }),
     langevals: resolveLangevalsRuntimeConfig(env),
     tracePrivacy: resolveTracePrivacyRuntimeConfig(
       {

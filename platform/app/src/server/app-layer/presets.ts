@@ -44,7 +44,6 @@ import {
   PostgresBillingAdapter,
   SaaSPlanProviderService,
   SeatEventSubscriptionService,
-  StripeClientAdapter,
   StripeCustomerCurrencyService,
   StripeErrorAdapter,
   StripeUsageReportingService,
@@ -157,6 +156,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { AppRedisRuntime } from "~/runtime/app/redis.runtime";
+import { AppStripeRuntime, resolveStripeRuntimeConfig } from "~/runtime/app/stripe.runtime";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
 import { resolveNlpLambdaRuntimeConfig } from "~/runtime/api/nlp-lambda";
@@ -276,7 +276,7 @@ import {
 import { AppMailerRuntime } from "~/runtime/app/mailer.runtime";
 import { AppLangevalsRuntime } from "~/runtime/app/langevals.runtime";
 import { resolveLangevalsRuntimeConfig } from "~/runtime/langevals.config";
-import { resolveMailerConfiguration } from "~/server/mailer/mailer.config";
+import { resolveAppMailerConfiguration } from "~/runtime/app/mailer.private-config";
 import { configureProcessOutboundProxy } from "~/server/outboundProxy";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { StoredObjectOwnerLookupRuntime } from "@langwatch/stored-object-server";
@@ -1301,11 +1301,9 @@ export function initializeDefaultApp(options?: DefaultAppCompositionOptions): Ap
   let billingCustomer: CustomerService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
   let webhookService: WebhookService | undefined;
-  let stripeClient: StripeClientAdapter["client"] | undefined;
+  let stripeClient: AppStripeRuntime["client"] | undefined;
   if (config.isSaas) {
-    stripeClient = StripeClientAdapter.create({
-      secretKey: env.STRIPE_SECRET_KEY,
-    }).client;
+    stripeClient = AppStripeRuntime.create(config.stripe).client;
     usageReportingService = StripeUsageReportingService.create({
       stripe: stripeClient,
       meterId: billingCatalogue.meters.BILLABLE_EVENTS,
@@ -2635,9 +2633,8 @@ export function createTestApp(
       payloadCodec: "json",
     },
     outboundProxy: {},
-    mailer: resolveMailerConfiguration({
-      baseHost: "http://localhost:5560",
-    }),
+    mailer: resolveAppMailerConfiguration({ BASE_HOST: "http://localhost:5560" }),
+    stripe: resolveStripeRuntimeConfig({}),
     langevals: resolveLangevalsRuntimeConfig({}),
     tracePrivacy: resolveTracePrivacyRuntimeConfig({
       googleDlpDisabled: true,
