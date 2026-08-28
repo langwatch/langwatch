@@ -7,6 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.post_api_suites_by_id_duplicate_response_201_kind import PostApiSuitesByIdDuplicateResponse201Kind
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_suites_by_id_duplicate_response_201_scope_type_0 import (
@@ -36,42 +37,43 @@ class PostApiSuitesByIdDuplicateResponse201:
         id (str):
         name (str):
         slug (str):
-        kind (PostApiSuitesByIdDuplicateResponse201Kind): custom is a hand-assembled run plan; folder is a test suite
-            that groups scenarios filed into it.
         description (None | str):
         scenario_ids (list[str]):
-        scope (None | PostApiSuitesByIdDuplicateResponse201ScopeType0 | PostApiSuitesByIdDuplicateResponse201ScopeType1
-            | PostApiSuitesByIdDuplicateResponse201ScopeType2 | PostApiSuitesByIdDuplicateResponse201ScopeType3): What the
-            run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the
-            cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every
-            run, so a scenario written later runs without editing the plan.
         targets (list[PostApiSuitesByIdDuplicateResponse201TargetsItem]):
         repeat_count (float):
         labels (list[str]):
         created_at (str):
         updated_at (str):
         platform_url (str):
+        kind (PostApiSuitesByIdDuplicateResponse201Kind | Unset): custom is a hand-assembled run plan; folder is a test
+            suite that groups scenarios filed into it. Absent on servers that predate test suites.
+        scope (None | PostApiSuitesByIdDuplicateResponse201ScopeType0 | PostApiSuitesByIdDuplicateResponse201ScopeType1
+            | PostApiSuitesByIdDuplicateResponse201ScopeType2 | PostApiSuitesByIdDuplicateResponse201ScopeType3 | Unset):
+            What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites),
+            labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved
+            again at every run, so a scenario written later runs without editing the plan.
     """
 
     id: str
     name: str
     slug: str
-    kind: PostApiSuitesByIdDuplicateResponse201Kind
     description: None | str
     scenario_ids: list[str]
-    scope: (
-        None
-        | PostApiSuitesByIdDuplicateResponse201ScopeType0
-        | PostApiSuitesByIdDuplicateResponse201ScopeType1
-        | PostApiSuitesByIdDuplicateResponse201ScopeType2
-        | PostApiSuitesByIdDuplicateResponse201ScopeType3
-    )
     targets: list[PostApiSuitesByIdDuplicateResponse201TargetsItem]
     repeat_count: float
     labels: list[str]
     created_at: str
     updated_at: str
     platform_url: str
+    kind: PostApiSuitesByIdDuplicateResponse201Kind | Unset = UNSET
+    scope: (
+        None
+        | PostApiSuitesByIdDuplicateResponse201ScopeType0
+        | PostApiSuitesByIdDuplicateResponse201ScopeType1
+        | PostApiSuitesByIdDuplicateResponse201ScopeType2
+        | PostApiSuitesByIdDuplicateResponse201ScopeType3
+        | Unset
+    ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -94,24 +96,10 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         slug = self.slug
 
-        kind = self.kind.value
-
         description: None | str
         description = self.description
 
         scenario_ids = self.scenario_ids
-
-        scope: dict[str, Any] | None
-        if isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType0):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType1):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType2):
-            scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType3):
-            scope = self.scope.to_dict()
-        else:
-            scope = self.scope
 
         targets = []
         for targets_item_data in self.targets:
@@ -128,6 +116,24 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         platform_url = self.platform_url
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        scope: dict[str, Any] | None | Unset
+        if isinstance(self.scope, Unset):
+            scope = UNSET
+        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType2):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesByIdDuplicateResponse201ScopeType3):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -135,10 +141,8 @@ class PostApiSuitesByIdDuplicateResponse201:
                 "id": id,
                 "name": name,
                 "slug": slug,
-                "kind": kind,
                 "description": description,
                 "scenarioIds": scenario_ids,
-                "scope": scope,
                 "targets": targets,
                 "repeatCount": repeat_count,
                 "labels": labels,
@@ -147,6 +151,10 @@ class PostApiSuitesByIdDuplicateResponse201:
                 "platformUrl": platform_url,
             }
         )
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if scope is not UNSET:
+            field_dict["scope"] = scope
 
         return field_dict
 
@@ -175,8 +183,6 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         slug = d.pop("slug")
 
-        kind = PostApiSuitesByIdDuplicateResponse201Kind(d.pop("kind"))
-
         def _parse_description(data: object) -> None | str:
             if data is None:
                 return data
@@ -186,6 +192,30 @@ class PostApiSuitesByIdDuplicateResponse201:
 
         scenario_ids = cast(list[str], d.pop("scenarioIds"))
 
+        targets = []
+        _targets = d.pop("targets")
+        for targets_item_data in _targets:
+            targets_item = PostApiSuitesByIdDuplicateResponse201TargetsItem.from_dict(targets_item_data)
+
+            targets.append(targets_item)
+
+        repeat_count = d.pop("repeatCount")
+
+        labels = cast(list[str], d.pop("labels"))
+
+        created_at = d.pop("createdAt")
+
+        updated_at = d.pop("updatedAt")
+
+        platform_url = d.pop("platformUrl")
+
+        _kind = d.pop("kind", UNSET)
+        kind: PostApiSuitesByIdDuplicateResponse201Kind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = PostApiSuitesByIdDuplicateResponse201Kind(_kind)
+
         def _parse_scope(
             data: object,
         ) -> (
@@ -194,8 +224,11 @@ class PostApiSuitesByIdDuplicateResponse201:
             | PostApiSuitesByIdDuplicateResponse201ScopeType1
             | PostApiSuitesByIdDuplicateResponse201ScopeType2
             | PostApiSuitesByIdDuplicateResponse201ScopeType3
+            | Unset
         ):
             if data is None:
+                return data
+            if isinstance(data, Unset):
                 return data
             try:
                 if not isinstance(data, dict):
@@ -234,43 +267,27 @@ class PostApiSuitesByIdDuplicateResponse201:
                 | PostApiSuitesByIdDuplicateResponse201ScopeType0
                 | PostApiSuitesByIdDuplicateResponse201ScopeType1
                 | PostApiSuitesByIdDuplicateResponse201ScopeType2
-                | PostApiSuitesByIdDuplicateResponse201ScopeType3,
+                | PostApiSuitesByIdDuplicateResponse201ScopeType3
+                | Unset,
                 data,
             )
 
-        scope = _parse_scope(d.pop("scope"))
-
-        targets = []
-        _targets = d.pop("targets")
-        for targets_item_data in _targets:
-            targets_item = PostApiSuitesByIdDuplicateResponse201TargetsItem.from_dict(targets_item_data)
-
-            targets.append(targets_item)
-
-        repeat_count = d.pop("repeatCount")
-
-        labels = cast(list[str], d.pop("labels"))
-
-        created_at = d.pop("createdAt")
-
-        updated_at = d.pop("updatedAt")
-
-        platform_url = d.pop("platformUrl")
+        scope = _parse_scope(d.pop("scope", UNSET))
 
         post_api_suites_by_id_duplicate_response_201 = cls(
             id=id,
             name=name,
             slug=slug,
-            kind=kind,
             description=description,
             scenario_ids=scenario_ids,
-            scope=scope,
             targets=targets,
             repeat_count=repeat_count,
             labels=labels,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            kind=kind,
+            scope=scope,
         )
 
         post_api_suites_by_id_duplicate_response_201.additional_properties = d

@@ -11,7 +11,7 @@ export async function handleCreateScenario(params: {
   situation: string;
   criteria?: string[];
   labels?: string[];
-  folderId?: string | null;
+  testSuiteId?: string | null;
 }): Promise<string> {
   const result = await apiCreateScenario(params);
 
@@ -26,8 +26,8 @@ export async function handleCreateScenario(params: {
   if (Array.isArray(result.labels) && result.labels.length > 0) {
     lines.push(`**Labels**: ${result.labels.join(", ")}`);
   }
-  if (result.folderId) {
-    lines.push(`**Test suite**: ${result.folderId}`);
+  if (result.testSuiteId) {
+    lines.push(`**Test suite**: ${result.testSuiteId}`);
   }
 
   return lines.join("\n");

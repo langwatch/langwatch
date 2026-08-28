@@ -17,7 +17,7 @@ import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { RunDialogController } from "./useRunDialogSubmit";
 
-/** What the run control reads, given how many cases the subject covers. */
+/** What the run control reads, given how many scenarios the subject covers. */
 export function runButtonLabel(caseCount: number | null): string {
   if (caseCount === null) return "Run";
   return caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;

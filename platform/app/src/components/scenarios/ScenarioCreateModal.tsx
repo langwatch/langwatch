@@ -23,10 +23,10 @@ export interface ScenarioCreateModalProps {
   /** Called when modal is closed */
   onClose: () => void;
   /**
-   * The test suite the new case is filed in. Absent leaves the case unfiled,
+   * The test suite the new scenario is filed in. Absent leaves the scenario unfiled,
    * which is what every surface outside Agent Testing wants.
    */
-  folderId?: string | null;
+  testSuiteId?: string | null;
   /** Which editor the draft opens in. Absent opens the v1 editor. */
   variant?: ScenarioEditorVariant;
 }
@@ -69,7 +69,7 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 export function ScenarioCreateModal({
   open,
   onClose,
-  folderId,
+  testSuiteId,
   variant,
 }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
@@ -95,20 +95,20 @@ export function ScenarioCreateModal({
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {
       const initialData: ScenarioInitialData = {
-        initialFormData: folderId ? { ...formData, folderId } : formData,
+        initialFormData: testSuiteId ? { ...formData, testSuiteId } : formData,
       };
       openDrawer(
         "scenarioEditor",
         {
           ...initialData,
-          ...(folderId ? { folderId } : {}),
+          ...(testSuiteId ? { testSuiteId } : {}),
           ...(variant ? { variant } : {}),
         },
         { resetStack: true },
       );
       onClose();
     },
-    [openDrawer, onClose, folderId, variant],
+    [openDrawer, onClose, testSuiteId, variant],
   );
 
   const handleGenerate = useCallback(

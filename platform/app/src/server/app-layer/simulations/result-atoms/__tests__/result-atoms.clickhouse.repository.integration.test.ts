@@ -14,6 +14,7 @@ import {
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { ResultsFilter } from "../atom.types";
 import {
+  MAX_CODE_TARGETS,
   MAX_TREND_POINTS,
   ResultAtomsClickHouseRepository,
 } from "../result-atoms.clickhouse.repository";
@@ -40,6 +41,7 @@ function makeRow({
   archivedAt = null,
   durationMs = "1500",
   name = "Refund Flow",
+  agents,
 }: {
   scenarioId?: string;
   scenarioRunId?: string;
@@ -57,10 +59,13 @@ function makeRow({
   archivedAt?: Date | null;
   durationMs?: string | null;
   name?: string | null;
+  /** What the code that pushed the run reported about who took part in it. */
+  agents?: { name: string; role: "agent" | "user" | "judge" }[];
 }) {
   const metadata: Record<string, unknown> = {};
   if (targetReferenceId) metadata.langwatch = { targetReferenceId };
   if (note) metadata.note = note;
+  if (agents) metadata.agents = agents;
 
   return {
     ProjectionId: `proj-${nanoid()}`,
@@ -773,6 +778,153 @@ describe("filters", () => {
 
       expect(atoms).toHaveLength(1);
       expect(atoms[0]?.ScenarioRunId).toBe(failedRunId);
+    });
+  });
+});
+
+describe("the target of a run that reports its agents", () => {
+  const reported = [
+    { name: "AcmeSupportAgent", role: "agent" as const },
+    { name: "UserSimulatorAgent", role: "user" as const },
+    { name: "JudgeAgent", role: "judge" as const },
+  ];
+
+  describe("given a run pushed from code that reports an agent", () => {
+    /** @scenario "A run that reports its agents names its target by the agent it tested" */
+    it("keys the target by the agent name and leaves the simulator and the judge out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms).toHaveLength(1);
+      expect(atoms[0]?.TargetKey).toBe("code:acmesupportagent");
+      expect(atoms[0]?.TargetName).toBe("AcmeSupportAgent");
+      expect(atoms[0]?.Trigger).toBe("code");
+    });
+  });
+
+  describe("given two runs that report the same agent", () => {
+    /** @scenario "Two runs of one agent name fold under one target" */
+    it("folds them under one target group", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "target",
+      });
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0]?.GroupKey).toBe("code:acmesupportagent");
+      expect(groups[0]?.TargetName).toBe("AcmeSupportAgent");
+      expect(groups[0]?.Atoms).toBe("2");
+    });
+  });
+
+  describe("given a run that reports no agent", () => {
+    /** @scenario "A run that reports no agent stays under the unknown target" */
+    it("keeps it under the unknown key with no target name", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "UserSimulatorAgent", role: "user" }],
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.TargetKey).toBe("unknown");
+      expect(atoms[0]?.TargetName).toBe("");
+    });
+  });
+
+  describe("given a run started on the platform that also reports an agent", () => {
+    /** @scenario "A run started on the platform keeps its platform target" */
+    it("keeps the reference id the platform stamped", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          agents: reported,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.TargetKey).toBe("agent_dev");
+      expect(atoms[0]?.Trigger).toBe("app");
+    });
+  });
+});
+
+describe("findCodeTargets", () => {
+  describe("given runs from code, one naming no agent, and a platform run", () => {
+    /** @scenario "The targets named by runs from code are listed for the filter" */
+    it("lists the named agents in name order and leaves the rest out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "AcmeSupportAgent", role: "agent" }],
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "AcmeBillingAgent", role: "agent" }],
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          agents: [{ name: "PlatformAgent", role: "agent" }],
+        }),
+      ]);
+
+      const rows = await repo.findCodeTargets(
+        baseFilter({ scenarioSetIds: [setId] }),
+      );
+
+      expect(rows).toEqual([
+        { TargetKey: "code:acmebillingagent", Name: "AcmeBillingAgent" },
+        { TargetKey: "code:acmesupportagent", Name: "AcmeSupportAgent" },
+      ]);
+      expect(rows.length).toBeLessThanOrEqual(MAX_CODE_TARGETS);
     });
   });
 });

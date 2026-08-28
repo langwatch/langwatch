@@ -1,5 +1,5 @@
 /**
- * What sits under the cases panel header: the skeleton, an empty state, or the
+ * What sits under the scenarios panel header: the skeleton, an empty state, or the
  * table of scenarios. The bulk selection action bar lives here too, so the
  * selection state does not leak into the tab model.
  *

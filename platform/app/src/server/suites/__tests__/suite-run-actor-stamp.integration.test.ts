@@ -48,7 +48,7 @@ async function createHttpAgent(): Promise<Agent> {
   });
 }
 
-/** A suite of two cases against one agent, ready to run. */
+/** A suite of two scenarios against one agent, ready to run. */
 async function createRunnableSuite() {
   const first = await scenarioService.create({
     projectId,

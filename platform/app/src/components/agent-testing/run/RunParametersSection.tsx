@@ -2,9 +2,9 @@
  * The parameter overrides of a run: one line for the plain values, or one row
  * per parameter once a value must stay hidden.
  *
- * The line is the small case and stays the default. The "Secret parameters"
+ * The line is the simple case and stays the default. The "Secret parameters"
  * toggle turns it into rows, where every row carries a lock, and the secrets
- * the cases declare join the same list.
+ * the scenarios declare join the same list.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
@@ -22,7 +22,7 @@ import type { RunDialogForm } from "./useRunDialogForm";
 export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";
 
 const PARAMETERS_HELP =
-  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same case as a free or a pro customer, in another locale, or on another model.";
+  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
 /** Why the toggle cannot go back once a row holds a credential. */
 export const LOCKED_IN_ROWS_MESSAGE =

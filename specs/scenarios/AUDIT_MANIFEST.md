@@ -11,9 +11,9 @@ audit: they describe behavior being built now, not legacy debt.
 
 | File | Tagging | Note |
 |------|---------|------|
-| scenario-folder-assignment.feature | all bound tags | Bound as WS1 and WS2 land. |
+| scenario-test-suite-assignment.feature | all bound tags | Bound as WS1 and WS2 land. |
 | scenario-versioning.feature | all bound tags | Bound. The editor-reload clause of the stale-save scenario is a frontend surface (WS4). |
-| scenario-version-on-runs.feature | all bound tags | Stamping scenarios bound. The three run-drawer scenarios are a frontend surface (WS4). "A one-off run of a single case records that case version" is bound in simulation-runner.router.unit.test.ts: the stamp decision lives in the router, and the queue-time version read is integration-covered by scenario-versioning.integration.test.ts. |
+| scenario-version-on-runs.feature | all bound tags | Stamping scenarios bound. The three run-drawer scenarios are a frontend surface (WS4). "A one-off run of a single scenario records that scenario version" is bound in simulation-runner.router.unit.test.ts: the stamp decision lives in the router, and the queue-time version read is integration-covered by scenario-versioning.integration.test.ts. |
 | scenario-version-restore.feature | all bound tags | Restore shipped; the `@unimplemented` tags are removed and every scenario is bound. |
 
 ## TL;DR

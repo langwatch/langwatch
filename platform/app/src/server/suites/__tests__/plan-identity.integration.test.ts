@@ -35,18 +35,18 @@ let queueSimulationRun: Mock<(data: QueueRunCommandData) => Promise<void>>;
 let suiteService: SuiteService;
 const scenarioService = ScenarioService.create(prisma);
 
-async function createCase(name: string, folderId?: string) {
+async function createCase(name: string, testSuiteId?: string) {
   return scenarioService.create({
     projectId,
     name,
     situation: "A customer asks for help",
     criteria: ["The agent helps"],
     labels: [],
-    ...(folderId !== undefined && { folderId }),
+    ...(testSuiteId !== undefined && { testSuiteId }),
   });
 }
 
-/** A case whose run needs a credential supplied when the run starts. */
+/** A scenario whose run needs a credential supplied when the run starts. */
 async function createSecretCase(name: string) {
   return scenarioService.create({
     projectId,
@@ -74,7 +74,7 @@ async function createHttpAgent(): Promise<Agent> {
   });
 }
 
-/** Starts a run under a name, with the pieces every case here needs. */
+/** Starts a run under a name, with the pieces every scenario here needs. */
 async function runUnderName(params: {
   name: string;
   scope: SuiteScope;
@@ -106,7 +106,7 @@ async function runUnderName(params: {
 
 async function plansNamed(name: string) {
   return prisma.simulationSuite.findMany({
-    where: { projectId, kind: "custom", name, archivedAt: null },
+    where: { projectId, kind: "run_plan", name, archivedAt: null },
   });
 }
 
@@ -170,13 +170,13 @@ describe("a run of one scenario", () => {
 
       const first = await runUnderName({
         name,
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [testCase.id],
         targets: [{ type: "http", referenceId: agent.id }],
       });
       const second = await runUnderName({
         name,
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [testCase.id],
         targets: [{ type: "http", referenceId: agent.id }],
       });
@@ -214,13 +214,13 @@ describe("a run of one scenario", () => {
 
       const first = await runUnderName({
         name: "Angry refund request prod-agent",
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [testCase.id],
         targets: [{ type: "http", referenceId: prod.id }],
       });
       const second = await runUnderName({
         name: "Angry refund request dev-agent",
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [testCase.id],
         targets: [{ type: "http", referenceId: dev.id }],
       });
@@ -270,7 +270,7 @@ describe("resolving a run plan by name", () => {
     it("takes a numbered slug when the name's slug is already used", async () => {
       await createCase("One");
       const agent = await createHttpAgent();
-      await suiteService.createFolder({ projectId, name: "Nightly" });
+      await suiteService.createTestSuite({ projectId, name: "Nightly" });
 
       await runUnderName({
         name: "Nightly",
@@ -288,17 +288,17 @@ describe("resolving a run plan by name", () => {
     /** @scenario "A run whose name matches a plan joins it and replaces its config" */
     it("joins the plan and replaces its config", async () => {
       await createCase("One");
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await createCase("Two", folder.id);
+      await createCase("Two", testSuite.id);
       const dev = await createHttpAgent();
       const prod = await createHttpAgent();
 
       const first = await runUnderName({
         name: "Nightly",
-        scope: { mode: "folders", folderIds: [folder.id] },
+        scope: { mode: "test_suites", testSuiteIds: [testSuite.id] },
         targets: [{ type: "http", referenceId: dev.id }],
       });
       const second = await runUnderName({
@@ -334,7 +334,7 @@ describe("resolving a run plan by name", () => {
       expect(second.suiteId).toBe(first.suiteId);
       expect(second.created).toBe(false);
       // The plan keeps the spelling it was created with. A match made without
-      // regard to case must not rename it to the caller's spelling.
+      // regard to scenario must not rename it to the caller's spelling.
       expect(await plansNamed("Nightly")).toHaveLength(1);
       expect(second.planName).toBe("Nightly");
     });
@@ -343,16 +343,16 @@ describe("resolving a run plan by name", () => {
     /** @scenario "Replacing a plan's config keeps its slug" */
     it("keeps the plan's name and slug when its config is replaced", async () => {
       await createCase("One");
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      await createCase("Two", folder.id);
+      await createCase("Two", testSuite.id);
       const agent = await createHttpAgent();
 
       const first = await runUnderName({
         name: "Nightly",
-        scope: { mode: "folders", folderIds: [folder.id] },
+        scope: { mode: "test_suites", testSuiteIds: [testSuite.id] },
         targets: [{ type: "http", referenceId: agent.id }],
       });
       const slugBefore = (await plansNamed("Nightly"))[0]!.slug;
@@ -404,13 +404,13 @@ describe("resolving a run plan by name", () => {
 
     /** @scenario "A run started with no name is named after its scope and targets" */
     it("names a run that sends no name after its scope and its targets", async () => {
-      const refunds = await suiteService.createFolder({
+      const refunds = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      // A second suite keeps the scope a folders scope: naming every suite of
+      // A second suite keeps the scope a test suites scope: naming every suite of
       // the project is the same thing as "all scenarios".
-      await suiteService.createFolder({ projectId, name: "Checkout" });
+      await suiteService.createTestSuite({ projectId, name: "Checkout" });
       await createCase("One", refunds.id);
       const first = await createHttpAgent();
       const second = await createHttpAgent();
@@ -423,7 +423,7 @@ describe("resolving a run plan by name", () => {
         projectId,
         organizationId,
         config: {
-          scope: { mode: "folders", folderIds: [refunds.id] },
+          scope: { mode: "test_suites", testSuiteIds: [refunds.id] },
           targets,
         },
         idempotencyKey: `run-${nanoid(6)}`,
@@ -445,7 +445,7 @@ describe("resolving a run plan by name", () => {
         projectId,
         organizationId,
         config: {
-          scope: { mode: "folders", folderIds: [refunds.id] },
+          scope: { mode: "test_suites", testSuiteIds: [refunds.id] },
           targets,
         },
         idempotencyKey: `run-${nanoid(6)}`,
@@ -456,11 +456,11 @@ describe("resolving a run plan by name", () => {
       expect(await plansNamed(expected)).toHaveLength(1);
     });
 
-    /** @scenario "A folder-kind suite does not answer to a run plan name" */
-    it("ignores a folder of the same name", async () => {
+    /** @scenario "A test suite does not answer to a run plan name" */
+    it("ignores a test suite of the same name", async () => {
       await createCase("One");
       const agent = await createHttpAgent();
-      const folder = await suiteService.createFolder({
+      const testSuite = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
@@ -472,11 +472,11 @@ describe("resolving a run plan by name", () => {
       });
 
       expect(result.created).toBe(true);
-      expect(result.suiteId).not.toBe(folder.id);
+      expect(result.suiteId).not.toBe(testSuite.id);
       const unchanged = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
-      expect(unchanged?.kind).toBe("folder");
+      expect(unchanged?.kind).toBe("test_suite");
       expect(unchanged?.targets).toEqual([]);
     });
 
@@ -487,7 +487,7 @@ describe("resolving a run plan by name", () => {
       const ephemeral = await suiteService.create({
         projectId,
         name: "CLI run",
-        kind: "custom",
+        kind: "run_plan",
         scenarioIds: [],
         targets: [],
         repeatCount: 1,
@@ -535,19 +535,19 @@ describe("resolving a run plan by name", () => {
     /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
     it("stores the scope as all, so it lands where Run all lands", async () => {
       const agent = await createHttpAgent();
-      const refunds = await suiteService.createFolder({
+      const refunds = await suiteService.createTestSuite({
         projectId,
         name: "Refunds",
       });
-      // Creating this one without a folder makes the project's Default suite.
+      // Creating this one without a test suite makes the project's Default suite.
       const loose = await createCase("One");
       await createCase("Two", refunds.id);
 
       const everything = await runUnderName({
         name: "Nightly",
         scope: {
-          mode: "folders",
-          folderIds: [refunds.id, loose.folderId!],
+          mode: "test_suites",
+          testSuiteIds: [refunds.id, loose.testSuiteId!],
         },
         targets: [{ type: "http", referenceId: agent.id }],
       });
@@ -582,7 +582,7 @@ describe("resolving a run plan by name", () => {
       ).rejects.toMatchObject({ code: "validation_error" });
 
       const plans = await prisma.simulationSuite.findMany({
-        where: { projectId, kind: "custom" },
+        where: { projectId, kind: "run_plan" },
       });
       expect(plans).toHaveLength(0);
       expect(startSuiteRun).not.toHaveBeenCalled();
@@ -603,7 +603,7 @@ describe("resolving a run plan by name", () => {
       await expect(
         runUnderName({
           name: "Billing nightly",
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           scenarioIds: [secretCase.id],
           targets: [{ type: "http", referenceId: agent.id }],
         }),
@@ -619,7 +619,7 @@ describe("resolving a run plan by name", () => {
       const dev = await createHttpAgent();
       await runUnderName({
         name: "Nightly",
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [first.id],
         targets: [{ type: "http", referenceId: dev.id }],
       });
@@ -630,7 +630,7 @@ describe("resolving a run plan by name", () => {
       await expect(
         runUnderName({
           name: "Nightly",
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           scenarioIds: [secretCase.id],
           targets: [{ type: "http", referenceId: prod.id }],
           repeatCount: 3,
@@ -662,8 +662,8 @@ describe("resolving a run plan by name", () => {
       expect(startSuiteRun).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A run refused for covering no case creates no plan" */
-    it("creates no plan when the scope covers no case", async () => {
+    /** @scenario "A run refused for covering no scenario creates no plan" */
+    it("creates no plan when the scope covers no scenario", async () => {
       await createCase("One");
       const agent = await createHttpAgent();
 
@@ -686,7 +686,7 @@ describe("resolving a run plan by name", () => {
 
       const result = await runUnderName({
         name: "Billing nightly",
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [secretCase.id],
         targets: [{ type: "http", referenceId: agent.id }],
         parameters: { api_token: "a-token" },
@@ -759,7 +759,7 @@ describe("when runs of one name start together", () => {
       Array.from({ length: 4 }, () =>
         runUnderName({
           name,
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           scenarioIds: [testCase.id],
           targets: [{ type: "http", referenceId: agent.id }],
         }),

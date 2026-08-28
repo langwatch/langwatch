@@ -7,6 +7,7 @@ import { ScenarioRunStatus } from "../scenario-event.enums";
 import {
   batchRunIdSchema,
   langwatchMetadataSchema,
+  scenarioAgentSchema,
   scenarioEventSchema,
   scenarioIdSchema,
   scenarioMessageSnapshotSchema,
@@ -55,6 +56,8 @@ export const runDataSchema = z.object({
        * @see specs/suites/run-note-metadata-convention.feature
        */
       note: z.string().optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough()

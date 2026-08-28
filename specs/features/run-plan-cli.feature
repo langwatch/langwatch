@@ -25,7 +25,7 @@ Feature: Run Plan CLI Commands
   @unit
   Scenario: Run the scenarios filed in a test suite
     Given my project has a test suite "Refunds"
-    When I run "langwatch run-plan run --suite Refunds --target http:agent_abc"
+    When I run "langwatch run-plan run --test-suite Refunds --target http:agent_abc"
     Then the test suite name is resolved to its ID
     And the run is scheduled with a scope of that test suite
 
@@ -39,7 +39,7 @@ Feature: Run Plan CLI Commands
   Scenario: Run named scenarios
     Given my project has scenarios "scenario_1" and "scenario_2"
     When I run "langwatch run-plan run --scenario scenario_1 --scenario scenario_2 --target http:agent_abc"
-    Then the run is scheduled with a scope of the named cases
+    Then the run is scheduled with a scope of the named scenarios
     And the two scenario IDs travel with the configuration
 
   @unit
@@ -94,7 +94,7 @@ Feature: Run Plan CLI Commands
   @unit
   Scenario: Run with no scope flag
     When I run "langwatch run-plan run --target http:agent_abc"
-    Then I see an error that one of --all, --suite, --label or --scenario is needed
+    Then I see an error that one of --all, --test-suite, --label or --scenario is needed
     And no run is scheduled
 
   @unit
@@ -116,9 +116,15 @@ Feature: Run Plan CLI Commands
     And no run is scheduled
 
   @unit
-  Scenario: Run a suite name that names nothing
+  Scenario: The old --suite flag is still accepted
+    When I run "langwatch run-plan run --help"
+    Then "--test-suite" is listed
+    And "--suite" is still read, and is not listed
+
+  @unit
+  Scenario: Run a test suite name that names nothing
     Given my project has no test suite named "Refunds"
-    When I run "langwatch run-plan run --suite Refunds --target http:agent_abc"
+    When I run "langwatch run-plan run --test-suite Refunds --target http:agent_abc"
     Then I see an error that the test suite was not found
     And no run is scheduled
 

@@ -119,7 +119,7 @@ export class AllTargetsArchivedError extends SuiteDomainError {
  * Thrown when a run is requested for a suite that has no target at all.
  *
  * Distinct from {@link AllTargetsArchivedError}: that one says the targets the
- * suite had are gone, this one says none were ever chosen. A folder starts
+ * suite had are gone, this one says none were ever chosen. A test suite starts
  * with no targets and gets them from the run dialog, so this is the expected
  * first-run state, not a broken reference.
  */
@@ -138,10 +138,10 @@ export class SuiteTargetsRequiredError extends SuiteDomainError {
 /**
  * Thrown when a run plan's scope covers no scenario at all.
  *
- * Distinct from {@link AllScenariosArchivedError}: that one says the cases the
+ * Distinct from {@link AllScenariosArchivedError}: that one says the scenarios the
  * plan named are archived, this one says the rule the plan carries matches
  * nothing right now, which a new label or an emptied test suite can cause
- * without any case being archived.
+ * without any scenario being archived.
  */
 export class SuiteScopeEmptyError extends SuiteDomainError {
   declare readonly code: "suite_scope_empty";

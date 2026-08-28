@@ -16,11 +16,11 @@ import {
 /**
  * The kinds of SimulationSuite.
  *
- * "custom" is a hand-assembled run plan; "folder" is a suite that groups
- * scenarios through Scenario.folderId. A string column plus this const union,
- * not a Prisma enum: adding a kind must not need a database migration.
+ * "run_plan" is a hand-assembled plan; "test_suite" is a suite that groups
+ * scenarios through Scenario.testSuiteId. A string column plus this const
+ * union, not a Prisma enum: adding a kind must not need a database migration.
  */
-export const SUITE_KINDS = ["folder", "custom"] as const;
+export const SUITE_KINDS = ["test_suite", "run_plan"] as const;
 export type SuiteKind = (typeof SUITE_KINDS)[number];
 
 /** Type guard: narrows a stored string to SuiteKind. */

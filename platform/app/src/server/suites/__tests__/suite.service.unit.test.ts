@@ -19,7 +19,7 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "proj_1",
     name: "Test Suite",
     slug: "test-suite",
-    kind: "custom",
+    kind: "run_plan",
     scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
@@ -53,7 +53,7 @@ function makeMockRepository(
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
     findNamesByIds: vi.fn(async () => []),
-    // No plan answers to a name unless a case says one does.
+    // No plan answers to a name unless a scenario says one does.
     findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
     archive: vi.fn(),
@@ -66,7 +66,7 @@ type MockScenarioRepository = {
   findNamesByIds: ReturnType<typeof vi.fn>;
   findActiveNamesByIds: ReturnType<typeof vi.fn>;
   findRunConfigByIds: ReturnType<typeof vi.fn>;
-  findManyByFolder: ReturnType<typeof vi.fn>;
+  findManyByTestSuite: ReturnType<typeof vi.fn>;
   findAll: ReturnType<typeof vi.fn>;
 };
 
@@ -99,7 +99,7 @@ function makeMockScenarioRepository(
         version: 1,
       })),
     ),
-    findManyByFolder: vi.fn(async () => []),
+    findManyByTestSuite: vi.fn(async () => []),
     findAll: vi.fn(async () => []),
     ...overrides,
   };
@@ -1203,7 +1203,7 @@ describe("SuiteService", () => {
 
   describe("getAll()", () => {
     describe("when the caller names no kind", () => {
-      /** @scenario "A caller that names no kind of suite gets custom run plans only" */
+      /** @scenario "A caller that names no kind of suite gets run plans only" */
       it("asks the repository for custom suites only", async () => {
         const { service, suiteRepo } = createService();
         suiteRepo.findAll.mockResolvedValue([makeSuite()]);
@@ -1212,7 +1212,7 @@ describe("SuiteService", () => {
 
         expect(suiteRepo.findAll).toHaveBeenCalledWith({
           projectId: "proj_1",
-          kinds: ["custom"],
+          kinds: ["run_plan"],
         });
       });
     });
@@ -1223,12 +1223,12 @@ describe("SuiteService", () => {
 
         await service.getAll({
           projectId: "proj_1",
-          kinds: ["folder", "custom"],
+          kinds: ["test_suite", "run_plan"],
         });
 
         expect(suiteRepo.findAll).toHaveBeenCalledWith({
           projectId: "proj_1",
-          kinds: ["folder", "custom"],
+          kinds: ["test_suite", "run_plan"],
         });
       });
     });
@@ -1241,23 +1241,23 @@ describe("SuiteService", () => {
         await service.getAll({ projectId: "proj_1" });
         expect(suiteRepo.findAll).toHaveBeenCalledWith({
           projectId: "proj_1",
-          kinds: ["custom"],
+          kinds: ["run_plan"],
         });
 
         await service.getAll({ projectId: "proj_1", includeArchived: true });
         expect(suiteRepo.findAll).toHaveBeenLastCalledWith({
           projectId: "proj_1",
-          kinds: ["custom"],
+          kinds: ["run_plan"],
           includeArchived: true,
         });
       });
     });
   });
 
-  describe("getFolderDetail()", () => {
-    describe("given a folder holding active and archived cases", () => {
-      /** @scenario "A folder reads back with the cases filed in it" */
-      it("names every active case in the order the folder holds them", async () => {
+  describe("getTestSuiteDetail()", () => {
+    describe("given a test suite holding active and archived scenarios", () => {
+      /** @scenario "A test suite reads back with the scenarios filed in it" */
+      it("names every active scenario in the order the test suite holds them", async () => {
         const { service, suiteRepo } = createService({
           scenarioRepository: {
             findActiveNamesByIds: vi.fn().mockResolvedValue([
@@ -1268,16 +1268,16 @@ describe("SuiteService", () => {
         });
         suiteRepo.findById.mockResolvedValue(
           makeSuite({
-            id: "folder_1",
-            kind: "folder",
+            id: "test_suite_1",
+            kind: "test_suite",
             name: "Refunds",
             scenarioIds: ["scen_1", "scen_2", "scen_archived"],
           }),
         );
 
-        const detail = await service.getFolderDetail({
+        const detail = await service.getTestSuiteDetail({
           projectId: "proj_1",
-          folderId: "folder_1",
+          testSuiteId: "test_suite_1",
         });
 
         expect(detail.name).toBe("Refunds");
@@ -1288,29 +1288,29 @@ describe("SuiteService", () => {
       });
     });
 
-    describe("given the id names a custom run plan", () => {
+    describe("given the id names a run plan", () => {
       it("refuses with suite_not_found", async () => {
         const { service, suiteRepo } = createService();
-        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "custom" }));
+        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "run_plan" }));
 
         await expect(
-          service.getFolderDetail({
+          service.getTestSuiteDetail({
             projectId: "proj_1",
-            folderId: "suite_abc123",
+            testSuiteId: "suite_abc123",
           }),
         ).rejects.toMatchObject({ code: "suite_not_found" });
       });
     });
   });
 
-  describe("createFolder()", () => {
+  describe("createTestSuite()", () => {
     describe("when the name is only spaces", () => {
-      /** @scenario "A folder created with a blank name is rejected with validation_error" */
+      /** @scenario "A test suite created with a blank name is rejected with validation_error" */
       it("rejects with validation_error and stores nothing", async () => {
         const { service, suiteRepo } = createService();
 
         await expect(
-          service.createFolder({ projectId: "proj_1", name: "   " }),
+          service.createTestSuite({ projectId: "proj_1", name: "   " }),
         ).rejects.toMatchObject({ code: "validation_error" });
 
         expect(suiteRepo.create).not.toHaveBeenCalled();
@@ -1318,19 +1318,19 @@ describe("SuiteService", () => {
     });
 
     describe("when the slug is free", () => {
-      it("creates an empty folder", async () => {
+      it("creates an empty test suite", async () => {
         const { service, suiteRepo } = createService();
         suiteRepo.create.mockImplementation(
           async (input: Record<string, unknown>) => makeSuite(input),
         );
 
-        await service.createFolder({ projectId: "proj_1", name: "Refunds" });
+        await service.createTestSuite({ projectId: "proj_1", name: "Refunds" });
 
         expect(suiteRepo.create).toHaveBeenCalledWith({
           projectId: "proj_1",
           name: "Refunds",
           slug: "refunds",
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           repeatCount: 1,
@@ -1340,7 +1340,7 @@ describe("SuiteService", () => {
     });
 
     describe("when another suite already holds the slug", () => {
-      /** @scenario "A folder created with a name another suite already uses keeps both names readable" */
+      /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
       it("appends a numeric suffix instead of refusing", async () => {
         const { service, suiteRepo } = createService({
           suiteRepository: {
@@ -1353,13 +1353,13 @@ describe("SuiteService", () => {
           async (input: Record<string, unknown>) => makeSuite(input),
         );
 
-        const folder = await service.createFolder({
+        const testSuite = await service.createTestSuite({
           projectId: "proj_1",
           name: "Refunds",
         });
 
-        expect(folder.name).toBe("Refunds");
-        expect(folder.slug).toBe("refunds-3");
+        expect(testSuite.name).toBe("Refunds");
+        expect(testSuite.slug).toBe("refunds-3");
       });
 
       it("retries once when the insert loses the slug race", async () => {
@@ -1376,12 +1376,12 @@ describe("SuiteService", () => {
             makeSuite(input),
           );
 
-        const folder = await service.createFolder({
+        const testSuite = await service.createTestSuite({
           projectId: "proj_1",
           name: "Refunds",
         });
 
-        expect(folder.slug).toBe("refunds-2");
+        expect(testSuite.slug).toBe("refunds-2");
         expect(suiteRepo.create).toHaveBeenCalledTimes(2);
       });
     });
@@ -1389,12 +1389,12 @@ describe("SuiteService", () => {
 
   describe("when running a test suite", () => {
     /** The plan row runTestSuite resolves, so the run has something to run. */
-    function folderRunService() {
+    function testSuiteRunService() {
       const created = createService({
         suiteRepository: {
           findNamesByIds: vi
             .fn()
-            .mockResolvedValue([{ id: "folder_1", name: "Refunds" }]),
+            .mockResolvedValue([{ id: "test_suite_1", name: "Refunds" }]),
         },
         scenarioRepository: {
           findNamesByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
@@ -1409,8 +1409,8 @@ describe("SuiteService", () => {
         prisma: {
           simulationSuite: {
             findMany: vi.fn(async () => [
-              { id: "folder_1" },
-              { id: "folder_2" },
+              { id: "test_suite_1" },
+              { id: "test_suite_2" },
             ]),
           },
           scenario: {
@@ -1419,7 +1419,7 @@ describe("SuiteService", () => {
         },
       });
       created.suiteRepo.findById.mockResolvedValue(
-        makeSuite({ id: "folder_1", kind: "folder", name: "Refunds" }),
+        makeSuite({ id: "test_suite_1", kind: "test_suite", name: "Refunds" }),
       );
       created.suiteRepo.create.mockImplementation(
         async (input: Record<string, unknown>) => makeSuite(input),
@@ -1428,13 +1428,13 @@ describe("SuiteService", () => {
     }
 
     describe("when the run carries a repeat count", () => {
-      /** @scenario "A folder run honours the repeat count sent with the run" */
-      it("schedules cases x targets x repeat count runs", async () => {
-        const { service, suiteRunService, suiteRepo } = folderRunService();
+      /** @scenario "A test suite run honours the repeat count sent with the run" */
+      it("schedules scenarios x targets x repeat count runs", async () => {
+        const { service, suiteRunService, suiteRepo } = testSuiteRunService();
 
         const result = await service.runTestSuite({
           ...RUN_DEFAULTS,
-          folderId: "folder_1",
+          testSuiteId: "test_suite_1",
           targets: [{ type: "http", referenceId: "agent_1" }],
           repeatCount: 3,
         });
@@ -1444,11 +1444,11 @@ describe("SuiteService", () => {
           expect.objectContaining({ repeatCount: 3 }),
         );
         // The settings land on the run plan the run resolved, never on the
-        // folder row.
+        // test suite row.
         // The second argument carries the transaction client, so the plan is
         // written under the name lock that the matching read was taken with.
         expect(suiteRepo.create).toHaveBeenCalledWith(
-          expect.objectContaining({ kind: "custom", repeatCount: 3 }),
+          expect.objectContaining({ kind: "run_plan", repeatCount: 3 }),
           expect.objectContaining({ tx: expect.anything() }),
         );
         expect(suiteRepo.update).not.toHaveBeenCalled();
@@ -1457,12 +1457,12 @@ describe("SuiteService", () => {
 
     describe("when the run names no target", () => {
       it("refuses with suite_targets_required before reading the suite", async () => {
-        const { service, suiteRepo, suiteRunService } = folderRunService();
+        const { service, suiteRepo, suiteRunService } = testSuiteRunService();
 
         await expect(
           service.runTestSuite({
             ...RUN_DEFAULTS,
-            folderId: "folder_1",
+            testSuiteId: "test_suite_1",
             targets: [],
           }),
         ).rejects.toMatchObject({ code: "suite_targets_required" });
@@ -1472,15 +1472,15 @@ describe("SuiteService", () => {
       });
     });
 
-    describe("when the id names a custom run plan", () => {
+    describe("when the id names a run plan", () => {
       it("refuses with suite_not_found", async () => {
-        const { service, suiteRepo } = folderRunService();
-        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "custom" }));
+        const { service, suiteRepo } = testSuiteRunService();
+        suiteRepo.findById.mockResolvedValue(makeSuite({ kind: "run_plan" }));
 
         await expect(
           service.runTestSuite({
             ...RUN_DEFAULTS,
-            folderId: "suite_abc123",
+            testSuiteId: "suite_abc123",
             targets: [{ type: "http", referenceId: "agent_1" }],
           }),
         ).rejects.toMatchObject({ code: "suite_not_found" });
@@ -1490,7 +1490,7 @@ describe("SuiteService", () => {
     describe("when the run carries no name", () => {
       /** @scenario "A run started with no name is named after its scope and targets" */
       it("names the plan after the suite and its targets", async () => {
-        const { service, suiteRepo, agentRepo } = folderRunService();
+        const { service, suiteRepo, agentRepo } = testSuiteRunService();
         agentRepo.findNamesByIds.mockResolvedValue([
           { id: "agent_1", name: "dev-agent" },
           { id: "agent_2", name: "prod-agent" },
@@ -1498,7 +1498,7 @@ describe("SuiteService", () => {
 
         const result = await service.runTestSuite({
           ...RUN_DEFAULTS,
-          folderId: "folder_1",
+          testSuiteId: "test_suite_1",
           targets: [
             { type: "http", referenceId: "agent_2" },
             { type: "http", referenceId: "agent_1" },
@@ -1514,8 +1514,8 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("when running one test case", () => {
-    describe("when the case does not exist", () => {
+  describe("when running one scenario", () => {
+    describe("when the scenario does not exist", () => {
       it("refuses before anything is scheduled", async () => {
         const { service, suiteRunService } = createService({
           scenarioRepository: { findNamesByIds: vi.fn(async () => []) },
@@ -1534,7 +1534,7 @@ describe("SuiteService", () => {
     });
 
     describe("when the run carries no name", () => {
-      it("names the plan after the case and its target", async () => {
+      it("names the plan after the scenario and its target", async () => {
         const { service, suiteRepo } = createService({
           scenarioRepository: {
             findNamesByIds: vi
@@ -1564,8 +1564,8 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("when a custom run plan is run by its id", () => {
-    /** @scenario "A run plan run through the folder path refuses stored execution settings" */
+  describe("when a run plan is run by its id", () => {
+    /** @scenario "A run plan run through the test suite path refuses stored execution settings" */
     it("refuses a request that carries execution settings", async () => {
       const { service, suiteRunService } = createService();
 
@@ -1599,14 +1599,14 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("given a folder suite", () => {
+  describe("given a test suite", () => {
     describe("when the suite editor updates it", () => {
-      /** @scenario "The suite editor refuses execution settings on a folder suite" */
+      /** @scenario "The suite editor refuses execution settings on a test suite" */
       it("saves the name and labels and refuses every execution field", async () => {
         const { service, suiteRepo } = createService();
         const stored = makeSuite({
-          id: "folder_1",
-          kind: "folder",
+          id: "test_suite_1",
+          kind: "test_suite",
           slug: "refunds",
           name: "Refunds",
         });
@@ -1662,16 +1662,16 @@ describe("SuiteService", () => {
         expect(suiteRepo.update).not.toHaveBeenCalled();
       });
 
-      /** @scenario "The suite editor refuses to broaden a folder into a code-owned suite" */
-      it("refuses a scope or scenarioIds write on a folder", async () => {
+      /** @scenario "The suite editor refuses to broaden a test suite into a code-owned suite" */
+      it("refuses a scope or scenarioIds write on a test suite", async () => {
         const { service, suiteRepo } = createService();
         suiteRepo.findById.mockResolvedValue(
-          makeSuite({ id: "folder_1", kind: "folder" }),
+          makeSuite({ id: "test_suite_1", kind: "test_suite" }),
         );
 
         await expect(
           service.update({
-            id: "folder_1",
+            id: "test_suite_1",
             projectId: "proj_1",
             data: { scope: { mode: "all" } },
           }),
@@ -1679,7 +1679,7 @@ describe("SuiteService", () => {
 
         await expect(
           service.update({
-            id: "folder_1",
+            id: "test_suite_1",
             projectId: "proj_1",
             data: { scenarioIds: ["scen_x"] },
           }),

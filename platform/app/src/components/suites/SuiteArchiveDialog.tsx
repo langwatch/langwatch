@@ -24,9 +24,9 @@ export function SuiteArchiveDialog({
   onConfirm: () => void;
   suiteName: string;
   isLoading?: boolean;
-  /** The question the dialog asks. A folder asks about a test suite instead. */
+  /** The question the dialog asks. A test suite asks about a test suite instead. */
   title?: string;
-  /** What happens on confirm. A folder also archives the cases it holds. */
+  /** What happens on confirm. A test suite also archives the scenarios it holds. */
   description?: string;
 }) {
   return (

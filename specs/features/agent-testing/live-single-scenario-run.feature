@@ -18,16 +18,16 @@ Feature: Running one scenario keeps the person in place
   # --- Staying in place ---
 
   @integration
-  Scenario: Confirming a run from a case row does not change the address
-    Given the case table is open at All scenarios
-    When Run is confirmed on a case row
+  Scenario: Confirming a run from a scenario row does not change the address
+    Given the scenario table is open at All scenarios
+    When Run is confirmed on a scenario row
     Then the address stays where it was
-    And the case table is still behind the drawer
+    And the scenario table is still behind the drawer
 
   @integration
   Scenario: Confirming a run from inside a test suite keeps that suite selected
     Given the test suite "Refunds" is selected
-    When Run is confirmed on one of its case rows
+    When Run is confirmed on one of its scenario rows
     Then "Refunds" is still selected in the rail
     And the address still names that suite
 
@@ -35,7 +35,7 @@ Feature: Running one scenario keeps the person in place
 
   @integration
   Scenario: The run detail drawer opens as soon as the run is queued
-    Given a case row with a target chosen
+    Given a scenario row with a target chosen
     When the run is confirmed
     Then the run detail drawer opens
     And it shows the run as queued
@@ -57,16 +57,16 @@ Feature: Running one scenario keeps the person in place
     And the duration and the cost of the run read in the drawer
 
   @integration
-  Scenario: The drawer offers Open Scenario for that case
+  Scenario: The drawer offers Open Scenario for that scenario
     Given the run detail drawer is open on a finished single-scenario run
     When its header is read
     Then a single "Open Scenario" button is offered
     And it opens the editor for that scenario
-    And a rerun is started from the case editor through its "Save & Run" control
+    And a rerun is started from the scenario editor through its "Save & Run" control
 
   @integration
   Scenario: Closing the drawer leaves the table where it was
-    Given the run detail drawer is open over the case table
+    Given the run detail drawer is open over the scenario table
     When the drawer is closed
     Then the same table is shown, at the same scroll position
     And the last result of that row now reads the new verdict
@@ -75,22 +75,22 @@ Feature: Running one scenario keeps the person in place
 
   @integration
   Scenario: The run goes out under a plan named after the scenario and the agent
-    Given the case "Angry refund request" and the agent "prod-agent"
-    When Run is confirmed on that case row
+    Given the scenario "Angry refund request" and the agent "prod-agent"
+    When Run is confirmed on that scenario row
     Then the run goes out under the name "Angry refund request prod-agent"
-    And that run plan covers only that one case
+    And that run plan covers only that one scenario
 
   @integration
-  Scenario: Running the same case against the same agent again joins the same plan
-    Given the case "Angry refund request" was already run against "prod-agent"
+  Scenario: Running the same scenario against the same agent again joins the same plan
+    Given the scenario "Angry refund request" was already run against "prod-agent"
     When it is run against "prod-agent" again
     Then both runs go out under the same name
     And the second run joins the plan the first one created
 
   @integration
-  Scenario: Running the same case against another agent is another plan
-    Given the case "Angry refund request" and the agents "prod-agent" and "dev-agent"
-    When the case is run against "dev-agent"
+  Scenario: Running the same scenario against another agent is another plan
+    Given the scenario "Angry refund request" and the agents "prod-agent" and "dev-agent"
+    When the scenario is run against "dev-agent"
     Then the run goes out under the name "Angry refund request dev-agent"
 
   # --- Stopping ---

@@ -26,7 +26,7 @@ function configuration(
   overrides: Partial<RunConfiguration> = {},
 ): RunConfiguration {
   return {
-    scope: { mode: "folders", folderIds: ["folder_refunds"] },
+    scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
     targets: [{ type: "http", referenceId: "agent_dev" }],
     repeatCount: 1,
     simulatorModel: null,
@@ -125,8 +125,8 @@ describe("configurationKeyOf", () => {
 describe("scopeKeyOf", () => {
   describe("when two hand-picked scopes hold different scenarios", () => {
     it("keeps them apart", () => {
-      expect(scopeKeyOf({ mode: "cases", caseIds: ["a"] })).not.toBe(
-        scopeKeyOf({ mode: "cases", caseIds: ["b"] }),
+      expect(scopeKeyOf({ mode: "scenarios", scenarioIds: ["a"] })).not.toBe(
+        scopeKeyOf({ mode: "scenarios", scenarioIds: ["b"] }),
       );
     });
   });
@@ -137,8 +137,8 @@ describe("normaliseRunScope", () => {
     it("reads as all scenarios", () => {
       expect(
         normaliseRunScope({
-          scope: { mode: "folders", folderIds: ["one", "two"] },
-          allFolderIds: ["one", "two"],
+          scope: { mode: "test_suites", testSuiteIds: ["one", "two"] },
+          allTestSuiteIds: ["one", "two"],
         }),
       ).toEqual({ mode: "all" });
     });
@@ -148,10 +148,10 @@ describe("normaliseRunScope", () => {
     it("stays a suite scope", () => {
       expect(
         normaliseRunScope({
-          scope: { mode: "folders", folderIds: ["one"] },
-          allFolderIds: ["one", "two"],
+          scope: { mode: "test_suites", testSuiteIds: ["one"] },
+          allTestSuiteIds: ["one", "two"],
         }),
-      ).toEqual({ mode: "folders", folderIds: ["one"] });
+      ).toEqual({ mode: "test_suites", testSuiteIds: ["one"] });
     });
   });
 });
@@ -232,13 +232,13 @@ describe("configurationsForScope", () => {
       const other = entry({
         planId: "plan_2",
         configuration: configuration({
-          scope: { mode: "folders", folderIds: ["folder_other"] },
+          scope: { mode: "test_suites", testSuiteIds: ["test_suite_other"] },
         }),
       });
 
       const found = configurationsForScope({
         entries: [refunds, other],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found.map((found) => found.planId)).toEqual(["plan_1"]);
@@ -258,7 +258,7 @@ describe("configurationsForScope", () => {
 
       const found = configurationsForScope({
         entries: [older, newer],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found).toHaveLength(1);
@@ -280,7 +280,7 @@ describe("configurationsForScope", () => {
 
       const found = configurationsForScope({
         entries: [older, newer],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found.map((entry) => entry.planId)).toEqual(["plan_2", "plan_1"]);

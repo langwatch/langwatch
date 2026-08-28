@@ -1,7 +1,7 @@
 /**
  * The test suites REST family.
  *
- * A TEST SUITE is a folder of scenarios. It holds what it collects and nothing
+ * A TEST SUITE is a group of scenarios. It holds what it collects and nothing
  * about how a run of it is executed, so the targets, the repeat count and the
  * models arrive with the run request and are written onto the run plan that
  * run resolves.
@@ -86,7 +86,7 @@ async function suiteUrl({
     projectId: app.project.id,
     organizationId: app.organizationId,
     slug: suite.slug,
-    kind: "folder",
+    kind: "test_suite",
   });
   return platformUrl({ projectSlug: app.project.slug, path });
 }
@@ -126,7 +126,7 @@ async function runResultWire({
     projectId: app.project.id,
     organizationId: app.organizationId,
     slug: plan.slug,
-    kind: "custom",
+    kind: "run_plan",
   });
   return {
     scheduled: true,
@@ -164,7 +164,7 @@ const registerCollectionEndpoints = (v: TestSuitesVersion): void => {
     ) => {
       const suites = await app.suites.getAll({
         projectId: app.project.id,
-        kinds: ["folder"],
+        kinds: ["test_suite"],
         includeArchived: query.includeArchived,
       });
       return Promise.all(suites.map((suite) => suiteWire({ app, suite })));
@@ -189,7 +189,7 @@ const registerCollectionEndpoints = (v: TestSuitesVersion): void => {
         app,
       }: { input: z.infer<typeof nameInputSchema>; app: TestSuitesApp },
     ) => {
-      const suite = await app.suites.createFolder({
+      const suite = await app.suites.createTestSuite({
         projectId: app.project.id,
         name: input.name,
       });
@@ -217,9 +217,9 @@ const registerItemEndpoints = (v: TestSuitesVersion): void => {
       _c,
       { params, app }: { params: { id: string }; app: TestSuitesApp },
     ) => {
-      const detail = await app.suites.getFolderDetail({
+      const detail = await app.suites.getTestSuiteDetail({
         projectId: app.project.id,
-        folderId: params.id,
+        testSuiteId: params.id,
       });
       return {
         ...(await suiteWire({ app, suite: detail })),
@@ -251,9 +251,9 @@ const registerItemEndpoints = (v: TestSuitesVersion): void => {
         app: TestSuitesApp;
       },
     ) => {
-      const suite = await app.suites.renameFolder({
+      const suite = await app.suites.renameTestSuite({
         projectId: app.project.id,
-        folderId: params.id,
+        testSuiteId: params.id,
         name: input.name,
       });
       return suiteWire({ app, suite });
@@ -276,9 +276,9 @@ const registerArchiveEndpoint = (v: TestSuitesVersion): void => {
       _c,
       { params, app }: { params: { id: string }; app: TestSuitesApp },
     ) => {
-      await app.suites.archiveFolder({
+      await app.suites.archiveTestSuite({
         projectId: app.project.id,
-        folderId: params.id,
+        testSuiteId: params.id,
       });
       return { id: params.id, archived: true as const };
     },
@@ -317,7 +317,7 @@ const registerRunEndpoint = (v: TestSuitesVersion): void => {
       const result = await app.suites.runTestSuite({
         projectId: app.project.id,
         organizationId: app.organizationId,
-        folderId: params.id,
+        testSuiteId: params.id,
         targets: input.targets,
         ...(input.name !== undefined && { name: input.name }),
         ...(input.repeatCount !== undefined && {

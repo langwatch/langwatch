@@ -5,7 +5,7 @@ Feature: The Results tab
 
   Background: three levels.
     The Results tab opens on a list titled "Test Runs". Each row is a run plan.
-    A test suite is a folder of scenarios and is never a row: the run plans
+    A test suite is a group of scenarios and is never a row: the run plans
     that run it are. There is no bucket row that collects runs belonging to no
     plan either: a single scenario run gets a run plan of its own, so iterating
     on one scenario reads as run 1, run 2, run 3 against that agent.
@@ -261,11 +261,12 @@ Feature: The Results tab
     And choosing it narrows the list by its key
 
   @integration
-  Scenario: A run from code reads From code for its target and its scope
+  Scenario: A run from code reads default for its target and From code for its scope
     Given a set that runs from code
     When its row and its runs are read
     Then the scope reads "From code"
-    And the target reads "From code"
+    And the target reads "default"
+    And the Target grouping row for it reads "default" with the from code mark
 
   @integration
   Scenario: Choosing a run inside an opened row lands on its plan at that run
@@ -273,6 +274,33 @@ Feature: The Results tab
     When that run is chosen
     Then the page lands on the plan "Nightly" open on that run
     And not on the newest run of the plan
+
+  @integration
+  Scenario: A target named by a run from code reads that name with the from code mark
+    Given a run from code that reported the agent "AcmeSupportAgent"
+    When "Target" is chosen in Group by
+    Then the row for it reads "AcmeSupportAgent"
+    And it carries the from code mark
+    And it does not read the key its runs fold under
+
+  @integration
+  Scenario: The Targets column reads the agent name a run from code reported
+    Given a set that runs from code whose runs reported the agent "AcmeSupportAgent"
+    When its row is read on the list of run plans
+    Then the Targets cell reads "AcmeSupportAgent"
+
+  @integration
+  Scenario: The Target filter lists the targets named by runs from code
+    Given a target named by a run from code inside the window
+    When the Target filter is opened
+    Then that target is offered under the name the run reported
+    And choosing it narrows the list by its key
+
+  @integration
+  Scenario: A run line reads the agent name its run reported
+    Given a target row opened onto the runs behind it
+    When a run line is read
+    Then it names the agent the run reported
 
   @integration
   Scenario: A run of a set that runs from code opens the row the list draws for it
@@ -415,28 +443,28 @@ Feature: The Results tab
 
   @integration
   Scenario: The results read as a table by default
-    Given a finished run of three cases against one target
+    Given a finished run of three scenarios against one target
     When the run is selected
-    Then a table lists one row per case and target pair
+    Then a table lists one row per scenario and target pair
     And each row shows the verdict, the duration and the cost
 
   @integration
   Scenario: A row that has not settled shows no time and no cost
-    Given a run whose first case is still running
+    Given a run whose first scenario is still running
     When the results table is read
     Then the time and cost cell of that row is empty
-    And the cell fills in once the case reaches its verdict
+    And the cell fills in once the scenario reaches its verdict
 
   @integration
   Scenario: The row menu of a result opens the editor of the scenario
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Edit scenario"
     And choosing it opens the editor of that scenario
 
   @integration
   Scenario: The row menu of a result runs the scenario again on its own
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Open the conversation"
     And it offers "Rerun this scenario"
@@ -639,7 +667,7 @@ Feature: The Results tab
   Scenario: A run that is still going updates without a reload
     Given a run that is queued and starting
     When its results are open
-    Then each case moves from queued to running to its verdict as it happens
+    Then each scenario moves from queued to running to its verdict as it happens
     And no manual reload is needed
 
   @integration
@@ -659,22 +687,22 @@ Feature: The Results tab
   # --- Stopping ---
 
   @integration
-  Scenario: One case in a running batch can be stopped on its own
-    Given a run in which one case is still running
+  Scenario: One scenario in a running batch can be stopped on its own
+    Given a run in which one scenario is still running
     When Stop is chosen on that row
-    Then that case stops
-    And the other cases keep running
+    Then that scenario stops
+    And the other scenarios keep running
 
   @integration
   Scenario: A whole running batch can be stopped at once
-    Given a run with several cases queued and running
+    Given a run with several scenarios queued and running
     When Stop all is chosen for the run
-    Then every queued and running case stops
-    And cases that already finished keep their verdict
+    Then every queued and running scenario stops
+    And scenarios that already finished keep their verdict
 
   @integration
-  Scenario: Stop is not offered for a case that already finished
-    Given a run in which every case finished
+  Scenario: Stop is not offered for a scenario that already finished
+    Given a run in which every scenario finished
     When the results are read
     Then no Stop control is offered
 
@@ -725,5 +753,5 @@ Feature: The Results tab
   Scenario: A run that stopped reporting reads as stalled
     Given a run that stopped reporting long ago
     When the results are read
-    Then that case reads as stalled with a warning mark
+    Then that scenario reads as stalled with a warning mark
     And it is treated as finished for the counts

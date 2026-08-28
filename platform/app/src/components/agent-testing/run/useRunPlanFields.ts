@@ -19,10 +19,12 @@ export function initialScopeOf(subject: RunDialogSubject | null): RunScope {
   if (subject.kind === "suite") {
     // A stored run plan hands its own rule in. A test suite hands none,
     // because it covers the scenarios filed in it.
-    return subject.scope ?? { mode: "folders", folderIds: [subject.suiteId] };
+    return (
+      subject.scope ?? { mode: "test_suites", testSuiteIds: [subject.suiteId] }
+    );
   }
   if (subject.kind === "case") {
-    return { mode: "cases", caseIds: [subject.scenarioId] };
+    return { mode: "scenarios", scenarioIds: [subject.scenarioId] };
   }
   // Run all and New run plan both start on everything; only New run plan can
   // then narrow it.

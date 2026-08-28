@@ -1654,7 +1654,7 @@ const presentations = {
         : `${rejected} None of its scenarios declare parameters.`;
     },
   },
-  scenario_folder_not_found: {
+  scenario_test_suite_not_found: {
     title: "That test suite isn't available",
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
@@ -2124,7 +2124,7 @@ const presentations = {
   suite_scope_not_allowed: {
     title: "A test suite takes no scope",
     describe: () =>
-      "It runs the scenarios filed in it. File cases into it to change what it covers.",
+      "It runs the scenarios filed in it. File scenarios into it to change what it covers.",
   },
   suite_targets_required: {
     title: "Choose an agent to run against",
@@ -2195,7 +2195,7 @@ const presentations = {
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",
-    // `meta.reason` is the sentence the service wrote for this exact case
+    // `meta.reason` is the sentence the service wrote for this exact scenario
     // ("This automation has no email recipients to test-fire to.") — it names
     // WHICH piece is missing, which the generic line cannot. It is also the
     // error's own message, authored server-side, never relayed.
@@ -2947,7 +2947,7 @@ const presentations = {
   },
   idempotency_error: {
     // Two refusals share one code because the caller's next move is the same
-    // shape in both cases: stop reusing this key, or wait for the first
+    // shape in both scenarios: stop reusing this key, or wait for the first
     // request to land. `meta.reason` is what lets the copy say which.
     title: "That idempotency key can't answer this request",
     describe: (error) =>
@@ -3003,7 +3003,7 @@ const presentations = {
     // Deliberately says nothing more. `pkg/config` builds this error's meta by
     // resolving each failed struct field to its environment variable name, so
     // the detail here is literally a list of our env vars — the operator finds
-    // them in the service logs, where they belong. This is the clearest case
+    // them in the service logs, where they belong. This is the clearest scenario
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
@@ -3033,7 +3033,7 @@ const presentations = {
     // code (llmproxy.go), which is a value from a small known set rather than
     // free text — it cannot smuggle a key, and the ones we recognise map to
     // copy written here. Everything else gets the generic line: a failure we
-    // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
+    // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
     describe: (error) => {
@@ -3395,7 +3395,7 @@ function describeUpstreamStatus({
 /**
  * Fallback headline for a failure that arrives with NO code at all.
  *
- * Only for that case. `fault` is a coarse attribution with a server-side
+ * Only for that scenario. `fault` is a coarse attribution with a server-side
  * default of `customer`, so using it as a headline for an unrecognised code
  * meant a platform failure whose payload predated the field read "Check your
  * input", and a customer's own Python error read "A connected service didn't
@@ -3475,7 +3475,7 @@ export function explainHandledError(
       // chrome without a single person having read them.
       //
       // Empty is not a loss. The callers fall back to the server's first
-      // remediation tip, which WAS written for this case, and failing that to
+      // remediation tip, which WAS written for this scenario, and failing that to
       // the generic line plus a trace id — the ADR-045 "unknown" path, working
       // exactly as intended. The fix for a code that lands here often is to
       // give it a registry entry, not to recite whatever it arrived with.

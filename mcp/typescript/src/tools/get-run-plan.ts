@@ -37,7 +37,7 @@ export async function handleGetRunPlan(params: {
   }
 
   if (plan.scenarioIds.length > 0) {
-    lines.push("\n## Cases");
+    lines.push("\n## Scenarios");
     for (const id of plan.scenarioIds) {
       lines.push(`- ${id}`);
     }

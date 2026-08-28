@@ -63,8 +63,8 @@ const collectParam = (pair: string, previous: string[] = []): string[] => [
 const NOTE_FLAG_HELP =
   "Why this run is being started: its hypothesis or commit message. It is kept with the batch and shown beside every run in it. Up to 200 characters.";
 
-/** Help for the `--folder` flag on the scenario write commands. */
-const FOLDER_FLAG_HELP =
+/** Help for the `--test-suite` flag on the scenario write commands. */
+const TEST_SUITE_FLAG_HELP =
   "The test suite to file this scenario in, named by ID or by name.";
 
 /**
@@ -74,7 +74,7 @@ const FOLDER_FLAG_HELP =
 const SCOPE_ALL_FLAG_HELP =
   "Run every active scenario of the project. The set is read again at each run, so a scenario written later runs too.";
 
-const SCOPE_SUITE_FLAG_HELP =
+const SCOPE_TEST_SUITE_FLAG_HELP =
   "Run the scenarios filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
 
 const SCOPE_LABEL_FLAG_HELP =
@@ -107,7 +107,7 @@ const IDEMPOTENCY_KEY_FLAG_HELP =
   "Key that makes this run safe to retry. Two requests carrying the same key schedule one run.";
 
 /**
- * Reads the `--folder` / `--no-folder` pair.
+ * Reads the `--test-suite` / `--no-test-suite` pair.
  *
  * Commander gives both flags ONE attribute, so whichever comes last on the
  * line silently wins and a caller passing both is never told. Each flag is
@@ -115,21 +115,24 @@ const IDEMPOTENCY_KEY_FLAG_HELP =
  * reader clears what it read, so a second parse in the same process starts
  * from nothing.
  */
-const trackFolderFlags = (
+const trackTestSuiteFlags = (
   command: Command,
-): (() => { folder?: string; noFolder: boolean }) => {
-  let folder: string | undefined;
-  let noFolder = false;
-  command.on("option:folder", (value: string) => {
-    folder = value;
+): (() => { testSuite?: string; noTestSuite: boolean }) => {
+  let testSuite: string | undefined;
+  let noTestSuite = false;
+  command.on("option:test-suite", (value: string) => {
+    testSuite = value;
   });
-  command.on("option:no-folder", () => {
-    noFolder = true;
+  command.on("option:no-test-suite", () => {
+    noTestSuite = true;
   });
   return () => {
-    const read = { ...(folder !== undefined && { folder }), noFolder };
-    folder = undefined;
-    noFolder = false;
+    const read = {
+      ...(testSuite !== undefined && { testSuite }),
+      noTestSuite,
+    };
+    testSuite = undefined;
+    noTestSuite = false;
     return read;
   };
 };
@@ -196,7 +199,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   program
     .name(resolveProgramName(bin))
-    .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
+    .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, test suites, and more")
     .version(__CLI_VERSION__, "-v, --version", "Display the current version")
     .enablePositionalOptions()
     .passThroughOptions()
@@ -2832,9 +2835,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
-      .option("--folder <folder>", FOLDER_FLAG_HELP)
+      .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string; folder?: string }) => {
+    async (name: string, options: { situation: string; criteria?: string; labels?: string; testSuite?: string }) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
@@ -2847,24 +2850,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--situation <situation>", "New situation/context")
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
     .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-    .option("--folder <folder>", FOLDER_FLAG_HELP)
-    .option("--no-folder", "Take the scenario out of its test suite")
+    .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+    .option("--no-test-suite", "Take the scenario out of its test suite")
     .option("-f, --format <format>", "Output format: table (default) or json", "table");
 
-  const readScenarioFolderFlags = trackFolderFlags(scenarioUpdateCmd);
+  const readScenarioTestSuiteFlags = trackTestSuiteFlags(scenarioUpdateCmd);
 
   emitsResult(
     scenarioUpdateCmd,
     async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
-      const { folder, noFolder } = readScenarioFolderFlags();
+      const { testSuite, noTestSuite } = readScenarioTestSuiteFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
       return impl(id, {
         name: options.name,
         situation: options.situation,
         criteria: options.criteria,
         labels: options.labels,
-        folder,
-        noFolder,
+        testSuite,
+        noTestSuite,
       });
     },
   );
@@ -2937,7 +2940,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Run a configuration under a name")
     .option("--target <target>", TARGET_FLAG_HELP, collectParam)
     .option("--all", SCOPE_ALL_FLAG_HELP)
-    .option("--suite <name-or-id>", SCOPE_SUITE_FLAG_HELP, collectParam)
+    .option("--test-suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP, collectParam)
+    // `--suite` is the name this flag shipped under. It is kept as an alias so
+    // a saved command line still runs, and it is left out of the help so the
+    // canonical spelling is the one a reader learns.
+    .addOption(
+      new Option("--suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP)
+        .argParser(collectParam)
+        .hideHelp(),
+    )
     .option("--label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
     .option("--scenario <id>", SCOPE_SCENARIO_FLAG_HELP, collectParam)
     .option("--name <name>", RUN_NAME_FLAG_HELP)
@@ -2949,9 +2960,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
     .option("--wait", "Wait for the run to complete")
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (options: { target?: string[]; all?: boolean; suite?: string[]; label?: string[]; scenario?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
+    .action(async (options: { target?: string[]; all?: boolean; testSuite?: string[]; suite?: string[]; label?: string[]; scenario?: string[]; name?: string; repeat?: string; simulatorModel?: string; judgeModel?: string; param?: string[]; note?: string; idempotencyKey?: string; wait?: boolean; format?: string }) => {
+      const { suite, ...rest } = options;
+      const testSuite = [...(options.testSuite ?? []), ...(suite ?? [])];
       const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
-      await impl(options);
+      await impl({
+        ...rest,
+        ...(testSuite.length > 0 ? { testSuite } : {}),
+      });
     });
 
   emitsResult(
@@ -2988,14 +3004,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Test suites. A test suite is a folder of scenarios: a name and the cases
-  // filed in it. It holds no targets, so a run carries them.
-  const suiteCmd = program
-    .command("suite")
-    .description("Manage test suites, the folders a scenario is filed in");
+  // Test suites. A test suite is a group of scenarios: a name and the
+  // scenarios filed in it. It holds no targets, so a run carries them.
+  // `suite` is the name the group shipped under and stays as an alias.
+  const testSuiteCmd = program
+    .command("test-suite")
+    .alias("suite")
+    .description("Manage test suites, the groups a scenario is filed in");
 
   emitsResult(
-    suiteCmd
+    testSuiteCmd
       .command("list")
       .description("List the test suites of the project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3006,7 +3024,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   emitsResult(
-    suiteCmd
+    testSuiteCmd
       .command("create <name>")
       .description("Create an empty test suite")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3017,7 +3035,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   emitsResult(
-    suiteCmd
+    testSuiteCmd
       .command("get <suite>")
       .description("Read one test suite, named by ID or by name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3028,7 +3046,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   emitsResult(
-    suiteCmd
+    testSuiteCmd
       .command("rename <suite> <name>")
       .description("Rename a test suite, keeping its slug")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3039,7 +3057,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   emitsResult(
-    suiteCmd
+    testSuiteCmd
       .command("archive <suite>")
       .description("Archive a test suite and every scenario filed in it")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -3049,7 +3067,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  suiteCmd
+  testSuiteCmd
     .command("run <suite>")
     .description("Run every scenario filed in a test suite against the given targets")
     .option("--target <target>", TARGET_FLAG_HELP, collectParam)

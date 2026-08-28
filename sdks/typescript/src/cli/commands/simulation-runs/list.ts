@@ -85,7 +85,7 @@ export const listSimulationRunsCommand = async (options: {
           console.log();
           console.log(chalk.gray("No simulation runs found."));
           console.log(chalk.gray("Run a suite to create simulation runs:"));
-          console.log(chalk.cyan("  langwatch suite run <suiteId>"));
+          console.log(chalk.cyan("  langwatch test-suite run <suiteId>"));
           return;
         }
 

@@ -12,12 +12,12 @@ import {
 /** The four scope flags a run takes. They answer one question, so only one may be given. */
 export interface ScopeOptions {
   all?: boolean;
-  suite?: string[];
+  testSuite?: string[];
   label?: string[];
   scenario?: string[];
 }
 
-/** What a run covers, plus the case ids a `cases` scope carries. */
+/** What a run covers, plus the scenario ids a `scenarios` scope carries. */
 export interface ResolvedScope {
   scope: RunPlanScope;
   scenarioIds?: string[];
@@ -29,8 +29,8 @@ export interface ResolvedScope {
  * The four flags answer the same question, so naming more than one is a
  * refusal rather than a merge: a run covers one rule. Naming none is a refusal
  * too, because the alternative is running the whole project by accident. A
- * `--suite` value is resolved through the test suite list, so a name reads as
- * well as an id.
+ * `--test-suite` value is resolved through the test suite list, so a name
+ * reads as well as an id.
  *
  * @see specs/features/run-plan-cli.feature
  */
@@ -40,7 +40,7 @@ export async function buildScope(
 ): Promise<ResolvedScope> {
   const chosen = [
     options.all ? "--all" : null,
-    options.suite?.length ? "--suite" : null,
+    options.testSuite?.length ? "--test-suite" : null,
     options.label?.length ? "--label" : null,
     options.scenario?.length ? "--scenario" : null,
   ].filter((flag): flag is string => flag !== null);
@@ -48,7 +48,7 @@ export async function buildScope(
   if (chosen.length === 0) {
     console.error(
       chalk.red(
-        "Error: say what to run with one of --all, --suite, --label or --scenario.",
+        "Error: say what to run with one of --all, --test-suite, --label or --scenario.",
       ),
     );
     process.exit(1);
@@ -76,16 +76,16 @@ export async function buildScope(
 
   if (options.scenario?.length) {
     return {
-      scope: { mode: "cases" },
+      scope: { mode: "scenarios" },
       scenarioIds: options.scenario.map((id) => id.trim()),
     };
   }
 
-  const folderIds: string[] = [];
-  for (const reference of options.suite ?? []) {
+  const testSuiteIds: string[] = [];
+  for (const reference of options.testSuite ?? []) {
     try {
       const suite = await resolveSuiteReference({ reference, service });
-      folderIds.push(suite.id);
+      testSuiteIds.push(suite.id);
     } catch (error) {
       if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
@@ -94,15 +94,15 @@ export async function buildScope(
       throw error;
     }
   }
-  return { scope: { mode: "folders", folderIds } };
+  return { scope: { mode: "test_suites", testSuiteIds } };
 }
 
 /** How a scope reads on one line of the command output. */
 export function describeScope(scope: RunPlanScope | null | undefined): string {
-  if (!scope || scope.mode === "cases") return "the scenarios listed";
+  if (!scope || scope.mode === "scenarios") return "the scenarios listed";
   if (scope.mode === "all") return "all scenarios";
-  if (scope.mode === "folders")
-    return `${scope.folderIds.length} test suite${scope.folderIds.length === 1 ? "" : "s"}`;
+  if (scope.mode === "test_suites")
+    return `${scope.testSuiteIds.length} test suite${scope.testSuiteIds.length === 1 ? "" : "s"}`;
   return `labels: ${scope.labels.join(", ")}`;
 }
 

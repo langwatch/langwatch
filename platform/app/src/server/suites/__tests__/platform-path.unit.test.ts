@@ -14,7 +14,7 @@ import { suitePlatformPath } from "../platform-path";
 
 const isEnabled = vi.mocked(featureFlagService.isEnabled);
 
-const pathFor = (kind: "custom" | "folder") =>
+const pathFor = (kind: "run_plan" | "test_suite") =>
   suitePlatformPath({
     projectId: "project_1",
     organizationId: "org_1",
@@ -33,19 +33,19 @@ describe("suitePlatformPath", () => {
     });
 
     it("opens a run plan on its results page", async () => {
-      await expect(pathFor("custom")).resolves.toBe(
+      await expect(pathFor("run_plan")).resolves.toBe(
         "/agent-testing/results/refunds",
       );
     });
 
     it("opens a test suite on its own page", async () => {
-      await expect(pathFor("folder")).resolves.toBe(
+      await expect(pathFor("test_suite")).resolves.toBe(
         "/agent-testing/suites/refunds",
       );
     });
 
     it("names the project and the organization in the flag read", async () => {
-      await pathFor("custom");
+      await pathFor("run_plan");
 
       expect(isEnabled).toHaveBeenCalledWith(
         "release_ui_agent_testing_v2_enabled",
@@ -63,13 +63,13 @@ describe("suitePlatformPath", () => {
     });
 
     it("opens a run plan on its simulations page", async () => {
-      await expect(pathFor("custom")).resolves.toBe(
+      await expect(pathFor("run_plan")).resolves.toBe(
         "/simulations/run-plans/refunds",
       );
     });
 
     it("opens a test suite on the simulations index", async () => {
-      await expect(pathFor("folder")).resolves.toBe("/simulations");
+      await expect(pathFor("test_suite")).resolves.toBe("/simulations");
     });
   });
 
@@ -77,7 +77,7 @@ describe("suitePlatformPath", () => {
     it("answers the interface every project can open", async () => {
       isEnabled.mockRejectedValue(new Error("flag store unreachable"));
 
-      await expect(pathFor("custom")).resolves.toBe(
+      await expect(pathFor("run_plan")).resolves.toBe(
         "/simulations/run-plans/refunds",
       );
     });

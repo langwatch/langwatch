@@ -1,11 +1,11 @@
 /**
- * The `suite` commands.
+ * The `test-suite` commands.
  *
- * A test suite is a folder of scenarios: a name and the cases filed in it. It
- * holds no targets, so running one sends them with the request and the
+ * A test suite is a group of scenarios: a name and the scenarios filed in it.
+ * It holds no targets, so running one sends them with the request and the
  * platform files the run under a run plan.
  *
- * Spec: specs/features/suite-cli.feature
+ * Spec: specs/features/test-suite-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";

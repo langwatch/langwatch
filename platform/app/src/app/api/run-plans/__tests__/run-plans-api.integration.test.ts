@@ -193,14 +193,14 @@ describe("Feature: Run Plans REST API", () => {
     });
   }
 
-  async function createFolder(name: string): Promise<SimulationSuite> {
+  async function createTestSuite(name: string): Promise<SimulationSuite> {
     return prisma.simulationSuite.create({
       data: {
         id: `suite_${nanoid()}`,
         projectId: testProjectId,
         name,
         slug: `${name.toLowerCase()}-${nanoid(6)}`,
-        kind: "folder",
+        kind: "test_suite",
         scenarioIds: [],
         targets: [],
         labels: [],
@@ -272,7 +272,7 @@ describe("Feature: Run Plans REST API", () => {
     /** @scenario "Listing run plans leaves out test suites" */
     it("returns only the run plan", async () => {
       const plan = await createPlan({ name: "Nightly" });
-      await createFolder("Refunds");
+      await createTestSuite("Refunds");
 
       const res = await api.get(BASE);
 
@@ -297,9 +297,9 @@ describe("Feature: Run Plans REST API", () => {
   describe("given the id names a test suite", () => {
     /** @scenario "Reading a test suite through the run plan route answers suite_not_found" */
     it("answers 404 naming the code", async () => {
-      const folder = await createFolder("Refunds");
+      const testSuite = await createTestSuite("Refunds");
 
-      const res = await api.get(`${BASE}/${folder.id}`);
+      const res = await api.get(`${BASE}/${testSuite.id}`);
 
       expect(res.status).toBe(404);
       expect((await res.json()).code).toBe("suite_not_found");
@@ -317,7 +317,7 @@ describe("Feature: Run Plans REST API", () => {
         const res = await api.post(`${BASE}/run`, {
           name: "Nightly",
           config: {
-            scope: { mode: "cases" },
+            scope: { mode: "scenarios" },
             scenarioIds: [scenario.id],
             targets: [{ type: "http", referenceId: agent.id }],
           },
@@ -343,7 +343,7 @@ describe("Feature: Run Plans REST API", () => {
           where: { id: body.runPlanId, projectId: testProjectId },
         });
         expect(stored?.name).toBe("Nightly");
-        expect(stored?.kind).toBe("custom");
+        expect(stored?.kind).toBe("run_plan");
         // Both interfaces open a run plan on a page of its own, so the link
         // names the plan either way. Whether it carries a scheme is a
         // property of BASE_HOST, which `shared/__tests__/platform-url.unit.test.ts`
@@ -357,7 +357,7 @@ describe("Feature: Run Plans REST API", () => {
       it("joins the plan the first run resolved", async () => {
         const { scenario, agent } = await runnable();
         const config = {
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           scenarioIds: [scenario.id],
           targets: [{ type: "http", referenceId: agent.id }],
         };
@@ -388,7 +388,7 @@ describe("Feature: Run Plans REST API", () => {
 
         const res = await api.post(`${BASE}/run`, {
           config: {
-            scope: { mode: "cases" },
+            scope: { mode: "scenarios" },
             scenarioIds: [scenario.id],
             targets: [{ type: "http", referenceId: agent.id }],
           },
@@ -421,7 +421,7 @@ describe("Feature: Run Plans REST API", () => {
           },
           body: JSON.stringify({
             config: {
-              scope: { mode: "cases" },
+              scope: { mode: "scenarios" },
               scenarioIds: [scenario.id],
               targets: [{ type: "http", referenceId: agent.id }],
             },
@@ -456,7 +456,7 @@ describe("Feature: Run Plans REST API", () => {
           },
           body: JSON.stringify({
             config: {
-              scope: { mode: "cases" },
+              scope: { mode: "scenarios" },
               scenarioIds: [scenario.id],
               targets: [{ type: "http", referenceId: agent.id }],
             },
@@ -484,7 +484,7 @@ describe("Feature: Run Plans REST API", () => {
 
         const res = await api.post(`${BASE}/run`, {
           config: {
-            scope: { mode: "cases" },
+            scope: { mode: "scenarios" },
             scenarioIds: [scenario.id],
             targets: [],
           },

@@ -3,7 +3,7 @@
  * Run button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
- * without a vertical rule between them, so a long list of cases reads as a
+ * without a vertical rule between them, so a long list of scenarios reads as a
  * list of names rather than as a spreadsheet.
  *
  * The table carries no last result: authoring stays here and results live on
@@ -15,7 +15,7 @@
  * control on every line.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
 import {
@@ -38,11 +38,11 @@ import { MenuActionLabel } from "./MenuActionLabel";
 import { RunCaseButton } from "./RunCaseButton";
 import type { TestCase } from "./test-cases";
 
-/** The last result of a case, as the aggregate answers it. */
+/** The last result of a scenario, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
- * The columns of the table: the case name takes the free space, the row
+ * The columns of the table: the scenario name takes the free space, the row
  * actions take what they need on the right. A checkbox column is added at
  * the start of every row when the table is in selection mode.
  */
@@ -63,7 +63,7 @@ export type CasesTableProps = {
   /** Enters selection mode with this row pre-checked. */
   onStartMoveToSuite: (scenarioId: string) => void;
   onRowClick: (testCase: TestCase) => void;
-  /** Opens the run dialog for the case. */
+  /** Opens the run dialog for the scenario. */
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
@@ -482,7 +482,7 @@ export function ExternalCasesTable({
   );
 }
 
-/** The skeleton the table stands in as while the case list is read. */
+/** The skeleton the table stands in as while the scenario list is read. */
 export function CasesTableSkeleton() {
   return (
     <VStack align="stretch" gap={2} data-testid="agent-testing-cases-skeleton">

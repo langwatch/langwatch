@@ -27,6 +27,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         scenario_version (int | Unset):
         simulator_model (str | Unset):
         judge_model (str | Unset):
+        resolved_simulator_model (str | Unset):
+        resolved_judge_model (str | Unset):
         actor_id (str | Unset):
         actor_label (PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel | Unset):
     """
@@ -37,6 +39,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
     scenario_version: int | Unset = UNSET
     simulator_model: str | Unset = UNSET
     judge_model: str | Unset = UNSET
+    resolved_simulator_model: str | Unset = UNSET
+    resolved_judge_model: str | Unset = UNSET
     actor_id: str | Unset = UNSET
     actor_label: PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -53,6 +57,10 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         simulator_model = self.simulator_model
 
         judge_model = self.judge_model
+
+        resolved_simulator_model = self.resolved_simulator_model
+
+        resolved_judge_model = self.resolved_judge_model
 
         actor_id = self.actor_id
 
@@ -76,6 +84,10 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if resolved_simulator_model is not UNSET:
+            field_dict["resolvedSimulatorModel"] = resolved_simulator_model
+        if resolved_judge_model is not UNSET:
+            field_dict["resolvedJudgeModel"] = resolved_judge_model
         if actor_id is not UNSET:
             field_dict["actorId"] = actor_id
         if actor_label is not UNSET:
@@ -98,6 +110,10 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
 
         judge_model = d.pop("judgeModel", UNSET)
 
+        resolved_simulator_model = d.pop("resolvedSimulatorModel", UNSET)
+
+        resolved_judge_model = d.pop("resolvedJudgeModel", UNSET)
+
         actor_id = d.pop("actorId", UNSET)
 
         _actor_label = d.pop("actorLabel", UNSET)
@@ -114,6 +130,8 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
             scenario_version=scenario_version,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            resolved_simulator_model=resolved_simulator_model,
+            resolved_judge_model=resolved_judge_model,
             actor_id=actor_id,
             actor_label=actor_label,
         )

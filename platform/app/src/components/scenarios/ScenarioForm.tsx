@@ -32,15 +32,15 @@ export const scenarioFormSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema,
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // The test suite the case is filed in. Absent keeps the suite the case has,
+  // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
   // null files it nowhere. Only the Agent Testing editor offers the field.
-  folderId: z.string().nullish(),
+  testSuiteId: z.string().nullish(),
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 
-/** One test suite the case can be filed in. */
-export type ScenarioFolderOption = { id: string; name: string };
+/** One test suite the scenario can be filed in. */
+export type ScenarioTestSuiteOption = { id: string; name: string };
 
 /** What "no test suite" reads as in the suite field. */
 export const UNFILED_OPTION_LABEL = "No test suite";
@@ -57,10 +57,10 @@ type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
   /**
-   * The test suites the case can be filed in. Absent hides the field, which
+   * The test suites the scenario can be filed in. Absent hides the field, which
    * is what every surface outside Agent Testing does.
    */
-  folderOptions?: ScenarioFolderOption[];
+  testSuiteOptions?: ScenarioTestSuiteOption[];
 };
 
 /**
@@ -71,7 +71,7 @@ type ScenarioFormProps = {
 export function ScenarioForm({
   defaultValues,
   formRef,
-  folderOptions,
+  testSuiteOptions,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
@@ -117,12 +117,12 @@ export function ScenarioForm({
         </Field.Root>
       </VStack>
 
-      {folderOptions && (
+      {testSuiteOptions && (
         <VStack align="stretch" gap={3}>
           <Field.Root>
             <SectionHeader>Test suite</SectionHeader>
             <Controller
-              name="folderId"
+              name="testSuiteId"
               control={control}
               render={({ field }) => (
                 <NativeSelect.Root size="sm">
@@ -134,7 +134,7 @@ export function ScenarioForm({
                     }
                   >
                     <option value="">{UNFILED_OPTION_LABEL}</option>
-                    {folderOptions.map((option) => (
+                    {testSuiteOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.name}
                       </option>
@@ -220,7 +220,7 @@ function useResetOnDefaultsChange({
           defaultValues.parameters,
           defaultValues.maxTurns,
           defaultValues.minTurns,
-          defaultValues.folderId,
+          defaultValues.testSuiteId,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -232,7 +232,7 @@ function useResetOnDefaultsChange({
           criteria: [],
           labels: [],
           parameters: [],
-          folderId: null,
+          testSuiteId: null,
           ...defaultValues,
         });
       }

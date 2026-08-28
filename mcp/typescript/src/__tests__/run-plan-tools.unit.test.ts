@@ -257,16 +257,16 @@ describe("handleGetRunPlan()", () => {
   });
 
   describe("when the scope names test suites", () => {
-    /** @scenario "Agent reads a plan that runs the cases of a test suite" */
-    it("says the plan covers the cases of those test suites", async () => {
+    /** @scenario "Agent reads a plan that runs the scenarios of a test suite" */
+    it("says the plan covers the scenarios of those test suites", async () => {
       mockGetRunPlan.mockResolvedValue({
         ...samplePlan,
-        scope: { mode: "folders", folderIds: ["folder_a", "folder_b"] },
+        scope: { mode: "test_suites", testSuiteIds: ["suite_a", "suite_b"] },
       });
 
       const result = await handleGetRunPlan({ id: "plan_abc123" });
 
-      expect(result).toContain("**Covers**: test suites: folder_a, folder_b");
+      expect(result).toContain("**Covers**: test suites: suite_a, suite_b");
     });
   });
 
@@ -287,12 +287,12 @@ describe("handleGetRunPlan()", () => {
   });
 
   describe("when the plan carries no scope", () => {
-    it("reads as the hand-picked case list it already held", async () => {
+    it("reads as the hand-picked scenario list it already held", async () => {
       mockGetRunPlan.mockResolvedValue({ ...samplePlan, scope: null });
 
       const result = await handleGetRunPlan({ id: "plan_abc123" });
 
-      expect(result).toContain("**Covers**: hand-picked cases (1)");
+      expect(result).toContain("**Covers**: hand-picked scenarios (1)");
     });
   });
 

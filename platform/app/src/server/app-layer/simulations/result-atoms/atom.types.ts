@@ -68,8 +68,17 @@ export interface ResultAtom {
   scenarioKey: string;
   /** The name the run carries, or null when it carries none. */
   scenarioName: string | null;
-  /** The bare `targetReferenceId`, or {@link UNKNOWN_TARGET_KEY}. */
+  /**
+   * The bare `targetReferenceId`, `code:` and the slug of the agent name a run
+   * from code reported, or {@link UNKNOWN_TARGET_KEY}.
+   */
   targetKey: string;
+  /**
+   * The agent name the code that pushed the run reported, or null when it
+   * reported none. A run started on the platform is named by its reference id
+   * instead, so this stays null there.
+   */
+  targetName: string | null;
   status: ScenarioRunStatus;
   outcome: AtomOutcome;
   durationMs: number | null;
@@ -106,6 +115,13 @@ export type ResultsGroupBy = "plan" | "scenario" | "target" | "none";
 /** One scenario that ran from code, as the scenario filter lists it. */
 export interface CodeScenario {
   /** The key its runs fold under, and what the scenario filter takes. */
+  key: string;
+  name: string;
+}
+
+/** One target a run from code named, as the target filter lists it. */
+export interface CodeTarget {
+  /** The key its runs fold under, and what the target filter takes. */
   key: string;
   name: string;
 }
@@ -149,8 +165,9 @@ export interface ResultsOverview {
  * What is in scope. Both reads take the same filter so the overview and the
  * atom list can never disagree about what the page is showing.
  *
- * `scenarioIds` carries the resolution of a label or a folder filter: labels
- * and folders live in Postgres, so the caller turns them into scenario ids
+ * `scenarioIds` carries the resolution of a label or a test suite filter:
+ * labels and test suites live in Postgres, so the caller turns them into
+ * scenario ids
  * before the query runs.
  */
 export interface ResultsFilter {
@@ -172,8 +189,8 @@ export interface ResultsFilter {
    * labels live in Postgres and the run row carries none.
    */
   labels?: string[];
-  /** Suites to keep, by folder id. Resolved to scenario ids the same way. */
-  folderIds?: string[];
+  /** Suites to keep, by test suite id. Resolved to scenario ids the same way. */
+  testSuiteIds?: string[];
   scenarioSetIds?: string[];
   targetKeys?: string[];
   /** `passed` and `failed` fold several statuses each, see categorizeRunStatus. */

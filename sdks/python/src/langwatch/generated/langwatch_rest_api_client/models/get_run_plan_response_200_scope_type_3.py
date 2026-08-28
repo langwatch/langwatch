@@ -13,10 +13,10 @@ T = TypeVar("T", bound="GetRunPlanResponse200ScopeType3")
 class GetRunPlanResponse200ScopeType3:
     """
     Attributes:
-        mode (Literal['cases']):
+        mode (Literal['scenarios']):
     """
 
-    mode: Literal["cases"]
+    mode: Literal["scenarios"]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,9 +35,9 @@ class GetRunPlanResponse200ScopeType3:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        mode = cast(Literal["cases"], d.pop("mode"))
-        if mode != "cases":
-            raise ValueError(f"mode must match const 'cases', got '{mode}'")
+        mode = cast(Literal["scenarios"], d.pop("mode"))
+        if mode != "scenarios":
+            raise ValueError(f"mode must match const 'scenarios', got '{mode}'")
 
         get_run_plan_response_200_scope_type_3 = cls(
             mode=mode,

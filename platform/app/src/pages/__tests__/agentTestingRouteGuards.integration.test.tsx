@@ -91,7 +91,7 @@ vi.mock("~/utils/api", () => ({
       // Left unread, so the tab strip carries no count and the guard is the
       // only thing this file is checking.
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
-      folders: {
+      testSuites: {
         getAll: { useQuery: () => ({ data: [], isLoading: false }) },
       },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },

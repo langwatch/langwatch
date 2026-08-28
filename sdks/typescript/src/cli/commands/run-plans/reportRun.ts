@@ -1,7 +1,7 @@
 /**
  * How a scheduled run reads on the terminal.
  *
- * The three run commands (`run-plan run`, `suite run`, `scenario run`) all end
+ * The three run commands (`run-plan run`, `test-suite run`, `scenario run`) all end
  * in the same answer: a plan, a batch, a job count, and whatever the platform
  * refused to schedule. Printing that in one place is what keeps them from
  * drifting into three different reports of the same event.

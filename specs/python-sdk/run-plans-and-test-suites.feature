@@ -1,10 +1,10 @@
 Feature: Python SDK run plans and test suites
   As a Python SDK user who runs agent tests
   I want a facade for run plans and a facade for test suites
-  So that I can start a run under a name and keep my scenarios grouped in folders
+  So that I can start a run under a name and keep my scenarios grouped in test suites
 
   Background: two nouns, one run.
-    A TEST SUITE is a folder of scenarios: a name and the cases filed under it.
+    A TEST SUITE is a group of scenarios: a name and the scenarios filed under it.
     A RUN PLAN is what you run, and its name is its identity: running under the
     name of an existing plan replaces that plan's configuration, running under a
     new name creates one. The configuration is the scope, the targets, the
@@ -41,10 +41,10 @@ Feature: Python SDK run plans and test suites
     Then the configuration carries the scope mode "all"
 
   @unit
-  Scenario: A folder scope carries the folder ids the caller named
+  Scenario: A test suite scope carries the test suite ids the caller named
     Given a run plan facade on a mounted transport
-    When the caller runs the scope "folders" with two folder ids
-    Then the configuration carries those folder ids under the "folders" mode
+    When the caller runs the scope "test_suites" with two test suite ids
+    Then the configuration carries those test suite ids under the "test_suites" mode
 
   @unit
   Scenario: A label scope carries the labels the caller named
@@ -53,10 +53,10 @@ Feature: Python SDK run plans and test suites
     Then the configuration carries those labels under the "labels" mode
 
   @unit
-  Scenario: A hand-picked scope carries the case ids as the configuration's scenario ids
+  Scenario: A hand-picked scope carries the scenario ids beside the mode
     Given a run plan facade on a mounted transport
-    When the caller runs the scope "cases" with two scenario ids
-    Then the configuration carries the "cases" mode and those scenario ids
+    When the caller runs the scope "scenarios" with two scenario ids
+    Then the configuration carries the "scenarios" mode and those scenario ids
 
   @unit
   Scenario: The run inputs the caller left out are absent from the body
@@ -73,10 +73,10 @@ Feature: Python SDK run plans and test suites
   # --- Run plans: local refusals ---
 
   @unit
-  Scenario: A folder scope with no folder ids is refused before the request
+  Scenario: A test suite scope with no test suite ids is refused before the request
     Given a run plan facade on a mounted transport
-    When the caller runs the scope "folders" without folder ids
-    Then the SDK raises a ValueError naming folder_ids
+    When the caller runs the scope "test_suites" without test suite ids
+    Then the SDK raises a ValueError naming test_suite_ids
     And no request is sent
 
   @unit
@@ -87,9 +87,9 @@ Feature: Python SDK run plans and test suites
     And no request is sent
 
   @unit
-  Scenario: A hand-picked scope with no case ids is refused before the request
+  Scenario: A hand-picked scope with no scenario ids is refused before the request
     Given a run plan facade on a mounted transport
-    When the caller runs the scope "cases" without scenario ids
+    When the caller runs the scope "scenarios" without scenario ids
     Then the SDK raises a ValueError naming scenario_ids
     And no request is sent
 
@@ -189,6 +189,38 @@ Feature: Python SDK run plans and test suites
     When the caller runs the test suite "suite_1" under the name "Nightly refunds"
     And gives a repeat count, both models, parameters, a note and an idempotency key
     Then every one of those fields rides in the body beside the targets
+
+  # --- Filing a scenario into a test suite ---
+
+  @unit
+  Scenario: Creating a scenario files it into the test suite the caller named
+    Given a scenario facade on a mounted transport
+    When the caller creates a scenario with a test suite id
+    Then the body carries that id under testSuiteId
+
+  @unit
+  Scenario: Creating a scenario without a test suite sends no testSuiteId
+    Given a scenario facade on a mounted transport
+    When the caller creates a scenario and names no test suite
+    Then the body carries no testSuiteId field
+
+  @unit
+  Scenario: Updating a scenario moves it to the test suite the caller named
+    Given a scenario facade on a mounted transport
+    When the caller updates a scenario with a test suite id
+    Then the body carries that id under testSuiteId
+
+  @unit
+  Scenario: An update that names no test suite leaves the scenario where it is
+    Given a scenario facade on a mounted transport
+    When the caller updates a scenario and names no test suite
+    Then the body carries no testSuiteId field
+
+  @unit
+  Scenario: An update with a null test suite unfiles the scenario
+    Given a scenario facade on a mounted transport
+    When the caller updates a scenario with a test suite id of None
+    Then the body carries testSuiteId as null
 
   # --- Failures and the deprecated facade ---
 

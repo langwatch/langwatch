@@ -24,6 +24,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type {
   CodeScenario,
+  CodeTarget,
   ResultAtom,
   ResultGroup,
   ResultTotals,
@@ -33,6 +34,7 @@ import { api } from "~/utils/api";
 import type { PlanRowModel } from "./PlanRowsTable";
 import type { ResultsFilterOption } from "./ResultsFilterMenu";
 import {
+  codeTargetNames,
   filterOutcome,
   isNarrowed,
   type ResultFilters,
@@ -55,6 +57,9 @@ const RESULTS_POLL_MS = 10_000;
 
 /** How many atoms one drill-down page holds. The server caps it at 500. */
 const ATOM_PAGE = 300;
+
+/** One stable empty list, so a read that answered nothing keeps its identity. */
+const EMPTY_GROUPS: ResultGroup[] = [];
 
 /** The totals of a window that holds nothing, so the strip still reads. */
 const EMPTY_TOTALS: ResultTotals = {
@@ -353,11 +358,14 @@ function buildPlanRows({
 function useResultFilterOptions({
   scenarios,
   codeScenarios,
+  codeTargets,
   targetNames,
 }: {
   scenarios: ScenarioSource[] | undefined;
   /** The scenarios that ran from code inside the window, which the project holds no row for. */
   codeScenarios: CodeScenario[] | undefined;
+  /** The targets a run from code named inside the window, for the same reason. */
+  codeTargets: CodeTarget[] | undefined;
   targetNames: Map<string, string>;
 }) {
   const scenarioOptions = useMemo(
@@ -385,20 +393,60 @@ function useResultFilterOptions({
       .map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
   }, [scenarios]);
 
+  // The project's agents and prompts, and beside them the agents a run from
+  // code named, which the project holds no row for.
   const targetOptions = useMemo(
     () =>
-      [...targetNames.entries()]
-        .map(([value, label]) => ({ value, label }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [targetNames],
+      [
+        ...[...targetNames.entries()].map(([value, label]) => ({
+          value,
+          label,
+        })),
+        ...(codeTargets ?? []).map((target) => ({
+          value: target.key,
+          label: target.name,
+        })),
+      ].sort((a, b) => a.label.localeCompare(b.label)),
+    [targetNames, codeTargets],
   );
 
-  const resolveTargetName = useMemo(
-    () => (targetKey: string) => targetNameOf({ targetKey, targetNames }),
-    [targetNames],
-  );
+  return { scenarioOptions, labelOptions, targetOptions };
+}
 
-  return { scenarioOptions, labelOptions, targetOptions, resolveTargetName };
+/**
+ * Every name a target key can read under: the project's agents and prompts,
+ * and the agent names the runs from code reported.
+ *
+ * A platform name always wins. A stored agent must read the same wherever it
+ * is listed, whatever a run happened to report for it.
+ */
+function useTargetNames({
+  targetNames,
+  codeTargets,
+  groups,
+  atoms,
+}: {
+  targetNames: Map<string, string>;
+  codeTargets: CodeTarget[] | undefined;
+  groups: ResultGroup[];
+  atoms: ResultAtom[] | undefined;
+}): Map<string, string> {
+  return useMemo(() => {
+    const carried = codeTargetNames([
+      ...(codeTargets ?? []).map((target) => ({
+        targetKey: target.key,
+        targetName: target.name,
+      })),
+      // A target grouping row reads under the name its newest run reported.
+      ...groups.map((group) => ({
+        targetKey: group.key,
+        targetName: group.title,
+      })),
+      ...(atoms ?? []),
+    ]);
+    for (const [key, name] of targetNames) carried.set(key, name);
+    return carried;
+  }, [targetNames, codeTargets, groups, atoms]);
 }
 
 export function useResultGroups({
@@ -436,12 +484,35 @@ export function useResultGroups({
     { enabled: !!project },
   );
 
-  const targetNames = useTargetNameMap();
+  // Read over the window alone, for the same reason.
+  const { data: codeTargets } = api.scenarios.getCodeTargets.useQuery(
+    { projectId, startDate: scope.startDate, endDate: scope.endDate },
+    { enabled: !!project },
+  );
+
+  const platformTargetNames = useTargetNameMap();
   const options = useResultFilterOptions({
     scenarios,
     codeScenarios,
-    targetNames,
+    codeTargets,
+    targetNames: platformTargetNames,
   });
+
+  const groups = overview.data?.groups ?? EMPTY_GROUPS;
+
+  const targetNames = useTargetNames({
+    targetNames: platformTargetNames,
+    codeTargets,
+    // Only a target grouping row names a target. Any other grouping keys its
+    // rows by something else, so its titles are not target names.
+    groups: grouping === "target" ? groups : EMPTY_GROUPS,
+    atoms: atomPage.data?.atoms,
+  });
+
+  const resolveTargetName = useMemo(
+    () => (targetKey: string) => targetNameOf({ targetKey, targetNames }),
+    [targetNames],
+  );
 
   const rows = useNamedRows({
     atoms: atomPage.data?.atoms,
@@ -454,8 +525,6 @@ export function useResultGroups({
     () => groupRowsByKey({ rows, grouping }),
     [rows, grouping],
   );
-
-  const groups = overview.data?.groups ?? [];
 
   const planRows = useMemo(
     () => buildPlanRows({ plans, groups, grouping, filters }),
@@ -470,6 +539,7 @@ export function useResultGroups({
     totals: overview.data?.totals ?? EMPTY_TOTALS,
     buckets: overview.data?.totals.series ?? [],
     ...options,
+    resolveTargetName,
     isLoading: overview.isLoading,
     hasMore: atomPage.data?.hasMore ?? false,
   };

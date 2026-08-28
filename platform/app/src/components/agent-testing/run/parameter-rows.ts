@@ -1,7 +1,7 @@
 /**
  * The parameter overrides of a run, as rows.
  *
- * The single line `name=value, name=value` is the small case. The moment a
+ * The single line `name=value, name=value` is the simple case. The moment a
  * value must be hidden the line cannot carry it, because a line shows what it
  * holds, so the block turns into one row per parameter: a key, a value, and a
  * lock that says the value is a credential.
@@ -60,12 +60,12 @@ function namedRows(rows: ParameterRow[]): ParameterRow[] {
 
 /**
  * What the run sends: every named row, plus whatever was typed for the
- * secrets the cases declare.
+ * secrets the scenarios declare.
  *
- * A name is sent as it was written, declared or not, so a name no case
+ * A name is sent as it was written, declared or not, so a name no scenario
  * declares is refused by the server by name rather than dropped in silence.
  * A plain row left with an empty value is omitted, so the run falls back to
- * the default each case declares for it. A secret keeps whatever was typed as
+ * the default each scenario declares for it. A secret keeps whatever was typed as
  * text: a token of digits is still a token.
  */
 export function toRowsRunParameters({
@@ -100,7 +100,7 @@ function rowValueOf(row: ParameterRow) {
  * What the suite is allowed to remember: the plain rows and their values.
  *
  * A row left with an empty value is dropped, the way the line drops one: the
- * run falls back to the default the cases declare for that name.
+ * run falls back to the default the scenarios declare for that name.
  */
 export function toStorableRowParameters(
   rows: ParameterRow[],

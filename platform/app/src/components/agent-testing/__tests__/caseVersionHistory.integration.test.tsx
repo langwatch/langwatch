@@ -35,7 +35,7 @@ const mocks = vi.hoisted(() => ({
   mockCloseDrawer: vi.fn(),
   mockParams: {} as Record<string, string | undefined>,
   canManage: true,
-  /** The agent this case last ran against, as the editor remembers it. */
+  /** The agent this scenario last ran against, as the editor remembers it. */
   persistedTarget: null as { type: string; id: string } | null,
 }));
 
@@ -95,7 +95,7 @@ vi.mock("~/utils/api", () => ({
       },
     },
     suites: {
-      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      testSuites: { getAll: { useQuery: () => ({ data: [] }) } },
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -221,7 +221,7 @@ function scenarioAt(version: number) {
     labels: [],
     parameters: null,
     version,
-    folderId: null,
+    testSuiteId: null,
     archivedAt: null,
   };
 }
@@ -240,7 +240,7 @@ function versionEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("the version chip in the case editor", () => {
+describe("the version chip in the scenario editor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.persistedTarget = null;
@@ -269,8 +269,8 @@ describe("the version chip in the case editor", () => {
       { wrapper: Wrapper },
     );
 
-  /** @scenario "The editor shows the current version beside the case name" */
-  it("shows the current version beside the case name", async () => {
+  /** @scenario "The editor shows the current version beside the scenario name" */
+  it("shows the current version beside the scenario name", async () => {
     renderEditor();
 
     expect(await screen.findByTestId("case-version-4")).toBeInTheDocument();
@@ -311,8 +311,8 @@ describe("the version chip in the case editor", () => {
     expect(await screen.findByTestId("case-version-5")).toBeInTheDocument();
   });
 
-  /** @scenario "A save that lost a race says the case changed" */
-  it("says the case changed and offers the reload when a save lost the race", async () => {
+  /** @scenario "A save that lost a race says the scenario changed" */
+  it("says the scenario changed and offers the reload when a save lost the race", async () => {
     const user = userEvent.setup();
     mocks.mockUpdateMutateAsync.mockRejectedValue({
       data: {
@@ -477,8 +477,8 @@ describe("the History drawer", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "A case that never had a save shows one Created entry" */
-  it("shows one Created entry for a case saved before history existed", () => {
+  /** @scenario "A scenario that never had a save shows one Created entry" */
+  it("shows one Created entry for a scenario saved before history existed", () => {
     mocks.mockListVersions.mockReturnValue({
       data: {
         versions: [

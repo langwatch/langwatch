@@ -57,7 +57,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -83,7 +83,7 @@ vi.mock("~/utils/api", () => ({
       runPlan: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
-      folders: { getAll: { useQuery: emptyQuery } },
+      testSuites: { getAll: { useQuery: emptyQuery } },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
@@ -363,10 +363,10 @@ describe("the wide run detail drawer", () => {
     assertContent();
   });
 
-  /** @scenario "The drawer header opens the case editor from one labelled button" */
+  /** @scenario "The drawer header opens the scenario editor from one labelled button" */
   /** @scenario "The drawer header offers Open Scenario for the scenario that ran" */
-  /** @scenario "The drawer offers Open Scenario for that case" */
-  it("offers one Open Scenario button that opens the case editor", async () => {
+  /** @scenario "The drawer offers Open Scenario for that scenario" */
+  it("offers one Open Scenario button that opens the scenario editor", async () => {
     const user = userEvent.setup();
     renderWide();
 
@@ -531,7 +531,7 @@ describe("the wide run detail drawer", () => {
     const failed = within(panel).getByTestId("run-verdict-failed-criteria");
     expect(within(passed).getByText("Passed criteria")).toBeInTheDocument();
     expect(within(failed).getByText("Failed criteria")).toBeInTheDocument();
-    // The two rows in the passed section keep the order the case declares.
+    // The two rows in the passed section keep the order the scenario declares.
     const passedText = passed.textContent ?? "";
     expect(passedText.indexOf("stays polite")).toBeLessThan(
       passedText.indexOf("offers the refund"),
@@ -698,10 +698,10 @@ describe("the wide run detail drawer", () => {
   // --- The version the run used ---
 
   /** @scenario "The run detail drawer shows the version the run used" */
-  it("reads the version the run recorded, not the version the case is at now", () => {
+  it("reads the version the run recorded, not the version the scenario is at now", () => {
     renderWide();
 
-    // The run recorded v3; the case is at v6 now.
+    // The run recorded v3; the scenario is at v6 now.
     expect(screen.getByTestId("case-version-3")).toBeInTheDocument();
     expect(screen.queryByTestId("case-version-6")).not.toBeInTheDocument();
   });
@@ -716,7 +716,7 @@ describe("the wide run detail drawer", () => {
 
     await user.click(screen.getByTestId("run-drawer-version"));
 
-    // The history belongs to the case, so the chip is a fact of the run and
+    // The history belongs to the scenario, so the chip is a fact of the run and
     // opens nothing.
     expect(mockOpenDrawer).not.toHaveBeenCalledWith(
       "scenarioVersionHistory",

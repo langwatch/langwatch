@@ -6,7 +6,7 @@
  *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/suites/run-notes.feature
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -34,7 +34,7 @@ const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockAgentsGetAll = vi.hoisted(() => vi.fn());
 const mockPromptsGetAll = vi.hoisted(() => vi.fn());
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
-const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockRunConfigurations = vi.hoisted(() => vi.fn());
 const mockSuitesCreate = vi.hoisted(() => vi.fn());
@@ -53,7 +53,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -65,13 +65,13 @@ vi.mock("~/utils/api", () => ({
       getRunConfigurations: { useQuery: mockRunConfigurations },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      moveToFolder: {
+      moveToTestSuite: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
     suites: {
-      folders: {
-        getAll: { useQuery: mockFoldersGetAll },
+      testSuites: {
+        getAll: { useQuery: mockTestSuitesGetAll },
         create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         rename: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -203,7 +203,7 @@ function casesDeclaring(parameters: unknown) {
         id: "case_1",
         name: "Double charge",
         labels: [],
-        folderId: "suite_refunds",
+        testSuiteId: "suite_refunds",
         parameters,
         createdAt: new Date("2026-07-06T12:00:00.000Z"),
         lastUpdatedById: null,
@@ -255,7 +255,7 @@ describe("<RunDialog/>", () => {
           id: "case_1",
           name: "Double charge",
           labels: [],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -264,7 +264,7 @@ describe("<RunDialog/>", () => {
       ],
       isLoading: false,
     });
-    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
@@ -409,7 +409,7 @@ describe("<RunDialog/>", () => {
           id: "case_1",
           name: "Double charge",
           labels: [],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: [
             { name: "model", defaultValue: "gpt-5-mini" },
             { name: "locale", defaultValue: "de" },
@@ -444,7 +444,7 @@ describe("<RunDialog/>", () => {
           id: "case_1",
           name: "Double charge",
           labels: [],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: [{ name: "model", defaultValue: "gpt-5-mini" }],
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -707,7 +707,7 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "The prompt chip replaces the agent area" */
-  it("replaces the agent area with the prompt picker, folders included", async () => {
+  it("replaces the agent area with the prompt picker, test suites included", async () => {
     const user = userEvent.setup();
     mockPromptsGetAll.mockReturnValue({
       data: [
@@ -722,7 +722,7 @@ describe("<RunDialog/>", () => {
     expect(screen.getByText("Prompt to be tested")).toBeInTheDocument();
     expect(screen.queryByTestId("run-dialog-agents")).not.toBeInTheDocument();
     const picker = screen.getByTestId("run-dialog-prompts");
-    // The folder of the handle heads its prompts, like the prompt list.
+    // The test suite of the handle heads its prompts, like the prompt list.
     expect(within(picker).getByText("checkout")).toBeInTheDocument();
     expect(
       within(picker).getByText("checkout/refund-prompt"),
@@ -786,7 +786,7 @@ describe("<RunDialog/>", () => {
       projectId: "proj_1",
       name: "Refunds prod-agent",
       config: {
-        scope: { mode: "folders", folderIds: ["suite_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["suite_refunds"] },
         targets: [{ type: "http", referenceId: "agent_1" }],
         repeatCount: 1,
       },
@@ -1082,7 +1082,7 @@ describe("<RunDialog/>", () => {
 
   // --- Failure paths ---
 
-  /** @scenario "A parameter value the cases do not declare is refused by name" */
+  /** @scenario "A parameter value the scenarios do not declare is refused by name" */
   it("names the unknown parameter and the declared ones in the refusal", async () => {
     const user = userEvent.setup();
     mockSuitesRunPlan.mockRejectedValue(
@@ -1105,8 +1105,8 @@ describe("<RunDialog/>", () => {
     expect(error).toHaveTextContent("model");
   });
 
-  /** @scenario "A run refused because every case is archived says so in the dialog" */
-  it("says there is nothing left to run when every case is archived", async () => {
+  /** @scenario "A run refused because every scenario is archived says so in the dialog" */
+  it("says there is nothing left to run when every scenario is archived", async () => {
     const user = userEvent.setup();
     mockSuitesRunPlan.mockRejectedValue(
       handledRejection("suite_all_scenarios_archived"),
@@ -1143,7 +1143,7 @@ describe("run entries on the Scenarios tab", () => {
           id: "case_1",
           name: "Double charge",
           labels: [],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -1152,13 +1152,13 @@ describe("run entries on the Scenarios tab", () => {
       ],
       isLoading: false,
     });
-    mockFoldersGetAll.mockReturnValue({
+    mockTestSuitesGetAll.mockReturnValue({
       data: [
         {
           id: "suite_refunds",
           name: "Refunds",
           slug: "refunds",
-          caseIds: ["case_1"],
+          scenarioIds: ["case_1"],
           targets: [],
         },
       ],
@@ -1261,8 +1261,8 @@ function configurationEntry(
 ) {
   const configuration = {
     scope: overrides.scope ?? {
-      mode: "folders",
-      folderIds: ["suite_refunds"],
+      mode: "test_suites",
+      testSuiteIds: ["suite_refunds"],
     },
     targets: overrides.targets ?? [{ type: "http", referenceId: "agent_1" }],
     repeatCount: overrides.repeatCount ?? 1,
@@ -1301,7 +1301,7 @@ describe("the run name", () => {
           id: "case_1",
           name: "Double charge",
           labels: ["billing"],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -1310,7 +1310,7 @@ describe("the run name", () => {
       ],
       isLoading: false,
     });
-    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
@@ -1683,7 +1683,7 @@ describe("the run name", () => {
         suiteId: "plan_1",
         name: "Refunds prod-agent",
         planName: "Refunds prod-agent",
-        scope: { mode: "folders", folderIds: ["suite_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["suite_refunds"] },
         initialTarget: { type: "http", id: "agent_1" },
         // The plan carries its own remembered target, which is what used to
         // stop the dialog reading the history at all.
@@ -1713,7 +1713,7 @@ describe("what the run covers", () => {
     mockPromptsGetAll.mockReturnValue({ data: [] });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
-    mockFoldersGetAll.mockReturnValue({
+    mockTestSuitesGetAll.mockReturnValue({
       data: [
         { id: "suite_refunds", name: "Refunds", slug: "refunds" },
         { id: "suite_billing", name: "Billing", slug: "billing" },
@@ -1733,7 +1733,7 @@ describe("what the run covers", () => {
           id: "case_1",
           name: "Double charge",
           labels: ["billing"],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -1743,7 +1743,7 @@ describe("what the run covers", () => {
           id: "case_2",
           name: "Late invoice",
           labels: ["invoices"],
-          folderId: "suite_billing",
+          testSuiteId: "suite_billing",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -1774,9 +1774,11 @@ describe("what the run covers", () => {
     expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
     const scope = screen.getByTestId("run-scope");
     expect(within(scope).getByTestId("run-scope-all")).toBeChecked();
-    expect(within(scope).getByTestId("run-scope-folders")).not.toBeChecked();
+    expect(
+      within(scope).getByTestId("run-scope-test_suites"),
+    ).not.toBeChecked();
     expect(within(scope).getByTestId("run-scope-labels")).not.toBeChecked();
-    expect(within(scope).getByTestId("run-scope-cases")).not.toBeChecked();
+    expect(within(scope).getByTestId("run-scope-scenarios")).not.toBeChecked();
     expect(scope).toHaveTextContent("2 scenarios will run.");
   });
 
@@ -1785,12 +1787,12 @@ describe("what the run covers", () => {
     const user = userEvent.setup();
     renderDialog(planSubject());
 
-    await user.click(screen.getByTestId("run-scope-folders"));
+    await user.click(screen.getByTestId("run-scope-test_suites"));
     expect(screen.getByTestId("run-scope")).toHaveTextContent(
       "0 scenarios will run.",
     );
 
-    await user.click(screen.getByTestId("run-scope-folder-suite_refunds"));
+    await user.click(screen.getByTestId("run-scope-test-suite-suite_refunds"));
     expect(screen.getByTestId("run-scope")).toHaveTextContent(
       "1 scenario will run.",
     );
@@ -1817,13 +1819,13 @@ describe("what the run covers", () => {
   });
 
   /** @scenario "A run can hold a hand-picked list of scenarios" */
-  /** @scenario "A custom run plan can select single scenarios grouped by their folder" */
+  /** @scenario "A run plan can select single scenarios grouped by their test suite" */
   it("lists the scenarios under their test suite and runs the ticked ones", async () => {
     const user = userEvent.setup();
     renderDialog(planSubject());
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
 
-    await user.click(screen.getByTestId("run-scope-cases"));
+    await user.click(screen.getByTestId("run-scope-scenarios"));
     const cases = screen.getByTestId("run-scope-cases-list");
     expect(cases).toHaveTextContent("Refunds");
     expect(cases).toHaveTextContent("Billing");
@@ -1833,7 +1835,7 @@ describe("what the run covers", () => {
       "1 scenario will run.",
     );
 
-    // One case out of each test suite, which is the plan that picker exists for.
+    // One scenario out of each test suite, which is the plan that picker exists for.
     await user.click(screen.getByTestId("run-scope-case-case_1"));
     expect(screen.getByTestId("run-scope")).toHaveTextContent(
       "2 scenarios will run.",
@@ -1844,7 +1846,7 @@ describe("what the run covers", () => {
     const sent = mockSuitesRunPlan.mock.calls[0]![0] as {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
-    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scope).toEqual({ mode: "scenarios" });
     expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
       "case_1",
       "case_2",
@@ -1855,14 +1857,14 @@ describe("what the run covers", () => {
   it("runs a stored plan on the scope it holds, not on its own id", async () => {
     const user = userEvent.setup();
     // The Results tab opens a stored plan as a subject that carries the plan's
-    // own rule. Derived from its id instead, the rule would name a folder that
+    // own rule. Derived from its id instead, the rule would name a test suite that
     // holds nothing and would overwrite the plan's real scope.
     renderDialog({
       kind: "suite",
       suiteId: "plan_nightly",
       name: "Nightly refunds",
       scenarioIds: ["case_1", "case_2"],
-      scope: { mode: "cases", caseIds: ["case_1", "case_2"] },
+      scope: { mode: "scenarios", scenarioIds: ["case_1", "case_2"] },
       initialTarget: { type: "http", id: "agent_1" },
     });
 
@@ -1872,7 +1874,7 @@ describe("what the run covers", () => {
     const sent = mockSuitesRunPlan.mock.calls[0]![0] as {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
-    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scope).toEqual({ mode: "scenarios" });
     expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
       "case_1",
       "case_2",
@@ -1885,7 +1887,7 @@ describe("what the run covers", () => {
     renderDialog(planSubject());
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
 
-    await user.click(screen.getByTestId("run-scope-cases"));
+    await user.click(screen.getByTestId("run-scope-scenarios"));
     await user.click(screen.getByTestId("run-scope-case-case_2"));
 
     const name = screen.getByTestId("run-dialog-name");
@@ -1908,8 +1910,8 @@ describe("what the run covers", () => {
       "All scenarios prod-agent",
     );
 
-    await user.click(screen.getByTestId("run-scope-folders"));
-    await user.click(screen.getByTestId("run-scope-folder-suite_billing"));
+    await user.click(screen.getByTestId("run-scope-test_suites"));
+    await user.click(screen.getByTestId("run-scope-test-suite-suite_billing"));
 
     expect(screen.getByTestId("run-dialog-name")).toHaveValue(
       "Billing prod-agent",
@@ -1931,7 +1933,7 @@ describe("the chips that add a run option", () => {
           id: "case_1",
           name: "Double charge",
           labels: [],
-          folderId: "suite_refunds",
+          testSuiteId: "suite_refunds",
           parameters: null,
           createdAt: new Date("2026-07-06T12:00:00.000Z"),
           lastUpdatedById: null,
@@ -1940,7 +1942,7 @@ describe("the chips that add a run option", () => {
       ],
       isLoading: false,
     });
-    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({

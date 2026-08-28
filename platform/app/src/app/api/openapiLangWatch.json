@@ -47004,6 +47004,29 @@
                           "note": {
                             "type": "string"
                           },
+                          "agents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agent",
+                                    "user",
+                                    "judge"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "role"
+                              ]
+                            }
+                          },
                           "langwatch": {
                             "type": "object",
                             "properties": {
@@ -47029,6 +47052,12 @@
                                 "type": "string"
                               },
                               "judgeModel": {
+                                "type": "string"
+                              },
+                              "resolvedSimulatorModel": {
+                                "type": "string"
+                              },
+                              "resolvedJudgeModel": {
                                 "type": "string"
                               },
                               "actorId": {
@@ -49094,12 +49123,12 @@
                           ]
                         }
                       },
-                      "folderId": {
+                      "testSuiteId": {
                         "type": [
                           "string",
                           "null"
                         ],
-                        "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                        "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                       },
                       "platformUrl": {
                         "type": "string",
@@ -49113,7 +49142,6 @@
                       "criteria",
                       "labels",
                       "parameters",
-                      "folderId",
                       "platformUrl"
                     ]
                   }
@@ -49282,12 +49310,12 @@
                         ]
                       }
                     },
-                    "folderId": {
+                    "testSuiteId": {
                       "type": [
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49301,7 +49329,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -49461,12 +49488,12 @@
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
                   },
-                  "folderId": {
+                  "testSuiteId": {
                     "type": [
                       "string",
                       "null"
                     ],
-                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
+                    "description": "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite."
                   }
                 },
                 "required": [
@@ -49555,12 +49582,12 @@
                         ]
                       }
                     },
-                    "folderId": {
+                    "testSuiteId": {
                       "type": [
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49574,7 +49601,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -49773,12 +49799,12 @@
                         ]
                       }
                     },
-                    "folderId": {
+                    "testSuiteId": {
                       "type": [
                         "string",
                         "null"
                       ],
-                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      "description": "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -49792,7 +49818,6 @@
                     "criteria",
                     "labels",
                     "parameters",
-                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -49971,12 +49996,12 @@
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
                   },
-                  "folderId": {
+                  "testSuiteId": {
                     "type": [
                       "string",
                       "null"
                     ],
-                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
+                    "description": "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite."
                   }
                 }
               }
@@ -50174,7 +50199,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                            "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded."
                           },
                           "authorId": {
                             "type": [
@@ -50202,7 +50227,7 @@
                           },
                           "isSynthesized": {
                             "type": "boolean",
-                            "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                            "description": "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
                           }
                         },
                         "required": [
@@ -50394,7 +50419,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                      "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded."
                     },
                     "authorId": {
                       "type": [
@@ -50422,7 +50447,7 @@
                     },
                     "isSynthesized": {
                       "type": "boolean",
-                      "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                      "description": "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
                     },
                     "schemaVersion": {
                       "type": "integer",
@@ -50523,7 +50548,7 @@
                         "maxTurns",
                         "minTurns"
                       ],
-                      "description": "The editable content of the case as this version saved it."
+                      "description": "The editable content of the scenario as this version saved it."
                     }
                   },
                   "required": [
@@ -52021,14 +52046,14 @@
                               "string",
                               "null"
                             ],
-                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes."
                           },
                           "scenarioVersion": {
                             "type": [
                               "integer",
                               "null"
                             ],
-                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions."
                           },
                           "platformUrl": {
                             "type": "string",
@@ -52047,8 +52072,6 @@
                           "timestamp",
                           "updatedAt",
                           "durationInMs",
-                          "note",
-                          "scenarioVersion",
                           "platformUrl"
                         ]
                       }
@@ -52301,14 +52324,14 @@
                         "string",
                         "null"
                       ],
-                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes."
                     },
                     "scenarioVersion": {
                       "type": [
                         "integer",
                         "null"
                       ],
-                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -52327,8 +52350,6 @@
                     "timestamp",
                     "updatedAt",
                     "durationInMs",
-                    "note",
-                    "scenarioVersion",
                     "platformUrl"
                   ]
                 }
@@ -52525,7 +52546,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes."
                           }
                         },
                         "required": [
@@ -52540,8 +52561,7 @@
                           "lastUpdatedAt",
                           "firstCompletedAt",
                           "allCompletedAt",
-                          "isComplete",
-                          "note"
+                          "isComplete"
                         ]
                       }
                     },
@@ -52740,7 +52760,7 @@
                         "string",
                         "null"
                       ],
-                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes."
                     }
                   },
                   "required": [
@@ -52755,8 +52775,7 @@
                     "lastUpdatedAt",
                     "firstCompletedAt",
                     "allCompletedAt",
-                    "isComplete",
-                    "note"
+                    "isComplete"
                   ]
                 }
               }
@@ -52889,7 +52908,7 @@
       "get": {
         "operationId": "getApiSuites",
         "deprecated": true,
-        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
+        "description": "Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.",
         "responses": {
           "200": {
             "description": "Success",
@@ -52915,7 +52934,7 @@
                           "custom",
                           "folder"
                         ],
-                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                       },
                       "description": {
                         "type": [
@@ -52997,7 +53016,7 @@
                             "type": "null"
                           }
                         ],
-                        "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                        "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                       },
                       "targets": {
                         "type": "array",
@@ -53049,10 +53068,8 @@
                       "id",
                       "name",
                       "slug",
-                      "kind",
                       "description",
                       "scenarioIds",
-                      "scope",
                       "targets",
                       "repeatCount",
                       "labels",
@@ -53162,7 +53179,7 @@
               ],
               "default": "custom"
             },
-            "description": "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did."
+            "description": "Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did."
           }
         ],
         "security": [
@@ -53198,7 +53215,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -53280,7 +53297,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53332,10 +53349,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -53527,7 +53542,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "targets": {
                     "type": "array",
@@ -53612,7 +53627,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -53694,7 +53709,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53746,10 +53761,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -53914,7 +53927,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -53996,7 +54009,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -54048,10 +54061,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -54255,7 +54266,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "scenarioIds": {
                     "type": "array",
@@ -54505,7 +54516,7 @@
                         "custom",
                         "folder"
                       ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites."
                     },
                     "description": {
                       "type": [
@@ -54587,7 +54598,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -54639,10 +54650,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -55151,9 +55160,9 @@
                             "properties": {
                               "mode": {
                                 "type": "string",
-                                "const": "folders"
+                                "const": "test_suites"
                               },
-                              "folderIds": {
+                              "testSuiteIds": {
                                 "type": "array",
                                 "items": {
                                   "type": "string"
@@ -55162,7 +55171,7 @@
                             },
                             "required": [
                               "mode",
-                              "folderIds"
+                              "testSuiteIds"
                             ]
                           },
                           {
@@ -55189,7 +55198,7 @@
                             "properties": {
                               "mode": {
                                 "type": "string",
-                                "const": "cases"
+                                "const": "scenarios"
                               }
                             },
                             "required": [
@@ -55197,7 +55206,7 @@
                             ]
                           }
                         ],
-                        "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                        "description": "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                       },
                       "scenarioIds": {
                         "type": "array",
@@ -55502,9 +55511,9 @@
                             "properties": {
                               "mode": {
                                 "type": "string",
-                                "const": "folders"
+                                "const": "test_suites"
                               },
-                              "folderIds": {
+                              "testSuiteIds": {
                                 "type": "array",
                                 "items": {
                                   "type": "string"
@@ -55513,7 +55522,7 @@
                             },
                             "required": [
                               "mode",
-                              "folderIds"
+                              "testSuiteIds"
                             ]
                           },
                           {
@@ -55540,7 +55549,7 @@
                             "properties": {
                               "mode": {
                                 "type": "string",
-                                "const": "cases"
+                                "const": "scenarios"
                               }
                             },
                             "required": [
@@ -55548,7 +55557,7 @@
                             ]
                           }
                         ],
-                        "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                        "description": "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                       },
                       "targets": {
                         "type": "array",
@@ -55602,7 +55611,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "description": "The scenarios a cases scope covers. Read by that scope alone; a scope that states a rule resolves its own list at run time."
+                        "description": "The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time."
                       }
                     },
                     "required": [
@@ -55695,9 +55704,9 @@
                           "properties": {
                             "mode": {
                               "type": "string",
-                              "const": "folders"
+                              "const": "test_suites"
                             },
-                            "folderIds": {
+                            "testSuiteIds": {
                               "type": "array",
                               "items": {
                                 "type": "string"
@@ -55706,7 +55715,7 @@
                           },
                           "required": [
                             "mode",
-                            "folderIds"
+                            "testSuiteIds"
                           ]
                         },
                         {
@@ -55733,7 +55742,7 @@
                           "properties": {
                             "mode": {
                               "type": "string",
-                              "const": "cases"
+                              "const": "scenarios"
                             }
                           },
                           "required": [
@@ -55741,7 +55750,7 @@
                           ]
                         }
                       ],
-                      "description": "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "scenarioIds": {
                       "type": "array",

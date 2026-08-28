@@ -1,9 +1,9 @@
 /**
  * Filing a scenario into a test suite from the command line.
  *
- * The suite is named by id or by name, and it is resolved through the test
- * suites API before the case is written, so a name that matches nothing leaves
- * no half-filed case behind.
+ * The test suite is named by id or by name, and it is resolved through the
+ * test suites API before the scenario is written, so a name that matches
+ * nothing leaves no half-filed scenario behind.
  *
  * Spec: specs/features/scenario-cli.feature
  */
@@ -67,13 +67,13 @@ const makeScenario = (
   criteria: [],
   labels: [],
   parameters: [],
-  folderId: null,
+  testSuiteId: null,
   platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });
 
-const makeFolder = (overrides: Record<string, unknown> = {}) => ({
-  id: "folder_abc",
+const makeTestSuite = (overrides: Record<string, unknown> = {}) => ({
+  id: "suite_abc",
   name: "Refunds",
   slug: "refunds",
   scenarioIds: [],
@@ -85,7 +85,7 @@ const makeFolder = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("filing a scenario into a folder from the command line", () => {
+describe("filing a scenario into a test suite from the command line", () => {
   let mockScenarioCreate: ReturnType<typeof vi.fn>;
   let mockScenarioUpdate: ReturnType<typeof vi.fn>;
   let mockScenarioGetAll: ReturnType<typeof vi.fn>;
@@ -115,52 +115,52 @@ describe("filing a scenario into a folder from the command line", () => {
     });
   });
 
-  describe("createScenarioCommand() with --folder", () => {
+  describe("createScenarioCommand() with --test-suite", () => {
     /** @scenario "Create a scenario inside a test suite" */
-    it("creates the scenario inside that folder", async () => {
-      mockSuitesList.mockResolvedValue([makeFolder()]);
+    it("creates the scenario inside that test suite", async () => {
+      mockSuitesList.mockResolvedValue([makeTestSuite()]);
       mockScenarioCreate.mockResolvedValue(
-        makeScenario({ folderId: "folder_abc" }),
+        makeScenario({ testSuiteId: "suite_abc" }),
       );
 
       const result = await createScenarioCommand("Login Flow", {
         situation: "User logs in",
-        folder: "folder_abc",
+        testSuite: "suite_abc",
       });
 
       expect(mockSuitesList).toHaveBeenCalled();
       expect(mockScenarioCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ folderId: "folder_abc" }),
+        expect.objectContaining({ testSuiteId: "suite_abc" }),
       );
-      expect(result!.data).toMatchObject({ folderId: "folder_abc" });
+      expect(result!.data).toMatchObject({ testSuiteId: "suite_abc" });
     });
 
     /** @scenario "Create a scenario inside a test suite" */
-    it("names the folder in the confirmation", async () => {
-      mockSuitesList.mockResolvedValue([makeFolder()]);
+    it("names the test suite in the confirmation", async () => {
+      mockSuitesList.mockResolvedValue([makeTestSuite()]);
       mockScenarioCreate.mockResolvedValue(
-        makeScenario({ folderId: "folder_abc" }),
+        makeScenario({ testSuiteId: "suite_abc" }),
       );
 
       await createScenarioCommand("Login Flow", {
         situation: "User logs in",
-        folder: "Refunds",
+        testSuite: "Refunds",
       });
 
-      // Named by name rather than by id, and still resolved to the folder.
+      // Named by name rather than by id, and still resolved to the test suite.
       expect(mockScenarioCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ folderId: "folder_abc" }),
+        expect.objectContaining({ testSuiteId: "suite_abc" }),
       );
     });
 
     /** @scenario "Create a scenario with a test suite that does not exist" */
-    it("refuses a folder that names nothing, and creates no scenario", async () => {
+    it("refuses a test suite that names nothing, and creates no scenario", async () => {
       mockSuitesList.mockResolvedValue([]);
 
       await expect(
         createScenarioCommand("Login Flow", {
           situation: "User logs in",
-          folder: "nonexistent-id",
+          testSuite: "nonexistent-id",
         }),
       ).rejects.toThrow(ProcessExitError);
 
@@ -170,48 +170,52 @@ describe("filing a scenario into a folder from the command line", () => {
     });
   });
 
-  describe("updateScenarioCommand() with --folder", () => {
+  describe("updateScenarioCommand() with --test-suite", () => {
     /** @scenario "Move a scenario to another test suite" */
-    it("moves the scenario into the named folder", async () => {
+    it("moves the scenario into the named test suite", async () => {
       mockSuitesList.mockResolvedValue([
-        makeFolder({ id: "folder_xyz", name: "Chargebacks" }),
+        makeTestSuite({ id: "suite_xyz", name: "Chargebacks" }),
       ]);
       mockScenarioUpdate.mockResolvedValue(
-        makeScenario({ folderId: "folder_xyz" }),
+        makeScenario({ testSuiteId: "suite_xyz" }),
       );
 
       const result = await updateScenarioCommand("scenario_abc123", {
-        folder: "folder_xyz",
+        testSuite: "suite_xyz",
       });
 
       expect(mockScenarioUpdate).toHaveBeenCalledWith("scenario_abc123", {
-        folderId: "folder_xyz",
+        testSuiteId: "suite_xyz",
       });
-      // A case belongs to one folder, so the new one replaces the old.
-      expect(result!.data).toMatchObject({ folderId: "folder_xyz" });
+      // A scenario belongs to one test suite, so the new one replaces the old.
+      expect(result!.data).toMatchObject({ testSuiteId: "suite_xyz" });
     });
 
-    /** @scenario "Unfile a scenario from its test suite" */
-    it("takes the scenario out of its folder with --no-folder", async () => {
-      mockScenarioUpdate.mockResolvedValue(makeScenario({ folderId: null }));
+    /** @scenario "Take a scenario out of the test suite it is in" */
+    it("clears the test suite, and reads back the Default the platform files it into", async () => {
+      // The platform keeps every scenario in exactly one suite, so a cleared
+      // test suite comes back as the project's Default rather than as none.
+      mockScenarioUpdate.mockResolvedValue(
+        makeScenario({ testSuiteId: "suite_default" }),
+      );
 
       const result = await updateScenarioCommand("scenario_abc123", {
-        noFolder: true,
+        noTestSuite: true,
       });
 
       expect(mockScenarioUpdate).toHaveBeenCalledWith("scenario_abc123", {
-        folderId: null,
+        testSuiteId: null,
       });
-      expect(result!.data).toMatchObject({ folderId: null });
+      expect(result!.data).toMatchObject({ testSuiteId: "suite_default" });
       expect(mockSuitesList).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Combining --folder and --no-folder is rejected" */
+    /** @scenario "Combining --test-suite and --no-test-suite is rejected" */
     it("refuses both options together, leaving the scenario unchanged", async () => {
       await expect(
         updateScenarioCommand("scenario_abc123", {
-          folder: "folder_abc",
-          noFolder: true,
+          testSuite: "suite_abc",
+          noTestSuite: true,
         }),
       ).rejects.toThrow(ProcessExitError);
 
@@ -222,26 +226,26 @@ describe("filing a scenario into a folder from the command line", () => {
   });
 
   describe("listScenariosCommand()", () => {
-    /** @scenario "List scenarios shows the folder each one belongs to" */
-    it("has a folder column naming the folder of each filed case", async () => {
+    /** @scenario "List scenarios shows the test suite each one belongs to" */
+    it("has a test suite column naming the test suite of each filed scenario", async () => {
       mockScenarioGetAll.mockResolvedValue([
-        makeScenario({ id: "scenario_1", folderId: "folder_abc" }),
-        makeScenario({ id: "scenario_2", folderId: null }),
+        makeScenario({ id: "scenario_1", testSuiteId: "suite_abc" }),
+        makeScenario({ id: "scenario_2", testSuiteId: null }),
       ]);
-      mockSuitesList.mockResolvedValue([makeFolder()]);
+      mockSuitesList.mockResolvedValue([makeTestSuite()]);
 
       const result = await listScenariosCommand();
       result!.table();
 
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
-      expect(printed).toContain("Folder");
+      expect(printed).toContain("Test suite");
       expect(printed).toContain("Refunds");
     });
 
-    /** @scenario "List scenarios shows the folder each one belongs to" */
-    it("reads a case with no folder as unfiled", async () => {
+    /** @scenario "List scenarios shows the test suite each one belongs to" */
+    it("reads a scenario with no test suite as unfiled", async () => {
       mockScenarioGetAll.mockResolvedValue([
-        makeScenario({ id: "scenario_2", folderId: null }),
+        makeScenario({ id: "scenario_2", testSuiteId: null }),
       ]);
 
       const result = await listScenariosCommand();

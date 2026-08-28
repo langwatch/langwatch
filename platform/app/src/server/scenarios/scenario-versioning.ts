@@ -3,9 +3,9 @@
  * saved state becomes a snapshot, and how two states diff into the changed
  * field list a history entry shows.
  *
- * The snapshot holds the editable content and nothing else. Folder
+ * The snapshot holds the editable content and nothing else. Test suite
  * membership, archive state and run history live beside the content, so a
- * restore brings the text back without moving the case or touching what ran.
+ * restore brings the text back without moving the scenario or touching what ran.
  *
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature
@@ -30,7 +30,7 @@ export type ScenarioActor = {
 
 /**
  * The fields a version snapshots. An update that names none of these (a
- * folder move, an author stamp) is not a save of the case's content and
+ * test suite move, an author stamp) is not a save of the scenario's content and
  * writes no version.
  */
 export const SCENARIO_VERSIONED_FIELDS = [

@@ -1,7 +1,7 @@
 /**
  * The latest result per scenario, read from real ClickHouse.
  *
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -285,12 +285,12 @@ describe("getLastResultSummaries", () => {
   });
 });
 
-describe("a folder's runs in the results view", () => {
-  describe("when a folder's internal run set holds a finished batch", () => {
-    /** @scenario "A folder run appears in the results view under the folder's name" */
-    it("reports the folder's set in the internal suite summaries", async () => {
-      const folderId = `folder-${nanoid(6)}`;
-      const setId = getSuiteSetId(folderId);
+describe("a test suite's runs in the results view", () => {
+  describe("when a test suite's internal run set holds a finished batch", () => {
+    /** @scenario "A test suite run appears in the results view under the test suite's name" */
+    it("reports the test suite's set in the internal suite summaries", async () => {
+      const testSuiteId = `suite-${nanoid(6)}`;
+      const setId = getSuiteSetId(testSuiteId);
       await insertRows([
         makeRunRow({
           scenarioId: `scen-${nanoid(6)}`,
@@ -303,11 +303,11 @@ describe("a folder's runs in the results view", () => {
         projectId: tenantId,
       });
 
-      const folderSummary = summaries.find(
+      const testSuiteSummary = summaries.find(
         (summary) => summary.scenarioSetId === setId,
       );
-      expect(folderSummary).toBeDefined();
-      expect(folderSummary?.totalCount).toBe(1);
+      expect(testSuiteSummary).toBeDefined();
+      expect(testSuiteSummary?.totalCount).toBe(1);
     });
   });
 });

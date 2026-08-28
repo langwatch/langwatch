@@ -2,10 +2,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { RUN_NOTE_EXPR } from "../repositories/simulation.clickhouse.repository";
 import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
+import { UNKNOWN_TARGET_KEY } from "./atom.types";
 import {
   ATOM_SORT_KEY,
   atomScopeSql,
   buildAtomFilters,
+  CODE_TARGET_NAME_EXPR,
   COST_NUMERIC_EXPR,
   COST_SOURCE_EXPR,
   COST_UNKNOWN_EXPR,
@@ -46,6 +48,8 @@ export interface RawAtomRow {
   DurationMs: string;
   Note: string;
   TargetKey: string;
+  /** The agent name the run reported, or '' when it reported none. */
+  TargetName: string;
   Trigger: string;
   CostUsd: string;
   CostSource: string;
@@ -65,6 +69,8 @@ export interface RawGroupRow {
   GroupKey: string;
   /** The name the newest run of the group carries, or '' when it carries none. */
   Name: string;
+  /** The agent name the newest run reported, or '' when it reported none. */
+  TargetName: string;
   Atoms: string;
   Passed: string;
   Settled: string;
@@ -88,6 +94,12 @@ export interface RawTrendRow {
 /** One scenario that ran from code, as the filter lists it. */
 export interface RawCodeScenarioRow {
   ScenarioKey: string;
+  Name: string;
+}
+
+/** One target a run from code named, as the filter lists it. */
+export interface RawCodeTargetRow {
+  TargetKey: string;
   Name: string;
 }
 
@@ -124,6 +136,9 @@ interface AtomCursor {
  */
 /** How many scenarios that ran from code the filter lists at most. */
 export const MAX_CODE_SCENARIOS = 500;
+
+/** How many targets named by a run from code the filter lists at most. */
+export const MAX_CODE_TARGETS = 500;
 
 export class ResultAtomsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
@@ -194,6 +209,7 @@ export class ResultAtomsClickHouseRepository {
          ifNull(toString(DurationMs), '') AS DurationMs,
          ${RUN_NOTE_EXPR} AS Note,
          ${TARGET_KEY_EXPR} AS TargetKey,
+         ${CODE_TARGET_NAME_EXPR} AS TargetName,
          ${TRIGGER_EXPR} AS Trigger,
          ${COST_VALUE_EXPR} AS CostUsd,
          ${COST_SOURCE_EXPR} AS CostSource,
@@ -300,6 +316,7 @@ export class ResultAtomsClickHouseRepository {
       `SELECT
          GroupKey,
          argMax(Name, RunAt)                     AS Name,
+         argMax(TargetName, RunAt)               AS TargetName,
          toString(count())                       AS Atoms,
          toString(countIf(Outcome = 'passed'))   AS Passed,
          toString(countIf(Outcome != 'pending')) AS Settled,
@@ -316,6 +333,7 @@ export class ResultAtomsClickHouseRepository {
            BatchRunId,
            ScenarioId,
            ${TARGET_KEY_EXPR} AS TargetKey,
+           ${CODE_TARGET_NAME_EXPR} AS TargetName,
            ${ATOM_SORT_KEY} AS RunAt,
            ${OUTCOME_EXPR} AS Outcome,
            ${COST_NUMERIC_EXPR} AS CostUsd,
@@ -359,6 +377,41 @@ export class ResultAtomsClickHouseRepository {
         tenantId: filter.projectId,
         ...filters.params,
         atomCodeScenarios: String(MAX_CODE_SCENARIOS),
+      },
+    );
+  }
+
+  /**
+   * The targets a run from code named inside the window, one per key, each
+   * under the name its newest run reported.
+   *
+   * These have no row in Postgres, so the window is the only place they can be
+   * listed from. A run that named no agent is left out: it groups under the
+   * `unknown` key, which the page already reads as the default target.
+   */
+  async findCodeTargets(filter: ResultsFilter): Promise<RawCodeTargetRow[]> {
+    if (isEmptyScope(filter)) return [];
+    const filters = buildAtomFilters(filter);
+    return this.queryRows<RawCodeTargetRow>(
+      `SELECT
+         TargetKey,
+         argMax(Name, RunAt) AS Name
+       FROM (
+         SELECT
+           ${TARGET_KEY_EXPR} AS TargetKey,
+           ${CODE_TARGET_NAME_EXPR} AS Name,
+           ${ATOM_SORT_KEY} AS RunAt
+         ${atomScopeSql(filters)}
+           AND ${TRIGGER_EXPR} = 'code'
+           AND ${TARGET_KEY_EXPR} != '${UNKNOWN_TARGET_KEY}'
+       )
+       GROUP BY TargetKey
+       ORDER BY Name ASC, TargetKey ASC
+       LIMIT {atomCodeTargets:UInt32}`,
+      {
+        tenantId: filter.projectId,
+        ...filters.params,
+        atomCodeTargets: String(MAX_CODE_TARGETS),
       },
     );
   }

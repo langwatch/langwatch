@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.get_api_scenarios_response_200_item_parameters_item import (
         GetApiScenariosResponse200ItemParametersItem,
@@ -25,8 +27,9 @@ class GetApiScenariosResponse200Item:
         criteria (list[str]):
         labels (list[str]):
         parameters (list[GetApiScenariosResponse200ItemParametersItem]):
-        folder_id (None | str): The test suite (folder) this scenario is filed in, or null when unfiled.
         platform_url (str):
+        test_suite_id (None | str | Unset): The test suite this scenario is filed in, or null when unfiled. Absent on
+            servers that predate test suites.
     """
 
     id: str
@@ -35,8 +38,8 @@ class GetApiScenariosResponse200Item:
     criteria: list[str]
     labels: list[str]
     parameters: list[GetApiScenariosResponse200ItemParametersItem]
-    folder_id: None | str
     platform_url: str
+    test_suite_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,10 +58,13 @@ class GetApiScenariosResponse200Item:
             parameters_item = parameters_item_data.to_dict()
             parameters.append(parameters_item)
 
-        folder_id: None | str
-        folder_id = self.folder_id
-
         platform_url = self.platform_url
+
+        test_suite_id: None | str | Unset
+        if isinstance(self.test_suite_id, Unset):
+            test_suite_id = UNSET
+        else:
+            test_suite_id = self.test_suite_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -70,10 +76,11 @@ class GetApiScenariosResponse200Item:
                 "criteria": criteria,
                 "labels": labels,
                 "parameters": parameters,
-                "folderId": folder_id,
                 "platformUrl": platform_url,
             }
         )
+        if test_suite_id is not UNSET:
+            field_dict["testSuiteId"] = test_suite_id
 
         return field_dict
 
@@ -101,14 +108,16 @@ class GetApiScenariosResponse200Item:
 
             parameters.append(parameters_item)
 
-        def _parse_folder_id(data: object) -> None | str:
+        platform_url = d.pop("platformUrl")
+
+        def _parse_test_suite_id(data: object) -> None | str | Unset:
             if data is None:
                 return data
-            return cast(None | str, data)
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
 
-        folder_id = _parse_folder_id(d.pop("folderId"))
-
-        platform_url = d.pop("platformUrl")
+        test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
         get_api_scenarios_response_200_item = cls(
             id=id,
@@ -117,8 +126,8 @@ class GetApiScenariosResponse200Item:
             criteria=criteria,
             labels=labels,
             parameters=parameters,
-            folder_id=folder_id,
             platform_url=platform_url,
+            test_suite_id=test_suite_id,
         )
 
         get_api_scenarios_response_200_item.additional_properties = d

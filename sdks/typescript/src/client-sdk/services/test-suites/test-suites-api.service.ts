@@ -11,7 +11,7 @@ import {
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans/run-plans-api.service";
 
-/** One test suite as the list answers it: a name and the cases filed in it. */
+/** One test suite as the list answers it: a name and the scenarios filed in it. */
 export type TestSuite = NonNullable<
   paths["/api/v1/test-suites"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
@@ -54,8 +54,8 @@ export class TestSuitesApiError extends Error {
 /**
  * Typed client for the test suite family (`/api/v1/test-suites`).
  *
- * A test suite is a folder of scenarios: a name, and the cases filed in it. It
- * holds no targets and no configuration, so running one sends its targets with
+ * A test suite is a group of scenarios: a name, and the scenarios filed in it.
+ * It holds no targets and no configuration, so running one sends its targets with
  * the request and the platform files the run under a run plan.
  *
  * @see specs/typescript-sdk/run-plans-and-test-suites.feature

@@ -13,25 +13,25 @@ T = TypeVar("T", bound="GetRunPlanResponse200ScopeType1")
 class GetRunPlanResponse200ScopeType1:
     """
     Attributes:
-        mode (Literal['folders']):
-        folder_ids (list[str]):
+        mode (Literal['test_suites']):
+        test_suite_ids (list[str]):
     """
 
-    mode: Literal["folders"]
-    folder_ids: list[str]
+    mode: Literal["test_suites"]
+    test_suite_ids: list[str]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         mode = self.mode
 
-        folder_ids = self.folder_ids
+        test_suite_ids = self.test_suite_ids
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "mode": mode,
-                "folderIds": folder_ids,
+                "testSuiteIds": test_suite_ids,
             }
         )
 
@@ -40,15 +40,15 @@ class GetRunPlanResponse200ScopeType1:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        mode = cast(Literal["folders"], d.pop("mode"))
-        if mode != "folders":
-            raise ValueError(f"mode must match const 'folders', got '{mode}'")
+        mode = cast(Literal["test_suites"], d.pop("mode"))
+        if mode != "test_suites":
+            raise ValueError(f"mode must match const 'test_suites', got '{mode}'")
 
-        folder_ids = cast(list[str], d.pop("folderIds"))
+        test_suite_ids = cast(list[str], d.pop("testSuiteIds"))
 
         get_run_plan_response_200_scope_type_1 = cls(
             mode=mode,
-            folder_ids=folder_ids,
+            test_suite_ids=test_suite_ids,
         )
 
         get_run_plan_response_200_scope_type_1.additional_properties = d

@@ -1,7 +1,7 @@
 /**
- * `--folder <folder>` and `--no-folder` share ONE commander attribute, so
- * whichever flag comes last on the line silently wins and a caller who passed
- * both is never told. program.ts records each flag as commander reads it, so
+ * `--test-suite <test-suite>` and `--no-test-suite` share ONE commander
+ * attribute, so whichever flag comes last on the line silently wins and a
+ * caller who passed both is never told. program.ts records each flag as commander reads it, so
  * the command can refuse the pair.
  *
  * This drives the real program rather than the command function: the refusal
@@ -36,8 +36,8 @@ import { buildProgram } from "../../../program";
 // no test runner defines (see help-topic.unit.test.ts).
 (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-describe("scenario update, given both folder flags on one line", () => {
-  /** @scenario "Combining --folder and --no-folder is rejected" */
+describe("scenario update, given both test suite flags on one line", () => {
+  /** @scenario "Combining --test-suite and --no-test-suite is rejected" */
   it("refuses the command and changes nothing", async () => {
     const reported: string[] = [];
     vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
@@ -62,9 +62,9 @@ describe("scenario update, given both folder flags on one line", () => {
         "scenario",
         "update",
         "scenario_abc123",
-        "--folder",
-        "folder_abc",
-        "--no-folder",
+        "--test-suite",
+        "suite_abc",
+        "--no-test-suite",
       ]),
     ).rejects.toThrow();
 

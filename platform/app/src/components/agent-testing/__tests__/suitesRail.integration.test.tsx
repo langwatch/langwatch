@@ -5,7 +5,7 @@
  * the period picker at its foot, and the one dialog that names a suite.
  *
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -133,7 +133,7 @@ describe("the test suites rail", () => {
       "suite-rail-item-nightly-ci",
     ]);
 
-    // No row carries a count and no row carries a time: how many cases a set
+    // No row carries a count and no row carries a time: how many scenarios a set
     // holds reads beside the panel title, once.
     for (const entry of railEntries()) {
       expect(screen.getByTestId(entry).textContent).not.toMatch(/\d/);
@@ -323,8 +323,8 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "Archive suite opens the confirmation dialog" */
-  /** @scenario "The archive dialog names the folder and says what happens to its cases" */
-  it("names the suite in the archive dialog and says its cases go with it", async () => {
+  /** @scenario "The archive dialog names the test suite and says what happens to its scenarios" */
+  it("names the suite in the archive dialog and says its scenarios go with it", async () => {
     const { props, view } = renderRail();
     const user = await openSuiteMenu("Refunds");
 
@@ -379,7 +379,7 @@ describe("the test suites rail", () => {
 
   // --- Selection ---
 
-  /** @scenario "Choosing a suite filters the case table to that suite" */
+  /** @scenario "Choosing a suite filters the scenario table to that suite" */
   it("asks for the chosen suite and marks the open one as selected", async () => {
     const user = userEvent.setup();
     const suites = [

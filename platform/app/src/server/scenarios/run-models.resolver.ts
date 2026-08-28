@@ -2,8 +2,8 @@
  * Reads, at queue time, the models each run of a batch will run on.
  *
  * The chain lives in `run-models.ts`; this is the half that reaches the
- * database for it: the case's own model choice, and the project default for
- * each role. It runs once per batch, so one read of the cases and at most one
+ * database for it: the scenario's own model choice, and the project default for
+ * each role. It runs once per batch, so one read of the scenarios and at most one
  * resolution per role covers every run.
  *
  * It never throws. A project with no model set for a role is a fault the
@@ -25,7 +25,7 @@ import {
 
 const logger = createLogger("langwatch:scenarios:run-models");
 
-/** The models each named case will run on, keyed by case id. */
+/** The models each named scenario will run on, keyed by scenario id. */
 export type RunModelsResolver = (params: {
   projectId: string;
   scenarioIds: string[];
@@ -55,7 +55,7 @@ export function createRunModelsResolver(
         ]),
       );
 
-      // One project default per role for the whole batch: every case of it
+      // One project default per role for the whole batch: every scenario of it
       // asks the same question of the same project.
       const defaults = new Map<string, Promise<string>>();
       const resolveFeatureModel = (featureKey: string) => {

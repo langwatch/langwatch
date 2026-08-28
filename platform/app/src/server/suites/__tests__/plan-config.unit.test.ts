@@ -14,8 +14,8 @@ import {
 } from "../plan-config";
 import type { SuiteTarget } from "../types";
 
-/** A Prisma stand-in that answers only the folder read the normalise makes. */
-function prismaWithFolders(ids: string[]): PrismaClient {
+/** A Prisma stand-in that answers only the test suite read the normalise makes. */
+function prismaWithTestSuites(ids: string[]): PrismaClient {
   return {
     simulationSuite: {
       findMany: vi.fn(async () => ids.map((id) => ({ id }))),
@@ -24,26 +24,26 @@ function prismaWithFolders(ids: string[]): PrismaClient {
 }
 
 describe("normalizePlanScope", () => {
-  describe("when the scope names every folder of the project", () => {
+  describe("when the scope names every test suite of the project", () => {
     /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
     it("becomes the all scope", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["b", "a"] },
-        prisma: prismaWithFolders(["a", "b"]),
+        scope: { mode: "test_suites", testSuiteIds: ["b", "a"] },
+        prisma: prismaWithTestSuites(["a", "b"]),
       });
 
       expect(scope).toEqual({ mode: "all" });
     });
 
     /** @scenario "An archived suite does not have to be named for a scope to be exhaustive" */
-    it("ignores archived folders, which hold no active scenario", async () => {
-      // The read is already filtered to non-archived folders, so an archived
+    it("ignores archived test suites, which hold no active scenario", async () => {
+      // The read is already filtered to non-archived test suites, so an archived
       // one never reaches the comparison.
-      const prisma = prismaWithFolders(["active"]);
+      const prisma = prismaWithTestSuites(["active"]);
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["active"] },
+        scope: { mode: "test_suites", testSuiteIds: ["active"] },
         prisma,
       });
 
@@ -56,35 +56,35 @@ describe("normalizePlanScope", () => {
     });
   });
 
-  describe("when the scope names some but not all folders", () => {
-    /** @scenario "A scope naming some but not all suites stays a folders scope" */
-    it("stays a folders scope naming those folders", async () => {
+  describe("when the scope names some but not all test suites", () => {
+    /** @scenario "A scope naming some but not all suites stays a test suites scope" */
+    it("stays a test suites scope naming those test suites", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["b", "a"] },
-        prisma: prismaWithFolders(["a", "b", "c"]),
+        scope: { mode: "test_suites", testSuiteIds: ["b", "a"] },
+        prisma: prismaWithTestSuites(["a", "b", "c"]),
       });
 
-      expect(scope).toEqual({ mode: "folders", folderIds: ["a", "b"] });
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: ["a", "b"] });
     });
   });
 
-  describe("when the scope names no folder", () => {
-    /** @scenario "A folders scope naming no suite is not treated as everything" */
-    it("stays a folders scope naming none", async () => {
+  describe("when the scope names no test suite", () => {
+    /** @scenario "A test suites scope naming no suite is not treated as everything" */
+    it("stays a test suites scope naming none", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: [] },
-        prisma: prismaWithFolders(["a", "b"]),
+        scope: { mode: "test_suites", testSuiteIds: [] },
+        prisma: prismaWithTestSuites(["a", "b"]),
       });
 
-      expect(scope).toEqual({ mode: "folders", folderIds: [] });
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: [] });
     });
   });
 
-  describe("when the scope is not a folders scope", () => {
+  describe("when the scope is not a test suites scope", () => {
     it("leaves it alone", async () => {
-      const prisma = prismaWithFolders(["a"]);
+      const prisma = prismaWithTestSuites(["a"]);
       expect(
         await normalizePlanScope({
           projectId: "project-1",
@@ -141,24 +141,34 @@ describe("configurationKey", () => {
 describe("scopeKey", () => {
   describe("when two hand-picked scopes cover different scenarios", () => {
     it("tells them apart, which the scope shape alone cannot", () => {
-      const first = scopeKey({ scope: { mode: "cases" }, scenarioIds: ["a"] });
-      const second = scopeKey({ scope: { mode: "cases" }, scenarioIds: ["b"] });
+      const first = scopeKey({
+        scope: { mode: "scenarios" },
+        scenarioIds: ["a"],
+      });
+      const second = scopeKey({
+        scope: { mode: "scenarios" },
+        scenarioIds: ["b"],
+      });
 
       expect(first).not.toBe(second);
     });
 
     it("reads the same list in either order as one scope", () => {
       expect(
-        scopeKey({ scope: { mode: "cases" }, scenarioIds: ["b", "a"] }),
-      ).toBe(scopeKey({ scope: { mode: "cases" }, scenarioIds: ["a", "b"] }));
+        scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["b", "a"] }),
+      ).toBe(
+        scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["a", "b"] }),
+      );
     });
   });
 
-  describe("when the scope is a folders scope", () => {
-    it("reads the same folders in either order as one scope", () => {
+  describe("when the scope is a test suites scope", () => {
+    it("reads the same test suites in either order as one scope", () => {
       expect(
-        scopeKey({ scope: { mode: "folders", folderIds: ["b", "a"] } }),
-      ).toBe(scopeKey({ scope: { mode: "folders", folderIds: ["a", "b"] } }));
+        scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["b", "a"] } }),
+      ).toBe(
+        scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["a", "b"] } }),
+      );
     });
   });
 });

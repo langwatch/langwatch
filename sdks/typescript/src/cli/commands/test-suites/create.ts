@@ -9,7 +9,7 @@ import { createCliTestSuitesService } from "./cli-test-suites-service";
  * Creates an empty test suite. Scenarios join it by being filed into it, and
  * the targets a run goes against travel with the run.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const createTestSuiteCommand = async (
   name: string,
@@ -34,7 +34,7 @@ export const createTestSuiteCommand = async (
         console.log();
         console.log(
           chalk.gray(
-            `File a scenario into it with: ${chalk.cyan(`langwatch scenario create "<name>" --situation "<situation>" --folder ${suite.id}`)}`,
+            `File a scenario into it with: ${chalk.cyan(`langwatch scenario create "<name>" --situation "<situation>" --test-suite ${suite.id}`)}`,
           ),
         );
       },

@@ -100,7 +100,7 @@ vi.mock("~/utils/api", () => ({
       // The run dialog offers the previous configurations of a scope, which
       // it reads from the run plans and the test suites of the project.
       getAll: { useQuery: () => ({ data: [] }) },
-      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      testSuites: { getAll: { useQuery: () => ({ data: [] }) } },
       create: {
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
@@ -201,7 +201,7 @@ const suitePlan: RunPlan = {
   slug: "checkout",
   name: "Checkout",
   kind: "suite",
-  scopeKind: "folders",
+  scopeKind: "test_suites",
   scopeLabel: "3 scenarios",
   scenarioSetId: SUITE_SET_ID,
   suiteId: "suite_1",
@@ -479,7 +479,7 @@ describe("<RunPlanDetail/>", () => {
   });
 
   /** @scenario "A row that has not settled shows no time and no cost" */
-  it("shows no time and no cost while a case is still running", () => {
+  it("shows no time and no cost while a scenario is still running", () => {
     setRuns([
       makeRun({
         scenarioRunId: "run_live",
@@ -613,20 +613,22 @@ describe("<RunPlanDetail/>", () => {
       makeRun({
         batchRunId: "batch_3",
         scenarioRunId: "run_3",
-        name: "Newest case",
+        name: "Newest scenario",
       }),
       makeRun({
         batchRunId: "batch_2",
         scenarioRunId: "run_2",
-        name: "Older case",
+        name: "Older scenario",
         timestamp: NOW - 86_400_000,
       }),
     ]);
     renderDetail({ batchRunId: "batch_2" });
 
     const table = screen.getByTestId("run-results-table");
-    expect(within(table).getByText("Older case")).toBeInTheDocument();
-    expect(within(table).queryByText("Newest case")).not.toBeInTheDocument();
+    expect(within(table).getByText("Older scenario")).toBeInTheDocument();
+    expect(
+      within(table).queryByText("Newest scenario"),
+    ).not.toBeInTheDocument();
     // The run that is not shown stays in the rail.
     expect(screen.getByTestId("runs-sidebar-item-batch_3")).toBeInTheDocument();
   });
@@ -817,7 +819,7 @@ describe("<RunPlanDetail/>", () => {
   });
 
   /** @scenario "A run that is still going updates without a reload" */
-  it("moves a case from queued to its verdict as the data arrives", () => {
+  it("moves a scenario from queued to its verdict as the data arrives", () => {
     setRuns([
       makeRun({
         scenarioRunId: "run_live",
@@ -873,8 +875,8 @@ describe("<RunPlanDetail/>", () => {
     expect(screen.queryByText(/reload/i)).not.toBeInTheDocument();
   });
 
-  /** @scenario "One case in a running batch can be stopped on its own" */
-  it("stops one running case on its own", async () => {
+  /** @scenario "One scenario in a running batch can be stopped on its own" */
+  it("stops one running scenario on its own", async () => {
     const user = userEvent.setup();
     setRuns([
       makeRun({
@@ -903,7 +905,7 @@ describe("<RunPlanDetail/>", () => {
       scenarioRunId: "run_running",
       scenarioId: "scen_1",
     });
-    // The other case keeps its own Stop, so it is still going.
+    // The other scenario keeps its own Stop, so it is still going.
     expect(screen.getAllByTestId("cancel-run-button")).toHaveLength(2);
   });
 
@@ -933,12 +935,12 @@ describe("<RunPlanDetail/>", () => {
       scenarioSetId: SUITE_SET_ID,
       batchRunId: "batch_3",
     });
-    // The case that already finished keeps its verdict.
+    // The scenario that already finished keeps its verdict.
     expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
   });
 
-  /** @scenario "Stop is not offered for a case that already finished" */
-  it("offers no Stop when every case finished", () => {
+  /** @scenario "Stop is not offered for a scenario that already finished" */
+  it("offers no Stop when every scenario finished", () => {
     renderDetail();
 
     expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();

@@ -280,15 +280,15 @@ describe("Scenarios API", () => {
     });
   });
 
-  describe("folderId over the public scenarios endpoint", () => {
-    async function createFolder(name: string) {
+  describe("testSuiteId over the public scenarios endpoint", () => {
+    async function createTestSuite(name: string) {
       return prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: testProjectId,
           name,
           slug: `${name.toLowerCase()}-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -296,39 +296,39 @@ describe("Scenarios API", () => {
       });
     }
 
-    describe("when a scenario is created with a folderId", () => {
-      it("files it there and reports folderId on the response", async () => {
-        const folder = await createFolder("Refunds");
+    describe("when a scenario is created with a testSuiteId", () => {
+      it("files it there and reports testSuiteId on the response", async () => {
+        const testSuite = await createTestSuite("Refunds");
 
         const res = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "A customer wants a refund",
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         });
 
         expect(res.status).toBe(201);
         const body = await res.json();
-        expect(body.folderId).toBe(folder.id);
+        expect(body.testSuiteId).toBe(testSuite.id);
 
         const stored = await prisma.simulationSuite.findFirst({
-          where: { id: folder.id, projectId: testProjectId },
+          where: { id: testSuite.id, projectId: testProjectId },
         });
         expect(stored?.scenarioIds).toEqual([body.id]);
       });
     });
 
-    describe("when a scenario is updated with folderId null", () => {
+    describe("when a scenario is updated with testSuiteId null", () => {
       it("files it into the Default suite", async () => {
-        const folder = await createFolder("Refunds");
+        const testSuite = await createTestSuite("Refunds");
         const created = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "s",
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         });
         const { id } = await created.json();
 
         const res = await helpers.api.put(`/api/scenarios/${id}`, {
-          folderId: null,
+          testSuiteId: null,
         });
 
         expect(res.status).toBe(200);
@@ -337,31 +337,31 @@ describe("Scenarios API", () => {
         const defaultSuite = await prisma.simulationSuite.findFirst({
           where: {
             projectId: testProjectId,
-            kind: "folder",
+            kind: "test_suite",
             name: DEFAULT_SUITE_NAME,
           },
         });
-        expect(body.folderId).toBe(defaultSuite?.id);
+        expect(body.testSuiteId).toBe(defaultSuite?.id);
         expect(defaultSuite?.scenarioIds).toEqual([id]);
 
         const stored = await prisma.simulationSuite.findFirst({
-          where: { id: folder.id, projectId: testProjectId },
+          where: { id: testSuite.id, projectId: testProjectId },
         });
         expect(stored?.scenarioIds).toEqual([]);
       });
     });
 
-    describe("when the folderId names no active folder", () => {
-      it("refuses with scenario_folder_not_found", async () => {
+    describe("when the testSuiteId names no active test suite", () => {
+      it("refuses with scenario_test_suite_not_found", async () => {
         const res = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "s",
-          folderId: "suite_missing",
+          testSuiteId: "suite_missing",
         });
 
         expect(res.status).toBe(404);
         const body = await res.json();
-        expect(body.error).toBe("scenario_folder_not_found");
+        expect(body.error).toBe("scenario_test_suite_not_found");
       });
     });
   });

@@ -1,12 +1,12 @@
 /**
  * @vitest-environment node
  *
- * The suites.folders tRPC surface and the v1 kind guard, against a real
+ * The suites.test suites tRPC surface and the v1 kind guard, against a real
  * database with real RBAC role bindings.
  *
- * @see specs/suites/suite-folders.feature
- * @see specs/suites/folder-run-plan-reuse.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/suites/test-suites.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -19,8 +19,8 @@ import { createInnerTRPCContext } from "../../../trpc";
 
 wireDefaultTestApp();
 
-describe("suites.folders integration", () => {
-  const ns = `folder-router-${nanoid(8)}`;
+describe("suites.test suites integration", () => {
+  const ns = `testSuite-router-${nanoid(8)}`;
   let projectId: string;
   let otherProjectId: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
@@ -31,12 +31,12 @@ describe("suites.folders integration", () => {
 
   beforeAll(async () => {
     const organization = await prisma.organization.create({
-      data: { name: "Folder Org", slug: `--test-org-${ns}` },
+      data: { name: "Test suite Org", slug: `--test-org-${ns}` },
     });
     organizationId = organization.id;
     const team = await prisma.team.create({
       data: {
-        name: "Folder Team",
+        name: "Test suite Team",
         slug: `--test-team-${ns}`,
         organizationId: organization.id,
       },
@@ -44,7 +44,7 @@ describe("suites.folders integration", () => {
     teamId = team.id;
     const project = await prisma.project.create({
       data: {
-        name: "Folder Project",
+        name: "Test suite Project",
         slug: `--test-project-${ns}`,
         apiKey: `sk-lw-test-${nanoid()}`,
         teamId: team.id,
@@ -106,8 +106,8 @@ describe("suites.folders integration", () => {
     );
   });
 
-  // Creating a case writes its first version, and ScenarioVersion has no
-  // foreign key, so those rows outlive the case unless they go first.
+  // Creating a scenario writes its first version, and ScenarioVersion has no
+  // foreign key, so those rows outlive the scenario unless they go first.
   beforeEach(() =>
     cleanupTestRows(prisma, [
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
@@ -134,7 +134,7 @@ describe("suites.folders integration", () => {
     const scenario = await prisma.scenario.create({
       data: {
         projectId: project,
-        name: `${name} case`,
+        name: `${name} scenario`,
         situation: "A customer asks for help",
         criteria: ["The agent helps"],
         labels: [],
@@ -153,23 +153,25 @@ describe("suites.folders integration", () => {
     });
   }
 
-  describe("creating a folder", () => {
-    /** @scenario "A new folder is created empty and appears in the rail" */
-    it("creates it empty and lists it in folders.getAll", async () => {
-      const folder = await caller.suites.folders.create({
+  describe("creating a test suite", () => {
+    /** @scenario "A new test suite is created empty and appears in the rail" */
+    it("creates it empty and lists it in test suites.getAll", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
 
-      expect(folder.kind).toBe("folder");
-      expect(folder.scenarioIds).toEqual([]);
+      expect(testSuite.kind).toBe("test_suite");
+      expect(testSuite.scenarioIds).toEqual([]);
 
-      const folders = await caller.suites.folders.getAll({ projectId });
-      expect(folders.map((f) => f.id)).toContain(folder.id);
-      expect(folders.find((f) => f.id === folder.id)?.caseIds).toEqual([]);
+      const testSuites = await caller.suites.testSuites.getAll({ projectId });
+      expect(testSuites.map((f) => f.id)).toContain(testSuite.id);
+      expect(
+        testSuites.find((f) => f.id === testSuite.id)?.scenarioIds,
+      ).toEqual([]);
     });
 
-    /** @scenario "A folder created with a name another suite already uses keeps both names readable" */
+    /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
     it("keeps the name readable and takes a different address when a run plan holds the slug", async () => {
       const plan = await prisma.simulationSuite.create({
         data: {
@@ -183,54 +185,54 @@ describe("suites.folders integration", () => {
         },
       });
 
-      const folder = await caller.suites.folders.create({
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
 
-      expect(folder.name).toBe("Refunds");
-      expect(folder.slug).not.toBe(plan.slug);
-      expect(folder.slug).toMatch(/^refunds-/);
+      expect(testSuite.name).toBe("Refunds");
+      expect(testSuite.slug).not.toBe(plan.slug);
+      expect(testSuite.slug).toMatch(/^refunds-/);
     });
   });
 
-  describe("renaming a folder", () => {
-    /** @scenario "Renaming a folder keeps its cases and its run history" */
+  describe("renaming a test suite", () => {
+    /** @scenario "Renaming a test suite keeps its scenarios and its run history" */
     it("changes the name and keeps the slug and the member list", async () => {
-      const folder = await caller.suites.folders.create({
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
       const scenario = await caller.scenarios.create({
         projectId,
-        name: "Refund case",
+        name: "Refund scenario",
         situation: "A customer wants a refund",
         criteria: [],
         labels: [],
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
       });
 
-      const renamed = await caller.suites.folders.rename({
+      const renamed = await caller.suites.testSuites.rename({
         projectId,
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
         name: "Refunds and credits",
       });
 
       expect(renamed.name).toBe("Refunds and credits");
-      // The slug addresses the folder's run history, so a rename keeps it.
-      expect(renamed.slug).toBe(folder.slug);
+      // The slug addresses the test suite's run history, so a rename keeps it.
+      expect(renamed.slug).toBe(testSuite.slug);
       expect(renamed.scenarioIds).toEqual([scenario.id]);
     });
 
-    /** @scenario "Renaming a folder in another project is refused with suite_not_found" */
-    it("refuses a folder of another project with suite_not_found", async () => {
+    /** @scenario "Renaming a test suite in another project is refused with suite_not_found" */
+    it("refuses a test suite of another project with suite_not_found", async () => {
       const foreign = await prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: otherProjectId,
           name: "Foreign",
           slug: `foreign-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -238,9 +240,9 @@ describe("suites.folders integration", () => {
       });
 
       await expect(
-        caller.suites.folders.rename({
+        caller.suites.testSuites.rename({
           projectId,
-          folderId: foreign.id,
+          testSuiteId: foreign.id,
           name: "Taken over",
         }),
       ).rejects.toMatchObject({
@@ -254,11 +256,11 @@ describe("suites.folders integration", () => {
     });
   });
 
-  describe("archiving a folder", () => {
-    /** @scenario "Archiving a folder archives the cases in it" */
-    /** @scenario "Archiving a folder archives its run plan too" */
-    it("archives the folder and its cases together", async () => {
-      const folder = await caller.suites.folders.create({
+  describe("archiving a test suite", () => {
+    /** @scenario "Archiving a test suite archives the scenarios in it" */
+    /** @scenario "Archiving a test suite archives its run plan too" */
+    it("archives the test suite and its scenarios together", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
@@ -268,7 +270,7 @@ describe("suites.folders integration", () => {
         situation: "s",
         criteria: [],
         labels: [],
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
       });
       const second = await caller.scenarios.create({
         projectId,
@@ -276,51 +278,60 @@ describe("suites.folders integration", () => {
         situation: "s",
         criteria: [],
         labels: [],
-        folderId: folder.id,
+        testSuiteId: testSuite.id,
       });
 
-      await caller.suites.folders.archive({ projectId, folderId: folder.id });
+      await caller.suites.testSuites.archive({
+        projectId,
+        testSuiteId: testSuite.id,
+      });
 
-      const folders = await caller.suites.folders.getAll({ projectId });
-      expect(folders.map((f) => f.id)).not.toContain(folder.id);
+      const testSuites = await caller.suites.testSuites.getAll({ projectId });
+      expect(testSuites.map((f) => f.id)).not.toContain(testSuite.id);
 
       const cases = await caller.scenarios.getAll({ projectId });
       const listedIds = cases.map((scenario) => scenario.id);
       expect(listedIds).not.toContain(first.id);
       expect(listedIds).not.toContain(second.id);
 
-      // The folder's own suite row is archived too, so no run plan surface
+      // The test suite's own suite row is archived too, so no run plan surface
       // lists it any more.
       const archivedRow = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(archivedRow?.archivedAt).not.toBeNull();
     });
 
-    /** @scenario "Archiving a folder that is already archived changes nothing" */
+    /** @scenario "Archiving a test suite that is already archived changes nothing" */
     it("keeps the first archive time on a second archive", async () => {
-      const folder = await caller.suites.folders.create({
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
-      await caller.suites.folders.archive({ projectId, folderId: folder.id });
+      await caller.suites.testSuites.archive({
+        projectId,
+        testSuiteId: testSuite.id,
+      });
       const firstArchive = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
 
-      await caller.suites.folders.archive({ projectId, folderId: folder.id });
+      await caller.suites.testSuites.archive({
+        projectId,
+        testSuiteId: testSuite.id,
+      });
 
       const secondArchive = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(secondArchive?.archivedAt).toEqual(firstArchive?.archivedAt);
     });
   });
 
-  describe("folder execution settings", () => {
-    /** @scenario "Updating a folder with execution settings is refused with validation_error" */
-    it("refuses targets, a repeat count and models on a folder", async () => {
-      const folder = await caller.suites.folders.create({
+  describe("test suite execution settings", () => {
+    /** @scenario "Updating a test suite with execution settings is refused with validation_error" */
+    it("refuses targets, a repeat count and models on a test suite", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
@@ -328,7 +339,7 @@ describe("suites.folders integration", () => {
       await expect(
         caller.suites.update({
           projectId,
-          id: folder.id,
+          id: testSuite.id,
           targets: [{ type: "http", referenceId: "agent_prod" }],
           repeatCount: 3,
           simulatorModel: "openai/gpt-5-mini",
@@ -338,33 +349,33 @@ describe("suites.folders integration", () => {
       });
 
       const kept = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(kept?.targets).toEqual([]);
       expect(kept?.repeatCount).toBe(1);
       expect(kept?.simulatorModel).toBeNull();
     });
 
-    it("still saves a name and labels on a folder", async () => {
-      const folder = await caller.suites.folders.create({
+    it("still saves a name and labels on a test suite", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
 
       await caller.suites.update({
         projectId,
-        id: folder.id,
+        id: testSuite.id,
         labels: ["priority"],
       });
 
       const kept = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(kept?.labels).toEqual(["priority"]);
     });
 
-    it("refuses a direct scenarioIds write on a folder", async () => {
-      const folder = await caller.suites.folders.create({
+    it("refuses a direct scenarioIds write on a test suite", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
@@ -372,7 +383,7 @@ describe("suites.folders integration", () => {
       await expect(
         caller.suites.update({
           projectId,
-          id: folder.id,
+          id: testSuite.id,
           scenarioIds: ["scen_forged"],
         }),
       ).rejects.toMatchObject({
@@ -380,17 +391,17 @@ describe("suites.folders integration", () => {
       });
 
       const kept = await prisma.simulationSuite.findFirst({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(kept?.scenarioIds).toEqual([]);
     });
   });
 
   describe("the v1 kind guard", () => {
-    /** @scenario "The v1 run plan list holds no folder rows" */
-    it("keeps folder rows out of suites.getAll when no kind is named", async () => {
-      await caller.suites.folders.create({ projectId, name: "Refunds" });
-      await caller.suites.folders.create({ projectId, name: "Checkout" });
+    /** @scenario "The v1 run plan list holds no test suite rows" */
+    it("keeps test suite rows out of suites.getAll when no kind is named", async () => {
+      await caller.suites.testSuites.create({ projectId, name: "Refunds" });
+      await caller.suites.testSuites.create({ projectId, name: "Checkout" });
       const plan = await createCustomPlan("Nightly");
 
       const listed = await caller.suites.getAll({ projectId });
@@ -398,13 +409,13 @@ describe("suites.folders integration", () => {
       expect(listed.map((suite) => suite.id)).toEqual([plan.id]);
     });
 
-    /** @scenario "The v2 Test Runs list holds custom run plans only" */
-    it("lists custom plans for Test Runs and folders for the suites rail", async () => {
-      const refunds = await caller.suites.folders.create({
+    /** @scenario "The v2 Test Runs list holds run plans only" */
+    it("lists custom plans for Test Runs and test suites for the suites rail", async () => {
+      const refunds = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
-      const checkout = await caller.suites.folders.create({
+      const checkout = await caller.suites.testSuites.create({
         projectId,
         name: "Checkout",
       });
@@ -412,11 +423,11 @@ describe("suites.folders integration", () => {
 
       const testRuns = await caller.suites.getAll({
         projectId,
-        kinds: ["custom"],
+        kinds: ["run_plan"],
       });
       expect(testRuns.map((suite) => suite.id)).toEqual([plan.id]);
 
-      const suites = await caller.suites.folders.getAll({ projectId });
+      const suites = await caller.suites.testSuites.getAll({ projectId });
       expect(suites.map((suite) => suite.id).sort()).toEqual(
         [refunds.id, checkout.id].sort(),
       );
@@ -424,95 +435,100 @@ describe("suites.folders integration", () => {
   });
 
   describe("permissions", () => {
-    /** @scenario "A viewer can read folders but cannot create or archive one" */
-    it("lets a viewer read folders and refuses their writes", async () => {
-      const folder = await caller.suites.folders.create({
+    /** @scenario "A viewer can read test suites but cannot create or archive one" */
+    it("lets a viewer read test suites and refuses their writes", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
 
-      const seen = await viewerCaller.suites.folders.getAll({ projectId });
-      expect(seen.map((f) => f.id)).toContain(folder.id);
+      const seen = await viewerCaller.suites.testSuites.getAll({ projectId });
+      expect(seen.map((f) => f.id)).toContain(testSuite.id);
 
       await expect(
-        viewerCaller.suites.folders.create({ projectId, name: "Mine" }),
+        viewerCaller.suites.testSuites.create({ projectId, name: "Mine" }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(
-        viewerCaller.suites.folders.archive({
+        viewerCaller.suites.testSuites.archive({
           projectId,
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    /** @scenario "A person with read-only access cannot move a case" */
-    it("refuses a viewer's move of a case", async () => {
-      const folder = await caller.suites.folders.create({
+    /** @scenario "A person with read-only access cannot move a scenario" */
+    it("refuses a viewer's move of a scenario", async () => {
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
       const scenario = await caller.scenarios.create({
         projectId,
-        name: "Refund case",
+        name: "Refund scenario",
         situation: "s",
         criteria: [],
         labels: [],
       });
 
       await expect(
-        viewerCaller.scenarios.moveToFolder({
+        viewerCaller.scenarios.moveToTestSuite({
           projectId,
           scenarioId: scenario.id,
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
 
       const kept = await prisma.scenario.findFirst({
         where: { id: scenario.id, projectId },
       });
-      expect(kept?.folderId).toBe(scenario.folderId);
+      expect(kept?.testSuiteId).toBe(scenario.testSuiteId);
     });
   });
 
-  describe("moving a case over tRPC", () => {
-    /** @scenario "Moving a case from its row menu regroups the case list" */
-    /** @scenario "Taking a case out of its suite moves it to Default" */
-    it("moves a case between suites and back to Default, keeping its id and history key", async () => {
-      const refunds = await caller.suites.folders.create({
+  describe("moving a scenario over tRPC", () => {
+    /** @scenario "Moving a scenario from its row menu regroups the scenario list" */
+    /** @scenario "Taking a scenario out of its suite moves it to Default" */
+    it("moves a scenario between suites and back to Default, keeping its id and history key", async () => {
+      const refunds = await caller.suites.testSuites.create({
         projectId,
         name: "Refunds",
       });
-      const checkout = await caller.suites.folders.create({
+      const checkout = await caller.suites.testSuites.create({
         projectId,
         name: "Checkout",
       });
       const scenario = await caller.scenarios.create({
         projectId,
-        name: "Refund case",
+        name: "Refund scenario",
         situation: "s",
         criteria: [],
         labels: [],
-        folderId: refunds.id,
+        testSuiteId: refunds.id,
       });
 
-      const moved = await caller.scenarios.moveToFolder({
+      const moved = await caller.scenarios.moveToTestSuite({
         projectId,
         scenarioId: scenario.id,
-        folderId: checkout.id,
+        testSuiteId: checkout.id,
       });
       // Run history keys on the scenario id, which the move never touches.
       expect(moved.id).toBe(scenario.id);
-      expect(moved.folderId).toBe(checkout.id);
+      expect(moved.testSuiteId).toBe(checkout.id);
 
-      const takenOut = await caller.scenarios.moveToFolder({
+      const takenOut = await caller.scenarios.moveToTestSuite({
         projectId,
         scenarioId: scenario.id,
-        folderId: null,
+        testSuiteId: null,
       });
       const defaultSuite = await prisma.simulationSuite.findFirst({
-        where: { projectId, kind: "folder", name: "Default", archivedAt: null },
+        where: {
+          projectId,
+          kind: "test_suite",
+          name: "Default",
+          archivedAt: null,
+        },
       });
-      expect(takenOut.folderId).toBe(defaultSuite?.id);
+      expect(takenOut.testSuiteId).toBe(defaultSuite?.id);
 
       const listed = await caller.scenarios.getAll({ projectId });
       expect(listed.map((s) => s.id)).toContain(scenario.id);

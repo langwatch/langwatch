@@ -1,7 +1,7 @@
 /**
  * Suite slugs.
  *
- * Folder slugs and run plan slugs share one per-project namespace, enforced by
+ * Test suite slugs and run plan slugs share one per-project namespace, enforced by
  * the unique (projectId, slug). A name a person picks may already be slugged by
  * another suite, so the slug takes a numeric suffix rather than the write being
  * refused.

@@ -12,7 +12,7 @@ Feature: The wide run detail drawer
     The results read as a labelled "Verdict:" line, then the criteria split
     into a "Passed criteria" section over a "Failed criteria" section, then
     what the judge said. Each section is drawn only when it has
-    rows. Within a section the criteria keep the order the case declares them.
+    rows. Within a section the criteria keep the order the scenario declares them.
     Nothing there repeats the chips at the top of the drawer: no success rate,
     no criteria count and no duration.
 
@@ -67,7 +67,7 @@ Feature: The wide run detail drawer
     Given a finished run whose judge met two criteria and missed one
     When the results are read
     Then a "Passed criteria" section reads over a "Failed criteria" section
-    And each section keeps the criteria in the order the case declares them
+    And each section keeps the criteria in the order the scenario declares them
     And a passed row carries a green check and a failed row a red cross
 
   @integration
@@ -126,15 +126,15 @@ Feature: The wide run detail drawer
     Given a run open in the drawer
     When its header is read
     Then one labelled "Open Scenario" control for the scenario is offered
-    And using it opens the case editor
+    And using it opens the scenario editor
 
   @integration
-  Scenario: The drawer header opens the case editor from one labelled button
+  Scenario: The drawer header opens the scenario editor from one labelled button
     Given a run open in the drawer
     When its header is read
     Then no separate Play and Edit icon buttons are offered
     And a single "Open Scenario" button is shown next to the overflow menu
-    And a run of that scenario is triggered from inside the case editor
+    And a run of that scenario is triggered from inside the scenario editor
       through its "Save & Run" control
 
   @integration

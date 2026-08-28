@@ -1,10 +1,10 @@
 /**
  * @vitest-environment node
  *
- * A folder row still carries execution settings, because a caller that
- * addresses a folder BY ID has nothing else to run against: the command line,
+ * A test suite row still carries execution settings, because a caller that
+ * addresses a test suite BY ID has nothing else to run against: the command line,
  * the MCP tool and the SDK all reach `POST /api/suites/:id/run`. What keeps
- * that from being a licence for the product UI to treat a folder as a run
+ * that from being a licence for the product UI to treat a test suite as a run
  * plan again is this guard.
  *
  * The v2 Agent Testing UI queues every run through `suites.runPlan`, which
@@ -17,7 +17,7 @@
  * anywhere under the feature calls these, which no single rendered component
  * can show.
  *
- * @see specs/suites/folder-run-plan-reuse.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -47,7 +47,7 @@ function filesMatching(pattern: RegExp): string[] {
 
 describe("given the Agent Testing UI", () => {
   describe("when it starts a run", () => {
-    /** @scenario "The Agent Testing UI runs only through the run plan procedure" */
+    /** @scenario "A run started from the Agent Testing UI always carries a run plan" */
     it("reaches suites.runPlan and never the id-based run procedures", () => {
       // `suites.run` is a prefix of both `runPlan` and `runAll`, so the dot
       // is what makes each pattern name one procedure.
@@ -56,7 +56,7 @@ describe("given the Agent Testing UI", () => {
       expect(filesMatching(/api\.suites\.runPlan\b/)).not.toEqual([]);
     });
 
-    /** @scenario "The Agent Testing UI writes no execution settings onto a suite row" */
+    /** @scenario "A test suite row never gains execution settings from the product UI" */
     it("never calls the suite procedures that accept execution settings", () => {
       expect(filesMatching(/api\.suites\.create\b/)).toEqual([]);
       expect(filesMatching(/api\.suites\.update\b/)).toEqual([]);

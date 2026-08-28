@@ -29,11 +29,19 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
-  folderId: z
+  /**
+   * Optional in the document, not in the answer: every server sends it. The
+   * field arrived after clients were generated from this family, and a client
+   * that reads it as required fails against a server that predates it.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
+  testSuiteId: z
     .string()
     .nullable()
+    .optional()
     .describe(
-      "The test suite (folder) this scenario is filed in, or null when unfiled.",
+      "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
     ),
 });
 
@@ -47,7 +55,7 @@ const scenarioVersionSummarySchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded.",
+      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded.",
     ),
   authorId: z
     .string()
@@ -63,7 +71,7 @@ const scenarioVersionSummarySchema = z.object({
   isSynthesized: z
     .boolean()
     .describe(
-      "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
+      "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
     ),
 });
 
@@ -96,7 +104,9 @@ const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
         maxTurns: z.number().nullable(),
         minTurns: z.number().nullable(),
       })
-      .describe("The editable content of the case as this version saved it."),
+      .describe(
+        "The editable content of the scenario as this version saved it.",
+      ),
   },
 );
 
@@ -117,8 +127,8 @@ const versionPathSchema = z.object({
 const parametersDescription =
   "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
 
-const folderIdDescription =
-  "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario.";
+const testSuiteIdDescription =
+  "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
 
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -128,7 +138,7 @@ const createScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
-  folderId: z.string().nullish().describe(folderIdDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -139,7 +149,7 @@ const updateScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
-  folderId: z.string().nullish().describe(folderIdDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
 
 /**
@@ -165,7 +175,7 @@ function toScenarioResponse(scenario: Scenario) {
     criteria: scenario.criteria,
     labels: scenario.labels,
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
-    folderId: scenario.folderId,
+    testSuiteId: scenario.testSuiteId,
   };
 }
 
@@ -319,7 +329,9 @@ function registerCreateScenarioRoute(
           criteria: body.criteria,
           labels: body.labels,
           ...(body.parameters !== undefined && { parameters: body.parameters }),
-          ...(body.folderId !== undefined && { folderId: body.folderId }),
+          ...(body.testSuiteId !== undefined && {
+            testSuiteId: body.testSuiteId,
+          }),
         },
         { actor: actorFromRequest(c) },
       );
@@ -393,7 +405,9 @@ function registerUpdateScenarioRoute(
           ...(body.criteria !== undefined && { criteria: body.criteria }),
           ...(body.labels !== undefined && { labels: body.labels }),
           ...(body.parameters !== undefined && { parameters: body.parameters }),
-          ...(body.folderId !== undefined && { folderId: body.folderId }),
+          ...(body.testSuiteId !== undefined && {
+            testSuiteId: body.testSuiteId,
+          }),
         },
         options: { actor: actorFromRequest(c) },
       });

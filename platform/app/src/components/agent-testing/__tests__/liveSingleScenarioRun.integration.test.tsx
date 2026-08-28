@@ -42,7 +42,7 @@ const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
 const mockGetBatchRunData = vi.hoisted(() => vi.fn());
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
-const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockLastResults = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
@@ -72,7 +72,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -93,7 +93,7 @@ vi.mock("~/utils/api", () => ({
       getScenarioSetBatchRunCount: { useQuery: emptyQuery },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      moveToFolder: {
+      moveToTestSuite: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       cancelJob: {
@@ -104,8 +104,8 @@ vi.mock("~/utils/api", () => ({
       },
     },
     suites: {
-      folders: {
-        getAll: { useQuery: mockFoldersGetAll },
+      testSuites: {
+        getAll: { useQuery: mockTestSuitesGetAll },
         create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         rename: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -256,7 +256,7 @@ const REFUNDS = {
   id: "suite_refunds",
   name: "Refunds",
   slug: "refunds",
-  caseIds: ["case_1"],
+  scenarioIds: ["case_1"],
   targets: [],
 };
 
@@ -265,7 +265,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     id: "case_1",
     name: "Angry refund request",
     labels: [],
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     parameters: null,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
@@ -314,7 +314,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-describe("starting a run of one scenario from the case table", () => {
+describe("starting a run of one scenario from the scenario table", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -328,7 +328,7 @@ describe("starting a run of one scenario from the case table", () => {
       data: [scenarioRow()],
       isLoading: false,
     });
-    mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
     mockLastResults.mockReturnValue({ data: [], isLoading: false });
     mockGetRunState.mockReturnValue({ data: undefined, error: null });
     mockGetBatchRunData.mockReturnValue({ data: undefined });
@@ -345,7 +345,7 @@ describe("starting a run of one scenario from the case table", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "Confirming a run from a case row does not change the address" */
+  /** @scenario "Confirming a run from a scenario row does not change the address" */
   it("keeps the address and the table when a run is confirmed", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
@@ -368,7 +368,7 @@ describe("starting a run of one scenario from the case table", () => {
     mockRouterState.asPath = "/test-project/agent-testing/suites/refunds";
     // Filed under Refunds so the row reads inside that suite.
     mockScenariosGetAll.mockReturnValue({
-      data: [scenarioRow({ folderId: REFUNDS.id })],
+      data: [scenarioRow({ testSuiteId: REFUNDS.id })],
       isLoading: false,
     });
     render(<TestCasesTab />, { wrapper: Wrapper });
@@ -383,7 +383,7 @@ describe("starting a run of one scenario from the case table", () => {
   });
 
   /** @scenario "The run detail drawer opens as soon as the run is queued" */
-  it("opens the drawer at queue time, naming the case and the target", async () => {
+  it("opens the drawer at queue time, naming the scenario and the target", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
 
@@ -402,7 +402,7 @@ describe("starting a run of one scenario from the case table", () => {
     });
     cleanup();
 
-    // What that drawer reads while the run is queued: the case, the target,
+    // What that drawer reads while the run is queued: the scenario, the target,
     // and the queued state.
     mockParams.value = {
       variant: "agent-testing",
@@ -423,7 +423,7 @@ describe("starting a run of one scenario from the case table", () => {
   });
 
   /** @scenario "The run goes out under a plan named after the scenario and the agent" */
-  it("queues one run plan named after the case and the agent, covering that case alone", async () => {
+  it("queues one run plan named after the scenario and the agent, covering that scenario alone", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
 
@@ -431,14 +431,14 @@ describe("starting a run of one scenario from the case table", () => {
 
     const sent = queuedPlanRun();
     expect(sent.name).toBe("Angry refund request prod-agent");
-    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scope).toEqual({ mode: "scenarios" });
     expect(sent.config.scenarioIds).toEqual(["case_1"]);
     // Nothing goes to the scenario runner any more, so nothing lands in the
     // project's internal run set.
     expect(mockRunScenario).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Running the same case against the same agent again joins the same plan" */
+  /** @scenario "Running the same scenario against the same agent again joins the same plan" */
   it("sends the same name both times, so the second run joins the first plan", async () => {
     const user = userEvent.setup();
     const view = render(<TestCasesTab />, { wrapper: Wrapper });
@@ -480,7 +480,7 @@ describe("starting a run of one scenario from the case table", () => {
     );
   });
 
-  /** @scenario "Running the same case against another agent is another plan" */
+  /** @scenario "Running the same scenario against another agent is another plan" */
   it("names the other agent when the run goes against it", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });

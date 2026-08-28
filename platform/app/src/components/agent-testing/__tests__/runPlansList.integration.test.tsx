@@ -50,7 +50,7 @@ function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
     slug: "checkout",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     labels: [],
-    scope: { mode: "cases" },
+    scope: { mode: "scenarios" },
     ...overrides,
   };
 }
@@ -113,24 +113,24 @@ function renderRows(
 /**
  * The run plans of a project, built the way the Results tab builds them.
  *
- * `folders` are the test suites: never rows of the list, but named by a plan
+ * `test suites` are the test suites: never rows of the list, but named by a plan
  * whose scope points at them.
  */
 function plansOf({
   plans = [],
-  folders = [],
+  testSuites = [],
   suiteSummaries = {},
   externalSets = [],
 }: {
   plans?: RunPlanSuite[];
-  folders?: { id: string; name: string }[];
+  testSuites?: { id: string; name: string }[];
   suiteSummaries?: Record<string, SuiteRunSummary>;
   externalSets?: ExternalSetSummary[];
 }): RunPlan[] {
   return buildRunPlans({
     plans,
     suiteNames: new Map(
-      [...plans, ...folders].map((suite) => [suite.id, suite.name]),
+      [...plans, ...testSuites].map((suite) => [suite.id, suite.name]),
     ),
     suiteSummaries,
     externalSets,
@@ -303,10 +303,13 @@ describe("the Test Runs list", () => {
           id: "suite_2",
           name: "Everything nightly",
           slug: "nightly",
-          scope: { mode: "folders", folderIds: ["suite_1", "folder_refunds"] },
+          scope: {
+            mode: "test_suites",
+            testSuiteIds: ["suite_1", "test_suite_refunds"],
+          },
         }),
       ],
-      folders: [{ id: "folder_refunds", name: "Refunds" }],
+      testSuites: [{ id: "test_suite_refunds", name: "Refunds" }],
     });
 
     renderRows(planRowsOf(plans));
@@ -335,7 +338,7 @@ describe("the Test Runs list", () => {
           id: "suite_2",
           name: "Nightly",
           slug: "nightly",
-          scope: { mode: "folders", folderIds: ["folder_refunds"] },
+          scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
         }),
         makeSuite({
           id: "suite_3",
@@ -347,10 +350,10 @@ describe("the Test Runs list", () => {
           id: "suite_4",
           name: "Picked",
           slug: "picked",
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
         }),
       ],
-      folders: [{ id: "folder_refunds", name: "Refunds" }],
+      testSuites: [{ id: "test_suite_refunds", name: "Refunds" }],
     });
 
     renderRows(planRowsOf(plans));
@@ -677,7 +680,7 @@ describe("the run plans of a project", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a hand-picked scope as how many scenarios it holds", () => {
     const plans = plansOf({
-      plans: [makeSuite({ scope: { mode: "cases" } })],
+      plans: [makeSuite({ scope: { mode: "scenarios" } })],
       suiteSummaries: {},
       externalSets: [],
     });

@@ -51,11 +51,11 @@ Feature: The run dialog
     creates a second plan and forks the one the person opened.
 
   @unit
-  Scenario: A folder answers to no plan name, so its run still derives one
-    Given a suite of kind folder and a run plan of kind custom
+  Scenario: A test suite answers to no plan name, so its run still derives one
+    Given a suite of kind test suite and a run plan of kind custom
     When each is opened in the run dialog from the Results tab
     Then the run plan opens on the name it is stored under
-    And the folder opens on a name derived from its scope and its target
+    And the test suite opens on a name derived from its scope and its target
 
   @integration
   Scenario: The derived name follows the agent until the person types
@@ -220,10 +220,10 @@ Feature: The run dialog
 
   @integration
   Scenario: The parameters chip adds one input line for the values
-    Given a test suite whose cases declare parameters
+    Given a test suite whose scenarios declare parameters
     When "Add parameters" is chosen
     Then one input line is added for the parameter values
-    And the values declared on the cases are already filled in
+    And the values declared on the scenarios are already filled in
     And a name written on that line is sent as the run parameter of that name
 
   @integration
@@ -296,7 +296,7 @@ Feature: The run dialog
 
   @integration
   Scenario: A declared secret parameter is a locked row of the same list
-    Given a test suite whose cases declare a secret parameter
+    Given a test suite whose scenarios declare a secret parameter
     When "Add parameters" is chosen
     Then the block opens in rows mode, with no separate secret section
     And the declared secret is a row with its lock on and its key fixed
@@ -356,7 +356,7 @@ Feature: The run dialog
     Given the run dialog opened from New run plan
     When "Specific scenarios" is chosen
     Then the scenarios read under the name of the test suite they are filed in
-    And the count follows the cases that are ticked
+    And the count follows the scenarios that are ticked
 
   @integration
   Scenario: A run of one scenario is named after that scenario
@@ -439,7 +439,7 @@ Feature: The run dialog
 
   @integration
   Scenario: A secret parameter value is never remembered
-    Given a test suite whose cases declare a secret parameter
+    Given a test suite whose scenarios declare a secret parameter
     And a run of that suite with the secret filled in
     When the run dialog for that suite is opened again
     Then the locked row is empty
@@ -471,15 +471,15 @@ Feature: The run dialog
     And Run does not start a run
 
   @integration
-  Scenario: A parameter value the cases do not declare is refused by name
+  Scenario: A parameter value the scenarios do not declare is refused by name
     Given the run dialog with parameter overrides added
-    When a value is given for a name none of the cases declare
+    When a value is given for a name none of the scenarios declare
     Then the run is refused with "scenario_parameter_unknown"
     And the rejection names the unknown name and the names the run does declare
 
   @integration
-  Scenario: A run refused because every case is archived says so in the dialog
-    Given a test suite in which every case is archived
+  Scenario: A run refused because every scenario is archived says so in the dialog
+    Given a test suite in which every scenario is archived
     When the run is confirmed
     Then the dialog shows that there is nothing left to run
     And it does not show a generic unknown error

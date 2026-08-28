@@ -100,7 +100,7 @@ interface StubPlan {
 function plan(overrides: Partial<StubPlan> & { id: string }): StubPlan {
   return {
     name: "Refund flow",
-    kind: "custom",
+    kind: "run_plan",
     scope: { mode: "all" },
     scenarioIds: [],
     targets: [DEFAULT_TARGET],

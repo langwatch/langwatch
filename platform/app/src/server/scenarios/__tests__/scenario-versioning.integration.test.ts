@@ -34,14 +34,14 @@ async function createCase(name = "Refund flow") {
   );
 }
 
-async function createFolder(name: string) {
+async function createTestSuite(name: string) {
   const slug = `${name.toLowerCase()}-${nanoid(6)}`;
   return prisma.simulationSuite.create({
     data: {
       projectId,
       name: `${name} ${nanoid(6)}`,
       slug,
-      kind: "folder",
+      kind: "test_suite",
       scenarioIds: [],
       targets: [],
     },
@@ -88,7 +88,7 @@ beforeEach(async () => {
 describe("scenario versioning", () => {
   describe("numbering", () => {
     /** @scenario "A new scenario starts at version 1" */
-    it("starts a new case at version 1 with one entry named Created", async () => {
+    it("starts a new scenario at version 1 with one entry named Created", async () => {
       const scenario = await createCase();
 
       expect(scenario.version).toBe(1);
@@ -165,30 +165,30 @@ describe("scenario versioning", () => {
       expect(versions[0]).toMatchObject({ version: 3, changedFields: [] });
     });
 
-    it("writes no version for a folder move", async () => {
-      const refunds = await createFolder("Refunds");
-      const checkout = await createFolder("Checkout");
+    it("writes no version for a test suite move", async () => {
+      const refunds = await createTestSuite("Refunds");
+      const checkout = await createTestSuite("Checkout");
       const scenario = await createCase();
 
-      // Filing, refiling and unfiling: every one of them moves the case
-      // between real folders, so an implementation that only skips the
+      // Filing, refiling and unfiling: every one of them moves the scenario
+      // between real test suites, so an implementation that only skips the
       // version when nothing changed cannot pass by accident. Taking the
-      // case out of its folder files it into Default, which is a move
-      // between two real folders as well.
-      for (const folderId of [refunds.id, checkout.id, null]) {
-        await service.moveToFolder({
+      // scenario out of its test suite files it into Default, which is a move
+      // between two real test suites as well.
+      for (const testSuiteId of [refunds.id, checkout.id, null]) {
+        await service.moveToTestSuite({
           scenarioId: scenario.id,
           projectId,
-          folderId,
+          testSuiteId,
         });
       }
 
       const defaultSuite = await prisma.simulationSuite.findFirst({
-        where: { projectId, kind: "folder", name: DEFAULT_SUITE_NAME },
+        where: { projectId, kind: "test_suite", name: DEFAULT_SUITE_NAME },
       });
       const stored = await service.getById({ id: scenario.id, projectId });
       expect(stored?.version).toBe(1);
-      expect(stored?.folderId).toBe(defaultSuite?.id);
+      expect(stored?.testSuiteId).toBe(defaultSuite?.id);
       const rows = await prisma.scenarioVersion.findMany({
         where: { projectId, scenarioId: scenario.id },
       });
@@ -306,7 +306,7 @@ describe("scenario versioning", () => {
     });
 
     /** @scenario "Saving over a version somebody else already replaced is refused with scenario_stale_version" */
-    it("refuses a save against a replaced version and leaves the case unchanged", async () => {
+    it("refuses a save against a replaced version and leaves the scenario unchanged", async () => {
       const scenario = await createCase();
       for (const text of ["second", "third", "fourth"]) {
         await service.update({
@@ -316,7 +316,7 @@ describe("scenario versioning", () => {
         });
       }
 
-      // Somebody else saves, so the case moves to version 5.
+      // Somebody else saves, so the scenario moves to version 5.
       await service.update({
         id: scenario.id,
         projectId,
@@ -340,14 +340,14 @@ describe("scenario versioning", () => {
     });
   });
 
-  describe("cases that existed before versions", () => {
+  describe("scenarios that existed before versions", () => {
     async function createPreVersioningCase() {
       // Written straight to the table, the way every scenario row existed
       // before versioning: version 1 by column default, no version rows.
       return prisma.scenario.create({
         data: {
           projectId,
-          name: "Old case",
+          name: "Old scenario",
           situation: "A customer asks for help",
           criteria: ["The agent helps"],
           labels: [],
@@ -375,7 +375,7 @@ describe("scenario versioning", () => {
       expect(versions[0]?.createdAt).toEqual(scenario.createdAt);
     });
 
-    /** @scenario "The first save of a pre-existing case starts real history" */
+    /** @scenario "The first save of a pre-existing scenario starts real history" */
     it("starts real history above the synthesized entry on the first save", async () => {
       const scenario = await createPreVersioningCase();
 
@@ -405,7 +405,7 @@ describe("scenario versioning", () => {
   });
 
   describe("tenancy", () => {
-    /** @scenario "Version history of a case in another project is not readable" */
+    /** @scenario "Version history of a scenario in another project is not readable" */
     it("does not read history across projects", async () => {
       const scenario = await createCase();
 

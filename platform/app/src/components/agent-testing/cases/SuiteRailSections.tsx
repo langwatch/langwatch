@@ -5,7 +5,7 @@
  * Both headings are plain labels. There is no root list of suites to open, so
  * a heading has nowhere to lead.
  *
- * No row carries a count or a time. How many cases a set holds reads once,
+ * No row carries a count or a time. How many scenarios a set holds reads once,
  * beside the title of the panel.
  *
  * @see specs/features/agent-testing/suites-rail.feature

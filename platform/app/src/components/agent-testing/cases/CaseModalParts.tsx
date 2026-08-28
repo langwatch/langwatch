@@ -36,7 +36,7 @@ import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
 const PARAMETERS_HELP =
-  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same case as a free or a pro customer, in another locale, or on another model.";
+  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
 /** The heading: what the dialog is for, and the way back to the versions. */
 export function CaseModalHeader({
@@ -46,7 +46,7 @@ export function CaseModalHeader({
   openHistoryOnOpen,
 }: {
   isEditing: boolean;
-  /** The case being edited, or nothing for a new one. */
+  /** The scenario being edited, or nothing for a new one. */
   scenarioId: string | null;
   version: number | null;
   /** True when the dialog was opened from a History entry. */
@@ -78,7 +78,7 @@ export function CaseModalHeader({
   );
 }
 
-/** The title of the case and the suite it is filed under, on one line. */
+/** The title of the scenario and the suite it is filed under, on one line. */
 function TitleAndSuiteRow({
   draft,
   setDraft,
@@ -107,9 +107,9 @@ function TitleAndSuiteRow({
           <NativeSelect.Field
             {...DIALOG_FIELD_STYLE}
             aria-label="Test suite"
-            value={draft.folderId ?? ""}
+            value={draft.testSuiteId ?? ""}
             onChange={(event) =>
-              setDraft({ folderId: event.target.value || null })
+              setDraft({ testSuiteId: event.target.value || null })
             }
           >
             <option value="">{UNFILED_OPTION_LABEL}</option>
@@ -171,7 +171,7 @@ function SituationAndCriteria({
   );
 }
 
-/** The declared parameters of the case, as one `name=value` line. */
+/** The declared parameters of the scenario, as one `name=value` line. */
 function ParametersBlock({
   draft,
   setDraft,
@@ -239,7 +239,7 @@ export function CaseModalFields({
   );
 }
 
-/** The labels of the case, and the two ways of leaving with it saved. */
+/** The labels of the scenario, and the two ways of leaving with it saved. */
 export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft } = editor;
 
@@ -350,7 +350,7 @@ function TurnsBlock({
 }
 
 /**
- * The models this case runs on. A case that overrides neither follows the
+ * The models this scenario runs on. A scenario that overrides neither follows the
  * models of the project.
  */
 function ModelsBlock({
@@ -393,7 +393,7 @@ function ModelsBlock({
 }
 
 /**
- * What the case can carry beyond the four questions: the parameters, the turn
+ * What the scenario can carry beyond the four questions: the parameters, the turn
  * limits and the model overrides, each behind a chip until it is asked for.
  */
 function CustomizeSection({ editor }: { editor: CaseEditorState }) {
@@ -439,7 +439,7 @@ function toTurnCount(raw: string): number | null {
 }
 
 /**
- * Says the case changed since it was opened, and offers the reload.
+ * Says the scenario changed since it was opened, and offers the reload.
  *
  * The refused save wrote nothing, so nothing is lost by leaving the draft as
  * it is. Reloading is the destructive choice, and the button says so.
@@ -478,7 +478,7 @@ function StaleVersionNotice({
   );
 }
 
-/** Stands in for the form while a stored case is being read. */
+/** Stands in for the form while a stored scenario is being read. */
 function CaseModalSkeleton() {
   return (
     <VStack align="stretch" gap={4} data-testid="case-modal-skeleton">

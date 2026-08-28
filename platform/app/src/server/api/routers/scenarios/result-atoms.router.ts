@@ -19,7 +19,7 @@ const resultsFilterSchema = z.object({
   endDate: z.number().int().nonnegative().optional(),
   scenarioIds: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  folderIds: z.array(z.string()).optional(),
+  testSuiteIds: z.array(z.string()).optional(),
   scenarioSetIds: z.array(z.string()).optional(),
   targetKeys: z.array(z.string()).optional(),
   outcome: z.enum(["passed", "failed", "pending"]).optional(),
@@ -50,6 +50,22 @@ export const resultAtomsRouter = createTRPCRouter({
     .permission("scenarios:view")
     .query(async ({ input }) => {
       return getApp().simulations.results.getCodeScenarios({
+        projectId: input.projectId,
+        startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+        endDate: input.endDate,
+      });
+    }),
+
+  /**
+   * The targets a run from code named inside the window, for the target
+   * filter. They have no row in Postgres, so the agent and prompt lists
+   * cannot name them.
+   */
+  getCodeTargets: protectedProcedure
+    .input(windowSchema)
+    .permission("scenarios:view")
+    .query(async ({ input }) => {
+      return getApp().simulations.results.getCodeTargets({
         projectId: input.projectId,
         startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
         endDate: input.endDate,

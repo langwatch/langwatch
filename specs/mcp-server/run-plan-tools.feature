@@ -48,10 +48,10 @@ Feature: MCP Run Plan Tools
     When the agent calls platform_get_run_plan with id "plan_abc123"
     Then the response includes the scope, the targets, the repeat count and the models
 
-  Scenario: Agent reads a plan that runs the cases of a test suite
+  Scenario: Agent reads a plan that runs the scenarios of a test suite
     Given a run plan whose scope names test suites
     When the agent calls platform_get_run_plan
-    Then the response says the plan covers the cases of those test suites
+    Then the response says the plan covers the scenarios of those test suites
 
   Scenario: Agent reads a plan that names its own models
     Given a run plan with no simulator model and no judge model

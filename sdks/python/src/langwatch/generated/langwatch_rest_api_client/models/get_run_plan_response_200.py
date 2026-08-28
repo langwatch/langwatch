@@ -25,10 +25,10 @@ class GetRunPlanResponse200:
         name (str): The run plan name. This is the plan's identity: a run started under this name joins this plan.
         slug (str): The plan's address in the platform. It is kept when the plan is renamed, so run history never moves.
         scope (GetRunPlanResponse200ScopeType0 | GetRunPlanResponse200ScopeType1 | GetRunPlanResponse200ScopeType2 |
-            GetRunPlanResponse200ScopeType3): What the run plan covers: all (every active scenario), folders (the scenarios
-            filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds
-            sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs
-            without editing the plan.
+            GetRunPlanResponse200ScopeType3): What the run plan covers: all (every active scenario), test_suites (the
+            scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the
+            scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written
+            later runs without editing the plan.
         scenario_ids (list[str]): The scenarios the last run of this plan covered.
         targets (list[GetRunPlanResponse200TargetsItem]): What the plan runs against, in the order the results show.
         repeat_count (float): How many times each scenario and target pairing runs.
