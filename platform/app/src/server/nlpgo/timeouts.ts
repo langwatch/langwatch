@@ -156,3 +156,43 @@ export function resolveMaxFetchTimeoutMs(): number {
     NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
   );
 }
+
+/**
+ * Lambda's own hard invocation ceiling. The code-block timeout override must
+ * stay under this or Lambda kills the invocation before nlpgo reports its own
+ * timeout — see {@link clampCodeBlockTimeoutSeconds}.
+ *
+ * Deliberately not env-configurable: it is a platform-wide hard boundary
+ * set by AWS Lambda's own function timeout ceiling.
+ */
+export const LAMBDA_INVOCATION_TIMEOUT_SECONDS = 900; // 15 minutes
+
+/**
+ * Safety margin subtracted from {@link LAMBDA_INVOCATION_TIMEOUT_SECONDS} to
+ * compute the clamp ceiling for nlpgo's code-block timeout override. Leaves
+ * nlpgo's own timeout-reporting a moment to run before Lambda kills the
+ * invocation.
+ *
+ * Deliberately not env-configurable: it exists purely to absorb nlpgo's own
+ * timeout-handling latency. Making it independently operator-tunable would
+ * recreate the exact drift problem this module's timeout coordination exists
+ * to prevent — there would again be two numbers that have to be kept in sync
+ * by hand.
+ */
+export const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
+
+/**
+ * Desired memory allocation, in MB, for every per-project langwatch_nlp Lambda.
+ *
+ * 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS headroom
+ * when the bundled image runs nlpgo + uvicorn + litellm in the same container.
+ * At 1024 MB observed Max Memory Used hit 805/1024 MB mid-request on lw-dev
+ * (TEST H, 2026-04-28); fork() would fail to clone parent pages and the uvicorn
+ * worker pool crashed, cascading to /studio/* 502s. 2048 MB also doubles
+ * Lambda's allocated CPU (Lambda allocates CPU proportional to memory;
+ * ~0.58 vCPU at 1024 → ~1.17 vCPU at 2048), shaving cold-start init time too.
+ *
+ * Already-created Lambdas are brought up to this value automatically by
+ * `reconcileProjectLambdaConfig` on the next ARN resolution.
+ */
+export const NLP_LAMBDA_MEMORY_SIZE_MB = 2048;

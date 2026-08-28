@@ -15,6 +15,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
 import {
+  CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS,
+  LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  NLP_LAMBDA_MEMORY_SIZE_MB,
+} from "../../../server/nlpgo/timeouts";
+import {
   deleteStagedObject,
   STAGED_PAYLOAD_HEADER,
   type StagedObject,
@@ -227,17 +232,6 @@ const createLogGroupWithRetention = async (
   }
 };
 
-// Lambda's own hard invocation ceiling (`Timeout` below). The code-block
-// timeout override must stay under this or Lambda kills the invocation
-// before nlpgo reports its own timeout — see clampCodeBlockTimeoutSeconds.
-const LAMBDA_INVOCATION_TIMEOUT_SECONDS = 900; // 15 minutes
-
-// Buffer subtracted from LAMBDA_INVOCATION_TIMEOUT_SECONDS so the clamp
-// lands strictly below the Lambda's own Timeout, not merely equal to it —
-// leaves nlpgo's own timeout-reporting a moment to run before Lambda kills
-// the invocation.
-const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
-
 // Operator-overridable via NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS, but the
 // override must stay below the Lambda's own Timeout (900s) or Lambda
 // terminates the invocation before nlpgo can report its own timeout to the
@@ -255,20 +249,10 @@ export const clampCodeBlockTimeoutSeconds = (rawValue: string | undefined): numb
 };
 
 /**
- * Desired memory allocation, in MB, for every per-project langwatch_nlp Lambda.
- *
- * 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS headroom
- * when the bundled image runs nlpgo + uvicorn + litellm in the same container.
- * At 1024 MB observed Max Memory Used hit 805/1024 MB mid-request on lw-dev
- * (TEST H, 2026-04-28); fork() would fail to clone parent pages and the uvicorn
- * worker pool crashed, cascading to /studio/* 502s. 2048 MB also doubles
- * Lambda's allocated CPU (Lambda allocates CPU proportional to memory;
- * ~0.58 vCPU at 1024 → ~1.17 vCPU at 2048), shaving cold-start init time too.
- *
- * Already-created Lambdas are brought up to this value automatically by
- * `reconcileProjectLambdaConfig` on the next ARN resolution.
+ * @deprecated Use {@link NLP_LAMBDA_MEMORY_SIZE_MB} from `server/nlpgo/timeouts`
+ *             instead. Kept as a re-export for backward compatibility.
  */
-export const LANGWATCH_NLP_LAMBDA_MEMORY_SIZE = 2048;
+export { NLP_LAMBDA_MEMORY_SIZE_MB as LANGWATCH_NLP_LAMBDA_MEMORY_SIZE } from "../../../server/nlpgo/timeouts";
 
 /**
  * The single source of truth for the environment variables every per-project
@@ -310,7 +294,7 @@ const createProjectLambda = async (
     },
     PackageType: "Image",
     Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS, // 15 minutes
-    MemorySize: LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
+    MemorySize: NLP_LAMBDA_MEMORY_SIZE_MB,
     Architectures: ["arm64"],
     VpcConfig: {
       SubnetIds: config.subnet_ids,
@@ -423,7 +407,7 @@ const reconcileProjectLambdaConfig = async (
     ([key, value]) => currentEnv[key] !== value,
   );
   const memoryDrifted =
-    currentConfig.MemorySize !== LANGWATCH_NLP_LAMBDA_MEMORY_SIZE;
+    currentConfig.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB;
 
   if (!envDrifted && !memoryDrifted) {
     return null;
@@ -444,7 +428,7 @@ const reconcileProjectLambdaConfig = async (
         ...desiredEnv,
       },
     },
-    MemorySize: LANGWATCH_NLP_LAMBDA_MEMORY_SIZE,
+    MemorySize: NLP_LAMBDA_MEMORY_SIZE_MB,
   });
 
   return lambda.send(command);
