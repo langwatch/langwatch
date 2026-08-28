@@ -20,6 +20,7 @@ import { auth } from "~/server/better-auth";
 import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
+import { runWithPasswordResetScope } from "~/server/better-auth/password-reset-session";
 import { prisma } from "~/server/db";
 
 const secured = createServiceApp({ basePath: "/api" });
@@ -205,9 +206,13 @@ const betterAuthCatchAll = async (c: Context) => {
   // the allowlist had opted IN was the one sign-up whose refusals skipped the
   // handled-error contract and reached the browser in better-auth's own
   // vocabulary.
-  const response = await (isBorn
-    ? runWithIdentityBirth(() => auth.handler(c.req.raw))
-    : auth.handler(c.req.raw));
+  const handle = () => auth.handler(c.req.raw);
+  // The reset scope is opened around EVERY request rather than only the
+  // reset path: it is a per-request slot that costs nothing empty, and the
+  // path check belongs to the hook that reads it, not to the route.
+  const response = await runWithPasswordResetScope(() =>
+    isBorn ? runWithIdentityBirth(handle) : handle(),
+  );
   // better-auth's refusals speak its own vocabulary, which is neither a
   // registered code nor copy anybody wrote for a customer. This is where the
   // families we have translated join the handled-error contract; everything

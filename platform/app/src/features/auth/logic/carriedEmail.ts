@@ -50,6 +50,25 @@ export function signUpHref({
   }`;
 }
 
+/**
+ * `/auth/forgot-password`, carrying the address in the fragment the same way.
+ *
+ * The link sits under the password field, so the person clicking it has just
+ * typed the address the reset is for. Asking for it again on the next screen
+ * was the one thing that screen did, and it is the screen somebody reaches
+ * already annoyed.
+ */
+export function forgotPasswordHref({
+  email,
+}: {
+  email?: string | null;
+}): string {
+  const fragment = new URLSearchParams();
+  if (email) fragment.set(KEY, email);
+  const fragmentPart = fragment.toString();
+  return `/auth/forgot-password${fragmentPart ? `#${fragmentPart}` : ""}`;
+}
+
 /** The address the fragment carries, if this browser arrived holding one. */
 export function readCarriedEmail(): string | undefined {
   if (typeof window === "undefined") return void 0;

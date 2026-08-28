@@ -14,6 +14,7 @@ import {
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import { AUTH_SURFACE, SIGN_UP_STEP } from "../logic/authAnalytics";
 import { forgetCarriedEmail, readCarriedEmail } from "../logic/carriedEmail";
+import { confirmSignUpAddress } from "../logic/confirmSignUpAddress";
 import type { AuthDepth } from "../logic/groundPalette";
 import { usePublishAuthStage } from "../logic/groundStage";
 import {
@@ -85,8 +86,15 @@ export function VerificationFirstSignUp() {
   useEffect(forgetCarriedEmail, []);
 
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
-  const completeVerification =
-    api.auth.completeSignUpVerification.useMutation();
+  // The link is spent against the better-auth endpoint rather than a tRPC
+  // procedure, because a link spent on an existing account opens that
+  // account's first session — a cookie, which tRPC cannot set. See
+  // `confirmSignUpAddress`. Its refusal is held here, in the REST body shape
+  // the registry reads.
+  const [linkError, setLinkError] = useState<unknown>(null);
+  // The address the link signed in, once it has: the card becomes the
+  // hand-off into the app and nothing else is asked.
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const routing = useSignInRouting();
   const { decide } = routing;
   const report = useAuthAnalytics(AUTH_SURFACE.signUp);
@@ -129,26 +137,43 @@ export function VerificationFirstSignUp() {
   useEffect(() => {
     if (!verifyToken || spent.current) return;
     spent.current = true;
-    completeVerification
-      .mutateAsync({ token: verifyToken })
-      .then(async ({ email, accountCreated, accountExists, addressProof }) => {
-        setVerifiedEmail(email);
-        setAddressProof(addressProof);
-        // "Ready" means there is nothing left to choose. An account that was
-        // already there is just as ready as one this link created — sign-up
-        // made it and the link is the address catching up, so asking such a
-        // person to pick a sign-in method would be asking twice.
-        setAccountIsReady(accountCreated || accountExists);
-        report.linkConfirmed({ accountCreated, accountExists });
-        await decide({ identifier: email });
-      })
+    confirmSignUpAddress({ token: verifyToken })
+      .then(
+        async ({
+          email,
+          accountCreated,
+          accountExists,
+          addressProof,
+          signedIn,
+        }) => {
+          report.linkConfirmed({ accountCreated, accountExists });
+          // The link opened the session. Nothing is left to choose, so the
+          // screen goes straight in — a full navigation, because the cookie
+          // was set by the request that just answered and everything cached
+          // under "signed out" has to go with it.
+          if (signedIn) {
+            setSignedInAs(email);
+            hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
+            return;
+          }
+          setVerifiedEmail(email);
+          setAddressProof(addressProof);
+          // "Ready" means there is nothing left to choose. An account that
+          // was already there is just as ready as one this link created —
+          // this is the link reopened inside its grace window, which confirms
+          // again but opens no second session, so the way in is offered.
+          setAccountIsReady(accountCreated || accountExists);
+          await decide({ identifier: email });
+        },
+      )
       .catch((failure: unknown) => {
-        // Rendered from the mutation's error below, through the registry. The
-        // dead link is a step of the funnel too, and a common one: a link
-        // opened twice, or opened a day late.
+        // Rendered below, through the registry. The dead link is a step of
+        // the funnel too, and a common one: a link opened twice, or opened a
+        // day late.
+        setLinkError(failure);
         report.refused("link", readHandledError(failure)?.code ?? null);
       });
-  }, [verifyToken, completeVerification, decide, report]);
+  }, [verifyToken, callbackUrl, decide, report]);
 
   // What this instance offers with no address in hand, so the same social
   // buttons the log-in screen shows are available here from the first step.
@@ -208,8 +233,10 @@ export function VerificationFirstSignUp() {
     door: "signup",
     depth: signUpDepth({
       challenged: twoStep !== null,
-      verifiedEmail,
-      accountIsReady,
+      // A link that signed them in is as settled as a confirmed account with
+      // its way in on screen: the ground reads the same for both.
+      verifiedEmail: signedInAs ?? verifiedEmail,
+      accountIsReady: accountIsReady || signedInAs !== null,
       welcomeBackEmail,
       sentTo,
       signingUpEmail,
@@ -225,13 +252,13 @@ export function VerificationFirstSignUp() {
     step: signUpStep({
       challenged: twoStep !== null,
       ceremony: passkeyCeremony !== null,
-      verifiedEmail,
-      accountIsReady,
+      verifiedEmail: signedInAs ?? verifiedEmail,
+      accountIsReady: accountIsReady || signedInAs !== null,
       welcomeBackEmail,
       sentTo,
       signingUpEmail,
       routedEmail,
-      linkIsDead: Boolean(verifyToken && completeVerification.error),
+      linkIsDead: Boolean(verifyToken && linkError),
     }),
     attributes: {
       // The SHAPE of the address, never the address: whether the log-in
@@ -278,6 +305,21 @@ export function VerificationFirstSignUp() {
     );
   }
 
+  // The link signed them in. The navigation is already under way; this is the
+  // card it leaves behind for the moment it takes, and it asks for nothing.
+  if (signedInAs) {
+    return (
+      <AuthCard title="You're in">
+        <HStack gap={3}>
+          <SuccessPulse label="Signed in" />
+          <Text data-testid="signed-in-handoff">
+            {signedInAs} is confirmed. Taking you to LangWatch.
+          </Text>
+        </HStack>
+      </AuthCard>
+    );
+  }
+
   if (verifiedEmail && accountIsReady) {
     return (
       <AccountIsReady
@@ -316,10 +358,10 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (verifyToken && completeVerification.error) {
+  if (verifyToken && linkError) {
     return (
       <LinkNoLongerWorks
-        error={completeVerification.error}
+        error={linkError}
         isSending={requestVerification.isPending}
         callbackUrl={callbackUrl}
         onResend={sendTo}

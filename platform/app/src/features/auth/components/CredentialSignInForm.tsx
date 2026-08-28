@@ -10,6 +10,7 @@ import { SHAPE } from "../authTheme";
 import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
 import { useRetryCountdown } from "../hooks/useRetryCountdown";
 import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
+import { forgotPasswordHref } from "../logic/carriedEmail";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import { startTwoStepChallenge } from "../logic/twoStepChallenge";
@@ -224,7 +225,13 @@ export function CredentialSignInForm({
           labelEnd={
             <Box asChild>
               <Link
-                href="/auth/forgot-password"
+                // The address travels in the fragment, never the query, for
+                // the reason `carriedEmail` gives: it is the one personal
+                // datum on this screen and a query string is written down by
+                // every hop it passes.
+                href={forgotPasswordHref({
+                  email: asksForAddress ? form.watch("email") : email,
+                })}
                 style={{
                   textDecoration: "underline",
                   textUnderlineOffset: "2px",

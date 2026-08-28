@@ -53,9 +53,17 @@ import {
 } from "./hooks";
 import { isLastWayInPath, refuseIfItClosesTheLastDoor } from "./last-way-in";
 import { passkeySignUpRegistration } from "./passkey-signup";
+import {
+  recordPasswordReset,
+  signInAfterPasswordReset,
+} from "./password-reset-session";
 import { issuersForRequest } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
+import {
+  SIGN_UP_CONFIRM_ADDRESS_PATH,
+  signUpConfirmation,
+} from "./sign-up-confirmation";
 import { resolveTrustedOrigins } from "./trustedOrigins";
 import {
   runTwoStepCeremony,
@@ -169,6 +177,9 @@ const plugins = [
       registration: passkeySignUpRegistration,
     }),
   ],
+  // The sign-up confirmation link, spent where a session can be opened for
+  // it. See `sign-up-confirmation.ts` for why this is not a tRPC procedure.
+  signUpConfirmation(),
   /**
    * Per-organization single sign-on (D09 — see
    * specs/identity/sso-idp-termination.feature).
@@ -679,6 +690,10 @@ export const auth = betterAuth({
      */
     onPasswordReset: async ({ user }) => {
       await revokeAllSessionsForUser({ prisma, userId: user.id });
+      // Every old session is gone; the after-hook opens the one new session
+      // this reset earned, for the device that set the password. Recorded
+      // AFTER the revoke so the new session is never among the revoked.
+      recordPasswordReset({ userId: user.id });
     },
   },
 
@@ -716,6 +731,9 @@ export const auth = betterAuth({
       // approaches either number.
       "/passkey/generate-register-options": { window: 60 * 60, max: 50 },
       "/passkey/verify-registration": { window: 60 * 60, max: 50 },
+      // Spending a confirmation link opens a session, so it is limited as a
+      // sign-in is. The same budget the tRPC procedure it replaced carried.
+      [SIGN_UP_CONFIRM_ADDRESS_PATH]: { window: 60 * 60, max: 60 },
     },
   },
 
@@ -991,6 +1009,10 @@ export const auth = betterAuth({
      */
     after: createAuthMiddleware(async (ctx) => {
       await runTwoStepCeremony(ctx as never);
+      // A completed reset opens the session it earned — see
+      // `password-reset-session.ts` for why the callback and the hook split
+      // the job between them.
+      await signInAfterPasswordReset(ctx as never);
     }),
   },
 });

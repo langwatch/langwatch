@@ -31,7 +31,6 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // organization name and the inviter's name). The invite code IS the
   // authorization, exactly as in `organization.acceptInvite`, and a revoked
   // invitation is answered identically to a missing one.
-  "auth.completeSignUpVerification",
   "auth.inviteLanding",
   "auth.requestFreshInvite",
   "auth.requestSignUpVerification",

@@ -138,8 +138,11 @@ describe("ResetPassword page", () => {
       expect(
         await screen.findByRole("heading", { name: /password updated/i }),
       ).toBeTruthy();
-      const signInLink = screen.getByTestId("reset-sign-in");
-      expect(signInLink.getAttribute("href")).toBe("/auth/signin");
+      // The reset signed them in, so the way on is into the app, not back to
+      // the log-in screen to type the password they just chose.
+      const continueLink = screen.getByTestId("reset-sign-in");
+      expect(continueLink.getAttribute("href")).toBe("/");
+      expect(continueLink).toHaveTextContent(/continue/i);
     });
   });
 
@@ -279,11 +282,13 @@ describe("ResetPassword page", () => {
         expect(screen.getByTestId("post-reset-passkey-offer")).toBeTruthy();
         // The plain action is still the unmissable one.
         expect(screen.getByTestId("reset-sign-in").getAttribute("href")).toBe(
-          "/auth/signin",
+          "/",
         );
+        // Signed in by the reset, so the offer goes straight to the page a
+        // passkey is made on — no sign-in step in between.
         expect(
           screen.getByTestId("reset-add-passkey").getAttribute("href"),
-        ).toContain("callbackUrl=");
+        ).toBe("/settings/security");
       });
 
       /** @scenario A completed reset offers a passkey rather than assuming one */

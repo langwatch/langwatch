@@ -247,7 +247,18 @@ export function EnterpriseCapabilitiesSection() {
 
         {!isEnterprise && (
           <HStack gap={3}>
-            <Button asChild size="sm" colorPalette="orange">
+            {/* The label colour is stated, not left to the palette: rendered
+                through `asChild` onto an anchor, the solid recipe's contrast
+                colour did not reach the text in light mode and the button
+                read as dark ink on orange. White holds on every orange this
+                button wears, resting or hovered, in both modes. */}
+            <Button
+              asChild
+              size="sm"
+              colorPalette="orange"
+              color="white"
+              _hover={{ color: "white" }}
+            >
               <a href="/settings/license">Activate a license</a>
             </Button>
             <Button asChild size="sm" variant="outline">

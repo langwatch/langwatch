@@ -192,12 +192,20 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     But I am not signed in
     And the screen tells me to open the link we sent to that address
 
+  # The link IS the first sign-in. It is a single-use secret sent to the
+  # address, so spending it proves the address the way a magic link does, and
+  # the session it opens is the one the password would have opened. Asking for
+  # the password again on the screen it lands on was asking twice - and on a
+  # deployment whose identifier projection had not caught up with the account
+  # yet, the screen it landed on read the projection and said no account
+  # existed. One link is one way in: reopened inside its grace window it
+  # confirms again but opens no second session, and offers the way in instead.
   @integration
   Scenario: Opening the link is what signs me in for the first time
     Given I signed up and have not opened the confirmation link
     When I open the link
     Then my address is confirmed
-    And I can sign in with the method I chose
+    And I am signed in and taken into LangWatch without typing my password again
 
   # The link goes out from the call that CREATES the account, not from the
   # screen. The screen has no session to send from - that is the point of the

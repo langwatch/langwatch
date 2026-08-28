@@ -78,7 +78,13 @@ describe("better-auth config", () => {
       // `sso` (D09, wave 3) is registered unconditionally: it is what
       // terminates an organization's own identity provider, and its
       // registration is deliberate in the same sense the others are.
-      const deliberate = ["generic-oauth", "two-factor", "passkey", "sso"];
+      const deliberate = [
+        "generic-oauth",
+        "two-factor",
+        "passkey",
+        "sso",
+        "langwatch-sign-up-confirmation",
+      ];
       for (const id of pluginIds) {
         expect(deliberate).toContain(id);
       }

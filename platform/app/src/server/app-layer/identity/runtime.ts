@@ -881,10 +881,11 @@ export function signUpVerification(): SignUpVerificationService {
     accounts: {
       createCredentialAccount: async ({ email, passwordHash }) => {
         // Nobody has been asked for a name on this path: the person typed an
-        // address and a password into a log-in form. Onboarding asks.
+        // address and a password into a log-in form. The address stands in
+        // until onboarding offers to replace it, the same as `user.register`.
         const created = await createCredentialUser({
           prisma,
-          name: null,
+          name: email,
           email,
           passwordHash,
         });

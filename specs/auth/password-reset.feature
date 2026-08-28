@@ -82,6 +82,7 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   Scenario: A successful reset revokes all of the user's existing sessions
     Given a user completes a password reset
     Then every existing session for that user is revoked
+    And only then is the one new session for the resetting device opened
 
   @integration
   Scenario: Password reset endpoints are rate-limited to five attempts per hour
@@ -91,12 +92,25 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
 
   # --- Setting the new password (/auth/reset-password) ---
 
+  # The reset SIGNS ME IN. The link proved the address and the password I just
+  # set is the credential, so there is nothing left for the log-in screen to
+  # check; sending me there to type both again was the old ending. The
+  # session is opened by the reset endpoint itself, after every old session
+  # is revoked, so the device that set the password is the one device signed
+  # in afterwards.
   @integration
-  Scenario: Submitting a valid new password with a token resets it and returns to sign-in
+  Scenario: Submitting a valid new password with a token resets it and signs me in
     Given I open /auth/reset-password with a valid token
     When I enter a new password and a matching confirmation and submit
     Then the app calls BetterAuth resetPassword with the new password and token
-    And on success I see a confirmation and a link to sign in
+    And on success I see a confirmation and a way to continue into LangWatch
+
+  @unit
+  Scenario: A completed reset opens a session for the device that set the password
+    Given the reset endpoint accepted my new password
+    When BetterAuth's after-hook runs for that request
+    Then a session is created for my account and its cookie is set
+    And a refused reset opens nothing
 
   @integration
   Scenario: The reset form rejects passwords shorter than 8 characters

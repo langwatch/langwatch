@@ -45,6 +45,13 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
+// Spending the confirmation link is a fetch to the better-auth endpoint, not
+// a tRPC procedure: the spend can open a session, which needs a cookie.
+vi.mock("~/features/auth/logic/confirmSignUpAddress", () => ({
+  confirmSignUpAddress: (...args: unknown[]) =>
+    completeVerificationMock(...args),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     auth: {
@@ -58,13 +65,6 @@ vi.mock("~/utils/api", () => ({
       requestSignUpVerification: {
         useMutation: () => ({
           mutateAsync: requestVerificationMock,
-          isPending: false,
-          error: null,
-        }),
-      },
-      completeSignUpVerification: {
-        useMutation: () => ({
-          mutateAsync: completeVerificationMock,
           isPending: false,
           error: null,
         }),

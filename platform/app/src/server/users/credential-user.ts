@@ -231,7 +231,10 @@ export async function createPasskeyUser({
       return { id: existing.id, created: false };
     }
 
-    const user = await tx.user.create({ data: { name: null, email } });
+    // The address stands in for the name nobody has asked for, as on the
+    // password path: a blank name renders as nothing everywhere a member is
+    // listed, and onboarding still offers to replace it.
+    const user = await tx.user.create({ data: { name: email, email } });
     await tx.account.create({
       data: {
         userId: user.id,

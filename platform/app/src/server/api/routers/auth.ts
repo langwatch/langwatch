@@ -110,10 +110,21 @@ export const authRouter = createTRPCRouter({
       }
 
       if (input.identifier !== null) {
+        // The same address, asked about from anywhere. This budget is not the
+        // enumeration guard — the peer budget above is, since walking a list
+        // means walking it from somewhere — it stops one address being probed
+        // from many places at once.
+        //
+        // Sized for ONE PERSON'S session, which asks this question far more
+        // often than once: the address step, the welcome-back turn, a refused
+        // password checking whether the address is held, the confirmation
+        // link landing, and a sign-out and back in are each an ask. Five an
+        // hour turned an ordinary afternoon of signing in and out into "wait
+        // 58 minutes" on the sign-up screen.
         const addressLimit = await rateLimit({
           key: `auth.route:address:${addressBudgetId(input.identifier)}`,
           windowSeconds: 60 * 60,
-          max: 5,
+          max: 30,
         });
         if (!addressLimit.allowed) {
           throw new AuthRateLimitedError({
@@ -279,27 +290,10 @@ export const authRouter = createTRPCRouter({
    * credential also creates the account. Expired, already spent and never
    * issued are one refusal — the way on is the same for all three.
    */
-  completeSignUpVerification: publicProcedure
-    .input(z.object({ token: z.string().min(1) }))
-    .noPermission({
-      reason:
-        "spends a signed-out visitor's own emailed confirmation token; the token is the authorization",
-    })
-    .mutation(async ({ ctx, input }) => {
-      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
-      const limit = await rateLimit({
-        key: `auth.completeSignUpVerification:${peerIp}`,
-        windowSeconds: 60 * 60,
-        max: 60,
-      });
-      if (!limit.allowed) {
-        throw new AuthRateLimitedError({
-          retryAfterSeconds: secondsUntil(limit.resetAt),
-        });
-      }
-
-      return signUpVerification().completeVerification({ token: input.token });
-    }),
+  // Spending the confirmation link is `POST /api/auth/sign-up/confirm-address`
+  // (`server/better-auth/sign-up-confirmation.ts`), not a procedure here: the
+  // spend opens the account's first session, and this boundary has no
+  // response to set a cookie on.
 
   /**
    * What an invitation link can say to whoever opens it: which organization

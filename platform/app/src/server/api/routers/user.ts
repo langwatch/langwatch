@@ -212,7 +212,11 @@ export const userRouter = createTRPCRouter({
 
       const newUser = await createCredentialUser({
         prisma: ctx.prisma,
-        name: name ?? null,
+        // The address stands in for a name nobody has been asked for yet. A
+        // blank name is what every member list, invitation and audit line
+        // rendered for a fresh account, and an address is at least who they
+        // are; onboarding still offers to replace it.
+        name: name ?? email,
         email,
         passwordHash: await hash(password, 10),
       });

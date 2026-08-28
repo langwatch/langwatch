@@ -1,7 +1,7 @@
 import { Box, Input, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
@@ -19,6 +19,10 @@ import {
   usePublishAuthStep,
 } from "~/features/auth/hooks/useAuthAnalytics";
 import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
+import {
+  forgetCarriedEmail,
+  readCarriedEmail,
+} from "~/features/auth/logic/carriedEmail";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
@@ -104,8 +108,14 @@ function ManagedElsewhereCard({ children }: { children: ReactNode }) {
 }
 
 function ForgotPasswordForm() {
+  // The address the log-in screen handed over, if the person came from its
+  // "Forgot password?" link — read at first paint, because that is when the
+  // field it fills is drawn, and forgotten straight after. See `carriedEmail`.
+  const [carriedEmail] = useState(readCarriedEmail);
+  useEffect(forgetCarriedEmail, []);
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: carriedEmail ?? "" },
     mode: "onSubmit",
     reValidateMode: "onSubmit",
   });

@@ -25,6 +25,7 @@ const {
   signInMock,
   addPasskeyMock,
   navigateMock,
+  hardRedirectMock,
   searchParamsRef,
   publicEnvRef,
 } = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ const {
   signInMock: vi.fn(),
   addPasskeyMock: vi.fn(),
   navigateMock: vi.fn(),
+  hardRedirectMock: vi.fn(),
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
 }));
@@ -81,9 +83,6 @@ vi.mock("~/utils/api", async () => {
         requestSignUpVerification: {
           useMutation: useFakeMutation(requestVerificationMock),
         },
-        completeSignUpVerification: {
-          useMutation: useFakeMutation(completeVerificationMock),
-        },
         sendMyAddressConfirmation: {
           useMutation: useFakeMutation(sendConfirmationMock),
         },
@@ -95,6 +94,21 @@ vi.mock("~/utils/api", async () => {
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
+}));
+
+// The link is spent against the better-auth endpoint, not a tRPC procedure,
+// because the spend can open a session. Mocked at the module that wraps the
+// fetch, so a rejection is the REST body the screen reads through the
+// registry.
+vi.mock("~/features/auth/logic/confirmSignUpAddress", () => ({
+  confirmSignUpAddress: (...args: unknown[]) =>
+    completeVerificationMock(...args),
+}));
+
+// A link that signed the person in leaves the page for the app. Spied rather
+// than let loose on jsdom's location.
+vi.mock("~/utils/hardRedirect", () => ({
+  hardRedirect: (...args: unknown[]) => hardRedirectMock(...args),
 }));
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
@@ -138,14 +152,13 @@ const localPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
+// The REST body a refused spend answers with — the flat shape a Hono route
+// sends, which is what the better-auth endpoint answers a handled error in.
 const expiredLink = {
-  data: {
-    error: {
-      code: "identity_verification_expired",
-      httpStatus: 410,
-      fault: "customer",
-    },
-  },
+  error: "identity_verification_expired",
+  message: "identity_verification_expired",
+  fault: "customer",
+  status: 410,
 };
 
 /**
@@ -253,13 +266,40 @@ describe("given the sign-up screen", () => {
 
   describe("when a confirmation link comes back for an account that exists", () => {
     /** @scenario Opening the link is what signs me in for the first time */
-    it("says the address is confirmed and offers the way in", async () => {
+    it("goes straight into the app on the session the link opened", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "verify=a-token&callbackUrl=%2Fprojects",
+      );
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        signedIn: true,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
+        /sam@acme\.com/,
+      );
+      // The link IS the sign-in. Nothing is asked — not a password for the
+      // account they just made, and not a picker that reads a projection
+      // which may not have caught up with the account yet.
+      expect(hardRedirectMock).toHaveBeenCalledWith("/projects");
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(routeMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Opening the link is what signs me in for the first time */
+    it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: true,
         addressProof: null,
+        signedIn: false,
       });
 
       renderScreen();
@@ -267,12 +307,12 @@ describe("given the sign-up screen", () => {
       expect(await screen.findByTestId("account-ready")).toHaveTextContent(
         /sam@acme\.com/,
       );
-      // The link is the LAST step of sign-up, not a receipt for it: no
-      // session exists yet, so the way in has to be on this card. The routed
-      // picker rather than a password box, because the credential this
-      // account holds may be a passkey — offering a password to somebody who
-      // never set one is the dead end this replaced.
+      // One link is one way in. Reopened inside its grace window it confirms
+      // again but opens no second session, so the way in has to be on this
+      // card: the routed picker rather than a password box, because the
+      // credential this account holds may be a passkey.
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(hardRedirectMock).not.toHaveBeenCalled();
     });
   });
 

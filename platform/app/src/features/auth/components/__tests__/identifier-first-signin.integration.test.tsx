@@ -168,6 +168,7 @@ const pickerMarkup = (container: HTMLElement, email: string): string => {
   const picker = container.querySelector('[data-testid="method-picker"]');
   if (!picker) throw new Error("no method picker rendered");
   return picker.innerHTML
+    .replaceAll(encodeURIComponent(email), "")
     .replaceAll(email, "")
     .replace(/_r_[0-9a-z]+_/g, "_field_");
 };
