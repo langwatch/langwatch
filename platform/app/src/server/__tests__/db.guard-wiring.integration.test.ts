@@ -4,7 +4,7 @@
  * specs/server/prisma-driver-adapter.feature — the tenancy guard chain
  * (enMasse → projectId → organizationId, plus the raw-SQL guard) used to hang
  * off Prisma's `$use`, which Prisma 7 removed; it now installs as a query
- * extension in `~/server/db`. The guards' own semantics are unit-tested
+ * extension in the Prisma process composition. The guards' own semantics are unit-tested
  * against the guard functions directly — what nothing else covers is the
  * WIRING: that every guard is actually present on the exported client, and
  * that guardEnMasse's argument rewrite (the only guard that mutates args
@@ -14,10 +14,26 @@
  */
 
 import { nanoid } from "nanoid";
-import { describe, expect, it } from "vitest";
-import { prisma } from "../db";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createProcessPrismaConnection } from "~/runtime/app/prisma-process.composition";
+import { createAppConfigFromEnv } from "../app-layer/config";
+import { closePrismaConnection, configurePrismaConnection, prisma } from "../db";
 
 describe("the tenancy guard chain on the exported client", () => {
+  beforeAll(() => {
+    const config = createAppConfigFromEnv();
+    configurePrismaConnection(
+      createProcessPrismaConnection({
+        databaseUrl: config.databaseUrl,
+        nodeEnv: config.nodeEnv,
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await closePrismaConnection();
+  });
+
   describe("when a project-scoped model is queried without a tenant filter", () => {
     /** @scenario "A project-scoped query without a tenant filter is refused" */
     it("refuses the query before it reaches the database", async () => {
@@ -68,9 +84,7 @@ describe("the tenancy guard chain on the exported client", () => {
   describe("when raw SQL names no tenancy column", () => {
     /** @scenario "Raw SQL without a tenancy predicate is refused, also inside a transaction" */
     it("refuses it directly and inside an interactive transaction", async () => {
-      await expect(prisma.$queryRaw`SELECT 1 AS probe`).rejects.toThrow(
-        /tenancy predicate/,
-      );
+      await expect(prisma.$queryRaw`SELECT 1 AS probe`).rejects.toThrow(/tenancy predicate/);
 
       // v10's `$use` never saw template-literal raw SQL inside interactive
       // transactions; the query extension does. This is the regression test
@@ -83,12 +97,14 @@ describe("the tenancy guard chain on the exported client", () => {
 
   describe("when raw SQL carries the sanctioned tenancy marker", () => {
     /** @scenario "Raw SQL with the sanctioned tenancy marker runs" */
-    it("reaches the database and returns rows", async () => {
+    it("reaches the database, times the delegated raw method, and returns rows", async () => {
+      const now = vi.spyOn(performance, "now");
       const rows = await prisma.$queryRaw<{ probe: number }[]>`
         -- @tenancy: guard-wiring test probe (no tenant data touched)
         SELECT 1 AS probe
       `;
       expect(rows).toHaveLength(1);
+      expect(now).toHaveBeenCalled();
     });
   });
 });

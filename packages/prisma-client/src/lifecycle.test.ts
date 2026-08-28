@@ -25,10 +25,7 @@ import { PrismaShutdownService } from "./shutdown";
 class RecordingGuard extends PrismaQueryGuard {
   readonly contexts: PrismaQueryContext[] = [];
 
-  async execute(
-    context: PrismaQueryContext,
-    next: PrismaQueryExecutor,
-  ): Promise<unknown> {
+  async execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     this.contexts.push(context);
     return next(context.args);
   }
@@ -68,8 +65,7 @@ class RecordingSeed extends PrismaSeed {
   }
 }
 
-const fakePool = (end = vi.fn(async () => undefined)): Pool =>
-  ({ end }) as unknown as Pool;
+const fakePool = (end = vi.fn(async () => undefined)): Pool => ({ end }) as unknown as Pool;
 
 const fakeClient = (overrides: Record<string, unknown> = {}): PrismaClient =>
   ({
@@ -134,6 +130,60 @@ describe("explicit Prisma lifecycle", () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
+  it("routes every raw entrypoint through the same guard and delegated query", async () => {
+    const pool = fakePool();
+    const client = fakeClient();
+    const guard = new RecordingGuard();
+    const driver = new RecordingDriver({ adapter: {} as PrismaPg, pool });
+    const clientFactory = new RecordingClientFactory(client);
+    const config = PrismaConfigService.create().resolve({
+      databaseUrl: "postgresql://localhost/langwatch",
+      log: ["error"],
+    });
+
+    PrismaConnectionService.create({
+      guard,
+      driverAdapter: driver,
+      clientFactory,
+    }).connect(config);
+
+    const extension = vi.mocked(client.$extends).mock.calls[0]?.[0] as {
+      query: {
+        $executeRaw(input: {
+          args: unknown;
+          query(args: unknown): Promise<unknown>;
+        }): Promise<unknown>;
+        $executeRawUnsafe(input: {
+          args: unknown;
+          query(args: unknown): Promise<unknown>;
+        }): Promise<unknown>;
+        $queryRaw(input: {
+          args: unknown;
+          query(args: unknown): Promise<unknown>;
+        }): Promise<unknown>;
+        $queryRawUnsafe(input: {
+          args: unknown;
+          query(args: unknown): Promise<unknown>;
+        }): Promise<unknown>;
+      };
+    };
+    const query = vi.fn(async (args: unknown) => ({ args }));
+
+    await extension.query.$queryRaw({ args: ["SELECT 1"], query });
+    await extension.query.$queryRawUnsafe({ args: ["SELECT 2"], query });
+    await extension.query.$executeRaw({ args: ["DELETE 1"], query });
+    await extension.query.$executeRawUnsafe({ args: ["DELETE 2"], query });
+
+    expect(guard.contexts).toEqual([
+      { action: "queryRaw", args: ["SELECT 1"] },
+      { action: "queryRaw", args: ["SELECT 2"] },
+      { action: "executeRaw", args: ["DELETE 1"] },
+      { action: "executeRaw", args: ["DELETE 2"] },
+    ]);
+    expect(query).toHaveBeenCalledTimes(4);
+    expect(query).toHaveBeenLastCalledWith(["DELETE 2"]);
+  });
+
   it("uses the sanctioned tenancy marker for readiness", async () => {
     const query = vi.fn(async () => [{ ready: 1 }]);
     const connection = PrismaConnection.create({
@@ -143,9 +193,7 @@ describe("explicit Prisma lifecycle", () => {
 
     await PrismaReadinessService.create().check({ connection });
 
-    expect(query).toHaveBeenCalledWith(
-      "-- @tenancy: prisma readiness probe\nSELECT 1 AS ready",
-    );
+    expect(query).toHaveBeenCalledWith("-- @tenancy: prisma readiness probe\nSELECT 1 AS ready");
   });
 
   it("disconnects the client and pool exactly once", async () => {

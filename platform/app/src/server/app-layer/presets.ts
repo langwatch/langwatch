@@ -3,6 +3,7 @@ import {
   installEnterpriseWebhookAccess,
 } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
+import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   REPORT_SCHEDULER_TARGET_TYPE,
   type AutomationService,
@@ -184,7 +185,14 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { _getSharedClickHouseClient, closeClickHouseClient } from "~/server/clickhouse/client";
-import { closePrismaConnection, prisma as globalPrisma } from "~/server/db";
+import { createProcessPrismaConnection } from "~/runtime/app/prisma-process.composition";
+import {
+  adoptPrismaConnection,
+  closePrismaConnection,
+  configurePrismaConnection,
+  hasPrismaConnection,
+  prisma as globalPrisma,
+} from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -443,12 +451,28 @@ export function initializeInProcessApp(): App {
   return initializeDefaultApp({ processRole: "all" });
 }
 
-export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
+export interface DefaultAppCompositionOptions {
+  processRole?: ProcessRole;
+  prismaConnection?: PrismaConnection;
+}
+
+export function initializeDefaultApp(options?: DefaultAppCompositionOptions): App {
+  if (options?.prismaConnection) {
+    adoptPrismaConnection(options.prismaConnection);
+  }
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
+  const config = createAppConfigFromEnv({ processRole: options?.processRole });
+  if (!options?.prismaConnection) {
+    configurePrismaConnection(
+      createProcessPrismaConnection({
+        databaseUrl: config.databaseUrl,
+        nodeEnv: config.nodeEnv,
+      }),
+    );
+  }
   const prisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma });
-  const config = createAppConfigFromEnv({ processRole: options?.processRole });
   configureProcessOutboundProxy(config.outboundProxy);
   configureAwsClientConfiguration(config.outboundProxy);
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
@@ -2220,6 +2244,14 @@ export function createTestApp(
     };
   },
 ): App {
+  const processConfig = createAppConfigFromEnv();
+  const testPrismaConfiguration = {
+    databaseUrl: overrides?.config?.databaseUrl ?? processConfig.databaseUrl,
+    nodeEnv: overrides?.config?.nodeEnv ?? processConfig.nodeEnv,
+  };
+  if (!hasPrismaConnection()) {
+    configurePrismaConnection(createProcessPrismaConnection(testPrismaConfiguration));
+  }
   const testPrisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const noop = async () => {
@@ -2282,8 +2314,8 @@ export function createTestApp(
   // re-register one after `createTestApp` returns.
   setDiscoverBroadcaster(null);
   const config: AppConfig = {
-    nodeEnv: "test",
-    databaseUrl: "postgresql://test@localhost/test",
+    nodeEnv: testPrismaConfiguration.nodeEnv,
+    databaseUrl: testPrismaConfiguration.databaseUrl,
     groupQueue: {
       compression: "gzip",
       payloadCodec: "json",
@@ -2620,6 +2652,9 @@ export function createTestApp(
       simulations: testSimulations,
     }),
   });
+  const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("database", "prisma", closePrismaConnection);
+
   return new App({
     config,
     nlpLambda,
@@ -2981,6 +3016,7 @@ export function createTestApp(
     dataRetention: testDataRetention,
     share: testShare,
     _authzMigration: testAuthz.migration,
+    _shutdownResources: shutdownResources,
     ...overrides,
   });
 }
