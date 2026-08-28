@@ -15,6 +15,14 @@ export {
   InvalidApiVersionError,
 } from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+export {
+  restVersionSelectorMiddleware,
+  RestVersionSelector,
+  type RestVersionSelection,
+  type RestVersionSelectorMiddlewareOptions,
+  type RestVersionSelectorOptions,
+  type RestVersionSource,
+} from "./rest-version-selector.js";
 // Spec generation must come from the same hono-openapi package instance that
 // attached the route metadata. Re-export it so hosts cannot accidentally use
 // a peer-resolved copy with a different metadata symbol.
@@ -45,6 +53,7 @@ export {
   type MountedRoute,
   type RequestActor,
   type RestServiceConfig,
+  type StaticRestVersioning,
   type ServiceConfig,
   type ServiceContext,
   VERSION_LATEST,

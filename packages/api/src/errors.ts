@@ -60,12 +60,8 @@ export class ApiVersionConflictError extends HandledError {
 }
 
 export class InvalidApiVersionError extends HandledError {
-  constructor() {
-    super(
-      "invalid_api_version",
-      "The API version must be latest or a real date in YYYY-MM-DD form",
-      { httpStatus: 400 },
-    );
+  constructor(expected = "latest or a real date in YYYY-MM-DD form") {
+    super("invalid_api_version", `The API version must be ${expected}`, { httpStatus: 400 });
     this.name = "InvalidApiVersionError";
   }
 }

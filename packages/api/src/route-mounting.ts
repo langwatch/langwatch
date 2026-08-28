@@ -5,7 +5,7 @@ import { buildServiceCatalogue, DISCOVER_NAME, type ServiceCatalogue } from "./d
 import { ApiVersionUnavailableError } from "./errors.js";
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
-import { mountOptionalVersionRoutes } from "./public-rest-routing.js";
+import { mountOptionalVersionRoutes, mountStaticVersionRoutes } from "./public-rest-routing.js";
 import type { BaseApp, HttpMethod, ServiceConfig, VersionStatus } from "./types.js";
 import { isDateVersion } from "./types.js";
 import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
@@ -34,6 +34,18 @@ export function mountResolvedRoutes<TProject>({
   serviceConfig: ServiceConfig;
   versionMap: Map<string, ResolvedEndpoint[]>;
 }): void {
+  if (serviceConfig.publicRest?.staticVersioning) {
+    mountStaticVersionRoutes({
+      app,
+      basePath,
+      onError,
+      providers,
+      serviceConfig,
+      versionMap,
+    });
+    return;
+  }
+
   for (const [version, endpoints] of versionMap) {
     const status = resolveVersionStatus(version);
     mountVersion({

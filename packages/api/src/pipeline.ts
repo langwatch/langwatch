@@ -294,23 +294,36 @@ function versionContextMiddleware({
 
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
+    const staticVersioning = serviceConfig.publicRest?.staticVersioning;
+    const staticSelection = staticVersioning?.selector.select({
+      pathVersion: staticVersioning.pathVersion,
+      headerVersion: staticVersioning
+        ? (c.req.header(staticVersioning.selector.headerName) ?? void 0)
+        : void 0,
+    });
     try {
-      const requested = (c.get("apiVersionRequest") as string | undefined) ?? version;
-      const versionHeader = serviceConfig.publicRest?.versionHeader;
-      const headerVersion = versionHeader ? c.req.header(versionHeader) : void 0;
-      if (headerVersion && headerVersion !== requested) {
-        throw new ApiVersionConflictError();
+      if (!staticSelection) {
+        const requested = (c.get("apiVersionRequest") as string | undefined) ?? version;
+        const versionHeader = serviceConfig.publicRest?.versionHeader;
+        const headerVersion = versionHeader ? c.req.header(versionHeader) : void 0;
+        if (headerVersion && headerVersion !== requested) {
+          throw new ApiVersionConflictError();
+        }
       }
       await next();
     } finally {
       // The date-namespace fallback serves an UNREGISTERED date with the
       // effective version's stack: the header names the namespace that was
       // asked for, not the one whose registration answered.
-      const answered = (c.get("apiVersionRequest") as string | undefined) ?? version;
+      const answered =
+        staticSelection?.version ?? (c.get("apiVersionRequest") as string | undefined) ?? version;
       // Set in a `finally` so validation errors and 410 withdrawals carry the
       // version headers — and the deprecation warning — too.
       c.header("X-API-Version", answered);
-      c.header("X-API-Version-Status", status);
+      c.header(
+        "X-API-Version-Status",
+        staticSelection?.source === "latest" ? "latest" : staticSelection ? "stable" : status,
+      );
       if (deprecated) {
         c.header("Deprecation", "true");
         c.header("X-API-Deprecation-Notice", deprecated);

@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { RateLimitedError } from "./errors.js";
 import type { RateLimiter, ResponseCache } from "./ports.js";
@@ -114,7 +115,7 @@ export function cacheReadMiddleware({
    * defaults mirror `serializeEndpointResult`: 204 for a no-body endpoint,
    * 200 otherwise.
    */
-  declaredStatus?: number;
+  declaredStatus?: ContentfulStatusCode;
 }): MiddlewareHandler {
   return async (c, next) => {
     const input = c.get(ENDPOINT_INPUT);
@@ -132,15 +133,13 @@ export function cacheReadMiddleware({
 
     if (cached) {
       if (cached.byteLength === 0) {
-        return c.body(null, (declaredStatus ?? 204) as 200);
+        return c.body(null, declaredStatus ?? 204);
       }
-      return new Response(cached as unknown as BodyInit, {
-        status: declaredStatus ?? 200,
-        headers: { "content-type": "application/json" },
-      });
+      const body = Uint8Array.from(cached);
+      return c.body(body, declaredStatus ?? 200, { "content-type": "application/json" });
     }
 
-    await next();
+    return next();
   };
 }
 

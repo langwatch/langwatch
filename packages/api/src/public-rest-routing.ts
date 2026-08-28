@@ -16,6 +16,60 @@ interface Candidate {
   stack: MiddlewareHandler[];
 }
 
+/**
+ * Mounts a static API-generation surface without the independent date-contract
+ * routes. The latest resolved catalogue remains the handler source.
+ */
+export function mountStaticVersionRoutes<TProject>({
+  app,
+  basePath,
+  onError,
+  providers,
+  serviceConfig,
+  versionMap,
+}: {
+  app: Hono;
+  basePath: string;
+  onError: ErrorHandler;
+  providers: ProviderMap<TProject>;
+  serviceConfig: ServiceConfig;
+  versionMap: Map<string, ResolvedEndpoint[]>;
+}): void {
+  const latest = versionMap.get(VERSION_LATEST);
+  const staticVersioning = serviceConfig.publicRest?.staticVersioning;
+  if (!latest || !staticVersioning) {
+    return;
+  }
+
+  const version = staticVersioning.selector.select({
+    pathVersion: staticVersioning.pathVersion,
+  }).version;
+  for (const endpoint of latest) {
+    const method = endpoint.method === "sse" ? "get" : endpoint.method;
+    const path = endpoint.path || "/";
+    const status = "latest" as const;
+    const stack = endpoint.withdrawn
+      ? buildWithdrawnMiddlewareStack({ ep: endpoint, serviceConfig, status, version })
+      : buildEndpointMiddlewareStack({
+          ep: endpoint,
+          onError,
+          providers,
+          serviceConfig,
+          status,
+          version,
+        });
+    mountRoute({ app, method, path, stack });
+    serviceConfig.onRouteMounted?.({
+      method,
+      path: mergePath(basePath, path),
+      version,
+      status,
+      withdrawn: endpoint.withdrawn === true,
+      config: endpoint.config,
+    });
+  }
+}
+
 export function mountOptionalVersionRoutes<TProject>({
   app,
   basePath,

@@ -46,6 +46,60 @@ function service() {
 }
 
 describe("modern REST", () => {
+  it("defaults to /api/v1/{name} and permits a validated explicit base path", async () => {
+    const endpoint = (path: string) =>
+      createRestService({
+        name: "thing",
+        basePath: path,
+        logger: false,
+        maxInputBytes: 1_024,
+        tracer: false,
+      })
+        .withoutPermission("framework test endpoint")
+        .withoutRateLimit("framework test endpoint")
+        .withoutResourceLimit("framework test endpoint")
+        .get("/items", "2026-08-07", (definition) =>
+          definition
+            .withInput(z.object({}))
+            .withOutput(z.object({ ok: z.boolean() }))
+            .handle(async () => ({ ok: true })),
+        )
+        .build();
+
+    const defaultApp = service()
+      .get("/items", "2026-08-07", (definition) =>
+        definition
+          .withInput(z.object({}))
+          .withOutput(z.object({ ok: z.boolean() }))
+          .handle(async () => ({ ok: true })),
+      )
+      .build();
+    const aliasApp = endpoint("/api/thing");
+
+    expect((await defaultApp.request("/api/v1/thing/items")).status).toBe(200);
+    expect((await aliasApp.request("/api/thing/items")).status).toBe(200);
+    expect((await aliasApp.request("/api/v1/thing/items")).status).toBe(404);
+  });
+
+  it("rejects unsafe REST base paths", () => {
+    expect(() =>
+      createRestService({
+        name: "thing",
+        basePath: "api/thing",
+        logger: false,
+        maxInputBytes: 1_024,
+      }),
+    ).toThrow(/basePath must be an absolute/);
+    expect(() =>
+      createRestService({
+        name: "thing",
+        basePath: "/api/thing/:id",
+        logger: false,
+        maxInputBytes: 1_024,
+      }),
+    ).toThrow(/static lower-kebab segments/);
+  });
+
   it("captures schemas before deriving the handler input and output", async () => {
     const app = service()
       .get("/items/:id", "2026-08-07", (endpoint) =>

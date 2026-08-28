@@ -2,6 +2,7 @@ import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz-contra
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
+import type { RestVersionSelector } from "./rest-version-selector.js";
 import type { ApiSchema } from "./schema.js";
 
 import type { RateLimiter, ResponseCache } from "./ports.js";
@@ -269,8 +270,8 @@ export interface MountedRoute {
   /** Absolute route path, including the service base path. */
   path: string;
   /**
-   * The version namespace of this mount (`"2025-03-15"`, `"latest"`,
-   * `"preview"`), or `null` for the namespace guards.
+   * The mounted version namespace or static generation (`"2025-03-15"`,
+   * `"latest"`, `"preview"`, or `"v1"`), or `null` for namespace guards.
    */
   version: string | null;
   /** Version status header value this mount responds with, or `null` for the guards. */
@@ -369,6 +370,8 @@ export interface ServiceConfig<TApp = unknown> {
   publicRest?: {
     versionHeader: string;
     maxInputBytes: number;
+    /** Mount direct paths only, without the date-contract namespaces. */
+    staticVersioning?: StaticRestVersioning;
     /** OpenAPI security derived from the REST service's authentication configuration. */
     security?: DescribeRouteOptions["security"];
   };
@@ -382,14 +385,19 @@ export interface ServiceConfig<TApp = unknown> {
 }
 
 /**
- * Configuration for the public REST surface. Its global `v1` prefix is fixed;
+ * Configuration for the public REST surface. It defaults to `/api/v1/{name}`;
  * date versions are negotiated by URL or `X-API-Version` within that surface.
  */
 export type RestServiceConfig<TApp = unknown> = Omit<
   ServiceConfig<TApp>,
-  "basePath" | "onError" | "publicRest"
+  "onError" | "publicRest"
 > & {
   maxInputBytes: number;
+  /**
+   * Selects a static API generation at the process mount. Omit pathVersion for
+   * an unversioned alias, which defaults to the selector's latest generation.
+   */
+  staticVersioning?: StaticRestVersioning;
   /**
    * The OpenAPI credential declaration for this REST service. It is required
    * when the service has authentication and is applied to every authenticated
@@ -397,6 +405,12 @@ export type RestServiceConfig<TApp = unknown> = Omit<
    */
   openapiSecurity?: DescribeRouteOptions["security"];
 };
+
+/** Static API-generation routing, independent from date-contract routing. */
+export type StaticRestVersioning = Readonly<{
+  selector: RestVersionSelector;
+  pathVersion?: string;
+}>;
 
 // ---------------------------------------------------------------------------
 // Internal endpoint registration record

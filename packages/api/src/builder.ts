@@ -929,6 +929,11 @@ export function createRestService<TApp = unknown>(
   if (!Number.isSafeInteger(config.maxInputBytes) || config.maxInputBytes < 1) {
     throw new Error("Modern REST maxInputBytes must be a positive safe integer");
   }
+  if (config.basePath !== void 0 && !isSafeRestBasePath(config.basePath)) {
+    throw new Error(
+      `REST service basePath must be an absolute /api path of static lower-kebab segments; received "${config.basePath}"`,
+    );
+  }
   if (config.auth && config.openapiSecurity === void 0) {
     throw new Error(
       `REST service "${config.name}" configures auth but no openapiSecurity declaration`,
@@ -945,17 +950,22 @@ export function createRestService<TApp = unknown>(
     );
   }
 
-  const { maxInputBytes, openapiSecurity, ...serviceConfig } = config;
+  const { maxInputBytes, openapiSecurity, staticVersioning, ...serviceConfig } = config;
   const service = new ServiceBuilder<unknown, EndpointVariables, TApp>({
     ...serviceConfig,
-    basePath: `/api/v1/${config.name}`,
+    basePath: config.basePath ?? `/api/v1/${config.name}`,
     publicRest: {
       versionHeader: API_VERSION_HEADER,
       maxInputBytes,
+      ...(staticVersioning ? { staticVersioning } : {}),
       security: openapiSecurity,
     },
   });
   return new RestServiceBuilder(service);
+}
+
+function isSafeRestBasePath(basePath: string): boolean {
+  return /^\/api(?:\/[a-z][a-z0-9-]*)+$/.test(basePath);
 }
 
 function hasOpenApiSecuritySchemes(security: unknown): boolean {
