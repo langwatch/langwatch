@@ -21,10 +21,14 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*"
+    "@langwatch/workflow-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -28,6 +29,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "ioredis": "5.10.1",
     "nanoid": "^6.0.0",
     "zod": "^4.4.3"

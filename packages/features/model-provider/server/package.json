@@ -27,6 +27,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

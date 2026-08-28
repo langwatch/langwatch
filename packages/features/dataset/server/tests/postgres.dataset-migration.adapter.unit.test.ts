@@ -298,7 +298,7 @@ describe("PostgresDatasetMigrationAdapter", () => {
   it("reports a pending schema without leaking a database error to the task", async () => {
     const subject = fixture({});
     subject.database.project.findMany = vi.fn(async () => {
-      throw { code: "P2022" };
+      throw Object.assign(new Error("P2022"), { code: "P2022" });
     });
 
     await expect(subject.migration.run()).resolves.toEqual({

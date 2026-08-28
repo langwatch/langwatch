@@ -25,3 +25,11 @@ export {
   NoopCodingAgentReadMetricsPort,
   type CodingAgentSessionListReadOutcome,
 } from "./adapters/coding-agent-read-metrics.adapter";
+export {
+  CodingAgentTrpcApi,
+  type CodingAgentCallerScope,
+  type CodingAgentTrpcContext,
+  type CodingAgentTrpcPorts,
+  type CodingAgentTrpcRequest,
+  type CodingAgentViewerVisibility,
+} from "./api/app-trpc/coding-agent.api";

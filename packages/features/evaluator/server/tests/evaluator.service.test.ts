@@ -319,6 +319,43 @@ describe("EvaluatorService", () => {
     ).rejects.toBeInstanceOf(EvaluatorWorkflowAlreadyAssignedError);
   });
 
+  it("refuses a workflow from another project on create", async () => {
+    const create = vi.fn();
+    const evaluators = service({
+      repository: repository({ create }),
+      workflows: workflows({
+        assertInProject: vi.fn().mockRejectedValue(new Error("workflow is not in project")),
+      }),
+    });
+
+    await expect(
+      evaluators.create({
+        id: "e2",
+        projectId: "p1",
+        name: "Foreign workflow",
+        type: "workflow",
+        config: {},
+        workflowId: "w2",
+      }),
+    ).rejects.toThrow("workflow is not in project");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a workflow from another project on update", async () => {
+    const update = vi.fn();
+    const evaluators = service({
+      repository: repository({ update }),
+      workflows: workflows({
+        assertInProject: vi.fn().mockRejectedValue(new Error("workflow is not in project")),
+      }),
+    });
+
+    await expect(
+      evaluators.update({ id: "e1", projectId: "p1", data: { workflowId: "w2" } }),
+    ).rejects.toThrow("workflow is not in project");
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("validates a code evaluator config even when its type is unchanged", async () => {
     const evaluators = service({
       repository: repository({

@@ -1,4 +1,18 @@
 export {
+  DatasetTrpcApi,
+  type DatasetTrpcContext,
+  type DatasetTrpcPorts,
+} from "./api/app-trpc/dataset.api";
+export {
+  DatasetRecordTrpcApi,
+  type DatasetRecordTrpcContext,
+} from "./api/app-trpc/dataset-record.api";
+export {
+  BatchRecordTrpcApi,
+  type BatchRecordTrpcContext,
+  type BatchRecordTrpcPorts,
+} from "./api/app-trpc/batch-record.api";
+export {
   PostgresDatasetAdapter,
   type PostgresDatasetAdapterOptions,
 } from "./adapters/postgres.dataset.adapter";

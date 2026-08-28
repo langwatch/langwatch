@@ -50,3 +50,10 @@ export {
   type EvaluationProcessingPipelineDeps,
 } from "./adapters/evaluation-processing.adapter";
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
+export {
+  EvaluationTrpcApi,
+  type EvaluationTrpcContext,
+  type EvaluationTrpcPorts,
+  type EvaluationRunOutcome,
+  type EvaluatorUnavailability,
+} from "./api/app-trpc/evaluation.api";

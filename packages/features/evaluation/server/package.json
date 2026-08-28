@@ -31,6 +31,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
@@ -41,6 +42,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "safe-regex2": "^5.1.1",
     "zod": "^4.4.3"
   },

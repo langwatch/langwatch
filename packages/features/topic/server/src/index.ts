@@ -79,3 +79,4 @@ export {
   topicClusteringPM,
   type TopicClusteringProcessState,
 } from "./processes/topic-clustering.process";
+export { TopicTrpcApi, type TopicTrpcContext } from "./api/app-trpc/topic.api";

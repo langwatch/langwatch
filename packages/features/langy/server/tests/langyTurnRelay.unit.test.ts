@@ -46,9 +46,13 @@ function surfaceResourceFrames({
   id = "call-surface",
   resourceId = "run_1",
   platformUrl = "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
-  command = undefined as string | undefined,
+  command = `langwatch trace get ${resourceId}`,
+}: {
+  id?: string;
+  resourceId?: string;
+  platformUrl?: string;
+  command?: string;
 } = {}) {
-  command ??= `langwatch trace get ${resourceId}`;
   return [
     frame({
       type: "tool",

@@ -22,3 +22,11 @@ export {
   type SuggestTierTargetsInput,
   type TierTargetSuggestion,
 } from "./adapters/suggest-tier-targets.adapter";
+export {
+  ModelProviderTrpcApi,
+  type ModelProviderTrpcContext,
+} from "./api/app-trpc/model-provider.api";
+export {
+  LlmModelCostTrpcApi,
+  type LlmModelCostTrpcContext,
+} from "./api/app-trpc/llm-model-cost.api";

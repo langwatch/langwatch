@@ -21,9 +21,13 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*"
+    "@langwatch/prisma-client": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

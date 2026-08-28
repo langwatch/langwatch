@@ -23,6 +23,19 @@ export type {
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export { LangyPublicApi } from "./api/public/langy.api";
 export { LangyInternalApi } from "./api/internal/langy.api";
+export {
+  LangyTrpcApi,
+  type LangyTrpcContext,
+  type LangyTrpcEmitters,
+  type LangyTrpcPorts,
+  type LangyTrpcRedis,
+  type LangyUiActionPort,
+} from "./api/app-trpc/langy.api";
+export {
+  LangyEgressTrpcApi,
+  type LangyEgressTrpcContext,
+  type LangyEgressTrpcPorts,
+} from "./api/app-trpc/langy-egress.api";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to
