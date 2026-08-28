@@ -1,9 +1,13 @@
-import { Config, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import {
+  Config,
+  resolveTelemetryConfiguration,
+  RuntimeConfig,
+  type ConfigValue,
+  type TelemetryConfig,
+} from "@langwatch/config";
 import type { LoggerConfiguration } from "@langwatch/observability";
 import { z } from "zod";
-import type { TelemetryConfig } from "./telemetry.config";
 import { resolveLegacyLoggerConfiguration } from "./logger.config";
-import { resolveTelemetryConfiguration } from "./telemetry.config";
 
 /**
  * The private configuration needed before an executable evaluates the legacy
@@ -45,9 +49,4 @@ export function resolveProcessBootstrapConfig(
     logger: resolveLegacyLoggerConfiguration(source),
     telemetry: resolveTelemetryConfiguration(source),
   };
-}
-
-/** Next calls the instrumentation hook in more than one runtime. */
-export function isNodeInstrumentationRuntime(source: Readonly<Record<string, unknown>>): boolean {
-  return source.NEXT_RUNTIME === "nodejs";
 }

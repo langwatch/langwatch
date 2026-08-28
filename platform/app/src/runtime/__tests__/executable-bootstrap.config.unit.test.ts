@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  isNodeInstrumentationRuntime,
-  resolveProcessBootstrapConfig,
-} from "../executable-bootstrap.config";
+import { isNodeInstrumentationRuntime } from "@langwatch/config";
+import { resolveProcessBootstrapConfig } from "../executable-bootstrap.config";
 import { AppBootConfigService } from "../config";
 
 describe("executable bootstrap configuration", () => {

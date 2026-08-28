@@ -7,6 +7,7 @@
 import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";
+import type { TelemetryConfig } from "@langwatch/config";
 import type { ExportResult } from "@opentelemetry/core";
 import type { Sampler } from "@opentelemetry/sdk-trace-base";
 import type { PushMetricExporter } from "@opentelemetry/sdk-metrics";
@@ -16,7 +17,6 @@ import { assertPlatformHasNoLangwatchApiKey } from "./langwatchPlatformGuard";
 // Dependency-free by design — safe on the boot path, before the app graph.
 import { startProfiling } from "./server/profiling/startProfiling";
 import { registerTelemetryFlush } from "./server/shutdown/telemetry";
-import type { TelemetryConfig } from "./runtime/telemetry.config";
 
 let instrumentationInitialized = false;
 

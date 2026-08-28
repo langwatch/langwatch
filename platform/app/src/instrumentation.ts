@@ -1,5 +1,5 @@
 export async function register() {
-  const { isNodeInstrumentationRuntime } = await import("./runtime/executable-bootstrap.config");
+  const { isNodeInstrumentationRuntime } = await import("@langwatch/config");
   if (isNodeInstrumentationRuntime(process.env)) {
     const { initializeEnvironmentConfig } = await import("./env.mjs");
     initializeEnvironmentConfig(process.env);

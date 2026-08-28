@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveTelemetryConfiguration } from "../telemetry.config";
+import { resolveTelemetryConfiguration } from "@langwatch/config";
 
 describe("resolveTelemetryConfiguration", () => {
   it("projects the process boundary without changing telemetry defaults", () => {

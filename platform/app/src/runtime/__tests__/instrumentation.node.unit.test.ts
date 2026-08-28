@@ -83,7 +83,7 @@ describe("initializeInstrumentation", () => {
       const stop = vi.fn().mockResolvedValue(void 0);
       mocks.startProfiling.mockReturnValue({ stop });
 
-      const { resolveTelemetryConfiguration } = await import("../telemetry.config");
+      const { resolveTelemetryConfiguration } = await import("@langwatch/config");
       const { initializeInstrumentation } = await import("../../instrumentation.node");
       const config = resolveTelemetryConfiguration({
         PYROSCOPE_SERVER_ADDRESS: "https://pyroscope.example",
@@ -111,7 +111,7 @@ describe("initializeInstrumentation", () => {
   });
 
   it("applies the platform API-key guard to projected config", async () => {
-    const { resolveTelemetryConfiguration } = await import("../telemetry.config");
+    const { resolveTelemetryConfiguration } = await import("@langwatch/config");
     const { initializeInstrumentation } = await import("../../instrumentation.node");
     const config = resolveTelemetryConfiguration({ LANGWATCH_API_KEY: "projected-key" });
 
