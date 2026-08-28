@@ -805,7 +805,12 @@ export function usePromptTabsStore<T>(
 ): T {
   const key = projectId ?? "__default__";
 
-  if (!projectId && process.env.NODE_ENV === "development") {
+  // Warned unconditionally rather than only in development. A missing
+  // projectId is a wiring bug in every environment — the store silently falls
+  // back to a shared `__default__` key, so one project's tabs become another's
+  // — and the environment read this used to guard on is not a package's to
+  // make. See `environment-boundaries`.
+  if (!projectId) {
     console.warn(
       `usePromptTabsStore called without projectId.
         This should not happen if used within DashboardLayout, guarantees projectId is available.`,

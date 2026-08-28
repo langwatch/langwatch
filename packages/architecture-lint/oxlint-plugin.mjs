@@ -399,8 +399,14 @@ const environmentBoundariesRule = {
     const classification = classifyFile(filename, context.cwd);
     const workspacePath = classification.workspacePath;
     const reusablePackage = /^packages\/.+\/src\//.test(workspacePath);
+    const processApp = isEnvironmentGovernedApp(workspacePath);
     const productionSource = !isNonProductionPackageSource(workspacePath);
-    if (!reusablePackage || !productionSource) return {};
+    if ((!reusablePackage && !processApp) || !productionSource) return {};
+    // A package may never read the environment. An app may, but only where it
+    // is composing the process — that is the "physical application composition
+    // root" the message names, and it is the one place a typed value can be
+    // parsed before anything downstream sees it.
+    if (processApp && isApplicationCompositionRoot(workspacePath)) return {};
 
     return {
       MemberExpression(node) {
@@ -417,6 +423,30 @@ const environmentBoundariesRule = {
     };
   },
 };
+
+/**
+ * The process apps whose features must receive configuration rather than read
+ * it. Named rather than globbed as `apps/*`: `apps/server` is the npx CLI that
+ * installs and supervises the other processes, so spawning with an environment
+ * IS its subject matter, and holding it to this rule would be wrong rather than
+ * merely inconvenient.
+ */
+function isEnvironmentGovernedApp(workspacePath) {
+  return /^apps\/(?:api|worker|ui)\/src\//.test(workspacePath);
+}
+
+/**
+ * Where an app is allowed to read the environment: its config modules, and the
+ * files that boot or compose the process. Everything else in an app — features,
+ * services, repositories, adapters, routes — receives typed values.
+ */
+function isApplicationCompositionRoot(workspacePath) {
+  const configModule = /(?:^|\/)platform\/config\//.test(workspacePath);
+  const processBoot = /\.(?:composition|executable|entrypoint|main|runtime)\.[cm]?tsx?$/.test(
+    workspacePath,
+  );
+  return configModule || processBoot;
+}
 
 function isNonProductionPackageSource(workspacePath) {
   const nonProductionDirectory = /(?:^|\/)(?:__tests__|tests|__bench__|benchmarks?)(?:\/|$)/.test(

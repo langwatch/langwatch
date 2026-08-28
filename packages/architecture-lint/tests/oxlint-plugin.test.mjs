@@ -189,6 +189,21 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
       code: 'const env = "not-env"; export const value = process[env];',
     },
     {
+      // Booting the process is where a typed value gets parsed.
+      filename: "apps/api/src/app/api-standalone.executable.ts",
+      code: "export const value = process.env.PORT;",
+    },
+    {
+      filename: "apps/worker/src/app/worker-production.composition.ts",
+      code: "export const value = process.env.REDIS_URL;",
+    },
+    {
+      // The npx CLI installs and supervises the other processes, so spawning
+      // with an environment is its subject matter rather than a leak.
+      filename: "apps/server/src/services/postgres.ts",
+      code: "export const value = process.env.POSTGRES_URL;",
+    },
+    {
       filename: "packages/eventing/src/probe.ts",
       code: 'const suffix = "nv"; export const value = process["e" + suffix];',
     },
@@ -206,6 +221,23 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
     {
       filename: "packages/config/src/example.ts",
       code: "export const value = import.meta.env.CONFIG_VALUE;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      // A feature inside a process app receives configuration like any other
+      // consumer; only the composition root parses it.
+      filename: "apps/api/src/features/scenario/scenario-event-rest.ts",
+      code: "export const value = process.env.BASE_HOST;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "apps/worker/src/features/trace/trace-worker-feature.installer.ts",
+      code: "export const value = process.env.TRACE_BATCH_SIZE;",
+      errors: [{ messageId: "environment" }],
+    },
+    {
+      filename: "apps/ui/src/behavior/analytics-client.ts",
+      code: "export const value = import.meta.env.POSTHOG_KEY;",
       errors: [{ messageId: "environment" }],
     },
     {

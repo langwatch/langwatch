@@ -32,8 +32,16 @@ const SLOW_CALL_THROTTLE_MS = 60_000;
 
 const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
 
-/** Zero or negative turns the warning off; unset or unparseable keeps the default. */
-export function resolveSlowCallBudgetMs(env: NodeJS.ProcessEnv = process.env): number {
+/**
+ * Zero or negative turns the warning off; unset or unparseable keeps the
+ * default.
+ *
+ * `env` is required rather than defaulted to `process.env`: a reusable package
+ * receives typed configuration and does not read the environment itself, which
+ * is what `environment-boundaries` enforces. The default was the whole
+ * violation — the parameter was already there.
+ */
+export function resolveSlowCallBudgetMs(env: NodeJS.ProcessEnv): number {
   const raw = env.TRPC_SLOW_CALL_MS;
   if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_SLOW_CALL_MS;
   const parsed = Number(raw);

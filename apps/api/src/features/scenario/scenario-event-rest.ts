@@ -21,6 +21,7 @@ import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  type PlatformUrlBuilder,
   requires,
   type SecuredApp,
   validator as zValidator,
@@ -63,6 +64,10 @@ export function createScenarioEventsRestApp(options: {
   traceUsageGuard: MiddlewareHandler;
   /** Caps a request body at `maxSize` bytes, refusing anything larger with 413. */
   bodyLimit: (options: { maxSize: number }) => MiddlewareHandler;
+  /** Absolute links back into this instance. Injected rather than read from the
+   *  environment here: a feature receives typed configuration, and the
+   *  composition root is the one place that parses it. */
+  platformUrl: PlatformUrlBuilder;
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const {
     security,
@@ -72,6 +77,7 @@ export function createScenarioEventsRestApp(options: {
     extractInlineMedia,
     traceUsageGuard,
     bodyLimit,
+    platformUrl,
   } = options;
 
   const secured = security.createProjectApp({ basePath: "/api/scenario-events" });
@@ -165,17 +171,10 @@ export function createScenarioEventsRestApp(options: {
         await broadcastStreamingEvent(broadcast(), project.id, event);
       }
 
-      const path = `/${project.slug}/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`;
-
-      const base = process.env.BASE_HOST;
-
-      if (!base) {
-        logger.error("BASE_HOST is not set, but required for scenario event url payload");
-
-        return c.json({ success: false }, 500);
-      }
-
-      const url = `${base}${path}`;
+      const url = platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`,
+      });
 
       return c.json({ success: true, url }, 201);
     },
@@ -218,21 +217,16 @@ export function createScenarioEventsRestApp(options: {
       const { project } = c.var;
       const { tabKey, batchRunId, scenarioSetId } = c.req.valid("json");
 
-      const base = process.env.BASE_HOST;
-
-      if (!base) {
-        logger.error("BASE_HOST is not set, but required for the scenario browser-tab handoff");
-
-        return c.json({ error: "BASE_HOST is not configured" }, 500);
-      }
-
       // Built server-side from ids rather than accepted as a URL: a handoff can
       // only ever point a browser at this instance's own simulations page. The
       // ids are caller-supplied and only length-bounded, so they are encoded — a
       // `#` or `?` in one would otherwise truncate the rest of the path.
-      const url = `${base}/${project.slug}/simulations/${encodeURIComponent(
-        scenarioSetId || DEFAULT_SET_ID,
-      )}/${encodeURIComponent(batchRunId)}`;
+      const url = platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/${encodeURIComponent(
+          scenarioSetId || DEFAULT_SET_ID,
+        )}/${encodeURIComponent(batchRunId)}`,
+      });
 
       const hasLiveTab = await scenarioTabs().hasLiveTab({
         projectId: project.id,

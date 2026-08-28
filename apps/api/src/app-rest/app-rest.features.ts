@@ -437,6 +437,7 @@ export function createAppRestFeatures(options: {
       extractInlineMedia: ports.extractInlineMedia,
       traceUsageGuard: ports.traceUsageGuard,
       bodyLimit: ports.bodyLimit,
+      platformUrl: ports.platformUrl,
     }).hono,
     createScenariosRestApp({
       security,
