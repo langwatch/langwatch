@@ -188,4 +188,21 @@ describe("useAgentTestingRouting", () => {
       );
     });
   });
+
+  describe("when a run of another plan is chosen from the list", () => {
+    /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */
+    it("names that plan and that run in one address change", () => {
+      openAt("/demo/agent-testing/results", { path: ["results"] });
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectPlanRun({
+        planSlug: "nightly",
+        batchRunId: "batch-2",
+      });
+
+      expect(lastPush().address).toBe(
+        "/demo/agent-testing/results/nightly/batch-2",
+      );
+    });
+  });
 });

@@ -240,14 +240,40 @@ function Harness(props: React.ComponentProps<typeof ResultsList>) {
 }
 
 const onNewRunPlan = vi.fn();
+const onSelectRun = vi.fn();
 
-function renderList() {
+/** The CSS the emitted classes of an element carry, as one string. */
+const rulesFor = (element: Element): string => {
+  const classes = Array.from(element.classList);
+  const texts: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let cssRules: CSSRuleList;
+    try {
+      cssRules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of Array.from(cssRules)) texts.push(rule.cssText);
+  }
+  for (const style of Array.from(document.querySelectorAll("style"))) {
+    texts.push(style.textContent ?? "");
+  }
+  return texts
+    .filter((text) => classes.some((className) => text.includes(className)))
+    .join("\n");
+};
+
+function renderList({
+  externalSets = [],
+}: {
+  externalSets?: Parameters<typeof buildRunPlans>[0]["externalSets"];
+} = {}) {
   const suite = makeSuite();
   const plans = buildRunPlans({
     plans: [suite],
     suiteNames: new Map([[suite.id, suite.name]]),
     suiteSummaries: {},
-    externalSets: [],
+    externalSets,
   });
 
   render(
@@ -265,7 +291,7 @@ function renderList() {
         setPeriod={vi.fn()}
         setRelativePeriod={vi.fn()}
         onSelectPlan={vi.fn()}
-        onSelectRun={vi.fn()}
+        onSelectRun={onSelectRun}
         onEditPlan={vi.fn()}
         onNewRunPlan={onNewRunPlan}
         isSseConnected={true}
@@ -286,6 +312,7 @@ describe("the toolbar of the Results tab", () => {
     atomState.atoms = [];
     atomState.lastInput = null;
     overviewState.lastInput = null;
+    onSelectRun.mockClear();
   });
 
   afterEach(() => {
@@ -387,6 +414,25 @@ describe("the toolbar of the Results tab", () => {
   });
 
   describe("when the Group by control is read", () => {
+    /** @scenario "Every control of the filter row is one height" */
+    it("draws every control of the row at one height and one type size", () => {
+      renderList();
+
+      const row = screen.getByTestId("agent-testing-results-filter-row");
+      const controls = [
+        within(row).getByTestId("results-filter-scenario"),
+        within(row).getByTestId("results-filter-status"),
+        within(row).getByRole("button", { name: /charts/i }),
+        within(row).getByTestId("results-period-picker"),
+      ];
+
+      for (const control of controls) {
+        const rules = rulesFor(control);
+        expect(rules).toMatch(/height:\s*32px/);
+        expect(rules).toMatch(/font-size:\s*12\.5px/);
+      }
+    });
+
     /** @scenario "Group by is an enclosed segmented control of four tabs" */
     it("draws four connected tabs in one enclosure, not a dropdown", () => {
       renderList();
@@ -403,6 +449,14 @@ describe("the toolbar of the Results tab", () => {
       // All four are inside the one enclosure rather than behind a trigger.
       for (const tab of tabs) expect(control).toContainElement(tab);
       expect(within(control).queryByRole("combobox")).toBeNull();
+
+      // Each tab is a label over a hidden radio, which a browser gives no
+      // pointer on its own, so the pointer is asked for.
+      for (const tab of tabs) {
+        const item = tab.closest("label");
+        expect(item).not.toBeNull();
+        expect(rulesFor(item as Element)).toMatch(/cursor:\s*pointer/);
+      }
 
       // Run plan is the grouping the tab opens on.
       expect(
@@ -499,6 +553,70 @@ describe("the toolbar of the Results tab", () => {
         within(opened).getByTestId("results-run-line-exec_2"),
       ).toBeInTheDocument();
       expect(atomState.lastInput?.scenarioIds).toEqual(["scen_1"]);
+    });
+
+    /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */
+    it("hands the plan and the run of a chosen run line over together", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.scenario = {
+        totals: makeTotals(),
+        groups: [makeGroup({ key: "scen_1", title: "Refund a paid order" })],
+      };
+      atomState.atoms = [
+        makeAtom({ executionId: "exec_1", planSlug: "checkout" }),
+        makeAtom({
+          executionId: "exec_2",
+          planSlug: "nightly",
+          runId: "batch_2",
+          outcome: "failed",
+        }),
+      ];
+
+      renderList();
+      await user.click(screen.getByRole("radio", { name: "Scenario" }));
+      await user.click(await screen.findByTestId("results-group-row-scen_1"));
+
+      await user.click(await screen.findByTestId("results-run-line-exec_2"));
+
+      expect(onSelectRun).toHaveBeenCalledWith("nightly", "batch_2");
+    });
+
+    /** @scenario "A run of a set that runs from code opens the row the list draws for it" */
+    it("opens a run of a set that runs from code under the row the list draws for it", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.scenario = {
+        totals: makeTotals(),
+        groups: [makeGroup({ key: "scen_1", title: "list agents" })],
+      };
+      // The read keys the atom by the bare set id; the list names that set
+      // under its external plan slug.
+      atomState.atoms = [
+        makeAtom({
+          executionId: "exec_9",
+          planSlug: "default",
+          runId: "batch_9",
+        }),
+      ];
+
+      renderList({
+        externalSets: [
+          {
+            scenarioSetId: "default",
+            passedCount: 1,
+            failedCount: 0,
+            totalCount: 1,
+            lastRunTimestamp: NOW,
+          },
+        ],
+      });
+      await user.click(screen.getByRole("radio", { name: "Scenario" }));
+      await user.click(await screen.findByTestId("results-group-row-scen_1"));
+
+      const line = await screen.findByTestId("results-run-line-exec_9");
+      expect(line).toHaveTextContent("default");
+      await user.click(line);
+
+      expect(onSelectRun).toHaveBeenCalledWith("external:default", "batch_9");
     });
 
     // dev is fed second and prod first, so a table that only preserved the

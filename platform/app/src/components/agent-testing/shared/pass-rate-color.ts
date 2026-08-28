@@ -15,16 +15,17 @@
  * - red below 40 percent.
  * - grey when nothing settled, so there is no rate to colour.
  *
- * The colours are the product's own. `PassRateIndicator` already owns what a
- * pass rate looks like, and Evaluations reads it through that, so a rate here
- * takes the same red, amber and green rather than a darker set of its own. The
- * bands stay, so the colour still answers this surface's rule: a plan is green
- * only when every scenario passed.
+ * The colours are the product's own status colours: the green a passed run
+ * reads in and the red a failed run reads in, taken from the shared run status
+ * config, with the theme's orange between them. A pass rate, a run status and
+ * a verdict then say the same thing in the same colour, on this surface and on
+ * every other one that draws a run.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { getPassRateGradientColor } from "~/components/shared/PassRateIndicator";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 /** Where amber starts. Under this a pass rate reads red. */
 export const PASS_RATE_AMBER_FLOOR = 40;
@@ -42,10 +43,13 @@ export const PASS_RATE_GREEN_FLOOR = 99.5;
 /** The bands a pass rate can fall in, once thresholds are applied. */
 export type PassRateBand = "green" | "amber" | "red" | "none";
 
+/** The orange of the theme, the one colour of the three no run status reads. */
+export const PASS_RATE_AMBER_COLOR = "orange.500";
+
 const BAND_COLORS: Record<PassRateBand, string> = {
-  green: getPassRateGradientColor(100),
-  amber: getPassRateGradientColor(50),
-  red: getPassRateGradientColor(0),
+  green: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
+  amber: PASS_RATE_AMBER_COLOR,
+  red: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor,
   none: "fg.subtle",
 };
 

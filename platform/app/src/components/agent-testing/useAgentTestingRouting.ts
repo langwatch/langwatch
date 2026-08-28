@@ -56,6 +56,8 @@ export type AgentTestingRouting = AgentTestingRoutingState & {
   selectSuite: (selection: AgentTestingSelection) => void;
   selectPlan: (planSlug: string | null) => void;
   selectRun: (batchRunId: string | null) => void;
+  /** Land on one run of one plan in a single address change. */
+  selectPlanRun: (target: { planSlug: string; batchRunId: string }) => void;
 };
 
 /** The address names no suite, so the tab opens the first one of the rail. */
@@ -272,6 +274,13 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     [push, state.planSlug],
   );
 
+  const selectPlanRun = useCallback(
+    ({ planSlug, batchRunId }: { planSlug: string; batchRunId: string }) => {
+      push({ ...DEFAULT_STATE, tab: "results", planSlug, batchRunId });
+    },
+    [push],
+  );
+
   return {
     ...state,
     isReady,
@@ -279,5 +288,6 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     selectSuite,
     selectPlan,
     selectRun,
+    selectPlanRun,
   };
 }

@@ -10,9 +10,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { getPassRateGradientColor } from "~/components/shared/PassRateIndicator";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   formatPassRate,
+  PASS_RATE_AMBER_COLOR,
   PASS_RATE_AMBER_FLOOR,
   passRateBand,
   passRateColor,
@@ -33,14 +35,19 @@ describe("the colour of a pass rate", () => {
   });
 
   describe("when the colour itself is read", () => {
-    /** @scenario "A pass rate reads in the product's own pass rate colours" */
-    it("answers the colour the product uses for a pass rate everywhere else", () => {
-      expect(passRateColor(100)).toBe(getPassRateGradientColor(100));
-      expect(passRateColor(60)).toBe(getPassRateGradientColor(50));
-      expect(passRateColor(0)).toBe(getPassRateGradientColor(0));
+    /** @scenario "A pass rate reads in the product's own status colours" */
+    it("answers the green of a passed run, the red of a failed one, and the theme's orange", () => {
+      expect(passRateColor(100)).toBe(
+        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
+      );
+      expect(passRateColor(0)).toBe(
+        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor,
+      );
+      expect(passRateColor(60)).toBe(PASS_RATE_AMBER_COLOR);
+      expect(PASS_RATE_AMBER_COLOR).toBe("orange.500");
     });
 
-    /** @scenario "A pass rate reads in the product's own pass rate colours" */
+    /** @scenario "A pass rate reads in the product's own status colours" */
     it("keeps this surface's bands deciding which colour applies", () => {
       // The product's scale is a gradient, so 60 percent would be a colour of
       // its own. Here it is amber, because a plan is green only at one hundred.

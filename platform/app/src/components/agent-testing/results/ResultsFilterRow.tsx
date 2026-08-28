@@ -27,6 +27,14 @@ import {
   type ResultGrouping,
 } from "./result-atoms";
 
+/**
+ * The height and the type size every control of the row shares. The filter
+ * chips, the status select, the Charts toggle and the period picker sit on
+ * one line, so one of them at another height reads as a mistake.
+ */
+const TOOLBAR_CONTROL_HEIGHT = "32px";
+const TOOLBAR_FONT_SIZE = "12.5px";
+
 export type ResultsFilterRowProps = {
   grouping: ResultGrouping;
   onGroupingChange: (grouping: ResultGrouping) => void;
@@ -86,6 +94,8 @@ export function ResultsFilterRow({
 
       <NativeSelect.Root size="sm" width="auto" minWidth="120px">
         <NativeSelect.Field
+          height={TOOLBAR_CONTROL_HEIGHT}
+          fontSize={TOOLBAR_FONT_SIZE}
           value={filters.status}
           aria-label="Filter by status"
           data-testid="results-filter-status"

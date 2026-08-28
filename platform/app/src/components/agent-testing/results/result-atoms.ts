@@ -31,7 +31,7 @@ import type {
   ResultsGroupBy,
 } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { UNKNOWN_TARGET_KEY } from "~/server/app-layer/simulations/result-atoms/atom.types";
-import type { RunPlan } from "./run-plans";
+import { type RunPlan, toExternalPlanSlug } from "./run-plans";
 
 /** What the filter row asks of the list. */
 export type ResultFilters = {
@@ -132,12 +132,13 @@ export function toResultRows({
 }): ResultRow[] {
   return atoms.map((atom) => {
     const facts = scenarioFacts.get(atom.scenarioId);
+    const plan = planOfAtom({ atom, plans });
     return {
       runId: atom.runId,
       executionId: atom.executionId,
       runAt: atom.runAt,
-      planSlug: atom.planSlug,
-      planName: plans.get(atom.planSlug)?.name ?? atom.planSlug,
+      planSlug: plan?.slug ?? atom.planSlug,
+      planName: plan?.name ?? atom.planSlug,
       scenarioId: atom.scenarioId,
       scenarioName: facts?.name ?? atom.scenarioId,
       labels: facts?.labels ?? [],
@@ -146,6 +147,26 @@ export function toResultRows({
       outcome: atom.outcome,
     };
   });
+}
+
+/**
+ * The plan of the list an atom belongs to.
+ *
+ * A stored plan is keyed by its slug on both sides. A set that runs from code
+ * has no stored plan: the read keys its atoms by the bare set id, while the
+ * list names that set under the external plan slug. Resolving here is what
+ * lets a run of such a set open the same row the list draws for it.
+ */
+function planOfAtom({
+  atom,
+  plans,
+}: {
+  atom: ResultAtom;
+  plans: Map<string, RunPlan>;
+}): RunPlan | undefined {
+  return (
+    plans.get(atom.planSlug) ?? plans.get(toExternalPlanSlug(atom.planSlug))
+  );
 }
 
 /** How a target reference id reads. */

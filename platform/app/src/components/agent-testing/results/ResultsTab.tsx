@@ -76,9 +76,32 @@ function TabSkeleton({
   );
 }
 
+/**
+ * The tab before the router reports the address. The skeleton stands in for
+ * the plans list, which has no rail, so it reserves none either and does not
+ * shift when `isReady` flips true.
+ */
+function ResultsTabPending() {
+  return (
+    <AgentTestingTabLayout
+      reserveRailSpace={false}
+      data-testid="agent-testing-results-tab"
+    >
+      <TabSkeleton flex={1} />
+    </AgentTestingTabLayout>
+  );
+}
+
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const routing = useAgentTestingRouting();
-  const { planSlug, batchRunId, isReady, selectPlan, selectRun } = routing;
+  const {
+    planSlug,
+    batchRunId,
+    isReady,
+    selectPlan,
+    selectRun,
+    selectPlanRun,
+  } = routing;
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
   const { plans, isLoading, hasAnyPlans } = useRunPlans({ period });
   const handleNewRunPlan = useNewRunPlanFlow();
@@ -101,18 +124,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
 
   const handleBack = useCallback(() => selectPlan(null), [selectPlan]);
 
-  if (!isReady) {
-    // The skeleton stands in for the plans list, which has no rail, so it
-    // reserves none either and does not shift when `isReady` flips true.
-    return (
-      <AgentTestingTabLayout
-        reserveRailSpace={false}
-        data-testid="agent-testing-results-tab"
-      >
-        <TabSkeleton flex={1} />
-      </AgentTestingTabLayout>
-    );
-  }
+  if (!isReady) return <ResultsTabPending />;
 
   // The plan detail has a rail (RunsSidebar) baked in. The list view has
   // none, and reserves none: it is the widest table of the page and reads
@@ -147,6 +159,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
       setPeriod={setPeriod}
       setRelativePeriod={setRelativePeriod}
       onSelectPlan={selectPlan}
+      onSelectPlanRun={selectPlanRun}
       onEditPlan={handleEditPlan}
       onNewRunPlan={handleNewRunPlan}
       isSseConnected={isSseConnected}
@@ -161,6 +174,7 @@ type ResultsListViewProps = Omit<
   planSlug: string | null;
   selectedPlan: RunPlan | null;
   isLoading: boolean;
+  onSelectPlanRun: (target: { planSlug: string; batchRunId: string }) => void;
 };
 
 function ResultsListView({
@@ -168,6 +182,7 @@ function ResultsListView({
   selectedPlan,
   isLoading,
   onSelectPlan,
+  onSelectPlanRun,
   ...listProps
 }: ResultsListViewProps) {
   // When the URL names a plan, we must not fall through to the plans list —
@@ -176,12 +191,13 @@ function ResultsListView({
   // real detail arrives. The empty branch is reserved for `!isLoading && !data`.
   const isResolvingPlan = !!planSlug && !selectedPlan && isLoading;
 
-  // Opening one run from the list lands on its plan, which opens on that
-  // plan's newest run. Landing on the run itself needs one address change
-  // rather than two, which the routing hook does not offer yet.
+  // Opening one run from an opened row lands on that run of its plan, in one
+  // address change, so the person sees the run they chose and not the plan's
+  // newest one.
   const handleSelectRun = useCallback(
-    (runPlanSlug: string) => onSelectPlan(runPlanSlug),
-    [onSelectPlan],
+    (runPlanSlug: string, batchRunId: string) =>
+      onSelectPlanRun({ planSlug: runPlanSlug, batchRunId }),
+    [onSelectPlanRun],
   );
 
   return (

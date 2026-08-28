@@ -190,6 +190,13 @@ Feature: The Results tab
     And the toggle carries no caret
 
   @integration
+  Scenario: Every control of the filter row is one height
+    Given the Results tab is open on the list of run plans
+    When the filter row is read
+    Then the filter chips, the status select, the Charts toggle and the period picker share one height
+    And they share one type size
+
+  @integration
   Scenario: The charts block is hidden until the Charts toggle is used
     Given the Results tab is open on the list of run plans
     When the tab is first read
@@ -222,6 +229,7 @@ Feature: The Results tab
     And they read "Run plan", "Scenario", "Target" and "None"
     And it is not a dropdown
     And "Run plan" is chosen
+    And each tab shows the pointer under the mouse
 
   @integration
   Scenario: Grouping by scenario opens a row for every run of that scenario
@@ -230,6 +238,19 @@ Feature: The Results tab
     Then one row reads "Refund a paid order"
     And opening it lists every run of that scenario across both plans
     And its Trend draws one bar per run
+
+  @integration
+  Scenario: Choosing a run inside an opened row lands on its plan at that run
+    Given a scenario row opened onto a run of the plan "Nightly"
+    When that run is chosen
+    Then the page lands on the plan "Nightly" open on that run
+    And not on the newest run of the plan
+
+  @integration
+  Scenario: A run of a set that runs from code opens the row the list draws for it
+    Given a scenario row opened onto a run of a set that runs from code
+    When that run is chosen
+    Then the page lands on that set's row of the list, open on that run
 
   @integration
   Scenario: Grouping by target compares one agent against another
@@ -247,11 +268,12 @@ Feature: The Results tab
   # --- Colour ---
 
   @unit
-  Scenario: A pass rate reads in the product's own pass rate colours
+  Scenario: A pass rate reads in the product's own status colours
     Given a pass rate
     When its colour is read
-    Then the colour is the one the product uses for a pass rate everywhere else
-    And the bands of this surface still decide which of them applies
+    Then green is the colour a passed run reads in everywhere a run is drawn
+    And red is the colour a failed run reads in everywhere a run is drawn
+    And amber is the orange of the theme
 
   @unit
   Scenario: One helper maps a pass rate to a colour for text and for bars
