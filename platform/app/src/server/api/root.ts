@@ -62,7 +62,7 @@ import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
 import { pinnedTraceRouter } from "./routers/pinnedTrace";
 import { planRouter } from "./routers/plan";
-import { presenceRouter } from "./routers/presence";
+import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
 import { projectRouter } from "./routers/project";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
 import { promptsRouter } from "./routers/prompts";

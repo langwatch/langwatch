@@ -3307,11 +3307,6 @@
       "kind": "composition"
     },
     {
-      "feature": "presence",
-      "file": "platform/app/src/server/api/routers/presence.ts",
-      "kind": "transport"
-    },
-    {
       "feature": "project",
       "file": "platform/app/src/app/api/projects/[[...route]]/app.ts",
       "kind": "transport"
