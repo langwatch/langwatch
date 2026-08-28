@@ -420,7 +420,7 @@ export class CodingAgentSessionClickHouseRepository
    * retry recovers.
    *
    * What keeps that unwindowed subquery cheap is the `idx_session_id` bloom
-   * filter (migration 00086), NOT the sort key. The sort key is
+   * filter (migration 00087), NOT the sort key. The sort key is
    * (TenantId, StartedAt, SessionId) and leads with time, so with StartedAt
    * unconstrained `SessionId` sits behind an unbounded second key position and
    * the primary index cannot exclude a granule on it. `UpdatedAt` is not a
