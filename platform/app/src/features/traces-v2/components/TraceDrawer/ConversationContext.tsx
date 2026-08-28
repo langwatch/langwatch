@@ -29,9 +29,12 @@ import {
   useTextTranslation,
 } from "../../hooks/useTextTranslation";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
-import { getDrawerDensityTokens, useDensityStore } from "@langwatch/trace-web";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { formatPreview } from "@langwatch/trace-web";
+import {
+  formatPreview,
+  getDrawerDensityTokens,
+  useDensityStore,
+  useDrawerStore,
+} from "@langwatch/trace-web";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
 
 interface ConversationContextProps {

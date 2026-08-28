@@ -3,7 +3,7 @@ import { ArrowUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTraceNewCount } from "../../hooks/useTraceNewCount";
-import { useSseStatusStore } from "../../stores/sseStatusStore";
+import { useSseStatusStore } from "@langwatch/trace-web";
 
 const SCROLL_THRESHOLD_PX = 80;
 

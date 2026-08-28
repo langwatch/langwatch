@@ -6,7 +6,7 @@ import { usePlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
 import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 /**
  * A step that couldn't run because the plan ran out — and the way to change it.
@@ -29,8 +29,8 @@ import { useLangyStore } from "../stores/langyStore";
  *
  * WHO gets the CTA is the point. Changing a plan is `organization:manage` — the
  * permission the subscription mutations themselves check
- * (`server/api/routers/subscription.enterprise.ts`) — so anyone else is told plainly whom to
- * ask instead. Handing them a button into a page that will refuse them is a
+ * (`@langwatch/enterprise-billing-server`, the `subscription.*` transport) — so
+ * anyone else is told plainly whom to ask instead. Handing them a button into a page that will refuse them is a
  * dead end dressed up as a way forward.
  */
 export function LangyPlanLimitCard({

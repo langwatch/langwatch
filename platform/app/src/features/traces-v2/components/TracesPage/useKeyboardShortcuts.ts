@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { useDensityStore } from "@langwatch/trace-web";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useFindStore } from "@langwatch/trace-web";
-import { useSelectionStore } from "@langwatch/trace-web";
-import { useUIStore } from "@langwatch/trace-web";
+import {
+  useDensityStore,
+  useDrawerStore,
+  useFindStore,
+  useSelectionStore,
+  useUIStore,
+} from "@langwatch/trace-web";
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;

@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
-import { parseEditParam, useDrawerStore } from "../stores/drawerStore";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../stores/traceEditStore";
+import {
+  parseEditParam,
+  selectIsTraceEditDirty,
+  useDrawerStore,
+  useTraceEditStore,
+} from "@langwatch/trace-web";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/traceEditMode";
 
 /**

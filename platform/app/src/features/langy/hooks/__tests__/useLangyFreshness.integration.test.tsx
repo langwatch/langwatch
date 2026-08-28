@@ -21,7 +21,7 @@ import {
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LangyConversationUpdateSignal } from "../../data/langy.dtos";
+import type { LangyConversationUpdateSignal } from "@langwatch/langy-contract";
 
 const PROJECT_ID = "project_test";
 const CONVERSATION_ID = "conv_open";
@@ -60,7 +60,7 @@ vi.mock("../useLangyConversationUpdateListener", () => ({
   },
 }));
 
-import { useLangyStore } from "../../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useLangyFreshness } from "../useLangyFreshness";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({

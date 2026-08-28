@@ -14,7 +14,7 @@ import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";

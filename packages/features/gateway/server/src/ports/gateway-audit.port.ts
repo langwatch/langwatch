@@ -18,6 +18,7 @@ export type GatewayAuditAction =
   | "gateway.virtual_key.enabled"
   | "gateway.virtual_key.guardrail_attached"
   | "gateway.virtual_key.guardrail_detached"
+  | "gateway.virtual_key.revoked"
   | "gateway.virtual_key.rotated"
   | "gateway.virtual_key.updated";
 

@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));

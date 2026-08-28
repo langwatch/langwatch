@@ -22,7 +22,7 @@ vi.mock("../components/LangyModelPill", () => ({
 }));
 
 import { Composer } from "../components/Composer";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 function renderComposer({
   variant,

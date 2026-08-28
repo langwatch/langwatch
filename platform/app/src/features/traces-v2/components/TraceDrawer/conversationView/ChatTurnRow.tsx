@@ -11,10 +11,15 @@ import {
   type UseTextTranslationResult,
   useTextTranslation,
 } from "../../../hooks/useTextTranslation";
-import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
+import {
+  formatCost,
+  formatDuration,
+  formatRelativeTimeAgo,
+  isSessionMarked,
+  isTerminalOrigin,
+  useAnnotationQueueSessionStore,
+} from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../types/trace";
-import { formatCost, formatDuration, formatRelativeTimeAgo } from "@langwatch/trace-web";
-import { isTerminalOrigin } from "@langwatch/trace-web";
 import {
   Bubble,
   type BubbleSide,

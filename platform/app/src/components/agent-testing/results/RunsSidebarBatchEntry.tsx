@@ -7,7 +7,7 @@
 import {
   type BatchRun,
   computeBatchRunSummary,
-} from "~/components/suites/run-history-transforms";
+} from "@langwatch/suite-web";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";

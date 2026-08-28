@@ -13,7 +13,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DrawerFooterContext, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
-import { ComponentIcon } from "../ColorfulBlockIcons";
+import { ComponentIcon } from "@langwatch/workflow-web";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { ComponentExecutionButton, getNodeDisplayName } from "@langwatch/workflow-web";

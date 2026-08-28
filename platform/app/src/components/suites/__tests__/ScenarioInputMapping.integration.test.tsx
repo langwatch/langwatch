@@ -18,7 +18,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FieldMapping } from "~/components/variables/VariableMappingInput";
+import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   ScenarioInputMappingSection,
   type ScenarioInputMappingSectionProps,

@@ -4,7 +4,7 @@
  * Thread sources (sources found in THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
  * or with sourceId "thread") are marked with `type: "thread"`.
  */
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   type MappingState,
   SERVER_ONLY_THREAD_SOURCES,

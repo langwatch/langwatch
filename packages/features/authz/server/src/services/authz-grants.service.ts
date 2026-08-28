@@ -282,6 +282,15 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return result;
   }
 
+  /**
+   * Retire this organization's cached authorization snapshots without a grant
+   * write. A membership being disabled or re-enabled changes what the person
+   * may do but touches no binding, so nothing else bumps the epoch for it.
+   */
+  async invalidateOrganization({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.options.epoch.bump({ organizationId });
+  }
+
   async attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
     return this.options.ledger.attachBindings(args);
   }

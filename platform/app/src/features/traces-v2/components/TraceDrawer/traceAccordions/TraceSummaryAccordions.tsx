@@ -8,10 +8,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import {
-  mediaRefBelongsToSide,
-  parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
+} from "@langwatch/trace-contract";
+import {
+  mediaRefBelongsToSide,
+  parseMediaRefs,
   type TraceMediaSide,
 } from "~/shared/traces/media-refs";
 import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
@@ -21,8 +23,7 @@ import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceHeaderCanonical } from "../../../hooks/useTraceHeader";
 import { useTraceResources } from "../../../hooks/useTraceResources";
-import { useDrawerStore } from "../../../stores/drawerStore";
-import { useFocusSectionStore } from "@langwatch/trace-web";
+import { useDrawerStore, useFocusSectionStore } from "@langwatch/trace-web";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { type AttributeComments, AttributeTable } from "../AttributeTable";
 import { commentCountsBySection } from "../anchoredComments/sectionComments";

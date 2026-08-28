@@ -14,9 +14,8 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { useCopyToClipboard } from "@langwatch/trace-web";
+import { ShikiCodeBlock, useCopyToClipboard } from "@langwatch/trace-web";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { ShikiCodeBlock } from "@langwatch/trace-web";
 import { SegmentedToggle } from "./SegmentedToggle";
 
 type RawTab = "trace" | "spans";

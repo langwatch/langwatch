@@ -12,7 +12,7 @@ import type { PromptConfigFormValues } from "~/prompts";
 import { PromptMessagesField } from "../PromptMessagesField";
 
 // Mock complex dependencies
-vi.mock("~/components/variables", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/prompt-textarea", () => ({
   PromptTextAreaWithVariables: ({
     value,
     onChange,

@@ -2,8 +2,8 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCopyToClipboard } from "@langwatch/trace-web";
 import type { PinnedAttribute } from "@langwatch/trace-web";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import { TooltipRow } from "../../shared/TooltipRow";
 import { Chip, type ChipTone } from "../Chip";
 

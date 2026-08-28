@@ -4,7 +4,7 @@ import {
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useViewStore } from "../stores/viewStore";
+import { useViewStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 
 /** A row with nothing said about it, and the shape one carries before its

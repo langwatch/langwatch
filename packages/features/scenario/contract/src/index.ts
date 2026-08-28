@@ -25,6 +25,7 @@ export * from "./scenario-run.utils";
 export * from "./scenario-set-id";
 export * from "./scenario-tab-events";
 export * from "./scenario-tab-presence";
+export * from "./streaming-event-codec";
 export * from "./simulation.commands";
 export * from "./simulation-event.constants";
 export * from "./simulation-event.values";

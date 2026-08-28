@@ -4,7 +4,7 @@ import { PRESIDIO_STRICT_ENTITIES } from "../../../server/tracer/collector/piiCh
 import {
   ESSENTIAL_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_ENTITY_LABELS,
-} from "../piiEntityLabels";
+} from "@langwatch/data-privacy-web";
 
 describe("PII entity tooltip labels", () => {
   describe("when the essential engine's entity list changes", () => {

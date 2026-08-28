@@ -4,7 +4,7 @@ import { useCallback, useRef } from "react";
 
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
-import type { LangyMessageDto } from "../data/langy.dtos";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { createLangyChatTransport } from "../logic/langyChatTransport";
 
 /**

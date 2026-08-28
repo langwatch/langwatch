@@ -102,7 +102,7 @@ vi.mock("~/components/agents/http", () => ({
   useHttpTest: () => ({ handleTest: vi.fn() }),
 }));
 
-vi.mock("~/components/variables", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => null,
 }));
 

@@ -2,8 +2,7 @@ import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { INITIAL_TIME_RANGE, useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { useOnboardingActive } from "./useOnboardingActive";
 

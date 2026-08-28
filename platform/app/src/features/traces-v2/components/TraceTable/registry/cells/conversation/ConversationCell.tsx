@@ -1,9 +1,7 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
-import { useFilterStore } from "../../../../../stores/filterStore";
-import { useViewStore } from "../../../../../stores/viewStore";
-import { truncateId } from "@langwatch/trace-web";
+import { truncateId, useFilterStore, useViewStore } from "@langwatch/trace-web";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { IOPreview } from "../../../IOPreview";
 import type { CellDef, RowActions } from "../../types";

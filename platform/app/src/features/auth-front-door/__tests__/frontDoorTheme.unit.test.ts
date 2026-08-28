@@ -15,7 +15,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { system } from "~/pages/_app";
+import { uiDesignSystem as system } from "@langwatch/ui/design-system";
 
 // getTokenCss() emits `{"@layer tokens": {"<selector>": {--var: value}}}`.
 const tokenCss = () =>

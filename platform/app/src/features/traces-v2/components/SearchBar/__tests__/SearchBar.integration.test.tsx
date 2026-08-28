@@ -100,7 +100,7 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "../../../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import { SearchBar } from "../SearchBar";
 import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 

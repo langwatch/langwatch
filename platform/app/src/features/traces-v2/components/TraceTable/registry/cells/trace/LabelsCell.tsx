@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import { getColorPaletteForString } from "~/utils/rotatingColors";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";

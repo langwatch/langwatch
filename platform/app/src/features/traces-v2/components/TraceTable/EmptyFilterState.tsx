@@ -1,8 +1,7 @@
 import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
-import type { TimeRange } from "../../stores/filterStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import type { TimeRange } from "@langwatch/trace-web";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (

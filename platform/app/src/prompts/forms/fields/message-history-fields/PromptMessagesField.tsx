@@ -13,13 +13,12 @@ import {
 } from "~/components/ui/messages";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import {
-  type AvailableSource,
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
-  type Variable,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/prompt-textarea";
+import type { AvailableSource, Variable } from "@langwatch/prompt-web/surfaces/variables";
 import type { PromptConfigFormValues } from "~/prompts";
-import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
+import { useLayoutMode } from "@langwatch/prompt-web/surfaces/prompt-layout";
 import {
   EditingModeTitle,
   getDefaultEditingMode,

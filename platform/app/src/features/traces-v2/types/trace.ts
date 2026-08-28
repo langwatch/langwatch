@@ -1,5 +1,5 @@
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 
 export type TraceStatus = "ok" | "error" | "warning";
 

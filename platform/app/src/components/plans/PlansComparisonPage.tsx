@@ -26,7 +26,7 @@ import {
   formatPrice,
   getGrowthPlanFeatures,
   getGrowthSeatPriceCents,
-} from "../subscription/billing-plans";
+} from "@langwatch/enterprise-billing-web";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,

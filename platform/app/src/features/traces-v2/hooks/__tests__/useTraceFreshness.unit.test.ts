@@ -90,8 +90,9 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-// Stores are at traces-v2/stores/ which from hooks/__tests__/ is ../../stores/.
-vi.mock("../../stores/drawerStore", () => ({
+// The stores live in @langwatch/trace-web. Mocking the module rather than the
+// barrel keeps the rest of the package real for the hook under test.
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({ traceId: null, occurredAtMs: null }),
@@ -102,7 +103,7 @@ vi.mock("../../stores/drawerStore", () => ({
 // Mutable live-updates mode — mutated in beforeEach / test body.
 let liveUpdatesMode: "live" | "ask" | "paused" = "live";
 
-vi.mock("../../stores/sseStatusStore", () => ({
+vi.mock("@langwatch/trace-web/sse-status.store", () => ({
   useSseStatusStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -126,7 +127,8 @@ vi.mock("../../stores/sseStatusStore", () => ({
 // Track pulse calls per traceId.
 const pulseMock = vi.fn();
 
-vi.mock("../../stores/rowPulseStore", () => ({
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
   useRowPulseStore: (selector: (s: { pulse: typeof pulseMock }) => unknown) =>
     selector({ pulse: pulseMock }),
 }));

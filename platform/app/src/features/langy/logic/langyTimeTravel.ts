@@ -32,7 +32,7 @@ import {
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
 
-import type { LangyMessageDto } from "../data/langy.dtos";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
 import {
   type LangyDevLogRecord,
   replayTurnProjection,

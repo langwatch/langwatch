@@ -34,13 +34,13 @@ vi.mock("~/components/ModelSelector", () => ({
 
 import { Composer } from "../components/Composer";
 import { LangyComposerPalette } from "../components/LangyComposerPalette";
-import { LangyContextTargetLayer } from "../components/LangyContextTargetLayer";
-import { useLangyContextTarget } from "../hooks/useLangyContextTarget";
 import {
-  type LangyContextTarget,
+  type LangyContextTargetDescriptor,
+  LangyContextTargetLayer,
+  useLangyContextTarget,
   useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
-import { useLangyStore } from "../stores/langyStore";
+  useLangyStore,
+} from "@langwatch/langy-web";
 
 function renderComposer() {
   return render(
@@ -195,7 +195,7 @@ describe("given a chip in the panel and its card on the page", () => {
    * in the only state it is ever used from, while these tests happily passed
    * against markup the app never rendered.
    */
-  function WorkflowCard({ target }: { target: LangyContextTarget }) {
+  function WorkflowCard({ target }: { target: LangyContextTargetDescriptor }) {
     const langy = useLangyContextTarget(target);
     return <div {...langy.targetProps}>{target.label}</div>;
   }

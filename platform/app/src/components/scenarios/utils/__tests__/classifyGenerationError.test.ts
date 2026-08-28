@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ScenarioGenerationError } from "../../services/scenarioGeneration";
+import { ScenarioGenerationError } from "@langwatch/scenario-web";
 import { classifyGenerationError } from "../classifyGenerationError";
 
 // ─────────────────────────────────────────────────────────────────────────────

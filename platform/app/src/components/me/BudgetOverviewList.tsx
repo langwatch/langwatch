@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**

@@ -6,23 +6,18 @@ import { clampMaxTokens } from "../../utils/clampMaxTokens";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { type Output, OutputsSection, type OutputType } from "../outputs/OutputsSection";
 import { Popover } from "@langwatch/design-system/popover";
-import { ParameterRow } from "./ParameterRow";
-import {
-  DEFAULT_SUPPORTED_PARAMETERS,
-  getDisplayParameters,
-  getParameterConfigWithModelOverrides,
-  toFormKey,
-} from "./parameterConfig";
-import type { LLMConfigValues } from "./types";
-import { getParamValue } from "./utils/paramValueUtils";
 import {
   buildModelChangeValues,
+  DEFAULT_SUPPORTED_PARAMETERS,
+  getDisplayParameters,
   getMaxTokenLimit,
+  getParameterConfigWithModelOverrides,
+  getParamValue,
+  type LLMConfigValues,
   normalizeMaxTokens,
-} from "./utils/tokenUtils";
-
-// Re-export types for backward compatibility
-export type { LLMConfigValues } from "./types";
+  ParameterRow,
+  toFormKey,
+} from "@langwatch/prompt-web/surfaces/llm-parameters";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };

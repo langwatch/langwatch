@@ -13,7 +13,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { MappingState } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
 const SPAN_ID = "0af31b2c9d4e5f60";

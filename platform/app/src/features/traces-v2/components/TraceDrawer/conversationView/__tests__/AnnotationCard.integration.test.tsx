@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import { useDrawerStore } from "../../../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { AnnotationCard } from "../AnnotationCard";
 
 const SCORE_NAMES = new Map([

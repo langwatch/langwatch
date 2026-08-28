@@ -3,7 +3,7 @@ import {
   formatEvalColumnId,
   isEvalColumnId,
   parseEvalColumnId,
-} from "../../../lens/evalColumnId";
+} from "@langwatch/trace-web";
 import type { TraceEvalResult, TraceListItem } from "../../../types/trace";
 import {
   buildEvalColumnDef,

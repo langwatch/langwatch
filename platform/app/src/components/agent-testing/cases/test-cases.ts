@@ -8,7 +8,7 @@
  * @see specs/scenarios/scenario-folder-assignment.feature
  */
 
-import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
+import type { RunGroupSummary } from "@langwatch/suite-web";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";

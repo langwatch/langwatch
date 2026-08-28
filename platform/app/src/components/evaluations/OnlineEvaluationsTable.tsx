@@ -19,9 +19,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import {
   type OnlineEvaluationPerformance,
   PerformancePreview,
-} from "./OnlineEvaluationPerformancePreview";
-
-export type { OnlineEvaluationPerformance } from "./OnlineEvaluationPerformancePreview";
+} from "@langwatch/evaluator-web";
 
 export type OnlineEvaluationRow = {
   id: string;

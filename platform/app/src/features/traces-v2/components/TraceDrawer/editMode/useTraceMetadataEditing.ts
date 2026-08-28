@@ -6,7 +6,7 @@ import {
 import {
   selectTraceMetadataBaseline,
   useTraceEditStore,
-} from "../../../stores/traceEditStore";
+} from "@langwatch/trace-web";
 import type { AttributeEditing } from "../AttributeTable";
 
 /**

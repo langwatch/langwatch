@@ -8,7 +8,7 @@
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 import { describe, expect, it } from "vitest";
-import type { FieldMapping } from "~/components/variables/VariableMappingInput";
+import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { isScenarioMappingValid } from "../ScenarioInputMappingSection";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
 }));
 
 const { RedactedField } = await import("~/components/ui/RedactedField");
-const { useTraceEditStore } = await import("../../../../stores/traceEditStore");
+const { useTraceEditStore } = await import("@langwatch/trace-web");
 const { SpanEditableIO } = await import("../SpanEditableIO");
 
 function renderInput({ redacted }: { redacted: boolean }) {

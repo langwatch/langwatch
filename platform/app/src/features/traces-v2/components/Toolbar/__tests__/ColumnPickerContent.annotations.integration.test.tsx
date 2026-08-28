@@ -27,7 +27,7 @@ vi.mock("../../../hooks/useEvaluatorOptions", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
-vi.mock("../../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       columnOrder: ["time", "trace"],
@@ -37,7 +37,8 @@ vi.mock("../../../stores/viewStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/timeFormatStore", () => ({
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));

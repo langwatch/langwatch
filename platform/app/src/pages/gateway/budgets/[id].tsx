@@ -21,7 +21,7 @@ import { useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";

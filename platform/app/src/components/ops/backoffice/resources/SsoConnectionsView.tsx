@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";

@@ -27,9 +27,11 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
+    "@trpc/server": "^11.18.0",
     "date-fns": "^4.4.0",
     "zod": "^4.4.3"
   },

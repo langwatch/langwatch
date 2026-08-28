@@ -6,12 +6,8 @@ import {
   useSessionGroups,
 } from "../../hooks/useSessionGroups";
 import { useTraceList } from "../../hooks/useTraceList";
-import type { PageCursor } from "../../stores/filterStore";
-import {
-  getEffectiveLens,
-  rowKindForGrouping,
-  useViewStore,
-} from "../../stores/viewStore";
+import type { PageCursor } from "@langwatch/trace-web";
+import { getEffectiveLens, rowKindForGrouping, useViewStore } from "@langwatch/trace-web";
 import { ConversationLensBody } from "./ConversationLensBody";
 import { EmptyFilterState } from "./EmptyFilterState";
 import { GroupLensBody } from "./GroupLensBody";

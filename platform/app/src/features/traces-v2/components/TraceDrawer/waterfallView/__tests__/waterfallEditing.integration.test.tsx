@@ -9,7 +9,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
   storedPatch: null as TraceEditOverlayPatch | null,
@@ -21,8 +21,8 @@ vi.mock("../../../../hooks/useTraceEditOverlay", () => ({
   }),
 }));
 
-const { useDrawerStore } = await import("../../../../stores/drawerStore");
-const { useTraceEditStore } = await import("../../../../stores/traceEditStore");
+const { useDrawerStore } = await import("@langwatch/trace-web");
+const { useTraceEditStore } = await import("@langwatch/trace-web");
 const { useCorrectionMarks } = await import("../useCorrectionMarks");
 const { useWaterfallEditing } = await import("../useWaterfallEditing");
 

@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
-import type { FieldMapping } from "~/components/variables";
+import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { nodeDataToLocalPromptConfig } from "~/prompts/utils/llmPromptConfigUtils";
 import { useSmartSetNode } from "@langwatch/workflow-web";

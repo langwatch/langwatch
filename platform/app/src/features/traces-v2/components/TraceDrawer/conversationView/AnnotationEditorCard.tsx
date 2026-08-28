@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
-} from "../../../stores/annotationDraftStore";
+} from "@langwatch/trace-web";
 import { useAnnotationMutations } from "./useAnnotationForm";
 
 interface AnnotationEditorCardProps {

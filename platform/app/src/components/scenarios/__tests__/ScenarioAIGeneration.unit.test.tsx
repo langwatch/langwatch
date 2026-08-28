@@ -4,12 +4,14 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  formHasContent,
   type GeneratedScenario,
+  SCENARIO_AI_PROMPT_KEY,
+} from "@langwatch/scenario-web";
+import {
+  formHasContent,
   usePromptHistory,
   useScenarioGeneration,
 } from "../ScenarioAIGeneration";
-import { SCENARIO_AI_PROMPT_KEY } from "../services/scenarioPromptStorage";
 
 // Clean up after each test to avoid interference
 afterEach(() => {

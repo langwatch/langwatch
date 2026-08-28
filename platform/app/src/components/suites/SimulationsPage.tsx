@@ -23,10 +23,7 @@ import {
 } from "~/components/PeriodSelector";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
-import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
-import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import { SuiteDetailPanel, SuiteEmptyState } from "~/components/suites/SuiteDetailPanel";
-import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { useRunSuite } from "~/components/suites/useRunSuite";
 import {
@@ -48,7 +45,12 @@ import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
 import type { SuiteRunSummary } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { NowProvider } from "@langwatch/suite-web";
+import {
+  NowProvider,
+  SuiteArchiveDialog,
+  SuiteContextMenu,
+  SuiteRunConfirmationDialog,
+} from "@langwatch/suite-web";
 
 export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();

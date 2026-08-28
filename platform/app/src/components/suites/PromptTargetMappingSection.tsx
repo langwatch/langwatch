@@ -12,8 +12,7 @@
  */
 
 import { Box, Text, VStack } from "@chakra-ui/react";
-import type { FieldMapping } from "~/components/variables/VariableMappingInput";
-import type { Variable } from "~/components/variables/VariablesSection";
+import type { FieldMapping, Variable } from "@langwatch/prompt-web/surfaces/variables";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { ScenarioInputMappingSection } from "./ScenarioInputMappingSection";
 

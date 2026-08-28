@@ -3,9 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
-import { useDrawerStore } from "../stores/drawerStore";
-import { useRowPulseStore } from "@langwatch/trace-web";
-import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useDrawerStore, useRowPulseStore, useSseStatusStore } from "@langwatch/trace-web";
 import { useVisibleTraceIds } from "./useVisibleTraceIds";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list

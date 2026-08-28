@@ -8,13 +8,12 @@ import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOver
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useTraceEditSession } from "../../hooks/useTraceEditSession";
 import { useTraceQueryArgs } from "../../hooks/useTraceQueryArgs";
-import { useDrawerStore } from "../../stores/drawerStore";
+import { useDrawerStore, useShikiAdapter } from "@langwatch/trace-web";
 import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { EditModeBar } from "./editMode/EditModeBar";
-import { useShikiAdapter } from "@langwatch/trace-web";
 import { PaneLayout } from "./panes/PaneLayout";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";

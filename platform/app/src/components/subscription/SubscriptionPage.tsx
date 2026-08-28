@@ -33,38 +33,36 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  classifyMemberType,
-  type MemberType,
-} from "~/server/license-enforcement/member-classification";
+import { classifyMemberType } from "~/server/license-enforcement/member-classification";
 import { api } from "~/utils/api";
-import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
+import {
+  CONTACT_SALES_URL,
+  type MemberType,
+} from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,
   buildPlanCapabilities,
+  ContactSalesBlock,
+  countFullMembers,
   type Currency,
+  type DrawerSaveResult,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
+  formatPlanTypeLabel,
   formatPrice,
   getAnnualDiscountPercent,
   getGrowthFeatures,
   isAnnualTieredPlan,
   parseGrowthSeatPlanType,
-} from "./billing-plans";
-import { ContactSalesBlock } from "./ContactSalesBlock";
-import { CurrentPlanBlock } from "./CurrentPlanBlock";
-import { InvoicesBlock } from "./InvoicesBlock";
-import {
-  countFullMembers,
-  type DrawerSaveResult,
-  formatPlanTypeLabel,
   type PlannedUser,
   type SubscriptionUser,
-} from "./subscription-types";
-import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
-import { UpgradePlanBlock } from "./UpgradePlanBlock";
+  UpdateSeatsBlock,
+  UpgradePlanBlock,
+  useBillingPricing,
+} from "@langwatch/enterprise-billing-web";
+import { CurrentPlanBlock } from "./CurrentPlanBlock";
+import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
-import { useBillingPricing } from "./useBillingPricing";
 import { useSubscriptionActions } from "./useSubscriptionActions";
 
 const currencyOptions = [

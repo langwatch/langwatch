@@ -21,7 +21,7 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import { useFacetLensStore } from "../../../stores/facetLensStore";
+import { useFacetLensStore } from "@langwatch/trace-web";
 import { FacetSection } from "../FacetSection";
 import type { FacetItem, FacetValueState } from "../types";
 

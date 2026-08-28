@@ -98,7 +98,7 @@ vi.mock("~/features/traces-v2/hooks/useTraceRefresh", () => ({
 }));
 
 const { clearDrawerStack, getDrawerStack, useDrawer } = await import("~/hooks/useDrawer");
-const { useDrawerStore } = await import("../../../stores/drawerStore");
+const { useDrawerStore } = await import("@langwatch/trace-web");
 const { useTraceDrawerScaffold } = await import("../useTraceDrawerScaffold");
 
 const TRACE = "trace-1";

@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 
 const EMPTY: { value: string; label?: string; count: number }[] = [];
 

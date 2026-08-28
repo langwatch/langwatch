@@ -1,5 +1,5 @@
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import type { useDrawerStore } from "../stores/drawerStore";
+import type { useDrawerStore } from "@langwatch/trace-web";
 import { isTerminalOrigin } from "@langwatch/trace-web";
 import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 

@@ -9,9 +9,8 @@ import { InputGroup } from "@langwatch/design-system/input-group";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore, WorkflowRunningStatus } from "@langwatch/workflow-web";
 import { getEntryInputs } from "@langwatch/workflow-contract";
-import { RunningStatus } from "./ExecutionState";
 
 interface ChatWindowProps {
   open: boolean;
@@ -99,7 +98,7 @@ export const ChatBox = ({
     getWorkflow: state.getWorkflow,
   }));
   const { project } = useOrganizationTeamProject();
-  const { startWorkflowExecution } = useWorkflowExecution();
+  const { startWorkflowExecution, stopWorkflowExecution } = useWorkflowExecution();
 
   const optimization = api.optimization.chat.useMutation();
   const workflow = getWorkflow();
@@ -223,7 +222,10 @@ export const ChatBox = ({
                   >
                     <Box bg="bg.emphasized" p={2} borderRadius="lg" whiteSpace="pre-wrap">
                       {optimization.isPending || executionStatus === "running" ? (
-                        <RunningStatus isLoading={optimization.isPending} />
+                        <WorkflowRunningStatus
+                          isLoading={optimization.isPending}
+                          onStop={({ traceId }) => stopWorkflowExecution({ trace_id: traceId })}
+                        />
                       ) : (
                         output
                       )}

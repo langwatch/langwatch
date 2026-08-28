@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;

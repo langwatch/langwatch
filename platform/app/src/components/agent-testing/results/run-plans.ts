@@ -21,7 +21,7 @@ import {
   type SuiteRunSummary,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
-import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
+import type { RunGroupSummary } from "@langwatch/suite-web";
 import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "~/components/suites/useSuiteRouting";
 import { ONE_OFF_RUNS_PLAN_SLUG, RESULTS_SEGMENT } from "../useAgentTestingRouting";
 

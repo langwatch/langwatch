@@ -20,7 +20,7 @@ import {
   readHandledError,
 } from "~/features/errors";
 
-import { ScenarioGenerationError } from "../services/scenarioGeneration";
+import { ScenarioGenerationError } from "@langwatch/scenario-web";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 
-import { formatBudgetUsd } from "../gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 import { Link } from "../ui/link";
 
 /**

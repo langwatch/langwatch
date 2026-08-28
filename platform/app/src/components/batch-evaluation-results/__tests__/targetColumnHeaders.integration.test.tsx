@@ -19,9 +19,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
-import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
-import { transformBatchEvaluationData } from "../types";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import {
+  BatchEvaluationResultsTable,
+  transformBatchEvaluationData,
+} from "@langwatch/experiment-web";
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),

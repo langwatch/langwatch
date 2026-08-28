@@ -19,16 +19,18 @@ import {
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import type { MemberType } from "~/server/license-enforcement/member-classification";
-import { type BillingInterval, type Currency, formatPrice } from "./billing-plans";
+import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import {
+  type BillingInterval,
   countFullMembers,
+  type Currency,
   type DrawerSaveResult,
+  formatPrice,
   isValidEmail,
   type PendingInviteWithMemberType,
   type PlannedUser,
   type SubscriptionUser,
-} from "./subscription-types";
+} from "@langwatch/enterprise-billing-web";
 
 export function UserManagementDrawer({
   open,

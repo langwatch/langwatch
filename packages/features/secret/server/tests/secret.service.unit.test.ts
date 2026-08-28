@@ -102,6 +102,7 @@ function createService(options?: {
 }
 
 describe("SecretService", () => {
+  /** @scenario "Product-owned secrets are hidden and immutable" */
   it("never lists product-owned secrets", async () => {
     const { repository, service } = createService();
     repository.rows.push(row(), row({ id: "reserved", name: "LANGY_KEY" }));
@@ -126,12 +127,12 @@ describe("SecretService", () => {
     const { repository, service } = createService();
     repository.rows.push(row({ id: "reserved", name: "LANGY_KEY" }));
 
-    await expect(
-      service.get({ projectId: "project-1", id: "reserved" }),
-    ).rejects.toBeInstanceOf(SecretNotFoundError);
-    await expect(
-      service.delete({ projectId: "project-1", id: "missing" }),
-    ).rejects.toBeInstanceOf(SecretNotFoundError);
+    await expect(service.get({ projectId: "project-1", id: "reserved" })).rejects.toBeInstanceOf(
+      SecretNotFoundError,
+    );
+    await expect(service.delete({ projectId: "project-1", id: "missing" })).rejects.toBeInstanceOf(
+      SecretNotFoundError,
+    );
   });
 
   it("refuses a creatable reserved name before persistence", async () => {

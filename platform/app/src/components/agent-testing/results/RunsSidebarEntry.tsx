@@ -13,7 +13,7 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   getPassRateGradientColor,
   PassRateCircle,
-} from "~/components/shared/PassRateIndicator";
+} from "@langwatch/design-system/pass-rate-indicator";
 import { FG_MUTED } from "../shared/design";
 
 export type RunsSidebarEntryProps = {

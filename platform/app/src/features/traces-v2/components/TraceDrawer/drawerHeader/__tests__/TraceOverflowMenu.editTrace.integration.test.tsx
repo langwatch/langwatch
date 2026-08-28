@@ -56,8 +56,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { useDrawerStore } = await import("../../../../stores/drawerStore");
-const { useTraceEditStore } = await import("../../../../stores/traceEditStore");
+const { useDrawerStore } = await import("@langwatch/trace-web");
+const { useTraceEditStore } = await import("@langwatch/trace-web");
 const { TraceOverflowMenu } = await import("../TraceOverflowMenu");
 
 const renderMenu = ({

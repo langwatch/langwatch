@@ -6,8 +6,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "@langwatch/design-system/popover";
-import type { TargetValue } from "./TargetSelector";
-import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
+import { isAgentTarget, type TargetValue, useFilteredAgents } from "./TargetSelector";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;

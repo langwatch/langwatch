@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AvailableSource, FieldMapping } from "~/components/variables";
+import type { AvailableSource, FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 
 // Mock next/router

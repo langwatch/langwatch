@@ -20,14 +20,15 @@ import {
   ASSISTANT_OPTIONS,
   ASSISTANT_PRESETS,
   type AssistantKind,
-} from "~/components/me/tiles/assistantIcons";
+} from "@langwatch/coding-agent-web";
 import {
+  type AiToolEntry,
+  type AiToolTileType,
   isToolPresetAsset,
   TOOL_KINDS,
   TOOL_PRESETS,
   toolPresetAsset,
-} from "~/components/me/tiles/toolIcons";
-import type { AiToolEntry, AiToolTileType } from "~/components/me/tiles/types";
+} from "@langwatch/enterprise-governance-web";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,

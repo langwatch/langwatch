@@ -18,7 +18,7 @@ import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys
 import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
-} from "../../server/modelProviders/registry";
+} from "@langwatch/model-provider-contract";
 import {
   getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,

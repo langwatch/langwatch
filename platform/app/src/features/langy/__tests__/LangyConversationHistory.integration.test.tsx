@@ -540,7 +540,7 @@ vi.mock("~/utils/api", async () => {
 import { toaster } from "~/components/ui/toaster";
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 // ---------------------------------------------------------------------------
 // Helpers

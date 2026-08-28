@@ -56,7 +56,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-vi.mock("~/features/traces-v2/stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: {
     getState: () => ({
       openTrace: mockOpenTrace,

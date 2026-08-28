@@ -14,7 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../stores/facetLensStore", () => ({
+vi.mock("@langwatch/trace-web/facet-lens.store", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
       lens: { sectionOpen: { "trace.cost": true } },

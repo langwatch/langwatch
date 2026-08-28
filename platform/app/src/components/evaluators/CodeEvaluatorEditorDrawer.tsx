@@ -8,7 +8,7 @@ import {
   type FieldMapping as UIFieldMapping,
   type Variable,
   VariablesSection,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,

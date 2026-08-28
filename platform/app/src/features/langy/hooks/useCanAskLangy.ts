@@ -5,8 +5,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * permission pair.
  *
  * `useShowLangy` gates on `langy:view`, which is READ. Starting a turn needs
- * `langy:create`, enforced server-side by `langyCreateProcedure` in
- * `routers/langy.ts`. Those are genuinely different grants, and until now the
+ * `langy:create`, enforced server-side by the `langy:create` procedures of
+ * `LangyTrpcApi`. Those are genuinely different grants, and until now the
  * gap was survivable only because the panel is opt-in: a read-only member had
  * to go looking for the composer before it could fail them.
  *

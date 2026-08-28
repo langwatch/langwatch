@@ -1,7 +1,7 @@
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import type {
   ComparisonEvaluatorConfig,
   DatasetReference,

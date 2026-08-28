@@ -1,7 +1,7 @@
 import { Box, Button, chakra, HoverCard, HStack, Portal, Text } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useTraceEditStore } from "../../../stores/traceEditStore";
+import { useTraceEditStore } from "@langwatch/trace-web";
 
 /**
  * How much of a captured value the hover shows. Past this the reader is not

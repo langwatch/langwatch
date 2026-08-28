@@ -10,7 +10,7 @@
  */
 import { z } from "zod";
 
-import { validateModelAliasesAgainstBoundProviders } from "~/components/gateway/virtualKeyAliasValidation";
+import { validateModelAliasesAgainstBoundProviders } from "@langwatch/gateway-web";
 import type { ScopeTriadEntry } from "~/components/settings/ScopeChipPicker";
 import { isModelTier, MODEL_TIERS, type ModelTier } from "~/utils/modelTierPresets";
 

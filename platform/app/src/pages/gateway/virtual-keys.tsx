@@ -30,9 +30,11 @@ import {
 import { useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
+import {
+  formatBudgetUsd,
+  GatewayErrorPanel,
+  resolveTracesHrefForKey,
+} from "@langwatch/gateway-web";
 import {
   VirtualKeyBudgetBar,
   type VirtualKeyBudgetBarValue,

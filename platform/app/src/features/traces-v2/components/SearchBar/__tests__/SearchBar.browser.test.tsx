@@ -46,7 +46,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   return { useLangyStore };
 });
 
-import { useFilterStore } from "../../../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import { SearchBar } from "../SearchBar";
 
 function renderSearchBar() {

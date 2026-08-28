@@ -11,7 +11,7 @@ import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useTraceDrawerShortcuts } from "../../hooks/useTraceDrawerShortcuts";
 import { useTraceHeader } from "../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../hooks/useTraceRefresh";
-import { useDrawerStore } from "../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { guardTraceEditExit } from "../../utils/traceEditMode";
 
 interface TraceDrawerScaffold {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { generateUniqueIdentifier } from "../src/prompt.identifier";
+import { generateUniqueIdentifier, normalizeIdentifier } from "../src/prompt.identifier";
 
 describe("generateUniqueIdentifier", () => {
   describe("when no existing identifiers", () => {
@@ -44,6 +44,48 @@ describe("generateUniqueIdentifier", () => {
       });
 
       expect(result).toBe("output_4");
+    });
+  });
+});
+
+describe("normalizeIdentifier", () => {
+  describe("when the value carries spaces", () => {
+    it("replaces them with underscores", () => {
+      expect(normalizeIdentifier("my variable")).toBe("my_variable");
+    });
+  });
+
+  describe("when the value carries punctuation", () => {
+    it("drops dashes", () => {
+      expect(normalizeIdentifier("my-custom-score")).toBe("mycustomscore");
+    });
+
+    it("drops every other special character", () => {
+      expect(normalizeIdentifier("my@score!test#123")).toBe("myscoretest123");
+    });
+
+    it("keeps underscores", () => {
+      expect(normalizeIdentifier("my_custom_score")).toBe("my_custom_score");
+    });
+
+    it("returns an empty identifier when nothing survives", () => {
+      expect(normalizeIdentifier("@#$%")).toBe("");
+    });
+  });
+
+  describe("when the value carries capitals", () => {
+    it("lower-cases the result", () => {
+      expect(normalizeIdentifier("MyVariable")).toBe("myvariable");
+    });
+
+    it("normalizes spaces, punctuation and case together", () => {
+      expect(normalizeIdentifier("My Variable Name!")).toBe("my_variable_name");
+    });
+  });
+
+  describe("when the value is empty", () => {
+    it("returns an empty identifier", () => {
+      expect(normalizeIdentifier("")).toBe("");
     });
   });
 });

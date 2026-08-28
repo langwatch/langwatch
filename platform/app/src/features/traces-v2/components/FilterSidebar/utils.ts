@@ -1,13 +1,14 @@
 import { HelpCircle, type LucideIcon } from "lucide-react";
-import { formatBytes } from "@langwatch/trace-web";
-import { ORIGIN_DISPLAY, originLabel } from "@langwatch/trace-web";
 import {
   FACET_ICONS,
   FACET_LABELS,
+  formatBytes,
   GROUP_ICONS,
   NORMAL_CASE_FIELDS,
+  ORIGIN_DISPLAY,
+  originLabel,
   SECTION_ORDER,
-} from "./constants";
+} from "@langwatch/trace-web";
 import type { SectionGroup } from "./types";
 
 const TOKEN_K = 1_000;

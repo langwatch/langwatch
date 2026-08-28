@@ -15,9 +15,9 @@ import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   type AvailableSource,
-  datasetColumnTypeToFieldType,
   type FieldMapping as UIFieldMapping,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

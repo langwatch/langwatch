@@ -15,8 +15,6 @@ import { MoreVertical, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { formatTimeAgo } from "@langwatch/ops-web";
-import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
@@ -27,11 +25,13 @@ import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "~/utils/grafanaLinks
 import {
   classifyGroup,
   describeNextRun,
+  formatTimeAgo,
   GroupStateBadge,
   isOverdue,
   matchesStatusFilter,
   sortGroupsBySeverity,
   type StatusFilter,
+  VirtualizedTableRows,
 } from "@langwatch/ops-web";
 
 const GROUPS_VIEWPORT_HEIGHT = 480;

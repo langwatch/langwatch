@@ -2,9 +2,8 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
-import { LIVE_REFETCH_MS } from "../constants/freshness";
+import { LIVE_REFETCH_MS, useSseStatusStore } from "@langwatch/trace-web";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
-import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /**

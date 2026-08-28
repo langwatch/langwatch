@@ -9,7 +9,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const openTraceId = vi.hoisted(() => ({ current: "trace-2" }));
 const overlayRow = vi.hoisted(() => ({
@@ -37,8 +37,7 @@ vi.mock("../useTraceQueryArgs", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useTraceEditStore } from "../../stores/traceEditStore";
+import { useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../useTraceEditOverlay";
 
 const patch = (name: string): TraceEditOverlayPatch => ({

@@ -1,11 +1,11 @@
 import { useCallback } from "react";
-import { useDrawerStore } from "../stores/drawerStore";
+import type { FocusSection } from "@langwatch/trace-web";
 import {
-  type FocusSection,
   isFocusSection,
+  useDrawerStore,
   useFocusSectionStore,
+  useSpanPulseStore,
 } from "@langwatch/trace-web";
-import { useSpanPulseStore } from "@langwatch/trace-web";
 
 /** A comment's anchor as it comes back from a read. */
 export interface AnnotationAnchorTarget {

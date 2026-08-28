@@ -4,7 +4,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const spans = vi.hoisted(() => ({ current: [] as SpanTreeNode[] }));
 const overlay = vi.hoisted(() => ({
@@ -60,8 +60,7 @@ vi.mock("../useTraceQueryArgs", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useTraceEditStore } from "../../stores/traceEditStore";
+import { useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { useSpanTree, useSpanTreeWithCaptured } from "../useSpanTree";
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }) {

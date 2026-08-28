@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { AiToolEntry } from "~/components/me/tiles/types";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-web";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";

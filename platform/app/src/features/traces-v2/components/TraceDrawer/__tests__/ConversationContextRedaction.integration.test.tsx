@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));

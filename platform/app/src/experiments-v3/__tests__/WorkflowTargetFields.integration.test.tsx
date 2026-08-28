@@ -11,13 +11,13 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import type { AvailableSource } from "~/components/variables";
+import type { AvailableSource } from "@langwatch/prompt-web/surfaces/variables";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../types";

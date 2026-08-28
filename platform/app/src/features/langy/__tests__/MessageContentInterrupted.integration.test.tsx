@@ -52,7 +52,7 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 import { MessageContent } from "../components/MessageContent";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 afterEach(cleanup);
 

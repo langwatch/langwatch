@@ -36,7 +36,7 @@ const SHARED_LENS = { id: "custom-abc", name: "Shared", filterText: "" };
 let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
-vi.mock("../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (sel: (s: unknown) => unknown) =>
     sel({
       activeLensId,
@@ -47,7 +47,7 @@ vi.mock("../../stores/viewStore", () => ({
   getPersistedActiveLensId: () => persistedLens,
 }));
 
-vi.mock("../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (sel: (s: unknown) => unknown) =>
     sel({
       queryText: "",

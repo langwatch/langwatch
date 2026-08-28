@@ -6,10 +6,14 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Checkbox } from "../../../../components/ui/checkbox";
 import { toaster } from "../../../../components/ui/toaster";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
-import { LENS_CAPABILITIES, type LensColumnOption } from "../../lens/capabilities";
-import { isEvalColumnId, parseEvalColumnId } from "../../lens/evalColumnId";
-import { type TimeColumnFormat, useTimeFormatStore } from "@langwatch/trace-web";
-import { useViewStore } from "../../stores/viewStore";
+import type { LensColumnOption, TimeColumnFormat } from "@langwatch/trace-web";
+import {
+  isEvalColumnId,
+  LENS_CAPABILITIES,
+  parseEvalColumnId,
+  useTimeFormatStore,
+  useViewStore,
+} from "@langwatch/trace-web";
 import { evalColumnLabel } from "../TraceTable/evalColumns";
 import {
   AddEvalColumnForm,

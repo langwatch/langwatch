@@ -28,12 +28,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 1_000, to: 2_000 } }),
 }));
 
-vi.mock("../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 

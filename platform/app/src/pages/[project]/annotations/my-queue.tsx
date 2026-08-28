@@ -18,9 +18,12 @@ import { Dialog } from "~/components/ui/dialog";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { showErrorToast } from "~/features/errors";
 import { ConversationView } from "~/features/traces-v2/components/TraceDrawer/conversationView";
-import { useShikiAdapter } from "@langwatch/trace-web";
+import {
+  sessionTraceIds,
+  useAnnotationQueueSessionStore,
+  useShikiAdapter,
+} from "@langwatch/trace-web";
 import { useConversationTurns } from "~/features/traces-v2/hooks/useConversationTurns";
-import { sessionTraceIds, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import { legacyTraceToTurn } from "~/features/traces-v2/utils/legacyTraceToTurn";
 import { openTraceEditorFromConversation } from "~/features/traces-v2/utils/traceEditMode";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";

@@ -11,12 +11,11 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
-import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { collectMediaParts } from "~/shared/traces/mediaParts";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
-import { useDensityStore } from "@langwatch/trace-web";
-import { formatPreview } from "@langwatch/trace-web";
+import { formatPreview, useDensityStore } from "@langwatch/trace-web";
 import { tryParseChat } from "./chatContent";
 
 const COMFORTABLE_LABEL_WIDTH = "60px";

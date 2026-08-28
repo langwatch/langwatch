@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { type DrawerViewMode, useDrawerStore } from "../stores/drawerStore";
+import { type DrawerViewMode, useDrawerStore } from "@langwatch/trace-web";
 import { guardTraceEditExit } from "../utils/traceEditMode";
 
 /**

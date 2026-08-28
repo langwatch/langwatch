@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { LangyStreamingAnswerWithCards } from "@langwatch/langy-web";
-import { LangyCardBoundary } from "../LangyCardBoundary";
+import {
+  LangyCardBoundary,
+  LangyStreamingAnswerWithCards,
+} from "@langwatch/langy-web";
 import { LangyDerivedCardView } from "./LangyDerivedCardView";
 
 export function StreamingAnswerWithCards({

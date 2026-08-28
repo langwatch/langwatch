@@ -1,7 +1,7 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import type { LangyMessageDto } from "../data/langy.dtos";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import type { LangyDevLogRecord } from "../stores/langyDevLog";
 

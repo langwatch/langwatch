@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 
 /**
  * Returns a callback that prefetches span detail for a given span id under

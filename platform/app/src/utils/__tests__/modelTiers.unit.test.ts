@@ -4,7 +4,7 @@ import {
   compareModelSortKeys,
   type OpenAIVariant,
   rankOpenAIChatModel,
-} from "../modelTiers";
+} from "@langwatch/model-provider-contract";
 
 const ranks = ({ id, variant }: { id: string; variant: OpenAIVariant }) =>
   rankOpenAIChatModel({ id, variant }) !== null;

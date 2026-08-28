@@ -76,7 +76,7 @@ vi.mock("~/components/simulations/MediaPart", () => ({
   ),
 }));
 
-import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { ConversationView } from "../ConversationView";
 

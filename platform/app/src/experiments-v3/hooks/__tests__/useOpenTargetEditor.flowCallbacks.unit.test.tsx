@@ -15,7 +15,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock optimization_studio to avoid circular dependency issues
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn(() => ({})),

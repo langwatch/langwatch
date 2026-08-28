@@ -1,4 +1,4 @@
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../types/trace";
 
 /** The numbers the turn separator reads out: time, cost, tokens. */

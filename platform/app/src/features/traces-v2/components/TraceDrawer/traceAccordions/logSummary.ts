@@ -1,4 +1,4 @@
-import type { TraceLogRecordDto } from "~/server/api/routers/tracesV2";
+import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import {
   type CodingAgentEvent,
   normalizeEventName,

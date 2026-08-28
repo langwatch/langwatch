@@ -1,4 +1,4 @@
-import { createService, type MountedRoute } from "@langwatch/api";
+import { createService, type MountedRoute } from "@langwatch/api/rest";
 import type { StoredObjectService as StoredObjectServiceContract } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 import { StoredObjectsPublicApi } from "../src";
@@ -32,9 +32,7 @@ describe("StoredObjectsPublicApi", () => {
       .install(builder)
       .build();
 
-    const routes = mounted.filter(
-      (route) => !route.isNamespaceGuard && !route.isDiscoverEndpoint,
-    );
+    const routes = mounted.filter((route) => !route.isNamespaceGuard);
     const latest = routes.filter((route) => route.version === "latest");
     expect(
       latest.map((route) => ({

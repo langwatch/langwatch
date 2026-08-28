@@ -17,7 +17,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (

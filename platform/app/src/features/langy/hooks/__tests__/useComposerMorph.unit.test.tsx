@@ -18,8 +18,10 @@ import { act, renderHook } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPOSER_ANCHOR_ATTR } from "../../components/Composer";
-import { PANEL_ROOT_ATTR } from "@langwatch/langy-web";
-import { useLangyStore } from "../../stores/langyStore";
+import {
+  PANEL_ROOT_ATTR,
+  useLangyStore,
+} from "@langwatch/langy-web";
 import { useComposerMorph } from "../useComposerMorph";
 
 const HERO = { top: 120, left: 40, width: 720, height: 46 };

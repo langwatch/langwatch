@@ -22,9 +22,11 @@
 import { Box } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { LWQL_QUERY_RESULT_DATASET } from "../visualization/lwqlDatasetNames";
-import { starterVegaLiteSpec } from "../visualization/starterVegaLiteSpec";
-import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
+import {
+  type LangWatchQLDatasetColumn,
+  LWQL_QUERY_RESULT_DATASET,
+  starterVegaLiteSpec,
+} from "@langwatch/analytics-web/visualization";
 
 import { LangWatchQLVegaLiteChart } from "./LangWatchQLVegaLiteChart";
 

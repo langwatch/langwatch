@@ -5,7 +5,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
+import type { AiActionError } from "@langwatch/trace-contract";
 import { aiBrandPalette } from "./aiBrandPalette";
 import { DEFAULT_THINKING_VERBS, useCyclingVerb } from "./useCyclingVerb";
 

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
+import {
+  useLangyContextTargetStore,
+  useLangyStore,
+} from "@langwatch/langy-web";
 import { useLangyDevLog } from "../stores/langyDevLog";
-import { useLangyStore } from "../stores/langyStore";
 
 /**
  * Nothing Langy holds may follow the user somewhere else.

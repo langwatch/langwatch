@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
+import { ScenarioArchiveDialog } from "@langwatch/scenario-web";
 import { RunDialog } from "../run/RunDialog";
 import { RenameSuiteDialog } from "./RenameSuiteDialog";
 import type { TestCasesTabModel } from "./useTestCasesTab";

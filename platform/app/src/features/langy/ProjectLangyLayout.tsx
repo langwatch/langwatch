@@ -7,8 +7,11 @@ import { LangySidecar } from "./components/LangyPanel";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
-import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "./logic/langyPanelLayout";
-import { useLangyStore } from "./stores/langyStore";
+import {
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+  useLangyStore,
+} from "@langwatch/langy-web";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.

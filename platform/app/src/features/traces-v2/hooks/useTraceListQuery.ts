@@ -3,9 +3,8 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
-import type { TraceListCursor } from "../stores/filterStore";
-import { useFilterStore } from "../stores/filterStore";
-import { DEFAULT_SORT, useViewStore } from "../stores/viewStore";
+import type { TraceListCursor } from "@langwatch/trace-web";
+import { DEFAULT_SORT, useFilterStore, useViewStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 

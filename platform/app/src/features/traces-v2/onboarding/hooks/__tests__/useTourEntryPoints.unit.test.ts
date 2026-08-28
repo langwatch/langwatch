@@ -50,7 +50,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 // Stub store getState calls made in onLaunchTour
-vi.mock("../../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -61,7 +61,7 @@ vi.mock("../../../stores/viewStore", () => ({
   ),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({

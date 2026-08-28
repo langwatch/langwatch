@@ -16,12 +16,12 @@
 
 import { Box, Link, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import type {
-  AvailableSource,
-  FieldMapping,
-} from "~/components/variables/VariableMappingInput";
-import type { Variable } from "~/components/variables/VariablesSection";
-import { VariablesSection } from "~/components/variables/VariablesSection";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  type Variable,
+  VariablesSection,
+} from "@langwatch/prompt-web/surfaces/variables";
 
 /** The three scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

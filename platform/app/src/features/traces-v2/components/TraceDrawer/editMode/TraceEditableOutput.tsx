@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectTraceOutputBaseline,
   useTraceEditStore,
-} from "../../../stores/traceEditStore";
+} from "@langwatch/trace-web";
 import { EditableIOField } from "./EditableIOField";
 
 /**

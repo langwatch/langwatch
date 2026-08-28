@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LENS_CAPABILITIES } from "../../../lens/capabilities";
+import { LENS_CAPABILITIES } from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../types/trace";
 import { type ConversationGroup, sortConversationGroups } from "../conversationGroups";
 

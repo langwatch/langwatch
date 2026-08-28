@@ -13,7 +13,7 @@ import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Lock, LockOpen, Plus, X } from "lucide-react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DIALOG_FIELD_STYLE } from "../shared/DialogFields";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { ParameterRow } from "./parameter-rows";

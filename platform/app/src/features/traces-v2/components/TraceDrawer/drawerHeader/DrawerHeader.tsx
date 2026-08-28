@@ -42,19 +42,19 @@ import { useSpanTree } from "../../../hooks/useSpanTree";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
-import { useDrawerStore } from "../../../stores/drawerStore";
-import { useFilterStore } from "../../../stores/filterStore";
-import { useFocusSectionStore } from "@langwatch/trace-web";
-import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
   formatAbsoluteTime,
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
   formatTokens,
+  isTerminalOrigin,
   STATUS_COLORS,
+  useDrawerStore,
+  useFilterStore,
+  useFocusSectionStore,
 } from "@langwatch/trace-web";
-import { isTerminalOrigin } from "@langwatch/trace-web";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { guardTraceEditExit } from "../../../utils/traceEditMode";
 import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";

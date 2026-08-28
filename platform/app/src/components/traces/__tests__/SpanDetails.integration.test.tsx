@@ -13,7 +13,7 @@ import React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "~/generated/prisma/client";
-import type { Span } from "../../../server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import { SpanDetails } from "../SpanDetails";
 
 const mockBuildUrl = vi.fn((spanId: string, action?: string) => {

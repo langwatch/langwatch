@@ -15,7 +15,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { LensColumnOption } from "../../../../lens/capabilities";
+import type { LensColumnOption } from "@langwatch/trace-web";
 import { VisibleOrderStrip } from "../VisibleOrderStrip";
 
 afterEach(() => cleanup());

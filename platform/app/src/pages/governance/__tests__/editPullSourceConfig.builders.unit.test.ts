@@ -20,13 +20,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { anthropicAdminPullConfigSchema } from "../../../services/pullers/anthropicAdmin.puller";
-import { recommendedPullSchedule } from "../../logic/pullCadence";
+import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { recommendedPullSchedule } from "@langwatch/enterprise-governance-web";
 import {
   buildAnthropicAdminPullConfig,
   buildEditedParserConfig,
   buildEditSubmission,
-} from "../inventory";
+} from "../inventory.enterprise";
 import { composer } from "./editPullSourceConfig.fixture";
 
 // `resolvePullConfig` toasts the offending field when a pull config will not

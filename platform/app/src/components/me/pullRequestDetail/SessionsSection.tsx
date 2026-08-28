@@ -1,5 +1,6 @@
 import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import {
+  AgentLabel,
   type DetailPayload,
   MISSING_VALUE,
   formatShortDate,
@@ -9,7 +10,6 @@ import type React from "react";
 import { ListTable } from "~/components/ui/ListTable";
 import { formatCost, formatTokens } from "@langwatch/trace-web";
 
-import { AgentLabel } from "../AgentLabel";
 import { useTerminalReplay } from "../sessions/useTerminalReplay";
 import { ContributorName } from "./ContributorName";
 import { EmptySection, Section } from "@langwatch/coding-agent-web";

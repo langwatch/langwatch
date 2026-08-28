@@ -24,7 +24,7 @@ import {
 import { createExecutionCellSet } from "../utils/executionScope";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn(() => ({})),

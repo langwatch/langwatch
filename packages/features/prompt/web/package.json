@@ -12,6 +12,10 @@
       "types": "./src/screens/prompt-studio/index.ts",
       "default": "./src/screens/prompt-studio/index.ts"
     },
+    "./surfaces/llm-parameters": {
+      "types": "./src/surfaces/llm-parameters/index.ts",
+      "default": "./src/surfaces/llm-parameters/index.ts"
+    },
     "./surfaces/variable-type": {
       "types": "./src/surfaces/variable-type/index.ts",
       "default": "./src/surfaces/variable-type/index.ts"
@@ -23,6 +27,18 @@
     "./surfaces/prompt-reference": {
       "types": "./src/surfaces/prompt-reference/index.ts",
       "default": "./src/surfaces/prompt-reference/index.ts"
+    },
+    "./surfaces/prompt-layout": {
+      "types": "./src/surfaces/prompt-layout/index.ts",
+      "default": "./src/surfaces/prompt-layout/index.ts"
+    },
+    "./surfaces/prompt-textarea": {
+      "types": "./src/surfaces/prompt-textarea/index.ts",
+      "default": "./src/surfaces/prompt-textarea/index.ts"
+    },
+    "./surfaces/variables": {
+      "types": "./src/surfaces/variables/index.ts",
+      "default": "./src/surfaces/variables/index.ts"
     }
   },
   "scripts": {
@@ -32,9 +48,17 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",
-    "react-icons": "^5.5.0"
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.5.0",
+    "rich-textarea": "^0.27.0",
+    "usehooks-ts": "^3.1.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

@@ -47,7 +47,7 @@ const BODY_ATTR = "body";
  * Free text an agent writes ABOUT the session (an error it hit, the task it
  * handed a sub-agent, the commit message it wrote). It routinely quotes the
  * prompt and the reply together, so it survives only for a viewer allowed
- * BOTH, mirroring how evaluator `details` are gated in `tracesV2.gates.ts`.
+ * BOTH, mirroring how evaluator `details` are gated in `trace-view-gates.api.ts`.
  */
 const SESSION_FREE_TEXT: LogContentCategory = "both";
 

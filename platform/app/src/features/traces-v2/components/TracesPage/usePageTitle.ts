@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useDrawerStore, useFilterStore } from "@langwatch/trace-web";
 
 const BASE_TITLE = "LangWatch";
 const TRACE_ID_LENGTH = 8;

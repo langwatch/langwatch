@@ -6,7 +6,7 @@ import {
 
 import type { api } from "~/utils/api";
 import { useLangyDevLog } from "../stores/langyDevLog";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 type ApiUtils = ReturnType<typeof api.useUtils>;
 

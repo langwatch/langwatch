@@ -14,7 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AddMembersForm } from "../../AddMembersForm";
 import { OrganizationUserRoleField } from "../OrganizationUserRoleField";
-import { LITE_MEMBER_EXPLANATION } from "../seatTypeCopy";
+import { LITE_MEMBER_EXPLANATION } from "@langwatch/enterprise-licensing-web";
 
 vi.mock("~/utils/api", () => ({
   api: {

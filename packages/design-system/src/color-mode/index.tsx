@@ -144,8 +144,7 @@ export const colorSystem = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface ColorModeProviderProps extends ThemeProviderProps {}
+export type ColorModeProviderProps = ThemeProviderProps;
 
 export function ColorModeProvider(props: ColorModeProviderProps) {
   // When dark mode feature is disabled, force light mode
@@ -247,8 +246,7 @@ export function ColorModeIcon() {
   return colorMode === "dark" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-interface ColorModeButtonProps extends Omit<IconButtonProps, "aria-label"> {}
+type ColorModeButtonProps = Omit<IconButtonProps, "aria-label">;
 
 export const ColorModeButton = React.forwardRef<HTMLButtonElement, ColorModeButtonProps>(
   function ColorModeButton(props, ref) {

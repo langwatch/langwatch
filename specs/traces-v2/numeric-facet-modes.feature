@@ -9,7 +9,7 @@
 #   platform/app/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx     (Discrete mode — reused categorical list)
 #   platform/app/src/features/traces-v2/components/FilterSidebar/SidebarSection.tsx   (header mode-toggle icon)
 #   platform/app/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (mode picker in the manager)
-#   platform/app/src/features/traces-v2/stores/                        (per-project per-facet mode setting, sibling of visibility)
+#   packages/features/trace/web/src/                        (per-project per-facet mode setting, sibling of visibility)
 #
 # Related specs:
 #   specs/traces-v2/search.feature           — owns the Range slider behaviour (Rule: Range facets) and the query syntax

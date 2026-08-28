@@ -29,8 +29,7 @@ import {
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../stores/filterStore";
-import { useUIStore } from "@langwatch/trace-web";
+import { useFilterStore, useUIStore } from "@langwatch/trace-web";
 import { QueryPreview } from "./QueryPreview";
 
 interface Example {

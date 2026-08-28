@@ -9,7 +9,7 @@
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
-import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
+import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TraceLogRecordDto } from "~/server/api/routers/tracesV2";
+import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import { groupLogsBySpanId } from "../useSpanLogs";
 
 function log(spanId: string, timeUnixMs: number): TraceLogRecordDto {

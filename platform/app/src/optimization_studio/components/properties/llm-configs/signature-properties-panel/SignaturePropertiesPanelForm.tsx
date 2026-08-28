@@ -6,12 +6,12 @@ import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
 import { toaster } from "~/components/ui/toaster";
+import type { PromptTextAreaOnAddMention } from "@langwatch/prompt-web/surfaces/prompt-textarea";
 import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-  type PromptTextAreaOnAddMention,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "@langwatch/workflow-web";
 import { computeMessageEdgeUpdate } from "@langwatch/workflow-web";

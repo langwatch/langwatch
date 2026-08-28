@@ -6,7 +6,7 @@
  * we add it here and TypeScript will enforce it everywhere.
  */
 
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { Field } from "@langwatch/workflow-contract";
 import type { LocalPromptConfig, FieldMapping as StoreFieldMapping } from "../types";
 import { convertFromUIMapping } from "./fieldMappingConverters";

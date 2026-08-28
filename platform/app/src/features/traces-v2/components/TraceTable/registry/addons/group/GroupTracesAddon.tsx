@@ -6,10 +6,10 @@ import type { TraceListItem } from "../../../../../types/trace";
 import {
   formatCost,
   formatDuration,
+  formatPreview,
   formatRelativeTime,
   formatTokens,
 } from "@langwatch/trace-web";
-import { formatPreview } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";

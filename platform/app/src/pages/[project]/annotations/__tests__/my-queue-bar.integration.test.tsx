@@ -132,7 +132,11 @@ vi.mock("~/utils/api", () => ({
 // The drawer store is the real one: "Edit trace" leaves the tab it lands on to
 // the shared helper, and what that helper does to the reader's remembered tab
 // is the point of the fallback.
-const { useDrawerStore } = await import("~/features/traces-v2/stores/drawerStore");
+// Subpath rather than the barrel, and that is load-bearing: this file replaces
+// the whole `@langwatch/trace-web` barrel with a one-key factory and no
+// `importOriginal`, so importing the barrel here would hand the test the mock
+// and quietly contradict the comment above.
+const { useDrawerStore } = await import("@langwatch/trace-web/drawer.store");
 const { useAnnotationQueueSessionStore } = await import("@langwatch/trace-web");
 const {
   default: MyQueuePage,

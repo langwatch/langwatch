@@ -28,7 +28,7 @@ const storeState = {
   togglePaneCollapsed,
 };
 
-vi.mock("../../../stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 

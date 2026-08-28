@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useTraceEditStore } from "../../../../stores/traceEditStore";
+import { useTraceEditStore } from "@langwatch/trace-web";
 import {
   CorrectedFieldFrame,
   CorrectedScalar,

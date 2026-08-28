@@ -4,7 +4,7 @@ import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import { toInternalKey } from "~/components/llmPromptConfigs/parameterConfig";
+import { toInternalKey } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "@langwatch/design-system/popover";

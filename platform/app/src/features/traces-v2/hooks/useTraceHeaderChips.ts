@@ -4,10 +4,13 @@ import {
   type ScenarioChipData,
   useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
-import { useDrawerStore } from "../stores/drawerStore";
-import { useFilterStore } from "../stores/filterStore";
-import { useFocusSectionStore } from "@langwatch/trace-web";
-import { parseSdkInfo, type SdkInfo } from "@langwatch/trace-web";
+import type { SdkInfo } from "@langwatch/trace-web";
+import {
+  parseSdkInfo,
+  useDrawerStore,
+  useFilterStore,
+  useFocusSectionStore,
+} from "@langwatch/trace-web";
 import { usePromptByHandle } from "./usePromptByHandle";
 import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 

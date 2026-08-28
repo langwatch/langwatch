@@ -13,7 +13,7 @@ vi.mock("~/shared/langy/langySkills", () => ({
 }));
 
 import { LangySkillChipView } from "../components/LangySkillChip";
-import type { LangyContextChip, LangySkillChip } from "../stores/langyStore";
+import type { LangyContextChip, LangySkillChip } from "@langwatch/langy-web";
 
 const chip: LangySkillChip = {
   id: "github",

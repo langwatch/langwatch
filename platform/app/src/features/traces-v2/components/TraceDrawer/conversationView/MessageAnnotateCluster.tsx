@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   isSameAnnotationTarget,
   useAnnotationDraftStore,
-} from "../../../stores/annotationDraftStore";
+} from "@langwatch/trace-web";
 import { HoverActionButton, HoverActionCluster } from "./HoverActionCluster";
 
 const logger = createLogger("MessageAnnotateCluster");

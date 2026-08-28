@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const mutate = vi.fn();
 const invalidate = vi.fn();
@@ -47,9 +47,7 @@ vi.mock("~/features/errors", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { useAnnotationSessionStore } from "@langwatch/trace-web";
-import { useDrawerStore } from "../../../../stores/drawerStore";
-import { useTraceEditStore } from "../../../../stores/traceEditStore";
+import { useAnnotationSessionStore, useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { EditModeBar } from "../EditModeBar";
 
 function renderBar() {

@@ -31,8 +31,8 @@ vi.mock("../../ai/useAiTraceAction", () => ({
 }));
 
 import { explainAnyError } from "~/features/errors";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../../stores/filterStore";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { useFilterStore } from "@langwatch/trace-web";
 import { FloatingAiBar } from "../FloatingAiBar";
 
 /** A handled failure in the shape tRPC delivers it. */

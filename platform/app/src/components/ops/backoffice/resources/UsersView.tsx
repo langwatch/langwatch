@@ -28,9 +28,10 @@ import {
   formatDate,
   formatDateTime,
   impersonateUser,
+  useAdminList,
+  useAdminUpdate,
 } from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
-import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 interface OrgRef {
   id: string;

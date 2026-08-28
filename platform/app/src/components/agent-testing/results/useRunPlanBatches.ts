@@ -11,7 +11,7 @@ import {
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
-} from "~/components/suites/run-history-transforms";
+} from "@langwatch/suite-web";
 import { useRunHistoryPagination } from "~/components/suites/useRunHistoryPagination";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

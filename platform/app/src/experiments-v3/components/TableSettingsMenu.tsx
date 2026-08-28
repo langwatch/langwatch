@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
-import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
+import type { RowHeightMode } from "@langwatch/dataset-web";
 import { Popover } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";

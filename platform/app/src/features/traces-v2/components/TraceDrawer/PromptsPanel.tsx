@@ -23,10 +23,10 @@ import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playgroun
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { formatDuration } from "@langwatch/trace-web";
+import type { PromptReference } from "@langwatch/trace-web";
 import {
   extractPromptReference,
-  type PromptReference,
+  formatDuration,
   parseTracePromptIds,
   promptReferenceKey,
 } from "@langwatch/trace-web";

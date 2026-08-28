@@ -1,8 +1,7 @@
 import { Center, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { ProcessFleetCard } from "./ProcessFleetCard";
-import { ProcessFleetStrip } from "./ProcessFleetStrip";
+import { ProcessFleetCard, ProcessFleetStrip } from "@langwatch/ops-web";
 import { ProcessRecentActions } from "./ProcessRecentActions";
 
 /** strip → structure → detail, per best_practices/ops-dashboard.md. */

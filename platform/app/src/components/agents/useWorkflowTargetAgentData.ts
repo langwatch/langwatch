@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Variable } from "~/components/variables";
+import type { Variable } from "@langwatch/prompt-web/surfaces/variables";
 import { linkedWorkflowId } from "@langwatch/agent-contract";
 import type { Field as DSLField, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";

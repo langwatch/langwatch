@@ -1,20 +1,20 @@
 import { Table } from "@chakra-ui/react";
 import {
   ActiveAndWaitingCell,
+  AgentLabel,
+  CompactionsCell,
+  ContextCell,
   PullRequestsCell,
   SessionNameCell,
   SessionRowActions,
   type SessionListRow,
   type SessionPullRequest,
   MISSING_VALUE,
+  TokenCostCell,
 } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import { AgentLabel } from "../AgentLabel";
 import { formatLastUpdate } from "../lastUpdate";
-import { CompactionsCell } from "./cells/CompactionsCell";
-import { ContextCell } from "./cells/ContextCell";
-import { TokenCostCell } from "./cells/TokenCostCell";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

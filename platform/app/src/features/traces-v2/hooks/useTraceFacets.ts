@@ -4,7 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sampleDescriptors";
 import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
-import { useFilterStore } from "../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import {
   type DiscoverDescriptors,
   getCachedDiscover,

@@ -8,7 +8,10 @@
 
 import { describe, expect, it } from "vitest";
 import { EXTERNAL_MEMBER_PERMISSIONS } from "../../../server/api/rbac";
-import { LITE_MEMBER_EXPLANATION, LITE_MEMBER_SHORT_DESCRIPTION } from "../seatTypeCopy";
+import {
+  LITE_MEMBER_EXPLANATION,
+  LITE_MEMBER_SHORT_DESCRIPTION,
+} from "@langwatch/enterprise-licensing-web";
 
 /** The resources the explanation promises a lite member can read. */
 const NAMED_IN_COPY: Record<string, string> = {

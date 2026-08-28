@@ -16,7 +16,7 @@ import { chakra, HStack, Text } from "@chakra-ui/react";
 import { differenceInCalendarDays } from "date-fns";
 import { Calendar, ChevronDown } from "lucide-react";
 import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { FG_MUTED } from "./design";
 
 /** The windows the list offers, shortest first. */

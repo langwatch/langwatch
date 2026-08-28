@@ -1,4 +1,4 @@
-import type { ServiceBuilder } from "@langwatch/api";
+import type { ServiceBuilder } from "@langwatch/api/rest";
 import {
   createStoredObjectsPublicRpc,
   type StoredObjectsConfirmUploadInput,

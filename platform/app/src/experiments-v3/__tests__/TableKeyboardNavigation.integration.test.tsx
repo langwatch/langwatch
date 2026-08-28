@@ -12,7 +12,7 @@ import {
 } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
+import { useTableKeyboardNavigation } from "@langwatch/dataset-web";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetColumn } from "../types";
 

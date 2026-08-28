@@ -5,7 +5,7 @@ import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../../stores/drawerStore";
+} from "@langwatch/trace-web";
 
 /**
  * Left-edge resize rail for the trace drawer.

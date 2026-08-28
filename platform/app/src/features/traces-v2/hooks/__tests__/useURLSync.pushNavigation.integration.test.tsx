@@ -18,8 +18,12 @@ import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
-import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
+import {
+  ACTIVE_LENS_KEY,
+  INITIAL_TIME_RANGE,
+  useFilterStore,
+  useViewStore,
+} from "@langwatch/trace-web";
 import { useURLSync } from "../useURLSync";
 
 let pushHash: ((hash: string) => void) | null = null;

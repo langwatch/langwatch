@@ -24,7 +24,13 @@ import {
   type OrgModelProvider,
   resolveEligible,
 } from "./eligibleModelProviders";
-import { humanizeGatewayError } from "./gatewayErrorCopy";
+import {
+  humanizeGatewayError,
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "@langwatch/gateway-web";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -60,12 +66,6 @@ import {
   expiryIncompleteReason,
   resolveExpiresAt,
 } from "./virtualKeyExpiration";
-import {
-  parseTagsCsv,
-  TAGS_CSV_MAX_LENGTH,
-  tagsBeyondLimitsNotice,
-  VK_TAGS_FIELD_DESCRIPTION,
-} from "./virtualKeyTagsField";
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;

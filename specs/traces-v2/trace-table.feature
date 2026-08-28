@@ -1,7 +1,7 @@
 # Trace Table — Gherkin Spec
 # Implementation: platform/app/src/features/traces-v2/components/TraceTable/**
 #                 platform/app/src/features/traces-v2/components/TracesPage/TracesPage.tsx
-#                 platform/app/src/features/traces-v2/stores/{filterStore,viewStore,selectionStore}.ts
+#                 packages/features/trace/web/src/{filter,view,selection}.store.ts
 #                 platform/app/src/features/traces-v2/hooks/useTraceListQuery.ts
 # Audited 2026-05-01: scenarios that described unimplemented behaviour have
 # been deleted or tagged @planned. The big movers were

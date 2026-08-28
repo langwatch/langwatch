@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 
 /**
  * The project the open drawer reads from.

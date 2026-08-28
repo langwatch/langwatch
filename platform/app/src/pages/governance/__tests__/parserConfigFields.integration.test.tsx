@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { SourceType } from "@langwatch/enterprise-governance-web";
-import { ParserConfigFields } from "../ingestion-sources.enterprise";
+import { ParserConfigFields } from "../inventory.enterprise";
 
 function Harness({ sourceType }: { sourceType: SourceType }) {
   const [values, setValues] = useState<Record<string, string>>({});

@@ -1,9 +1,8 @@
 import type React from "react";
 import { Pagination as PaginationBar } from "~/components/ui/Pagination";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
-import type { PageCursor } from "../../stores/filterStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import type { PageCursor } from "@langwatch/trace-web";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { useTraceTableScrollElement } from "./scrollContext";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;

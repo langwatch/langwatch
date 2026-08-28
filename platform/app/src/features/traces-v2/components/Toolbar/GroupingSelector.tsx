@@ -10,8 +10,8 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "@langwatch/design-system/menu";
-import type { GroupingMode } from "../../stores/viewStore";
-import { useViewStore } from "../../stores/viewStore";
+import type { GroupingMode } from "@langwatch/trace-web";
+import { useViewStore } from "@langwatch/trace-web";
 
 const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   flat: "Flat",

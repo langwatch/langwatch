@@ -3,9 +3,9 @@
 # Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/FilterSidebar/constants.ts       (FACET_GROUPS refined into finer sub-groups)
+#   packages/features/trace/web/src/facet-constants.ts       (FACET_GROUPS refined into finer sub-groups)
 #   platform/app/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (perspective switcher + grouped checklist)
-#   platform/app/src/features/traces-v2/stores/facetLensStore.ts                    (built-in perspectives + activePerspectiveId)
+#   packages/features/trace/web/src/facet-lens.store.ts                    (built-in perspectives + activePerspectiveId)
 #   platform/app/src/features/traces-v2/components/FilterSidebar/hooks/useFilterSidebarData.ts  (consumes groupOrder/sectionOrder)
 #   platform/app/src/features/traces-v2/components/FilterSidebar/__tests__/facetGroups.unit.test.ts  (pinned taxonomy)
 #

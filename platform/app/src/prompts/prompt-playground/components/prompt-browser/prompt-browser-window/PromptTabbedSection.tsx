@@ -5,7 +5,7 @@ import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type Variable, VariablesSection } from "~/components/variables";
+import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { RuntimeParametersField } from "~/prompts/forms/fields/RuntimeParametersField";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -16,7 +16,7 @@ import {
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
-import type { LayoutMode } from "./PromptBrowserWindowContent";
+import type { LayoutMode } from "@langwatch/prompt-web/surfaces/prompt-layout";
 import { ResizableDivider } from "./ResizableDivider";
 
 /** The default "input" variable is locked - cannot be removed or renamed */

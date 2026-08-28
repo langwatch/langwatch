@@ -19,10 +19,13 @@ import { useFirstTraceSpotlightTrigger } from "../../onboarding/hooks/useFirstTr
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "@langwatch/trace-web";
-import { useUIStore } from "@langwatch/trace-web";
+import {
+  SELECT_ALL_MATCHING_CAP,
+  useDrawerStore,
+  useFilterStore,
+  useSelectionStore,
+  useUIStore,
+} from "@langwatch/trace-web";
 import { DensityProvider } from "../DensityProvider";
 import { ExportConfigDialog } from "../ExportConfigDialog";
 import { ExportProgress } from "../ExportProgress";

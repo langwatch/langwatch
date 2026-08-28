@@ -13,7 +13,7 @@ import type {
   CodingAssistantConfig,
   ExternalToolConfig,
   ModelProviderConfig,
-} from "./tiles/types";
+} from "@langwatch/enterprise-governance-web";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",

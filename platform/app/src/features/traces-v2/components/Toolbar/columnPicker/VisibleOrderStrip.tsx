@@ -15,7 +15,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, X } from "lucide-react";
 import type React from "react";
-import type { LensColumnOption } from "../../../lens/capabilities";
+import type { LensColumnOption } from "@langwatch/trace-web";
 
 /**
  * Compact drag-to-reorder strip of the visible columns. Each row is

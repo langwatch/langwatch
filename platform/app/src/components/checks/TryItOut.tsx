@@ -45,7 +45,7 @@ import { InputGroup } from "@langwatch/design-system/input-group";
 import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
-import { evaluationStatusColor } from "./EvaluationStatus";
+import { evaluationStatusColor } from "@langwatch/evaluator-web";
 
 export function TryItOut({
   form,

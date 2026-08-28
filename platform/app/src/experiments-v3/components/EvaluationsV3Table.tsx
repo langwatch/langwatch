@@ -18,11 +18,13 @@ import {
 } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
-import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
-import type { ColumnType } from "~/components/datasets/editor/TableCell";
-import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
-import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import {
+  type DatasetTableColumnType as ColumnType,
+  datasetTableCss,
+  useTableKeyboardNavigation,
+  VirtualizedTableBody,
+} from "@langwatch/dataset-web";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   getFlowCallbacks,
   setComplexProps,

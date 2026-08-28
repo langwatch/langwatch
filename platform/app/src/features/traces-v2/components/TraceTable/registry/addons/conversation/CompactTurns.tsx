@@ -6,14 +6,14 @@ import type { ReactNode } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import type { DensityTokens } from "../../../../../hooks/useDensityTokens";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
-import { useTimeFormatStore } from "@langwatch/trace-web";
-import type { TraceListItem } from "../../../../../types/trace";
 import {
   formatCost,
   formatDuration,
   formatISOTimestamp,
   formatTokens,
+  useTimeFormatStore,
 } from "@langwatch/trace-web";
+import type { TraceListItem } from "../../../../../types/trace";
 import { useRelativeTime } from "../../../../../utils/useRelativeTime";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import { truncateText } from "../../../chatContent";

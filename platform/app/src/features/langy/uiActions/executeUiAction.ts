@@ -1,4 +1,4 @@
-import { reserveNavigate } from "../logic/langyNavigateDedup";
+import { reserveNavigate } from "@langwatch/langy-web";
 import type { LangyUiActionHandlers } from "./types";
 
 /**

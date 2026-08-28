@@ -14,7 +14,7 @@ import {
   AVATAR_MAX_SOURCE_BYTES,
   AvatarImageProcessingFailedError,
   processAvatarImage,
-} from "../processAvatarImage";
+} from "@langwatch/user-web";
 
 /**
  * The pre-flight cases here are the ones that decide before the canvas is

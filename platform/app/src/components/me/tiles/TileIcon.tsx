@@ -4,9 +4,12 @@ import type { ReactNode } from "react";
 
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 
-import { ASSISTANT_PRESETS, type AssistantKind } from "./assistantIcons";
-import { resolveToolPreset, TOOL_PRESETS } from "./toolIcons";
-import type { AiToolTileType } from "./types";
+import { ASSISTANT_PRESETS, type AssistantKind } from "@langwatch/coding-agent-web";
+import {
+  type AiToolTileType,
+  resolveToolPreset,
+  TOOL_PRESETS,
+} from "@langwatch/enterprise-governance-web";
 
 const FALLBACK_ICONS: Record<AiToolTileType, ReactNode> = {
   coding_assistant: <Bot size={18} />,

@@ -3,6 +3,7 @@ export * from "./langwatch-vega-config";
 export * from "./lwql-chart-failures";
 export * from "./lwql-dataset-names";
 export * from "./scan-langwatch-ql-chart-values";
+export * from "./starter-vega-lite-spec";
 export * from "./vega-lite-expressions";
 export * from "./vega-lite-fields";
 export * from "./vega-lite-policy";

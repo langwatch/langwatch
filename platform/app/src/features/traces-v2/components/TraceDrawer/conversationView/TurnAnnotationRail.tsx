@@ -9,7 +9,7 @@ import {
   isTurnRailDraft,
   type OpenAnnotationDraftParams,
   useAnnotationDraftStore,
-} from "../../../stores/annotationDraftStore";
+} from "@langwatch/trace-web";
 import { AnnotationCard } from "./AnnotationCard";
 import { AnnotationEditorCard } from "./AnnotationEditorCard";
 

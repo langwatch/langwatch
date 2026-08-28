@@ -15,7 +15,10 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { LangyUiActionHandlers } from "../uiActions/types";
+import {
+  type LangyUiActionHandlers,
+  useLangyStore,
+} from "@langwatch/langy-web";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -252,7 +255,6 @@ vi.mock("~/utils/api", () => ({
 
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";
-import { useLangyStore } from "../stores/langyStore";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>

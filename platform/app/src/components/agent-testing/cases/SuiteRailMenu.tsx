@@ -6,7 +6,7 @@
 
 import { Button } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import type { TestSuiteEntry } from "./test-cases";
 
 export type SuiteRailMenuProps = {

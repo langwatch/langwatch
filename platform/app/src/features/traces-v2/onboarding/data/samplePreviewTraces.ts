@@ -1,4 +1,5 @@
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { previewTraceId } from "@langwatch/trace-web";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { RouterOutputs } from "~/utils/api";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace";
@@ -50,12 +51,6 @@ const NOT_REDACTED: Pick<
  * lookup can short-circuit cleanly without hitting tRPC.
  */
 
-const PREVIEW_PREFIX = "lw-preview-";
-
-export function isPreviewTraceId(traceId: string): boolean {
-  return traceId.startsWith(PREVIEW_PREFIX);
-}
-
 const NOW = () => Date.now();
 const minutesAgo = (n: number) => NOW() - n * 60_000;
 
@@ -87,7 +82,7 @@ interface MakeTraceArgs {
 
 function makeTrace(args: MakeTraceArgs): TraceListItem {
   return {
-    traceId: `${PREVIEW_PREFIX}${args.id}`,
+    traceId: previewTraceId(args.id),
     timestamp: minutesAgo(args.ageMin),
     name: args.name,
     serviceName: args.serviceName,

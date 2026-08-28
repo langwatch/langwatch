@@ -29,9 +29,12 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
-import { describeChipContext } from "../logic/langyChipContext";
-import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
-import { type LangyContextChip, useLangyStore } from "../stores/langyStore";
+import {
+  describeChipContext,
+  type LangyContextChip,
+  useLangyContextTargetStore,
+  useLangyStore,
+} from "@langwatch/langy-web";
 import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
 import { LangyModelPill } from "./LangyModelPill";
 

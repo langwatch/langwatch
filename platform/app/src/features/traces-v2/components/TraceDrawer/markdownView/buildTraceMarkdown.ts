@@ -4,8 +4,7 @@ import type {
   TraceHeader,
 } from "@langwatch/trace-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import { formatCost, formatDuration } from "@langwatch/trace-web";
-import type { MarkdownConfig } from "./types";
+import { formatCost, formatDuration, type MarkdownConfig } from "@langwatch/trace-web";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
 

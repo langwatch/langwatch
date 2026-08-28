@@ -73,9 +73,7 @@ export class SecretService extends SecretServiceContract {
     if (this.reservedNames.has(parsed.name)) {
       throw new SecretReservedNameError(parsed.name);
     }
-    if (
-      (await this.options.repository.count(parsed.projectId)) >= this.maximumPerProject
-    ) {
+    if ((await this.options.repository.count(parsed.projectId)) >= this.maximumPerProject) {
       throw new SecretLimitReachedError(this.maximumPerProject);
     }
     return this.options.repository.create({
@@ -103,10 +101,7 @@ export class SecretService extends SecretServiceContract {
     await this.options.repository.delete(parsed.projectId, parsed.id);
   }
 
-  private async getMutableSecret(input: {
-    projectId: string;
-    id: string;
-  }): Promise<Secret> {
+  private async getMutableSecret(input: { projectId: string; id: string }): Promise<Secret> {
     const secret = await this.options.repository.get(input.projectId, input.id);
     if (this.reservedNames.has(secret.name)) {
       throw new SecretNotFoundError();

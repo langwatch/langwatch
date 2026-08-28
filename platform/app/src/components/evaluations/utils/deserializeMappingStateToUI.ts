@@ -5,7 +5,7 @@
  * always get sourceId "thread", even when the monitor level is "trace"
  * (mixed trace + thread scenario).
  */
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 
 export function deserializeMappingStateToUI(

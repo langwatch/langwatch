@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
+import { isPreviewTraceId } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 import { useDrawerProjectId } from "./useDrawerProjectId";
 

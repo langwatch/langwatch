@@ -42,7 +42,9 @@
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
-    "hono": "^4.12.27"
+    "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

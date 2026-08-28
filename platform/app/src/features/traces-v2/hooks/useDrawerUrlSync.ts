@@ -12,7 +12,7 @@ import {
   useDrawerStore,
   type VizTab,
   viewModeForEditState,
-} from "../stores/drawerStore";
+} from "@langwatch/trace-web";
 
 const DEFAULTS = {
   // Mirror drawerStore's "summary" default so a popstate into an older

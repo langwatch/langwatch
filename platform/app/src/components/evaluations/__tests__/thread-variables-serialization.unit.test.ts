@@ -8,7 +8,7 @@
  * functions from the shared mappingSerialization module.
  */
 import { describe, expect, it } from "vitest";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import { deserializeMappingStateToUI } from "../utils/deserializeMappingStateToUI";
 import { serializeMappingsToMappingState } from "../utils/serializeMappingsToMappingState";

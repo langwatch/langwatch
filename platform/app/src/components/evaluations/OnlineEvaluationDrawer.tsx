@@ -34,7 +34,7 @@ import {
   RULE_LABELS,
 } from "~/components/preconditions/preconditionFieldUtils";
 import { Drawer } from "~/components/ui/drawer";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mappingValidation";
 import { EvaluationExecutionMode } from "~/generated/prisma/client";

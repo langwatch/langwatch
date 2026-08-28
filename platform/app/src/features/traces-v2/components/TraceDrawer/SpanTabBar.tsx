@@ -21,8 +21,7 @@ import {
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { formatDuration, SPAN_TYPE_COLORS } from "@langwatch/trace-web";
+import { formatDuration, SPAN_TYPE_COLORS, useDrawerStore } from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**

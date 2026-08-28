@@ -35,9 +35,7 @@ export class PrismaSecretRepository extends SecretRepository {
     return rows.map((row) => secretSchema.parse(row));
   }
 
-  listEncryptedValues(
-    projectId: string,
-  ): Promise<Array<{ name: string; encryptedValue: string }>> {
+  listEncryptedValues(projectId: string): Promise<Array<{ name: string; encryptedValue: string }>> {
     return this.database.projectSecret.findMany({
       where: { projectId },
       select: { name: true, encryptedValue: true },
@@ -77,10 +75,7 @@ export class PrismaSecretRepository extends SecretRepository {
         }),
       );
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new SecretDuplicateError(input.name);
       }
       throw error;
@@ -105,10 +100,7 @@ export class PrismaSecretRepository extends SecretRepository {
         }),
       );
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new SecretNotFoundError();
       }
       throw error;
@@ -119,10 +111,7 @@ export class PrismaSecretRepository extends SecretRepository {
     try {
       await this.database.projectSecret.delete({ where: { id, projectId } });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new SecretNotFoundError();
       }
       throw error;

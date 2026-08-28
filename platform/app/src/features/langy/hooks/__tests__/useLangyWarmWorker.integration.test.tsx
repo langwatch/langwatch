@@ -13,7 +13,7 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { useLangyWarmWorker } from "../useLangyWarmWorker";
 
 type WarmInput = {

@@ -3,9 +3,8 @@ import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
-import { LIVE_REFETCH_MS } from "../constants/freshness";
+import { LIVE_REFETCH_MS, useSseStatusStore } from "@langwatch/trace-web";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
-import { useSseStatusStore } from "../stores/sseStatusStore";
 import {
   mergeSpanTreeDelta,
   spanTreeDeltaSinceMs,

@@ -31,7 +31,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: harness.query }),
 }));
 
-import { useDrawerStore } from "../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { useDrawerUrlSync } from "../useDrawerUrlSync";
 
 /** The params an open drawer already carries, so only `drawer.edit` is in play. */

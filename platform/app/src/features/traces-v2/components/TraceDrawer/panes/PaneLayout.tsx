@@ -9,7 +9,7 @@ import {
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useConversationContext } from "../../../hooks/useConversationContext";
-import { useDrawerStore } from "../../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { ConversationContext } from "../ConversationContext";
 import { VizPlaceholder } from "../VizPlaceholder";
 import { SpanDetailPane } from "./SpanDetailPane";

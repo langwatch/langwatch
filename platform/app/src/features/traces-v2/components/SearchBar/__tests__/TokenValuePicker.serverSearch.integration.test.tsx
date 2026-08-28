@@ -45,7 +45,7 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),

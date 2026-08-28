@@ -16,7 +16,7 @@ import {
   VariableTypeIcon,
 } from "@langwatch/prompt-web/surfaces/variable-type";
 import { outputsSchema } from "@langwatch/prompt-contract";
-import { generateUniqueIdentifier, normalizeIdentifier } from "~/utils/identifierUtils";
+import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 
 // ============================================================================
 // Types
@@ -98,7 +98,10 @@ export const OutputsSection = ({
   const handleAddOutput = useCallback(
     (type: OutputType) => {
       const existingIdentifiers = outputs.map((o) => o.identifier);
-      const newIdentifier = generateUniqueIdentifier("output", existingIdentifiers);
+      const newIdentifier = generateUniqueIdentifier({
+        baseName: "output",
+        existingIdentifiers,
+      });
 
       const newOutput: Output = {
         identifier: newIdentifier,

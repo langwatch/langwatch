@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
-import { PricingSummary } from "./PricingSummary";
+import { PricingSummary } from "@langwatch/enterprise-billing-web";
 
 export function CurrentPlanBlock({
   planName,

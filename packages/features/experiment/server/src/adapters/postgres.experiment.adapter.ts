@@ -15,6 +15,7 @@ import {
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
+import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
 import { UnavailableExperimentExecutionAdapter } from "./unavailable-experiment-execution.adapter";
 import { ExperimentService } from "../services/experiment.service";
 
@@ -139,6 +140,11 @@ export type PostgresExperimentAdapterOptions = {
       occurredAt: number;
     }): Promise<void>;
   };
+  /**
+   * App-owned live-update transport for the workbench. Omitted by runtimes
+   * with no broadcaster, which fall back to the no-op adapter.
+   */
+  updates?: ExperimentWorkbenchUpdatesPort;
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;

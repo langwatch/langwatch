@@ -4,7 +4,7 @@
  * a present-and-false entry would make the endpoint a membership oracle.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FeatureFlagTrpcApi,

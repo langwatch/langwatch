@@ -18,7 +18,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
 import { HoverableBigText } from "../HoverableBigText";
 import { Menu } from "@langwatch/design-system/menu";

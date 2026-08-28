@@ -24,7 +24,7 @@
  * ADR-088 v7, Decision 9.
  */
 import { describe, expect, it } from "vitest";
-import { buildEditSubmission } from "../inventory";
+import { buildEditSubmission } from "../inventory.enterprise";
 
 /**
  * `databricks_genie` routes conversations and is NOT an editable pull source

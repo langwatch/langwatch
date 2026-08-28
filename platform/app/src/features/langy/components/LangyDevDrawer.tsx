@@ -54,6 +54,7 @@ import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
+  useLangyStore,
 } from "@langwatch/langy-web";
 import {
   DEV_LOG_CAPACITY,
@@ -70,7 +71,6 @@ import {
   toolCallsFrom,
   useLangyDevLog,
 } from "../stores/langyDevLog";
-import { useLangyStore } from "../stores/langyStore";
 import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 
 const MotionBox = motion.create(Box);

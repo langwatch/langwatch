@@ -5,7 +5,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
   VariablesSection,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mappingValidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";

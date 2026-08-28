@@ -13,8 +13,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useDrawerStore } from "../../../stores/drawerStore";
-import type { LensConfig } from "../../../stores/viewStore";
+import type { LensConfig } from "@langwatch/trace-web";
+import { useDrawerStore } from "@langwatch/trace-web";
 import {
   mapSessionGroupToConversationGroup,
   type SessionGroupPayloadItem,

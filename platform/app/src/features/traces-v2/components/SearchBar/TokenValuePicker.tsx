@@ -6,9 +6,7 @@ import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
-import { useFilterStore } from "../../stores/filterStore";
-import { useUIStore } from "@langwatch/trace-web";
-import { dedupeByValue } from "@langwatch/trace-web";
+import { dedupeByValue, useFilterStore, useUIStore } from "@langwatch/trace-web";
 
 const MAX_VALUES_PER_PAGE = 60;
 const POPOVER_WIDTH = 320;

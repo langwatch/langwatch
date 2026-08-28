@@ -6,7 +6,7 @@ import {
   indexSpanPatches,
 } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";

@@ -13,7 +13,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioGenerationError } from "../../scenarios/services/scenarioGeneration";
+import { ScenarioGenerationError } from "@langwatch/scenario-web";
 import { AICreateModal } from "../AICreateModal";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

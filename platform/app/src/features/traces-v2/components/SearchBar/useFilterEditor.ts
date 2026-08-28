@@ -15,8 +15,8 @@ import {
   readEditorContext,
 } from "./editorDocument";
 import { FilterHighlight } from "./filterHighlight";
-import { getSuggestionState, type SuggestionState } from "@langwatch/trace-web";
-import { handleKey } from "@langwatch/trace-web";
+import type { SuggestionState } from "@langwatch/trace-web";
+import { getSuggestionState, handleKey, useLatestRef } from "@langwatch/trace-web";
 import { searchBarPlaceholder } from "./PlaceholderEditor";
 import {
   buildSuggestionUI,
@@ -25,7 +25,6 @@ import {
   navigateSuggestion,
   type SuggestionUIState,
 } from "./suggestionUI";
-import { useLatestRef } from "@langwatch/trace-web";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);

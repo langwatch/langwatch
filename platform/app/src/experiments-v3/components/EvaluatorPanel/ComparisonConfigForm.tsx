@@ -18,7 +18,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 
 import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
 import { useTargetOutputs } from "../../hooks/useTargetOutputs";

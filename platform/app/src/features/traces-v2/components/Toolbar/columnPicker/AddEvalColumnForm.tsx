@@ -9,7 +9,7 @@ import {
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
-} from "../../../lens/evalColumnId";
+} from "@langwatch/trace-web";
 import { evalColumnLabel } from "../../TraceTable/evalColumns";
 
 /** Toast hint shown after a column is added, shared with the picker's own

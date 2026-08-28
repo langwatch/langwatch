@@ -14,7 +14,10 @@ import { describe, expect, it, vi } from "vitest";
  */
 
 const devModeRef = { current: true };
-vi.mock("../hooks/useLangyDevMode", () => ({
+// Only developer mode is stubbed; the rest of the package is the real thing,
+// because the card under test renders through several of its other exports.
+vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   useLangyDevMode: () => [devModeRef.current, vi.fn()],
 }));
 

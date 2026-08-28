@@ -1,5 +1,5 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { EVAL_FIELD_LABELS, type EvalColumnField } from "../../lens/evalColumnId";
+import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-web";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace";
 
 /**

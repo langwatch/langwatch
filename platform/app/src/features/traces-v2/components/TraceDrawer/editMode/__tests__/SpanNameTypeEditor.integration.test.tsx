@@ -10,12 +10,12 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import {
   buildTraceEditPatch,
   selectIsTraceEditDirty,
   useTraceEditStore,
-} from "../../../../stores/traceEditStore";
+} from "@langwatch/trace-web";
 import { SpanNameTypeEditor } from "../SpanNameTypeEditor";
 
 const CAPTURED_NAME = "handler";

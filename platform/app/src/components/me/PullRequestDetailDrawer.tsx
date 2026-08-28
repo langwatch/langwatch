@@ -16,8 +16,8 @@ import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/sha
 import { formatCost, formatTokens } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
+import { ModelsSection } from "@langwatch/coding-agent-web";
 import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";
-import { ModelsSection } from "./pullRequestDetail/ModelsSection";
 import { SessionsSection } from "./pullRequestDetail/SessionsSection";
 
 /**

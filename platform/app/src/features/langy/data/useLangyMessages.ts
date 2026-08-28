@@ -4,8 +4,8 @@ import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useLangyStore } from "../stores/langyStore";
-import type { LangyMessageDto } from "./langy.dtos";
+import { useLangyStore } from "@langwatch/langy-web";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
 
 export interface LangyMessagesResult {
   messages: LangyMessageDto[];

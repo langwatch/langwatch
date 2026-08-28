@@ -23,18 +23,20 @@
  * on, made visible).
  */
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { StreamingStatusLine } from "@langwatch/langy-web";
+import {
+  LangyGitHubProgressCard,
+  StreamingStatusLine,
+  useLangyStore,
+} from "@langwatch/langy-web";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
 import { explainLangyError, KNOWN_LANGY_ERROR_KINDS } from "../logic/langyErrorExplainer";
-import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
-import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { LangyError } from "./LangyError";
 import { LangyFeedback } from "./LangyFeedback";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
@@ -52,8 +54,8 @@ const TRACE_FIXTURE_NOW = Date.parse("2026-07-11T14:03:00Z");
 
 /**
  * One trace, in the shape `POST /api/trace/search` actually returns under
- * `--format json` (`traceSchema` in `server/tracer/types.ts`): snake_case ids,
- * `input`/`output` as `{ value }` envelopes, `timestamps.started_at` in epoch
+ * `--format json` (`traceSchema` in @langwatch/trace-contract): snake_case
+ * ids, `input`/`output` as `{ value }` envelopes, `timestamps.started_at` in epoch
  * ms, metrics nested. Fixtures that drift from the real shape are worse than no
  * fixtures — the card would render here and break in the panel.
  */

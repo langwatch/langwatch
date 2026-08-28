@@ -1,7 +1,7 @@
 # Inline annotation rail beside the conversation
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/stores/annotationDraftStore.ts
+#   packages/features/trace/web/src/annotation-draft.store.ts
 #   platform/app/src/features/traces-v2/hooks/useConversationAnnotations.ts
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/useRailLayout.ts
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotatedTurnRow.tsx

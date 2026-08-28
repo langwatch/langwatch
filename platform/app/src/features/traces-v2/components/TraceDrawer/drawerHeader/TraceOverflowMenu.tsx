@@ -23,7 +23,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
-import { isPreviewTraceId } from "../../../onboarding/data/samplePreviewTraces";
+import { isPreviewTraceId } from "@langwatch/trace-web";
 import { enterTraceEditMode } from "../../../utils/traceEditMode";
 
 interface TraceOverflowMenuProps {

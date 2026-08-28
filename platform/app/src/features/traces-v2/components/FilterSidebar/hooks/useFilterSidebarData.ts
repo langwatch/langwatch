@@ -6,29 +6,29 @@ import {
   getFacetValues,
 } from "@langwatch/trace-contract";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
-import { useDensityStore } from "@langwatch/trace-web";
-import { applyLensOrder, useFacetLensStore } from "../../../stores/facetLensStore";
-import { selectVisibilityFor, useFacetVisibilityStore } from "@langwatch/trace-web";
-import { useFilterStore } from "../../../stores/filterStore";
+import type { NumericMode } from "@langwatch/trace-web";
 import {
-  type NumericMode,
-  selectNumericModesFor,
-  useNumericModeStore,
-} from "@langwatch/trace-web";
-import { hashColor } from "@langwatch/trace-web";
-import {
+  applyLensOrder,
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
   DISCRETE_MODE_MAX_VALUES,
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
+  hashColor,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
+  selectNumericModesFor,
+  selectVisibilityFor,
   SPAN_ATTRIBUTES_SECTION_KEY,
+  useDensityStore,
+  useFacetLensStore,
+  useFacetVisibilityStore,
+  useFilterStore,
+  useNumericModeStore,
   VIBRANT_FIELDS,
-} from "../constants";
+} from "@langwatch/trace-web";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discreteMode";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {

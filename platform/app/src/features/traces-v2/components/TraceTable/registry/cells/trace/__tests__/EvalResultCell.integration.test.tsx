@@ -8,7 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EvalColumnField } from "../../../../../../lens/evalColumnId";
+import type { EvalColumnField } from "@langwatch/trace-web";
 import type { TraceEvalResult, TraceListItem } from "../../../../../../types/trace";
 import { makeEvalCellDef } from "../EvalResultCell";
 

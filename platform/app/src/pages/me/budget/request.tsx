@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 import MyLayout from "~/components/me/MyLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { showErrorToast } from "~/features/errors";

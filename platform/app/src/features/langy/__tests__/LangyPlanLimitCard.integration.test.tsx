@@ -46,7 +46,7 @@ vi.mock("~/utils/tracking", () => ({
 }));
 
 const { LangyToolActivity } = await import("../components/LangyToolActivity");
-const { useLangyStore } = await import("../stores/langyStore");
+const { useLangyStore } = await import("@langwatch/langy-web");
 
 const limitFailure = JSON.stringify({
   ok: false,

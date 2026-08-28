@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 
 /**
  * Bridge: subscribe to `filterStore.queryText` and forward changes into

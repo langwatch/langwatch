@@ -27,3 +27,4 @@ export * from "./github-command";
 export * from "./langy-permission-policy";
 export * from "./langy-turn-context";
 export * from "./langy-prompt";
+export * from "./langy.dtos";

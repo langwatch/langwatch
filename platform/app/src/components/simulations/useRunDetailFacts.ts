@@ -7,10 +7,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { buildDisplayTitle } from "@langwatch/suite-web";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { shouldShowNoResponse } from "./scenario-run-status.utils";
+import { shouldShowNoResponse } from "@langwatch/scenario-web";
 import type { ScenarioRunState } from "./useRunStateStream";
 
 /**

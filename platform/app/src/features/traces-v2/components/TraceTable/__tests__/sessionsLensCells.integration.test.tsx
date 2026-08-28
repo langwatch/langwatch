@@ -12,8 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { getCapability } from "../../../lens/capabilities";
-import { truncateId } from "@langwatch/trace-web";
+import { getCapability, truncateId } from "@langwatch/trace-web";
 import {
   mapSessionGroupToConversationGroup,
   type SessionGroupPayloadItem,

@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useState } from "react";
-import { useDrawerStore } from "../../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 
 export type DrawerLayout = "vertical" | "horizontal";
 

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 

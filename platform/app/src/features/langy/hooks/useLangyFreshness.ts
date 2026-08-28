@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { LangyConversationUpdateSignal } from "../data/langy.dtos";
+import type { LangyConversationUpdateSignal } from "@langwatch/langy-contract";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import { useLangyDevLog } from "../stores/langyDevLog";
 import { useLangyConversationUpdateListener } from "./useLangyConversationUpdateListener";

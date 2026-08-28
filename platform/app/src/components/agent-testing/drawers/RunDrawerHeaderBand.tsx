@@ -8,13 +8,15 @@
 
 import { Button, Heading, HStack, VStack } from "@chakra-ui/react";
 import { Square } from "lucide-react";
-import { formatCost, formatLatency } from "~/components/shared/formatters";
-import { CopyIdChip } from "~/components/simulations/CopyIdChip";
-import { RunCriteriaChip } from "~/components/simulations/RunCriteriaChip";
-import { ScenarioRunActions } from "~/components/simulations/ScenarioRunActions";
-import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
-import { hasNoResults } from "~/components/simulations/scenario-run-status.utils";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import {
+  CopyIdChip,
+  hasNoResults,
+  RunCriteriaChip,
+  SCENARIO_RUN_STATUS_CONFIG,
+  ScenarioRunActions,
+  ScenarioRunStatusIcon,
+} from "@langwatch/scenario-web";
 import { Drawer } from "~/components/ui/drawer";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { CaseVersionChip } from "../shared/CaseVersionChip";

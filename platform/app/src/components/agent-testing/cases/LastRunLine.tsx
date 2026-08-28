@@ -7,7 +7,7 @@
 
 import { HStack, Text } from "@chakra-ui/react";
 import { format } from "date-fns";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
+import { RunMetricsSummary } from "@langwatch/suite-web";
 import { FG_MUTED } from "../shared/design";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import type { CaseLastResult } from "./CasesTable";

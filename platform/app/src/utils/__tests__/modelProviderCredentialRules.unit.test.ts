@@ -10,12 +10,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { modelProviders } from "@langwatch/model-provider-contract";
+import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
 import {
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,
   getRequiredCredentialKeys,
-  getSchemaShape,
 } from "../modelProviderHelpers";
 
 /** The exact inputs the drawer feeds the rule for a given provider. */

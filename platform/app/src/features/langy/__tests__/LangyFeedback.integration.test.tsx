@@ -33,7 +33,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import { LangyFeedback } from "../components/LangyFeedback";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 function renderFeedback(props: Partial<React.ComponentProps<typeof LangyFeedback>> = {}) {
   return render(

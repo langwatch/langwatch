@@ -35,18 +35,20 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { LangyObservationState } from "@langwatch/langy-web";
-import { type CapabilityData, useCapabilityData } from "../../hooks/useCapabilityData";
-import { traceContextChip } from "../../logic/langyContextChips";
 import {
   buildTraceExplorerHref,
+  collectionOf,
+  LangyContextTarget,
+  LangyObservationState,
   readTraceSearchQuery,
+  textValue,
+  totalOf,
+  traceContextChip,
   type TraceSearchQuery,
 } from "@langwatch/langy-web";
-import { LangyContextTarget } from "../LangyContextTarget";
+import { type CapabilityData, useCapabilityData } from "../../hooks/useCapabilityData";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import type { CapabilityCardInput } from "./capabilityRegistry";
-import { collectionOf, textValue, totalOf } from "@langwatch/langy-web";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

@@ -10,7 +10,7 @@
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { catchUpConversationFold } from "../langyDurableCatchUp";
 
 type Utils = Parameters<typeof catchUpConversationFold>[0]["utils"];

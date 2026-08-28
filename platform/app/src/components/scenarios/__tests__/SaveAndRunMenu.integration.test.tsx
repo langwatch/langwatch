@@ -15,7 +15,7 @@ vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
   useAllPromptsForProject: () => ({ data: [] }),
 }));
 
-vi.mock("../useFilteredScenarioTargets", () => ({
+vi.mock("../TargetSelector", () => ({
   isAgentTarget: () => false,
   useFilteredAgents: () => [],
 }));

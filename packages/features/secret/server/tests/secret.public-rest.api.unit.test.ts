@@ -1,4 +1,4 @@
-import { createRestService } from "@langwatch/api";
+import { createRestService } from "@langwatch/api/rest";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 import { SECRET_PUBLIC_API_VERSION, SecretPublicRestApi } from "../src/api/public-rest/secret.api";

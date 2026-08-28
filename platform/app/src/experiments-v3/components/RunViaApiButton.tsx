@@ -20,7 +20,7 @@ import { DataSourcePicker } from "~/components/run-via-api/DataSourcePicker";
 import { buildRunSnippet } from "~/components/run-via-api/runSnippets";
 import { useRunViaApiTabs } from "~/components/run-via-api/useRunViaApiTabs";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { WorkflowField } from "~/optimization_studio/utils/workflowFields";
+import type { WorkflowField } from "@langwatch/workflow-contract";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 

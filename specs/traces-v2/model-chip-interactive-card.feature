@@ -3,7 +3,7 @@
 # Implementation:
 #   platform/app/src/features/traces-v2/components/TraceTable/registry/cells/trace/ModelCell.tsx
 #   platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/DrawerHeader.tsx  (ModelsTooltip consumer)
-#   platform/app/src/features/traces-v2/stores/filterStore.ts  (toggleFacet)
+#   packages/features/trace/web/src/filter.store.ts  (toggleFacet)
 #
 # Motivation (round 5): a trace that touched several models renders one
 # chip — primary model + a quiet "+N". The full list lives in a

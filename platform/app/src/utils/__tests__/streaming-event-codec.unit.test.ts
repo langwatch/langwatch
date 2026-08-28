@@ -4,7 +4,7 @@ import {
   encodeEnd,
   encodeStart,
   isCompactStreamingEvent,
-} from "../streaming-event-codec";
+} from "@langwatch/scenario-contract";
 
 describe("streaming-event-codec", () => {
   const baseFields = {

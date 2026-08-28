@@ -10,7 +10,7 @@ import { Link } from "~/components/ui/link";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 
 import { ComparisonConfigForm } from "~/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm";
 import type {

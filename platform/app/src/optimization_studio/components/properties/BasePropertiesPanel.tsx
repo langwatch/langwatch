@@ -12,7 +12,7 @@ import {
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { toaster } from "../../../components/ui/toaster";
 import { DEFAULT_MODEL } from "../../../utils/constants";
-import { ComponentIcon } from "../ColorfulBlockIcons";
+import { ComponentIcon } from "@langwatch/workflow-web";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
 export { FieldsDefinition, FieldsForm, PropertyField };

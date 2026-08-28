@@ -44,7 +44,7 @@ export const designSystemConfig = defineConfig({
     },
     "*::selection": {
       // Chakra by default overrides browser selection color, I really don't like things overriding defaults
-      // @ts-expect-error
+      // @ts-expect-error Chakra types `bg` as a token string; `null` is what unsets the property, and it types no null.
       bg: null,
     },
     // Chakra's `CodeBlock` paints highlighted lines via an absolutely
@@ -793,7 +793,7 @@ export const designSystemConfig = defineConfig({
           },
         },
         defaultVariants: {
-          // @ts-expect-error
+          // @ts-expect-error This recipe declares only a `variant` variant, so `size` is not a key of its generated variant map. Chakra still forwards it to the underlying Ark component.
           size: "sm",
         },
       }),

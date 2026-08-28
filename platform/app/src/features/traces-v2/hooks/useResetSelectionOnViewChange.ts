@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore } from "../stores/filterStore";
-import { useSelectionStore } from "@langwatch/trace-web";
-import { useViewStore } from "../stores/viewStore";
+import { useFilterStore, useSelectionStore, useViewStore } from "@langwatch/trace-web";
 
 /**
  * Clears the bulk-selection set whenever the meaning of a row could shift

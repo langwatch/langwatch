@@ -4,7 +4,7 @@
 #   packages/features/coding-agent/server/src/services/coding-agent.service.ts (the canonical read service)
 #   platform/app/src/server/api/routers/coding-agent.ts                        (codingAgents.sessionsList)
 #   platform/app/src/server/api/routers/coding-agent.gates.ts                  (the title and cost gates)
-#   platform/app/src/server/traces/protections.ts                              (the shared content-visibility rule)
+#   packages/features/trace/server/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
 #   The page and its table live under platform/app/src/pages/me/ and
 #   platform/app/src/components/me/.
 #

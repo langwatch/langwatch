@@ -12,7 +12,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
-import type { ScenarioFormController } from "@langwatch/scenario-web";
+import {
+  consumeStoredPrompt,
+  type GeneratedScenario,
+  generateScenarioWithAI,
+  type ScenarioFormController,
+} from "@langwatch/scenario-web";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
@@ -20,11 +25,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { toaster } from "../ui/toaster";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
-import {
-  type GeneratedScenario,
-  generateScenarioWithAI,
-} from "./services/scenarioGeneration";
-import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 import { classifyGenerationError } from "./utils/classifyGenerationError";
 import { getDefaultModelState } from "./utils/defaultModelState";
 
@@ -36,9 +36,6 @@ type ScenarioAIGenerationProps = {
 
 export type GenerationStatus = "idle" | "generating" | "done" | "error";
 type ViewMode = "prompt" | "input";
-
-// Re-export for backwards compatibility
-export type { GeneratedScenario } from "./services/scenarioGeneration";
 
 export function usePromptHistory() {
   const [history, setHistory] = useState<string[]>([]);

@@ -101,7 +101,7 @@ vi.mock("../components/LangyPanel", () => ({
 
 import { useEffect } from "react";
 import ProjectLangyLayout from "../ProjectLangyLayout";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 function LangySidecarStub() {
   const isOpen = useLangyStore((s) => s.isOpen);

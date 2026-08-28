@@ -10,8 +10,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useMemo, useRef, useState } from "react";
+import { VirtualizedTableRows } from "@langwatch/ops-web";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { Link } from "~/components/ui/link";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";

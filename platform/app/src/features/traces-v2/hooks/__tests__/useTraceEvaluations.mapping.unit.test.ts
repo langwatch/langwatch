@@ -6,7 +6,7 @@
  * stay null rather than becoming a fabricated 0 that renders as "0.00".
  */
 import { describe, expect, it } from "vitest";
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/trace-contract";
 import { mapScore, mapStatus } from "../useTraceEvaluations";
 
 function makeEvaluation(overrides: Partial<Evaluation> = {}): Evaluation {

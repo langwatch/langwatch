@@ -25,13 +25,13 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
-import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
+import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_NEEDS_TEAM_WARNING,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
-} from "./settings/seatTypeCopy";
+} from "@langwatch/enterprise-licensing-web";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,

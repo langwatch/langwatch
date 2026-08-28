@@ -7,10 +7,9 @@ import { api } from "~/utils/api";
 import {
   buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
-  isPreviewTraceId,
   RICH_ARRIVAL_TRACE_ID,
 } from "../onboarding/data/samplePreviewTraces";
-import { useDrawerStore } from "../stores/drawerStore";
+import { isPreviewTraceId, useDrawerStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 import { spanTreeQueryFn, spanTreeQueryKey } from "./spanTreePagedQuery";
 

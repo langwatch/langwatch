@@ -4,8 +4,6 @@ import type { DensityTokens } from "../../../hooks/useDensityTokens";
 import type { Density } from "@langwatch/trace-web";
 import type { RowStyle } from "../StatusRow";
 
-export type RowKind = "trace" | "conversation" | "group";
-
 export interface RowActions {
   onSelect?: () => void;
   onTogglePeek?: () => void;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Span } from "../../../server/tracer/types";
+import type { Span } from "@langwatch/trace-contract";
 import { getEvaluationResult } from "../SpanDetails";
 
 function buildSpan(output: Span["output"]): Span {

@@ -1,7 +1,7 @@
 # Trace Drawer Shell — Gherkin Spec
 # Implementation:
 #   platform/app/src/features/traces-v2/components/TraceDrawer/**
-#   platform/app/src/features/traces-v2/stores/drawerStore.ts
+#   packages/features/trace/web/src/drawer.store.ts
 #   platform/app/src/features/traces-v2/hooks/{useDrawerUrlSync,useTraceDrawerShortcuts,useTraceDrawerNavigation}.ts
 #   platform/app/src/features/traces-v2/hooks/traceDrawerShortcutTable.ts
 #

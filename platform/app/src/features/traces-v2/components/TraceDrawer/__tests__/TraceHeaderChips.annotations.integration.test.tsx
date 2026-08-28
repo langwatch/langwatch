@@ -40,7 +40,7 @@ vi.mock("../../../hooks/useSpanTree", () => ({
   useSpanTree: () => ({ data: [{ spanId: "span-7", name: "web_search" }] }),
 }));
 
-vi.mock("../../../stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: (selector: (state: unknown) => unknown) =>
     selector({ setViewMode: mocks.setViewMode }),
 }));

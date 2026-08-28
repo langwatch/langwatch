@@ -745,7 +745,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
       try {
         pointAttributes = JSON.parse(row.PointAttributesJson) as Record<string, string>;
       } catch {
-        pointAttributes = {};
+        // Malformed row: keep the attribute-less default.
       }
       return {
         metricName: row.MetricName,

@@ -4,7 +4,7 @@
  * request body, and keeps tenant policy out of a viewer's catalogue.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   FeatureFlagTrpcApi,

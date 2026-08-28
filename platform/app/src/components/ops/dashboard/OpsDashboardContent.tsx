@@ -1,6 +1,11 @@
 import { Card, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { HealthLine, LatencyWindowsCard, TopErrorsCard } from "@langwatch/ops-web";
+import {
+  HealthLine,
+  LatencyWindowsCard,
+  ThroughputChart,
+  TopErrorsCard,
+} from "@langwatch/ops-web";
 import { useMemo } from "react";
 import { AnomaliesCard } from "~/components/ops/queues/AnomaliesCard";
 import { BlockedCard } from "~/components/ops/queues/BlockedCard";
@@ -11,7 +16,6 @@ import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { PausedCard } from "./paused/PausedCard";
 import { StatStrip } from "./StatStrip";
-import { ThroughputChart } from "./ThroughputChart";
 
 /**
  * The ops landing page, read top to bottom as strip → health → chart →

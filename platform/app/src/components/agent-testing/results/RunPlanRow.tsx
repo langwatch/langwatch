@@ -10,8 +10,8 @@
 
 import { Badge, Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { Folder, FolderCode, MoreVertical, Zap } from "lucide-react";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import { Menu } from "~/components/ui/menu";
+import { RunMetricsSummary } from "@langwatch/suite-web";
+import { Menu } from "@langwatch/design-system/menu";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED, ROW_HOVER_BG } from "../shared/design";

@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { useDrawerStore } from "../stores/drawerStore";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../stores/traceEditStore";
+import { selectIsTraceEditDirty, useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { useTraceEditOverlay } from "./useTraceEditOverlay";
 
 /**

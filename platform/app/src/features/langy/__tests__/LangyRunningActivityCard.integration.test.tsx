@@ -24,7 +24,7 @@ import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LangyToolActivity } from "../components/LangyToolActivity";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 function turnFromParts(parts: unknown[]): UIMessage {
   return {

@@ -1,16 +1,16 @@
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { api } from "~/utils/api";
-import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
-import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
-import { LicenseLoadError } from "./license/LicenseLoadError";
-import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
 import {
+  LicenseDetailsCard,
+  LicenseLoadError,
+  LicenseLoadingSkeleton,
   licenseMetersSeats,
   normalizeKeyForActivation,
-} from "./license/licenseStatusUtils";
+  OverSeatsCallout,
+} from "@langwatch/enterprise-licensing-web";
+import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
 import { NoLicenseCard } from "./license/NoLicenseCard";
-import { OverSeatsCallout } from "./license/OverSeatsCallout";
 import { useLicenseActions } from "./license/useLicenseActions";
 
 interface LicenseStatusProps {

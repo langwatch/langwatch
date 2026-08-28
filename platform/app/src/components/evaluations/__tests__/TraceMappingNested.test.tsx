@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { type AvailableSource, VariableMappingInput } from "~/components/variables";
+import { type AvailableSource, VariableMappingInput } from "@langwatch/prompt-web/surfaces/variables";
 import { TRACE_MAPPINGS } from "~/server/tracer/tracesMapping";
 
 // Import the actual function we want to test

@@ -9,7 +9,7 @@ import {
   CONTACT_SALES_URL,
   DEFAULT_LICENSE_PURCHASE_URL,
 } from "@langwatch/enterprise-licensing-contract";
-import { formatFileSize } from "./licenseStatusUtils";
+import { formatFileSize } from "@langwatch/enterprise-licensing-web";
 
 type ActivationMethod = "file" | "key";
 

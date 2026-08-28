@@ -12,10 +12,10 @@ import { useEffect, useMemo } from "react";
 import { LANGY_SKILLS, type LangySkill } from "~/shared/langy/langySkills";
 import {
   absorbContextTarget,
-  type LangyContextTarget,
+  type LangyContextChip,
+  type LangyContextTargetDescriptor,
   useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
-import type { LangyContextChip } from "../stores/langyStore";
+} from "@langwatch/langy-web";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.
@@ -120,7 +120,7 @@ function buildItems({
 }: {
   mode: PaletteMode;
   chips: LangyContextChip[];
-  pageTargets: LangyContextTarget[];
+  pageTargets: LangyContextTargetDescriptor[];
 }): PaletteItem[] {
   if (mode === "skills") {
     return LANGY_SKILLS.map((skill) => ({

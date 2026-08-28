@@ -143,6 +143,17 @@ export type GatewayBudgetScopeTarget = {
   memberCount?: number;
 };
 
+/**
+ * The key format of the map `GatewayService.resolveScopeTargets` answers.
+ *
+ * It lives beside that map's value type because every caller of the method
+ * has to build the same key to read it back, and a second spelling of
+ * `${scopeType}:${scopeId}` anywhere would silently miss every lookup.
+ */
+export function scopeTargetKey(scopeType: string, scopeId: string): string {
+  return `${scopeType}:${scopeId}`;
+}
+
 export type GatewayBudgetScopeReachInput = {
   organizationId: string;
   scope: {

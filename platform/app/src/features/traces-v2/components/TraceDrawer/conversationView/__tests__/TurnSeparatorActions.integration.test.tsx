@@ -53,9 +53,12 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
-import { useDrawerStore } from "../../../../stores/drawerStore";
-import { useTraceEditStore } from "../../../../stores/traceEditStore";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+  useDrawerStore,
+  useTraceEditStore,
+} from "@langwatch/trace-web";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { enterTraceEditMode } from "../../../../utils/traceEditMode";
 import { ChatTurnRow } from "../ChatTurnRow";

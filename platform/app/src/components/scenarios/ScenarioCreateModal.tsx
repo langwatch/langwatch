@@ -1,4 +1,9 @@
-import type { ScenarioFormData, ScenarioInitialData } from "@langwatch/scenario-web";
+import {
+  generateScenarioWithAI,
+  type ScenarioFormData,
+  type ScenarioInitialData,
+  storePromptForScenario,
+} from "@langwatch/scenario-web";
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
@@ -8,8 +13,6 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
 import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
-import { generateScenarioWithAI } from "./services/scenarioGeneration";
-import { storePromptForScenario } from "./services/scenarioPromptStorage";
 import { getDefaultModelState } from "./utils/defaultModelState";
 
 // ─────────────────────────────────────────────────────────────────────────────

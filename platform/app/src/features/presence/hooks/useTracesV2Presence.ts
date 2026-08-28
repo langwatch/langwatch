@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PresenceLocation } from "@langwatch/presence-contract";
 import {

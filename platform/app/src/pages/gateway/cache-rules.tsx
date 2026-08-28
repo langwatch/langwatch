@@ -19,7 +19,7 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { CacheRuleCreateDrawer } from "~/components/gateway/CacheRuleCreateDrawer";
 import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import { GatewayErrorPanel } from "@langwatch/gateway-web";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "@langwatch/design-system/menu";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";

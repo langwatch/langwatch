@@ -26,15 +26,15 @@ import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
 import { useConversationTurnEvents } from "../../../hooks/useConversationTurnEvents";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
-import { useCopyToClipboard } from "@langwatch/trace-web";
-import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import {
   isTurnRailDraft,
+  RenderedMarkdown,
   useAnnotationDraftStore,
-} from "../../../stores/annotationDraftStore";
+  useCopyToClipboard,
+} from "@langwatch/trace-web";
+import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../../types/trace";
 import { FormatSelect } from "../FormatSelect";
-import { RenderedMarkdown } from "@langwatch/trace-web";
 import {
   extractReadableText,
   extractReasoningText,

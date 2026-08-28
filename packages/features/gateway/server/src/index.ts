@@ -25,6 +25,7 @@ export {
   bucketScopeIdFor,
   budgetAppliesToProvider,
 } from "./adapters/gateway-bucket-scope.adapter";
+export { spendTargetsForBudgets } from "./adapters/gateway-budget-spend-target.adapter";
 export * from "./adapters/gateway-audit-serializer.adapter";
 export * from "./adapters/gateway-budget-dto.adapter";
 export * from "./adapters/gateway-virtual-key-dto.adapter";

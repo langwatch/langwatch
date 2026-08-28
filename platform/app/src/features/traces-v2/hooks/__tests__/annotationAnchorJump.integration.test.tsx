@@ -11,9 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useSectionFocusGlow } from "../../components/TraceDrawer/traceAccordions/useSectionFocusGlow";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useFocusSectionStore } from "@langwatch/trace-web";
-import { useSpanPulseStore } from "@langwatch/trace-web";
+import { useDrawerStore, useFocusSectionStore, useSpanPulseStore } from "@langwatch/trace-web";
 import { useJumpToAnnotationAnchor } from "../useJumpToAnnotationAnchor";
 
 const TRACE_ID = "trace-1";

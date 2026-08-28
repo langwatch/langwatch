@@ -1,4 +1,4 @@
-import type { TraceListCursor } from "../stores/filterStore";
+import type { TraceListCursor } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 import { useNewlyArrivedTraceIds } from "./useNewlyArrivedTraceIds";
 import { useTraceListAnnotations } from "./useTraceListAnnotations";

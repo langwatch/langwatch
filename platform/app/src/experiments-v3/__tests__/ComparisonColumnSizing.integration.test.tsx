@@ -12,7 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn(() => ({})),

@@ -17,8 +17,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useAnnotationQueueSessionStore } from "@langwatch/trace-web";
-import { useAnnotationSessionStore } from "@langwatch/trace-web";
+import { useAnnotationQueueSessionStore, useAnnotationSessionStore } from "@langwatch/trace-web";
 
 /** The toast-and-invalidate pair every annotation write ends on. */
 function saveCallbacks({

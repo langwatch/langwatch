@@ -58,7 +58,7 @@ import {
 } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LangyConversationListItemDto } from "../data/langy.dtos";
+import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
 import { formatLangyConversationDate } from "@langwatch/langy-web";
 

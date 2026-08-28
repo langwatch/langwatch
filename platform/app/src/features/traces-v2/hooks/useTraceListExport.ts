@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useFilterStore } from "../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import { useExportTraces } from "./useExportTraces";
 
 /**

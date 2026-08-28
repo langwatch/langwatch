@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { applyOverlayToSpansFull, useSpansFullCanonical } from "../../hooks/useSpansFull";
 import { useTraceHeaderCanonical } from "../../hooks/useTraceHeader";
 import { SegmentedToggle } from "./SegmentedToggle";

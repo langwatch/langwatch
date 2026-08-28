@@ -10,7 +10,7 @@
 
 import { Box, VStack } from "@chakra-ui/react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { NowProvider } from "~/components/suites/NowProvider";
+import { NowProvider } from "@langwatch/suite-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
 import { api } from "~/utils/api";

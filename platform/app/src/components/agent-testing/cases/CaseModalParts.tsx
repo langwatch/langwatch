@@ -19,7 +19,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Play } from "lucide-react";
-import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
+import { UNFILED_OPTION_LABEL } from "@langwatch/scenario-web";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Dialog } from "~/components/ui/dialog";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import { getMaxTokenLimit } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";

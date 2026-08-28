@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 /**
  * Tell Langy which scope it is in, so nothing follows the user out of it.

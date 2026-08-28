@@ -40,7 +40,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { formatMoneyShort, Money } from "../Money";
+import { formatMoneyShort, Money } from "@langwatch/langy-web";
 import type { CapabilityCardInput } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 

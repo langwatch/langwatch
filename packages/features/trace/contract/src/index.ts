@@ -41,6 +41,7 @@ export * from "./trace-media-ref";
 export * from "./trace-read.contract";
 export * from "./trace-session-group";
 export * from "./trace-share.schemas";
+export * from "./trace-span-io";
 export * from "./trace-span-read-model";
 export * from "./trace-ai-query";
 export * from "./trace-edit-overlay.contract";

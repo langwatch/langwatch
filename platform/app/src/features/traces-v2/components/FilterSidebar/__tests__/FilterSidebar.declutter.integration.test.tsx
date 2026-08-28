@@ -57,7 +57,7 @@ vi.mock("@langwatch/trace-web", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       ast: { type: "group", combinator: "and", filters: [] },
@@ -66,7 +66,7 @@ vi.mock("../../../stores/filterStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -76,7 +76,7 @@ vi.mock("../../../stores/viewStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/facetLensStore", () => ({
+vi.mock("@langwatch/trace-web/facet-lens.store", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
       lens: { sectionOrder: [], groupOrder: [] },

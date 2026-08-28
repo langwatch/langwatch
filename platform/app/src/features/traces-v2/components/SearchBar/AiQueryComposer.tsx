@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useFilterStore } from "../../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { useAiTraceAction } from "../ai/useAiTraceAction";
 

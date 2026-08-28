@@ -29,19 +29,21 @@ export function dateTrunc(column: string, timeScaleMinutes: number, timeZone: st
   const tz = validateTimeZone(timeZone);
   if (timeScaleMinutes <= 1) {
     return `toStartOfMinute(${column}, '${tz}')`;
-  } else if (timeScaleMinutes < MINUTES_PER_DAY) {
+  }
+
+  if (timeScaleMinutes < MINUTES_PER_DAY) {
     if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
       const hours = timeScaleMinutes / MINUTES_PER_HOUR;
       return `toStartOfInterval(${column}, INTERVAL ${hours} HOUR, '${tz}')`;
     }
     return `toStartOfInterval(${column}, INTERVAL ${timeScaleMinutes} MINUTE, '${tz}')`;
-  } else {
-    const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
-    if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
-    if (days <= DAYS_PER_WEEK) return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
-    if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
-    return `toStartOfMonth(${column}, '${tz}')`;
   }
+
+  const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
+  if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
+  if (days <= DAYS_PER_WEEK) return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
+  if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
+  return `toStartOfMonth(${column}, '${tz}')`;
 }
 
 export function hasFilterValues(

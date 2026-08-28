@@ -4,12 +4,12 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { COMPOSER_ANCHOR_ATTR } from "../components/Composer";
 import {
   glowRectFor,
-  type MorphRect,
   midpointRect,
+  type MorphRect,
   readRect,
   readRectAtRest,
+  useLangyStore,
 } from "@langwatch/langy-web";
-import { useLangyStore } from "../stores/langyStore";
 
 /**
  * How long the travelling copy stays up.

@@ -603,16 +603,16 @@ export class LangyConversationService {
      */
     runToken?: string;
   }): Promise<{ id: string }> {
-    conversationId ??= this.runtime.generateId("conversation");
+    const resolvedConversationId = conversationId ?? this.runtime.generateId("conversation");
     await this.commands.createConversation({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
-      conversationId,
+      conversationId: resolvedConversationId,
       userId,
       title: title ?? null,
       runToken: runToken ?? mintRunToken(),
     });
-    return { id: conversationId };
+    return { id: resolvedConversationId };
   }
 
   /**
@@ -743,18 +743,18 @@ export class LangyConversationService {
     /** Stable logical-send identity supplied by the turn orchestrator. */
     messageId?: string;
   }): Promise<{ messageId: string }> {
-    messageId ??= this.runtime.generateId("message");
+    const resolvedMessageId = messageId ?? this.runtime.generateId("message");
     await this.commands.recordMessage({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
       conversationId,
       userId,
-      messageId,
+      messageId: resolvedMessageId,
       role,
       parts,
       title: title ?? null,
     });
-    return { messageId };
+    return { messageId: resolvedMessageId };
   }
 
   /**
@@ -788,19 +788,19 @@ export class LangyConversationService {
     /** Prior checkpoint-producing turn consumed atomically with this start. */
     consumeHandoffTurnId?: string;
   }): Promise<{ turnId: string }> {
-    turnId ??= this.runtime.createTurnId();
+    const resolvedTurnId = turnId ?? this.runtime.createTurnId();
     await this.commands.acceptAgentTurn({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
       conversationId,
-      turnId,
+      turnId: resolvedTurnId,
       ...(questionParts !== undefined ? { questionParts } : {}),
       ...(model !== undefined ? { model } : {}),
       ...(conversationStart ? { conversationStart } : {}),
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),
     });
-    return { turnId };
+    return { turnId: resolvedTurnId };
   }
 
   /**

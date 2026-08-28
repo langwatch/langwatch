@@ -125,7 +125,7 @@ vi.mock("~/utils/api", () => {
 
 import AnomalyRulesPage from "../anomaly-rules.enterprise";
 import IngestionSourceDetailPage from "../ingestion-source-detail.enterprise";
-import IngestionSourcesPage from "../ingestion-sources.enterprise";
+import IngestionSourcesPage from "../inventory.enterprise";
 
 import GovernanceOverviewPage from "../index";
 import PeoplePage from "../people";

@@ -8,8 +8,7 @@ import {
   sortConversationGroups,
 } from "../components/TraceTable/conversationGroups";
 import { useSamplePreview } from "../onboarding";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { mapSessionGroupsPayload } from "../utils/mapSessionGroupsPayload";
 
 export interface SessionGroupsResult {

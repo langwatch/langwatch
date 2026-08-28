@@ -239,7 +239,7 @@ vi.mock("~/utils/api", async () => {
 
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>

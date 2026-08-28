@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { HttpConfigEditor, useHttpTest } from "~/components/agents/http";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { OutputsSection } from "~/components/outputs/OutputsSection";
-import { VariablesSection } from "~/components/variables";
+import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { useDrawer } from "~/hooks/useDrawer";
 import type {
   AgentComponent,

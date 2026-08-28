@@ -71,11 +71,7 @@ vi.mock("~/features/traces-v2/hooks/useTraceResources", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../stores/drawerStore";
-import {
-  buildTraceEditPatch,
-  useTraceEditStore,
-} from "../../../../stores/traceEditStore";
+import { buildTraceEditPatch, useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { TraceSummaryAccordions } from "../TraceSummaryAccordions";
 
 const TRACE_ID = "trace-1";

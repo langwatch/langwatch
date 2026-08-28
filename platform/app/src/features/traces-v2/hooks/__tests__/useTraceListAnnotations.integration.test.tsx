@@ -31,7 +31,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 

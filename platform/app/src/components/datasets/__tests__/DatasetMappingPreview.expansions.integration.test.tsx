@@ -16,7 +16,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type { Dataset } from "~/generated/prisma/client";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({

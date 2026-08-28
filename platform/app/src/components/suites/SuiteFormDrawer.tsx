@@ -43,10 +43,13 @@ import { SimulationModelSelect } from "../scenarios/SimulationModelSelect";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { PromptTargetMappingSection } from "./PromptTargetMappingSection";
-import { ScenarioPicker } from "./ScenarioPicker";
-import { TargetPicker } from "./TargetPicker";
+import {
+  ScenarioPicker,
+  type SuiteFormData,
+  TargetPicker,
+  useSuiteForm,
+} from "@langwatch/suite-web";
 import { useArchivedItemsResolution } from "./useArchivedItemsResolution";
-import { type SuiteFormData, useSuiteForm } from "./useSuiteForm";
 import { useSuiteRunMutation } from "./useSuiteRunMutation";
 
 /** Callbacks passed via flowCallbacks from the parent page. */

@@ -23,7 +23,9 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "^1.22.0",
+    "react-feather": "^2.0.10",
     "react-icons": "^5.5.0"
   },
   "devDependencies": {

@@ -647,7 +647,9 @@ function getDateTruncFunction(timeScaleMinutes: number, timeZone: string): strin
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
     return `toStartOfMinute(ts.OccurredAt, '${validatedTimeZone}')`;
-  } else if (timeScaleMinutes < MINUTES_PER_DAY) {
+  }
+
+  if (timeScaleMinutes < MINUTES_PER_DAY) {
     // Use HOUR interval only when timeScaleMinutes is an exact multiple of 60
     // Otherwise use MINUTE interval to preserve precision (e.g., 90 minutes)
     if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
@@ -655,19 +657,20 @@ function getDateTruncFunction(timeScaleMinutes: number, timeZone: string): strin
       return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
     }
     return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${validatedTimeZone}')`;
-  } else {
-    // Days
-    const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
-    if (days === 1) {
-      return `toStartOfDay(ts.OccurredAt, '${validatedTimeZone}')`;
-    } else if (days <= DAYS_PER_WEEK) {
-      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${validatedTimeZone}')`;
-    } else if (days <= DAYS_PER_MONTH) {
-      return `toStartOfWeek(ts.OccurredAt, 1, '${validatedTimeZone}')`;
-    } else {
-      return `toStartOfMonth(ts.OccurredAt, '${validatedTimeZone}')`;
-    }
   }
+
+  // Days
+  const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
+  if (days === 1) {
+    return `toStartOfDay(ts.OccurredAt, '${validatedTimeZone}')`;
+  }
+  if (days <= DAYS_PER_WEEK) {
+    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${validatedTimeZone}')`;
+  }
+  if (days <= DAYS_PER_MONTH) {
+    return `toStartOfWeek(ts.OccurredAt, 1, '${validatedTimeZone}')`;
+  }
+  return `toStartOfMonth(ts.OccurredAt, '${validatedTimeZone}')`;
 }
 
 /**
@@ -2638,11 +2641,11 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
   const es = tableAliases.evaluation_runs;
   const referencedEvalCols = extractReferencedEvaluationColumns([selectExpression]);
   if (referencedEvalCols.size > 0) {
-    let rewritten = selectExpression;
+    let evalRewritten = selectExpression;
     for (const col of referencedEvalCols) {
-      rewritten = rewritten.replaceAll(`${es}.${col}`, `eval_${snakeCase(col)}`);
+      evalRewritten = evalRewritten.replaceAll(`${es}.${col}`, `eval_${snakeCase(col)}`);
     }
-    return rewritten;
+    return evalRewritten;
   }
 
   // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.)
@@ -2652,17 +2655,16 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
   // Value-based aggregations (avgArray, sumArray, etc.) pass through unchanged
   // because rewriting them would silently change "average score" to "count of traces".
   const ss = tableAliases.stored_spans;
-  if (
+  const readsEventColumns =
     selectExpression.includes(`${ss}."Events.Name"`) ||
-    selectExpression.includes(`${ss}."Events.Attributes"`)
-  ) {
-    if (
-      /\bcountIf\s*\(/.test(selectExpression) ||
-      /\bcount\s*\(/.test(selectExpression) ||
-      /\buniq/.test(selectExpression)
-    ) {
-      return `uniqExact(trace_id) AS ${alias}`;
-    }
+    selectExpression.includes(`${ss}."Events.Attributes"`);
+  const countsRows =
+    /\bcountIf\s*\(/.test(selectExpression) ||
+    /\bcount\s*\(/.test(selectExpression) ||
+    /\buniq/.test(selectExpression);
+
+  if (readsEventColumns && countsRows) {
+    return `uniqExact(trace_id) AS ${alias}`;
   }
 
   // Default: return as-is (may need extension for other metric types)
@@ -2708,7 +2710,7 @@ export function buildDataForFilterQuery(
     .join("\n");
 
   let sql: string;
-  let joins = "";
+  let joins: string;
 
   // Build query based on field type
   switch (field) {

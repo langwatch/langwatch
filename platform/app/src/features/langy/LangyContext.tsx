@@ -10,8 +10,10 @@ import {
   useState,
 } from "react";
 import type { ProposalHandlers } from "./components/MessageContent";
-import type { LangyContextChip } from "./stores/langyStore";
-import type { LangyUiActionHandlers } from "./uiActions/types";
+import {
+  type LangyContextChip,
+  type LangyUiActionHandlers,
+} from "@langwatch/langy-web";
 
 /**
  * Per-page registration surface for Langy (proposal handlers + precise page

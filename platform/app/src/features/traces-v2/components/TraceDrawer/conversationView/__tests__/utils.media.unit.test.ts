@@ -4,7 +4,7 @@
  * the same side rule as the trace summary strips either way.
  */
 import { describe, expect, it } from "vitest";
-import type { TraceMediaRef } from "~/shared/traces/media-refs";
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 import { turnMediaForSide } from "../utils";
 
 const CALLER = "/api/files/project-1/caller";

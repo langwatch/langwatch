@@ -2,12 +2,12 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
   type AvailableSource,
-  datasetColumnTypeToFieldType,
   type FieldType,
   type Variable,
   type FieldMapping as VariableFieldMapping,
   VariablesSection,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
 import type { Field } from "@langwatch/workflow-contract";
 import { useResolveTargetName } from "../../hooks/useResolveTargetName";
 import type { DatasetReference, FieldMapping, TargetConfig } from "../../types";

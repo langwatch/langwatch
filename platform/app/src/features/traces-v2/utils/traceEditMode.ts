@@ -1,5 +1,9 @@
-import { isUneditableViewMode, useDrawerStore } from "../stores/drawerStore";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../stores/traceEditStore";
+import {
+  isUneditableViewMode,
+  selectIsTraceEditDirty,
+  useDrawerStore,
+  useTraceEditStore,
+} from "@langwatch/trace-web";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL

@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const overlayData = vi.hoisted(() => ({
   current: null as {
@@ -31,8 +31,7 @@ vi.mock("../../../../hooks/useSpansFull", () => ({
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));
 
-import { useDrawerStore } from "../../../../stores/drawerStore";
-import { useTraceEditStore } from "../../../../stores/traceEditStore";
+import { useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { EditedOriginalToggle } from "../EditedOriginalToggle";
 
 const patch: TraceEditOverlayPatch = {

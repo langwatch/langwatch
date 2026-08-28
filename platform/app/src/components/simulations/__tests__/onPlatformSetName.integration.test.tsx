@@ -11,7 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SetCard } from "../SetCard";
+import { SetCard } from "@langwatch/scenario-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

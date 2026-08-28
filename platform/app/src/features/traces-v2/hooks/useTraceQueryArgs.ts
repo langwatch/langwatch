@@ -1,8 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LIVE_WINDOW_MS } from "../constants/freshness";
+import { isPreviewTraceId, LIVE_WINDOW_MS, useDrawerStore } from "@langwatch/trace-web";
 import { useTraceViewer } from "../context/TraceViewerContext";
-import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
-import { useDrawerStore } from "../stores/drawerStore";
 import { useDrawerProjectId } from "./useDrawerProjectId";
 
 /**

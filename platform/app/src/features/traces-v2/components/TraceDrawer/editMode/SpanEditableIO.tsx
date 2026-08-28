@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanEditBaseline,
   useTraceEditStore,
-} from "../../../stores/traceEditStore";
+} from "@langwatch/trace-web";
 import { EditableIOField } from "./EditableIOField";
 import { capturedInputForEditing } from "./spanInputSeed";
 

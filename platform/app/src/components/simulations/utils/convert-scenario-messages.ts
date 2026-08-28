@@ -8,7 +8,7 @@ import {
   TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
-import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback";
+import { safeJsonParseOrStringFallback } from "@langwatch/scenario-web";
 
 /**
  * Converts scenario messages to CopilotKit messages with proper ordering

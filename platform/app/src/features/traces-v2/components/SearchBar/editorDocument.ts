@@ -1,6 +1,6 @@
 import type { Editor } from "@tiptap/react";
-import { getSuggestionState, type SuggestionState } from "@langwatch/trace-web";
-import type { KeyAction } from "@langwatch/trace-web";
+import type { KeyAction, SuggestionState } from "@langwatch/trace-web";
+import { getSuggestionState } from "@langwatch/trace-web";
 
 // TipTap wraps text in a paragraph node, so cursor positions in
 // `editor.state.selection` are 1-based. Subtract 1 to map back to a string

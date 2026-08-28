@@ -22,8 +22,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { Pagination } from "../Pagination";
 
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };

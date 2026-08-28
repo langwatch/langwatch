@@ -8,8 +8,8 @@
  * spinner instead of a verdict it does not have yet.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { formatRunStatusLabel } from "~/components/suites/format-run-status-label";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/scenario-web";
+import { formatRunStatusLabel } from "@langwatch/suite-web";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 export type LastResultCriteria = {

@@ -20,7 +20,7 @@ import { describeError, readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import { humanizeGatewayError } from "./gatewayErrorCopy";
+import { humanizeGatewayError } from "@langwatch/gateway-web";
 
 /**
  * A budget on a scope no active key can reach is refused, because it would

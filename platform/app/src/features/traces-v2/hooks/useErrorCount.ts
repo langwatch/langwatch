@@ -1,7 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useFilterStore, useSseStatusStore } from "@langwatch/trace-web";
 
 const FALLBACK_INTERVAL_MS = 60_000;
 

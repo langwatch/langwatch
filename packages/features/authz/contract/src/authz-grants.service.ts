@@ -46,6 +46,16 @@ export abstract class AuthzGrantsService {
 
   abstract offboard(args: AuthzOffboardInput): Promise<AuthzOffboardOutput>;
 
+  /**
+   * Retire every cached authorization snapshot for one organization.
+   *
+   * Grant writes do this for themselves. This is for the writes that change
+   * who may do what WITHOUT touching a grant — a membership being disabled or
+   * re-enabled is a plain column write, and an admin who has just revoked
+   * someone's access must not wait for a cache to age out before it is true.
+   */
+  abstract invalidateOrganization(args: { organizationId: string }): Promise<void>;
+
   /** Lossless compatibility operations for existing application writers.
    * They live on this capability so no public ledger-writer surface escapes. */
   abstract attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;

@@ -11,7 +11,7 @@ import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
-import { useDrawerStore } from "../../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { type AttributeComments, AttributeTable } from "../AttributeTable";
 import { commentCountsBySection } from "../anchoredComments/sectionComments";
 import { CorrectedFieldFrame } from "../editMode/CorrectedField";

@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import type { EvaluatorConfig } from "../types";
 

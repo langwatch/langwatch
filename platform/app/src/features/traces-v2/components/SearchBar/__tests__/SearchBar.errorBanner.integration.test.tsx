@@ -71,8 +71,8 @@ vi.mock("~/features/langy/stores/langyStore", () => {
 });
 
 import { explainAnyError } from "~/features/errors";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../../stores/filterStore";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { useFilterStore } from "@langwatch/trace-web";
 import { SearchBar } from "../SearchBar";
 
 /**

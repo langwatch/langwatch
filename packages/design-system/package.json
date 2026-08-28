@@ -62,6 +62,14 @@
       "types": "./src/components/drawer.tsx",
       "default": "./src/components/drawer.tsx"
     },
+    "./icons": {
+      "types": "./src/components/icons/index.ts",
+      "default": "./src/components/icons/index.ts"
+    },
+    "./info-without-selecting": {
+      "types": "./src/components/info-without-selecting.tsx",
+      "default": "./src/components/info-without-selecting.tsx"
+    },
     "./input-group": {
       "types": "./src/components/input-group.tsx",
       "default": "./src/components/input-group.tsx"

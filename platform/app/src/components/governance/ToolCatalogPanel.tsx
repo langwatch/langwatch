@@ -2,7 +2,7 @@ import { Tabs, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { LoadingScreen } from "~/components/LoadingScreen";
-import type { AiToolEntry } from "~/components/me/tiles/types";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-web";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";

@@ -8,7 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../billing-plans";
+import {
+  ENTERPRISE_PLAN_FEATURES,
+  WEBHOOK_FEATURE_LABEL,
+} from "@langwatch/enterprise-billing-web";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,

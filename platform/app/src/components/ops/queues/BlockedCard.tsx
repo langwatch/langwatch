@@ -1,7 +1,7 @@
 import { Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
+import { VirtualizedTableRows } from "@langwatch/ops-web";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";

@@ -13,7 +13,7 @@
  */
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import { serializeOptionalScalarValue } from "~/utils/jsonValueText";
+import { serializeOptionalScalarValue } from "@langwatch/design-system/json-value-text";
 import { parseParameterLine } from "./parameter-line";
 
 /** One parameter of the block, as the rows editor holds it. */

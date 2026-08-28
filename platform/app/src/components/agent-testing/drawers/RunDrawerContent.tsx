@@ -21,7 +21,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RunDetailSection } from "~/components/simulations/RunDetailSection";
+import { RunDetailSection } from "@langwatch/scenario-web";
 import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
 import {
   ParameterRow,

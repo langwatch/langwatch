@@ -1,4 +1,4 @@
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 
 /**
  * Second line under the "Spent this month" figure on /me.

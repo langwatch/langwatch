@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import "../authFrontDoor.css";
 import { useTweenedGround } from "../hooks/useTweenedGround";

@@ -12,17 +12,16 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import type { TimeRange } from "../stores/filterStore";
-import { useFilterStore } from "../stores/filterStore";
-import type { LensConfig } from "../stores/viewStore";
-import { getPersistedActiveLensId, useViewStore } from "../stores/viewStore";
-import { getPresetById } from "@langwatch/trace-web";
-import type { BarStateOverrides, FragmentState } from "@langwatch/trace-web";
+import type { BarStateOverrides, FragmentState, LensConfig, TimeRange } from "@langwatch/trace-web";
 import {
   buildFragment,
   computeOverrides,
+  getPersistedActiveLensId,
+  getPresetById,
   isOverridesEmpty,
   parseFragment,
+  useFilterStore,
+  useViewStore,
 } from "@langwatch/trace-web";
 
 const DEFAULT_LENS_ID = "all-traces";

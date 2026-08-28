@@ -3,7 +3,7 @@ import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
-import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import { getMaxTokenLimit } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import { FormOutputsSection } from "~/components/outputs/FormOutputsSection";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
@@ -12,7 +12,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { getFieldsUsedByPromptTemplate } from "~/experiments-v3/utils/mappingValidation";

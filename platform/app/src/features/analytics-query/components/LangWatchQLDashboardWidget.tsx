@@ -43,7 +43,7 @@ import { api } from "~/utils/api";
 
 import { useLangWatchQLWidgetRun } from "../hooks/useLangWatchQLWidgetRun";
 import { widgetCoarsenedNotice } from "../logic/widgetCoarsenedNotice";
-import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
+import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-web/visualization";
 
 import { LazyLangWatchQLWidgetChart } from "./LazyLangWatchQLWidgetChart";
 

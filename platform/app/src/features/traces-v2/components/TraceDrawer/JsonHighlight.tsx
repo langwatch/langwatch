@@ -125,7 +125,8 @@ export function PinnedAwareJsonView({
     [formatted, pinnedKeys],
   );
 
-  // The orange highlight is applied globally in `pages/_app.tsx` via
+  // The orange highlight is applied globally in
+  // `packages/design-system/src/system/config.ts` via
   // `--highlight-bg` + the `::after` pseudo on `[data-line][data-highlight]`
   // — every Chakra `CodeBlock` with `meta.highlightLines` picks it up.
   return (

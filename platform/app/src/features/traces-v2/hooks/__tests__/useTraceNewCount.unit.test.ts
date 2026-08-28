@@ -79,7 +79,7 @@ vi.mock("~/hooks/usePageVisibility", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedTimeRange: stores.debouncedTimeRange,
@@ -87,7 +87,7 @@ vi.mock("../../stores/filterStore", () => ({
     }),
 }));
 
-vi.mock("../../stores/sseStatusStore", () => ({
+vi.mock("@langwatch/trace-web/sse-status.store", () => ({
   useSseStatusStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({

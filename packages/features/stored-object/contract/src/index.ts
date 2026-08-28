@@ -2,6 +2,7 @@ export * from "./audiences";
 export * from "./ids";
 export * from "./metadata";
 export * from "./references";
+export * from "./safe-media-types";
 export * from "./stored-object.commands";
 export * from "./stored-object-owner-resolver";
 export * from "./stored-object.errors";

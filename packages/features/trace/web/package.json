@@ -13,6 +13,34 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./drawer.store": {
+      "types": "./src/drawer.store.ts",
+      "default": "./src/drawer.store.ts"
+    },
+    "./facet-lens.store": {
+      "types": "./src/facet-lens.store.ts",
+      "default": "./src/facet-lens.store.ts"
+    },
+    "./filter.store": {
+      "types": "./src/filter.store.ts",
+      "default": "./src/filter.store.ts"
+    },
+    "./preview-trace-id": {
+      "types": "./src/preview-trace-id.ts",
+      "default": "./src/preview-trace-id.ts"
+    },
+    "./sse-status.store": {
+      "types": "./src/sse-status.store.ts",
+      "default": "./src/sse-status.store.ts"
+    },
+    "./trace-edit.store": {
+      "types": "./src/trace-edit.store.ts",
+      "default": "./src/trace-edit.store.ts"
+    },
+    "./view.store": {
+      "types": "./src/view.store.ts",
+      "default": "./src/view.store.ts"
     }
   },
   "scripts": {
@@ -22,10 +50,13 @@
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
+    "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/annotation-web": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@tanstack/react-virtual": "^3.14.5",
+    "liqe": "^3.8.7",
     "lucide-react": "^1.22.0",
     "mermaid": "^11.16.0",
     "react": "^19.2.7",

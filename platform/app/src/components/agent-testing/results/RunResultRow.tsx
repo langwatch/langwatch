@@ -13,9 +13,9 @@ import {
   Play,
   Square,
 } from "lucide-react";
-import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { buildDisplayTitle } from "@langwatch/suite-web";
 import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { ROW_HOVER_BG } from "../shared/design";

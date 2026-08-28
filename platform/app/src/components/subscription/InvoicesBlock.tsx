@@ -21,7 +21,7 @@ import {
   formatInvoiceAmount,
   formatInvoiceDate,
   getInvoiceStatusColor,
-} from "./invoice-utils";
+} from "@langwatch/enterprise-billing-web";
 
 export function InvoicesBlock({
   organizationId,

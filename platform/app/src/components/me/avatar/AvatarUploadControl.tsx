@@ -8,7 +8,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
-import { processAvatarImage } from "./processAvatarImage";
+import { processAvatarImage } from "@langwatch/user-web";
 
 const FORMAT_HINT = "PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.";
 

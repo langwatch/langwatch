@@ -3,15 +3,9 @@ import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 import { SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
-import { useUIStore } from "@langwatch/trace-web";
-import {
-  FACET_GROUPS,
-  type FacetGroupDef,
-  GROUP_ICONS,
-  getFacetGroupId,
-} from "../FilterSidebar/constants";
+import type { FacetGroupDef, SuggestionState } from "@langwatch/trace-web";
+import { FACET_GROUPS, getFacetGroupId, GROUP_ICONS, useUIStore } from "@langwatch/trace-web";
 import { getFacetIcon } from "../FilterSidebar/utils";
-import type { SuggestionState } from "@langwatch/trace-web";
 import type { SuggestionRow, SuggestionUIState } from "./suggestionUI";
 
 interface SuggestionDropdownProps {

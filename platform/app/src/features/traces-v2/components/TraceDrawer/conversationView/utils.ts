@@ -1,7 +1,7 @@
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 import {
   mediaRefBelongsToSide,
   mediaRoleBelongsToSide,
-  type TraceMediaRef,
   type TraceMediaSide,
 } from "~/shared/traces/media-refs";
 import {

@@ -47,7 +47,7 @@ vi.mock("~/components/ui/toaster", () => ({
 vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("~/components/variables", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 

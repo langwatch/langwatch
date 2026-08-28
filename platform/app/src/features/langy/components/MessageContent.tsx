@@ -13,35 +13,32 @@ import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-web";
+import {
+  foldReasoningTitles,
+  hasLangyBlockParts,
+  isSubstantiveLangyAnswer,
+  LANGY_ACTION_SHADOW,
+  type LangyAnswerSegment,
+  langyAnswerSegments,
+  LangyCardBoundary,
+  LangyFailedCard,
+  LangyGitHubProgressCard,
+  LangyMeshLayer,
+  langyPlan,
+  parseLangyFeedbackDirective,
+  questionToolCardParts,
+  stripReasoningTitles,
+  stripToolNarration,
+  useLangyStore,
+} from "@langwatch/langy-web";
 import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  hasLangyBlockParts,
-  type LangyAnswerSegment,
-  langyAnswerSegments,
-} from "@langwatch/langy-web";
-import {
-  isSubstantiveLangyAnswer,
-  parseLangyFeedbackDirective,
-} from "@langwatch/langy-web";
-import {
-  foldReasoningTitles,
-  langyPlan,
-  questionToolCardParts,
-  stripReasoningTitles,
-  stripToolNarration,
-} from "@langwatch/langy-web";
 import { useSpaLinkClick } from "../logic/spaLink";
-import { useLangyStore } from "../stores/langyStore";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
-import { LangyFailedCard } from "@langwatch/langy-web";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
-import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
-import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { hasLangyActivity, LangyActivityParts } from "./LangyToolActivity";

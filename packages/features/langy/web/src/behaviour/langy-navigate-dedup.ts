@@ -3,8 +3,8 @@
  *
  * `langy.onTurnStream` yields BARE `LangyStreamEntry` values — no stream id
  * (the server reads `{id, entry}` off the Redis stream internally, but the
- * subscription only ever `yield`s `entry`; see
- * `src/server/api/routers/langy.ts`'s `onTurnStream`). A stream-tail replay
+ * subscription only ever `yield`s `entry`; see `LangyTrpcApi`'s
+ * `onTurnStream`). A stream-tail replay
  * after a reconnect can therefore hand the client the exact same navigate
  * instruction twice, with nothing on the wire to tell the two apart — the
  * dedup key has to be built from the instruction's own content instead.

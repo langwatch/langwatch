@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useDensityStore } from "@langwatch/trace-web";
-import { useFilterStore } from "../stores/filterStore";
-import { useRefreshUIStore } from "@langwatch/trace-web";
-import { useViewStore } from "../stores/viewStore";
+import {
+  useDensityStore,
+  useFilterStore,
+  useRefreshUIStore,
+  useViewStore,
+} from "@langwatch/trace-web";
 
 interface DimInputs {
   isFetching: boolean;

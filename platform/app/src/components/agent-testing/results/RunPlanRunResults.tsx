@@ -6,8 +6,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { BatchRun } from "~/components/suites/run-history-transforms";
-import { ScenarioRunContent } from "~/components/suites/ScenarioRunContent";
+import { type BatchRun, ScenarioRunContent } from "@langwatch/suite-web";
 import { useCan } from "~/hooks/useCan";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import type { PeriodControls } from "./period-controls";

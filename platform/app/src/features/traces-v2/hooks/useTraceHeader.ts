@@ -3,10 +3,8 @@ import { useEffect, useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
-import { LIVE_REFETCH_MS } from "../constants/freshness";
+import { LIVE_REFETCH_MS, useDrawerStore, useSseStatusStore } from "@langwatch/trace-web";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";
-import { useDrawerStore } from "../stores/drawerStore";
-import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 

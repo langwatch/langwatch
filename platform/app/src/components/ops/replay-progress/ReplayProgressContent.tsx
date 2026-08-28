@@ -15,8 +15,13 @@ import {
 } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { formatDuration } from "@langwatch/ops-web";
-import { PhaseTimeline, replayStateColor } from "@langwatch/ops-web";
+import {
+  CowboyAnimation,
+  formatDuration,
+  parseActiveProjections,
+  PhaseTimeline,
+  replayStateColor,
+} from "@langwatch/ops-web";
 import { Link } from "~/components/ui/link";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
@@ -25,8 +30,6 @@ import type {
   ReplayStatus,
 } from "~/server/app-layer/ops/repositories/replay.repository";
 import { api } from "~/utils/api";
-import { CowboyAnimation } from "./CowboyAnimation";
-import { parseActiveProjections } from "@langwatch/ops-web";
 
 const MESH_PULSE_CSS = `
   @keyframes meshPulse {

@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { resolveSnippetGatewayBaseUrl } from "./gatewaySnippetUrl";
+import { resolveSnippetGatewayBaseUrl } from "@langwatch/gateway-web";
 
 export type VirtualKeyUsageSnippetProps = {
   /**

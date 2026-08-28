@@ -11,6 +11,7 @@
  * Batch-shaped: one findMany per scope kind regardless of how many
  * budgets are being labelled.
  */
+import { scopeTargetKey } from "@langwatch/gateway-contract";
 import type { ProjectName } from "@langwatch/project-contract";
 import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -25,10 +26,6 @@ export type BudgetScopeTargetInfo = {
   /** GROUP targets only: how many members the per-member allowance covers. */
   memberCount?: number;
 };
-
-export function scopeTargetKey(scopeType: string, scopeId: string): string {
-  return `${scopeType}:${scopeId}`;
-}
 
 /**
  * Resolve display targets for a set of budget scopes, grouped by scopeType

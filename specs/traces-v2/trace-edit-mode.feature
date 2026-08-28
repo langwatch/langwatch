@@ -1,7 +1,7 @@
 # Trace edit mode: correcting a trace inside the drawer
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/stores/traceEditStore.ts                                (draft state)
+#   packages/features/trace/web/src/trace-edit.store.ts                                (draft state)
 #   platform/app/src/features/traces-v2/hooks/useTraceEditOverlay.ts                            (correction read + appliers)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditModeBar.tsx         (bar, save, discard)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditableIOField.tsx     (input/output editor)

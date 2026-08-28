@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectionOf, countResults, totalOf } from "../cliResultDocument";
+import { collectionOf, countResults, totalOf } from "@langwatch/langy-web";
 
 describe("collectionOf", () => {
   describe("given a recognised collection key", () => {

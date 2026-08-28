@@ -17,7 +17,7 @@ import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
-import { type AvailableSource, type FieldMapping, VariablesSection } from "~/components/variables";
+import { type AvailableSource, type FieldMapping, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "~/features/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

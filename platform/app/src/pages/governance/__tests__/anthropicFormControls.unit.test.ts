@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { anthropicAdminPullConfigSchema } from "../../../services/pullers/anthropicAdmin.puller";
+import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import {
   buildAnthropicAdminPullConfig,
   type ComposerState,
@@ -32,7 +32,7 @@ import {
   PARSER_FIELDS,
   reconcileParserValues,
   seedComposerParserConfig,
-} from "../inventory";
+} from "../inventory.enterprise";
 
 const fieldFor = (key: string) => {
   const field = PARSER_FIELDS.anthropic_admin.find((f) => f.key === key);

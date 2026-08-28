@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanParamsBaseline,
   useTraceEditStore,
-} from "../../../stores/traceEditStore";
+} from "@langwatch/trace-web";
 import type { AttributeEditing } from "../AttributeTable";
 
 /**

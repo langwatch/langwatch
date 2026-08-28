@@ -293,7 +293,7 @@ vi.mock("~/utils/api", () => ({
 
 import { LangySidecar } from "../components/LangyPanel";
 import { LangyProvider } from "../LangyContext";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 // ---------------------------------------------------------------------------
 // Helpers

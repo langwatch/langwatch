@@ -56,8 +56,8 @@ vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
 const { EditModeBar } = await import("../../components/TraceDrawer/editMode/EditModeBar");
-const { useDrawerStore } = await import("../../stores/drawerStore");
-const { useTraceEditStore } = await import("../../stores/traceEditStore");
+const { useDrawerStore } = await import("@langwatch/trace-web");
+const { useTraceEditStore } = await import("@langwatch/trace-web");
 const { guardTraceEditExit } = await import("../../utils/traceEditMode");
 const { useTraceDrawerNavigation } = await import("../useTraceDrawerNavigation");
 const { useTraceDrawerUrlHydrator } = await import("../useTraceDrawerUrlHydrator");

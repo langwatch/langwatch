@@ -8,8 +8,11 @@
 
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
-import { StreamingStatCard, type LangyTurnMetric } from "@langwatch/langy-web";
-import { formatMoneyShort } from "../Money";
+import {
+  formatMoneyShort,
+  type LangyTurnMetric,
+  StreamingStatCard,
+} from "@langwatch/langy-web";
 import { type CapabilityCardInput, extractToolText } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 

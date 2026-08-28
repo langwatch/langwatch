@@ -7,7 +7,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 import { InstallCliCard } from "../InstallCliCard";
 import { TileIcon } from "./TileIcon";
-import type { CodingAssistantConfig } from "./types";
+import type { CodingAssistantConfig } from "@langwatch/enterprise-governance-web";
 
 interface Props {
   displayName: string;

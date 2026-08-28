@@ -2,7 +2,7 @@ import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
-import { useLangyDevMode } from "../hooks/useLangyDevMode";
+import { useLangyDevMode } from "@langwatch/langy-web";
 import type {
   LangyErrorPresentation,
   LangySerializedReason,

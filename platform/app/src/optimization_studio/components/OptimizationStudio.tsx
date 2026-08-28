@@ -73,7 +73,7 @@ import { HoverableBigText } from "../../components/HoverableBigText";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { Evaluate } from "./Evaluate";
 import { History } from "./History";
-import { ComponentIcon } from "./ColorfulBlockIcons";
+import { ComponentIcon } from "@langwatch/workflow-web";
 import { useComponentExecution } from "../hooks/useComponentExecution";
 import { useComponentVersion } from "../hooks/useComponentVersion";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";

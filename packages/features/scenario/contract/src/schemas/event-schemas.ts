@@ -139,7 +139,7 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
  * Neither the AG-UI `MessageSchema` nor the tracer `chatMessageSchema` content
  * unions accept an `input_audio` part, so a voice MESSAGE_SNAPSHOT was
  * 400-rejected at the route validator (`zValidator("json", scenarioEventSchema)`
- * in `app/api/scenario-events/[[...route]]/app.ts`) BEFORE
+ * in `apps/api/src/features/scenario/scenario-event-rest.ts`) BEFORE
  * `extractInlineMediaFromEvent` — which already externalizes `input_audio`
  * (`server/stored-objects/content-extractor.ts` `inputAudio`) — ever ran.
  * Accepting it here lets the payload reach that extractor so the UI render leg

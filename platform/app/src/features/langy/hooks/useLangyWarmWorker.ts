@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { api } from "~/utils/api";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 /**
  * The dedup key one warm is remembered under. The model is part of it: a

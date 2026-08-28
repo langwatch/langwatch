@@ -25,8 +25,11 @@ import {
   OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
-import type { FieldMapping } from "~/components/variables";
-import { type Variable, VariablesSection } from "~/components/variables";
+import {
+  type FieldMapping,
+  type Variable,
+  VariablesSection,
+} from "@langwatch/prompt-web/surfaces/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   HttpAuth,

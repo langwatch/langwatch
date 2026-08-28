@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { useTraceHeader } from "../useTraceHeader";
 
 const headerData: { traceId?: string; timestamp?: number } = {};
@@ -34,7 +34,7 @@ vi.mock("../useTraceQueryArgs", () => ({
   }),
 }));
 
-vi.mock("../../stores/sseStatusStore", () => ({
+vi.mock("@langwatch/trace-web/sse-status.store", () => ({
   useSseStatusStore: () => false,
 }));
 

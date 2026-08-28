@@ -20,10 +20,13 @@
   },
   "dependencies": {
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/identity": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/user-contract": "workspace:*"
+    "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

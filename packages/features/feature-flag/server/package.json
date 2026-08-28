@@ -33,7 +33,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@langwatch/trpc": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

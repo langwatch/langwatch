@@ -1,9 +1,11 @@
 import { SimpleGrid } from "@chakra-ui/react";
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { LIMIT_TYPE_DISPLAY_LABELS } from "../../server/license-enforcement/constants";
+import {
+  LIMIT_TYPE_DISPLAY_LABELS,
+  ResourceLimitRow,
+} from "@langwatch/enterprise-licensing-web";
 import { api } from "../../utils/api";
-import { ResourceLimitRow } from "../license/ResourceLimitRow";
 
 /**
  * Where the organization stands on each kind of seat, on the page where seats

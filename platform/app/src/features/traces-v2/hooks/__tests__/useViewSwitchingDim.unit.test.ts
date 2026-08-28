@@ -19,7 +19,7 @@ const mockSetReplacingData = vi.fn();
 
 // ─── Store mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedQueryText: mockQueryText,
@@ -33,7 +33,7 @@ vi.mock("../../stores/filterStore", () => ({
     }),
 }));
 
-vi.mock("../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       sort: { columnId: mockSortColumnId, direction: mockSortDirection },

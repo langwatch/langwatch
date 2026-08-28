@@ -4,7 +4,7 @@ import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../stores/drawerStore";
+} from "@langwatch/trace-web";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { ResizeRail } from "./panes/ResizeRail";
 import { TraceDrawerContent } from "./TraceDrawerContent";

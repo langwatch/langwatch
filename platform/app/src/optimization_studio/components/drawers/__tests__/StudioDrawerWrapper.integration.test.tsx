@@ -35,6 +35,7 @@ vi.mock("@langwatch/workflow-web", async (importOriginal) => {
         deleteNode: mockDeleteNode,
       }),
     ComponentExecutionButton: () => <div data-testid="exec-button" />,
+    ComponentIcon: () => <div data-testid="component-icon" />,
     getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
   };
 });
@@ -45,10 +46,6 @@ vi.mock("zustand/react/shallow", () => ({
 
 vi.mock("usehooks-ts", () => ({
   useWindowSize: () => ({ width: 1200, height: 800 }),
-}));
-
-vi.mock("../../ColorfulBlockIcons", () => ({
-  ComponentIcon: () => <div data-testid="component-icon" />,
 }));
 
 vi.mock("../../component_execution/InputPanel", () => ({

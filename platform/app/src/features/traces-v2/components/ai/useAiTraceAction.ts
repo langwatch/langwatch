@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  AiActionError,
-  AiActionErrorDetails,
-} from "~/server/app-layer/traces/ai-query";
+import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.

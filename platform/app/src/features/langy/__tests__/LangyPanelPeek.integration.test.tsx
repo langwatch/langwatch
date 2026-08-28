@@ -275,8 +275,8 @@ import {
   FLOATING_PEEK_NEAR_PX,
   FLOATING_PEEK_REST_PX,
   resolvePeekTranslate,
+  useLangyStore,
 } from "@langwatch/langy-web";
-import { useLangyStore } from "../stores/langyStore";
 
 // ---------------------------------------------------------------------------
 // Helpers

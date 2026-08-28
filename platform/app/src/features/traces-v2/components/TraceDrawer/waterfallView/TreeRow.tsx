@@ -12,9 +12,12 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
-import { useSpanHoverStore } from "@langwatch/trace-web";
-import { useSpanPulseStore } from "@langwatch/trace-web";
-import { formatCost, formatDuration } from "@langwatch/trace-web";
+import {
+  formatCost,
+  formatDuration,
+  useSpanHoverStore,
+  useSpanPulseStore,
+} from "@langwatch/trace-web";
 import { AnchorCommentButton } from "../anchoredComments/AnchorCommentButton";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { isSkillSpan } from "../transcript/skillInvocation";

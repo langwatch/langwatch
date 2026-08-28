@@ -19,7 +19,7 @@ import { useShallow } from "zustand/react/shallow";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { EvaluatorConfig, TargetConfig } from "../types";
 import { isComparisonEvaluator } from "../types";

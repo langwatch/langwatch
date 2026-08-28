@@ -2,7 +2,7 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, BookOpen, ExternalLink, ScrollText } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
 import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
-import { LangyFailureReference } from "./LangyFailureReference";
+import { LangyFailureReference } from "@langwatch/langy-web";
 
 /**
  * A failed Langy tool call, separate from both assistant prose and raw JSON.

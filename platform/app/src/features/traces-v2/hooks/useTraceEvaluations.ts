@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
-import { useDrawerStore } from "../stores/drawerStore";
+import { isPreviewTraceId, useDrawerStore } from "@langwatch/trace-web";
 import type { EvalSummary } from "../types/trace";
 
 export type RichEval = EvalSummary & {

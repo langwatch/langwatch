@@ -23,9 +23,14 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { Currency, PricingModel } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
-import { dateInputToISO, EmptyCell, formatDate } from "@langwatch/ops-web";
+import {
+  dateInputToISO,
+  EmptyCell,
+  formatDate,
+  useAdminList,
+  useAdminUpdate,
+} from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
-import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Organization shape — intentionally does NOT include

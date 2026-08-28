@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Variable, VariablesSection } from "~/components/variables";
+import { type Variable, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import {
   clearStoreInstances,
@@ -385,7 +385,8 @@ describe("PromptTabbedSection Store Integration", () => {
 const { tabIdRef } = vi.hoisted(() => ({
   tabIdRef: { current: "test-tab-id" },
 }));
-vi.mock("../../ui/TabContext", () => ({
+vi.mock("@langwatch/prompt-web/screens/prompt-studio", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/prompt-web/screens/prompt-studio")>()),
   useTabId: () => tabIdRef.current,
 }));
 

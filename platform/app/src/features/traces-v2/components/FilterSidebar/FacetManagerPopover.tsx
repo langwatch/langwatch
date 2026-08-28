@@ -42,14 +42,14 @@ import { Kbd } from "@langwatch/ops-web";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFacetLensStore } from "../../stores/facetLensStore";
 import type { NumericMode } from "@langwatch/trace-web";
-import { useUIStore } from "@langwatch/trace-web";
 import {
   FACET_PERSPECTIVES,
   getFacetGroupId,
   orderedGroupDefsForPerspective,
-} from "./constants";
+  useFacetLensStore,
+  useUIStore,
+} from "@langwatch/trace-web";
 
 // Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
 // TracesPage). Below this + a little slack the "shown / total" count chip

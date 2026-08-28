@@ -21,9 +21,13 @@ import { Switch } from "@langwatch/design-system/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
-import { EmptyCell, formatDate } from "@langwatch/ops-web";
+import {
+  EmptyCell,
+  formatDate,
+  useAdminList,
+  useAdminUpdate,
+} from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
-import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Project shape — does NOT include s3Endpoint / s3AccessKeyId /

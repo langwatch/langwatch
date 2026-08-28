@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDisplayInput } from "~/server/tracer/spanIOStringify";
-import type { Span } from "~/server/tracer/types";
+import { buildDisplayInput, type Span } from "@langwatch/trace-contract";
 import { capturedInputForEditing } from "../spanInputSeed";
 
 const MESSAGES = [

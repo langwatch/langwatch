@@ -5,7 +5,7 @@
  * separator.
  */
 import { Text } from "@chakra-ui/react";
-import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 
 export type ResultMetricsInlineProps = {
   durationInMs?: number | null;

@@ -48,7 +48,7 @@ import {
   type OrgModelProvider,
 } from "~/components/gateway/eligibleModelProviders";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
-import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
+import { resolveTracesHrefForKey } from "@langwatch/gateway-web";
 import {
   type VirtualKeyDetail,
   VirtualKeyEditDrawer,

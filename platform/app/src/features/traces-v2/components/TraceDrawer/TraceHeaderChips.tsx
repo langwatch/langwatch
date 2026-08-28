@@ -25,7 +25,7 @@ import {
   type TraceHeaderChipData,
   useTraceHeaderChips,
 } from "../../hooks/useTraceHeaderChips";
-import { useDrawerStore } from "../../stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { TraceCommentList } from "./anchoredComments/TraceCommentList";
 import type { ChipDef } from "./ChipBar";
 import { ChipBar } from "./ChipBar";

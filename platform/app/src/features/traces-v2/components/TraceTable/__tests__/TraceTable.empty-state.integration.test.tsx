@@ -53,7 +53,7 @@ vi.mock("../../../hooks/useSessionGroups", () => ({
 // gating through the same table shell.
 let mockGrouping: "flat" | "by-conversation" = "flat";
 
-vi.mock("../../../stores/viewStore", () => ({
+vi.mock("@langwatch/trace-web/view.store", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -112,7 +112,7 @@ vi.mock("../../../onboarding/store/onboardingStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       queryText: "",

@@ -11,8 +11,8 @@
 
 import { Box, chakra, Input, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import { Switch } from "~/components/ui/switch";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";

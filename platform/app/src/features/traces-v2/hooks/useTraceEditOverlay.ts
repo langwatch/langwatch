@@ -1,9 +1,8 @@
 import { keepPreviousData } from "@tanstack/react-query";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
-import { useDrawerStore } from "../stores/drawerStore";
-import { useTraceEditStore } from "../stores/traceEditStore";
+import { useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /**

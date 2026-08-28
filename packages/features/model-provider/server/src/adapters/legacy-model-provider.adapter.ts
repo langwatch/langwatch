@@ -16,6 +16,7 @@
  */
 import {
   customModelEntrySchema,
+  type CustomModelEntry,
   getAllModels,
   getParameterConstraints,
   getSchemaShape,
@@ -32,14 +33,12 @@ type LegacyModelProviderScope = {
   scopeId: string;
 };
 
-type LegacyCustomModel = {
-  modelId: string;
-  displayName: string;
-  mode: "chat" | "embedding";
-  maxTokens?: number | null;
-  supportedParameters?: string[];
-  multimodalInputs?: Array<"image" | "file" | "audio">;
-};
+/**
+ * The legacy custom-model entry IS the canonical one: every value here is
+ * produced by `customModelEntrySchema.parse`, so restating it with a wider
+ * `supportedParameters: string[]` only broke callers that read it back.
+ */
+type LegacyCustomModel = CustomModelEntry;
 
 /**
  * The legacy execution shape used by LiteLLM and the workflow DSL.  It is

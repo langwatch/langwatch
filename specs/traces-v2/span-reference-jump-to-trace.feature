@@ -4,7 +4,7 @@
 #   platform/app/src/features/traces-v2/components/TraceDrawer/ExceptionsContent.tsx            (header exceptions)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/TraceSummaryAccordions.tsx  (summary tab)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx   (selected span)
-#   platform/app/src/features/traces-v2/stores/drawerStore.ts  (viewMode, selectSpan)
+#   packages/features/trace/web/src/drawer.store.ts  (viewMode, selectSpan)
 #
 # Motivation (round 5): span reference buttons (an error span in the
 # header, eval/event/exception spans in the Summary tab, span refs in the

@@ -3,7 +3,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
-import { LIVE_REFETCH_MS } from "../../constants/freshness";
+import { LIVE_REFETCH_MS } from "@langwatch/trace-web";
 import { useSpanTree } from "../useSpanTree";
 
 type TreeQueryOptions = {
@@ -117,7 +117,7 @@ vi.mock("../useTraceQueryArgs", () => ({
   useTraceQueryArgs: () => traceQueryArgs,
 }));
 
-vi.mock("../../stores/sseStatusStore", () => ({
+vi.mock("@langwatch/trace-web/sse-status.store", () => ({
   useSseStatusStore: (selector: (state: { sseConnectionState: string }) => boolean) =>
     selector({ sseConnectionState }),
 }));

@@ -1,4 +1,4 @@
-import type { RestService } from "@langwatch/api";
+import type { RestService } from "@langwatch/api/rest";
 import { secretPublicRest, toSecretPublic, type SecretService } from "@langwatch/secret-contract";
 
 export const SECRET_PUBLIC_API_VERSION = "2026-08-24" as const;

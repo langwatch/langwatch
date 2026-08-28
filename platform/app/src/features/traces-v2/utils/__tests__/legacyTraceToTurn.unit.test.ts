@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { NO_TRACE_EVENTS } from "../../types/trace";
 import { legacyTraceToTurn } from "../legacyTraceToTurn";
 

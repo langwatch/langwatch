@@ -27,8 +27,7 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import { formatBudgetUsd, GatewayErrorPanel } from "@langwatch/gateway-web";
 import {
   ProviderScopeChips,
   type ProviderScopeType,

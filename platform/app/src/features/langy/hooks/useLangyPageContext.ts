@@ -3,17 +3,15 @@ import { useInRouterContext, useLocation } from "react-router";
 import { useLangy } from "../LangyContext";
 import {
   datasetContextChip,
-  mergeContextChips,
-  traceContextChip,
-} from "../logic/langyContextChips";
-import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
-import {
   type LangyContextChip,
+  mergeContextChips,
   selectAddableChips,
   selectVisibleChips,
+  traceContextChip,
+  useLangyContextTargetStore,
+  useLangyDrawerContext,
   useLangyStore,
-} from "../stores/langyStore";
-import { useLangyDrawerContext } from "./useLangyDrawerContext";
+} from "@langwatch/langy-web";
 import { useLangySelectionContext } from "./useLangySelectionContext";
 import { useLangyTraceViewContext } from "./useLangyTraceViewContext";
 

@@ -31,11 +31,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { getModelById } from "@langwatch/model-provider-contract";
 import {
+  LangyComboboxSearch,
   type LangyModelGroup,
   profileLangyModel,
   splitLangyModels,
 } from "@langwatch/langy-web";
-import { LangyComboboxSearch } from "./LangyComboboxSearch";
 
 type ProviderKey = keyof typeof modelProviderIcons;
 

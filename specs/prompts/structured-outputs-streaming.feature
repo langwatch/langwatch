@@ -9,7 +9,7 @@ Feature: Structured Outputs Streaming in Prompt Playground
   # delta calculation, but service-adapter.test.ts has only an it.todo placeholder
   # for the streaming case. Output formatting (string/JSON wrapping) and identifier
   # normalization are fully covered by output-formatter.test.ts and
-  # identifierUtils.test.ts respectively. Aspirational pending KEEP-class delta
+  # prompt.identifier.unit.test.ts respectively. Aspirational pending KEEP-class delta
   # streaming test addition tracked in PR #3458.
 
   Background:

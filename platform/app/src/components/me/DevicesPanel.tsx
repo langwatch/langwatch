@@ -7,7 +7,7 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import { InstallCliCard } from "./InstallCliCard";
-import { formatRelativeTime } from "./relativeTime";
+import { formatRelativeTime } from "@langwatch/user-web";
 import { usePersonalContext } from "./usePersonalContext";
 
 /**

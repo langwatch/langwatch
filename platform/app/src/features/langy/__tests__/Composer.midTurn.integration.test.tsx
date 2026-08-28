@@ -20,7 +20,7 @@ vi.mock("../components/LangyModelPill", () => ({
 }));
 
 import { Composer } from "../components/Composer";
-import { useLangyStore } from "../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";

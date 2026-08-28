@@ -20,6 +20,7 @@ import {
   gatewayBudgetApiProjectInputSchema,
   gatewayBudgetApiResetInputSchema,
   gatewayBudgetApiUpdateInputSchema,
+  scopeTargetKey,
   type GatewayBudgetWithSeats,
   type GatewayService,
 } from "@langwatch/gateway-contract";
@@ -32,7 +33,6 @@ import {
 } from "@trpc/server";
 import { effectiveBudgetPeriod } from "../../adapters/gateway-period.adapter";
 import { providerLabelFor } from "../../repositories/prisma/prisma.gateway-provider-label.repository";
-import { scopeTargetKey } from "../../repositories/prisma/prisma.gateway-budget-scope-target.repository";
 
 type GatewayBudgetApplication = Readonly<{
   gateway: Readonly<{ budgetDecisions: GatewayService }>;

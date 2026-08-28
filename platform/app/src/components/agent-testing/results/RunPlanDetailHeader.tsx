@@ -18,9 +18,8 @@
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Download, MoreVertical, Pencil, Play, Square } from "lucide-react";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
-import { Menu } from "~/components/ui/menu";
+import { type RunGroupSummary, RunMetricsSummary } from "@langwatch/suite-web";
+import { Menu } from "@langwatch/design-system/menu";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";

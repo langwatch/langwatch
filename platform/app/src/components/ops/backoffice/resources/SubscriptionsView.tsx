@@ -21,9 +21,15 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { PlanTypes, SubscriptionStatus } from "~/generated/prisma/client";
-import { dateInputToISO, EmptyCell, formatDate } from "@langwatch/ops-web";
+import {
+  dateInputToISO,
+  EmptyCell,
+  formatDate,
+  useAdminCreate,
+  useAdminList,
+  useAdminUpdate,
+} from "@langwatch/ops-web";
 import { BackofficeTable } from "../BackofficeTable";
-import { useAdminCreate, useAdminList, useAdminUpdate } from "../useAdminResource";
 
 interface AdminSubscription {
   id: string;

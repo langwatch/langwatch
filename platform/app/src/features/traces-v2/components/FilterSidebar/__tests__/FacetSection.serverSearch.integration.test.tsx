@@ -27,7 +27,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
+vi.mock("@langwatch/trace-web/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 1, to: 2, label: undefined } }),
 }));

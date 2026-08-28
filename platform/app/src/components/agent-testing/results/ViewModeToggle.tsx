@@ -7,7 +7,7 @@
 
 import { HStack, IconButton } from "@chakra-ui/react";
 import { LayoutGrid, Table2 } from "lucide-react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FG_MUTED } from "../shared/design";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";
 

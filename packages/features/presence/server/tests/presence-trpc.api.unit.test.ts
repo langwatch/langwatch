@@ -8,7 +8,7 @@ import {
   type PresenceSession,
 } from "@langwatch/presence-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
 import { PresenceTrpcApi, type PresenceTrpcContext } from "../src/api/app-trpc/presence.api";
 import { PresenceBroadcastPort, PresenceEmitterPort } from "../src/ports/presence.port";

@@ -13,7 +13,7 @@
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DeadLettersTable } from "../deadLetters/DeadLettersCard";
+import { DeadLettersTable } from "@langwatch/ops-web";
 import { DlqRow } from "../queues/DlqCard";
 
 vi.mock("~/utils/api", () => ({

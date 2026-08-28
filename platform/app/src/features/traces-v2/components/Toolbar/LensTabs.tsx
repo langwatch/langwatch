@@ -12,13 +12,13 @@ import {
 } from "@langwatch/design-system/menu";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
-import { useUIStore } from "@langwatch/trace-web";
+import type { LensConfig } from "@langwatch/trace-web";
 import {
   COST_LENS_IDS,
-  type LensConfig,
   PERFORMANCE_LENS_IDS,
+  useUIStore,
   useViewStore,
-} from "../../stores/viewStore";
+} from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { CreateLensButton } from "./CreateLensButton";
 import { LensNameDialog } from "./LensNameDialog";

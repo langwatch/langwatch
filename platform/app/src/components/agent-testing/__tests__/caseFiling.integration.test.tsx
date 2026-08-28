@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ScenarioForm,
   UNFILED_OPTION_LABEL,
-} from "~/components/scenarios/ScenarioForm";
+} from "@langwatch/scenario-web";
 import {
   PICKER_UNFILED_GROUP_NAME,
   ScenarioPicker,

@@ -46,7 +46,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../onboarding/data/samplePreviewTraces", () => ({
+vi.mock("@langwatch/trace-web/preview-trace-id", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web/preview-trace-id")>()),
   isPreviewTraceId: () => previewTraceId,
 }));
 

@@ -3,7 +3,7 @@ import { useSSESubscription } from "~/hooks/useSSESubscription";
 import {
   type LangyConversationUpdateSignal,
   langyConversationUpdateSignalSchema,
-} from "~/server/api/routers/langy.schemas";
+} from "@langwatch/langy-contract";
 import { api } from "~/utils/api";
 
 interface UseLangyConversationUpdateListenerOptions {

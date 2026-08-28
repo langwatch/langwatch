@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useRefreshUIStore } from "@langwatch/trace-web";
-import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useFilterStore, useRefreshUIStore, useSseStatusStore } from "@langwatch/trace-web";
 import { useTraceListRefresh } from "./useTraceListRefresh";
 
 const FAST_MS = 5_000;

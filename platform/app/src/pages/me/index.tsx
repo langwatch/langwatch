@@ -1,7 +1,7 @@
 import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useState } from "react";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import {

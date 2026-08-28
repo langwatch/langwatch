@@ -5,7 +5,7 @@
 #   platform/app/src/server/api/routers/annotation.ts                                            (anchored writes, anchored reads, suggestion hand-off)
 #   platform/app/src/server/traces/edit-overlay/traceEditOverlay.service.ts                       (a field suggestion merged into the correction)
 #   platform/app/src/server/traces/clickhouse-trace.service.ts                                   (trace-level annotation reads for lists and datasets)
-#   platform/app/src/features/traces-v2/stores/annotationDraftStore.ts                           (what is being written, and about what)
+#   packages/features/trace/web/src/annotation-draft.store.ts                           (what is being written, and about what)
 #   platform/app/src/features/traces-v2/hooks/useConversationAnnotations.ts                       (comments grouped by trace and by anchor)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/TreeRow.tsx          (comment on a span)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx    (scrolling to an anchored span)

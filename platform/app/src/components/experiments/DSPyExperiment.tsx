@@ -53,7 +53,7 @@ import { titleCase } from "../../utils/stringCasing";
 import { getRunDisplayName } from "@langwatch/experiment-web";
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import { FeedbackLink } from "../FeedbackLink";
-import { LLMIcon } from "../icons/LLMIcon";
+import { LLMIcon } from "@langwatch/design-system/icons";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";

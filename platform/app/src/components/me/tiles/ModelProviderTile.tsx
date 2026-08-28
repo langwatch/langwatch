@@ -15,7 +15,7 @@ import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
 
 import { TileIcon } from "./TileIcon";
-import type { ModelProviderConfig } from "./types";
+import type { ModelProviderConfig } from "@langwatch/enterprise-governance-web";
 
 /**
  * Personal-VK label rules (mirrors `PersonalVirtualKeyTrpcApi.issuePersonal`

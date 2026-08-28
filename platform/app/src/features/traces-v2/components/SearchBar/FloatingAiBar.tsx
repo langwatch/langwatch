@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useFilterStore } from "../../stores/filterStore";
+import type { FloatRect } from "@langwatch/trace-web";
+import { useFilterStore } from "@langwatch/trace-web";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
 import { FloatingAiErrorRow } from "./FloatingAiErrorRow";
-import type { FloatRect } from "@langwatch/trace-web";
 
 interface FloatingAiBarProps {
   rect: FloatRect | null;

@@ -321,6 +321,13 @@ export class DeleteRoleCommand implements CommandHandler<
   }
 }
 
+/**
+ * How many of ONE grant's queued same-command jobs fold into a single insert.
+ * A ceiling on a redelivery or retry pile-up for one grant, not a throughput
+ * lever: distinct grants keep distinct lanes and never share a batch.
+ */
+export const GRANT_COALESCE_MAX_BATCH = 50;
+
 export interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: GrantProjectionWriteStore;
   authzAuditTrailStore: AuthzAuditTrailStore;
@@ -358,9 +365,34 @@ export class EventingAuthzAdapter {
           store: this.options.authzAuditTrailStore,
         }),
       )
-      .withCommand("attachGrant", AttachGrantCommand)
-      .withCommand("changeGrantRole", ChangeGrantRoleCommand)
-      .withCommand("revokeGrant", RevokeGrantCommand)
+      // ADR-114 (amended): every command about ONE grant rides ONE lane.
+      // `serializeByAggregate` keys the lane on the grant id AND drops the
+      // command NAME from the job path, so `attachGrant` and the `revokeGrant`
+      // that follows it queue behind each other instead of racing in two lanes.
+      //
+      // The projection's guard cannot recover that order on its own. `revoked`
+      // is a conditional UPDATE: a revoke that arrives before the row exists
+      // matches nothing and writes nothing, and the late `attached` then
+      // inserts a live row that no revocation contradicts. Ordering is the
+      // queue's job, and this option is what makes the queue do it.
+      //
+      // The batch bound means something narrower than a throughput lever: it
+      // folds ONE grant's own queued same-command jobs into a single insert —
+      // the `serializeByAggregate` shape `queueManager` names, safe precisely
+      // because those jobs share an aggregate. It buys no cross-grant economy,
+      // and is not meant to.
+      .withCommand("attachGrant", AttachGrantCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("revokeGrant", RevokeGrantCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
       .withCommand("defineRole", DefineRoleCommand)
       .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
       .withCommand("deleteRole", DeleteRoleCommand)

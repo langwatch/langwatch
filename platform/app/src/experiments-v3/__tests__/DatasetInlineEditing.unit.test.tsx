@@ -11,7 +11,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EditableCell } from "~/components/datasets/editor/EditableCell";
+import { EditableCell } from "@langwatch/dataset-web";
 import { EvaluationsV3DatasetTableProvider } from "../components/EvaluationsV3DatasetTableProvider";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_TEST_DATA_ID } from "../types";

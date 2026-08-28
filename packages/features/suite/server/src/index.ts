@@ -33,3 +33,9 @@ export {
   type RecordSuiteRunItemStartedCommandData,
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
+export { SuiteTrpcApi } from "./api/app-trpc/suite.api";
+export type {
+  SuiteApplication,
+  SuiteTrpcContext,
+  SuiteTrpcProcedures,
+} from "./api/app-trpc/suite.trpc-context";

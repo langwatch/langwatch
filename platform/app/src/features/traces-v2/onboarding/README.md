@@ -20,7 +20,7 @@ attribute, aurora ribbon).
 - `useTraceListQuery` — core trace fetching. Consumes the onboarding sample
   hook (`useSamplePreview`) but isn't itself onboarding-specific.
 - General UI prefs (sidebar collapsed, syntax help, shortcuts dialog) —
-  stay in `traces-v2/stores/uiStore.ts`.
+  stay in `packages/features/trace/web/src/ui.store.ts`.
 - The What's-new dialog — retired and absorbed into the Tour's
   `OutroPanel`. The standalone `welcomeStore`, `WelcomeScreen`, and
   `useAutoOpenWelcome` are gone.

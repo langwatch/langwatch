@@ -8,7 +8,7 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "@langwatch/presence-web";
-import type { DrawerViewMode } from "../../stores/drawerStore";
+import type { DrawerViewMode } from "@langwatch/trace-web";
 
 interface ModeSwitchProps {
   viewMode: DrawerViewMode;

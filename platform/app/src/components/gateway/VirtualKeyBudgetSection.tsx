@@ -12,7 +12,7 @@ import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { api } from "~/utils/api";
 import { SmallLabel } from "../SmallLabel";
 import type { ScopeTriadEntry } from "../settings/ScopeChipPicker";
-import { formatBudgetUsd } from "./formatBudgetUsd";
+import { formatBudgetUsd } from "@langwatch/gateway-web";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 

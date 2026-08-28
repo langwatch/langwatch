@@ -14,7 +14,7 @@ import {
   Play,
   Plus,
 } from "lucide-react";
-import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
+import { ScenarioLabelFilter as LabelFilterDropdown } from "@langwatch/scenario-web";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { CasesPanelProps } from "./CasesPanel";

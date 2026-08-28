@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { BatchRun } from "~/components/suites/run-history-transforms";
+import type { BatchRun } from "@langwatch/suite-web";
 import { oneOffRunTitle, type RunPlan, runOrdinal } from "./run-plans";
 
 /** A one-off run carries the name of the case it ran; a plan run its number. */

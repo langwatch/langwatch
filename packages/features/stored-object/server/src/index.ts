@@ -54,3 +54,9 @@ export {
   type StoredObjectServiceOptions,
 } from "./services/stored-object.service";
 export { PostgresStoredObjectAdapter } from "./adapters/postgres.stored-object.adapter";
+export {
+  StoredObjectTrpcApi,
+  type StoredObjectHead,
+  type StoredObjectProbe,
+  type StoredObjectTrpcContext,
+} from "./api/app-trpc/stored-object.api";

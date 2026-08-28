@@ -18,7 +18,7 @@ import {
 } from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import type { FieldMapping, Variable } from "~/components/variables";
+import type { FieldMapping, Variable } from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

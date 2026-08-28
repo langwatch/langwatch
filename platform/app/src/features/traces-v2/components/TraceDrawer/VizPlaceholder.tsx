@@ -27,11 +27,15 @@ import {
 } from "@langwatch/presence-web";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
-import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
-import { SPAN_TYPE_COLORS } from "@langwatch/trace-web";
+import type { VizTab } from "@langwatch/trace-web";
+import {
+  FlameView,
+  SequenceSkeleton,
+  SPAN_TYPE_COLORS,
+  TopologySkeleton,
+  useDrawerStore,
+} from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
-import { FlameView } from "@langwatch/trace-web";
-import { SequenceSkeleton, TopologySkeleton } from "@langwatch/trace-web";
 import { WaterfallView } from "./waterfallView";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).

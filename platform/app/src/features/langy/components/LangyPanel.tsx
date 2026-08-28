@@ -9,34 +9,55 @@ import {
 } from "@chakra-ui/react";
 import {
   APP_HEADER_HEIGHT,
+  attachedContextToChip,
   currentTurnAssistant,
   deriveWaveActivity,
+  EmptyState,
+  executeUiAction,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   FLOATING_PEEK_NEAR_PX,
   hasTokens,
   LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
+  LangyCardBoundary,
+  langyChoicesTimeline,
+  LangyContextTargetLayer,
   LangyMark,
   LangyMarkGradientDefs,
+  type LangyPanelEffect,
+  type LangyPanelMode,
   type LangyPeekPhase,
-  LangyThinkingLine,
-  LangyWave,
-  langyChoicesTimeline,
   langyRestingFloorPx,
+  LangyThinkingLine,
+  type LangyUiActionHandlers,
+  LangyWave,
+  mergeContextChips,
   navigateDedupKey,
   PANEL_LAYOUT_TRANSITION,
   PANEL_ROOT_ATTR,
+  PANEL_SUGGESTION_COUNT,
+  reserveNavigate,
   resolveFloatingPanelWidth,
+  resolveLangyActivityOwnership,
   resolveLangyStopTarget,
   resolvePeekTranslate,
-  reserveNavigate,
   runningTool,
+  selectLangySuggestions,
+  settledTool,
   shouldRehydrateEngineFromDurable,
   SIDEBAR_PANEL_WIDTH,
   SIDEBAR_PEEK_NEAR_PX,
-  settledTool,
   StreamingStatusLine,
+  useGlobalLangyShortcut,
+  useLangyContextDropZone,
+  useLangyDevMode,
+  useLangyOrbProximity,
+  useLangyPeekProximity,
+  useLangyStore,
+  useLangyTurnSignals,
+  useLingeringDodge,
+  useScrolledFromTop,
 } from "@langwatch/langy-web";
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
@@ -92,28 +113,18 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
-import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
 import { useLangyChatEngine } from "../hooks/useLangyChatEngine";
-import { useLangyContextDropZone } from "../hooks/useLangyContextDropZone";
-import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyExternalLinkGuard } from "../hooks/useLangyExternalLinkGuard";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
-import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
 import { useLangyPageContext } from "../hooks/useLangyPageContext";
-import { useLangyPeekProximity } from "../hooks/useLangyPeekProximity";
 import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
 import { turnHadSideEffects, useLangyTurnRecovery } from "../hooks/useLangyTurnRecovery";
-import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
 import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
-import { useLingeringDodge } from "../hooks/useLingeringDodge";
-import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
-import { resolveLangyActivityOwnership } from "@langwatch/langy-web";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
-import { mergeContextChips } from "../logic/langyContextChips";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
   explainLangyError,
@@ -123,10 +134,6 @@ import {
   resolveLiveTurnError,
 } from "../logic/langyErrorExplainer";
 import {
-  PANEL_SUGGESTION_COUNT,
-  selectLangySuggestions,
-} from "../logic/langyHomeSuggestions";
-import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../logic/langyMakeDefaultOffer";
@@ -134,22 +141,11 @@ import { langyToolNarrator } from "../adapters/langy-tool-narrator.adapter";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { isInternalHref } from "../logic/spaLink";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
-import {
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-} from "../stores/langyStore";
-import { executeUiAction } from "../uiActions/executeUiAction";
-import type { LangyUiActionHandlers } from "../uiActions/types";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
 import { ConversationSkeleton, skeletonMessageCount } from "./ConversationSkeleton";
-import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
-import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyCardGallery } from "./LangyCardGallery";
-import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";

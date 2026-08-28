@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFilterStore } from "../../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 
 // Query-text edits wait longer than time-range changes before hitting the
 // backend. Every keystroke re-serialises `queryText`, and at 300ms a normal

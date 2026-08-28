@@ -3,8 +3,7 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { expandDeletedSpanIds } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import { changedSpanFields } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
-import { useDrawerStore } from "../../../stores/drawerStore";
-import { useTraceEditStore } from "../../../stores/traceEditStore";
+import { useDrawerStore, useTraceEditStore } from "@langwatch/trace-web";
 
 const NO_MARKS = {
   correctedSpanIds: new Set<string>(),

@@ -9,8 +9,8 @@
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
-import { transformBatchEvaluationData } from "../types";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 
 const TARGETS = [
   { id: "target-classifier", name: "classifier", type: "prompt" },

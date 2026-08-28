@@ -3,8 +3,8 @@ import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { explainAnyError } from "~/features/errors";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../stores/filterStore";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { useFilterStore } from "@langwatch/trace-web";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 
 /**

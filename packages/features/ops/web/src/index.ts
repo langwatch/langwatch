@@ -78,3 +78,7 @@ export * from "./foundry/generate-trace-dialog";
 export * from "./foundry/playground-content";
 export * from "./foundry/preset-picker";
 export * from "./foundry/trace.store";
+export * from "./ops.cowboy-animation";
+export * from "./ops.throughput-chart";
+export * from "./ops.virtualized-table-rows";
+export * from "./use-admin-resource";

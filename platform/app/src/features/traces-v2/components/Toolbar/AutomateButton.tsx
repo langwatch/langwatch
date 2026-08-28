@@ -3,7 +3,7 @@ import { Zap } from "lucide-react";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getCurrentFilterText } from "../../stores/filterStore";
+import { getCurrentFilterText } from "@langwatch/trace-web";
 
 /**
  * Filtered traces → automation entry point (ADR-043).

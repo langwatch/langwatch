@@ -27,12 +27,12 @@ import {
 } from "recharts";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import {
+  formatBudgetUsd,
+  GatewayErrorPanel,
   resolveTracesHrefForKey,
   type TracesWindow,
-} from "~/components/gateway/tracesHrefForKey";
+} from "@langwatch/gateway-web";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";

@@ -1,7 +1,6 @@
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import { ORIGIN_DISPLAY } from "@langwatch/trace-web";
-import { FACET_COLORS } from "../FilterSidebar/constants";
+import { FACET_COLORS, ORIGIN_DISPLAY } from "@langwatch/trace-web";
 import { facetLabel, paletteFromColor } from "../FilterSidebar/utils";
 import { OriginCell } from "../TraceTable/registry/cells/trace/SimpleCells";
 import type { TraceListItem } from "../../types/trace";

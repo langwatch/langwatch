@@ -2,7 +2,7 @@ import type {
   DataRetentionService,
   RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import { TrpcRootDefinition } from "@langwatch/trpc";
+import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DataRetentionTrpcApi,

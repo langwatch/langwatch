@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { SELECT_ALL_MATCHING_CAP } from "@langwatch/trace-web";
 import { filterContextChip } from "../hooks/useLangyFilterContext";
 import { selectionContextChip } from "../hooks/useLangySelectionContext";
-import { describeChipContext } from "../logic/langyChipContext";
-import type { LangyContextChip } from "../stores/langyStore";
+import {
+  describeChipContext,
+  type LangyContextChip,
+} from "@langwatch/langy-web";
 
 /** Every kind the chip vocabulary has, so none can be added without copy. */
 const ALL_KINDS: LangyContextChip["kind"][] = [

@@ -20,12 +20,12 @@ vi.mock("../../../../hooks/useTraceEditOverlay", () => ({
   useTraceEditOverlay: () => ({ data: { patch: harness.patch } }),
 }));
 
-vi.mock("../../../../stores/drawerStore", () => ({
+vi.mock("@langwatch/trace-web/drawer.store", () => ({
   useDrawerStore: (selector: (s: unknown) => unknown) =>
     selector({ isEditing: harness.isEditing }),
 }));
 
-vi.mock("../../../../stores/traceEditStore", () => ({
+vi.mock("@langwatch/trace-web/trace-edit.store", () => ({
   useTraceEditStore: (selector: (s: unknown) => unknown) =>
     selector({ overlayView: harness.overlayView, basePatch: null }),
 }));

@@ -8,7 +8,7 @@
  * Mirrors the pattern in promptEditorCallbacks.ts for prompt targets.
  */
 
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "../types";
 
 /**

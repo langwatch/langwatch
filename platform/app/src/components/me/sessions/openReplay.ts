@@ -1,5 +1,5 @@
 import { toaster } from "~/components/ui/toaster";
-import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import type { useDrawer } from "~/hooks/useDrawer";
 import type { api } from "~/utils/api";
 import type { useRouter } from "~/utils/compat/next-router";

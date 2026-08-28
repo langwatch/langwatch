@@ -1,15 +1,15 @@
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import type { MemberType } from "~/server/license-enforcement/member-classification";
+import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { api } from "~/utils/api";
 import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
-import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import {
   type BillingInterval,
   type Currency,
+  type PlannedUser,
   resolveGrowthSeatPlanType,
-} from "./billing-plans";
-import type { PlannedUser } from "./subscription-types";
+} from "@langwatch/enterprise-billing-web";
+import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };

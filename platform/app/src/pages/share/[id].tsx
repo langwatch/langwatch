@@ -18,7 +18,7 @@ import {
   useSharedTrace,
 } from "~/features/traces-v2/context/SharedTraceContext";
 import { TraceViewerProvider } from "~/features/traces-v2/context/TraceViewerContext";
-import { useDrawerStore } from "~/features/traces-v2/stores/drawerStore";
+import { useDrawerStore } from "@langwatch/trace-web";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { api } from "../../utils/api";

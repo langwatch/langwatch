@@ -2,13 +2,13 @@ import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
+import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { Select } from "@langwatch/design-system/select";
-import { InfoWithoutSelecting } from "./InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
-} from "./seatTypeCopy";
+} from "@langwatch/enterprise-licensing-web";
 
 export type OrgRoleOption = {
   label: string;

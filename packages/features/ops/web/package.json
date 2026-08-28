@@ -31,10 +31,13 @@
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-web": "2.10.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-virtual": "^3.14.5",
     "@xyflow/react": "^12.11.1",
     "langwatch": "workspace:*",
     "lucide-react": "^1.22.0",
     "react": "19.2.4",
+    "recharts": "^3.9.1",
     "zustand": "^4.5.7"
   },
   "devDependencies": {

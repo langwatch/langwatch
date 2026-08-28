@@ -25,10 +25,10 @@ import {
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical } from "lucide-react";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import { Menu } from "~/components/ui/menu";
+import { RunMetricsSummary } from "@langwatch/suite-web";
+import { Menu } from "@langwatch/design-system/menu";
 import { TagList } from "~/components/ui/TagList";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";

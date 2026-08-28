@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Markdown } from "~/components/Markdown";
 
 import { TileIcon } from "./TileIcon";
-import type { ExternalToolConfig } from "./types";
+import type { ExternalToolConfig } from "@langwatch/enterprise-governance-web";
 
 interface Props {
   displayName: string;

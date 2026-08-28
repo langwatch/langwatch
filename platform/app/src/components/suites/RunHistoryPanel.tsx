@@ -52,8 +52,7 @@ import {
   groupRunsByTarget,
   resolveOriginLabel,
 } from "@langwatch/suite-web";
-import { ScenarioRunExportDialog } from "./ScenarioRunExportDialog";
-import { useAutoExpansion } from "@langwatch/suite-web";
+import { ScenarioRunExportDialog, useAutoExpansion } from "@langwatch/suite-web";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import { useExportScenarioRuns } from "./useExportScenarioRuns";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";

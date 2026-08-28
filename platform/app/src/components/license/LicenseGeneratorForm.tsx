@@ -25,8 +25,11 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { ENTERPRISE_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
 import { toaster } from "../ui/toaster";
-import { formatFileSize } from "./licenseStatusUtils";
-import { getPlanDefaults, type PlanType } from "./planFormDefaults";
+import {
+  formatFileSize,
+  getPlanDefaults,
+  type PlanType,
+} from "@langwatch/enterprise-licensing-web";
 
 const planTypeCollection = createListCollection({
   items: [

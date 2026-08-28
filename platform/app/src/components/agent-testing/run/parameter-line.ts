@@ -18,7 +18,7 @@ import {
   displayOptionalValue,
   serializeOptionalScalarValue,
   serializeScalarValue,
-} from "~/utils/jsonValueText";
+} from "@langwatch/design-system/json-value-text";
 
 /**
  * The pairs a line holds, in the order they were written.

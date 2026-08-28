@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { MappingState } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({

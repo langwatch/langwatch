@@ -346,9 +346,6 @@
         "../../server/analytics/utils",
         "../../server/filters/types"
       ],
-      "platform/app/src/components/gateway/virtualKeyTagsField.ts": [
-        "~/server/gateway/virtualKey.config"
-      ],
       "platform/app/src/components/home/RecentItemsSection.tsx": ["~/server/home/types"],
       "platform/app/src/components/home/TracesOverview.tsx": ["~/server/analytics/registry"],
       "platform/app/src/components/license/ResourceLimitsDisplay.tsx": [
@@ -385,9 +382,6 @@
         "~/server/app-layer/ops/types"
       ],
       "platform/app/src/components/ops/dashboard/StatStrip.tsx": ["~/server/app-layer/ops/types"],
-      "platform/app/src/components/ops/dashboard/ThroughputChart.tsx": [
-        "~/server/app-layer/ops/types"
-      ],
       "platform/app/src/components/ops/dashboard/TopErrorsCard.tsx": [
         "~/server/app-layer/ops/types"
       ],
@@ -405,12 +399,6 @@
         "~/server/app-layer/ops/repositories/process-ops.repository"
       ],
       "platform/app/src/components/ops/processes/processFleet.ts": [
-        "~/server/app-layer/ops/manager-explorer.service"
-      ],
-      "platform/app/src/components/ops/processes/ProcessFleetCard.tsx": [
-        "~/server/app-layer/ops/manager-explorer.service"
-      ],
-      "platform/app/src/components/ops/processes/ProcessFleetStrip.tsx": [
         "~/server/app-layer/ops/manager-explorer.service"
       ],
       "platform/app/src/components/ops/processes/ProcessInstancesDrawer.tsx": [
@@ -608,9 +596,6 @@
       "platform/app/src/components/suites/ScenarioRunContent.tsx": [
         "~/server/scenarios/scenario-event.types"
       ],
-      "platform/app/src/components/suites/ScenarioRunExportDialog.tsx": [
-        "~/server/export/scenario-runs/types"
-      ],
       "platform/app/src/components/suites/ScenarioTargetRow.tsx": [
         "~/server/scenarios/scenario-event.enums",
         "~/server/scenarios/scenario-event.types"
@@ -627,13 +612,9 @@
         "~/server/suites/types"
       ],
       "platform/app/src/components/suites/SuiteFormDrawer.tsx": ["~/server/suites/constants"],
-      "platform/app/src/components/suites/SuiteRunConfirmationDialog.tsx": [
-        "~/server/scenarios/parameters"
-      ],
       "platform/app/src/components/suites/SuiteSidebar.tsx": [
         "~/server/scenarios/scenario-event.types"
       ],
-      "platform/app/src/components/suites/TargetPicker.tsx": ["~/server/suites/types"],
       "platform/app/src/components/suites/useCancelScenarioRun.ts": [
         "~/server/scenarios/scenario-event.enums"
       ],
@@ -646,10 +627,6 @@
       ],
       "platform/app/src/components/suites/useRunSuite.ts": [
         "~/server/scenarios/parameters",
-        "~/server/suites/types"
-      ],
-      "platform/app/src/components/suites/useSuiteForm.ts": [
-        "~/server/suites/constants",
         "~/server/suites/types"
       ],
       "platform/app/src/components/suites/useSuiteRunFreshness.ts": [
@@ -742,10 +719,6 @@
       "platform/app/src/features/onboarding/components/sections/model-provider/ModelProviderSetup.tsx": [
         "~/server/scopes/scope.types"
       ],
-      "platform/app/src/features/simulations/sort-scenario-sets.ts": [
-        "~/server/scenarios/internal-set-id",
-        "~/server/scenarios/scenario-event.types"
-      ],
       "platform/app/src/features/traces-v2/components/ExportConfigDialog.tsx": [
         "~/server/export/types"
       ],
@@ -783,9 +756,6 @@
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/CorrectedSpanScalars.tsx": [
         "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/spanInputSeed.ts": [
-        "~/server/tracer/spanIOStringify"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useSpanCorrection.ts": [
         "~/server/api/routers/tracesV2.schemas",
@@ -954,12 +924,6 @@
       "platform/app/src/features/traces-v2/onboarding/data/samplePreviewTraces.ts": [
         "~/server/api/routers/tracesV2.schemas",
         "~/server/app-layer/evaluations/types"
-      ],
-      "platform/app/src/features/traces-v2/stores/annotationDraftStore.ts": [
-        "~/server/annotations/annotationAnchor"
-      ],
-      "platform/app/src/features/traces-v2/stores/traceEditStore.ts": [
-        "~/server/tracer/spanIOStringify"
       ],
       "platform/app/src/features/traces-v2/utils/errorSpans.ts": [
         "~/server/api/routers/tracesV2.schemas"

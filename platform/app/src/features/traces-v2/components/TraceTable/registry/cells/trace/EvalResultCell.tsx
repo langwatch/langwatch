@@ -4,7 +4,7 @@ import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import {
   EVAL_FIELD_LABELS,
   type EvalColumnField,
-} from "../../../../../lens/evalColumnId";
+} from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../../../types/trace";
 import { latestEvalForKey } from "../../../evalColumns";
 import type { CellDef } from "../../types";

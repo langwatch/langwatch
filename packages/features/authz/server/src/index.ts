@@ -23,3 +23,4 @@ export {
   type AuthzCutoverCounter,
 } from "./adapters/observability.authz-cutover.adapter";
 export { deriveGrantId as deriveAuthzGrantId } from "./adapters/eventing.authz-grant.adapter";
+export { AuthzTrpcApi, type AuthzTrpcContext } from "./api/app-trpc/authz.api";

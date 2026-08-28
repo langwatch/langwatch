@@ -18,16 +18,20 @@ import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
+import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
-import { useFacetHoverStore } from "@langwatch/trace-web";
-import { useFilterStore } from "../../stores/filterStore";
+import {
+  editorStyles,
+  useFacetHoverStore,
+  useFilterStore,
+  useFloatRect,
+  useGlobalAiShortcut,
+} from "@langwatch/trace-web";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
-import { editorStyles, useGlobalAiShortcut } from "@langwatch/trace-web";
 import { FloatingAiBar } from "./FloatingAiBar";
 import { FloatingLangyBar } from "./FloatingLangyBar";
 import { setFilterChipLabels } from "./filterHighlight";
@@ -43,7 +47,6 @@ import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./TokenValuePicker";
 import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
-import { useFloatRect } from "@langwatch/trace-web";
 
 const MAX_DYNAMIC_ITEMS = 10;
 

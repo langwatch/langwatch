@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
-import { useDrawerStore } from "../stores/drawerStore";
-import { useFilterStore } from "../stores/filterStore";
-import { getPresetById } from "@langwatch/trace-web";
+import { getPresetById, useDrawerStore, useFilterStore } from "@langwatch/trace-web";
 
 // Each tick rolls the live time range forward, which invalidates every
 // query that includes timeRange in its input (discover, list, newCount,

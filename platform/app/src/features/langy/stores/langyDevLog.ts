@@ -8,7 +8,7 @@ import {
 } from "@langwatch/langy-contract";
 import { create } from "zustand";
 import type { LangyStreamEntry } from "@langwatch/langy-server";
-import { useLangyStore } from "./langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 
 /**
  * The developer drawer's record of what actually crossed the wire — in BOTH

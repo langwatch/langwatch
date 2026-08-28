@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../stores/langyStore";
+import { useLangyStore } from "@langwatch/langy-web";
 import { syncLangyAfterDefaultModelWrite } from "../codingDefaultSync";
 
 /**

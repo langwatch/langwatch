@@ -11,13 +11,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { useFilteredAgents } from "~/components/scenarios/useFilteredScenarioTargets";
+import { type TargetValue, useFilteredAgents } from "~/components/scenarios/TargetSelector";
 import { unionParameterDefinitions } from "~/components/suites/useRunSuite";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import type { PromptEntry } from "./PromptPicker";

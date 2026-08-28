@@ -4,7 +4,7 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import { type AvailableSource, type FieldMapping, VariablesSection } from "~/components/variables";
+import { type AvailableSource, type FieldMapping, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";

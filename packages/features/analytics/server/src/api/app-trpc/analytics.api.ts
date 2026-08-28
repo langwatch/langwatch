@@ -129,23 +129,31 @@ export class AnalyticsTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    const dataForFilterInputSchema = z.intersection(
-      ports.sharedFiltersSchema,
-      z.object({
-        field: ports.filterFieldSchema,
-        key: z.string().optional(),
-        subkey: z.string().optional(),
-        query: z.string().optional(),
-      }),
-    );
+    /**
+     * The narrowing this read adds on top of the host's shared filters.
+     *
+     * Chained onto `sharedFiltersSchema` with a SECOND `.input()` rather than
+     * intersected into one parser: tRPC keeps every input parser, runs each
+     * against the raw request and spreads the results, so the handler sees the
+     * same object either way — but a `ZodIntersection` exposes no `.shape`, so
+     * the declaration sweep cannot read `projectId` out of it and reports the
+     * procedure as opaque input with no scope id to check. Two readable object
+     * parsers keep the authorization declaration verifiable.
+     */
+    const filterSelectionSchema = z.object({
+      field: ports.filterFieldSchema,
+      key: z.string().optional(),
+      subkey: z.string().optional(),
+      query: z.string().optional(),
+    });
 
     return trpc.router({
-      getTimeseries: policy("analytics:view")(
-        procedure.input(ports.timeseriesInputSchema),
-      ).query(async ({ ctx, input }) => ctx.app.analytics.getTimeseries(input)),
+      getTimeseries: policy("analytics:view")(procedure.input(ports.timeseriesInputSchema)).query(
+        async ({ ctx, input }) => ctx.app.analytics.getTimeseries(input),
+      ),
 
       dataForFilter: policy("analytics:view")(
-        procedure.input(dataForFilterInputSchema),
+        procedure.input(ports.sharedFiltersSchema).input(filterSelectionSchema),
       ).query(async ({ ctx, input }) => {
         const { field, key, subkey } = input;
 
@@ -187,9 +195,9 @@ export class AnalyticsTrpcApi {
       // The full shared-filter schema is accepted for API compatibility even
       // though only projectId, startDate, endDate and filters are read; query,
       // traceIds and negateFilters are accepted and ignored.
-      topUsedDocuments: policy("cost:view")(
-        procedure.input(ports.sharedFiltersSchema),
-      ).query(async ({ ctx, input }) => ctx.app.analytics.getTopUsedDocuments(input)),
+      topUsedDocuments: policy("cost:view")(procedure.input(ports.sharedFiltersSchema)).query(
+        async ({ ctx, input }) => ctx.app.analytics.getTopUsedDocuments(input),
+      ),
 
       feedbacks: policy("cost:view")(procedure.input(ports.sharedFiltersSchema)).query(
         async ({ ctx, input }) => ctx.app.analytics.getFeedbacks(input),

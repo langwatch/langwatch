@@ -1,10 +1,9 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TraceEventRollup } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceEventRollup } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../types/trace";
 import { NO_TRACE_EVENTS } from "../types/trace";
 

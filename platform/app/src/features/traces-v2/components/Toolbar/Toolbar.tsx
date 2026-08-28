@@ -10,9 +10,7 @@ import { useTraceExplorerTourPreference } from "../../onboarding/hooks/useTraceE
 import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useDrawerStore, useFilterStore, useViewStore } from "@langwatch/trace-web";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";

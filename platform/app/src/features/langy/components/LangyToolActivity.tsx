@@ -38,20 +38,22 @@ import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { useLangyDevMode } from "../hooks/useLangyDevMode";
-import { type CapabilityCommand, commandOfToolCall } from "@langwatch/langy-web";
-import { LangyInterruptedNote, langyThinkingShimmerStyles } from "@langwatch/langy-web";
 import {
+  type CapabilityCommand,
+  commandOfToolCall,
   isPlanToolPart,
   isQuestionToolPart,
+  LangyInterruptedNote,
+  langyThinkingShimmerStyles,
   questionToolCardParts,
+  useLangyDevMode,
+  useLangyStore,
 } from "@langwatch/langy-web";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../logic/langyToolFailure";
 import { commandOf, describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
-import { useLangyStore } from "../stores/langyStore";
 import {
   type CapabilityProgress,
   isProposalOutput,

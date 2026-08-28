@@ -1,4 +1,4 @@
-import { readSystemInstructions } from "~/server/tracer/spanIOStringify";
+import { readSystemInstructions } from "@langwatch/trace-contract";
 
 function isSystemMessageFor({
   message,

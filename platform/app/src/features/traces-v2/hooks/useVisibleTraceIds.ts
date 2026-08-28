@@ -1,7 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */

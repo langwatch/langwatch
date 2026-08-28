@@ -1,15 +1,11 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import {
+  type LayoutMode,
+  LayoutModeContext,
+} from "@langwatch/prompt-web/surfaces/prompt-layout";
 import { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
 import { cloneDeep, debounce } from "lodash-es";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "~/prompts/hooks";
 import {
@@ -26,14 +22,6 @@ const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
 export { useTabId } from "@langwatch/prompt-web/screens/prompt-studio";
-
-export type LayoutMode = "vertical" | "horizontal";
-
-/** Context for sharing layout mode with nested components */
-const LayoutModeContext = createContext<LayoutMode>("vertical");
-
-/** Hook to get the current layout mode */
-export const useLayoutMode = () => useContext(LayoutModeContext);
 
 /**
  * Window content for a prompt tab.

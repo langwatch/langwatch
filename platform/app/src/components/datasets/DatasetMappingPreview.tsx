@@ -15,7 +15,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
 import type { Dataset } from "~/generated/prisma/client";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/trace-contract";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { MappingState } from "../../server/tracer/tracesMapping";

@@ -5,7 +5,7 @@ import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import type { ScopeTriadEntry } from "~/components/settings/ScopeChipPicker";
 import { isModelTier } from "~/utils/modelTierPresets";
 
-import { RoutingPolicyRowActions } from "./RoutingPolicyRowActions";
+import { RoutingPolicyRowActions } from "@langwatch/enterprise-governance-web";
 
 export type RoutingPolicyScopeLevel = "organization" | "team" | "project";
 

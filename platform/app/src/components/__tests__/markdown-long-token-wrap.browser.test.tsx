@@ -24,8 +24,8 @@ import "@testing-library/jest-dom/vitest";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { RenderedMarkdown } from "~/features/traces-v2/components/TraceDrawer/markdownView/RenderedMarkdown";
-import { system } from "~/pages/_app";
+import { RenderedMarkdown } from "@langwatch/trace-web";
+import { uiDesignSystem as system } from "@langwatch/ui/design-system";
 import { Markdown } from "../Markdown";
 
 /**

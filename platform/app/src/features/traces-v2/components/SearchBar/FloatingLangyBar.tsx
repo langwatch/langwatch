@@ -5,10 +5,10 @@ import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
-import { useFilterStore } from "../../stores/filterStore";
+import type { FloatRect } from "@langwatch/trace-web";
+import { useFilterStore } from "@langwatch/trace-web";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
-import type { FloatRect } from "@langwatch/trace-web";
 
 interface FloatingLangyBarProps {
   rect: FloatRect | null;

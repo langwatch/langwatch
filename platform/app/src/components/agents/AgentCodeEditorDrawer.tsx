@@ -28,7 +28,7 @@ import {
   type FieldMapping,
   type Variable,
   VariablesSection,
-} from "~/components/variables";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "~/features/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

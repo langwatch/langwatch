@@ -12,7 +12,7 @@
 import { Button, useDisclosure } from "@chakra-ui/react";
 import { History } from "lucide-react";
 import { useEffect } from "react";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { ScenarioVersionList } from "../drawers/ScenarioVersionList";
 import { FG_MUTED } from "../shared/design";
 

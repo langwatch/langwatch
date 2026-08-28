@@ -63,7 +63,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import { useAnnotationDraftStore } from "../../../../stores/annotationDraftStore";
+import { useAnnotationDraftStore } from "@langwatch/trace-web";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { ChatTurnRow } from "../ChatTurnRow";
 import type { TurnLayout } from "../types";

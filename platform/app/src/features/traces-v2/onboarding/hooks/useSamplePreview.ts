@@ -1,4 +1,4 @@
-import { useFilterStore } from "../../stores/filterStore";
+import { useFilterStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../../types/trace";
 import { shouldShowArrivals } from "../chapters/onboardingJourneyConfig";
 import {

@@ -82,11 +82,18 @@ vi.mock("~/stores/upgradeModalStore", () => ({
       : { open: vi.fn() },
 }));
 
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
-  CodeEditor: () => null,
-}));
+vi.mock(
+  "~/optimization_studio/components/code/workflow-code-editor.transport",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/optimization_studio/components/code/workflow-code-editor.transport")
+    >()),
+    CodeEditor: () => null,
+  }),
+);
 
-vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
+vi.mock("@langwatch/workflow-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/workflow-web")>()),
   TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
 }));
 

@@ -22,7 +22,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { SourceEditDrawer } from "../inventory";
+import { SourceEditDrawer } from "../inventory.enterprise";
 
 /**
  * `OttlEditor` sits inside the drawer's body and calls tRPC on render. It is
