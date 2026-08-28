@@ -402,13 +402,15 @@ const reconcileProjectLambdaConfig = async (
   );
   const memoryDrifted =
     currentConfig.MemorySize !== NLP_LAMBDA_MEMORY_SIZE_MB;
+  const timeoutDrifted =
+    currentConfig.Timeout !== LAMBDA_INVOCATION_TIMEOUT_SECONDS;
 
-  if (!envDrifted && !memoryDrifted) {
+  if (!envDrifted && !memoryDrifted && !timeoutDrifted) {
     return null;
   }
 
   logger.info(
-    { projectId, envDrifted, memoryDrifted },
+    { projectId, envDrifted, memoryDrifted, timeoutDrifted },
     `Reconciling Lambda function configuration for ${functionName}`,
   );
 
@@ -423,6 +425,7 @@ const reconcileProjectLambdaConfig = async (
       },
     },
     MemorySize: NLP_LAMBDA_MEMORY_SIZE_MB,
+    Timeout: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
   });
 
   return lambda.send(command);

@@ -374,6 +374,34 @@ describe("getProjectLambdaArn", () => {
       expect(NLP_LAMBDA_MEMORY_SIZE_MB).toBe(2048);
     });
 
+    /** @scenario A pre-existing Lambda carrying a short Timeout is reconciled */
+    it("updates drifted Timeout", async () => {
+      const drifted = {
+        ...mockLambdaConfig,
+        Timeout: 300, // Short timeout, needs update to 900
+      };
+
+      const send = vi
+        .spyOn(LambdaClient.prototype as any, "send")
+        // checkLambdaExists
+        .mockResolvedValueOnce({ Configuration: drifted })
+        // GetFunction for image/config details
+        .mockResolvedValueOnce({
+          Configuration: drifted,
+          Code: { ImageUri: currentImageUri },
+        })
+        .mockResolvedValueOnce(mockLambdaConfig)
+        .mockResolvedValue({ Configuration: mockLambdaConfig });
+
+      const arn = await getProjectLambdaArn("reconcile-timeout");
+      expect(arn).toBe(mockLambdaConfig.FunctionArn);
+
+      const updates = configUpdateCalls(send);
+      expect(updates).toHaveLength(1);
+      expect(updates[0][0].input.Timeout).toBe(900);
+    });
+
+
     /** @scenario No drift means no AWS write at all — the common path */
     it("issues no configuration update when nothing has drifted", async () => {
       const send = vi
