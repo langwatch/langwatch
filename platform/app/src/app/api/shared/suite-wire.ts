@@ -354,16 +354,19 @@ export function toRunItemsWire(
  *
  * The column is JSON, and rows written before the current shape may hold a
  * string, so it is read defensively rather than parsed strictly: a plan whose
- * targets cannot be read still lists, it just lists with none.
+ * targets cannot be read still lists, it just lists with none. Each entry is
+ * parsed on its own, so one bad entry costs its own row and not the rest.
+ * Casting instead would publish `type` and `referenceId` as undefined.
  */
 function readTargets(raw: unknown): SuiteTargetWire[] {
   const value = typeof raw === "string" ? parseJson(raw) : raw;
-  return Array.isArray(value)
-    ? (value as SuiteTargetWire[]).map((target) => ({
-        type: target.type,
-        referenceId: target.referenceId,
-      }))
-    : [];
+  if (!Array.isArray(value)) return [];
+  const targets: SuiteTargetWire[] = [];
+  for (const entry of value) {
+    const parsed = suiteTargetSchema.safeParse(entry);
+    if (parsed.success) targets.push(parsed.data);
+  }
+  return targets;
 }
 
 function parseJson(raw: string): unknown {

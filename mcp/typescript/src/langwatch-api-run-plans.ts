@@ -1,4 +1,10 @@
+import type { z } from "zod";
 import { makeRequest } from "./langwatch-api.js";
+import type {
+  runParametersSchema,
+  runPlanScopeSchema,
+  runPlanTargetSchema,
+} from "./schemas/run-plan.js";
 
 /**
  * Client for `/api/v1/run-plans`.
@@ -10,21 +16,20 @@ import { makeRequest } from "./langwatch-api.js";
  * one run, not to the plan.
  */
 
+/**
+ * The shapes the run plan tools accept, taken from the zod that validates
+ * them. They are inferred rather than written twice, so the schema stays the
+ * one place the shape is stated.
+ */
+
 /** What a run plan covers. Mirrors `suiteScopeSchema` on the platform. */
-export type RunPlanScope =
-  | { mode: "all" }
-  | { mode: "folders"; folderIds: string[] }
-  | { mode: "labels"; labels: string[] }
-  | { mode: "cases" };
+export type RunPlanScope = z.infer<typeof runPlanScopeSchema>;
 
 /** One thing a plan runs its cases against. */
-export interface RunPlanTarget {
-  type: "prompt" | "http" | "code" | "workflow";
-  referenceId: string;
-}
+export type RunPlanTarget = z.infer<typeof runPlanTargetSchema>;
 
 /** The values a run supplies for the parameters its scenarios declare. */
-export type RunParameters = Record<string, string | number | boolean>;
+export type RunParameters = z.infer<typeof runParametersSchema>;
 
 export interface RunPlan {
   id: string;

@@ -14,7 +14,8 @@
  * archived and then writes an unfiled scenario gets a fresh Default, because
  * the scenario still needs a home.
  *
- * Existing projects were brought to this state by the 20260825120004 migration.
+ * Existing projects were brought to this state by the 20260827120001_default_suite
+ * migration.
  *
  * @see specs/suites/default-suite.feature
  */

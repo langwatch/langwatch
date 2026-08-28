@@ -295,7 +295,7 @@ export class SuiteRunService {
     }
 
     const now = Date.now();
-    await Promise.allSettled(
+    const enqueued = await Promise.allSettled(
       items.map((item) => {
         const secretParameters = secretParametersByScenarioId?.get(
           item.scenarioId,
@@ -332,20 +332,48 @@ export class SuiteRunService {
       }),
     );
 
+    // An item whose enqueue was rejected has no run and never will, so it is
+    // reported neither in the count nor in the list: a caller that waited on
+    // its scenarioRunId would wait for a run that was never queued. Each
+    // rejection is logged with the batch it belongs to, because a partial
+    // enqueue is otherwise invisible to everyone.
+    const queuedItems = items.filter(
+      (_, index) => enqueued[index]?.status === "fulfilled",
+    );
+    for (const [index, result] of enqueued.entries()) {
+      if (result.status !== "rejected") continue;
+      const item = items[index];
+      logger.error(
+        {
+          suiteId,
+          batchRunId,
+          scenarioRunId: item?.scenarioRunId,
+          scenarioId: item?.scenarioId,
+          error: result.reason,
+        },
+        "Failed to queue a simulation run; it is left out of the batch",
+      );
+    }
+
     // No explicit job scheduling — the execution subscriber picks up queued events
     // via the GroupQueue and spawns child processes in the execution pool.
 
     logger.debug(
-      { suiteId, batchRunId, itemCount: items.length },
+      {
+        suiteId,
+        batchRunId,
+        itemCount: items.length,
+        queuedCount: queuedItems.length,
+      },
       "Suite run queued via event-sourcing",
     );
 
     return {
       batchRunId,
       setId,
-      jobCount: items.length,
+      jobCount: queuedItems.length,
       skippedArchived,
-      items: items.map((item) => ({
+      items: queuedItems.map((item) => ({
         scenarioRunId: item.scenarioRunId,
         scenarioId: item.scenarioId,
         target: item.target,
