@@ -94,7 +94,7 @@ export class ChartsApiService {
   private readonly queryApi: QueryApiService;
 
   constructor(
-    config?: Pick<InternalConfig, "langwatchApiClient"> & {
+    config?: Partial<Pick<InternalConfig, "langwatchApiClient">> & {
       projectId?: string;
     },
   ) {
