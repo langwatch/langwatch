@@ -1176,6 +1176,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../prisma-client
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1

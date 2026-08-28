@@ -3,8 +3,8 @@
 `@langwatch/eventing` owns the reusable event-driven application framework:
 events, aggregates, pipelines, commands, projections, subscribers, process
 managers, replay, and the ports needed to run them. Product pipelines,
-registries, persistence adapters, and runtime composition belong to the app or
-feature package that uses it.
+registries and product composition belong to the app or feature package that
+uses it.
 
 Eventing depends on `@langwatch/group-queue` for generic Redis transport. Group
 Queue does not depend on Eventing.
@@ -50,8 +50,11 @@ manager for durable, stateful orchestration.
 
 - Import framework contracts from the package root.
 - Import test helpers from `@langwatch/eventing/testing` only in tests.
-- Bind ClickHouse, Postgres, Redis, object storage, and product services in the
-  application composition root.
+- Import `@langwatch/eventing/server` only from a process composition root to
+  construct the private Prisma, ClickHouse, retention, and Group Queue graph.
+  Inject an already-created Prisma client, tenant-aware ClickHouse resolver,
+  semantic retention configuration, and Group Queue dependencies; the server
+  surface reads no environment or global clients.
 - Declare every durable event in exactly one aggregate. The runtime event
   catalogue rejects unknown event types and duplicate ownership.
 

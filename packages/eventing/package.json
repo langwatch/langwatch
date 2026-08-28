@@ -18,6 +18,10 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./server": {
+      "types": "./src/server/index.ts",
+      "default": "./src/server/index.ts"
     }
   },
   "scripts": {
@@ -30,6 +34,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "ioredis": "5.10.1",
     "langwatch": "1.0.0",

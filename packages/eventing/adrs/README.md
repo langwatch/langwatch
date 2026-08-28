@@ -6,6 +6,7 @@ These decisions define the reusable Eventing framework:
 - [Projection replay coordination](./015-projection-replay-coordination.md)
 - [ClickHouse cached projections](./066-clickhouse-cached-projections.md)
 - [Events and staged payloads](./089-events-and-staged-payloads.md)
+- [Production server adapters](./20260828-production-server-adapters.md)
 
 Product pipeline decisions live with their owning feature or in the central
 [application ADR index](../../../dev/docs/adr/README.md).
