@@ -27,11 +27,12 @@
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  *       specs/ai-gateway/budgets-principal-cascade.feature
  */
-import type {
-  GatewayBudget,
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+  groupBucketScopeId,
+} from "../../adapters/gateway-bucket-scope.adapter";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
@@ -238,24 +239,6 @@ async function keyTeamScopeIds({
 }
 
 /**
- * The ledger buckets spend by (Scope, ScopeId), so anything that must
- * accrue separately has to be separate in that key. Two budgets on the
- * same target, one counting everything and one counting only OpenAI, would
- * otherwise share a bucket and each report the other's spend. The provider
- * filter therefore rides the bucket id.
- */
-export function bucketScopeIdFor(
-  budget: Pick<GatewayBudget, "providerKey">,
-  baseScopeId: string,
-): string {
-  return budget.providerKey
-    ? `${baseScopeId}${PROVIDER_BUCKET_SEPARATOR}${budget.providerKey}`
-    : baseScopeId;
-}
-
-export const PROVIDER_BUCKET_SEPARATOR = "|provider:";
-
-/**
  * Group ids the user belongs to within this organization. Scoped to the
  * org so a user in several orgs never drags another org's group
  * budget into this one's cascade.
@@ -274,41 +257,6 @@ async function memberGroupIds({
     select: { groupId: true },
   });
   return memberships.map((m) => m.groupId);
-}
-
-/**
- * Per-member bucket key for a GROUP budget. Group ids are nanoids and
- * user ids are cuids, neither contains a colon, so the pair round-trips
- * unambiguously through the ledger's ScopeId column.
- */
-export function groupBucketScopeId(groupId: string, principalUserId: string): string {
-  return `${groupId}:${principalUserId}`;
-}
-
-/**
- * Per-end-user bucket key for an ATTRIBUTED_USER template: the anchor (a
- * virtual key or project id) plus the caller-supplied external id. Anchor
- * ids are nanoids and never contain ":", so the key parses unambiguously
- * from the left; the end-user id is external input and may contain
- * anything, which is why nothing ever parses this key from the right.
- */
-export function attributedUserBucketScopeId(anchorId: string, endUserId: string): string {
-  return `${anchorId}:${endUserId}`;
-}
-
-/**
- * Whether a budget counts spend dispatched to `providerKey`. An unfiltered
- * budget (providerKey null) counts everything; a filtered one counts only
- * its own provider. A dispatch with no reported provider matches only
- * unfiltered budgets: attributing it to a provider-filtered budget would
- * be a guess, and guessing here silently mis-bills a governance control.
- */
-export function budgetAppliesToProvider(
-  budget: Pick<GatewayBudget, "providerKey">,
-  dispatchedProviderKey: string | null | undefined,
-): boolean {
-  if (!budget.providerKey) return true;
-  return budget.providerKey === dispatchedProviderKey;
 }
 
 function byScopeThenId(a: ResolvedBudget, b: ResolvedBudget): number {

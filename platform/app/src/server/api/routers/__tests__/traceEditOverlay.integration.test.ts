@@ -13,7 +13,7 @@ import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { prisma } from "../../../db";
-import type { TraceEditOverlayPatch } from "../../../traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 

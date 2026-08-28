@@ -12,9 +12,10 @@ decision; callers do not construct a budget service per request.
 The service validates its input with the Gateway contract, owns the private
 budget repository boundary, prefers authoritative ClickHouse spend when
 available, and preserves the existing decision, warning, block, and scope
-response fields. Virtual-key CRUD, usage reads, routing, cache rules, and
-guardrails remain residual Gateway migrations and are not duplicated in this
-slice.
+response fields. The same process-owned Gateway graph now also owns cache-rule
+and guardrail catalogue persistence plus the configuration-bundle persistence
+facade. Virtual-key CRUD, usage reads, routing, and guardrail evaluation remain
+residual Gateway migrations and are not duplicated in this slice.
 
 ## Decision
 
@@ -28,8 +29,12 @@ budget rows, membership facts, and spend data. The service applies reachability
 policy after Project resolves the stored destinations.
 
 Existing REST, tRPC, Go-gateway, and CLI transports keep their current shapes
-and read the composed service. Virtual-key CRUD, usage, routing, cache rules,
-and guardrails remain later vertical cuts.
+and read the composed graph. Cache-rule mutations atomically write the row,
+Gateway change event, and audit record through one Prisma transaction.
+Guardrail catalogue writes resolve evaluator, monitor, and Project facts through
+complete feature services before their private repository and audit boundary.
+Virtual-key CRUD, usage, routing, and guardrail evaluation remain later vertical
+cuts.
 
 ## Contracts and validation
 
@@ -39,9 +44,12 @@ remain private to repository adapters.
 
 ## Persistence
 
-Gateway repositories own budget, key, membership, audit and spend persistence.
-Project identity, organization ownership and trace destinations come from the
-complete `ProjectService`, never a Gateway-owned Project query.
+Gateway repositories own budget, key, membership, audit, spend, cache-rule, and
+guardrail persistence. Project identity, organization ownership and trace
+destinations come from the complete `ProjectService`, never a Gateway-owned
+Project query. The configuration-bundle facade reads only enabled, non-archived
+cache rules and project-scoped guardrails, discarding guardrail attachments that
+are absent from that catalogue.
 
 ## Dependencies
 
@@ -71,7 +79,8 @@ error. Only `try*` methods expose absence.
 
 ## Consequences
 
-Later Gateway slices join this service rather than creating another budget
-implementation.
+Later Gateway slices join this graph rather than creating duplicate Gateway
+implementations. Realtime session booking, settlement, and locking remain
+outside this ADR's boundary as recorded in ADR-002.
 
 See [the executable feature contract](../specs/gateway-budget-service.feature).

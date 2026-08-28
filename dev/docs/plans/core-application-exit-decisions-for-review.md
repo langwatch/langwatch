@@ -462,6 +462,468 @@ runner pool. It needs your call, not mine. The cheap version is to gate only
 
 ---
 
+## The gateway vertical's nine tRPC routers: split across three packages, with a named port seam
+
+**What I decided.** The nine routers named as "the gateway vertical" did not all
+belong to one feature, so they did not all go to one package.
+
+- Six went to `@langwatch/gateway-server`
+  (`packages/features/gateway/server/src/api/app-trpc/`): `virtualKeys`,
+  `gatewayUsage`, `gatewayBudgets`, `gatewayCacheRules`, `gatewayGuardrails`,
+  `gatewaySpendEvents`. Their mount is
+  `apps/api/src/features/gateway/gateway-trpc.mount.ts`.
+- Two went to `@langwatch/enterprise-governance-server`: `routingPolicies` and
+  `personalVirtualKeys`. Every procedure in them answers from
+  `app.governance.*`, and the errors they translate are
+  `@langwatch/enterprise-governance-contract`'s.
+- One went to `@langwatch/enterprise-webhook-server`: `webhookEndpoints`.
+
+**Why webhookEndpoints is not gateway.** The only thing tying it to the gateway
+is that the composition root parks the endpoint and health capabilities under
+`deps.gateway.*`. Its service, its views, its delivery controls and all four of
+its refusals are the webhook feature's, and none of them mentions a virtual key
+or a budget. `packages/enterprise/features/webhook/` already existed with a
+contract and a server. The transport's context type still names
+`app.gateway.webhookEndpoints`, because that is the process's shape and this
+slice is a transport move, not a rearrangement of the composition root.
+
+**Why the two enterprise surfaces are not in `apps/api`.** No package under
+`packages/features/**` depends on any `@langwatch/enterprise-*` package, and
+`packages/enterprise/composition/api` says in its own header why: a core package
+may not depend on an Enterprise one. `apps/api` has no Enterprise dependency
+either. So their composition went beside its sibling, as
+`EnterpriseGatewayTrpcComposition` in a NEW file
+(`packages/enterprise/composition/api/src/trpc/enterprise-gateway-trpc.composition.ts`)
+rather than as more branches inside `EnterpriseTrpcComposition`, which another
+agent is editing right now.
+
+**The alternative I did not take** was to put all nine in
+`@langwatch/gateway-server` and add `@langwatch/enterprise-governance-contract`
+and `@langwatch/enterprise-webhook-*` to its dependencies. That keeps the
+vertical in one place and reads better in the plan, and it inverts the
+OSS/Enterprise boundary in a package the OSS build ships. I judged the boundary
+worth more than the tidiness.
+
+**The cost, stated plainly.** "The gateway vertical" is now three packages and
+two mounts. Someone looking for `routingPolicy.list` will not find it under
+`features/gateway`. If the OSS/Enterprise split is ever relaxed, this should be
+collapsed back into one package and one mount.
+
+**Reversibility.** High. Each API file is self-contained; moving one between
+packages is a file move plus an index line plus a mount line.
+
+**What to look at when reviewing.** Whether `routingPolicies` really is
+governance rather than gateway — it is named after a gateway concept and lives
+on a gateway settings screen, and I put it with the service that answers it.
+
+---
+
+## The `virtualKeys` transport moved on top of a fifteen-entry port bag
+
+**What I decided.** I moved `virtualKeys.ts` (609 lines) even though everything
+it delegates to still lives in `platform/app/src/server/gateway/**` — about
+2,200 lines across `virtualKey.authz.ts`, `virtualKey.dto.ts`,
+`virtualKey.service.ts`, `applicableBudgets.service.ts` and
+`virtualKeyDirectBudget.service.ts`. Each one arrives as a named entry in
+`VirtualKeyTrpcPorts`, wired in `root.ts`.
+
+**Why.** The transport IS movable: procedure names, input schemas, the
+credential contract, the visibility-versus-permission split and the access
+declarations are all now package-owned and reviewable in one file. The domain
+code underneath is a separate slice, and `virtualKey.authz.ts` in particular
+cannot move until `server/app-layer/permissions/imperative.ts` and
+`server/rbac/role-binding-resolver.ts` do.
+
+**The cost, stated plainly.** Fifteen ports is a lot, and every one of them is a
+function that used to be a plain import. `root.ts` grows by roughly ninety lines
+of wiring while `platform/app` loses 609, so the net is good but the seam is
+ugly and it is now frozen into a package's exported type. Two ports are
+especially unlovely: `schemas.virtualKeyBudgetInput` passes a Zod schema through
+a port (taken rather than restated, because its decimal regex and
+positive-amount refinement are the write path's contract and a second copy would
+drift), and `principal` is typed `unknown` because a session belongs to the
+process's authentication, not to this feature.
+
+**The alternative I did not take** was to leave `virtualKeys` behind until
+`server/gateway/**` moves. That would have kept the seam clean and left the
+headline surface of the vertical in the tree this programme exists to delete.
+
+**Reversibility.** High but noisy: reverting means restoring one file and
+deleting the ports bag.
+
+**What to look at when reviewing.** Whether the ports bag reads as a to-do list
+for the next slice (intended) or as a permanent abstraction (not intended). Also
+`toVirtualKeyDtos`, which collapses the always-paired
+`loadTraceDestinationFacts` + `toVirtualKeyCamelDto` into one call — the only
+place I combined two existing functions rather than fronting each.
+
+---
+
+## Resolver-authorized procedures declare their real permissions instead of `enforces`
+
+**What I decided.** Eleven procedures used
+`.use(authorizeInResolver({ organizationId: "<what the resolver does>" }))`,
+which declares `{ kind: "service-authorized", permissions: [], enforces: {...} }`.
+In the package they declare
+`{ kind: "service-authorized", reason, permissions: [<the real ones>] }` — no
+`enforces`.
+
+**Why.** `enforces` cannot cross the package seam. The builder the process
+exposes is `@langwatch/trpc`'s `serviceAuthorized({ reason, permissions })`,
+which does not accept `enforces`, and `packages/trpc/**` belongs to another
+agent this session. The sweep
+(`platform/app/src/server/api/__tests__/authz-declaration-sweep.unit.test.ts`)
+covers a `service-authorized` declaration's required scope fields from EITHER
+`enforces` OR the grant tiers of its declared permissions; every one of these
+inputs requires `organizationId` and every permission named is grantable at the
+organization tier, so coverage holds either way.
+
+**Why it is arguably better.** `permissions: []` recorded nothing about what the
+resolver enforces. Naming `virtualKeys:manage`, `virtualKeys:update`,
+`virtualKeys:rotate`, `virtualKeys:delete` and `virtualKeys:viewOtherPersonal`
+records it, and that is what `.authorizeInService()` exists to say.
+
+**The cost, stated plainly.** The declaration text changed on eleven
+procedures, so a reviewer diffing declarations sees churn that is not a
+behaviour change. Runtime behaviour is identical: both kinds mark the request
+checked and run nothing else.
+
+**The alternative I did not take** was to add `enforces` pass-through to
+`packages/trpc/src/trpc-declared-authz.ts` and
+`apps/api/src/app-trpc/app-trpc.declared-check.ts`. That is the faithful
+preservation, and it edits a file another agent owns.
+
+**Reversibility.** High, once `packages/trpc` is free: add `enforces` to the
+builder and swap the declarations back.
+
+**What to look at when reviewing.** That every one of the eleven still passes
+the sweep — I could not run it (see the report), and a permission whose grant
+tiers exclude `organization` would silently stop covering `organizationId`.
+
+---
+
+## I added `appTrpcServiceAuthorizedPolicy` to the shared apps/api policy module
+
+**What I decided.** `apps/api/src/app-trpc/app-trpc.policy.ts` exported three of
+the four declaration kinds (`permission`, `permission-any`, `no-permission`).
+I appended the fourth, `service-authorized`, and exported it from
+`apps/api/src/app-trpc/index.ts`.
+
+**Why.** Without it a package-owned transport cannot express
+`.authorizeInService()`, which eleven of these procedures need. The existing
+`declaredCheckFrom` already maps the kind; only the caller-facing helper was
+missing.
+
+**The cost, stated plainly.** It is an edit to a file several agents are
+touching this session. It is purely additive (a new export at the end), so the
+worst case is a merge conflict rather than a behaviour change.
+
+**Reversibility.** Trivial.
+
+**What to look at when reviewing.** That it did not land twice after a merge.
+
+---
+
+## Three router tests moved to their packages; two of them narrowed
+
+**What I decided.** `gatewaySpendEvents.unit.test.ts`,
+`gatewayBudgets.perPerson.unit.test.ts` and `webhookEndpoints.unit.test.ts` moved
+into their packages, keeping every `@scenario` annotation so feature parity stays
+bound. Two changed shape.
+
+- The webhook test still drives the REAL endpoint service over a stubbed Prisma
+  client and an identity cipher, so the secret-once contract is unchanged. Only
+  the RBAC assertions changed: they now stand on the policy the process hands
+  in, asserting that the handler never runs when the policy refuses.
+- The budgets test NARROWED. The version in `platform/app` drove
+  `GatewayService` and its Prisma repository through a mocked client and asserted
+  the per-person standing arithmetic; the package version stands in for the
+  budget-decision service and asserts only that the standing and the scope-target
+  name reach the wire.
+
+**Why the budgets one narrowed.** Reproducing the old test meant constructing a
+real `GatewayService` over a mocked Prisma client, and `GatewayService.create`'s
+signature changed under me this session (another agent folded cache rules and
+guardrails into it). Writing that blind, with no ability to run tests, was the
+worse risk.
+
+**The cost, stated plainly.** Coverage of the seat-standing arithmetic THROUGH
+the router is gone. It is still covered directly by
+`packages/features/gateway/server/tests/gateway-budget-dto.unit.test.ts` and
+`platform/app/src/server/gateway/__tests__/budgetSeatStandings.unit.test.ts`, so
+no scenario is unbound — but a regression in how `listWithHealth` assembles the
+standing would now fail one file rather than two.
+
+**Reversibility.** Medium. Restoring the wide version means writing the
+`GatewayService` fixture against whatever signature settles.
+
+**What to look at when reviewing.** Whether the narrowed budgets test is worth
+keeping at all, or whether the DTO test already says everything it says.
+
+---
+
+## Small substitutions I made rather than porting a `platform/app` import
+
+Three imports had exact equivalents already inside the packages, so I used those
+instead of adding a port. All three are same-values swaps; I list them because
+each is a place a reviewer would otherwise wonder why the code differs.
+
+- `WEBHOOK_DESTINATION_KINDS` from `~/utils/webhookDestinations` became
+  `webhookDestinationKindSchema` from `@langwatch/enterprise-webhook-contract`.
+  Both are `["http", "sqs"]`.
+- `z.nativeEnum(RoutingPolicyScopeType)` from the generated Prisma client became
+  `routingPolicyScopeTypeSchema` from the governance contract. Both are
+  `["ORGANIZATION", "TEAM", "PROJECT"]`. I deliberately did NOT adopt the
+  contract's `routingPolicyScopeEntrySchema`, which is `.strict()` and requires a
+  non-empty `scopeId`: that would tighten validation, which is a behaviour
+  change.
+- `MODEL_TIERS` from `~/utils/modelTierPresets` became a local
+  `z.enum(["complex", "reasoning", "fast"])` annotated as
+  `z.ZodType<SuggestTierTargetsInput["tier"]>`, so a tier added to the suggester
+  is a compile error here rather than a value this surface silently refuses.
+- `scopeAssignmentSchema` from `~/server/scopes/scope.types` became a local
+  schema in the gateway package annotated as
+  `z.ZodType<GatewayVirtualKeyScope>`. Same three tiers, same `min(1)`.
+
+**The cost.** Four values now have a second definition site, each pinned to a
+shared type rather than to the original schema. If a fifth scope tier is ever
+added, three of these four fail to compile and one (the webhook kinds) does not.
+
+**What to look at when reviewing.** Whether the type annotations really would
+catch drift, particularly `z.ZodType<GatewayVirtualKeyScope>`.
+
+---
+
+## Two things I found broken and did not fix
+
+Both predate this slice and are reported rather than repaired, because repairing
+them means guessing at another agent's in-flight work.
+
+1. `gatewayBudgets.ts` called `ctx.app.gateway.budgetDecisions.getDetail(...)`,
+   which does not exist on this branch: `GatewayService` and its contract both
+   name it `tryGetDetail`, and `origin/main`'s router still says `getDetail`. So
+   a rename landed here without updating the caller. The package version calls
+   `tryGetDetail`; its `if (!detail) throw NOT_FOUND` was already exactly
+   `tryGetDetail`'s contract, so nothing else changed.
+2. `packages/eventing/adrs/20260828-production-server-adapters.md` names
+   `platform/app/src/server/api/routers/webhookEndpoints.ts`, which this slice
+   deletes. It is another agent's file, dated today; I left it alone.
+
+---
+
+## The trace vertical: which trace types moved into the contract, and which did not
+
+`traces.*`, `spans.*` and `traceEditOverlay.*` became package-owned. A tRPC
+handler's return type IS the client's type, and inside a generic
+`create<TContext extends …>` TypeScript resolves a property access against the
+CONSTRAINT, not against the concrete context the mount later supplies. So the
+package cannot leave the legacy read service's result types unnamed: whatever
+the constraint says is what every caller of `api.traces.*` sees.
+
+I moved six result types out of `platform/app/src/server/traces/types.ts` into
+`@langwatch/trace-contract` (`trace-read.contract.ts`): `TraceWithGuardrail`,
+`TracesForProjectResult`, `TopicCountsResult`, `CustomersAndLabelsResult`,
+`DistinctFieldNamesResult` and `PromptStudioSpanResult`. Every one of them is
+built only from types already in that package. I left the three INPUT types
+behind — `GetAllTracesForProjectInput`, `AggregationFiltersInput` and
+`GetAllTracesForProjectOptions` — because they are derived from
+`sharedFiltersInputSchema` and `ProjectionPlan`, neither of which has left the
+application, and dragging those out is a filter-vertical slice rather than a
+transport one.
+
+**The alternative I did not take** was to keep every result type where it was
+and declare the port with `unknown` returns. That compiles and moves the same
+files, and it silently turns `api.traces.getAllForProject` into `unknown` for
+every caller in the UI. A second alternative — a generic parameter per result
+type — does not work: TypeScript resolves the handler body against the
+constraint, so the generic would never be reached.
+
+**The cost.** `platform/app/src/server/traces/types.ts` is now split across two
+homes, and a reader of `TraceService` has to look in two places for the shapes
+it deals in. Eight files were repointed (`clickhouse-trace.service.ts`,
+`trace.service.ts`, `parseLLMSpanMessages.ts`, two export tests, three
+ClickHouse pagination tests).
+
+**Reversibility.** High. The six types moved verbatim; moving them back is a
+copy and eight import lines.
+
+**What to look at when reviewing.** Whether the split is the right seam, or
+whether the whole of `traces/types.ts` should follow once the filter schema
+moves.
+
+---
+
+## The trace-correction patch schema moved into the contract rather than becoming a port
+
+`traceEditOverlay.upsert` parses its patch with `traceEditOverlayPatchSchema`.
+The package is supposed to own its input schemas, but that schema lived in
+`platform/app/src/server/traces/edit-overlay/traceEditOverlay.schemas.ts`, which
+19 other files import — 15 of them browser code importing a `~/server/…` path
+for a type.
+
+I moved the whole module into `@langwatch/trace-contract` as
+`trace-edit-overlay.contract.ts`, and put `TraceEditOverlayAuthor` (from the
+repository) and `TraceEditOverlayDto` (from the service) in it as well, since
+the transport's return type is that DTO. Its unit test moved with it, to
+`packages/features/trace/contract/tests/trace-edit-overlay.contract.unit.test.ts`.
+The module depended on nothing but `zod` and `@langwatch/trace-contract`, so
+nothing had to be broken up to move it, and seven now-stale entries came out of
+`legacy-application-boundary-baseline.json`.
+
+**The alternative I did not take** was injecting the schema as a port the way
+the analytics filters are injected. That is one line instead of 21 repointed
+imports, and it would have left a contract-shaped module inside the application
+and 15 browser files still importing server code.
+
+**The cost.** 21 files changed for a transport slice, several of them in
+`features/traces-v2/`, which other agents may be editing. Every change is a
+one-line import specifier, so a clobber loses a rename rather than corrupting
+logic — but it is still churn outside the vertical's transport.
+
+**Reversibility.** High; the file moved verbatim.
+
+**What to look at when reviewing.** That the DTO and the author interface belong
+in a `.contract.ts` rather than staying a server detail — a correction's
+`createdBy` is a `User` projection, so it is arguably identity's shape, not
+trace's.
+
+---
+
+## `protections` is `unknown` in the trace read port, and a named field in the overlay one
+
+Every legacy trace read takes the viewer's read-time redactions. `Protections`
+lives in `platform/app/src/server/traces/protections.ts` and 48 files import it.
+
+`spans.*` and `traces.*` never look inside the value — they ask the process for
+it and hand it straight to the read — so their port declares it `unknown`. That
+is accurate rather than lazy: a second declaration of a 40-line type would be
+duplication, and TypeScript's bivariant method parameters let the real
+`Protections` satisfy it.
+
+`traceEditOverlay.*` DOES read one field (`visibilityCutoffMs`, to decide
+whether the plan's window teases the trace), so its port is generic over
+`TProtections extends { visibilityCutoffMs?: number | null }`, inferred from the
+process's own function. Nothing else about the shape is restated.
+
+**The alternative I did not take** was moving `Protections` into a contract
+package. It is the right end state — it would let the read port be honest and
+would unblock several other verticals — but it is 48 files, in a tree several
+agents are editing, for a slice whose subject is the transport.
+
+**The cost.** Two different treatments of the same value in three sibling files,
+and a reader has to notice why. A future move of `Protections` will want to
+replace both.
+
+**What to look at when reviewing.** Whether `unknown` here reads as a gap. If it
+does, the fix is the 48-file move, not a duplicated type.
+
+---
+
+## Extended inputs are chained `.input()` calls, not `.extend()` or `z.intersection`
+
+Three procedures took the shared filter schema plus a few extra keys
+(`getSampleTraces`, `getSampleTracesDataset`, `getAllForDownload`). The router
+wrote that as `tracesFilterInput.extend({ … })`. The package does not hold that
+schema — it arrives as a port — so `.extend()` is not available on a
+`z.ZodType`.
+
+The obvious replacement is `z.intersection`, which is what
+`analytics.api.ts` already does for `dataForFilter`. I did not use it:
+`authz-declaration-sweep.unit.test.ts` reads each procedure's input schema to
+find the scope ids it accepts, and a `ZodIntersection` exposes no `shape`, so it
+is reported as an input the sweep cannot inspect — a guard failure, not a silent
+pass. I verified this against the installed zod 4.4.3.
+
+So each of the three chains a second `.input()` carrying only the keys the
+process's schema does not already have. tRPC keeps both parsers on the
+procedure (each still a readable object), runs both against the raw payload, and
+spreads the results — I read `createInputMiddleware` and `createNewBuilder` in
+`@trpc/server` 11.18.0 to confirm. The router's `.extend({ projectId, query })`
+re-declared two keys the base schema already had, so those are dropped rather
+than duplicated; re-declaring them in the second parser would make both parsers
+emit the same key.
+
+**The cost.** The extra keys are now in a separate schema object from the ones
+they conceptually extend, which reads slightly oddly. And the input is validated
+by two passes rather than one.
+
+**Reversibility.** High.
+
+**What to look at when reviewing.** That the dropped `projectId`/`query`
+re-declarations really were identical to the base schema's — they are, in
+`traces.schemas.ts` and `analytics/types.ts`.
+
+---
+
+## A six-line Fisher–Yates instead of adding `lodash-es` to the package
+
+`getSampleTraces` used `shuffle` from `lodash-es`. `@langwatch/trace-server` does
+not depend on it, the repo does not hoist it, and I could not run
+`pnpm install` to add it, so a new dependency would have been declared but
+unresolvable until someone installed.
+
+I wrote `shuffled()` in `traces.api.ts` instead: a copy plus Fisher–Yates, which
+is what lodash's `shuffle` does, on `Math.random`, which is what lodash uses.
+
+**The cost.** A utility with a second implementation in the repo. If the sampling
+ever needs a seeded shuffle, this is one more site to change.
+
+**Reversibility.** High — add the dependency and delete six lines.
+
+**What to look at when reviewing.** Whether adding `lodash-es` to
+`packages/features/trace/server` is preferred; if so it is a one-line
+`package.json` change plus an install.
+
+---
+
+## The injected filter schemas carry the SENT shape as well as the parsed one
+
+`analytics.api.ts` declares its injected schemas as `z.ZodType<TReadInput>`. In
+zod 4 that is `ZodType<TReadInput, unknown>`, and tRPC types the CLIENT off a
+parser's input type — so every caller of those procedures passes `unknown` and
+is unchecked. `traces.getAllForProject` is called from a lot of UI, so I took
+the second type parameter as well: `z.ZodType<TFilterInput, TFilterInputRaw>`,
+with the raw shape inferred from whatever the process hands over.
+
+**The cost.** Two more type parameters on `TracesTrpcApi.create` (eight in
+total), which is a lot of machinery on one signature. If inference ever fails
+the parameter degrades to `unknown`, i.e. back to the analytics behaviour, so
+the failure mode is not worse than the status quo.
+
+**What to look at when reviewing.** Whether analytics should get the same
+treatment — as it stands, four analytics reads accept anything from the client.
+
+---
+
+## Where I stopped: `sharedTrace` and `tracesV2` did not move
+
+I did `spans` → `traceEditOverlay` → `traces` and stopped, deliberately.
+
+`sharedTrace.ts` imports four mappers (`mapTraceSummaryToHeader`,
+`deriveTraceDropPrivacy`, `mapSpansToDetailDtos`, `redactV2Content`) out of
+`tracesV2.ts`, plus `tracesV2.gates.ts`, `tracesV2.resourceAttrs.ts` and
+`trace-tree.legacy.mapper.ts`. A package cannot import a router that stays in
+`platform/app`, so `sharedTrace` cannot move before `tracesV2` does — the
+prescribed order has them the other way round, and that ordering does not hold
+once the imports are read.
+
+`tracesV2.ts` is 2,192 lines, 27 procedures, and roughly 1,000 lines of exported
+mapper and redaction helpers that six other modules import. It depends on
+fifteen application modules that have not moved (`data-privacy/*`,
+`traces/mappers/redaction`, `traces/mappers/redactAttributes`,
+`tracer/spanIOStringify`, `traces/findPromptReferenceInAncestors`,
+`app-layer/traces/claude-code-log-enrichment`, `app-layer/traces/ai-query`,
+`app-layer/traces/model-cost-span-preview.service`,
+`app-layer/traces/trace-metadata.service`, `shared/traces/media-refs`, …). It is
+a slice of its own, and doing it in the tail of this one would have produced
+exactly the rushed result the brief warned against.
+
+**What to look at when reviewing.** Whether the next slice should be the
+redaction/mapper layer (`tracesV2`'s helpers plus `Protections`) rather than the
+transport — the transport is the easy half once those move.
+
+---
+
 ## How to add to this file
 
 Anyone — human or agent — making a call of this kind appends a section in the

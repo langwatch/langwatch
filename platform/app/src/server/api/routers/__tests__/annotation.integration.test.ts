@@ -24,7 +24,7 @@ import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import type { Trace } from "@langwatch/trace-contract";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { applyOverlayToTrace } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
-import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";

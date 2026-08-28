@@ -12,6 +12,8 @@ import { createTRPCRouter } from "~/server/api/trpc";
 import {
   appTrpcNoPermissionPolicy,
   appTrpcPolicy,
+  appTrpcServiceAuthorizedPolicy,
+  createGatewayTrpcRouters,
   createOpsTrpcRouter,
   createPinnedTraceTrpcRouter,
   createPromptTagTrpcRouter,
@@ -23,6 +25,7 @@ import {
   declaredCheckFrom,
   type AppTrpcPolicyKit,
   type AppTrpcPolicyMiddlewares,
+  type GatewayTrpcPorts,
 } from "@langwatch/platform-api/app-trpc";
 import {
   checkDeclaredPermission,
@@ -48,10 +51,34 @@ import { scopeLineageGuard } from "./trpc.scope-lineage-middleware";
 import {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
+  EnterpriseGatewayTrpcComposition,
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
 } from "@langwatch/enterprise-api";
 import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
+import type { GuardrailAttachment } from "@langwatch/gateway-contract";
+import { GatewayUsageService, resolveProviderLabels } from "@langwatch/gateway-server";
+import { assertWebhookEndpointsEntitled } from "~/runtime/app/features/webhooks";
+import type { Session } from "~/server/auth";
+import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
+import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
+import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
+import {
+  assertActorCanManageAllScopes,
+  assertActorCanOperateOnAnyScope,
+  assertGuardrailAttachmentsAllowed,
+  assertScopesBelongToOrg,
+  assertTraceProjectBelongsToOrg,
+  isVisibleToMembership,
+  loadMembershipSet,
+  requireExistingVk,
+  requireVisibleVk,
+  resolveVkProjectId,
+} from "~/server/gateway/virtualKey.authz";
+import { loadTraceDestinationFacts, toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { virtualKeyBudgetInputSchema } from "~/server/gateway/virtualKey.service";
+import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { env } from "~/env.mjs";
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { authProviderIsMounted, platformSSOAllowed } from "~/runtime/app/features/sso";
@@ -92,11 +119,6 @@ import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "~/runtime/app/internal-api/feature-flag.router";
 import { frontDoorRouter } from "./routers/frontDoor";
-import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
-import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
-import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
-import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
-import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { githubRouter } from "~/runtime/app/internal-api/github.router";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
@@ -114,7 +136,6 @@ import { monitorsRouter } from "~/runtime/app/internal-api/monitor.router";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
-import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
 import { planRouter } from "./routers/plan";
 import { presenceRouter } from "~/runtime/app/internal-api/presence.router";
@@ -122,7 +143,6 @@ import { projectRouter } from "~/runtime/app/internal-api/project.router";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleBindingRouter } from "~/runtime/app/internal-api/role-binding.router";
 import { roleRouter } from "~/runtime/app/internal-api/role.router";
-import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { secretsRouter } from "~/runtime/app/internal-api/secrets.router";
 import { setupSkillsRouter } from "./routers/setupSkills";
@@ -135,8 +155,6 @@ import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
-import { virtualKeysRouter } from "./routers/virtualKeys";
-import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
 import { workflowRouter } from "./routers/workflows";
 
 /** This process's concrete policy chain, in the order the mounts apply it. */
@@ -274,7 +292,187 @@ const enterpriseRouters = EnterpriseTrpcComposition.create({
   },
 });
 
+/** Refuses an organization id that names no organization, as this surface always has. */
+const assertOrganizationExists = async (organizationId: string): Promise<void> => {
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  if (!organization) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
+  }
+};
+
+/** The caller as the virtual-key authorization vocabulary names them. */
+const virtualKeyActor = (principal: unknown) =>
+  ({ kind: "session", session: principal as Session }) as const;
+
+const listVisibleVirtualKeys = async ({
+  organizationId,
+  userId,
+  virtualKeys,
+}: {
+  organizationId: string;
+  userId: string;
+  virtualKeys: {
+    getAll(organizationId: string): Promise<Awaited<ReturnType<typeof requireExistingVk>>[]>;
+  };
+}) => {
+  const membership = await loadMembershipSet(prisma, organizationId, userId);
+  return (await virtualKeys.getAll(organizationId)).filter((vk) =>
+    isVisibleToMembership(membership, vk.scopes),
+  );
+};
+
+/**
+ * The one seam left between the gateway transports and this application: every
+ * entry fronts a module under `server/gateway/**` or a persistence read the
+ * routers used to make inline. It shrinks to nothing when those move.
+ */
+const gatewayTrpcPorts = {
+  budgets: {
+    assertOrganizationExists,
+    resolveProviderLabels: (budgets) => resolveProviderLabels({ prisma, budgets: [...budgets] }),
+    listGroupTargets: async (organizationId) => {
+      const groups = await prisma.group.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, _count: { select: { members: true } } },
+        orderBy: { name: "asc" },
+      });
+      return groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        memberCount: group._count.members,
+      }));
+    },
+  },
+  cacheRules: {
+    assertOrganizationExists,
+    cacheRules: () => GatewayCacheRuleService.create(prisma),
+  },
+  guardrails: {
+    guardrails: ({ evaluators, monitors }) =>
+      GatewayGuardrailService.create(prisma, evaluators, monitors),
+  },
+  spendEvents: {
+    resolveVirtualKeyNames: ({ organizationId, virtualKeyIds }) =>
+      prisma.virtualKey.findMany({
+        where: { id: { in: [...virtualKeyIds] }, organizationId },
+        select: { id: true, name: true },
+      }),
+  },
+  usage: {
+    listVisibleVirtualKeys,
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      isVisibleToMembership(
+        await loadMembershipSet(prisma, organizationId, userId),
+        virtualKey.scopes,
+      ),
+    createUsageService: ({ chRepo, spendRepo }) =>
+      GatewayUsageService.create({ prisma, chRepo, spendRepo }),
+  },
+  virtualKeys: {
+    listVisibleVirtualKeys,
+    requireVisibleVirtualKey: async ({ organizationId, id, userId, virtualKeys }) =>
+      requireVisibleVk(virtualKeys, await loadMembershipSet(prisma, organizationId, userId), {
+        id,
+        organizationId,
+      }),
+    requireExistingVirtualKey: ({ organizationId, id, virtualKeys }) =>
+      requireExistingVk(virtualKeys, id, organizationId),
+    assertCanManageAllScopes: ({ principal, scopes }) =>
+      assertActorCanManageAllScopes({ prisma, actor: virtualKeyActor(principal) }, [...scopes]),
+    assertCanOperateOnAnyScope: ({ principal, scopes, permission }) =>
+      assertActorCanOperateOnAnyScope(
+        { prisma, actor: virtualKeyActor(principal) },
+        [...scopes],
+        permission,
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
+    assertGuardrailAttachmentsAllowed: ({ principal, projectId, attachments }) =>
+      assertGuardrailAttachmentsAllowed(
+        { prisma, actor: virtualKeyActor(principal) },
+        projectId,
+        attachments as GuardrailAttachment[] | undefined,
+      ),
+    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
+      resolveVkProjectId(prisma, organizationId, {
+        vkId: virtualKeyId,
+        inputScopes: scopes ? [...scopes] : undefined,
+        traceProjectId,
+      }),
+    isOrganizationMember: async ({ organizationId, userId }) =>
+      (await prisma.organizationUser.findFirst({
+        where: { organizationId, userId },
+        select: { userId: true },
+      })) !== null,
+    toVirtualKeyDtos: async ({ virtualKeys, projects }) => {
+      // One read of the destinations for the whole page: a listing must not
+      // cost a query per key to say where each one's traffic goes.
+      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...virtualKeys] });
+      return virtualKeys.map((virtualKey) => toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    resolveApplicableBudgets: ({ target, projects, budgetDecisions, budgets }) =>
+      resolveApplicableBudgetsForDraftKey(
+        prisma,
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        budgetDecisions,
+        budgets,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now, chRepo }) =>
+      loadDirectBudgetsForKeys({
+        prisma,
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window, chRepo, spendRepo }) =>
+      GatewayUsageService.create({ prisma, chRepo, spendRepo }).spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+  },
+  // `satisfies`, not an annotation: an annotation would collapse each port's
+  // concrete return type to the loose constraint and the routers would lose
+  // their output typing.
+} satisfies GatewayTrpcPorts;
+
+const gatewayRouters = createGatewayTrpcRouters({ ...appTrpcMount, ports: gatewayTrpcPorts });
+
+const enterpriseGatewayRouters = EnterpriseGatewayTrpcComposition.create({
+  root: appTrpcRoot,
+  protectedProcedure: authProtectedProcedure,
+  policy: appTrpcPolicy(appTrpcMiddlewares),
+  resolverAuthorizedPolicy: appTrpcServiceAuthorizedPolicy(appTrpcMiddlewares),
+  ports: {
+    personalVirtualKeys: {
+      isOrganizationMember: async ({ organizationId, userId }) =>
+        (await prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+        })) !== null,
+      // Post-collapse VirtualKey is organization-scoped; the
+      // (organizationId, principalUserId, name) tuple is the personal-key
+      // uniqueness contract.
+      hasActivePersonalKeyLabelled: async ({ organizationId, userId, label }) =>
+        (await prisma.virtualKey.findFirst({
+          where: {
+            organizationId,
+            principalUserId: userId,
+            name: label,
+            revokedAt: null,
+          },
+        })) !== null,
+    },
+    webhookEndpoints: { assertEntitled: assertWebhookEndpointsEntitled },
+  },
+});
+
 const coreRouters = {
+
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
@@ -343,10 +541,10 @@ const coreRouters = {
   group: groupRouter,
   ops: opsRouter,
   storedObjects: storedObjectsRouter,
-  virtualKeys: virtualKeysRouter,
-  personalVirtualKeys: personalVirtualKeysRouter,
+  virtualKeys: gatewayRouters.virtualKeys,
+  personalVirtualKeys: enterpriseGatewayRouters.personalVirtualKeys,
   personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,
-  routingPolicy: routingPoliciesRouter,
+  routingPolicy: enterpriseGatewayRouters.routingPolicy,
   ingestionSources: ingestionSourcesRouter,
   activityMonitor: activityMonitorRouter,
   anomalyRules: anomalyRulesRouter,
@@ -357,12 +555,12 @@ const coreRouters = {
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
-  gatewayBudgets: gatewayBudgetsRouter,
-  gatewayCacheRules: gatewayCacheRulesRouter,
-  gatewayGuardrails: gatewayGuardrailsRouter,
-  gatewayUsage: gatewayUsageRouter,
-  gatewaySpendEvents: gatewaySpendEventsRouter,
-  webhookEndpoints: webhookEndpointsRouter,
+  gatewayBudgets: gatewayRouters.gatewayBudgets,
+  gatewayCacheRules: gatewayRouters.gatewayCacheRules,
+  gatewayGuardrails: gatewayRouters.gatewayGuardrails,
+  gatewayUsage: gatewayRouters.gatewayUsage,
+  gatewaySpendEvents: gatewayRouters.gatewaySpendEvents,
+  webhookEndpoints: enterpriseGatewayRouters.webhookEndpoints,
   github: githubRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,

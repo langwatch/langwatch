@@ -15,3 +15,13 @@ Feature: Gateway budget decision service
     Given the API, CLI, and Gateway routes use the application instance
     When multiple requests perform budget checks
     Then they share the same Gateway service and repository instances
+
+  Scenario: A cache-rule mutation refreshes the Gateway configuration atomically
+    Given an active cache rule for an organization
+    When the rule is created, updated, or archived
+    Then its row mutation, Gateway change event, and audit record use one persistence transaction
+
+  Scenario: A configuration bundle includes only eligible persistence records
+    Given an organization has enabled and archived cache rules and a virtual key targets a trace project
+    When the Gateway materialises its configuration bundle
+    Then it includes only enabled non-archived cache rules and guardrail attachments present in that project catalogue

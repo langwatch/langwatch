@@ -98,3 +98,14 @@ export {
   type WebhookEndpointHealthSource,
   type WebhookHealthDeps,
 } from "./services/webhook-health.service";
+
+/**
+ * The app-process tRPC transport this feature owns. The process supplies its
+ * root, authenticated procedure and policy chain; the procedure names, input
+ * schemas, access declarations and delegation are the feature's.
+ */
+export {
+  WebhookEndpointTrpcApi,
+  type WebhookEndpointTrpcContext,
+  type WebhookEndpointTrpcPorts,
+} from "./api/app-trpc/webhook-endpoint.api";

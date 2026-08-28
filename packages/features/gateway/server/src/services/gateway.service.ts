@@ -17,8 +17,19 @@ import {
   type GatewayBudgetScopeReachInput,
   type GatewayBudgetScopeReachResult,
   type GatewayBudgetWithSeats,
+  type ArchiveGatewayCacheRuleInput,
+  type ArchiveGatewayGuardrailInput,
+  type CreateGatewayCacheRuleInput,
+  type CreateGatewayGuardrailInput,
+  type GatewayCacheRuleCursor,
+  type GatewayCacheRuleResource,
+  type GatewayConfigBundlePersistence,
+  type GatewayConfigGuardrailAttachment,
+  type GatewayGuardrailResource,
   type GatewayResolvedBudget,
   type ResetGatewayBudgetInput,
+  type UpdateGatewayCacheRuleInput,
+  type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
@@ -32,6 +43,8 @@ import {
 } from "../repositories/gateway-budget.repository";
 import { type GatewayBudgetScope } from "../repositories/gateway-budget.repository";
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service";
+import { GatewayCacheRulePersistence } from "./gateway-cache-rule.service";
+import { GatewayGuardrailCatalogue } from "./gateway-guardrail.service";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 
@@ -42,15 +55,19 @@ export class GatewayService extends GatewayServiceContract {
   private constructor(
     private readonly repository: GatewayBudgetRepository,
     private readonly projects: ProjectService,
+    private readonly cacheRules: GatewayCacheRulePersistence,
+    private readonly guardrails: GatewayGuardrailCatalogue,
   ) {
     super();
   }
 
-  static create(
-    repository: GatewayBudgetRepository,
-    projects: ProjectService,
-  ): GatewayService {
-    return new GatewayService(repository, projects);
+  static create(input: {
+    repository: GatewayBudgetRepository;
+    projects: ProjectService;
+    cacheRules: GatewayCacheRulePersistence;
+    guardrails: GatewayGuardrailCatalogue;
+  }): GatewayService {
+    return new GatewayService(input.repository, input.projects, input.cacheRules, input.guardrails);
   }
 
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
@@ -118,18 +135,12 @@ export class GatewayService extends GatewayServiceContract {
     return this.withScopeReach(result, project.team.organizationId);
   }
 
-  async tryGet(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetWithSeats | null> {
+  async tryGet(id: string, organizationId: string): Promise<GatewayBudgetWithSeats | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     return this.repository.tryGet({ id, organizationId, tenantIds });
   }
 
-  async tryGetWithHealth(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetHealth | null> {
+  async tryGetWithHealth(id: string, organizationId: string): Promise<GatewayBudgetHealth | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const result = await this.repository.tryGetWithHealth({
       id,
@@ -147,10 +158,7 @@ export class GatewayService extends GatewayServiceContract {
     return { ...result, unreachableByAnyKey: !scopeReach.reachable };
   }
 
-  async tryGetDetail(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetDetail | null> {
+  async tryGetDetail(id: string, organizationId: string): Promise<GatewayBudgetDetail | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const detail = await this.repository.tryGetDetail({ id, organizationId, tenantIds });
     if (!detail) {
@@ -162,12 +170,8 @@ export class GatewayService extends GatewayServiceContract {
     return target ? { ...detail, scopeTarget: target } : detail;
   }
 
-  async scopeReach(
-    input: GatewayBudgetScopeReachInput,
-  ): Promise<GatewayBudgetScopeReachResult> {
-    const candidates = await this.repository.listScopeReachCandidates(
-      input.organizationId,
-    );
+  async scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
+    const candidates = await this.repository.listScopeReachCandidates(input.organizationId);
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );
@@ -187,9 +191,7 @@ export class GatewayService extends GatewayServiceContract {
   }
 
   update(input: UpdateBudgetInput): Promise<GatewayBudgetResource> {
-    return this.repository.update(
-      updateGatewayBudgetInputSchema.parse(input) as UpdateBudgetInput,
-    );
+    return this.repository.update(updateGatewayBudgetInputSchema.parse(input) as UpdateBudgetInput);
   }
 
   archive(input: ArchiveBudgetInput): Promise<GatewayBudgetResource> {
@@ -200,9 +202,7 @@ export class GatewayService extends GatewayServiceContract {
     return this.repository.reset(resetGatewayBudgetInputSchema.parse(input));
   }
 
-  resolveApplicableBudgets(
-    input: GatewayBudgetResolutionTarget,
-  ): Promise<GatewayResolvedBudget[]> {
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.repository.resolveApplicableBudgets(input);
   }
 
@@ -211,10 +211,7 @@ export class GatewayService extends GatewayServiceContract {
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
     const projectIds = budgets
-      .filter(
-        (budget) =>
-          budget.scopeType === "PROJECT" || budget.scopeType === "ATTRIBUTED_USER",
-      )
+      .filter((budget) => budget.scopeType === "PROJECT" || budget.scopeType === "ATTRIBUTED_USER")
       .map((budget) => budget.scopeId);
     const virtualKeyIds = budgets
       .filter((budget) => budget.scopeType === "VIRTUAL_KEY")
@@ -225,10 +222,7 @@ export class GatewayService extends GatewayServiceContract {
     });
     const projects = await this.projects.listNamesByIds({
       projectIds: [
-        ...new Set([
-          ...projectIds,
-          ...virtualKeyProjectScopes.map((scope) => scope.projectId),
-        ]),
+        ...new Set([...projectIds, ...virtualKeyProjectScopes.map((scope) => scope.projectId)]),
       ],
     });
     return this.repository.resolveScopeTargets(
@@ -241,6 +235,75 @@ export class GatewayService extends GatewayServiceContract {
 
   listSpendTenantIds(organizationId: string): Promise<string[]> {
     return this.projects.listIdsByOrganization({ organizationId });
+  }
+
+  cacheRuleList(organizationId: string): Promise<GatewayCacheRuleResource[]> {
+    return this.cacheRules.list(organizationId);
+  }
+
+  cacheRuleListPage(input: {
+    organizationId: string;
+    limit: number;
+    cursor: GatewayCacheRuleCursor | null;
+  }): Promise<GatewayCacheRuleResource[]> {
+    return this.cacheRules.listPage(input);
+  }
+
+  tryCacheRuleGet(id: string, organizationId: string): Promise<GatewayCacheRuleResource | null> {
+    return this.cacheRules.tryGet(id, organizationId);
+  }
+
+  cacheRuleCreate(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.cacheRules.create(input);
+  }
+
+  cacheRuleUpdate(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.cacheRules.update(input);
+  }
+
+  cacheRuleArchive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
+    return this.cacheRules.archive(input);
+  }
+
+  guardrailList(projectId: string): Promise<GatewayGuardrailResource[]> {
+    return this.guardrails.list(projectId);
+  }
+
+  tryGuardrailGet(id: string, projectId: string): Promise<GatewayGuardrailResource | null> {
+    return this.guardrails.tryGet(id, projectId);
+  }
+
+  guardrailCreate(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
+    return this.guardrails.create(input);
+  }
+
+  guardrailUpdate(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
+    return this.guardrails.update(input);
+  }
+
+  guardrailArchive(input: ArchiveGatewayGuardrailInput): Promise<void> {
+    return this.guardrails.archive(input);
+  }
+
+  async loadConfigurationPersistence(input: {
+    organizationId: string;
+    traceProjectId: string | null;
+    guardrailAttachments: GatewayConfigGuardrailAttachment[];
+  }): Promise<GatewayConfigBundlePersistence> {
+    const cacheRules = await this.cacheRules.listEnabledForOrganization(input.organizationId);
+    if (!input.traceProjectId) {
+      return { cacheRules, guardrails: [], attachments: [] };
+    }
+
+    const guardrails = await this.guardrails.listBundleEntries(input.traceProjectId);
+    const availableGuardrailIds = new Set(guardrails.map((guardrail) => guardrail.id));
+    const attachments = input.guardrailAttachments
+      .map((attachment) => ({
+        direction: attachment.direction,
+        guardrailIds: attachment.guardrailIds.filter((id) => availableGuardrailIds.has(id)),
+      }))
+      .filter((attachment) => attachment.guardrailIds.length > 0);
+    return { cacheRules, guardrails, attachments };
   }
 
   private async withScopeReach(
@@ -283,14 +346,9 @@ export class GatewayService extends GatewayServiceContract {
     });
   }
 
-  private async assertProjectScopesBelongToOrganization(
-    input: CreateBudgetInput,
-  ): Promise<void> {
+  private async assertProjectScopesBelongToOrganization(input: CreateBudgetInput): Promise<void> {
     if (input.scope.kind === "PROJECT") {
-      await this.assertProjectBelongsToOrganization(
-        input.scope.projectId,
-        input.organizationId,
-      );
+      await this.assertProjectBelongsToOrganization(input.scope.projectId, input.organizationId);
     }
 
     if (input.scope.kind === "ATTRIBUTED_USER" && input.scope.anchorProjectId) {

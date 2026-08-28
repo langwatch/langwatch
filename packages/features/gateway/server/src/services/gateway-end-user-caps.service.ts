@@ -3,7 +3,7 @@ import { bucketPeriodFloorMs, effectiveBudgetPeriod } from "../adapters/gateway-
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
-} from "../repositories/prisma/prisma.gateway-budget-resolution.repository";
+} from "../adapters/gateway-bucket-scope.adapter";
 import { toWireEnum } from "../adapters/gateway-wire-enums.adapter";
 import { usdDisplayString } from "../adapters/gateway-wire-money.adapter";
 import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";

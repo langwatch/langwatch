@@ -94,3 +94,18 @@ export {
 } from "./subscribers/governance-kpis.subscriber";
 export { GovernanceOcsfSubscriber } from "./subscribers/governance-ocsf.subscriber";
 export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trigger-match.subscriber";
+
+/**
+ * The app-process tRPC transports this feature owns. The process supplies its
+ * root, authenticated procedure and policy chain; the procedure names, input
+ * schemas, access declarations and delegation are the feature's.
+ */
+export {
+  PersonalVirtualKeyTrpcApi,
+  type PersonalVirtualKeyTrpcContext,
+  type PersonalVirtualKeyTrpcPorts,
+} from "./api/app-trpc/personal-virtual-key.api";
+export {
+  RoutingPolicyTrpcApi,
+  type RoutingPolicyTrpcContext,
+} from "./api/app-trpc/routing-policy.api";

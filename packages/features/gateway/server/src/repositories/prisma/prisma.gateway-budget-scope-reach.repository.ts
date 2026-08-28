@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayKeyReachCandidate } from "../gateway-budget.repository";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** Gateway-owned active-key facts used by the budget reach policy. */
 export class PrismaGatewayBudgetScopeReachRepository {

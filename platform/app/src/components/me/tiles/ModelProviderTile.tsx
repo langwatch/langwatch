@@ -18,7 +18,7 @@ import { TileIcon } from "./TileIcon";
 import type { ModelProviderConfig } from "./types";
 
 /**
- * Personal-VK label rules (mirrors `personalVirtualKeysRouter.issuePersonal`
+ * Personal-VK label rules (mirrors `PersonalVirtualKeyTrpcApi.issuePersonal`
  * Zod regex `/^[a-z0-9][a-z0-9_\-]*$/`): lowercase alphanumeric with dashes
  * or underscores, no spaces, must start with alnum. Admins fill the
  * catalog `defaultLabel` freeform — sanitise on the user side so spaces

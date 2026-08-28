@@ -9,11 +9,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudget,
-  GatewayBudgetWindow,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetWindow, PrismaClient } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository";
 import { serializeRowForAudit } from "../../adapters/gateway-audit-serializer.adapter";
@@ -26,16 +22,16 @@ import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
   budgetAppliesToProvider,
-  resolveApplicableBudgets,
-} from "./prisma.gateway-budget-resolution.repository";
+} from "../../adapters/gateway-bucket-scope.adapter";
+import { resolveApplicableBudgets } from "./prisma.gateway-budget-resolution.repository";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
+import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
 import {
   isCyclicWindow,
   nextBoundaryFor,
   shouldResetBudget,
 } from "../../adapters/gateway-window.adapter";
-import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
 import {
   GatewayBudgetCycleAnchorInvalidError,
   type GatewayBudgetPageInput,
@@ -72,11 +68,6 @@ import {
 import type { ProjectName } from "@langwatch/project-contract";
 
 const logger = createLogger("langwatch:gateway:budget-service");
-
-/** Structural database capability accepted by process composition. */
-export type GatewayDatabase = {
-  readonly gatewayBudget: object;
-};
 
 /**
  * A budget row plus the per-person standing that only a fanned-out budget
@@ -289,16 +280,14 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   static create(
-    database: GatewayDatabase,
+    database: PrismaClient,
     chRepo?: GatewayBudgetSpendPort,
   ): PrismaGatewayBudgetRepository {
-    const prisma = database as PrismaClient;
-
     return new PrismaGatewayBudgetRepository(
-      prisma,
-      new PrismaGatewayChangeEventsRepository(prisma),
-      new PrismaGatewayAuditRepository(prisma),
-      PrismaGatewayBudgetScopeReachRepository.create(prisma),
+      database,
+      new PrismaGatewayChangeEventsRepository(database),
+      new PrismaGatewayAuditRepository(database),
+      PrismaGatewayBudgetScopeReachRepository.create(database),
       chRepo,
     );
   }
@@ -341,16 +330,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     organizationId: string | null;
     virtualKeyIds: string[];
   }): Promise<GatewayVirtualKeyProjectScope[]> {
-    return listVirtualKeyProjectScopes(
-      this.prisma,
-      input.organizationId,
-      input.virtualKeyIds,
-    );
+    return listVirtualKeyProjectScopes(this.prisma, input.organizationId, input.virtualKeyIds);
   }
 
-  async list(
-    input: GatewayOrganizationBudgetReadInput,
-  ): Promise<GatewayBudgetWithSeats[]> {
+  async list(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
     const budgets = await this.prisma.gatewayBudget.findMany({
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
@@ -358,9 +341,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return await this.applyClickHouseSpend(budgets, input);
   }
 
-  async listForProject(
-    input: GatewayProjectBudgetReadInput,
-  ): Promise<GatewayBudgetWithSeats[]> {
+  async listForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
     const budgets = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId: input.organizationId,
@@ -392,10 +373,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     budgets: GatewayBudget[],
     input: GatewayOrganizationBudgetReadInput,
   ): Promise<GatewayBudgetWithSeats[]> {
-    const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(
-      budgets,
-      input,
-    );
+    const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(budgets, input);
     return decorated;
   }
 
@@ -481,9 +459,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     budgets: GatewayBudget[],
     organizationId: string,
   ): Promise<Map<string, BudgetBucketBoundary[]>> {
-    const templateIds = budgets
-      .filter((b) => b.scopeType === "ATTRIBUTED_USER")
-      .map((b) => b.id);
+    const templateIds = budgets.filter((b) => b.scopeType === "ATTRIBUTED_USER").map((b) => b.id);
     const byBudget = new Map<string, BudgetBucketBoundary[]>();
     if (templateIds.length === 0) return byBudget;
 
@@ -542,9 +518,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * the view cannot render honestly without: whether spend could be totalled
    * at all, and which budgets no active key can ever spend against.
    */
-  async listWithHealth(
-    input: GatewayOrganizationBudgetReadInput,
-  ): Promise<BudgetListWithHealth> {
+  async listWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth> {
     const rows = await this.prisma.gatewayBudget.findMany({
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
@@ -651,10 +625,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return decorated ?? budget;
   }
 
-  private tryGetStored(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudget | null> {
+  private tryGetStored(id: string, organizationId: string): Promise<GatewayBudget | null> {
     return this.prisma.gatewayBudget.findFirst({ where: { id, organizationId } });
   }
 
@@ -669,10 +640,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { id: input.id, organizationId: input.organizationId },
     });
     if (!row) return null;
-    const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth(
-      [row],
-      input,
-    );
+    const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth([row], input);
     const budget = budgets[0] ?? row;
 
     const scopeTarget: BudgetScopeTargetInfo = {
@@ -943,9 +911,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       })
       // As on the virtual-key create: the index decides, so the refusal is
       // read off its violation rather than off a racy pre-flight SELECT.
-      .catch((error: unknown) =>
-        translateExternalIdConflict(error, "budget", input.externalId),
-      );
+      .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
 
     return created;
   }
@@ -961,8 +927,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           where: { id: input.id },
           data: {
             name: input.name ?? existing.name,
-            description:
-              input.description === undefined ? existing.description : input.description,
+            description: input.description === undefined ? existing.description : input.description,
             limitUsd:
               input.limitUsd !== undefined
                 ? new Prisma.Decimal(input.limitUsd.toString())
@@ -994,9 +959,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         );
         return updated;
       })
-      .catch((error: unknown) =>
-        translateExternalIdConflict(error, "budget", input.externalId),
-      );
+      .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
   }
 
   async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {
@@ -1340,14 +1303,7 @@ function scopeIdForScope(scope: BudgetScope): string {
 
 function scopeKindToEnum(
   kind: BudgetScope["kind"],
-):
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "VIRTUAL_KEY"
-  | "PRINCIPAL"
-  | "GROUP"
-  | "ATTRIBUTED_USER" {
+): "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER" {
   return kind;
 }
 

@@ -26,14 +26,17 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/model-provider-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "jsonpath-plus": "^10.4.0",
     "zod": "^4.4.3"
   },

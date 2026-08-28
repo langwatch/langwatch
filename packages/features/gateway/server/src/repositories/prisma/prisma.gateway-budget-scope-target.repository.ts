@@ -11,9 +11,9 @@
  * Batch-shaped: one findMany per scope kind regardless of how many
  * budgets are being labelled.
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectName } from "@langwatch/project-contract";
 import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 export type BudgetScopeTargetInfo = {
   kind: string;

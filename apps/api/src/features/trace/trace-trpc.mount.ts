@@ -11,10 +11,7 @@
  * single public trace read on its own surface, and nothing in this file is
  * reachable without a session.
  */
-import type {
-  TraceLegacyFilterInput,
-  TraceLegacyListInput,
-} from "@langwatch/trace-contract";
+import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import {
   SpansTrpcApi,
   TraceEditOverlayTrpcApi,
@@ -104,13 +101,7 @@ type TracesMount<
    * same shapes are the v1 REST search body and the analytics read input: one
    * definition, in the process, is what keeps those surfaces from drifting.
    */
-  ports: TracesTrpcPorts<
-    TListInput,
-    TListInputRaw,
-    TFilterInput,
-    TFilterInputRaw,
-    TPrecondition
-  >;
+  ports: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
 }>;
 
 /** Mounts `traces.*` on the app process's tRPC root. */

@@ -403,7 +403,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       );
     }
     const client = await this.resolveClient(tenantId);
-    const records = entries.map(({ tenantId, gatewayRequestId, state }) => ({
+    const records = entries.map(({ gatewayRequestId, state }) => ({
       TenantId: tenantId,
       GatewayRequestId: gatewayRequestId,
       OrganizationId: state.organizationId,

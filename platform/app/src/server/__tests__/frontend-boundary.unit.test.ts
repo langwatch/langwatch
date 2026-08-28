@@ -583,9 +583,13 @@ describe("browser-only UI never reaches the backend", () => {
     });
 
     it("ignores one in type position, because the annotation is erased", () => {
-      const specs = valueImportsOf(path.join(SRC, "server/api/routers/gatewayBudgets.ts"));
+      const specs = valueImportsOf(path.join(SRC, "server/stored-objects/azure-blob-driver.ts"));
 
-      expect(specs).not.toContain("~/generated/prisma/client");
+      // The file names "node:stream" as a real value import and
+      // "node:stream/web" only inside a type annotation, so the walk must
+      // report the first and not the second.
+      expect(specs).toContain("node:stream");
+      expect(specs).not.toContain("node:stream/web");
     });
   });
 });

@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  attributedUserBucketScopeId,
-  resolveApplicableBudgets,
-} from "../src/repositories/prisma/prisma.gateway-budget-resolution.repository";
+import { attributedUserBucketScopeId } from "../src/adapters/gateway-bucket-scope.adapter";
+import { resolveApplicableBudgets } from "../src/repositories/prisma/prisma.gateway-budget-resolution.repository";
 
 /**
  * Resolution unit over a stubbed Prisma: the queries this service runs are

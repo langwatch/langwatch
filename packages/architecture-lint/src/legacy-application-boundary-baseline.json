@@ -23,7 +23,6 @@
       ],
       "platform/app/src/server/api/routers/license.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/organization.ts": ["~/env.mjs"],
-      "platform/app/src/server/api/routers/personalVirtualKeys.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/publicEnv.ts": ["../../../env.mjs"],
       "platform/app/src/server/api/routers/subscription.ts": ["~/env.mjs"],
       "platform/app/src/server/api/routers/tracesV2.ts": [
@@ -802,16 +801,14 @@
         "~/server/api/routers/tracesV2.schemas"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/CorrectedSpanScalars.tsx": [
-        "~/server/api/routers/tracesV2.schemas",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/api/routers/tracesV2.schemas"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/spanInputSeed.ts": [
         "~/server/tracer/spanIOStringify"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useSpanCorrection.ts": [
         "~/server/api/routers/tracesV2.schemas",
-        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useTraceMetadataEditing.ts": [
         "~/server/traces/edit-overlay/traceMetadataEditableKeys"
@@ -885,8 +882,7 @@
         "~/server/api/routers/tracesV2.schemas"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/TraceEditDiffDialog.tsx": [
-        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/TraceHeaderChips.tsx": [
         "~/server/api/routers/tracesV2.schemas"
@@ -919,8 +915,7 @@
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/useWaterfallEditing.ts": [
         "~/server/api/routers/tracesV2.schemas",
-        "~/server/traces/edit-overlay/applyTraceEditOverlay",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/traces/edit-overlay/applyTraceEditOverlay"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx": [
         "~/server/api/routers/tracesV2.schemas"
@@ -954,8 +949,7 @@
       "platform/app/src/features/traces-v2/hooks/useSpansFull.ts": [
         "~/server/api/routers/tracesV2.schemas",
         "~/server/traces/edit-overlay/applyTraceEditOverlay",
-        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/traces/edit-overlay/applyTraceEditOverlayToViews"
       ],
       "platform/app/src/features/traces-v2/hooks/useSpanTree.ts": [
         "~/server/api/routers/tracesV2.schemas",
@@ -963,9 +957,6 @@
       ],
       "platform/app/src/features/traces-v2/hooks/useTraceDrawerShortcuts.ts": [
         "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/hooks/useTraceEditOverlay.ts": [
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
       ],
       "platform/app/src/features/traces-v2/hooks/useTraceEvents.ts": [
         "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation"
@@ -994,8 +985,7 @@
         "~/server/app-layer/traces/ai-query"
       ],
       "platform/app/src/features/traces-v2/stores/traceEditStore.ts": [
-        "~/server/tracer/spanIOStringify",
-        "~/server/traces/edit-overlay/traceEditOverlay.schemas"
+        "~/server/tracer/spanIOStringify"
       ],
       "platform/app/src/features/traces-v2/utils/errorSpans.ts": [
         "~/server/api/routers/tracesV2.schemas"

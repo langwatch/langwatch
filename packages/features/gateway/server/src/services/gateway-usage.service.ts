@@ -181,16 +181,16 @@ export class GatewayUsageService {
       totalRequests,
       blockedRequests,
       avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
-      byVirtualKey: topEntries(byVk).map(([virtualKeyId, { totalUsd, requests }]) => ({
+      byVirtualKey: topEntries(byVk).map(([virtualKeyId, { totalUsd: bucketUsd, requests }]) => ({
         virtualKeyId,
         name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
         displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
-        totalUsd: totalUsd.toFixed(6),
+        totalUsd: bucketUsd.toFixed(6),
         requests,
       })),
-      byModel: topEntries(byModel).map(([model, { totalUsd, requests }]) => ({
+      byModel: topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
-        totalUsd: totalUsd.toFixed(6),
+        totalUsd: bucketUsd.toFixed(6),
         requests,
       })),
       byDay: sortedDays(byDay),
@@ -256,9 +256,9 @@ export class GatewayUsageService {
       totalRequests,
       blockedRequests,
       avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
-      byModel: topEntries(byModel).map(([model, { totalUsd, requests }]) => ({
+      byModel: topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
         model,
-        totalUsd: totalUsd.toFixed(6),
+        totalUsd: bucketUsd.toFixed(6),
         requests,
       })),
       byDay: sortedDays(byDay),

@@ -61,7 +61,7 @@ import {
 import {
   bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
-} from "../prisma/prisma.gateway-budget-resolution.repository";
+} from "../../adapters/gateway-bucket-scope.adapter";
 import { parseSummedNanoUsd } from "../../adapters/gateway-spend-parse.adapter";
 import { nanoUsdToDecimalString } from "../../adapters/gateway-wire-money.adapter";
 
@@ -1420,7 +1420,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
       limit,
       since: Date.now() - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
     };
-    const tenantPlaceholders = tenantIds
+    const boundTenantPlaceholders = tenantIds
       .map((id, i) => {
         params[`tenant${i}`] = id;
         return `{tenant${i}:String}`;
@@ -1444,7 +1444,7 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
           Status AS status,
           toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
         FROM ${EVENTS_TABLE}
-        WHERE TenantId IN (${tenantPlaceholders})
+        WHERE TenantId IN (${boundTenantPlaceholders})
           AND BudgetId = {budgetId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
         ORDER BY OccurredAt DESC
