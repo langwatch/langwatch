@@ -23,7 +23,10 @@ import type { FoldProjectionDefinition } from "~/server/event-sourcing/projectio
 import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 
-import { GovernanceCostRollupClickHouseRepository } from "../../services/governanceCostRollup.clickhouse.repository";
+import {
+  GovernanceCostRollupClickHouseRepository,
+  type GovernanceCostRollupRow,
+} from "../../services/governanceCostRollup.clickhouse.repository";
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GOVERNANCE_COST_ROLLUP_TABLE,
@@ -199,6 +202,64 @@ async function rawRowCount(): Promise<number> {
   return Number(rows[0]?.N ?? 0);
 }
 
+/** One cell's dimensions, fixed so the seed and the read address the same row. */
+function withdrawnCellDimensions() {
+  return {
+    tenantId,
+    day: DAY,
+    costSource: GOVERNANCE_COST_SOURCE.PULLED,
+    ingestionSourceId: "src_1",
+    provider: "anthropic",
+    model: "claude-sonnet-4",
+    agentId: "",
+    currencyCode: "USD",
+    rawActorId: "",
+  };
+}
+
+/**
+ * A stored row carrying a price, written straight to the table. The fold is
+ * not involved on purpose: this exercises what the READ does with two versions
+ * of one cell, which is a property of the query rather than of the fold.
+ */
+function pricedCell({
+  amountNanoUsd,
+  at,
+}: {
+  amountNanoUsd: number | null;
+  at: number;
+}): GovernanceCostRollupRow {
+  const d = withdrawnCellDimensions();
+  return {
+    TenantId: d.tenantId,
+    Day: d.day,
+    CostSource: d.costSource,
+    IngestionSourceId: d.ingestionSourceId,
+    Provider: d.provider,
+    Model: d.model,
+    AgentId: d.agentId,
+    CurrencyCode: d.currencyCode,
+    RawActorId: d.rawActorId,
+    OrganizationId: "org_acme",
+    ExactOrEstimate: "exact",
+    AmountNanoUsd: amountNanoUsd,
+    AmountNanoMinor: amountNanoUsd ?? 0,
+    TokensInput: 100,
+    TokensOutput: 20,
+    TokensCacheRead: 0,
+    TokensCacheWrite: 0,
+    RequestCount: 1,
+    RevisionCount: 0,
+    PreviousAmountNanoUsd: null,
+    PulledItemsJson: "{}",
+    Version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+    AppliedEventIds: [],
+    CreatedAt: DAY_MS,
+    LastEventOccurredAt: DAY_MS,
+    EventTimestamp: at,
+  };
+}
+
 describe("governance cost rollup", () => {
   beforeAll(() => {
     const client = getTestClickHouseClient();
@@ -340,6 +401,54 @@ describe("governance cost rollup", () => {
       expect(cells[0]!.RevisionCount).toBe(1);
       expect(cells[0]!.PreviousAmountNanoUsd).toBe(12_340_000_000);
       expect(cells[0]!.ExactOrEstimate).toBe("exact");
+    });
+  });
+
+  describe("given a priced cell is restated to carry no figure at all", () => {
+    /**
+     * The other half of the restatement rule, and the one an aggregate-level
+     * dedup gets wrong on its own. `argMax` ignores rows whose FIRST argument
+     * is NULL, so a cell that went priced -> unpriced reads back at its old
+     * price: the newest version is skipped for being NULL and the superseded
+     * one wins by default. That resurrects a figure the provider withdrew.
+     *
+     * Wrapping the value in a tuple is what fixes it. A tuple is never NULL,
+     * so no version is ever skipped, and `.1` unwraps the NULL the winning
+     * version actually held.
+     */
+    it("reports no figure, rather than resurrecting the withdrawn one", async () => {
+      const priced = pricedCell({ amountNanoUsd: 12_340_000_000, at: 1_000 });
+      await repo.upsert(priced);
+      await repo.upsert({
+        ...priced,
+        AmountNanoUsd: null,
+        PreviousAmountNanoUsd: 12_340_000_000,
+        RevisionCount: 1,
+        EventTimestamp: 2_000,
+      });
+
+      // Deliberately NOT compacted: both versions are still on disk, which is
+      // the window this whole class of bug lives in.
+      expect(await rawRowCount()).toBe(2);
+
+      const cell = await repo.findCellWithApplied(withdrawnCellDimensions());
+      expect(cell?.AmountNanoUsd).toBeNull();
+      // The withdrawal is a restatement like any other, so what it replaced
+      // stays readable.
+      expect(cell?.PreviousAmountNanoUsd).toBe(12_340_000_000);
+
+      const day = await repo.sumDay({ tenantId, day: DAY });
+      expect(day.amountNanoUsd).toBeNull();
+      expect(day.cellsWithoutAmount).toBe(1);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]!.amountNanoUsd).toBeNull();
+      expect(lanes[0]!.cellsWithoutAmount).toBe(1);
     });
   });
 
